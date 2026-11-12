@@ -26,6 +26,7 @@ import {
 } from '../../llm-agent/harness/enum/harness.enum';
 import { DebriefPmAgentService } from './debrief-pm-agent.service';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
+import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefRunnerService } from './debrief-runner.service';
 import { DebriefSettingsService } from './debrief-settings.service';
@@ -78,6 +79,7 @@ export class DebriefTrialsService implements OnModuleInit {
     private readonly releases: AgentReleaseService,
     private readonly testSets: DebriefTestSetsService,
     @Optional() private readonly autonomy?: DebriefAutonomyService,
+    @Optional() private readonly notifier?: DebriefNotifier,
   ) {}
 
   onModuleInit(): void {
@@ -338,6 +340,14 @@ export class DebriefTrialsService implements OnModuleInit {
               `[debrief] could not stop the canary for idea ${id}: ${(e as Error).message}`,
             ),
           );
+      }
+      if (decision.status === 'reverted') {
+        // FR-54: every revert tells the owner, the canary's own included.
+        await this.notifier?.owner({
+          title: 'Debriefs: a canary was reverted on its own',
+          body: decision.reason,
+          data: { ideaId: id, releaseId: canary.releaseId ?? null },
+        });
       }
       if (decision.status !== 'running') {
         this.canaryCache = null;

@@ -166,4 +166,42 @@ describe('Debrief console role gating', () => {
     );
     expect(debriefRoles(ADVISOR).receivesEscalations).toBe(true);
   });
+
+  it('proposals and releases: Ally team or owner; release settings and budget promotions: the owner', async () => {
+    const C = DebriefConsoleController;
+    for (const h of [
+      'proposeChange',
+      'editDraft',
+      'promoteCodeDraft',
+      'writeReleaseNotes',
+    ]) {
+      expect(await allowed(TEAM, C, h)).toBe(true);
+      expect(await allowed(ADVISOR, C, h)).toBe(false);
+    }
+    const view = { viewer: jest.fn(async () => ({ can: debriefCan(TEAM) })) };
+    const releaseHistory = { proposeChange: jest.fn() };
+    const pmAgent = {
+      getIdea: jest.fn(async () => ({
+        change: { ideaKind: 'release', budgetOnly: true },
+      })),
+      approve: jest.fn(),
+    };
+    const controller = Object.create(DebriefConsoleController.prototype);
+    Object.assign(controller, { view, releaseHistory, pmAgent });
+    await expect(
+      controller.proposeChange(
+        { user: { id: 1 } },
+        { title: 't', settings: { runCeilingUsd: 0.4 } },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await controller.proposeChange(
+      { user: { id: 1 } },
+      { title: 't', steps: [{ step: 'reviser', enabled: false }] },
+    );
+    expect(releaseHistory.proposeChange).toHaveBeenCalledTimes(1);
+    await expect(
+      controller.approve('i1', { user: { id: 1 } }, {}),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(pmAgent.approve).not.toHaveBeenCalled();
+  });
 });

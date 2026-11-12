@@ -18,7 +18,7 @@ from app.core.pm_agent.quotes import REMOVED, strip_quotes
 from app.core.pm_agent.runner import run_pm_agent
 from app.core.pm_agent.schemas import PmAgentRunRequest
 from app.core.pm_agent.store import MEMORY_NAMESPACE
-from app.core.pm_agent.tools import READ_TOOLS
+from app.core.pm_agent.tools import ALL_TOOLS, READ_TOOLS
 from tests.core.ask_ally.fakes import FakeGateway, ScriptedModel, ai
 
 PRIMARY = "gemini-2.5-pro"
@@ -370,7 +370,7 @@ def test_subagents_only_get_read_tools(monkeypatch):
         sub["name"] == "general-purpose"
     )  # replaces the default, which would inherit all
     assert {t.name for t in sub["tools"]} == set(READ_TOOLS)
-    assert len(seen["tools"]) == 9
+    assert len(seen["tools"]) == len(ALL_TOOLS)
     assert seen["skills"] == ["/skills/"] and seen["memory"] == ["/memories/AGENTS.md"]
 
 
@@ -419,3 +419,83 @@ async def test_skills_are_offered_and_read_only():
     assert "never see learner words" in tool_out["a"]
     assert "denied" in tool_out["b"].lower() or "permission" in tool_out["b"].lower()
     assert not (agent_module.SKILLS_DIR / "evil").exists()
+
+
+@pytest.mark.asyncio
+async def test_answer_only_run_reads_questions_and_posts_answers():
+    """Plan §11.7 "Ask a question": a short run with read tools and
+    question_answer only; the answer goes back through the gateway with quotes
+    removed."""
+
+    class Recording(ScriptedModel):
+        def _next(self, messages):
+            self.calls.append(
+                {"tools": list(self.bound.get("tools") or []), "messages": messages}
+            )
+            return self.script.pop(0)
+
+    model = Recording(
+        script=[
+            ai(calls=[{"name": "questions_read", "args": {}}]),
+            ai(
+                calls=[
+                    {
+                        "name": "question_answer",
+                        "args": {
+                            "idea_id": IDEA,
+                            "question_id": "q1",
+                            "answer": (
+                                "It fixes 14 of 30 cases; one learner said "
+                                f'"{QUOTE}".'
+                            ),
+                        },
+                    }
+                ]
+            ),
+            ai("Answered 1 question."),
+        ]
+    )
+    gw = FakeGateway(
+        {
+            "questions_read": {
+                "questions": [
+                    {
+                        "idea_id": IDEA,
+                        "question_id": "q1",
+                        "question": "Why only the Writer?",
+                    }
+                ]
+            },
+            "question_answer": {"ok": True, "id": "a1"},
+        }
+    )
+    tools = [
+        "questions_read",
+        "question_answer",
+        "reporting_query",
+        "comments_read",
+        "metrics_view",
+    ]
+    out = await run_pm_agent(
+        request(
+            review="questions",
+            tools=tools,
+            inputs={"open_questions": [{"idea_id": IDEA, "question_id": "q1"}]},
+        ),
+        store=InMemoryStore(),
+        checkpointer=None,
+        default_model=PRIMARY,
+        models_factory=factory({PRIMARY: model}),
+        gateway=gw,
+    )
+    assert out["status"] == "finished"
+    assert out["report"] == "Answered 1 question."
+    bound = set(model.calls[0]["tools"])
+    assert {"questions_read", "question_answer"} <= bound
+    assert not ({"idea_propose", "release_draft", "ladder_start_quick_test"} & bound)
+    first = model.calls[0]["messages"][-1].content
+    assert first.startswith("REVIEW: questions.")
+    answer = next(c for c in gw.calls if c["tool"] == "question_answer")["body"]
+    assert answer["idea_id"] == IDEA and answer["question_id"] == "q1"
+    assert QUOTE not in answer["answer"] and REMOVED in answer["answer"]
+    assert "question_answer" in [s["step"] for s in out["steps"]]

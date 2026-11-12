@@ -415,7 +415,7 @@ tracing is off for the run; the trace is the returned `steps`.
 ```jsonc
 {
   "agent_run_id": "uuid",                 // ally-be's id; also in every audit row the run's tools write
-  "review": "weekly | monthly",
+  "review": "weekly | monthly | questions", // questions: a short answer-only run (below)
   "model": "gemini-2.5-pro", "backup_model": "gemini-2.5-flash",
   "prices": { "<model>": { "input_per_m": 1.25, "output_per_m": 10 } },   // an unpriced model never runs
   "budget_usd": 2.4,                      // min(owner setting pmAgentRunCapUsd, learning budget left)
@@ -452,6 +452,17 @@ PM agent tab reads the latest. Schedules: weekly (after the test sets are topped
 action tool refused) and `pmAgentStartsQuickTests` (off: propose only). Closing the loop (C5): a daily job records,
 for each promoted idea that has stood 14 days, the named metric now against the baseline `idea_propose` stored
 (`evidence.forecast.after`, `moved`), and the next run reads it in `idea_outcomes`.
+
+**Answer-only runs (plan §11.7 "Ask a question").** When a person asks a question on one of the agent's ideas
+(`POST /v1/debriefs/console/pm-agent/ideas/:id/questions`), ally-be queues a short run with `review: "questions"`,
+`inputs: { open_questions: [ { idea_id, question_id, title, question, at } ], ideas: [ ... ] }`, a budget of
+min(`pmAgentRunCapUsd`, $0.50, learning budget left), and only the tools `questions_read`, `question_answer`,
+`reporting_query`, `comments_read`, `metrics_view`. One run at a time; a question that arrives during a run is
+answered after it. Skipped while `pmAgentEnabled` is off or the learning budget is spent. Its `curator_run` row carries
+`review: "questions"` and is not shown as the latest report. Weekly and monthly runs also get both tools and
+`open_questions`. Gateway tools: `questions_read {}` → `{ questions: [...] }`; `question_answer { idea_id,
+question_id?, answer }` → `{ ok, id }`, appended to the idea's `evidence.questions` as `{ role: "agent", replyTo }`
+(quotes stripped in ally-ai).
 
 Planted-idea fixtures for the offline "right final state" eval (METRICS.md): `ally-ai/tests/fixtures/pm_agent_planted_ideas.json`
 (good, bad, neutral; no runner yet).

@@ -13,7 +13,8 @@ How to work:
    - D (a person): the rubric, safety rules, budgets, data access, clinical content. person_ask.
 5. Write drafts in scratch files first when they are long.
 6. Update /memories/AGENTS.md: what you tried this run and why, results you saw from earlier ideas, open hypotheses. Keep it short; rewrite rather than append forever.
-7. Finish with the report for the team, plain words, at most 300 words: what changed since last time, what is holding the debriefs back, what you are trying next.
+7. If open_questions lists questions people asked on your ideas, answer each with question_answer.
+8. Finish with the report for the team, plain words, at most 300 words: what changed since last time, what is holding the debriefs back, what you are trying next.
 
 Never (ally-be refuses these, and you must not try): Context Library chunks; the judge's rubric or model; safety rules or the Safety reader's instructions; budgets; data access and scopes; the list of what needs a person's approval. If one of them looks wrong, that is a route D question.
 

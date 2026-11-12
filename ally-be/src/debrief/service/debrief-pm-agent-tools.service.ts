@@ -7,6 +7,7 @@ import {
 } from '../constants/debrief-release.constants';
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
+import { DebriefNotifier } from './debrief-notifier.service';
 import { parseMetricsFilter } from '../util/debrief-metrics-filter.util';
 import {
   metricFailurePoints,
@@ -84,6 +85,7 @@ export class DebriefPmAgentToolsService {
     private readonly runner: DebriefRunnerService,
     /** What the agent may do alone per kind and step (PRD §12). */
     @Optional() private readonly autonomy?: DebriefAutonomyService,
+    @Optional() private readonly notifier?: DebriefNotifier,
   ) {}
 
   async call(
@@ -112,6 +114,10 @@ export class DebriefPmAgentToolsService {
           return await this.bugHunterReport(claims, b);
         case 'person_ask':
           return await this.personAsk(claims, b);
+        case 'questions_read':
+          return await this.questionsRead();
+        case 'question_answer':
+          return await this.questionAnswer(claims, b);
       }
     } catch (e) {
       if (e instanceof Refused) {
@@ -606,7 +612,7 @@ export class DebriefPmAgentToolsService {
     const topic = topics.includes(b.topic) ? b.topic : 'other';
     const question = text(b.question, 1500);
     if (question.length < 10) refuse('ask a question a person can answer');
-    return this.storeHandoff(claims, idea, {
+    const out = await this.storeHandoff(claims, idea, {
       kind: 'person',
       topic,
       question,
@@ -616,6 +622,40 @@ export class DebriefPmAgentToolsService {
         ? 'clinical_advisor'
         : 'owner',
     });
+    // FR-54: every route-D proposal tells the owner.
+    await this.notifier?.owner({
+      title: 'Debriefs: the PM agent has a question for a person',
+      body: `${idea.text} (${topic})`,
+      data: { ideaId: idea.id },
+    });
+    return out;
+  }
+
+  // --- "Ask a question" (plan §11.7, spec C5) -------------------------------------------
+
+  /** Questions people asked on the agent's ideas that it has not answered yet. */
+  async questionsRead() {
+    const questions = await this.pm.openQuestions();
+    return {
+      questions,
+      note: 'Answer each with question_answer: plain words, under 150 words, citing numbers and ids, never learner words.',
+    };
+  }
+
+  /** The agent's answer, posted back to the idea's question thread. */
+  async questionAnswer(claims: DebriefAgentClaims, b: Record<string, any>) {
+    await this.requireOn();
+    if (typeof b.idea_id !== 'string' || !UUID.test(b.idea_id)) {
+      refuse('idea_id is not an idea id');
+    }
+    const answer = text(b.answer, 1500);
+    if (answer.length < 2) refuse('write the answer');
+    return this.pm.answerQuestion(
+      b.idea_id,
+      typeof b.question_id === 'string' ? b.question_id : null,
+      answer,
+      claims.agentRunId,
+    );
   }
 
   private async storeHandoff(

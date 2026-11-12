@@ -39,6 +39,7 @@ import {
 } from '../util/debrief-console-view.util';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
+import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefMetricsService } from './debrief-metrics.service';
 import {
   GateResult,
@@ -90,6 +91,8 @@ export class DebriefPmAgentService implements OnModuleInit {
     private readonly moduleRef: ModuleRef,
     /** What may run on its own per kind and step (PRD §12); absent in unit tests. */
     @Optional() private readonly autonomy?: DebriefAutonomyService,
+    /** FR-54: the owner hears about promotions, filings and proposals. */
+    @Optional() private readonly notifier?: DebriefNotifier,
   ) {}
 
   /** The policy for this idea at this step; 'auto' when no policy is wired (tests). */
@@ -231,6 +234,13 @@ export class DebriefPmAgentService implements OnModuleInit {
   async challengerOptions(
     idea: Record<string, any>,
   ): Promise<Partial<RunOptions>> {
+    if (idea.change?.ideaKind === 'release') {
+      // A person's proposed change: its whole draft release is the challenger.
+      const r = await this.releases.getById(idea.change.releaseId);
+      return {
+        release: { id: r.id, version: r.version, bundle: r.bundle } as any,
+      };
+    }
     const { bundle } = await this.gaBundle();
     const code = idea.change?.promptCode;
     const promptTexts: Record<string, string> = {};
@@ -519,6 +529,7 @@ export class DebriefPmAgentService implements OnModuleInit {
       | 'handoff'
       | 'forecast'
       | 'expiry'
+      | 'expiryWarning'
       | 'signoff',
     value: Record<string, unknown>,
   ): Promise<void> {
@@ -563,7 +574,10 @@ export class DebriefPmAgentService implements OnModuleInit {
     if (['needs_code', 'defect', 'needs_person'].includes(kind)) {
       return this.approveHandoff(idea, userId, note);
     }
-    if (kind !== 'prompt_edit' && kind !== 'setting') {
+    if (kind === 'release' && idea.change?.budgetOnly) {
+      return this.promoteBudgetChange(idea, userId, note);
+    }
+    if (kind !== 'prompt_edit' && kind !== 'setting' && kind !== 'release') {
       throw new BadRequestException(
         kind === 'registry_agent'
           ? 'registry agents wait for the agent registry (spec step 7)'
@@ -593,6 +607,12 @@ export class DebriefPmAgentService implements OnModuleInit {
         releaseId: canary.releaseId,
         note: note ?? null,
       });
+      await this.notifier?.owner({
+        title: `Debriefs: v${(released as { version?: number })?.version ?? canary.version} is live for everyone`,
+        body: `Promoted from idea “${idea.text}”.${note ? ` ${note}` : ''}`,
+        data: { ideaId, releaseId: canary.releaseId },
+        excludeUserId: userId,
+      });
       return {
         releaseId: canary.releaseId,
         version: (released as { version?: number })?.version ?? canary.version,
@@ -611,6 +631,11 @@ export class DebriefPmAgentService implements OnModuleInit {
       throw new ConflictException(
         'canaries are off for this kind of change (owner policy)',
       );
+    }
+    if (kind === 'release') {
+      // A person's proposed change already carries its draft release.
+      const draftRelease = await this.releases.getById(idea.change.releaseId);
+      return this.startCanaryFor(idea, draftRelease, userId, note);
     }
     const { bundle } = await this.gaBundle();
     const next: DebriefBundle = JSON.parse(JSON.stringify(bundle));
@@ -670,6 +695,17 @@ export class DebriefPmAgentService implements OnModuleInit {
       userId,
       `PM agent idea (canary): ${idea.text}`,
     );
+    return this.startCanaryFor(idea, draft, userId, note);
+  }
+
+  /** Rung 4: the candidate release reaches a share of live learners; the canary watcher decides. */
+  private async startCanaryFor(
+    idea: Record<string, any>,
+    draft: { id: string; version: number },
+    userId: number,
+    note?: string,
+  ): Promise<{ releaseId: string; version: number; stage: 'canary' }> {
+    const ideaId = idea.id as string;
     const { canaryShare } = await this.ownerSettings.get();
     // The harness's canary (one per agent, audited, at most 30%).
     await this.releases.startCanary(
@@ -694,6 +730,46 @@ export class DebriefPmAgentService implements OnModuleInit {
       note: note ?? null,
     });
     return { releaseId: draft.id, version: draft.version, stage: 'canary' };
+  }
+
+  /**
+   * A proposed change that touches only budget settings (the run ceiling,
+   * the monthly cap): it does not change what learners read, so it skips the
+   * ladder and goes live when the owner approves it (the controller checks
+   * the owner permission).
+   */
+  private async promoteBudgetChange(
+    idea: Record<string, any>,
+    userId: number,
+    note?: string,
+  ): Promise<{ releaseId: string; version: number; stage: 'promoted' }> {
+    const released = await this.releases.makeGa(
+      idea.change.releaseId,
+      userId,
+      AgentReleaseAuditAction.PROMOTED,
+      note,
+    );
+    await this.dataSource.query(
+      `UPDATE agent_lessons SET status = 'active', "releaseId" = $2, "decidedBy" = $3,
+              "decidedAt" = now(), "updatedAt" = now() WHERE id = $1`,
+      [idea.id, idea.change.releaseId, userId],
+    );
+    await this.audit('activated', idea.id, userId, {
+      releaseId: idea.change.releaseId,
+      budgetOnly: true,
+      note: note ?? null,
+    });
+    await this.notifier?.owner({
+      title: `Debriefs: v${released.version} is live (budgets)`,
+      body: `${idea.text}${note ? ` — ${note}` : ''}`,
+      data: { ideaId: idea.id, releaseId: idea.change.releaseId },
+      excludeUserId: userId,
+    });
+    return {
+      releaseId: idea.change.releaseId,
+      version: released.version,
+      stage: 'promoted',
+    };
   }
 
   /**
@@ -765,6 +841,17 @@ export class DebriefPmAgentService implements OnModuleInit {
       id,
       note: note ?? null,
     });
+    if (stage !== 'answered') {
+      await this.notifier?.owner({
+        title:
+          stage === 'builder'
+            ? 'Debriefs: a Builder session was filed'
+            : 'Debriefs: a bug was filed for Bug Hunter',
+        body: `From PM agent idea “${idea.text}”.`,
+        data: { ideaId: idea.id, filedId: id },
+        excludeUserId: userId,
+      });
+    }
     return { stage, id };
   }
 
@@ -810,7 +897,13 @@ export class DebriefPmAgentService implements OnModuleInit {
 
   /** Questions people asked that the PM agent has not answered, for its run context. */
   async openQuestions(): Promise<
-    Array<{ idea_id: string; title: string; question: string; at: string }>
+    Array<{
+      idea_id: string;
+      question_id: string;
+      title: string;
+      question: string;
+      at: string;
+    }>
   > {
     const rows: Array<{ id: string; text: string; questions: any[] }> =
       await this.dataSource.query(
@@ -821,21 +914,27 @@ export class DebriefPmAgentService implements OnModuleInit {
       );
     const out: Array<{
       idea_id: string;
+      question_id: string;
       title: string;
       question: string;
       at: string;
     }> = [];
     for (const r of rows) {
       const qs = (r.questions ?? []) as Array<{
+        id: string;
         role: string;
         text: string;
         at: string;
+        replyTo?: string | null;
       }>;
-      const lastAgent = qs.map((q) => q.role).lastIndexOf('agent');
-      for (const q of qs.slice(lastAgent + 1)) {
-        if (q.role === 'person') {
+      const answered = new Set(
+        qs.filter((q) => q.role === 'agent').map((q) => q.replyTo),
+      );
+      for (const q of qs) {
+        if (q.role === 'person' && !answered.has(q.id)) {
           out.push({
             idea_id: r.id,
+            question_id: q.id,
             title: r.text,
             question: q.text,
             at: q.at,
@@ -844,6 +943,50 @@ export class DebriefPmAgentService implements OnModuleInit {
       }
     }
     return out;
+  }
+
+  /** The PM agent's answer, added to the idea's question thread. */
+  async answerQuestion(
+    ideaId: string,
+    questionId: string | null,
+    answer: string,
+    agentRunId: string,
+  ): Promise<{ ok: true; id: string }> {
+    const idea = await this.getIdea(ideaId);
+    const qs = (idea.evidence?.questions ?? []) as Array<{
+      id: string;
+      role: string;
+    }>;
+    const target =
+      (questionId &&
+        qs.find((q) => q.id === questionId && q.role === 'person')) ||
+      [...qs].reverse().find((q) => q.role === 'person');
+    if (!target) {
+      throw new BadRequestException('there is no question on this idea');
+    }
+    const entry = {
+      id: randomUUID(),
+      role: 'agent',
+      by: null,
+      agentRunId,
+      replyTo: target.id,
+      at: new Date().toISOString(),
+      text: answer.slice(0, 1500),
+    };
+    await this.dataSource.query(
+      `UPDATE agent_lessons
+          SET evidence = jsonb_set(coalesce(evidence, '{}'::jsonb), '{questions}',
+                coalesce(evidence->'questions', '[]'::jsonb) || jsonb_build_array($2::jsonb)),
+              "updatedAt" = now()
+        WHERE id = $1::uuid`,
+      [ideaId, JSON.stringify(entry)],
+    );
+    await this.audit('pipeline_step', ideaId, null, {
+      step: 'question_answered',
+      questionId: target.id,
+      agentRunId,
+    });
+    return { ok: true, id: entry.id };
   }
 
   /**
@@ -968,6 +1111,12 @@ export class DebriefPmAgentService implements OnModuleInit {
       throw new ConflictException('this change has already been proposed');
     }
     await this.audit('proposed', rows[0].id, userId, { kind: 'pinned_rule' });
+    await this.notifier?.owner({
+      title: 'Debriefs: a pinned-rule change needs sign-off',
+      body: `Proposed change to ${input.promptCode}: ${why}`,
+      data: { ideaId: rows[0].id },
+      excludeUserId: userId,
+    });
     return { id: rows[0].id };
   }
 
@@ -1136,6 +1285,7 @@ export class DebriefPmAgentService implements OnModuleInit {
     const rows = await this.dataSource.query(
       `SELECT detail, "createdAt" FROM agent_lesson_audit
         WHERE "agentKey" = $1 AND action = 'curator_run' AND detail ? 'report'
+          AND detail->>'review' IS DISTINCT FROM 'questions'
         ORDER BY "createdAt" DESC LIMIT 1`,
       [DEBRIEF_AGENT_KEY],
     );

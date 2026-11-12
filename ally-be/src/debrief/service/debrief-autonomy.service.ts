@@ -16,6 +16,7 @@ import {
   CONFIGURABLE_KINDS,
   changeKindOf,
   effectivePolicy,
+  JUDGE_DRIFT_SOURCE,
   kindEligibility,
   matrixChangeRefusal,
   normaliseAutonomy,
@@ -265,7 +266,7 @@ export class DebriefAutonomyService implements OnModuleInit {
     );
     if (bad.length) {
       throw new BadRequestException(
-        `${bad.map(([k]) => k).join(', ')}: use paired_trial, canary or guidance with default, ask or never`,
+        `${bad.map(([k]) => k).join(', ')}: use paired_trial or canary with default, ask or never`,
       );
     }
     const policy = await this.policy();
@@ -329,6 +330,7 @@ export class DebriefAutonomyService implements OnModuleInit {
       overrides: Record<OrgPolicyStep, OrgPolicy>;
     }>;
     facts: AutonomyFacts;
+    judgeDrift: typeof JUDGE_DRIFT_SOURCE;
     relocks: AutonomyPolicy['relocks'];
   }> {
     const f = await this.facts();
@@ -372,11 +374,11 @@ export class DebriefAutonomyService implements OnModuleInit {
           overrides: {
             paired_trial: o.paired_trial ?? 'default',
             canary: o.canary ?? 'default',
-            guidance: o.guidance ?? 'default',
           },
         };
       }),
       facts: f,
+      judgeDrift: JUDGE_DRIFT_SOURCE,
       relocks: policy.relocks,
     };
   }

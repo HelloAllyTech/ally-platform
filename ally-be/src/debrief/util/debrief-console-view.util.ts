@@ -100,6 +100,8 @@ export const APPROVAL_WARN_DAYS = 3;
 export type ApprovalWait =
   | 'pinned_rule'
   | 'handoff'
+  | 'start_quick_test'
+  | 'promote_budget'
   | 'start_gate'
   | 'start_trial'
   | 'start_canary'
@@ -120,6 +122,15 @@ export function awaitingDecision(idea: {
       ? new Date(v as string).toISOString()
       : new Date(idea.createdAt).toISOString();
   const kind = idea.change?.ideaKind;
+  if (kind === 'release' && idea.status === 'proposed') {
+    // A person's proposed change: budgets go live on the owner's word; any
+    // other change waits for someone to start its quick test.
+    if (idea.change?.budgetOnly) {
+      return { wait: 'promote_budget', since: iso(idea.createdAt) };
+    }
+    if (!e.screen)
+      return { wait: 'start_quick_test', since: iso(idea.createdAt) };
+  }
   if (kind === 'pinned_rule') {
     return idea.status === 'proposed'
       ? { wait: 'pinned_rule', since: iso(idea.createdAt) }
@@ -177,13 +188,14 @@ export function approvalState(
 
 // --- Kinds of change and autonomy (PRD §12) ----------------------------------------
 
-export const CHANGE_KINDS = [
-  'settings',
-  'guidance',
-  'prompts',
-  'models',
-  'pinned_rules',
-] as const;
+/**
+ * The kinds of change the PM agent's policy covers (spec C3, C4). Settings:
+ * non-budget settings. Prompts: prompt (skill) edits, registry agents and
+ * default plans. Pinned rules: always never. Guidance is not here: the PM
+ * agent never touches Context Library chunks (C4). Models are not here:
+ * model trials are Release 2.
+ */
+export const CHANGE_KINDS = ['settings', 'prompts', 'pinned_rules'] as const;
 export type ChangeKind = (typeof CHANGE_KINDS)[number];
 
 /** Pinned rules: the safety rules, the rubric, and the judge's instructions. */
@@ -215,6 +227,9 @@ export function changeKindOf(
       return PINNED_RULE_CODES.has(change.promptCode)
         ? 'pinned_rules'
         : 'prompts';
+    case 'registry_agent':
+    case 'default_plan':
+      return 'prompts';
     default:
       return null;
   }
@@ -233,7 +248,7 @@ export type AutonomyStep = (typeof AUTONOMY_STEPS)[number];
 export type StepPolicy = 'auto' | 'ask' | 'off';
 /** An organisation may only tighten: default (use the global), ask, never. */
 export type OrgPolicy = 'default' | 'ask' | 'never';
-export const ORG_POLICY_STEPS = ['paired_trial', 'canary', 'guidance'] as const;
+export const ORG_POLICY_STEPS = ['paired_trial', 'canary'] as const;
 export type OrgPolicyStep = (typeof ORG_POLICY_STEPS)[number];
 
 /** The kinds whose cells the owner may set; pinned rules are always never. */
@@ -268,9 +283,7 @@ export function defaultAutonomyMatrix(startsQuickTests = true): AutonomyMatrix {
   });
   return {
     settings: row(),
-    guidance: row(),
     prompts: row(),
-    models: row(),
     pinned_rules: {
       quick_test: 'off',
       gate_test: 'off',
@@ -324,8 +337,8 @@ export function stricter(a: StepPolicy, b: StepPolicy | null): StepPolicy {
 /**
  * What the PM agent may do for this kind at this step, for this organisation:
  * off when the master switch is off; else the global cell, tightened by the
- * organisation's override (paired trials and canaries reach its learners; its
- * own guidance is its own). An organisation can never loosen the global.
+ * organisation's override (paired trials and canaries reach its learners).
+ * An organisation can never loosen the global.
  */
 export function effectivePolicy(
   policy: AutonomyPolicy,
@@ -341,9 +354,6 @@ export function effectivePolicy(
     if (step === 'paired_trial' || step === 'canary') {
       p = stricter(p, ORG_AS_STEP[o[step] ?? 'default']);
     }
-    if (kind === 'guidance') {
-      p = stricter(p, ORG_AS_STEP[o.guidance ?? 'default']);
-    }
   }
   return p;
 }
@@ -358,9 +368,19 @@ export interface AutonomyFacts {
   reverts: Partial<Record<ChangeKind, number>>;
   /** The latest monthly sealed run scored worse than the one before. */
   failedBaseline: { failed: boolean; detail: string | null };
-  /** Judge drift: not measured yet (null), or drifted. */
+  /**
+   * Judge drift. Measured by the nightly evaluator job, which is Release 2:
+   * until then null ("not measured") and never blocks.
+   */
   judgeDrift: boolean | null;
 }
+
+/** Where judge drift will come from, for the UI ("measured from Release 2"). */
+export const JUDGE_DRIFT_SOURCE = {
+  measured: false,
+  from: 'release_2',
+  note: 'Judge drift is measured by the nightly evaluator job (Release 2).',
+} as const;
 
 export const RELOCK_REVERTS = 2;
 export const RELOCK_WINDOW_DAYS = 28;
@@ -740,4 +760,86 @@ export function heldReasons(run: {
     });
   }
   return lines;
+}
+
+// --- Ideas are like pull requests: open or closed ------------------------------------
+
+export type IdeaClosedReason =
+  | 'promoted'
+  | 'rejected'
+  | 'expired'
+  | 'reverted'
+  | 'did_not_pass'
+  | 'handed_off'
+  | 'answered'
+  | 'signed_off'
+  | 'retired';
+
+/**
+ * Open: needs a person, being tested, or in canary. Closed: promoted (with
+ * the release it became), rejected, expired with no decision, reverted (with
+ * why), did not pass a test, handed to Builder or Bug Hunter, answered, a
+ * pinned rule signed off, or retired.
+ */
+export function ideaState(idea: {
+  status: string;
+  releaseId?: string | null;
+  change?: Record<string, any> | null;
+  evidence?: Record<string, any> | null;
+}): {
+  state: 'open' | 'closed';
+  closedReason: IdeaClosedReason | null;
+  closedWhy: string | null;
+  releaseId: string | null;
+} {
+  const e = idea.evidence ?? {};
+  const closed = (
+    reason: IdeaClosedReason,
+    why: string | null = null,
+    releaseId: string | null = null,
+  ) => ({
+    state: 'closed' as const,
+    closedReason: reason,
+    closedWhy: why,
+    releaseId,
+  });
+  if (idea.status === 'active') {
+    return closed(
+      'promoted',
+      null,
+      idea.releaseId ?? e.canary?.releaseId ?? idea.change?.releaseId ?? null,
+    );
+  }
+  if (idea.status === 'retired') return closed('retired');
+  if (idea.status === 'rejected') {
+    if (e.expiry) return closed('expired', 'no decision within 14 days');
+    if (e.canary?.status === 'reverted') {
+      return closed('reverted', e.canary.reason ?? null);
+    }
+    return closed('rejected');
+  }
+  if (e.canary?.status === 'reverted') {
+    return closed('reverted', e.canary.reason ?? null);
+  }
+  if (idea.status === 'approved') {
+    if (idea.change?.ideaKind === 'pinned_rule') return closed('signed_off');
+    if (e.handoff?.status === 'filed') return closed('handed_off');
+    if (e.handoff?.status === 'answered') return closed('answered');
+  }
+  for (const [k, label] of [
+    ['screen', 'quick test'],
+    ['gate', 'gate test'],
+    ['trial', 'paired trial'],
+  ] as const) {
+    const r = e[k];
+    if (r && (r.passed === false || r.status === 'failed')) {
+      return closed('did_not_pass', `did not pass the ${label}`);
+    }
+  }
+  return {
+    state: 'open',
+    closedReason: null,
+    closedWhy: null,
+    releaseId: null,
+  };
 }

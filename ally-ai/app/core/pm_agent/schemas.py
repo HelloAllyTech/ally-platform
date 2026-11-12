@@ -10,7 +10,10 @@ from pydantic import BaseModel, Field
 class PmAgentRunRequest(BaseModel):
     #: ally-be's id for this run: the checkpoint thread and the audit trail's key.
     agent_run_id: str
-    review: Literal["weekly", "monthly"] = "weekly"
+    #: weekly / monthly: the analysis runs. questions: a short answer-only run,
+    #: started when a person asks a question on one of the agent's ideas (plan
+    #: §11.7); ally-be gives it read tools and `question_answer` only.
+    review: Literal["weekly", "monthly", "questions"] = "weekly"
     #: The agent's model and its backup (priced in `prices`; an unpriced model
     #: never runs).
     model: Optional[str] = None

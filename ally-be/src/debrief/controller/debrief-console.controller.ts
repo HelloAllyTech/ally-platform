@@ -46,6 +46,7 @@ import {
 import { DebriefConsoleViewService } from '../service/debrief-console-view.service';
 import { DebriefAutonomyService } from '../service/debrief-autonomy.service';
 import { DebriefReviewService } from '../service/debrief-review.service';
+import { DebriefReleasesService } from '../service/debrief-releases.service';
 import {
   DebriefCommentAnchor,
   DebriefCommentStatus,
@@ -338,6 +339,11 @@ class AutonomyOrgDto {
 }
 
 class BudgetsDto {
+  @ApiProperty({ required: false, description: 'The evaluator bar (5–10)' })
+  @IsOptional()
+  @IsNumber()
+  passScore?: number;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsNumber()
@@ -380,6 +386,92 @@ class ScoreDto {
   note?: string;
 }
 
+class StepEditDto {
+  @ApiProperty({
+    description:
+      'A recipe step (`reviser`) or an agent (`agent:protocol_check`)',
+  })
+  @IsString()
+  @MaxLength(64)
+  step!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  model?: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  backupModel?: string | null;
+}
+
+class ProposeChangeDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(300)
+  title!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  why?: string;
+
+  @ApiProperty({ required: false, type: [StepEditDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @ValidateNested({ each: true })
+  @Type(() => StepEditDto)
+  steps?: StepEditDto[];
+
+  @ApiProperty({
+    required: false,
+    description: '{ runCeilingUsd?, monthlyCapUsd?, passScore? } (owner)',
+  })
+  @IsOptional()
+  @IsObject()
+  settings?: Record<string, number>;
+
+  @ApiProperty({ required: false, description: "Ask Ally's model" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  reply?: string;
+}
+
+class ReleaseNoteChangeDto {
+  @IsOptional() @IsString() @MaxLength(80) area?: string;
+  @IsOptional() @IsString() @MaxLength(300) what?: string;
+  @IsOptional() @IsString() @MaxLength(600) why?: string;
+  @IsOptional() @IsString() @MaxLength(600) before?: string;
+  @IsOptional() @IsString() @MaxLength(600) after?: string;
+}
+
+class ReleaseNotesDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  summary?: string;
+
+  @ApiProperty({ required: false, type: [ReleaseNoteChangeDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @ValidateNested({ each: true })
+  @Type(() => ReleaseNoteChangeDto)
+  changes?: ReleaseNoteChangeDto[];
+}
+
 type AuthedRequest = { user: { id: number } };
 
 /**
@@ -409,7 +501,24 @@ export class DebriefConsoleController {
     private readonly view: DebriefConsoleViewService,
     private readonly autonomy: DebriefAutonomyService,
     private readonly reviews: DebriefReviewService,
+    private readonly releaseHistory: DebriefReleasesService,
   ) {}
+
+  /** Release settings (budgets, the evaluator bar) are the owner's. */
+  private async requireOwnerFor(
+    userId: number,
+    settings: Record<string, unknown> | undefined,
+  ) {
+    if (
+      settings &&
+      Object.keys(settings).length &&
+      !(await this.view.viewer(userId)).can.ownerSettings
+    ) {
+      throw new ForbiddenException(
+        'Only the Debrief owner changes budgets and the evaluator bar',
+      );
+    }
+  }
 
   @Get('review')
   @DebriefRead()
@@ -626,14 +735,30 @@ export class DebriefConsoleController {
   @Get('pm-agent')
   @DebriefRead()
   @ApiOperation({ summary: "The PM agent's latest report and its ideas" })
-  async pmAgentState(@Req() req: AuthedRequest) {
+  async pmAgentState(
+    @Req() req: AuthedRequest,
+    @Query('state') state?: string,
+  ) {
     const viewer = await this.view.viewer(req.user.id);
-    const ideas = await this.pmAgent.history(50);
+    const ideas = (await this.pmAgent.history(100)).map((i) =>
+      this.view.ideaView(i, viewer),
+    );
+    const open = ideas.filter((i) => i.state === 'open');
+    // An open idea's draft release (its version, what changed against live).
+    for (const i of open) {
+      (i as Record<string, unknown>).draftRelease = await this.releaseHistory
+        .draftFor(i)
+        .catch(() => null);
+    }
     return {
       ...(await this.pmAgent.latestReport()),
-      // Each idea keeps its old fields, plus its approval clock (14 days),
-      // questions, kind and what this viewer may do (`can`).
-      ideas: ideas.map((i) => this.view.ideaView(i, viewer)),
+      // Each idea keeps its old fields, plus open/closed, its approval clock
+      // (14 days), questions, kind, draft release and what this viewer may do.
+      ideas:
+        state === 'open' || state === 'closed'
+          ? ideas.filter((i) => i.state === state)
+          : ideas,
+      counts: { open: open.length, closed: ideas.length - open.length },
       viewer: { roles: viewer.roles, can: viewer.can },
     };
   }
@@ -663,11 +788,16 @@ export class DebriefConsoleController {
     summary:
       'Approve an idea: route A starts its canary or promotes it; B opens a Builder session; C files a bug for Bug Hunter; D marks the question answered',
   })
-  approve(
+  async approve(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: AuthedRequest,
     @Body() body: ReasonDto,
   ) {
+    const idea = await this.pmAgent.getIdea(id);
+    // A budgets-only change goes live on the owner's word.
+    if (idea.change?.budgetOnly) {
+      await this.requireOwnerFor(req.user.id, { budgets: true });
+    }
     return this.pmAgent.approve(id, req.user.id, body?.reason);
   }
 
@@ -707,12 +837,31 @@ export class DebriefConsoleController {
     description:
       "Checked by the same rules as every release (approved, priced, active in the LLM catalog; the Writer and Evaluator on different models, neither on the judge's). Undo with Roll back.",
   })
-  setModels(@Req() req: AuthedRequest, @Body() body: ModelChangeDto) {
-    return this.console.setModels(
-      { steps: body.steps, reply: body.reply },
+  async setModels(@Req() req: AuthedRequest, @Body() body: ModelChangeDto) {
+    // The live release is never edited: a model swap is a proposed change
+    // carrying a draft release, which climbs the ladder.
+    const out = await this.releaseHistory.proposeChange(
+      {
+        title: `Model change: ${[
+          ...Object.keys(body.steps ?? {}),
+          ...(body.reply ? ['ask_ally'] : []),
+        ].join(', ')}`,
+        why: body.note ?? null,
+        steps: Object.entries(body.steps ?? {}).map(([step, model]) => ({
+          step,
+          model,
+        })),
+        reply: body.reply ?? null,
+      },
       req.user.id,
-      body.note,
     );
+    return {
+      ...out,
+      changed: [
+        ...out.diff.steps.map((d) => d.step),
+        ...(out.diff.reply ? ['ask_ally'] : []),
+      ],
+    };
   }
 
   @Post('releases/orchestrator-challenger')
@@ -723,8 +872,22 @@ export class DebriefConsoleController {
     description:
       'The planner chooses the analysis agents from the registry. Nothing changes for learners until the draft passes the ladder and a person promotes it.',
   })
-  orchestratorChallenger(@Req() req: AuthedRequest, @Body() body: ReasonDto) {
-    return this.console.createOrchestratorChallenger(req.user.id, body?.reason);
+  async orchestratorChallenger(
+    @Req() req: AuthedRequest,
+    @Body() body: ReasonDto,
+  ) {
+    const draft = await this.console.createOrchestratorChallenger(
+      req.user.id,
+      body?.reason,
+    );
+    // It belongs to an idea, like every draft: shown on Ideas, tested there.
+    const idea = await this.releaseHistory.adoptDraft(
+      draft.releaseId,
+      'Orchestrator challenger: the planner chooses the analysis agents',
+      body?.reason ?? null,
+      req.user.id,
+    );
+    return { ...draft, ideaId: idea.ideaId };
   }
 
   @Post('releases/:id/rollback')
@@ -737,7 +900,8 @@ export class DebriefConsoleController {
     @Req() req: AuthedRequest,
     @Body() body: ReasonDto,
   ) {
-    return this.console.rollback(id, req.user.id, body?.reason);
+    // Only to a release that has been live; everything it named comes back.
+    return this.releaseHistory.rollback(id, req.user.id, body?.reason);
   }
 
   @Post('test-sets/build')
@@ -961,12 +1125,14 @@ export class DebriefConsoleController {
     summary:
       '"Ask a question" on an item waiting for approval; the PM agent reads it on its next run',
   })
-  ask(
+  async ask(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: AuthedRequest,
     @Body() body: QuestionDto,
   ) {
-    return this.pmAgent.askQuestion(id, req.user.id, body.text);
+    const q = await this.pmAgent.askQuestion(id, req.user.id, body.text);
+    // A short answer-only PM agent run, not the weekly one.
+    return { ...q, answerRun: this.pmRuns.queueAnswers(req.user.id) };
   }
 
   @Post('pm-agent/ideas/:id/start-step')
@@ -1063,10 +1229,19 @@ export class DebriefConsoleController {
       'Owner: change the run ceiling and the monthly cap (a new live release from the current one; undo with Roll back)',
   })
   budgets(@Req() req: AuthedRequest, @Body() body: BudgetsDto) {
-    return this.console.setBudgets(
-      { runCeilingUsd: body.runCeilingUsd, monthlyCapUsd: body.monthlyCapUsd },
+    const settings: Record<string, number> = {};
+    if (body.runCeilingUsd != null) settings.runCeilingUsd = body.runCeilingUsd;
+    if (body.monthlyCapUsd != null) settings.monthlyCapUsd = body.monthlyCapUsd;
+    if (body.passScore != null) settings.passScore = body.passScore;
+    // A proposed change carrying a draft: budgets alone go live when the
+    // owner approves it; the evaluator bar climbs the ladder.
+    return this.releaseHistory.proposeChange(
+      {
+        title: `Settings: ${Object.keys(settings).join(', ')}`,
+        why: body.note ?? null,
+        settings,
+      },
       req.user.id,
-      body.note,
     );
   }
 
@@ -1088,5 +1263,122 @@ export class DebriefConsoleController {
       learnersSee: 'not_available',
       reason: body.reason,
     };
+  }
+
+  // --- Ideas carry proposed changes; Releases is the live history -----------------
+
+  @Post('pm-agent/ideas/propose')
+  @DebriefAct('pmAgent')
+  @ApiOperation({
+    summary:
+      'Propose a change: a person-made idea carrying a draft release (steps on/off, model swaps, release settings) that climbs the ladder',
+  })
+  async proposeChange(
+    @Req() req: AuthedRequest,
+    @Body() body: ProposeChangeDto,
+  ) {
+    await this.requireOwnerFor(req.user.id, body.settings);
+    return this.releaseHistory.proposeChange(
+      {
+        title: body.title,
+        why: body.why ?? null,
+        steps: body.steps,
+        settings: body.settings,
+        reply: body.reply ?? null,
+      },
+      req.user.id,
+    );
+  }
+
+  @Patch('pm-agent/ideas/:id/draft')
+  @DebriefAct('pmAgent')
+  @ApiOperation({
+    summary: "Change a proposed change's draft release before its tests start",
+  })
+  async editDraft(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ProposeChangeDto,
+  ) {
+    await this.requireOwnerFor(req.user.id, body.settings);
+    return this.releaseHistory.editDraft(id, {
+      steps: body.steps,
+      settings: body.settings,
+      reply: body.reply ?? null,
+    });
+  }
+
+  @Get('release-history')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'Releases that have been live (Live, Retired, Rolled back), newest first, and code releases waiting as drafts',
+  })
+  releaseHistoryList() {
+    return this.releaseHistory.list();
+  }
+
+  @Get('release-history/:id')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'One release: release notes, where it came from, evidence before and while live, and what is in it',
+  })
+  async releaseHistoryDetail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    const viewer = await this.view.viewer(req.user.id);
+    const r = await this.releaseHistory.detail(id);
+    return {
+      ...r,
+      can: {
+        rollBack: viewer.can.releases && r.status === 'retired',
+        writeNotes: viewer.can.releases && r.notes.canWrite,
+      },
+    };
+  }
+
+  @Put('release-history/:id/notes')
+  @DebriefAct('releases')
+  @ApiOperation({
+    summary: 'Write the release notes of a code release',
+  })
+  writeReleaseNotes(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ReleaseNotesDto,
+  ) {
+    return this.releaseHistory.writeNotes(id, body, req.user.id);
+  }
+
+  @Get('releases/:id/compare')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'Compare a release with another (default: the one before): changes, and both texts of each changed prompt',
+  })
+  compareRelease(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('with') withId?: string,
+  ) {
+    return this.releaseHistory.compare(
+      id,
+      withId && /^[0-9a-f-]{36}$/i.test(withId) ? withId : undefined,
+    );
+  }
+
+  @Post('releases/:id/promote-code-draft')
+  @DebriefAct('releases')
+  @ApiOperation({
+    summary:
+      'Put a code release waiting as a draft live (code releases skip the ladder)',
+  })
+  promoteCodeDraft(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ReasonDto,
+  ) {
+    return this.releaseHistory.promoteCodeDraft(id, req.user.id, body?.reason);
   }
 }

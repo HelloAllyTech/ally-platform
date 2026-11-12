@@ -72,6 +72,9 @@ export const PM_AGENT_GATEWAY_TOOLS = [
   'builder_handoff',
   'bug_hunter_report',
   'person_ask',
+  // Plan §11.7 "Ask a question": read the open questions, post an answer.
+  'questions_read',
+  'question_answer',
 ] as const;
 export type PmAgentGatewayTool = (typeof PM_AGENT_GATEWAY_TOOLS)[number];
 

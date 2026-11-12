@@ -42,7 +42,9 @@ person_ask.
 5. Write drafts in scratch files first when they are long.
 6. Update /memories/AGENTS.md: what you tried this run and why, results you saw from \
 earlier ideas, open hypotheses. Keep it short; rewrite rather than append forever.
-7. Finish with the report for the team, plain words, at most 300 words: what changed \
+7. If open_questions lists questions people asked on your ideas, answer each \
+with question_answer.
+8. Finish with the report for the team, plain words, at most 300 words: what changed \
 since last time, what is holding the debriefs back, what you are trying next.
 
 Never (ally-be refuses these, and you must not try): Context Library chunks; the \
@@ -58,12 +60,21 @@ do not retry the same call.\
 
 def render_inputs(review: str, inputs: Dict[str, Any]) -> str:
     """The run's first message: which review, then every packed input."""
-    head = (
-        "REVIEW: monthly. Look across the whole month, trends against the previous "
-        "month, and which kinds of ideas have worked."
-        if review == "monthly"
-        else "REVIEW: weekly."
-    )
+    if review == "questions":
+        head = (
+            "REVIEW: questions. People asked questions on your ideas. Answer each "
+            "open question with question_answer, briefly and with the numbers "
+            "behind it; read the reporting views or comments only when an answer "
+            "needs them. Do not propose ideas or start tests in this run. Finish "
+            "with one line: how many questions you answered."
+        )
+    elif review == "monthly":
+        head = (
+            "REVIEW: monthly. Look across the whole month, trends against the "
+            "previous month, and which kinds of ideas have worked."
+        )
+    else:
+        head = "REVIEW: weekly."
     parts = [head]
     for key, value in inputs.items():
         parts.append(

@@ -9,7 +9,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Seeded so nothing changes on deploy: the quick-test column copies the old
  * `pmAgentStartsQuickTests` switch (true unless a person turned it off); a
  * passed quick test still starts the gate and a passed gate the paired trial
- * on their own; canaries wait for a person; pinned rules never. The matrix is
+ * on their own; canaries wait for a person; pinned rules never. Kinds:
+ * settings (non-budget), prompts (prompts, registry agents, default plans),
+ * pinned rules; organisations may tighten paired trials and canaries. The matrix is
  * written out here, not imported, so this migration keeps its meaning.
  */
 const ROW = (quick: 'auto' | 'ask') => ({
@@ -27,9 +29,7 @@ const NEVER = {
 const policy = (quick: 'auto' | 'ask') => ({
   matrix: {
     settings: ROW(quick),
-    guidance: ROW(quick),
     prompts: ROW(quick),
-    models: ROW(quick),
     pinned_rules: NEVER,
   },
   orgs: {},

@@ -35,6 +35,17 @@ import { DebriefReviewService } from './debrief-review.service';
 import { DebriefSettingsService } from './debrief-settings.service';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
 
+/** An answer-only run (plan §11.7 "Ask a question") never spends more than this. */
+export const ANSWER_RUN_CAP_USD = 0.5;
+/** The tools an answer-only run gets: read, and answer; nothing that proposes or acts. */
+export const ANSWER_RUN_TOOLS = [
+  'questions_read',
+  'question_answer',
+  'reporting_query',
+  'comments_read',
+  'metrics_view',
+] as const;
+
 /** A run is minutes; past this ally-be stops waiting (the token lives 2 h). */
 export const PM_AGENT_RUN_TIMEOUT_MS = 45 * 60 * 1000;
 
@@ -73,6 +84,8 @@ export class DebriefPmAgentRunService implements OnModuleInit {
     DebriefPmAgentRunService.name,
   );
   private running = false;
+  /** A question arrived while a run was going: answer once it ends. */
+  private answersPending = false;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -136,7 +149,121 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       return await this.runOnce(opts);
     } finally {
       this.running = false;
+      this.drainAnswers();
     }
+  }
+
+  /**
+   * Plan §11.7 "Ask a question": a person asked on an idea, so a short
+   * answer-only run starts now rather than at the weekly run — read-only
+   * tools and `question_answer`, paid from the learning budget, capped at
+   * ANSWER_RUN_CAP_USD and the owner's run cap, never while the agent is off.
+   * One at a time: a question that arrives during a run is answered after it.
+   */
+  queueAnswers(actorUserId?: number | null): {
+    queued: boolean;
+    reason?: string;
+  } {
+    if (this.running) {
+      this.answersPending = true;
+      return { queued: true, reason: 'after the run in progress' };
+    }
+    this.running = true;
+    void this.answerOnce(actorUserId ?? null)
+      .catch((e) =>
+        this.logger.error(
+          `[pm-agent] answer run failed: ${(e as Error).message}`,
+        ),
+      )
+      .finally(() => {
+        this.running = false;
+        this.drainAnswers();
+      });
+    return { queued: true };
+  }
+
+  private drainAnswers(): void {
+    if (!this.answersPending) return;
+    this.answersPending = false;
+    this.queueAnswers(null);
+  }
+
+  async answerOnce(actor: number | null): Promise<PmAgentRunOutcome> {
+    const review = 'questions';
+    const skipped = await this.precheck();
+    if (skipped) return { report: null, ideas: [], skipped };
+    const questions = await this.pm.openQuestions();
+    if (!questions.length) {
+      return { report: null, ideas: [], skipped: 'no open questions' };
+    }
+    const ideaIds = new Set(questions.map((q) => q.idea_id));
+    const ideas = (await this.pm.history(100))
+      .filter((h) => ideaIds.has(h.id))
+      .map((h) => ({
+        id: h.id,
+        title: h.title,
+        status: h.status,
+        route: h.change?.route ?? null,
+        kind: h.change?.ideaKind ?? null,
+        hypothesis: h.evidence?.hypothesis ?? null,
+        expected_effect: h.evidence?.expectedEffect ?? null,
+        quick_test: h.evidence?.screen ?? null,
+        gate: h.evidence?.gate ?? null,
+        trial: h.evidence?.trial ?? null,
+        canary: h.evidence?.canary ?? null,
+      }));
+    const settings = await this.ownerSettings.get();
+    const left =
+      (await this.pm.learningBudgetThisMonth()) -
+      (await this.pm.learningSpentThisMonth());
+    const budgetUsd = Math.max(
+      0,
+      Math.min(settings.pmAgentRunCapUsd, ANSWER_RUN_CAP_USD, left),
+    );
+    const agentRunId = randomUUID();
+    const model = DEBRIEF_MODELS.pmAgent;
+    const backup = DEBRIEF_MODELS.pmAgentBackup;
+    const body = {
+      agent_run_id: agentRunId,
+      review,
+      model,
+      backup_model: backup,
+      prices: modelPrices([model, backup]),
+      budget_usd: Math.round(budgetUsd * 100) / 100,
+      system_prompt: await this.context.promptText(
+        DEBRIEF_PROMPT_CODES.pmAgent,
+        null,
+      ),
+      inputs: { open_questions: questions, ideas },
+      tools: [...ANSWER_RUN_TOOLS],
+      agent_token: this.tokens.signAgent(agentRunId, ANSWER_RUN_TOOLS),
+      gateway_url: this.tokens.gatewayUrl(),
+    };
+    let res: PmAgentRunResponse;
+    try {
+      res = await this.call(body);
+    } catch (e) {
+      res = { status: 'failed', error: (e as Error).message.slice(0, 300) };
+    }
+    await this.pm.audit('curator_run', null, actor, {
+      agentRunId,
+      review,
+      status: res.status,
+      report: res.report ?? null,
+      error: res.error ?? null,
+      model: res.model ?? null,
+      steps: res.steps ?? [],
+      refusals: res.refusals ?? [],
+      costUsd: res.estimated_cost_usd ?? null,
+      budgetUsd: body.budget_usd,
+      questions: questions.length,
+    });
+    return {
+      report: res.report ?? null,
+      ideas: [],
+      status: res.status,
+      agentRunId,
+    };
   }
 
   private async runOnce(opts: {

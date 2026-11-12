@@ -183,60 +183,6 @@ export class DebriefConsoleService {
     return { releaseId: draft.id, version: draft.version, changed };
   }
 
-  /**
-   * The owner's budgets (Settings › Budgets): the run ceiling and the monthly
-   * cap live in the release, so a change is a new release from the live one,
-   * checked by the same rules, put live, and undone with Roll back. The PM
-   * agent can never make this change (never-list: budgets).
-   */
-  async setBudgets(
-    change: { runCeilingUsd?: number; monthlyCapUsd?: number },
-    userId: number,
-    note?: string,
-  ) {
-    const { bundle } = await this.runner.resolveRelease();
-    const next = JSON.parse(JSON.stringify(bundle)) as DebriefBundle;
-    const changed: Record<string, { before: number; after: number }> = {};
-    for (const key of ['runCeilingUsd', 'monthlyCapUsd'] as const) {
-      const v = change[key];
-      if (v == null) continue;
-      if (
-        !Number.isFinite(v) ||
-        v <= 0 ||
-        v > (key === 'runCeilingUsd' ? 10 : 100_000)
-      ) {
-        throw new BadRequestException(`${key} is out of range`);
-      }
-      if (next.settings[key] !== v) {
-        changed[key] = { before: next.settings[key], after: v };
-        next.settings[key] = v;
-      }
-    }
-    if (!Object.keys(changed).length) {
-      throw new BadRequestException('No budget changed');
-    }
-    const problems = validateDebriefBundle(
-      next,
-      await this.runner.modelCatalog(),
-    );
-    if (problems.length) throw new BadRequestException(problems.join('; '));
-    const draft = await this.releases.createDraft(
-      DEBRIEF_AGENT_KEY,
-      next as unknown as Record<string, unknown>,
-      userId,
-      `Budgets: ${Object.entries(changed)
-        .map(([k, v]) => `${k} ${v.before} → ${v.after}`)
-        .join(', ')}${note ? ` — ${note}` : ''}`,
-    );
-    await this.releases.makeGa(
-      draft.id,
-      userId,
-      AgentReleaseAuditAction.PROMOTED,
-      note,
-    );
-    return { releaseId: draft.id, version: draft.version, changed };
-  }
-
   async overview(days = 7) {
     const [r] = await this.dataSource.query(
       `SELECT count(*) FILTER (WHERE status <> 'skipped')::int AS runs,

@@ -2,7 +2,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
+  Optional,
 } from '@nestjs/common';
+import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
+import { DebriefNotifier } from './debrief-notifier.service';
+import { DebriefReleasesService } from './debrief-releases.service';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -22,6 +27,7 @@ import {
 import {
   approvalState,
   changeKindOf,
+  ideaState,
   COST_BAND_USD,
   heldReasons,
   HIT_CEILING_SHARE,
@@ -66,7 +72,7 @@ interface ScoringSample {
  * No redaction: the console shows the real context.
  */
 @Injectable()
-export class DebriefConsoleViewService {
+export class DebriefConsoleViewService implements OnModuleInit {
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(DebriefRun)
@@ -82,7 +88,83 @@ export class DebriefConsoleViewService {
     private readonly autonomy: DebriefAutonomyService,
     private readonly config: AppConfigService,
     private readonly moduleRef: ModuleRef,
+    @Optional() private readonly notifier?: DebriefNotifier,
+    @Optional() private readonly releasesView?: DebriefReleasesService,
   ) {}
+
+  onModuleInit(): void {
+    // FR-54: the Ally team hears about approvals in their last 3 days and
+    // urgent items past the review deadline, once each.
+    scheduledTaskRegistry.register('30min', 'debrief-console-alerts', () =>
+      this.notifyDue().then(() => undefined),
+    );
+  }
+
+  /**
+   * In-app notifications that wait on a person (FR-54): an approval entering
+   * its last 3 days (once per idea), an urgent item past `flagReviewSlaHours`
+   * (once per run). Returns how many it sent.
+   */
+  async notifyDue(
+    now = new Date(),
+  ): Promise<{ approvals: number; urgent: number }> {
+    if (!this.notifier) return { approvals: 0, urgent: 0 };
+    let approvals = 0;
+    let urgent = 0;
+    const ideas: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT id, status, text, change, evidence, "createdAt" FROM agent_lessons
+        WHERE "agentKey" = 'debrief' AND status IN ('proposed','approved')
+          AND NOT (coalesce(evidence, '{}'::jsonb) ? 'expiryWarning')`,
+    );
+    for (const i of ideas) {
+      const a = approvalState(i as any, now);
+      if (!a?.expiringSoon) continue;
+      const alert = {
+        title: `Debriefs: an approval expires in ${a.expiresInDays} day(s)`,
+        body: `"${i.text}" expires with no decision on ${a.expiresAt.slice(0, 10)}.`,
+        data: { ideaId: i.id },
+      };
+      await this.notifier.team(alert);
+      if (a.wait === 'pinned_rule') await this.notifier.owner(alert);
+      await this.pmAgent.writeEvidence(i.id, 'expiryWarning', {
+        at: now.toISOString(),
+        expiresAt: a.expiresAt,
+      });
+      approvals++;
+    }
+    const s = await this.settings.get();
+    const params: unknown[] = [];
+    const base = this.baseSql(
+      { category: 'needs', mode: 'live', limit: 500, offset: 0 },
+      params,
+    );
+    params.push(s.flagReviewSlaHours);
+    const slaParam = '$' + params.length;
+    const rows: Array<Record<string, any>> = await this.dataSource.query(
+      `${base}
+       SELECT ranked.id, ranked."scenarioTitle", COALESCE(ranked.flag_since, ranked."createdAt") AS since
+         FROM ranked JOIN debrief_runs dr ON dr.id = ranked.id
+        WHERE ranked.rank = 0
+          AND COALESCE(ranked.flag_since, ranked."createdAt") < now() - make_interval(hours => ${slaParam})
+          AND NOT (coalesce(dr.workspace, '{}'::jsonb) ? 'overdueNotifiedAt')`,
+      params,
+    );
+    for (const r of rows) {
+      await this.notifier.team({
+        title: 'Debriefs: an urgent item is past its review deadline',
+        body: `${r.scenarioTitle ?? 'A session'} has waited since ${new Date(r.since).toISOString().slice(0, 16).replace('T', ' ')} UTC.`,
+        data: { runId: r.id },
+      });
+      await this.dataSource.query(
+        `UPDATE debrief_runs
+            SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{overdueNotifiedAt}', to_jsonb($2::text))
+          WHERE id = $1`,
+        [r.id, now.toISOString()],
+      );
+      urgent++;
+    }
+    return { approvals, urgent };
+  }
 
   // --- The viewer -------------------------------------------------------------------
 
@@ -1197,8 +1279,11 @@ export class DebriefConsoleViewService {
       ? viewer.can.approvePinnedRule
       : viewer.can.pmAgent;
     const expired = !!idea.evidence?.expiry;
+    const st = ideaState(idea as any);
+    const budgetOnly = !!idea.change?.budgetOnly;
     return {
       ...idea,
+      ...st,
       kind: idea.change?.ideaKind ?? null,
       changeKind: kind,
       approval: a,
@@ -1211,11 +1296,22 @@ export class DebriefConsoleViewService {
           : null,
       questions: (idea.evidence?.questions ?? []) as unknown[],
       can: {
-        approve: !!a && !a.expired && mayDecide,
+        approve:
+          !!a &&
+          !a.expired &&
+          !['start_quick_test', 'start_gate', 'start_trial'].includes(a.wait) &&
+          (budgetOnly ? viewer.can.ownerSettings : mayDecide),
         reject: !['active', 'rejected'].includes(idea.status) && mayDecide,
         tryIt:
           viewer.can.pmAgent &&
-          ['prompt_edit', 'setting'].includes(idea.change?.ideaKind),
+          st.state === 'open' &&
+          !budgetOnly &&
+          ['prompt_edit', 'setting', 'release'].includes(idea.change?.ideaKind),
+        editDraft:
+          viewer.can.pmAgent &&
+          idea.change?.ideaKind === 'release' &&
+          idea.status === 'proposed' &&
+          !idea.evidence?.screen,
         askQuestion:
           viewer.can.pmAgent && !['rejected', 'retired'].includes(idea.status),
         startStep:

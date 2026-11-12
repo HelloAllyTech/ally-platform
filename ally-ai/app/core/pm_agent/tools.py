@@ -18,7 +18,12 @@ from app.core.pm_agent.ledger import RunLedger
 from app.core.pm_agent.quotes import strip_quotes
 
 #: Tools that only read; the investigator subagents get these and nothing else.
-READ_TOOLS = ("reporting_query", "comments_read", "metrics_view")
+READ_TOOLS = (
+    "reporting_query",
+    "comments_read",
+    "metrics_view",
+    "questions_read",
+)
 #: Tools that propose or request an action; main agent only.
 ACTION_TOOLS = (
     "idea_propose",
@@ -27,6 +32,7 @@ ACTION_TOOLS = (
     "builder_handoff",
     "bug_hunter_report",
     "person_ask",
+    "question_answer",
 )
 ALL_TOOLS = READ_TOOLS + ACTION_TOOLS
 
@@ -143,6 +149,21 @@ class BugHunterReportArgs(BaseModel):
     repo: Optional[Literal["ally-be", "ally-ai", "ally-web", "ally-mobile"]] = None
 
 
+class QuestionsReadArgs(BaseModel):
+    """No arguments: every open question on the agent's ideas."""
+
+
+class QuestionAnswerArgs(BaseModel):
+    idea_id: str
+    question_id: Optional[str] = Field(
+        None, description="The question's id from questions_read."
+    )
+    answer: str = Field(
+        description="Plain words, under 150 words: what you know, the numbers "
+        "(with n) and ids behind it, and what you do not know yet. Never learner words."
+    )
+
+
 class PersonAskArgs(BaseModel):
     idea_id: str
     topic: Literal[
@@ -217,6 +238,15 @@ def make_tools(
     async def person_ask(**a: Any) -> str:
         return await call("person_ask", PersonAskArgs(**a).model_dump())
 
+    async def questions_read(**a: Any) -> str:
+        return await call("questions_read", {})
+
+    async def question_answer(**a: Any) -> str:
+        body = QuestionAnswerArgs(**a).model_dump(exclude_none=True)
+        # People read it in the Console; still, no learner words.
+        body["answer"] = strip_quotes(body["answer"])[0]
+        return await call("question_answer", body)
+
     specs = [
         (
             reporting_query,
@@ -273,6 +303,18 @@ def make_tools(
             PersonAskArgs,
             "Route D: put a question to the owner or clinical advisor (rubric, "
             "safety rules, budgets, data access, clinical content).",
+        ),
+        (
+            questions_read,
+            QuestionsReadArgs,
+            "The questions people asked on your ideas that you have not answered "
+            "yet, each with its idea id and question id.",
+        ),
+        (
+            question_answer,
+            QuestionAnswerArgs,
+            "Answer one question a person asked on one of your ideas. The answer "
+            "appears in that idea's thread in the Console.",
         ),
     ]
     tools: List[BaseTool] = []

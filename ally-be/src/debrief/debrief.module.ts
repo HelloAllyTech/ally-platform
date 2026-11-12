@@ -46,6 +46,7 @@ import { DebriefBaselineService } from './service/debrief-baseline.service';
 import { DebriefReportingService } from './service/debrief-reporting.service';
 import { DebriefTrialsService } from './service/debrief-trials.service';
 import { DebriefAutonomyService } from './service/debrief-autonomy.service';
+import { DebriefReleasesService } from './service/debrief-releases.service';
 import { DebriefConsoleViewService } from './service/debrief-console-view.service';
 import { DebriefOwnerSettings } from './entity/debrief-owner-settings.entity';
 import { DebriefProbeResult } from './entity/debrief-probe-result.entity';
@@ -134,6 +135,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefTrialsService,
     // What the PM agent may do alone, per kind and step (PRD §12).
     DebriefAutonomyService,
+    // Releases that have been live, release notes, proposed changes' drafts.
+    DebriefReleasesService,
     // The redesigned console's read models: sessions, session view, attention.
     DebriefConsoleViewService,
     DebriefLearnerEventsService,
