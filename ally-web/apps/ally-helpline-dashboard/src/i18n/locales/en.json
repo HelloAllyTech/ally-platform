@@ -973,7 +973,7 @@
           "revising": "Making it clearer (round {{round}})…"
         }
       },
-      "onItsWay": "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day.",
+      "onItsWay": "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day. We'll let you know.",
       "tooShort": "This session was too short for a debrief. Try a longer conversation next time and Ally will write you one.",
       "flag": {
         "open": "This isn't right",
@@ -1001,6 +1001,29 @@
       },
       "helpful": {
         "question": "Was this helpful?",
+        "yes": "Yes",
+        "no": "No",
+        "thanks": "Thanks for telling us."
+      },
+      "failed": {
+        "title": "Your debrief didn't load",
+        "body": "It's safe and waiting for you. Check your connection and try again.",
+        "retry": "Try again",
+        "retrying": "Trying again…"
+      },
+      "explainer": {
+        "link": "How Ally writes your debrief",
+        "title": "How Ally writes your debrief",
+        "how": "Ally reads your session, looks up guidance, writes this debrief, then reviews and improves its own draft before you see it.",
+        "quotes": "Every quote is checked against your transcript.",
+        "wrong": "Ally can still get things wrong. If something isn't right, tap This isn't right and a person from the Ally team will look at it.",
+        "supervisor": "Your supervisor can read your debriefs, the points you flag, and your questions to Ally.",
+        "close": "Close"
+      },
+      "pulse": {
+        "intro": "Two quick questions about this debrief.",
+        "knew_next": "Did you know what to practise next?",
+        "fair": "Did this feel fair?",
         "yes": "Yes",
         "no": "No",
         "thanks": "Thanks for telling us."

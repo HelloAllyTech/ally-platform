@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/learner_debrief_repository.dart';
@@ -8,11 +9,13 @@ import '../../../data/learner_debrief_repository.dart';
 /// endpoints): the Debrief agent's debrief for one session, or `null` when
 /// today's debrief should be shown instead.
 ///
-/// [view] stays `null` in every case where the new debrief must stay
-/// invisible: the learner's organisation isn't switched on
-/// (`not_available`), the request never succeeded (network, 403, 500), or
-/// the first answer hasn't arrived yet. Falling back is silent on purpose —
-/// an org that isn't on the new debrief must see exactly today's screen.
+/// [view] stays `null` where the new debrief must stay invisible: the
+/// learner's organisation isn't switched on (`not_available`), the server
+/// refused (401/403/404), or the first answer hasn't arrived yet. A first
+/// request that failed outright is a state of its own (PRD §6.12): no
+/// connection → `offline`, a 5xx → `failed`, both with Try again ([retry]),
+/// never the old note silently in its place. A supervisor's view keeps the
+/// note on any failure.
 ///
 /// Polls every [pollInterval] (3 s) while the state is `working`, for up to
 /// [fastPollFor] (4 minutes), then every [slowPollInterval] (30 s); every
@@ -50,11 +53,56 @@ class LearnerDebriefController extends ChangeNotifier {
   bool _slow = false;
   bool _disposed = false;
   bool _helpfulSending = false;
+  bool _pulseSending = false;
+
+  /// Set when the first request failed outright and nothing has landed yet.
+  LearnerDebriefState? _loadFailure;
+  bool _retrying = false;
 
   /// What to render, or `null` to keep today's debrief.
-  LearnerDebriefView? get view => (_latest?.isShowable ?? false) ? _latest : null;
+  LearnerDebriefView? get view {
+    if (_latest?.isShowable ?? false) return _latest;
+    if (_latest == null && _loadFailure != null) return LearnerDebriefView(state: _loadFailure!);
+    return null;
+  }
 
   bool get helpfulSending => _helpfulSending;
+  bool get pulseSending => _pulseSending;
+
+  /// True while a [retry] is in flight.
+  bool get retrying => _retrying;
+
+  /// Which failure a request error is: no connection, a server error, or
+  /// neither (a refusal — keep today's debrief).
+  static LearnerDebriefState? failureOf(Object error) {
+    if (error is! DioException) return null;
+    switch (error.type) {
+      case DioExceptionType.connectionError:
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return LearnerDebriefState.offline;
+      case DioExceptionType.badResponse:
+        final status = error.response?.statusCode ?? 0;
+        return status >= 500 ? LearnerDebriefState.failed : null;
+      case DioExceptionType.unknown:
+        // A socket error with no response is a lost connection.
+        return error.response == null ? LearnerDebriefState.offline : null;
+      default:
+        return null;
+    }
+  }
+
+  /// "Try again" on a debrief that didn't load (and on reconnecting).
+  Future<void> retry() async {
+    if (sessionId.isEmpty || _retrying || _disposed) return;
+    _retrying = true;
+    notifyListeners();
+    await _fetch();
+    if (_disposed) return;
+    _retrying = false;
+    notifyListeners();
+  }
 
   /// First load. A blank [sessionId] never asks.
   Future<void> load() async {
@@ -70,10 +118,19 @@ class LearnerDebriefController extends ChangeNotifier {
           : await _repository.getDebrief(sessionId);
       if (_disposed) return;
       _latest = next;
+      _loadFailure = null;
       notifyListeners();
-    } catch (_) {
-      // Keep whatever we had (null → today's debrief stays).
+    } catch (error) {
+      // Keep whatever we had: a blip mid-poll keeps the last good answer.
       if (_disposed) return;
+      if (_latest == null && !supervisor) {
+        final failure = failureOf(error);
+        if (failure != null || _loadFailure != null) {
+          // A retry that fails differently (back online, server still down) says so.
+          _loadFailure = failure ?? _loadFailure;
+          notifyListeners();
+        }
+      }
     }
     if (_disposed) return;
     if (_latest?.state != LearnerDebriefState.working) {
@@ -111,6 +168,27 @@ class LearnerDebriefController extends ChangeNotifier {
       }
     }
     if (!_disposed) unawaited(_refresh());
+  }
+
+  /// The pulse (PRD §9): shows the answer as soon as the server accepts it.
+  Future<void> answerPulse(DebriefPulseQuestion question, bool answer) async {
+    final current = _latest;
+    if (current?.pulse == null || _pulseSending) return;
+    _pulseSending = true;
+    notifyListeners();
+    try {
+      await _repository.answerPulse(sessionId, question, answer: answer);
+      if (_disposed) return;
+      final latest = _latest ?? current!;
+      _latest = latest.copyWith(pulse: (latest.pulse ?? const DebriefPulse()).withAnswer(question, answer));
+    } catch (_) {
+      // Leave the previous answer showing.
+    } finally {
+      if (!_disposed) {
+        _pulseSending = false;
+        notifyListeners();
+      }
+    }
   }
 
   /// "This isn't right" on one card. Throws when the request fails so the

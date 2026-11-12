@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,8 +107,8 @@ void main() {
       verify(() => h.learnerDebrief.getDebrief('session-1')).called(1);
     });
 
-    testWidgets('when the request fails', (tester) async {
-      when(() => h.learnerDebrief.getDebrief(any())).thenThrow(Exception('500'));
+    testWidgets('when the server refuses (403)', (tester) async {
+      when(() => h.learnerDebrief.getDebrief(any())).thenThrow(_dioError(403));
       await h.pump(tester);
       expect(find.text('from Ally'), findsOneWidget);
       expect(find.byKey(const Key('debrief-cards')), findsNothing);
@@ -348,6 +349,64 @@ void main() {
         .toggled;
     expect(toggled('debrief-helpful-yes'), isTrue);
     expect(toggled('debrief-helpful-no'), isFalse);
+  });
+
+  group('a debrief that didn\'t load (PRD §6.12)', () {
+    testWidgets('a 5xx shows "didn\'t load" with Try again, not the old note; Try again loads it', (tester) async {
+      var calls = 0;
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer((_) async {
+        if (calls++ == 0) throw _dioError(500);
+        return LearnerDebriefView.fromJson(readyDebriefJson());
+      });
+      await h.pump(tester);
+      expect(find.byKey(const Key('debrief-failed')), findsOneWidget);
+      expect(find.text("Your debrief didn't load"), findsOneWidget);
+      expect(find.text('from Ally'), findsNothing);
+      expect(tester.getSize(find.byKey(const Key('debrief-retry'))).height, greaterThanOrEqualTo(44));
+
+      await tapVisible(tester, find.byKey(const Key('debrief-retry')));
+      expect(find.byKey(const Key('debrief-failed')), findsNothing);
+      expect(find.text('What worked'), findsOneWidget);
+    });
+
+    testWidgets('no connection shows "You\'re offline" with Try again', (tester) async {
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenThrow(
+        DioException(requestOptions: RequestOptions(path: '/x'), type: DioExceptionType.connectionError),
+      );
+      await h.pump(tester);
+      expect(find.byKey(const Key('debrief-offline')), findsOneWidget);
+      expect(find.text("You're offline"), findsOneWidget);
+      expect(find.byKey(const Key('debrief-retry')), findsOneWidget);
+    });
+  });
+
+  testWidgets('"How Ally writes your debrief" opens the explainer sheet', (tester) async {
+    stubDebrief(readyDebriefJson());
+    await h.pump(tester);
+    await tapVisible(tester, find.byKey(const Key('debrief-explainer-link')));
+    expect(find.byKey(const Key('debrief-explainer')), findsOneWidget);
+    expect(find.textContaining('reviews and improves its own draft'), findsOneWidget);
+    expect(find.textContaining('Your supervisor can read your debriefs'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('debrief-explainer-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('debrief-explainer')), findsNothing);
+  });
+
+  testWidgets('the pulse shows only when picked, and sends an answer', (tester) async {
+    stubDebrief({...readyDebriefJson(), 'pulse': {'knew_next': null, 'fair': null}});
+    when(
+      () => h.learnerDebrief.answerPulse('session-1', DebriefPulseQuestion.fair, answer: false),
+    ).thenAnswer((_) async {});
+    await h.pump(tester);
+    expect(find.text('Did you know what to practise next?'), findsOneWidget);
+    await tapVisible(tester, find.byKey(const Key('debrief-pulse-fair-no')));
+    verify(() => h.learnerDebrief.answerPulse('session-1', DebriefPulseQuestion.fair, answer: false)).called(1);
+  });
+
+  testWidgets('no pulse on a debrief that wasn\'t picked', (tester) async {
+    stubDebrief(readyDebriefJson());
+    await h.pump(tester);
+    expect(find.byKey(const Key('debrief-pulse')), findsNothing);
   });
 
   testWidgets('touch targets are at least 44pt', (tester) async {
@@ -868,7 +927,7 @@ void main() {
       await h.pump(tester);
       expect(
         find.text(
-          'Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day.',
+          "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day. We'll let you know.",
         ),
         findsOneWidget,
       );
@@ -1084,3 +1143,9 @@ void main() {
     });
   });
 }
+
+DioException _dioError(int status) => DioException(
+  requestOptions: RequestOptions(path: '/debriefs/sessions/session-1'),
+  type: DioExceptionType.badResponse,
+  response: Response(requestOptions: RequestOptions(path: '/debriefs/sessions/session-1'), statusCode: status),
+);

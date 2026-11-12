@@ -11,14 +11,36 @@ import {
 import { LearnerDebriefView } from "@types";
 
 /**
+ * Whether a failed request means "the debrief didn't load" (the learner gets
+ * Try again) rather than "this debrief isn't yours to see" (today's view):
+ * a server error or no connection at all, never a 401/403/404.
+ */
+const isLoadFailure = (error: unknown): boolean => {
+  if (!error || typeof error !== "object" || !("status" in error)) return false;
+  const status = (error as { status: unknown }).status;
+  if (typeof status === "number") return status >= 500;
+  return status === "FETCH_ERROR" || status === "TIMEOUT_ERROR" || status === "PARSING_ERROR";
+};
+
+export interface LearnerDebriefResult {
+  /** The view to render, or `null` to keep the existing debrief. */
+  view: LearnerDebriefView | null;
+  /** Ask again after a failed load. */
+  retry: () => void;
+  /** True while that retry is in flight. */
+  retrying: boolean;
+}
+
+/**
  * The new Debrief agent's view for a session, or `null` when the existing
  * debrief should be shown instead.
  *
- * `null` covers every case where the new debrief must stay invisible: the
- * learner's organisation isn't switched on (`not_available`), the request
- * never succeeded (network, 403, 500), or the first answer hasn't
- * arrived yet. Falling back is silent on purpose — an org that isn't on the
- * new debrief must see exactly today's screen.
+ * `null` covers the cases where the new debrief must stay invisible: the
+ * learner's organisation isn't switched on (`not_available`), the server
+ * refused (401/403/404), or the first answer hasn't arrived yet. A request
+ * that failed outright — a 5xx or no connection — is `failed` instead
+ * (PRD §6.12): the learner sees "Your debrief didn't load" with Try again,
+ * never the old note silently in its place.
  *
  * Polls every 3 s while the state is `working`, for up to 4 minutes, then
  * every 30 s; every 30 s while a person finishes one (`on_its_way`); and not
@@ -27,11 +49,11 @@ import { LearnerDebriefView } from "@types";
 export const useLearnerDebrief = (
   sessionId: string | undefined,
   { skip = false }: { skip?: boolean } = {},
-): LearnerDebriefView | null => {
+): LearnerDebriefResult => {
   const [isWorking, setIsWorking] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [slow, setSlow] = useState(false);
-  const { data } = useGetLearnerDebriefQuery(sessionId ?? "", {
+  const { data, error, refetch, isFetching } = useGetLearnerDebriefQuery(sessionId ?? "", {
     skip: skip || !sessionId,
     pollingInterval:
       isWorking && !slow
@@ -77,8 +99,28 @@ export const useLearnerDebrief = (
     setIsWaiting(data?.state === "on_its_way");
   }, [data?.state]);
 
-  if (skip || !sessionId || !data || data.state === "not_available") return null;
+  // Stays failed through a retry, so Try again never flashes the old note.
+  const loadFailed = !data && isLoadFailure(error);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (data) setFailed(false);
+    else if (loadFailed) setFailed(true);
+  }, [data, loadFailed]);
+
+  const retry = () => {
+    if (!skip && sessionId) void refetch();
+  };
+  const result = (view: LearnerDebriefView | null): LearnerDebriefResult => ({
+    view,
+    retry,
+    retrying: isFetching,
+  });
+  if (skip || !sessionId) return result(null);
+  // RTK Query keeps the last good answer when a later poll fails, so only a
+  // request that never succeeded reaches here without `data`.
+  if (!data) return result(failed || loadFailed ? { state: "failed" } : null);
+  if (data.state === "not_available") return result(null);
   // A `ready` answer without cards has nothing to render — keep today's view.
-  if (data.state === "ready" && !data.cards) return null;
-  return data;
+  if (data.state === "ready" && !data.cards) return result(null);
+  return result(data);
 };

@@ -199,6 +199,8 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
           ),
           LearnerDebriefState.onItsWay => _Body(ref.t('$_k.onItsWay'), key: const Key('debrief-on-its-way')),
           LearnerDebriefState.tooShort => _Body(ref.t('$_k.tooShort'), key: const Key('debrief-too-short')),
+          LearnerDebriefState.failed => _LoadProblem(controller: widget.controller, offline: false),
+          LearnerDebriefState.offline => _LoadProblem(controller: widget.controller, offline: true),
           LearnerDebriefState.ready when view.cards != null => _ReadyCards(
             cards: view.cards!,
             view: view,
@@ -220,6 +222,7 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
         return _Frame(
           title: ref.t('$_k.header'),
           aiLabel: ref.t('$_k.aiLabel'),
+          explainer: const _ExplainerLink(),
           controls: ready
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -283,11 +286,14 @@ List<String> readableSections(LearnerDebriefView view) {
 /// The same gradient frame as today's debrief ([AskAiGradientCard]), with
 /// the "Written by Ally (AI)" label beside the title.
 class _Frame extends StatelessWidget {
-  const _Frame({required this.title, required this.aiLabel, required this.child, this.controls});
+  const _Frame({required this.title, required this.aiLabel, required this.child, this.controls, this.explainer});
 
   final String title;
   final String aiLabel;
   final Widget child;
+
+  /// "How Ally writes your debrief", under the title (PRD §6.3).
+  final Widget? explainer;
 
   /// "Listen all" and its controls, on a row under the title.
   final Widget? controls;
@@ -345,6 +351,11 @@ class _Frame extends StatelessWidget {
               ],
             ),
           ),
+          if (explainer != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+              child: Align(alignment: AlignmentDirectional.centerStart, child: explainer),
+            ),
           if (controls != null)
             Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 4), child: controls),
           Expanded(
@@ -795,8 +806,10 @@ class _ReadyCards extends ConsumerWidget {
           key: const Key('debrief-supervisor-helpful'),
           style: _smallStyle,
         )
-      else
+      else ...[
         _Helpful(controller: controller, helpful: view.helpful),
+        if (view.pulse != null) _Pulse(controller: controller, pulse: view.pulse!),
+      ],
     ];
 
     return Column(
@@ -1569,6 +1582,204 @@ class _Helpful extends ConsumerWidget {
         choice(false, ref.t('$_k.no'), Icons.thumb_down_outlined),
         if (helpful != null) Semantics(liveRegion: true, child: Text(ref.t('$_k.thanks'), style: _smallStyle)),
       ],
+    );
+  }
+}
+
+/// PRD §6.12 "failed" and (phone only) "offline": the first request failed
+/// outright. Amber, never red; the debrief is safe, so say so, and offer
+/// Try again. Offline also retries by itself on reconnecting ([DebriefTab]).
+class _LoadProblem extends ConsumerWidget {
+  const _LoadProblem({required this.controller, required this.offline});
+
+  final LearnerDebriefController controller;
+  final bool offline;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final k = offline ? 'postSim.debriefCards.offline' : 'postSim.debriefCards.failed';
+    final retrying = controller.retrying;
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        key: Key(offline ? 'debrief-offline' : 'debrief-failed'),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _amberFill,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _amberBorder, width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(header: true, child: Text(ref.t('$k.title'), style: _leadStyle.copyWith(fontSize: 16))),
+            const SizedBox(height: 8),
+            Text(ref.t('$k.body'), style: _bodyStyle),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const Key('debrief-retry'),
+              onPressed: retrying ? null : controller.retry,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text(
+                ref.t(retrying ? 'postSim.debriefCards.failed.retrying' : 'postSim.debriefCards.failed.retry'),
+              ),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(44, 44),
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                textStyle: _leadStyle,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "How Ally writes your debrief" (PRD §6.3, §6.12; plan §7.5): a link in the
+/// header that opens a static sheet — Ally checks and revises its own draft,
+/// quotes are checked, it can still be wrong, and supervisors can read debriefs.
+class _ExplainerLink extends ConsumerWidget {
+  const _ExplainerLink();
+
+  static const _k = 'postSim.debriefCards.explainer';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Semantics(
+      button: true,
+      child: TextButton(
+        key: const Key('debrief-explainer-link'),
+        onPressed: () => showDebriefExplainer(context),
+        style: TextButton.styleFrom(
+          minimumSize: const Size(44, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          foregroundColor: Colors.white,
+          textStyle: _smallStyle.copyWith(fontSize: 13, decoration: TextDecoration.underline),
+        ),
+        child: Text(ref.t('$_k.link')),
+      ),
+    );
+  }
+}
+
+/// Opens the explainer as a bottom sheet.
+Future<void> showDebriefExplainer(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    builder: (_) => const _ExplainerSheet(),
+  );
+}
+
+class _ExplainerSheet extends ConsumerWidget {
+  const _ExplainerSheet();
+
+  static const _k = 'postSim.debriefCards.explainer';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        key: const Key('debrief-explainer'),
+        padding: const EdgeInsets.fromLTRB(20, 8, 8, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    header: true,
+                    child: Text(ref.t('$_k.title'), style: _leadStyle.copyWith(fontSize: 16)),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('debrief-explainer-close'),
+                  tooltip: ref.t('$_k.close'),
+                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: AppColors.highEmphasis),
+                ),
+              ],
+            ),
+            for (final key in const ['how', 'quotes', 'wrong', 'supervisor']) ...[
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                // Indic scripts need the taller line (plan §7.7: ≥ 1.6).
+                child: Text(ref.t('$_k.$key'), style: _bodyStyle.copyWith(height: 1.6)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The post-launch pulse (PRD §9): on a debrief the server picked, two
+/// yes/no questions under "Was this helpful?"; answering again changes it.
+class _Pulse extends ConsumerWidget {
+  const _Pulse({required this.controller, required this.pulse});
+
+  final LearnerDebriefController controller;
+  final DebriefPulse pulse;
+
+  static const _k = 'postSim.debriefCards.pulse';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    Widget choice(DebriefPulseQuestion question, bool value) {
+      final pressed = pulse.answerTo(question) == value;
+      return Semantics(
+        toggled: pressed,
+        child: OutlinedButton(
+          key: Key('debrief-pulse-${question.wire}-${value ? 'yes' : 'no'}'),
+          onPressed: controller.pulseSending ? null : () => controller.answerPulse(question, value),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(64, 44),
+            foregroundColor: AppColors.highEmphasis,
+            backgroundColor: Colors.white,
+            side: BorderSide(color: pressed ? AppColors.primary : AppColors.blue100, width: pressed ? 2 : 1),
+            textStyle: pressed ? _leadStyle : _bodyStyle,
+          ),
+          child: Text(ref.t(value ? '$_k.yes' : '$_k.no')),
+        ),
+      );
+    }
+
+    final answered = DebriefPulseQuestion.values.every((q) => pulse.answerTo(q) != null);
+    return Container(
+      key: const Key('debrief-pulse'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.blue50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.blue100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(ref.t('$_k.intro'), style: _bodyStyle),
+          for (final question in DebriefPulseQuestion.values) ...[
+            const SizedBox(height: 12),
+            Text(ref.t('$_k.${question.wire}'), style: _leadStyle),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [choice(question, true), choice(question, false)]),
+          ],
+          if (answered) ...[
+            const SizedBox(height: 8),
+            Semantics(liveRegion: true, child: Text(ref.t('$_k.thanks'), style: _smallStyle)),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -182,10 +182,14 @@ class AskAiAllyReply extends ConsumerWidget {
 /// RN `AskAI` / Debrief error row: red[50] pill-ish banner with a blue
 /// "Retry" button.
 class AskAiErrorBanner extends ConsumerWidget {
-  const AskAiErrorBanner({super.key, required this.message, required this.onRetry});
+  const AskAiErrorBanner({super.key, required this.message, required this.onRetry, this.calm = false});
 
   final String message;
   final VoidCallback onRetry;
+
+  /// The learner debrief's Ask Ally: no red anywhere in learner feedback
+  /// (PRD §6.3), so a calm blue panel and a 44pt Retry instead.
+  final bool calm;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -193,19 +197,20 @@ class AskAiErrorBanner extends ConsumerWidget {
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.red50,
+        color: calm ? AppColors.blue50 : AppColors.red50,
         borderRadius: BorderRadius.circular(8),
+        border: calm ? Border.all(color: AppColors.blue100) : null,
       ),
       child: Row(
         children: [
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: AppFonts.ibmPlexSerifRegular,
                 fontSize: 12,
                 height: 16 / 12,
-                color: AppColors.red400,
+                color: calm ? AppColors.highEmphasis : AppColors.red400,
               ),
             ),
           ),
@@ -215,6 +220,8 @@ class AskAiErrorBanner extends ConsumerWidget {
             behavior: HitTestBehavior.opaque,
             onTap: onRetry,
             child: Container(
+              constraints: calm ? const BoxConstraints(minHeight: 44, minWidth: 44) : null,
+              alignment: calm ? Alignment.center : null,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.primary,

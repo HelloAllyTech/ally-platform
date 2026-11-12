@@ -5,9 +5,9 @@ import { DebriefTab } from "../DebriefTab";
 
 /**
  * The Debrief agent's debrief swaps in for today's supervisor note only when
- * the learner's organisation is switched on. Every other answer — the org is
- * off (`not_available`), or the request failed — must leave today's view as it
- * was, so these tests pin both sides of that swap.
+ * the learner's organisation is switched on. The org being off
+ * (`not_available`) or a refusal must leave today's view as it was; a request
+ * that failed outright says so with Try again. These tests pin each side.
  */
 
 const mockLearnerDebriefQuery = vi.hoisted(() => vi.fn());
@@ -15,7 +15,12 @@ const mockFetchAudio = vi.hoisted(() => vi.fn());
 const mockMarkRead = vi.hoisted(() => vi.fn());
 const mockMarkOpened = vi.hoisted(() => vi.fn());
 const mockReportEvent = vi.hoisted(() => vi.fn(() => ({ unwrap: () => Promise.resolve() })));
-const mockMutations = vi.hoisted(() => ({ helpful: vi.fn(), flag: vi.fn(), undo: vi.fn() }));
+const mockMutations = vi.hoisted(() => ({
+  helpful: vi.fn(),
+  flag: vi.fn(),
+  undo: vi.fn(),
+  pulse: vi.fn(),
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -38,6 +43,7 @@ vi.mock("@api", () => ({
   useGetChatHistoryQuery: () => ({ data: undefined, isLoading: false }),
   useGetLearnerDebriefQuery: (...args: unknown[]) => mockLearnerDebriefQuery(...args),
   useSetDebriefHelpfulMutation: () => [mockMutations.helpful, { isLoading: false }],
+  useAnswerDebriefPulseMutation: () => [mockMutations.pulse, { isLoading: false }],
   useFlagDebriefCardMutation: () => [mockMutations.flag, { isLoading: false }],
   useUndoDebriefFlagMutation: () => [mockMutations.undo, { isLoading: false }],
   useLazyGetDebriefCardAudioQuery: () => [mockFetchAudio],
@@ -146,17 +152,83 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     );
   });
 
-  it("falls back to today's debrief silently when the request fails", () => {
+  it("says the debrief didn't load, with Try again, when the request fails (PRD §6.12)", () => {
+    const refetch = vi.fn();
     mockLearnerDebriefQuery.mockReturnValue({
       data: undefined,
       isError: true,
       error: { status: 500 },
+      refetch,
+    });
+    renderTab();
+
+    expect(screen.getByTestId("debrief-failed")).toHaveTextContent(
+      "postSim.debriefCards.failed.title",
+    );
+    expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /postSim.debriefCards.failed.retry/ }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it("treats no connection as failed too", () => {
+    mockLearnerDebriefQuery.mockReturnValue({
+      data: undefined,
+      isError: true,
+      error: { status: "FETCH_ERROR", error: "TypeError: Failed to fetch" },
+      refetch: vi.fn(),
+    });
+    renderTab();
+    expect(screen.getByTestId("debrief-failed")).toBeInTheDocument();
+  });
+
+  it("keeps today's debrief when the server refuses (403)", () => {
+    mockLearnerDebriefQuery.mockReturnValue({
+      data: undefined,
+      isError: true,
+      error: { status: 403 },
     });
     renderTab();
 
     expect(screen.getByTestId("supervisor-note")).toHaveTextContent(NOTE);
     expect(screen.queryByTestId("debrief-cards")).not.toBeInTheDocument();
-    expect(screen.queryByText("common.somethingWentWrong")).not.toBeInTheDocument();
+  });
+
+  it("opens and closes 'How Ally writes your debrief' from the header", () => {
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "ready", cards: CARDS } });
+    renderTab();
+
+    const link = screen.getByTestId("debrief-explainer-link");
+    fireEvent.click(link);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("postSim.debriefCards.explainer.how");
+    expect(dialog).toHaveTextContent("postSim.debriefCards.explainer.supervisor");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(link).toHaveFocus();
+  });
+
+  it("asks the pulse only on a debrief the server picked, and records an answer", () => {
+    mockLearnerDebriefQuery.mockReturnValue({
+      data: { state: "ready", cards: CARDS, pulse: { knew_next: null, fair: true } },
+    });
+    renderTab();
+
+    const pulse = screen.getByTestId("debrief-pulse");
+    expect(pulse).toHaveTextContent("postSim.debriefCards.pulse.knew_next");
+    fireEvent.click(
+      within(pulse).getAllByRole("button", { name: "postSim.debriefCards.pulse.yes" })[0],
+    );
+    expect(mockMutations.pulse).toHaveBeenCalledWith({
+      sessionId: "s-1",
+      question: "knew_next",
+      answer: true,
+    });
+  });
+
+  it("asks no pulse on a debrief that wasn't picked", () => {
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "ready", cards: CARDS } });
+    renderTab();
+    expect(screen.queryByTestId("debrief-pulse")).not.toBeInTheDocument();
   });
 
   it("keeps today's debrief while the first answer is loading", () => {

@@ -10,12 +10,19 @@ import '../../../core/network/api_client.dart';
 ///
 /// `notAvailable` means the learner's organisation isn't switched on for the
 /// new debrief — callers then keep showing the existing debrief unchanged.
+///
+/// `failed` and `offline` are never sent by the server: the controller sets
+/// them when the request itself failed (a 5xx; no connection), so the
+/// learner sees "didn't load" / "You're offline" with Try again rather than
+/// the old note (PRD §6.12).
 enum LearnerDebriefState {
   ready,
   working,
   onItsWay,
   tooShort,
-  notAvailable;
+  notAvailable,
+  failed,
+  offline;
 
   static LearnerDebriefState parse(Object? value) => switch (value) {
     'ready' => ready,
@@ -418,6 +425,42 @@ class DebriefSupportLine {
   Uri get telUri => Uri(scheme: 'tel', path: phone.replaceAll(RegExp(r'[^\d+]'), ''));
 }
 
+/// Which pulse question (PRD §9); the wire value is the body's `question`
+/// and the translation-key suffix (`postSim.debriefCards.pulse.<wire>`).
+enum DebriefPulseQuestion {
+  knewNext('knew_next'),
+  fair('fair');
+
+  const DebriefPulseQuestion(this.wire);
+  final String wire;
+}
+
+/// The post-launch pulse (PRD §9): on a debrief the server picked (1 in 10,
+/// for 8 weeks), two yes/no questions and the answers so far.
+class DebriefPulse {
+  const DebriefPulse({this.knewNext, this.fair});
+
+  static DebriefPulse? parse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final knewNext = json['knew_next'];
+    final fair = json['fair'];
+    return DebriefPulse(knewNext: knewNext is bool ? knewNext : null, fair: fair is bool ? fair : null);
+  }
+
+  final bool? knewNext;
+  final bool? fair;
+
+  bool? answerTo(DebriefPulseQuestion question) => switch (question) {
+    DebriefPulseQuestion.knewNext => knewNext,
+    DebriefPulseQuestion.fair => fair,
+  };
+
+  DebriefPulse withAnswer(DebriefPulseQuestion question, bool answer) => switch (question) {
+    DebriefPulseQuestion.knewNext => DebriefPulse(knewNext: answer, fair: fair),
+    DebriefPulseQuestion.fair => DebriefPulse(knewNext: knewNext, fair: answer),
+  };
+}
+
 /// A roleplay the learner can still open, for "Practise this (next)".
 class DebriefPracticeScenario {
   const DebriefPracticeScenario({required this.id, required this.title});
@@ -440,6 +483,7 @@ class LearnerDebriefView {
     this.supportLines = const [],
     this.practice = const [],
     this.supervisor,
+    this.pulse,
   });
 
   /// `GET /debriefs/sessions/:id/supervisor` (v9 FR-26), as a read-only
@@ -485,6 +529,7 @@ class LearnerDebriefView {
         for (final p in _maps(json['practice']))
           if (_optInt(p['id']) case final id?) DebriefPracticeScenario(id: id, title: _str(p['title'])),
       ],
+      pulse: DebriefPulse.parse(json['pulse']),
     );
   }
 
@@ -512,6 +557,9 @@ class LearnerDebriefView {
   /// are read-only and show the learner's feedback instead of controls.
   final SupervisorDebriefExtras? supervisor;
 
+  /// Present only on a debrief picked for the pulse.
+  final DebriefPulse? pulse;
+
   DebriefPracticeScenario? practiceFor(int? scenarioId) =>
       scenarioId == null ? null : practice.where((p) => p.id == scenarioId).firstOrNull;
 
@@ -520,7 +568,7 @@ class LearnerDebriefView {
   bool get isShowable =>
       state != LearnerDebriefState.notAvailable && !(state == LearnerDebriefState.ready && cards == null);
 
-  LearnerDebriefView copyWith({bool? helpful, List<DebriefMyFlag>? flags}) => LearnerDebriefView(
+  LearnerDebriefView copyWith({bool? helpful, List<DebriefMyFlag>? flags, DebriefPulse? pulse}) => LearnerDebriefView(
     state: state,
     cards: cards,
     language: language,
@@ -533,6 +581,7 @@ class LearnerDebriefView {
     supportLines: supportLines,
     practice: practice,
     supervisor: supervisor,
+    pulse: pulse ?? this.pulse,
   );
 }
 
@@ -559,6 +608,14 @@ class LearnerDebriefRepository {
   /// One answer per debrief; answering again changes it.
   Future<void> setHelpful(String sessionId, {required bool helpful}) async {
     await _dio.put<void>('/debriefs/sessions/$sessionId/helpful', data: {'helpful': helpful});
+  }
+
+  /// The pulse (PRD §9): one yes/no answer per question; answering again changes it.
+  Future<void> answerPulse(String sessionId, DebriefPulseQuestion question, {required bool answer}) async {
+    await _dio.put<void>(
+      '/debriefs/sessions/$sessionId/pulse',
+      data: {'question': question.wire, 'answer': answer, 'platform': platform},
+    );
   }
 
   /// "This isn't right" on one card. A 409 (already flagged) throws like

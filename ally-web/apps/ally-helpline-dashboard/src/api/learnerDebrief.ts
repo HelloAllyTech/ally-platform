@@ -1,5 +1,10 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
-import { DebriefFlagReason, LearnerDebriefView, SupervisorDebriefView } from "@types";
+import {
+  DebriefFlagReason,
+  DebriefPulseQuestion,
+  LearnerDebriefView,
+  SupervisorDebriefView,
+} from "@types";
 
 import { baseAPI } from "./baseAPI";
 
@@ -39,6 +44,20 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.DEBRIEFS.HELPFUL(sessionId),
         method: HttpMethod.PUT,
         body: { helpful },
+      }),
+      invalidatesTags: (_r, _e, { sessionId }) => [
+        { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
+      ],
+    }),
+    /** The pulse (PRD §9): one yes/no answer per question; answering again changes it. */
+    answerDebriefPulse: builder.mutation<
+      unknown,
+      { sessionId: string; question: DebriefPulseQuestion; answer: boolean }
+    >({
+      query: ({ sessionId, question, answer }) => ({
+        url: ApiEndpoints.DEBRIEFS.PULSE(sessionId),
+        method: HttpMethod.PUT,
+        body: { question, answer, platform: "web" },
       }),
       invalidatesTags: (_r, _e, { sessionId }) => [
         { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
@@ -113,6 +132,7 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
 });
 
 export const {
+  useAnswerDebriefPulseMutation,
   useGetSupervisorDebriefQuery,
   useLazyGetDebriefCardAudioQuery,
   useMarkDebriefReadMutation,

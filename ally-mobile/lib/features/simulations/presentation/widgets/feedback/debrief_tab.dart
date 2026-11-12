@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/localization/translate_ref.dart';
+import '../../../../../core/realtime/connectivity.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_fonts.dart';
 import '../../../../../core/widgets/ask_ai_chat/ask_ai_chat.dart';
@@ -155,7 +156,7 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
           const SizedBox(height: 12),
         ],
         if (chat.error != null) ...[
-          AskAiErrorBanner(message: chat.error!, onRetry: chat.retry),
+          AskAiErrorBanner(message: chat.error!, onRetry: chat.retry, calm: true),
           const SizedBox(height: 12),
         ],
         SizedBox(key: _threadEndKey, height: 0),
@@ -223,6 +224,15 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
 
   @override
   Widget build(BuildContext context) {
+    // "You're offline … It will load when you're back online": a debrief
+    // that didn't load asks again by itself on reconnecting.
+    if (!widget.readOnly) {
+      ref.listen<AsyncValue<bool>>(isOfflineProvider, (previous, next) {
+        final state = _learnerDebrief.view?.state;
+        final failed = state == LearnerDebriefState.offline || state == LearnerDebriefState.failed;
+        if (previous?.value == true && next.value == false && failed) _learnerDebrief.retry();
+      });
+    }
     final chat = widget.chat;
     if (_showingLearnerDebrief) {
       return DebriefCards(

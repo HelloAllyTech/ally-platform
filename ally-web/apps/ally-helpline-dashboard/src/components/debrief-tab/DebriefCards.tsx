@@ -7,6 +7,7 @@ import {
   HeartHandshake,
   HelpCircle,
   Loader2,
+  RefreshCw,
   MessageSquareQuote,
   Phone,
   Sprout,
@@ -26,7 +27,8 @@ import {
   SupervisorDebriefFlag,
 } from "@types";
 
-import { CardFlag, DebriefHelpful } from "./DebriefCardFeedback";
+import { CardFlag, DebriefHelpful, DebriefPulseCard } from "./DebriefCardFeedback";
+import { DebriefExplainer } from "./DebriefExplainer";
 import {
   ListenAllBar,
   ListenButton,
@@ -453,7 +455,10 @@ const ReadyCards: FC<{
               : t("postSim.debriefCards.supervisor.helpfulNone")}
         </p>
       ) : (
-        <DebriefHelpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
+        <>
+          <DebriefHelpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
+          {view.pulse && <DebriefPulseCard sessionId={sessionId} pulse={view.pulse} />}
+        </>
       )}
     </div>
   );
@@ -522,6 +527,10 @@ interface DebriefCardsProps {
   supervisor?: SupervisorView;
   /** Ask Ally's thread and composer, under the reflective question. */
   replyThread?: ReactNode;
+  /** "Try again" on a debrief that didn't load. */
+  onRetry?: () => void;
+  /** True while that retry is in flight. */
+  retrying?: boolean;
 }
 
 /**
@@ -537,6 +546,8 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
   sessionId,
   replyThread,
   supervisor,
+  onRetry,
+  retrying = false,
 }) => {
   const { t } = useTranslation();
   const readAloud = useDebriefReadAloud(sessionId);
@@ -583,6 +594,37 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
     content = <Body>{t("postSim.debriefCards.onItsWay")}</Body>;
   } else if (view.state === "too_short") {
     content = <Body>{t("postSim.debriefCards.tooShort")}</Body>;
+  } else if (view.state === "failed") {
+    // PRD §6.12 "failed": the request itself failed. Amber, never red; the
+    // debrief is safe, so say so and offer one way forward.
+    content = (
+      <div
+        role="alert"
+        data-testid="debrief-failed"
+        className="flex flex-col gap-3 rounded-lg border-2 border-warning-300 bg-warning-50 p-4"
+      >
+        <h3 className="font-primary text-base font-semibold text-typography-900">
+          {t("postSim.debriefCards.failed.title")}
+        </h3>
+        <Body>{t("postSim.debriefCards.failed.body")}</Body>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="inline-flex min-h-[44px] items-center gap-2 self-start rounded-md bg-primary-600 px-4 font-primary text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={`h-4 w-4 ${retrying ? "animate-spin motion-reduce:animate-none" : ""}`}
+            />
+            {retrying
+              ? t("postSim.debriefCards.failed.retrying")
+              : t("postSim.debriefCards.failed.retry")}
+          </button>
+        )}
+      </div>
+    );
   } else if (view.state === "ready" && view.cards) {
     const cards = (
       <ReadyCards
@@ -608,6 +650,7 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
             <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-primary text-xs font-medium text-typography-800">
               {t("postSim.debriefCards.aiLabel")}
             </span>
+            <DebriefExplainer />
           </div>
         </div>
         <div

@@ -5,10 +5,17 @@ import { useTranslation } from "react-i18next";
 
 import {
   useFlagDebriefCardMutation,
+  useAnswerDebriefPulseMutation,
   useSetDebriefHelpfulMutation,
   useUndoDebriefFlagMutation,
 } from "@api";
-import { DebriefCorrection, DebriefFlagReason, DebriefMyFlag } from "@types";
+import {
+  DebriefCorrection,
+  DebriefFlagReason,
+  DebriefMyFlag,
+  DebriefPulse,
+  DebriefPulseQuestion,
+} from "@types";
 
 const REASONS: DebriefFlagReason[] = [
   "didnt_say",
@@ -213,6 +220,60 @@ export const DebriefHelpful: FC<{ sessionId: string; helpful: boolean | null }> 
       {helpful !== null && (
         <span role="status" className="font-primary text-xs text-typography-700">
           {t("postSim.debriefCards.helpful.thanks")}
+        </span>
+      )}
+    </div>
+  );
+};
+
+const PULSE_QUESTIONS: DebriefPulseQuestion[] = ["knew_next", "fair"];
+
+/**
+ * The post-launch pulse (PRD §9): on 1 in 10 debriefs for 8 weeks, two
+ * yes/no questions under "Was this helpful?". The server decides which
+ * debriefs ask; answering again changes the answer.
+ */
+export const DebriefPulseCard: FC<{ sessionId: string; pulse: DebriefPulse }> = ({
+  sessionId,
+  pulse,
+}) => {
+  const { t } = useTranslation();
+  const [answer, { isLoading }] = useAnswerDebriefPulseMutation();
+  const answered = PULSE_QUESTIONS.every(q => pulse[q] !== null);
+  return (
+    <div
+      data-testid="debrief-pulse"
+      className="flex flex-col gap-3 rounded-lg border border-primary-100 bg-primary-50 p-4"
+    >
+      <p className="font-primary text-sm text-typography-800">
+        {t("postSim.debriefCards.pulse.intro")}
+      </p>
+      {PULSE_QUESTIONS.map(question => (
+        <fieldset key={question} className="flex flex-wrap items-center gap-2">
+          <legend className="mb-1 w-full font-primary text-sm font-semibold text-typography-900">
+            {t(`postSim.debriefCards.pulse.${question}`)}
+          </legend>
+          {[true, false].map(value => (
+            <button
+              key={String(value)}
+              type="button"
+              aria-pressed={pulse[question] === value}
+              disabled={isLoading}
+              onClick={() => void answer({ sessionId, question, answer: value })}
+              className={`inline-flex min-h-[44px] min-w-[64px] items-center justify-center rounded-md border px-3 font-primary text-sm ${
+                pulse[question] === value
+                  ? "border-primary-600 bg-white font-semibold text-typography-900"
+                  : "border-primary-100 bg-white text-typography-800"
+              }`}
+            >
+              {value ? t("postSim.debriefCards.pulse.yes") : t("postSim.debriefCards.pulse.no")}
+            </button>
+          ))}
+        </fieldset>
+      ))}
+      {answered && (
+        <span role="status" className="font-primary text-xs text-typography-700">
+          {t("postSim.debriefCards.pulse.thanks")}
         </span>
       )}
     </div>

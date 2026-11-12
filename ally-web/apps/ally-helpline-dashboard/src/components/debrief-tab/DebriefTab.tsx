@@ -87,9 +87,14 @@ export const DebriefTab: FC<DebriefTabProps> = ({
 
   const sessionExists = useSelector((state: RootState) => state.chatHistory.sessions[sessionId]);
   // The Debrief agent's debrief replaces everything below once the learner's
-  // organisation is switched on. `null` — not switched on, request failed,
-  // or still loading — keeps today's debrief exactly as it was.
-  const learnerDebrief = useLearnerDebrief(sessionId);
+  // organisation is switched on. `null` — not switched on, refused, or still
+  // loading — keeps today's debrief exactly as it was; a request that failed
+  // outright shows "didn't load" with Try again.
+  const {
+    view: learnerDebrief,
+    retry: retryDebrief,
+    retrying: retryingDebrief,
+  } = useLearnerDebrief(sessionId);
   // Roleplay Logs (read-only): a supervisor reads the learner's new debrief,
   // their flags and their Ask Ally thread (v9 FR-26). Anything else — not
   // switched on, an older session, a refusal — keeps today's note.
@@ -150,11 +155,13 @@ export const DebriefTab: FC<DebriefTabProps> = ({
           agentName={agentName}
         />
       )}
+      {/* No red anywhere in learner feedback (PRD §6.3): the same calm
+          outline as "Check again". */}
       {error && (
         <div className="flex w-full justify-start">
           <button
             onClick={retryLastMessage}
-            className="flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2.5 font-primary text-sm text-red-600 transition-colors hover:bg-red-100"
+            className="flex min-h-[44px] items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-2.5 font-primary text-sm text-primary-600 transition-colors hover:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
           >
             <Refresh className="h-4 w-4" />
             {t("common.somethingWentWrong")} {t("common.retry")}
@@ -208,6 +215,8 @@ export const DebriefTab: FC<DebriefTabProps> = ({
       <DebriefCards
         view={learnerDebrief}
         sessionId={sessionId}
+        onRetry={retryDebrief}
+        retrying={retryingDebrief}
         replyThread={
           askAlly ? (
             <div data-testid="ask-ally" className="flex flex-col gap-3">
