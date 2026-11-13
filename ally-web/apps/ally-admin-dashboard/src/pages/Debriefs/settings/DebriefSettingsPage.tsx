@@ -40,6 +40,7 @@ import { getErrorMessage, hasFeature } from "@utils";
 
 import { gateMeasureLabel, inWords, settingName, settingValueLabel } from "../consoleLabels";
 import { SettingsSection } from "../consoleRoutes";
+import { TruncatedTitle } from "../consoleRows";
 import { BackLink, ConsoleTag, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { OrganisationsSection } from "./OrganisationsSection";
@@ -55,6 +56,8 @@ export const DEBRIEF_GUIDANCE_COLLECTION = "debrief_guidance";
  * (old `#guidance` links) are views too, but not tabs.
  */
 const TABS: SettingsSection[] = ["orgs", "budget", "tests", "autonomy", "weights", "pinned"];
+/** The tabs that move into More below lg (1056px), last first, so the tab row never wraps. */
+const NARROW_MORE: SettingsSection[] = ["weights", "pinned"];
 
 const Section: React.FC<{
   id: SettingsSection;
@@ -611,20 +614,27 @@ export const DebriefSettingsPage: React.FC = () => {
   const inMore = !TABS.includes(current);
   return (
     <div className="flex flex-col gap-6 font-primary" data-testid="debrief-settings-page">
-      <div className="flex flex-wrap items-center gap-3">
-        <BackLink to={ROUTES.DEBRIEFS}>{en.debriefs.title}</BackLink>
-        <h1 className="font-secondary text-[28px] font-normal">{s.title}</h1>
-        <span className="text-[13px] text-neutral-600" data-testid="settings-owner-note">
-          {s.ownerOnly}
-        </span>
+      {/* One row: back, title, the read-only tag, then the owner note, which truncates first. */}
+      <div className="flex flex-nowrap items-center gap-3" data-testid="settings-header">
+        <div className="shrink-0">
+          <BackLink to={ROUTES.DEBRIEFS}>{en.debriefs.title}</BackLink>
+        </div>
+        <h1 className="shrink-0 whitespace-nowrap font-secondary text-[28px] font-normal">
+          {s.title}
+        </h1>
         {!access.settings && <ConsoleTag>{s.readOnly}</ConsoleTag>}
+        <TruncatedTitle
+          text={s.ownerOnly}
+          className="text-[13px] text-neutral-600"
+          testId="settings-owner-note"
+        />
       </div>
       {/* The PM agent page's tabs, kept in view while a long section scrolls. The page scrolls
           inside a padded container (p-4 / lg:p-6): stick at minus that padding and fill it, or the
           section shows through the strip above the tabs. The negative margin keeps the row in place. */}
       <nav
         aria-label={s.tabsLabel}
-        className="sticky -top-4 z-10 -mt-4 flex flex-wrap items-end gap-6 border-b border-neutral-100 bg-white pt-4 text-sm lg:-top-6 lg:-mt-6 lg:pt-6"
+        className="sticky -top-4 z-10 -mt-4 flex flex-nowrap items-end gap-6 border-b border-neutral-100 bg-white pt-4 text-sm lg:-top-6 lg:-mt-6 lg:pt-6"
         data-testid="settings-tabs"
       >
         {TABS.map(id => (
@@ -633,41 +643,49 @@ export const DebriefSettingsPage: React.FC = () => {
             to={to(id)}
             aria-current={id === current ? "page" : undefined}
             data-testid={`settings-tab-${id}`}
-            className={`whitespace-nowrap py-2.5 no-underline ${id === current ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
+            className={`whitespace-nowrap py-2.5 no-underline ${NARROW_MORE.includes(id) ? "hidden lg:inline" : ""} ${id === current ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
           >
             {s.nav[id]}
           </Link>
         ))}
-        {(schedules || canOpenGuidance) && (
-          <OverflowMenu
-            size="sm"
-            align="bottom-start"
-            renderIcon={() => (
-              <span className="flex items-center gap-1 text-sm">
-                {s.more}
-                <ChevronDown size={12} aria-hidden="true" />
-              </span>
-            )}
-            iconDescription={s.more}
-            className={`!h-auto !w-auto !bg-transparent !px-0 py-2.5 ${inMore ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
-            data-testid="settings-more"
-          >
-            {schedules && (
-              <OverflowMenuItem
-                itemText={s.nav.schedules}
-                onClick={() => navigate(to("schedules"))}
-              />
-            )}
-            {canOpenGuidance && (
-              <OverflowMenuItem
-                itemText={s.guidanceLink}
-                onClick={() =>
-                  navigate(`${ROUTES.CONTEXT_LIBRARY}?collection=${DEBRIEF_GUIDANCE_COLLECTION}`)
-                }
-              />
-            )}
-          </OverflowMenu>
-        )}
+        {/* More holds Schedules and Guidance; below lg also the last tabs, so the row never wraps.
+            With nothing else to hold, it shows only below lg. */}
+        <OverflowMenu
+          size="sm"
+          align="bottom-start"
+          renderIcon={() => (
+            <span className="flex items-center gap-1 text-sm">
+              {s.more}
+              <ChevronDown size={12} aria-hidden="true" />
+            </span>
+          )}
+          iconDescription={s.more}
+          className={`!h-auto !w-auto shrink-0 !bg-transparent !px-0 py-2.5 ${schedules || canOpenGuidance ? "" : "lg:!hidden"} ${inMore ? "border-b-2 border-primary-500 font-semibold text-typography-900" : NARROW_MORE.includes(current) ? "text-neutral-600 max-lg:border-b-2 max-lg:border-primary-500 max-lg:font-semibold max-lg:text-typography-900" : "text-neutral-600"}`}
+          data-testid="settings-more"
+        >
+          {NARROW_MORE.map(id => (
+            <OverflowMenuItem
+              key={id}
+              itemText={s.nav[id]}
+              wrapperClassName="lg:hidden"
+              onClick={() => navigate(to(id))}
+            />
+          ))}
+          {schedules && (
+            <OverflowMenuItem
+              itemText={s.nav.schedules}
+              onClick={() => navigate(to("schedules"))}
+            />
+          )}
+          {canOpenGuidance && (
+            <OverflowMenuItem
+              itemText={s.guidanceLink}
+              onClick={() =>
+                navigate(`${ROUTES.CONTEXT_LIBRARY}?collection=${DEBRIEF_GUIDANCE_COLLECTION}`)
+              }
+            />
+          )}
+        </OverflowMenu>
       </nav>
       <div className="flex min-w-0 max-w-[960px] flex-col gap-8">
         {current === "orgs" && (

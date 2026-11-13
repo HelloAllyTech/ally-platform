@@ -22,6 +22,13 @@ import {
   pmAgentPath,
   settingsPath,
 } from "../consoleRoutes";
+import {
+  FilterChip,
+  FilterChips,
+  KeyboardHint,
+  MoreActions,
+  MoreFiltersButton,
+} from "../consoleRows";
 import { AlertBanner } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import {
@@ -72,7 +79,7 @@ const Filter: React.FC<{
   options: Item[];
   onChange: (v: string) => void;
 }> = ({ id, label, value, options, onChange }) => (
-  <div className="w-full sm:w-48" data-testid={`home-filter-${id}`}>
+  <div className="w-full min-w-0 sm:w-48 sm:shrink" data-testid={`home-filter-${id}`}>
     <Dropdown
       id={`debriefs-filter-${id}`}
       size="md"
@@ -156,6 +163,10 @@ export const DebriefsHome: React.FC = () => {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [polling, setPolling] = useState(false);
+  // More filters starts open when one of the filters behind it is set, so a shared link shows it.
+  const [moreOpen, setMoreOpen] = useState(() =>
+    ["fallback", "riskCue", "cost"].some(k => params.get(k)),
+  );
   const attention = useGetDebriefAttentionQuery(undefined, { pollingInterval: 60_000 });
   // The access before the list has said: the attention payload, then the user's permissions.
   const preAccess = useDebriefAccess(attention.data?.viewer);
@@ -261,6 +272,85 @@ export const DebriefsHome: React.FC = () => {
     ...more,
   ];
 
+  type FilterDef = {
+    id: keyof typeof h.filters;
+    key: (typeof FILTER_KEYS)[number];
+    options: Item[];
+  };
+  const filterDefs: FilterDef[] = [
+    {
+      id: "org",
+      key: "tenantId",
+      options: opts(
+        "org",
+        (options?.tenants ?? []).map(t => ({ id: t.id, label: t.name })),
+      ),
+    },
+    {
+      id: "language",
+      key: "language",
+      options: opts(
+        "language",
+        (options?.languages ?? []).map(l => ({ id: l, label: languageLabel(l) })),
+      ),
+    },
+    {
+      id: "recipe",
+      key: "recipe",
+      options: opts(
+        "recipe",
+        (options?.recipes ?? []).map(r => ({ id: r, label: recipeLabel(r) })),
+      ),
+    },
+    {
+      id: "fallback",
+      key: "fallback",
+      options: opts(
+        "fallback",
+        (["none", "light", "heavy"] as const).map(id => ({ id, label: h.filters.fallback[id] })),
+      ),
+    },
+    {
+      id: "risk",
+      key: "riskCue",
+      options: opts(
+        "risk",
+        (["true", "false"] as const).map(id => ({ id, label: h.filters.risk[id] })),
+      ),
+    },
+    {
+      id: "cost",
+      key: "cost",
+      options: opts(
+        "cost",
+        (["over_0_20", "hit_ceiling"] as const).map(id => ({ id, label: h.filters.cost[id] })),
+      ),
+    },
+  ];
+  const mainFilters = filterDefs.slice(0, 3);
+  const moreFilters = filterDefs.slice(3);
+  const valueOf = (f: FilterDef) => filters[f.key] ?? "";
+  const hiddenActive = moreFilters.filter(f => valueOf(f)).length;
+  const chips: FilterChip[] = filterDefs
+    .filter(f => valueOf(f))
+    .map(f => ({
+      id: f.id,
+      label: `${h.filters[f.id].label}: ${
+        f.options.find(o => o.id === valueOf(f))?.label ?? valueOf(f)
+      }`,
+      onRemove: () => set({ [f.key]: null }),
+    }));
+  const renderFilter = (f: FilterDef) => (
+    <Filter
+      key={f.id}
+      id={f.id}
+      label={h.filters[f.id].label}
+      value={valueOf(f)}
+      options={f.options}
+      onChange={v => set({ [f.key]: v })}
+    />
+  );
+
   return (
     <div className="flex flex-col gap-5 font-primary" data-testid="debriefs-home">
       <header className="flex flex-col gap-1.5">
@@ -296,8 +386,13 @@ export const DebriefsHome: React.FC = () => {
         </AlertBanner>
       ))}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-[16rem]" data-testid="home-category">
+      {/* One row at lg and up: Show, then layout, Analytics and PM agent; Settings goes in More.
+          Below lg the actions take a second row, on purpose (design B1, 2026-11-13). */}
+      <div
+        className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-center"
+        data-testid="home-toolbar"
+      >
+        <div className="min-w-[16rem] lg:shrink-0" data-testid="home-category">
           <Dropdown
             id="debriefs-category"
             type="inline"
@@ -313,150 +408,112 @@ export const DebriefsHome: React.FC = () => {
             }}
           />
         </div>
-        <div className="flex-1" />
-        <div
-          role="group"
-          aria-label={h.layoutLabel}
-          className="flex overflow-hidden rounded-sm border border-neutral-400"
-        >
-          {(["cards", "list"] as const).map((v, i) => (
-            <button
-              key={v}
-              type="button"
-              aria-label={h.layout[v]}
-              aria-pressed={list === (v === "list")}
-              onClick={() => set({ view: v === "list" ? "list" : null })}
-              className={[
-                "flex h-[34px] w-10 items-center justify-center",
-                i ? "border-l border-neutral-400" : "",
-                list === (v === "list") ? "bg-neutral-100" : "bg-white",
-              ].join(" ")}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="#393939"
-                strokeWidth="1.5"
-                aria-hidden="true"
+        <div className="hidden min-w-0 flex-1 lg:block" />
+        <div className="flex flex-nowrap items-center gap-3" data-testid="home-actions">
+          <div
+            role="group"
+            aria-label={h.layoutLabel}
+            className="flex shrink-0 overflow-hidden rounded-sm border border-neutral-400"
+          >
+            {(["cards", "list"] as const).map((v, i) => (
+              <button
+                key={v}
+                type="button"
+                aria-label={h.layout[v]}
+                aria-pressed={list === (v === "list")}
+                onClick={() => set({ view: v === "list" ? "list" : null })}
+                className={[
+                  "flex h-[34px] w-10 items-center justify-center",
+                  i ? "border-l border-neutral-400" : "",
+                  list === (v === "list") ? "bg-neutral-100" : "bg-white",
+                ].join(" ")}
               >
-                {v === "cards" ? (
-                  <>
-                    <rect x="2" y="2" width="5" height="5" rx="1" />
-                    <rect x="9" y="2" width="5" height="5" rx="1" />
-                    <rect x="2" y="9" width="5" height="5" rx="1" />
-                    <rect x="9" y="9" width="5" height="5" rx="1" />
-                  </>
-                ) : (
-                  <path d="M2 4h12M2 8h12M2 12h12" />
-                )}
-              </svg>
-            </button>
-          ))}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="#393939"
+                  strokeWidth="1.5"
+                  aria-hidden="true"
+                >
+                  {v === "cards" ? (
+                    <>
+                      <rect x="2" y="2" width="5" height="5" rx="1" />
+                      <rect x="9" y="2" width="5" height="5" rx="1" />
+                      <rect x="2" y="9" width="5" height="5" rx="1" />
+                      <rect x="9" y="9" width="5" height="5" rx="1" />
+                    </>
+                  ) : (
+                    <path d="M2 4h12M2 8h12M2 12h12" />
+                  )}
+                </svg>
+              </button>
+            ))}
+          </div>
+          <Link
+            to={analyticsDebriefsPath()}
+            data-testid="analytics-button"
+            className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
+          >
+            <BarChart3 aria-hidden="true" className="h-4 w-4" />
+            {h.analytics}
+          </Link>
+          <Link
+            to={pmAgentPath()}
+            data-testid="pm-agent-button"
+            className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
+          >
+            {h.pmAgent}
+            {needsYou > 0 && (
+              <span
+                aria-label={h.needsYouCount(needsYou)}
+                data-testid="pm-needs-you"
+                className="rounded-full bg-primary-500 px-[7px] py-px text-[11px] font-semibold text-white"
+              >
+                {needsYou}
+              </span>
+            )}
+          </Link>
+          <MoreActions
+            testId="home-more"
+            items={[{ id: "settings", label: h.settings, to: settingsPath() }]}
+          />
         </div>
-        <Link
-          to={analyticsDebriefsPath()}
-          data-testid="analytics-button"
-          className="inline-flex h-9 items-center gap-2 rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
-        >
-          <BarChart3 aria-hidden="true" className="h-4 w-4" />
-          {h.analytics}
-        </Link>
-        <Link
-          to={pmAgentPath()}
-          data-testid="pm-agent-button"
-          className="inline-flex h-9 items-center gap-2 rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
-        >
-          {h.pmAgent}
-          {needsYou > 0 && (
-            <span
-              aria-label={h.needsYouCount(needsYou)}
-              data-testid="pm-needs-you"
-              className="rounded-full bg-primary-500 px-[7px] py-px text-[11px] font-semibold text-white"
-            >
-              {needsYou}
-            </span>
-          )}
-        </Link>
-        <Link
-          to={settingsPath()}
-          className="inline-flex h-9 items-center gap-2 rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
-        >
-          {h.settings}
-        </Link>
       </div>
 
-      <div
-        className="flex flex-wrap items-center gap-2 border-b border-neutral-100 pb-4"
-        data-testid="home-filters"
-      >
-        <Filter
-          id="org"
-          label={h.filters.org.label}
-          value={filters.tenantId ?? ""}
-          options={opts(
-            "org",
-            (options?.tenants ?? []).map(t => ({ id: t.id, label: t.name })),
-          )}
-          onChange={v => set({ tenantId: v })}
+      {/* The three most-used filters stay in the bar; fallback step, risk cue and cost sit behind
+          More filters, which counts the ones set. Every set filter shows as a removable chip. */}
+      <div className="flex flex-col gap-2.5 border-b border-neutral-100 pb-4">
+        <div
+          className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center"
+          data-testid="home-filters"
+        >
+          {mainFilters.map(renderFilter)}
+          <MoreFiltersButton
+            open={moreOpen}
+            onToggle={() => setMoreOpen(o => !o)}
+            active={hiddenActive}
+            controls="home-more-filters"
+            testId="home-more-filters-button"
+          />
+          <div className="hidden min-w-0 flex-1 sm:block" />
+          <KeyboardHint keys={access.escalate ? h.keys : h.keysNoEscalate} testId="home-keys" />
+        </div>
+        {moreOpen && (
+          <div
+            id="home-more-filters"
+            className="flex flex-col gap-2 bg-neutral-50 p-3 sm:flex-row sm:flex-nowrap sm:items-center"
+            data-testid="home-more-filters"
+          >
+            {moreFilters.map(renderFilter)}
+          </div>
+        )}
+        <FilterChips
+          chips={chips}
+          onClearAll={() => set(Object.fromEntries(FILTER_KEYS.map(k => [k, null])))}
+          testId="home-chips"
         />
-        <Filter
-          id="language"
-          label={h.filters.language.label}
-          value={filters.language ?? ""}
-          options={opts(
-            "language",
-            (options?.languages ?? []).map(l => ({ id: l, label: languageLabel(l) })),
-          )}
-          onChange={v => set({ language: v })}
-        />
-        <Filter
-          id="recipe"
-          label={h.filters.recipe.label}
-          value={filters.recipe ?? ""}
-          options={opts(
-            "recipe",
-            (options?.recipes ?? []).map(r => ({ id: r, label: recipeLabel(r) })),
-          )}
-          onChange={v => set({ recipe: v })}
-        />
-        <Filter
-          id="fallback"
-          label={h.filters.fallback.label}
-          value={filters.fallback ?? ""}
-          options={opts(
-            "fallback",
-            (["none", "light", "heavy"] as const).map(id => ({
-              id,
-              label: h.filters.fallback[id],
-            })),
-          )}
-          onChange={v => set({ fallback: v })}
-        />
-        <Filter
-          id="risk"
-          label={h.filters.risk.label}
-          value={filters.riskCue ?? ""}
-          options={opts(
-            "risk",
-            (["true", "false"] as const).map(id => ({ id, label: h.filters.risk[id] })),
-          )}
-          onChange={v => set({ riskCue: v })}
-        />
-        <Filter
-          id="cost"
-          label={h.filters.cost.label}
-          value={filters.cost ?? ""}
-          options={opts(
-            "cost",
-            (["over_0_20", "hit_ceiling"] as const).map(id => ({ id, label: h.filters.cost[id] })),
-          )}
-          onChange={v => set({ cost: v })}
-        />
-        <span className="ml-auto text-xs text-neutral-600" data-testid="home-keys">
-          {access.escalate ? h.keys : h.keysNoEscalate}
-        </span>
       </div>
 
       {queueNote && shown.length > 0 && (

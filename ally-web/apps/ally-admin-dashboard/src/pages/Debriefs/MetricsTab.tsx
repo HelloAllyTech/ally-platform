@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import "@carbon/charts/styles.css";
 import "../Analytics/analytics-carbon.scss";
 
-import { Button, CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
+import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetDebriefMetricsQuery } from "@api";
 import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { InfoTip } from "@components/ally-guide/InfoTip";
@@ -23,6 +23,7 @@ import {
 } from "@types";
 
 import { languageLabel } from "./consoleLabels";
+import { FilterChip, FilterChips, MoreFiltersButton } from "./consoleRows";
 import { ChangeWhiskers, WhiskerRow } from "../Analytics/ChangeWhiskers";
 import { ChartCard, KpiTile, lineOpts, PALETTE } from "../Analytics/chartKit";
 import { CONTEXT, stableScale } from "../Analytics/chartScales";
@@ -1065,99 +1066,129 @@ const SegmentBar: React.FC<{
   onSegment: (s: DebriefPassRateSegment) => void;
 }> = ({ options, segment, onSegment }) => {
   const g = en.debriefs.metrics.quality.segments;
+  const [moreOpen, setMoreOpen] = useState(
+    () => !!(segment.sessionLength || segment.stepModel || segment.risk),
+  );
   if (!options) return null;
   type Item = { id: string; label: string };
+  type Def = {
+    id: keyof DebriefPassRateSegment;
+    label: string;
+    choices: Item[];
+    onChange: (v: string) => void;
+    width?: string;
+  };
   const set = (patch: Partial<DebriefPassRateSegment>) => onSegment({ ...segment, ...patch });
-  const pick = (
-    id: keyof DebriefPassRateSegment,
-    label: string,
-    choices: Item[],
-    onChange: (v: string) => void,
-    width = "sm:w-48",
-  ) => {
-    const value = segment[id];
-    // Keep a set filter visible even if its value left the window, so it can be cleared.
-    if (choices.length === 0 && value === undefined) return null;
-    const items: Item[] = [{ id: "", label: g.allOf[id] }, ...choices];
+  const defs: Def[] = [
+    {
+      id: "skill",
+      label: g.skill,
+      choices: (options.skills ?? []).map(x => ({ id: x, label: x })),
+      onChange: v => set({ skill: v || undefined }),
+    },
+    {
+      id: "scenarioId",
+      label: g.scenario,
+      choices: (options.scenarios ?? []).map(x => ({ id: String(x.id), label: x.name })),
+      onChange: v => set({ scenarioId: v ? Number(v) : undefined }),
+    },
+    {
+      id: "courseId",
+      label: g.course,
+      choices: (options.courses ?? []).map(x => ({ id: String(x.id), label: x.name })),
+      onChange: v => set({ courseId: v ? Number(v) : undefined }),
+    },
+    {
+      id: "sessionLength",
+      label: g.sessionLength,
+      choices: (options.sessionLengths ?? []).map(x => ({ id: x, label: g.length(x) })),
+      onChange: v => set({ sessionLength: v || undefined }),
+      width: "sm:w-48",
+    },
+    {
+      id: "stepModel",
+      label: g.stepModel,
+      choices: (options.stepModels ?? []).map(x => ({ id: x, label: groupLabel(x) })),
+      onChange: v => set({ stepModel: v || undefined }),
+      width: "sm:w-64",
+    },
+    {
+      id: "risk",
+      label: g.risk,
+      choices: (options.risks ?? []).map(x => ({ id: x, label: g.risks[x] ?? x })),
+      onChange: v => set({ risk: (v || undefined) as DebriefPassRateSegment["risk"] }),
+      width: "sm:w-64",
+    },
+  ];
+  const valueOf = (d: Def) => {
+    const v = segment[d.id];
+    return v === undefined ? "" : String(v);
+  };
+  // Keep a set filter visible even if its value left the window, so it can be cleared.
+  const offered = defs.filter(d => d.choices.length > 0 || valueOf(d));
+  const pick = (d: Def) => {
+    const items: Item[] = [{ id: "", label: g.allOf[d.id] }, ...d.choices];
     return (
-      <div className={`w-full ${width}`} key={id} data-testid={`metrics-segment-${id}`}>
+      <div
+        className={`w-full min-w-0 sm:shrink ${d.width ?? "sm:w-56"}`}
+        key={d.id}
+        data-testid={`metrics-segment-${d.id}`}
+      >
         <Dropdown
-          id={`debrief-pass-rate-${id}`}
+          id={`debrief-pass-rate-${d.id}`}
           size="md"
-          titleText={label}
+          titleText={d.label}
           hideLabel
-          label={label}
+          label={d.label}
           items={items}
-          selectedItem={
-            items.find(i => i.id === (value === undefined ? "" : String(value))) ?? items[0]
-          }
+          selectedItem={items.find(i => i.id === valueOf(d)) ?? items[0]}
           itemToString={(item: Item | null) => item?.label ?? ""}
           onChange={({ selectedItem }: { selectedItem: Item | null }) =>
-            onChange(selectedItem?.id ?? "")
+            d.onChange(selectedItem?.id ?? "")
           }
         />
       </div>
     );
   };
-  const active = Object.values(segment).some(v => v !== undefined && v !== "");
+  // Skill, scenario and course stay in the row; the rest sit behind More filters.
+  const main = offered.filter(d => ["skill", "scenarioId", "courseId"].includes(d.id));
+  const more = offered.filter(d => !main.includes(d));
+  const chips: FilterChip[] = offered
+    .filter(d => valueOf(d))
+    .map(d => ({
+      id: d.id,
+      label: `${d.label}: ${d.choices.find(c => c.id === valueOf(d))?.label ?? valueOf(d)}`,
+      onRemove: () => {
+        const next = { ...segment };
+        delete next[d.id];
+        onSegment(next);
+      },
+    }));
   return (
     <div className="flex flex-col gap-2" data-testid="metrics-segments">
-      <div className="flex flex-wrap items-end gap-3">
-        {pick(
-          "skill",
-          g.skill,
-          (options.skills ?? []).map(x => ({ id: x, label: x })),
-          v => set({ skill: v || undefined }),
-          "sm:w-56",
-        )}
-        {pick(
-          "scenarioId",
-          g.scenario,
-          (options.scenarios ?? []).map(x => ({ id: String(x.id), label: x.name })),
-          v => set({ scenarioId: v ? Number(v) : undefined }),
-          "sm:w-56",
-        )}
-        {pick(
-          "courseId",
-          g.course,
-          (options.courses ?? []).map(x => ({ id: String(x.id), label: x.name })),
-          v => set({ courseId: v ? Number(v) : undefined }),
-          "sm:w-56",
-        )}
-        {pick(
-          "sessionLength",
-          g.sessionLength,
-          (options.sessionLengths ?? []).map(x => ({ id: x, label: g.length(x) })),
-          v => set({ sessionLength: v || undefined }),
-        )}
-        {pick(
-          "stepModel",
-          g.stepModel,
-          (options.stepModels ?? []).map(x => ({ id: x, label: groupLabel(x) })),
-          v => set({ stepModel: v || undefined }),
-          "sm:w-64",
-        )}
-        {pick(
-          "risk",
-          g.risk,
-          (options.risks ?? []).map(x => ({ id: x, label: g.risks[x] ?? x })),
-          v => set({ risk: (v || undefined) as DebriefPassRateSegment["risk"] }),
-          "sm:w-64",
-        )}
-        {active && (
-          <div className="flex items-center">
-            <Button
-              kind="ghost"
-              size="md"
-              data-testid="metrics-segment-clear"
-              onClick={() => onSegment({})}
-            >
-              {g.clear}
-            </Button>
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-nowrap sm:items-end">
+        {main.map(pick)}
+        {more.length > 0 && (
+          <MoreFiltersButton
+            open={moreOpen}
+            onToggle={() => setMoreOpen(o => !o)}
+            active={more.filter(d => valueOf(d)).length}
+            controls="metrics-segment-more"
+            testId="metrics-segment-more-button"
+          />
         )}
       </div>
-      {active && <p className="text-xs text-typography-700">{g.note}</p>}
+      {moreOpen && more.length > 0 && (
+        <div
+          id="metrics-segment-more"
+          className="flex flex-col gap-3 bg-neutral-50 p-3 sm:flex-row sm:flex-nowrap sm:items-end"
+          data-testid="metrics-segment-more"
+        >
+          {more.map(pick)}
+        </div>
+      )}
+      <FilterChips chips={chips} onClearAll={() => onSegment({})} testId="metrics-segment-chips" />
+      {chips.length > 0 && <p className="text-xs text-typography-700">{g.note}</p>}
     </div>
   );
 };
@@ -1173,99 +1204,136 @@ const FilterBar: React.FC<{
   onFilter: (f: DebriefMetricsFilter) => void;
 }> = ({ options, filter, onFilter }) => {
   const s = en.debriefs.metrics.filters;
+  const [moreOpen, setMoreOpen] = useState(
+    () =>
+      filter.learnerLevel !== undefined ||
+      filter.releaseVersion !== undefined ||
+      filter.judgeVersion !== undefined,
+  );
   if (!options) return null;
   const set = (patch: Partial<DebriefMetricsFilter>) => onFilter({ ...filter, ...patch });
   type Item = { id: string; label: string };
-  const pick = (
-    id: string,
-    label: string,
-    value: string | number | undefined,
-    choices: Item[],
-    onChange: (v: string) => void,
-    width = "sm:w-44",
-  ) => {
-    const items: Item[] = [{ id: "", label: s.allOf[id] ?? s.all }, ...choices];
+  type Def = {
+    id: string;
+    key: keyof DebriefMetricsFilter;
+    label: string;
+    choices: Item[];
+    onChange: (v: string) => void;
+    width?: string;
+  };
+  const defs: Def[] = [
+    {
+      id: "organisation",
+      key: "tenantId",
+      label: s.organisation,
+      choices: options.organisations.map(o => ({ id: o.id, label: o.name })),
+      onChange: v => set({ tenantId: v || undefined }),
+      width: "sm:w-52",
+    },
+    {
+      id: "language",
+      key: "language",
+      label: s.language,
+      choices: options.languages.map(l => ({ id: l, label: l })),
+      onChange: v => set({ language: v || undefined }),
+    },
+    {
+      id: "recipe",
+      key: "recipe",
+      label: s.recipe,
+      choices: options.recipes.map(r => ({ id: r, label: s.recipes[r] ?? r })),
+      onChange: v => set({ recipe: v || undefined }),
+    },
+    {
+      id: "learnerLevel",
+      key: "learnerLevel",
+      label: s.learnerLevel,
+      choices: options.learnerLevels.map(l => ({ id: l, label: s.levels[l] ?? l })),
+      onChange: v => set({ learnerLevel: v || undefined }),
+      width: "sm:w-56",
+    },
+    {
+      id: "releaseVersion",
+      key: "releaseVersion",
+      label: s.releaseVersion,
+      choices: options.releaseVersions.map(v => ({ id: String(v), label: s.release(v) })),
+      onChange: v => set({ releaseVersion: v ? Number(v) : undefined }),
+      width: "sm:w-40",
+    },
+    {
+      id: "judgeVersion",
+      key: "judgeVersion",
+      label: s.judgeVersion,
+      choices: options.judgeVersions.map(v => ({ id: v, label: v })),
+      onChange: v => set({ judgeVersion: v || undefined }),
+      width: "sm:w-56",
+    },
+  ];
+  const valueOf = (d: Def) => {
+    const v = filter[d.key];
+    return v === undefined ? "" : String(v);
+  };
+  const pick = (d: Def) => {
+    const items: Item[] = [{ id: "", label: s.allOf[d.id] ?? s.all }, ...d.choices];
     return (
-      <div className={`w-full ${width}`} key={id} data-testid={`metrics-filter-${id}`}>
+      <div
+        className={`w-full min-w-0 sm:shrink ${d.width ?? "sm:w-44"}`}
+        key={d.id}
+        data-testid={`metrics-filter-${d.id}`}
+      >
         <Dropdown
-          id={`debrief-metrics-${id}`}
+          id={`debrief-metrics-${d.id}`}
           size="md"
-          titleText={label}
+          titleText={d.label}
           hideLabel
-          label={label}
+          label={d.label}
           items={items}
-          selectedItem={
-            items.find(i => i.id === (value === undefined ? "" : String(value))) ?? items[0]
-          }
+          selectedItem={items.find(i => i.id === valueOf(d)) ?? items[0]}
           itemToString={(item: Item | null) => item?.label ?? ""}
           onChange={({ selectedItem }: { selectedItem: Item | null }) =>
-            onChange(selectedItem?.id ?? "")
+            d.onChange(selectedItem?.id ?? "")
           }
         />
       </div>
     );
   };
-  const active = Object.values(filter).some(v => v !== undefined && v !== "");
+  // Organisation, language and debrief type sit in the page's filter row beside the time range;
+  // learner level, release and judge version sit behind More filters, which counts the set ones.
+  const main = defs.slice(0, 3);
+  const more = defs.slice(3);
+  const chips: FilterChip[] = defs
+    .filter(d => valueOf(d))
+    .map(d => ({
+      id: d.id,
+      label: `${d.label}: ${d.choices.find(c => c.id === valueOf(d))?.label ?? valueOf(d)}`,
+      onRemove: () => {
+        const next = { ...filter };
+        delete next[d.key];
+        onFilter(next);
+      },
+    }));
   return (
-    <TabControls>
-      {pick(
-        "organisation",
-        s.organisation,
-        filter.tenantId,
-        options.organisations.map(o => ({ id: o.id, label: o.name })),
-        v => set({ tenantId: v || undefined }),
-        "sm:w-56",
-      )}
-      {pick(
-        "language",
-        s.language,
-        filter.language,
-        options.languages.map(l => ({ id: l, label: l })),
-        v => set({ language: v || undefined }),
-      )}
-      {pick(
-        "learnerLevel",
-        s.learnerLevel,
-        filter.learnerLevel,
-        options.learnerLevels.map(l => ({ id: l, label: s.levels[l] ?? l })),
-        v => set({ learnerLevel: v || undefined }),
-        "sm:w-56",
-      )}
-      {pick(
-        "recipe",
-        s.recipe,
-        filter.recipe,
-        options.recipes.map(r => ({ id: r, label: s.recipes[r] ?? r })),
-        v => set({ recipe: v || undefined }),
-      )}
-      {pick(
-        "releaseVersion",
-        s.releaseVersion,
-        filter.releaseVersion,
-        options.releaseVersions.map(v => ({ id: String(v), label: s.release(v) })),
-        v => set({ releaseVersion: v ? Number(v) : undefined }),
-        "sm:w-40",
-      )}
-      {pick(
-        "judgeVersion",
-        s.judgeVersion,
-        filter.judgeVersion,
-        options.judgeVersions.map(v => ({ id: v, label: v })),
-        v => set({ judgeVersion: v || undefined }),
-        "sm:w-56",
-      )}
-      {active && (
-        <div className="flex items-center">
-          <Button
-            kind="ghost"
-            size="md"
-            data-testid="metrics-filter-clear"
-            onClick={() => onFilter({})}
-          >
-            {s.clear}
-          </Button>
+    <>
+      <TabControls>
+        {main.map(pick)}
+        <MoreFiltersButton
+          open={moreOpen}
+          onToggle={() => setMoreOpen(o => !o)}
+          active={more.filter(d => valueOf(d)).length}
+          controls="metrics-filter-more"
+          testId="metrics-filter-more-button"
+        />
+      </TabControls>
+      {moreOpen && (
+        <div
+          id="metrics-filter-more"
+          className="flex flex-col gap-3 bg-neutral-50 p-3 sm:flex-row sm:flex-nowrap sm:items-end"
+          data-testid="metrics-filter-more"
+        >
+          {more.map(pick)}
         </div>
       )}
-    </TabControls>
+      <FilterChips chips={chips} onClearAll={() => onFilter({})} testId="metrics-filter-chips" />
+    </>
   );
 };

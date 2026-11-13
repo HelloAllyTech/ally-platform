@@ -180,10 +180,16 @@ const page = (hash = "") =>
   );
 
 describe("Settings › Schedules: engineering only", () => {
-  it("has no More item or section without the debrief_schedules toggle", () => {
+  it("has no Schedules item or section without the debrief_schedules toggle", () => {
     page();
     expect(screen.queryByRole("link", { name: s.columns.job })).toBeNull();
-    expect(screen.queryByRole("button", { name: en.debriefs.settingsPage.more })).toBeNull();
+    // More holds only the tabs that overflow below lg (it is hidden at lg and up): no Schedules.
+    fireEvent.click(screen.getByRole("button", { name: en.debriefs.settingsPage.more }));
+    expect(
+      within(screen.getByRole("menu"))
+        .getAllByRole("menuitem")
+        .map(i => i.textContent),
+    ).toEqual([en.debriefs.settingsPage.nav.weights, en.debriefs.settingsPage.nav.pinned]);
     expect(screen.queryByText(en.debriefs.settingsPage.nav.schedules)).toBeNull();
     expect(screen.queryByTestId("schedules-table")).toBeNull();
   });
@@ -204,7 +210,11 @@ describe("Settings › Schedules: engineering only", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map(i => i.textContent),
-    ).toEqual([en.debriefs.settingsPage.nav.schedules]);
+    ).toEqual([
+      en.debriefs.settingsPage.nav.weights,
+      en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.schedules,
+    ]);
     fireEvent.click(
       within(menu).getByRole("menuitem", { name: en.debriefs.settingsPage.nav.schedules }),
     );
@@ -225,7 +235,11 @@ describe("Settings › Schedules: engineering only", () => {
     page();
     fireEvent.click(screen.getByRole("button", { name: en.debriefs.settingsPage.more }));
     const items = within(screen.getByRole("menu")).getAllByRole("menuitem");
-    expect(items.map(i => i.textContent)).toEqual([en.debriefs.settingsPage.guidanceLink]);
+    expect(items.map(i => i.textContent)).toEqual([
+      en.debriefs.settingsPage.nav.weights,
+      en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.guidanceLink,
+    ]);
   });
 });
 

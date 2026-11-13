@@ -10,6 +10,7 @@ import { PmReport, PmReportChanged, PmReportKind, PmReportListItem } from "@type
 
 import { inWords } from "../consoleLabels";
 import { pmAgentPath, pmReleasePath, pmReportPath } from "../consoleRoutes";
+import { TruncatedTitle } from "../consoleRows";
 
 // --- Choosing a report (pure, tested) ------------------------------------------------
 
@@ -378,19 +379,24 @@ export const ReportsView: React.FC = () => {
     <div className="flex flex-wrap items-start gap-6 px-8 py-6" data-testid="pm-reports">
       <style>{PRINT_CSS}</style>
       <main className="flex max-w-[900px] flex-[1_1_560px] flex-col gap-5" data-print-root="">
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <div>
-            <div className="text-[13px] text-neutral-600" data-testid="pm-report-kicker">
+        {/* One row at lg and up: the title truncates (full text in its tooltip), the toolbar keeps
+            its line. Below lg the toolbar takes a second row, on purpose. */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-end lg:justify-between lg:gap-6">
+          <div className="min-w-0">
+            <div className="truncate text-[13px] text-neutral-600" data-testid="pm-report-kicker">
               {kicker}
             </div>
-            <h2 className="mt-1 text-2xl font-normal" data-testid="pm-report-title">
-              {current?.title ?? ""}
-            </h2>
+            <TruncatedTitle
+              as="h2"
+              text={current?.title ?? ""}
+              className="mt-1 block text-2xl font-normal"
+              testId="pm-report-title"
+            />
           </div>
           <div
             role="toolbar"
             aria-label={s.toolbar}
-            className="flex flex-wrap items-center gap-3"
+            className="flex shrink-0 flex-nowrap items-center gap-3"
             data-print-hide=""
           >
             <div

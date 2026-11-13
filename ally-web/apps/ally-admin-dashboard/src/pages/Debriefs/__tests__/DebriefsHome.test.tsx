@@ -311,7 +311,9 @@ describe("Debriefs home", () => {
     renderAt();
     expect(screen.queryByRole("button", { name: /To score/ })).toBeNull();
     expect(screen.queryByTestId("to-score-badge")).toBeNull();
-    expect(screen.getByTestId("home-keys")).toHaveTextContent("j / k move · Enter open");
+    // Keyboard hints live in a tooltip on an icon, never as inline text in the filter row.
+    expect(screen.getByTestId("home-keys")).toHaveAttribute("data-keys", "j / k move · Enter open");
+    expect(screen.getByTestId("home-filters")).not.toHaveTextContent("j / k move");
     fireEvent.keyDown(window, { key: "e" });
     expect(h.escalate).not.toHaveBeenCalled();
   });
@@ -403,6 +405,65 @@ describe("the queue note says nothing of the checks to the clinical advisor", ()
     expect(queueNoteFor("needs", false, notes)).toBe("T");
     expect(queueNoteFor("needs", true, notes)).toBe("N");
     expect(queueNoteFor("escalated", true, notes)).toBe("E");
+  });
+});
+
+describe("rows never wrap (2026-11-13)", () => {
+  it("keeps Settings reachable through More, after Analytics and PM agent", () => {
+    renderAt();
+    const actions = screen.getByTestId("home-actions");
+    expect(within(actions).queryByRole("link", { name: "Settings" })).toBeNull();
+    fireEvent.click(
+      within(screen.getByTestId("home-more")).getByRole("button", { name: "More actions" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Settings" }));
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/settings");
+  });
+
+  it("shows three filters, puts the rest behind More filters with a count, and chips every set one", () => {
+    renderAt("/debriefs?cat=published&language=hi&riskCue=true&cost=hit_ceiling");
+    const bar = screen.getByTestId("home-filters");
+    for (const id of ["org", "language", "recipe"]) {
+      expect(within(bar).getByTestId(`home-filter-${id}`)).toBeInTheDocument();
+    }
+    expect(within(bar).queryByTestId("home-filter-risk")).toBeNull();
+    expect(screen.getByTestId("home-more-filters-button-count")).toHaveTextContent("2");
+    expect(screen.getByTestId("home-more-filters-button")).toHaveAccessibleName(
+      "More filters, 2 active",
+    );
+    // A link with a hidden filter set opens with More filters showing it.
+    expect(
+      within(screen.getByTestId("home-more-filters")).getByTestId("home-filter-risk"),
+    ).toBeInTheDocument();
+    const chips = screen.getByTestId("home-chips");
+    expect(chips).toHaveTextContent("Language: Hindi");
+    expect(chips).toHaveTextContent("Risk cue: With a risk cue");
+    expect(chips).toHaveTextContent("Cost: Hit the ceiling");
+    fireEvent.click(
+      within(chips).getByRole("button", { name: "Remove Risk cue: With a risk cue" }),
+    );
+    expect(h.sessions).toHaveBeenLastCalledWith({
+      category: "published",
+      language: "hi",
+      cost: "hit_ceiling",
+    });
+    expect(screen.getByTestId("home-more-filters-button-count")).toHaveTextContent("1");
+    fireEvent.click(
+      within(screen.getByTestId("home-chips")).getByRole("button", { name: "Clear all" }),
+    );
+    expect(h.sessions).toHaveBeenLastCalledWith({ category: "published" });
+    expect(screen.queryByTestId("home-chips")).toBeNull();
+  });
+
+  it("opens More filters on demand when nothing behind it is set", () => {
+    renderAt();
+    expect(screen.queryByTestId("home-more-filters")).toBeNull();
+    expect(screen.queryByTestId("home-more-filters-button-count")).toBeNull();
+    fireEvent.click(screen.getByTestId("home-more-filters-button"));
+    const more = screen.getByTestId("home-more-filters");
+    for (const id of ["fallback", "risk", "cost"]) {
+      expect(within(more).getByTestId(`home-filter-${id}`)).toBeInTheDocument();
+    }
   });
 });
 

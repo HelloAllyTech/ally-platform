@@ -256,6 +256,11 @@ describe("PM agent › Reports", () => {
       "Monthly review · published 1 Nov 2026",
     );
     expect(screen.getByTestId("pm-report-title")).toHaveTextContent("October 2026");
+    expect(screen.getByTestId("pm-report-title")).toHaveAttribute("title", "October 2026");
+    expect(screen.getByTestId("pm-report-title")).toHaveClass("truncate");
+    // The page header keeps one row at lg; below lg the actions take a second row on purpose.
+    expect(screen.getByTestId("pm-header")).toHaveClass("lg:flex-nowrap");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute("title", "PM agent");
     const changed = screen.getByTestId("pm-report-changed");
     expect(changed).toHaveTextContent("What changed this month");
     expect(changed).toHaveTextContent(

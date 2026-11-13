@@ -18,6 +18,7 @@ import { getErrorMessage } from "@utils";
 
 import { codeWords } from "../consoleLabels";
 import { pmAgentPath, PmAgentView } from "../consoleRoutes";
+import { TruncatedTitle } from "../consoleRows";
 import { AlertBanner, BackLink, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { IdeasView } from "./IdeasView";
@@ -131,22 +132,34 @@ export const PmAgentPage: React.FC = () => {
   return (
     <div className="font-primary" data-testid="pm-agent-page">
       <header className="flex flex-col gap-3.5 border-b border-neutral-100 px-8 pt-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <BackLink to={ROUTES.DEBRIEFS}>{en.debriefs.title}</BackLink>
-          <h1 className="font-secondary text-[28px] font-normal">{p.title}</h1>
-          <div className="flex-1" />
+        {/* One row at lg and up; below lg the actions take a second row, on purpose. */}
+        <div
+          className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-center"
+          data-testid="pm-header"
+        >
+          <div className="flex min-w-0 flex-nowrap items-center gap-3">
+            <div className="shrink-0">
+              <BackLink to={ROUTES.DEBRIEFS}>{en.debriefs.title}</BackLink>
+            </div>
+            <TruncatedTitle
+              as="h1"
+              text={p.title}
+              className="font-secondary text-[28px] font-normal"
+            />
+          </div>
+          <div className="hidden min-w-0 flex-1 lg:block" />
           {access.pmAgent && (
-            <Button kind="tertiary" size="md" onClick={() => setProposing(true)}>
-              {p.propose.button}
-            </Button>
-          )}
-          {access.pmAgent && (
-            <Button kind="tertiary" size="md" disabled={running} onClick={() => void runNow()}>
-              {running ? s.running : s.runNow}
-            </Button>
+            <div className="flex shrink-0 flex-nowrap items-center gap-3">
+              <Button kind="tertiary" size="md" onClick={() => setProposing(true)}>
+                {p.propose.button}
+              </Button>
+              <Button kind="tertiary" size="md" disabled={running} onClick={() => void runNow()}>
+                {running ? s.running : s.runNow}
+              </Button>
+            </div>
           )}
         </div>
-        <nav aria-label={p.title} className="flex gap-6 text-sm">
+        <nav aria-label={p.title} className="flex flex-nowrap gap-6 whitespace-nowrap text-sm">
           {VIEWS.map(v => (
             <Link
               key={v}

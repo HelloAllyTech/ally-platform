@@ -73,29 +73,39 @@ const CHIP_KINDS = ["settings", "prompts", "pinned_rules"] as const;
 const AutonomyChips: React.FC<{ autonomy: DebriefAutonomyView }> = ({ autonomy }) => {
   const p = en.debriefs.pmPage;
   return (
+    // One row at lg and up: the label truncates first (full words in its tooltip), the chips never
+    // shrink. Below lg the chips take their own row, on purpose.
     <div
-      className="flex flex-wrap items-center gap-2 border-b border-neutral-100 px-8 py-2.5 text-[13px]"
+      className="flex flex-col gap-2 border-b border-neutral-100 px-8 py-2.5 text-[13px] lg:flex-row lg:flex-nowrap lg:items-center"
       data-testid="autonomy-chips"
     >
-      <span className="mr-1 text-neutral-600">{p.actsAlone}</span>
-      {CHIP_KINDS.map(kind => {
-        const row = autonomy.kinds.find(k => k.kind === kind);
-        if (!row) return null;
-        // Quick checks, pass tests and side-by-side trials always run on their own (2026-11-12),
-        // so the chip says only whether learner try-outs do.
-        const alone = row.cells.canary === "auto";
-        const state = kind === "pinned_rules" ? "never" : alone ? "alone" : "asks_first";
-        return (
-          <span
-            key={kind}
-            title={inWords(row.relockReason ?? row.reason)}
-            data-state={state}
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] font-semibold ${alone ? "bg-success-50 text-success-600" : "bg-[#FFF2E8] text-[#8A3800]"}`}
-          >
-            {p.autonomyKinds[kind]}: {p.autonomyStates[state]}
-          </span>
-        );
-      })}
+      <span
+        className="min-w-0 truncate text-neutral-600 lg:mr-1"
+        title={p.actsAloneHint}
+        data-testid="autonomy-label"
+      >
+        {p.actsAlone}
+      </span>
+      <div className="flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto">
+        {CHIP_KINDS.map(kind => {
+          const row = autonomy.kinds.find(k => k.kind === kind);
+          if (!row) return null;
+          // Quick checks, pass tests and side-by-side trials always run on their own (2026-11-12),
+          // so the chip says only whether learner try-outs do.
+          const alone = row.cells.canary === "auto";
+          const state = kind === "pinned_rules" ? "never" : alone ? "alone" : "asks_first";
+          return (
+            <span
+              key={kind}
+              title={inWords(row.relockReason ?? row.reason)}
+              data-state={state}
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-[3px] font-semibold ${alone ? "bg-success-50 text-success-600" : "bg-[#FFF2E8] text-[#8A3800]"}`}
+            >
+              {p.autonomyKinds[kind]}: {p.autonomyStates[state]}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 };

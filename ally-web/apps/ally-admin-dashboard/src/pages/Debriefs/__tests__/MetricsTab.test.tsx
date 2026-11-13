@@ -144,6 +144,9 @@ describe("Debriefs tab: pass rate", () => {
     expect(within(bar).getByRole("combobox", { name: /skill/i })).toHaveTextContent("All skills");
     await user.click(within(bar).getByRole("combobox", { name: /skill/i }));
     await user.click(await screen.findByRole("option", { name: "Open questions" }));
+    // Skill, scenario and course stay in the row; step model sits behind More filters.
+    expect(within(bar).queryByRole("combobox", { name: /step model/i })).toBeNull();
+    await user.click(within(bar).getByTestId("metrics-segment-more-button"));
     await user.click(within(bar).getByRole("combobox", { name: /step model/i }));
     await user.click(
       await screen.findByRole("option", { name: "Safety reader: gemini-3-flash-preview" }),
@@ -156,7 +159,11 @@ describe("Debriefs tab: pass rate", () => {
       }),
     );
     expect(bar.parentElement).toHaveTextContent("These narrow only the pass rate.");
-    await user.click(within(bar).getByTestId("metrics-segment-clear"));
+    expect(within(bar).getByTestId("metrics-segment-more-button-count")).toHaveTextContent("1");
+    expect(within(bar).getByTestId("metrics-segment-chips")).toHaveTextContent(
+      "Skill: Open questions",
+    );
+    await user.click(within(bar).getByTestId("metrics-segment-chips-clear"));
     await waitFor(() =>
       expect(h.metrics.mock.calls[h.metrics.mock.calls.length - 1][0]).toEqual({ weeks: 13 }),
     );
@@ -423,15 +430,16 @@ describe("Debriefs tab: states", () => {
     const user = userEvent.setup();
     h.metrics.mockReturnValue(answer(fullView()));
     render(<MetricsTab />);
-    for (const id of [
-      "organisation",
-      "language",
-      "learnerLevel",
-      "recipe",
-      "releaseVersion",
-      "judgeVersion",
-    ]) {
+    // Three filters in the row; learner level, release and judge version behind More filters.
+    for (const id of ["organisation", "language", "recipe"]) {
       expect(screen.getByTestId(`metrics-filter-${id}`)).toBeInTheDocument();
+    }
+    expect(screen.queryByTestId("metrics-filter-learnerLevel")).toBeNull();
+    await user.click(screen.getByTestId("metrics-filter-more-button"));
+    for (const id of ["learnerLevel", "releaseVersion", "judgeVersion"]) {
+      expect(
+        within(screen.getByTestId("metrics-filter-more")).getByTestId(`metrics-filter-${id}`),
+      ).toBeInTheDocument();
     }
     expect(screen.getByRole("combobox", { name: /learner level/i })).toHaveTextContent(
       "All learner levels",
@@ -450,7 +458,13 @@ describe("Debriefs tab: states", () => {
     expect(screen.getByTestId("metrics-unfiltered-note")).toHaveTextContent(
       "Not filtered: baselines, uptake lift and the PM agent.",
     );
-    await user.click(screen.getByTestId("metrics-filter-clear"));
+    expect(screen.getByTestId("metrics-filter-more-button-count")).toHaveTextContent("2");
+    const chips = screen.getByTestId("metrics-filter-chips");
+    expect(chips).toHaveTextContent("Language: hi-IN");
+    expect(chips).toHaveTextContent("Release: v5");
+    await user.click(within(chips).getByRole("button", { name: "Remove Language: hi-IN" }));
+    await waitFor(() => expect(lastQuery()).not.toHaveProperty("language"));
+    await user.click(screen.getByTestId("metrics-filter-chips-clear"));
     await waitFor(() => expect(lastQuery()).toEqual({ weeks: 13 }));
   });
 

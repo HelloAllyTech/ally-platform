@@ -9326,6 +9326,16 @@ export const en = {
     noAccess:
       "Your account can't open the Debriefs console. It needs the Analytics toggle and the Ally team, clinical advisor or owner permission. Ask a platform admin.",
     title: "Debriefs",
+    /** Shared words for rows of controls that overflow instead of wrapping (2026-11-13). */
+    rows: {
+      moreActions: "More actions",
+      moreFilters: "More filters",
+      moreFiltersCount: (n: number) => `More filters, ${n} active`,
+      activeFilters: "Active filters",
+      remove: (what: string) => `Remove ${what}`,
+      clearAll: "Clear all",
+      keyboard: "Keyboard shortcuts",
+    },
     intro:
       "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the PM agent is changing, and which organisations have it.",
     // Expert review (debrief orchestrator spec Part B): clinical experts comment on exact lines.
@@ -10390,7 +10400,8 @@ export const en = {
       beingTested: (n: number) => `${n} being tested`,
       learningBudget: "Learning budget",
       ofThisMonth: (budget: string) => `of ${budget} this month`,
-      actsAlone: "What it may change without asking a person (hover for why):",
+      actsAlone: "Changes without asking a person:",
+      actsAloneHint: "What the PM agent may change without asking a person. Hover a chip for why.",
       openClosed: "Open or closed",
       open: "Open",
       closed: "Closed",

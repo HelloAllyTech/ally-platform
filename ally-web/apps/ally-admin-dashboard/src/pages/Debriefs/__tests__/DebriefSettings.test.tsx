@@ -412,6 +412,21 @@ describe("Debrief settings page: who can change what", () => {
     expect(shown()).toEqual(["settings-section-pinned"]);
   });
 
+  it("never wraps: the owner note truncates with its full text on hover, the last tabs overflow into More below lg", () => {
+    h.permissions = [];
+    renderPage();
+    const note = screen.getByTestId("settings-owner-note");
+    expect(note).toHaveAttribute("title", "Only the owner can change these.");
+    expect(note).toHaveClass("truncate");
+    expect(screen.getByTestId("settings-tabs")).toHaveClass("flex-nowrap");
+    // Steering and Pinned rules are tabs at lg and up, More items below it.
+    for (const id of ["weights", "pinned"]) expect(tab(id)).toHaveClass("hidden", "lg:inline");
+    expect(tab("orgs")).not.toHaveClass("hidden");
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Steering" }));
+    expect(where).toBe("/debriefs/settings#weights");
+  });
+
   it("is read-only for someone who isn't the owner, and says who can change it", () => {
     h.permissions = [];
     renderPage();
