@@ -4,6 +4,7 @@ import {
   DebriefFeedbackStatus,
   DebriefFlagReason,
   DebriefRunArm,
+  DebriefRunLogKind,
   DebriefRunMode,
   DebriefRunStatus,
 } from '../../debrief/enum/debrief-run.enum';
@@ -405,6 +406,7 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_debrief_runs_status', Object.values(DebriefRunStatus)],
     ['CHK_debrief_runs_arm', Object.values(DebriefRunArm)],
     ['CHK_debrief_run_feedback_kind', Object.values(DebriefFeedbackKind)],
+    ['CHK_debrief_run_logs_kind', Object.values(DebriefRunLogKind)],
     ['CHK_debrief_run_feedback_reason', Object.values(DebriefFlagReason)],
     ['CHK_debrief_run_feedback_status', Object.values(DebriefFeedbackStatus)],
     ['CHK_debrief_reviews_verdict', Object.values(DebriefReviewVerdict)],

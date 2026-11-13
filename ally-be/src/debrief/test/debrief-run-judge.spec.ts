@@ -20,6 +20,7 @@ describe('the run judge is given the Writer’s guidance', () => {
   ) {
     const query = jest.fn(async () => []);
     const find = jest.fn(async () => chunks);
+    const agentLogs = { recordJudge: jest.fn(async () => undefined) };
     const svc = new DebriefRunJudgeService(
       { manager: { getRepository: () => ({ find }) }, query } as any,
       {
@@ -31,10 +32,14 @@ describe('the run judge is given the Writer’s guidance', () => {
           learnerLevel: 'LAY',
         })),
         promptText: jest.fn(async (code: string) => prompts[code] ?? null),
+        currentPromptVersions: jest.fn(async () => ({
+          [DEBRIEF_JUDGE_INSTRUCTIONS_CODE]: 4,
+        })),
       } as any,
       { ai: { apiUrl: 'http://ai', outboundApiKey: 'k' } } as any,
+      agentLogs as any,
     );
-    return { svc, find };
+    return { svc, find, agentLogs };
   }
 
   const run = (passages?: string[]) =>
@@ -108,5 +113,28 @@ describe('the run judge is given the Writer’s guidance', () => {
     await svc.judge(run(), { store: false });
     expect(post.mock.calls[0][1].guidance).toBeNull();
     expect(find).not.toHaveBeenCalled();
+  });
+
+  it("logs the judge's call against the run when it stores the score (Agent logs)", async () => {
+    const log = { input: '{{system_prompt}}\n…', prompt_inlined: true };
+    post.mockResolvedValue({
+      data: {
+        judge_model: 'm',
+        judge_prompt_version: 'v3',
+        dimensions: [{ dimension: 'accuracy', score: 9 }],
+        hard_fails: [],
+        log,
+      },
+    });
+    const { svc, agentLogs } = build([], {
+      [DEBRIEF_JUDGE_INSTRUCTIONS_CODE]: 'INSTRUCTIONS',
+    });
+    await svc.judge(run());
+    expect(agentLogs.recordJudge).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'r1' }),
+      log,
+      { code: DEBRIEF_JUDGE_INSTRUCTIONS_CODE, version: 4 },
+      'm',
+    );
   });
 });

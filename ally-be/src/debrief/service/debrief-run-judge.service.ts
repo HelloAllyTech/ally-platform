@@ -19,6 +19,10 @@ import { DebriefCards, renderCards } from '../util/debrief-cards.util';
 import { guidancePassage } from '../util/debrief-guidance.util';
 import { ClChunk } from '../../context-library/entity/cl-chunk.entity';
 import { DebriefContextRepository } from './debrief-context.repository';
+import {
+  DebriefRunLogsService,
+  JudgeCallLog,
+} from './debrief-run-logs.service';
 
 /**
  * Marks run judgments given the Writer's guidance (from 2026-11-11). Without it
@@ -58,6 +62,7 @@ export class DebriefRunJudgeService {
     private readonly runs: Repository<DebriefRun>,
     private readonly context: DebriefContextRepository,
     private readonly config: AppConfigService,
+    private readonly agentLogs: DebriefRunLogsService,
   ) {}
 
   /**
@@ -108,6 +113,7 @@ export class DebriefRunJudgeService {
       judge_prompt_version: string;
       dimensions: Array<{ dimension: string; score: number }>;
       hard_fails: Array<{ code: string; evidence: string }>;
+      log?: JudgeCallLog | null;
     };
     const scores = Object.fromEntries(
       d.dimensions.map((x) => [x.dimension, x.score]),
@@ -129,6 +135,23 @@ export class DebriefRunJudgeService {
         WHERE id = $1`,
       [run.id, JSON.stringify(judgment)],
     );
+    // The independent check in the run's Agent logs, after the run's own entries.
+    if (d.log) {
+      const versions = judgeInstructions
+        ? await this.context
+            .currentPromptVersions([DEBRIEF_JUDGE_INSTRUCTIONS_CODE])
+            .catch(() => ({}) as Record<string, number>)
+        : {};
+      await this.agentLogs.recordJudge(
+        run,
+        d.log,
+        {
+          code: DEBRIEF_JUDGE_INSTRUCTIONS_CODE,
+          version: versions[DEBRIEF_JUDGE_INSTRUCTIONS_CODE] ?? null,
+        },
+        d.judge_model,
+      );
+    }
     run.workspace = { ...run.workspace, judge: judgment };
     return judgment;
   }

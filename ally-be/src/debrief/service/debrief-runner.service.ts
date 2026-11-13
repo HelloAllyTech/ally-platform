@@ -43,6 +43,10 @@ import {
   DebriefGraphRequest,
   DebriefGraphResponse,
 } from './debrief-graph.client';
+import {
+  DebriefRunLogsService,
+  PromptVersions,
+} from './debrief-run-logs.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import {
   DEBRIEF_ORCHESTRATOR_TOOLS,
@@ -119,7 +123,11 @@ const GRAPH_STATUSES: ReadonlySet<string> = new Set([
 /** A prepared run: either it already ended in ally-be, or here is what the graph gets. */
 type Prepared =
   | { ended: DebriefRun }
-  | { request: Omit<DebriefGraphRequest, 'run_token' | 'gateway_url'> };
+  | {
+      request: Omit<DebriefGraphRequest, 'run_token' | 'gateway_url'>;
+      /** The Skills Store version of each prompt sent, for the Agent logs. */
+      promptVersions: PromptVersions;
+    };
 
 /**
  * Debriefs one session (plan §8) on the Debrief harness
@@ -154,6 +162,7 @@ export class DebriefRunnerService {
     private readonly releases: AgentReleaseService,
     private readonly practice: DebriefPracticeService,
     private readonly llmModels: LlmModelService,
+    private readonly agentLogs: DebriefRunLogsService,
   ) {}
 
   /**
@@ -284,7 +293,7 @@ export class DebriefRunnerService {
         },
         bundle.settings.riskDeadlineMs,
       );
-      return await this.apply(run, res);
+      return await this.apply(run, res, prepared.promptVersions);
     } catch (e) {
       // ally-ai unreachable or crashed mid-run (a deploy, a restart): the run
       // stays `running` so the stuck-run sweeper resumes it from the graph's
@@ -462,7 +471,7 @@ export class DebriefRunnerService {
       pastWorkOnThis,
       cohort,
       practiceOptions,
-      prompts,
+      { texts: prompts, versions: promptVersions },
       availability,
     ] = await Promise.all([
       orFallback(
@@ -529,14 +538,22 @@ export class DebriefRunnerService {
           ...(availability ? { availability } : {}),
         },
       },
+      promptVersions,
     };
   }
 
-  /** Every prompt the bundle names and the graph runs, live text with this run's overrides. */
+  /**
+   * Every prompt the bundle names and the graph runs, live text with this
+   * run's overrides; and the Skills Store version each one is (an override's
+   * own text, which has none), for the Agent logs.
+   */
   private async prompts(
     bundle: DebriefBundle,
     overrides: Record<string, string> = {},
-  ): Promise<Record<string, string | null>> {
+  ): Promise<{
+    texts: Record<string, string | null>;
+    versions: PromptVersions;
+  }> {
     const codes = [
       ...new Set([
         ...GRAPH_PROMPT_CODES,
@@ -552,13 +569,34 @@ export class DebriefRunnerService {
           (await this.context.promptText(code, bundle.prompts?.[code] ?? null)),
       ),
     );
-    return Object.fromEntries(codes.map((code, i) => [code, texts[i]]));
+    const current = await orFallback(
+      () =>
+        this.context.currentPromptVersions(
+          codes.filter((c) => bundle.prompts?.[c] == null && !overrides[c]),
+        ),
+      {} as Record<string, number>,
+    );
+    const versions: PromptVersions = Object.fromEntries(
+      codes.map((code, i) => [
+        code,
+        overrides[code] != null
+          ? { text: overrides[code] }
+          : texts[i] == null
+            ? null
+            : (bundle.prompts?.[code] ?? current[code] ?? null),
+      ]),
+    );
+    return {
+      texts: Object.fromEntries(codes.map((code, i) => [code, texts[i]])),
+      versions,
+    };
   }
 
   /** The graph's answer onto the run: the same fields the in-process runner wrote. */
   private async apply(
     run: DebriefRun,
     res: DebriefGraphResponse,
+    promptVersions: PromptVersions = {},
   ): Promise<DebriefRun> {
     if (!res || !GRAPH_STATUSES.has(res.status)) {
       throw new Error(
@@ -605,6 +643,8 @@ export class DebriefRunnerService {
       finishedAt: new Date(),
     });
     await this.runs.save(run);
+    // The Agent logs: what every agent was sent and answered. Never fails the run.
+    await this.agentLogs.record(run, res.logs, promptVersions);
     return run;
   }
 
