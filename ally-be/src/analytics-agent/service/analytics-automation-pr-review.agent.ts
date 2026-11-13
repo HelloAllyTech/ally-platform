@@ -64,6 +64,7 @@ export class AnalyticsAutomationPrReviewAgent {
     intent: string;
   }): Promise<PrReviewResult> {
     const result = await runStructuredAgent({
+      label: 'pr-review',
       systemPrompt: PR_REVIEW_SYSTEM_PROMPT,
       schema: reviewSchema,
       tools: await this.github.readTools(),

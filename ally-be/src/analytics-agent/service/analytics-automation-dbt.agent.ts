@@ -110,6 +110,7 @@ export class AnalyticsAutomationDbtAgent {
       : 'Nothing has been rejected before.';
 
     const result = await runStructuredAgent({
+      label: 'dbt-analysis',
       systemPrompt: DBT_ANALYSIS_SYSTEM_PROMPT,
       schema: analysisSchema,
       tools: await this.github.readTools(),
@@ -186,6 +187,7 @@ export class AnalyticsAutomationDbtAgent {
     );
 
     const authored = await runStructuredAgent({
+      label: 'dbt-changes',
       systemPrompt: DBT_CHANGES_SYSTEM_PROMPT,
       schema: changesSchema,
       tools: [...(await this.github.readTools()), ...writeTools],

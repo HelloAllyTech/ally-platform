@@ -98,6 +98,7 @@ export class AnalyticsAutomationPosthogAgent {
     );
 
     const proposal = await runStructuredAgent({
+      label: 'posthog-events',
       systemPrompt: POSTHOG_EVENTS_SYSTEM_PROMPT,
       schema,
       tools: [...(await this.github.readTools()), ...writeTools],

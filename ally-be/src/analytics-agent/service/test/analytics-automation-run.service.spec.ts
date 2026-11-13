@@ -395,3 +395,116 @@ describe('AnalyticsAutomationRunService approve / reject', () => {
     );
   });
 });
+
+describe('AnalyticsAutomationRunService starting a run', () => {
+  const settled = (id: string, head: string) => ({
+    id,
+    ranAt: new Date('2026-11-01T00:00:00Z'),
+    commitShas: {
+      platform: { base: null, head, since: 's' },
+      dbt: { head: 'd' },
+    },
+  });
+
+  function startBuild(
+    previousRuns: object[],
+    agentsOf: Record<string, object[]>,
+  ) {
+    const created: Array<Record<string, unknown>> = [];
+    const manager = {
+      create: (_entity: unknown, data: Record<string, unknown>) => data,
+      save: jest.fn(async (x: unknown) => {
+        const items = Array.isArray(x) ? x : [x];
+        created.push(...(items as Array<Record<string, unknown>>));
+        return Array.isArray(x)
+          ? x
+          : { id: 'new-run-id-0000', ...(x as object) };
+      }),
+    };
+    const runs = {
+      update: jest.fn().mockResolvedValue({ affected: 0 }),
+      exists: jest.fn().mockResolvedValue(false),
+      find: jest.fn().mockResolvedValue(previousRuns),
+      manager: {
+        transaction: async (fn: (m: unknown) => unknown) => fn(manager),
+      },
+    };
+    const agentRuns = {
+      update: jest.fn().mockResolvedValue({ affected: 0 }),
+      find: jest.fn(
+        async (opts: { where: { runId: string } }) =>
+          agentsOf[opts.where.runId] ??
+          // The run just created: hand back the agent rows saved for it.
+          created
+            .filter((c) => c.agent)
+            .map((c, i) => ({ ...c, id: `agent-${i}` })),
+      ),
+    };
+    const github = { getBranchHead: jest.fn().mockResolvedValue('head-now') };
+    const backendReview = { run: jest.fn() };
+    const posthog = { run: jest.fn() };
+    const service = new AnalyticsAutomationRunService(
+      runs as never,
+      agentRuns as never,
+      {} as never,
+      github as never,
+      backendReview as never,
+      posthog as never,
+      {} as never,
+    );
+    return { service, created, backendReview, posthog };
+  }
+
+  const finished = [
+    { agent: 'backend_review', status: 'completed' },
+    { agent: 'posthog_events', status: 'completed' },
+  ];
+
+  it('records a completed run with no agent work when the head has not moved', async () => {
+    const { service, created, backendReview, posthog } = startBuild(
+      [settled('prev', 'head-now')],
+      { prev: finished },
+    );
+
+    const started = await service.startManualRun();
+    await started.done;
+
+    expect(started.run.status).toBe('completed');
+    const agents = created.filter((c) => c.agent);
+    expect(agents).toHaveLength(3);
+    for (const a of agents) {
+      expect(a.status).toBe('completed');
+      expect(a.summary).toMatch(/No new commits since the last run/);
+    }
+    expect(backendReview.run).not.toHaveBeenCalled();
+    expect(posthog.run).not.toHaveBeenCalled();
+  });
+
+  it('runs the agents when the head moved', async () => {
+    const { service } = startBuild([settled('prev', 'old-head')], {
+      prev: finished,
+    });
+    const started = await service.startManualRun();
+    expect(started.run.status).toBe('running');
+    // processRun is in flight in the background; let it settle before the suite ends.
+    await started.done;
+  });
+
+  it('does not treat a run whose PostHog agent failed as the baseline', async () => {
+    // The newest run has the same head but its PostHog agent failed: it reviewed
+    // nothing, so this run must still do the work.
+    const { service, backendReview } = startBuild(
+      [settled('failed-run', 'head-now')],
+      {
+        'failed-run': [
+          { agent: 'backend_review', status: 'completed' },
+          { agent: 'posthog_events', status: 'failed' },
+        ],
+      },
+    );
+    const started = await service.startManualRun();
+    await started.done;
+    expect(started.run.status).toBe('running');
+    expect(backendReview.run).toHaveBeenCalled();
+  });
+});

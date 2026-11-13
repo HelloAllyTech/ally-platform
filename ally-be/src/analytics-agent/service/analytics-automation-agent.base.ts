@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
 import { createAgent, HumanMessage, toolStrategy } from 'langchain';
 import type { z } from 'zod';
@@ -14,6 +15,8 @@ export interface AutomationRunContext {
 }
 
 type CreateAgentParams = Parameters<typeof createAgent>[0];
+
+const agentLogger = new Logger('AnalyticsAutomationAgent');
 
 let llm: ChatOpenAI | undefined;
 
@@ -38,6 +41,8 @@ export function automationLlm(): ChatOpenAI {
 export async function runStructuredAgent<
   S extends z.ZodObject<z.ZodRawShape>,
 >(opts: {
+  /** Names the agent in the log lines, e.g. `posthog-events`. */
+  label: string;
   systemPrompt: string;
   schema: S;
   input: string;
@@ -49,9 +54,40 @@ export async function runStructuredAgent<
     responseFormat: toolStrategy(opts.schema),
     tools: opts.tools,
   });
+  const startedAt = Date.now();
+  const toolCalls: Record<string, number> = {};
+  agentLogger.log(`[${opts.label}] started`);
   const result = await agent.invoke(
     { messages: [new HumanMessage(opts.input)] },
-    { recursionLimit: AUTOMATION_LIMITS.RECURSION_LIMIT },
+    {
+      recursionLimit: AUTOMATION_LIMITS.RECURSION_LIMIT,
+      // One line per tool call, so a run can be followed as it happens.
+      callbacks: [
+        {
+          handleToolStart: (
+            _tool: unknown,
+            input: string,
+            _runId: string,
+            _parentRunId?: string,
+            _tags?: string[],
+            _metadata?: Record<string, unknown>,
+            name?: string,
+          ) => {
+            const tool = name ?? 'tool';
+            toolCalls[tool] = (toolCalls[tool] ?? 0) + 1;
+            agentLogger.log(
+              `[${opts.label}] ${tool} ${String(input).replace(/\s+/g, ' ').slice(0, 140)}`,
+            );
+          },
+        },
+      ],
+    },
+  );
+  const calls = Object.entries(toolCalls)
+    .map(([name, n]) => `${name}×${n}`)
+    .join(', ');
+  agentLogger.log(
+    `[${opts.label}] finished in ${Math.round((Date.now() - startedAt) / 1000)}s; tool calls: ${calls || 'none'}`,
   );
   const parsed = opts.schema.safeParse(
     (result as { structuredResponse?: unknown }).structuredResponse,

@@ -36,6 +36,7 @@ export class AnalyticsAutomationBackendReviewAgent {
 
   async run(ctx: AutomationRunContext): Promise<BackendReviewResult> {
     const result = await runStructuredAgent({
+      label: 'backend-review',
       systemPrompt: BACKEND_REVIEW_SYSTEM_PROMPT,
       schema,
       tools: await this.github.readTools(),

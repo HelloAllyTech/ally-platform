@@ -245,6 +245,7 @@ export class AnalyticsAutomationGithubService {
             }
             const result = await original.invoke(args);
             noteWriteSucceeded(name, args, state);
+            this.logger.log(this.describeWrite(name, args, policy));
             if (name === 'create_pull_request') {
               const pr = parsePullRequestResult(
                 typeof result === 'string' ? result : JSON.stringify(result),
@@ -263,6 +264,23 @@ export class AnalyticsAutomationGithubService {
           },
         );
       }) as unknown as McpTools;
+  }
+
+  /** One log line for a write that reached GitHub (names and counts, never file contents). */
+  private describeWrite(
+    name: string,
+    args: Record<string, unknown>,
+    policy: WritePolicy,
+  ): string {
+    const repo = `${policy.owner}/${policy.repo}`;
+    if (name === 'create_branch') {
+      return `Created branch ${String(args.branch)} in ${repo}`;
+    }
+    if (name === 'push_files') {
+      const files = Array.isArray(args.files) ? args.files.length : 0;
+      return `Pushed ${files} file(s) to ${String(args.branch)} in ${repo}`;
+    }
+    return `Opened a pull request in ${repo}: ${String(args.head)} -> ${String(args.base)}`;
   }
 
   /** Whether a pull request is open, merged, or closed without merging. */

@@ -55,6 +55,10 @@ export interface StartedAutomationRun {
   done: Promise<void>;
 }
 
+/** What every agent shows on a run recorded because nothing was committed. */
+const NO_NEW_COMMITS_SUMMARY =
+  'No new commits since the last run. Nothing was reviewed and no model calls were made.';
+
 /** Shown on the dbt agent while it waits for a person: nothing has run. */
 const DBT_APPROVAL_NOTE =
   'Nothing has run yet. Approving checks the PostHog pull request on GitHub and then starts the dbt agent.';
@@ -152,11 +156,10 @@ export class AnalyticsAutomationRunService {
       this.github.getBranchHead(repos.dbt, repos.dbt.base),
     ]);
 
-    // Diff from the last run that got as far as taking a snapshot.
-    const previous = await this.runs.findOne({
-      where: {},
-      order: { ranAt: 'DESC' },
-    });
+    // Diff from the last run whose first two agents both finished: a run that
+    // failed reviewed nothing, so its window must be covered again.
+    const previous = await this.lastSettledRun();
+    const unchanged = previous?.commitShas?.platform?.head === platformHead;
     const since = previous
       ? new Date(previous.ranAt.getTime() - AUTOMATION_LIMITS.SINCE_MARGIN_MS)
       : new Date(
@@ -170,7 +173,8 @@ export class AnalyticsAutomationRunService {
         const saved = await manager.save(
           manager.create(AnalyticsAutomationRun, {
             ranAt,
-            status: 'running',
+            status: unchanged ? 'completed' : 'running',
+            finishedAt: unchanged ? ranAt : null,
             trigger,
             commitShas: {
               platform: {
@@ -187,12 +191,26 @@ export class AnalyticsAutomationRunService {
             manager.create(AnalyticsAutomationAgentRun, {
               runId: saved.id,
               agent,
-              status: agent === 'dbt_metrics' ? 'waiting' : 'running',
-              startedAt: agent === 'dbt_metrics' ? null : ranAt,
-              note:
-                agent === 'dbt_metrics'
-                  ? 'Waiting for the PostHog events agent to finish.'
-                  : null,
+              ...(unchanged
+                ? {
+                    // Nothing new to look at: recorded, with no model calls.
+                    status: 'completed' as const,
+                    startedAt: ranAt,
+                    finishedAt: ranAt,
+                    summary: NO_NEW_COMMITS_SUMMARY,
+                    note: null,
+                  }
+                : {
+                    status:
+                      agent === 'dbt_metrics'
+                        ? ('waiting' as const)
+                        : ('running' as const),
+                    startedAt: agent === 'dbt_metrics' ? null : ranAt,
+                    note:
+                      agent === 'dbt_metrics'
+                        ? 'Waiting for the PostHog events agent to finish.'
+                        : null,
+                  }),
               output: {},
             }),
           ),
@@ -206,7 +224,40 @@ export class AnalyticsAutomationRunService {
       throw err;
     }
 
+    const short = (sha: string | null | undefined) =>
+      sha?.slice(0, 7) ?? 'none';
+    this.logger.log(
+      `Run ${run.id.slice(0, 8)} (${trigger}) started: platform ${repos.platform.owner}/${repos.platform.repo}@${repos.platform.base} head ${short(platformHead)} (previous run's head ${short(previous?.commitShas?.platform?.head)}; commits since ${since.toISOString()}); dbt ${repos.dbt.owner}/${repos.dbt.repo}@${repos.dbt.base} head ${short(dbtHead)}`,
+    );
+    if (unchanged) {
+      this.logger.log(
+        `Run ${run.id.slice(0, 8)} recorded without running any agent: no new commits since run ${previous?.id.slice(0, 8)}`,
+      );
+      return { run, done: Promise.resolve() };
+    }
     return { run, done: this.processRun(run) };
+  }
+
+  /**
+   * The newest run whose backend review AND PostHog agent both completed. A run
+   * where either failed (or that is still going) is skipped, so what it should
+   * have covered is covered by the next one.
+   */
+  private async lastSettledRun(): Promise<AnalyticsAutomationRun | null> {
+    const candidates = await this.runs.find({
+      where: { status: 'completed' },
+      order: { ranAt: 'DESC' },
+      take: 10,
+    });
+    for (const candidate of candidates) {
+      const agents = await this.agentRuns.find({
+        where: { runId: candidate.id },
+      });
+      const done = (name: AnalyticsAutomationAgentName) =>
+        agents.some((a) => a.agent === name && a.status === 'completed');
+      if (done('backend_review') && done('posthog_events')) return candidate;
+    }
+    return null;
   }
 
   /** Runs the two starting agents together, closes the run, then checks the dbt gate. */
@@ -250,6 +301,7 @@ export class AnalyticsAutomationRunService {
         summary: result.summary,
         output: jsonb(result.output),
       });
+      this.logger.log(`Backend review ${agentRunId.slice(0, 8)} completed`);
     } catch (err) {
       this.logger.error(
         `Backend review ${agentRunId} failed: ${errorText(err)}`,
@@ -271,6 +323,9 @@ export class AnalyticsAutomationRunService {
         summary: result.summary,
         output: jsonb(result.output),
       });
+      this.logger.log(
+        `PostHog agent ${agentRunId.slice(0, 8)} completed with ${result.findings.length} finding(s)`,
+      );
     } catch (err) {
       // A pull request opened before the failure stays recorded on the row.
       this.logger.error(
@@ -295,6 +350,9 @@ export class AnalyticsAutomationRunService {
 
     const gate = evaluateDbtGate(
       rows.find((r) => r.agent === 'posthog_events') ?? null,
+    );
+    this.logger.log(
+      `dbt agent ${dbtRow.id.slice(0, 8)} is now awaiting approval (PostHog PR as of run end: ${gate.open ? 'none or settled' : 'open'}); nothing has run`,
     );
     await this.agentRuns.update(
       { id: dbtRow.id, status: 'waiting' },
@@ -380,7 +438,15 @@ export class AnalyticsAutomationRunService {
     }
     // The gate, on GitHub's answer right now: an open PostHog PR refuses.
     const gate = await this.checkDbtGate(row.runId);
-    if (!gate.open) throw new ConflictException(gate.reason);
+    if (!gate.open) {
+      this.logger.log(
+        `Approve refused for dbt agent ${row.id.slice(0, 8)}: ${gate.reason}`,
+      );
+      throw new ConflictException(gate.reason);
+    }
+    this.logger.log(
+      `dbt agent ${row.id.slice(0, 8)} approved by user ${userId}; PostHog events ${gate.withEvents ? 'included' : 'left out'}`,
+    );
 
     const claimed = await this.agentRuns
       .createQueryBuilder()
@@ -457,6 +523,9 @@ export class AnalyticsAutomationRunService {
         events,
         rejectedKeys: await this.rejectedKeys(),
       });
+      this.logger.log(
+        `dbt analysis ${agentRunId.slice(0, 8)}: ${analysis.needsChanges ? `${analysis.items.length} item(s) need dbt changes` : 'nothing needs changing'}`,
+      );
       // A retry after a failure starts from a clean list.
       await this.findings.delete({ agentRunId });
       if (!analysis.needsChanges) {
@@ -495,6 +564,9 @@ export class AnalyticsAutomationRunService {
         finishedAt: new Date(),
         summary: result.summary,
       });
+      this.logger.log(
+        `dbt agent ${agentRunId.slice(0, 8)} finished: ${result.pr ? `PR #${result.pr.number}` : 'no PR opened'}`,
+      );
     } catch (err) {
       // A pull request opened before the failure stays recorded on the row.
       this.logger.error(`dbt agent ${agentRunId} failed: ${errorText(err)}`);
