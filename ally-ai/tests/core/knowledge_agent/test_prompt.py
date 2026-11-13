@@ -8,7 +8,6 @@ wrong passage — the answer would still read fine.
 
 from app.core.knowledge_agent.prompt import (
     ANSWER_PROMPT_PATH,
-    CRISIS_PROMPT_PATH,
     MAX_CRISIS_HISTORY_CHARS,
     MAX_PASSAGE_CHARS,
     NO_CRISIS_HISTORY,
@@ -191,16 +190,26 @@ class TestCrisisHistory:
     because production gets the new text only after the code that fills `{history}`.
     """
 
-    def test_empty_history_renders_todays_prompt_exactly(self):
-        assert build_crisis_prompt("hello", history=[]) == build_crisis_prompt("hello")
-        assert build_crisis_prompt("hello", history=None) == load_template(
-            CRISIS_PROMPT_PATH
-        ).replace("{message}", "hello")
+    # The live text before chunk 15a used only `{message}`.
+    OLD_TEXT = "Decide whether the message shows risk.\n\n# Message\n{message}\n"
 
-    def test_a_text_without_history_ignores_it(self):
-        with_history = build_crisis_prompt("I mean it", history=["earlier"])
-        assert with_history == build_crisis_prompt("I mean it")
-        assert "earlier" not in with_history
+    def test_an_old_text_renders_exactly_as_before(self):
+        old = crisis_override(self.OLD_TEXT)
+        expected = "Decide whether the message shows risk.\n\n# Message\nhello"
+        assert build_crisis_prompt("hello", prompts=old) == expected
+        assert build_crisis_prompt("hello", history=[], prompts=old) == expected
+        assert (
+            build_crisis_prompt("hello", history=["earlier"], prompts=old) == expected
+        )
+
+    def test_the_seed_renders_with_and_without_history(self):
+        none = build_crisis_prompt("hi")
+        assert "{history}" not in none and "{message}" not in none
+        assert NO_CRISIS_HISTORY in none
+
+        some = build_crisis_prompt("I mean it", history=["I saved up my pills"])
+        assert "- I saved up my pills" in some
+        assert NO_CRISIS_HISTORY not in some
 
     def test_history_reaches_a_text_that_uses_it(self):
         rendered = build_crisis_prompt(
