@@ -9995,6 +9995,7 @@ export const en = {
       intro:
         "The debriefs learners read after a roleplay. Open one to read it beside the session and review it.",
       categoriesLabel: "Categories",
+      showLabel: "Show",
       categories: {
         needs: "Needs a person",
         escalated: "Escalated to you",

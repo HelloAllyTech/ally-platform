@@ -236,7 +236,7 @@ describe("Debriefs home", () => {
     const cards = screen.getAllByTestId("session-card");
     expect(cards.map(c => c.dataset.run)).toEqual(["urgent-old", "urgent-new", "flag", "below"]);
     expect(cards[0]).toHaveTextContent("Urgent");
-    expect(screen.getByTestId("count-needs")).toHaveTextContent("4");
+    expect(screen.getByRole("option", { name: "Needs a person (4)" })).toBeInTheDocument();
     expect(screen.getByText(/Most urgent first/)).toBeInTheDocument();
     // A session link keeps the category so Back and Previous / Next agree.
     expect(cards[0]).toHaveAttribute("href", "/debriefs/sessions/urgent-old");
@@ -320,9 +320,9 @@ describe("Debriefs home", () => {
     h.sessions.mockReturnValue(page(QUEUE, ADVISOR));
     h.attention.mockReturnValue(attention(ADVISOR));
     renderAt();
-    expect(screen.queryByRole("button", { name: /To score/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /Escalated to you/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Agreement sample/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /To score/ })).toBeNull();
+    expect(screen.getByRole("option", { name: /Escalated to you/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Agreement sample/ })).toBeInTheDocument();
     expect(screen.queryByTestId("to-score-badge")).toBeNull();
     const card = screen.getAllByTestId("session-card")[0];
     expect(card).toHaveTextContent("Independent check");
@@ -338,7 +338,7 @@ describe("Debriefs home", () => {
     h.sessions.mockReturnValue(blindPage);
     h.attention.mockReturnValue(attention(ADVISOR));
     const { unmount } = renderAt("/debriefs?cat=below");
-    expect(screen.queryByRole("button", { name: /Below the bar/ })).toBeNull();
+    expect(screen.queryByRole("option", { name: /Below the bar/ })).toBeNull();
     // A link to the Below the bar list falls back to the advisor's own default.
     expect(h.sessions).not.toHaveBeenCalledWith(expect.objectContaining({ category: "below" }));
     expect(screen.getAllByTestId("session-card")[0]).not.toHaveTextContent("Below the bar");
@@ -348,7 +348,7 @@ describe("Debriefs home", () => {
     h.sessions.mockReturnValue(page(QUEUE, TEAM));
     h.attention.mockReturnValue(attention(TEAM));
     renderAt();
-    expect(screen.getByRole("button", { name: /Below the bar/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Below the bar/ })).toBeInTheDocument();
     expect(categoriesFor({ escalations: false, team: true })).toContain("below");
   });
 });

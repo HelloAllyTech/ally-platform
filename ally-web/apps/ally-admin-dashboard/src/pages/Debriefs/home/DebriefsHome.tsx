@@ -22,7 +22,7 @@ import {
   pmAgentPath,
   settingsPath,
 } from "../consoleRoutes";
-import { AlertBanner, Segmented } from "../consoleUi";
+import { AlertBanner } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import {
   categoriesFor,
@@ -210,6 +210,11 @@ export const DebriefsHome: React.FC = () => {
     : groupByDay(shown, { today: h.today, yesterday: h.yesterday });
 
   // j / k move through what is shown, Enter opens it, e escalates it (the Ally team only).
+  // One "Show" dropdown instead of a row of buttons (design B1, 2026-11-13): each view with its count.
+  const categoryItems: Item[] = categories.map(c => {
+    const n = categoryCount(page?.counts, c);
+    return { id: c, label: n == null ? h.categories[c] : `${h.categories[c]} (${n})` };
+  });
   const [selected, setSelected] = useState(0);
   if (selected >= shown.length && selected !== Math.max(0, shown.length - 1)) {
     setSelected(Math.max(0, shown.length - 1));
@@ -287,22 +292,22 @@ export const DebriefsHome: React.FC = () => {
       ))}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Segmented
-          label={h.categoriesLabel}
-          value={cat}
-          onChange={c => set({ cat: c === defaultCategory(preAccess) ? null : c })}
-          items={categories.map(c => ({
-            id: c,
-            label: (
-              <>
-                {h.categories[c]}
-                <span className="text-xs opacity-75" data-testid={`count-${c}`}>
-                  {categoryCount(page?.counts, c) ?? ""}
-                </span>
-              </>
-            ),
-          }))}
-        />
+        <div className="min-w-[16rem]" data-testid="home-category">
+          <Dropdown
+            id="debriefs-category"
+            type="inline"
+            size="md"
+            titleText={h.showLabel}
+            label={h.showLabel}
+            items={categoryItems}
+            selectedItem={categoryItems.find(o => o.id === cat) ?? categoryItems[0]}
+            itemToString={(o: Item | null) => o?.label ?? ""}
+            onChange={({ selectedItem }: { selectedItem: Item | null }) => {
+              const c = (selectedItem?.id ?? defaultCategory(preAccess)) as typeof cat;
+              set({ cat: c === defaultCategory(preAccess) ? null : c });
+            }}
+          />
+        </div>
         <div className="flex-1" />
         <div
           role="group"
