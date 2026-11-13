@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import "@carbon/charts/styles.css";
 import "../Analytics/analytics-carbon.scss";
@@ -1194,6 +1194,26 @@ const SegmentBar: React.FC<{
 };
 
 /**
+ * Below this width the Analytics page's filter row cannot hold the time range plus three
+ * dropdowns and More filters on one line (it needs ~920px of content width, ~1085px of
+ * viewport), so Debrief type moves behind More filters. Only this tab's controls change.
+ */
+const NARROW_FILTERS = "(max-width: 1179px)";
+
+const useMedia = (query: string): boolean => {
+  const [matches, setMatches] = useState(() => Boolean(window.matchMedia?.(query)?.matches));
+  useEffect(() => {
+    const list = window.matchMedia?.(query);
+    if (!list) return undefined;
+    const on = () => setMatches(list.matches);
+    on();
+    list.addEventListener?.("change", on);
+    return () => list.removeEventListener?.("change", on);
+  }, [query]);
+  return matches;
+};
+
+/**
  * The six filters, applied to every live metric on the page. They render into the Analytics page's
  * shared filter row (beside its time range), as Carbon dropdowns like every other tab's filters.
  * Only values that exist in the window are offered; the first item of each means "all".
@@ -1204,11 +1224,13 @@ const FilterBar: React.FC<{
   onFilter: (f: DebriefMetricsFilter) => void;
 }> = ({ options, filter, onFilter }) => {
   const s = en.debriefs.metrics.filters;
+  const narrow = useMedia(NARROW_FILTERS);
   const [moreOpen, setMoreOpen] = useState(
     () =>
       filter.learnerLevel !== undefined ||
       filter.releaseVersion !== undefined ||
-      filter.judgeVersion !== undefined,
+      filter.judgeVersion !== undefined ||
+      (Boolean(window.matchMedia?.(NARROW_FILTERS)?.matches) && filter.recipe !== undefined),
   );
   if (!options) return null;
   const set = (patch: Partial<DebriefMetricsFilter>) => onFilter({ ...filter, ...patch });
@@ -1299,8 +1321,11 @@ const FilterBar: React.FC<{
   };
   // Organisation, language and debrief type sit in the page's filter row beside the time range;
   // learner level, release and judge version sit behind More filters, which counts the set ones.
-  const main = defs.slice(0, 3);
-  const more = defs.slice(3);
+  // Below 1180px debrief type joins them, so the row never wraps (the time range used to sit
+  // alone on the first line between ~1056 and ~1108px).
+  const inRow = narrow ? 2 : 3;
+  const main = defs.slice(0, inRow);
+  const more = defs.slice(inRow);
   const chips: FilterChip[] = defs
     .filter(d => valueOf(d))
     .map(d => ({

@@ -468,6 +468,35 @@ describe("Debriefs tab: states", () => {
     await waitFor(() => expect(lastQuery()).toEqual({ weeks: 13 }));
   });
 
+  it("below 1180px keeps organisation and language in the row and moves debrief type behind More filters", async () => {
+    const user = userEvent.setup();
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === "(max-width: 1179px)",
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    try {
+      h.metrics.mockReturnValue(answer(fullView()));
+      render(<MetricsTab />);
+      expect(screen.getByTestId("metrics-filter-organisation")).toBeInTheDocument();
+      expect(screen.getByTestId("metrics-filter-language")).toBeInTheDocument();
+      expect(screen.queryByTestId("metrics-filter-recipe")).toBeNull();
+      await user.click(screen.getByTestId("metrics-filter-more-button"));
+      const more = screen.getByTestId("metrics-filter-more");
+      for (const id of ["recipe", "learnerLevel", "releaseVersion", "judgeVersion"]) {
+        expect(within(more).getByTestId(`metrics-filter-${id}`)).toBeInTheDocument();
+      }
+      // A debrief type set there counts on More filters like the others.
+      await choose(user, /debrief type/i, "Standard");
+      await waitFor(() => expect(lastQuery()).toMatchObject({ recipe: "standard" }));
+      expect(screen.getByTestId("metrics-filter-more-button-count")).toHaveTextContent("1");
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it("says when the filters match nothing", async () => {
     const user = userEvent.setup();
     h.metrics.mockReturnValue(answer({ ...emptyView(), filterOptions: fullView().filterOptions }));
