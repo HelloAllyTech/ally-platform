@@ -468,6 +468,36 @@ question_id?, answer }` → `{ ok, id }`, appended to the idea's `evidence.quest
 Planted-idea fixtures for the offline "right final state" eval (METRICS.md): `ally-ai/tests/fixtures/pm_agent_planted_ideas.json`
 (good, bad, neutral; no runner yet).
 
+## 7b. The PM agent answers Builder — `POST /api/v1/pm-agent/builder-answers` (ally-ai)
+
+"Hand to Builder" (R2-20, plan §11.5). A person approves a route B idea and picks who answers Builder's interview:
+"The PM agent" (default) or "I'll answer them myself". ally-be opens the Builder session with `requestedBy:
+"debrief_pm_agent"` and `requestRef: <idea id>`, starts its first interview turn as that person, and stores
+`evidence.handoff.answerer`. Builder tells the requester (`builderRequesters`) whenever an interview turn ends.
+
+With the PM agent answering, ally-be (`DebriefBuilderRequesterService`) sends Builder's one pending question:
+`{ idea_id, model, backup_model, prices, budget_usd, brief: { title, problem, evidence_summary, expected_effect,
+acceptance_checks[] }, questions: [ { id, prompt, rationale?, options: [ { id, label, description? } ] } ],
+known_texts[] }` → `{ status: finished | budget_spent | failed, answers: [ { question_id, can_answer,
+selected_option_ids[], answer, reason } ], estimated_cost_usd, model, error }`.
+
+- One structured model call (the PM agent's model, backup via `with_fallbacks`), no tools. The brief is the PM
+  agent's own, quote-stripped by the gateway and again by ally-be against the cited comments (`known_texts`).
+- `can_answer: false` when the brief does not settle it: the question stays in Builder for the person who clicked,
+  exactly as Builder asks today, and is recorded in `evidence.builder.escalated` so it is not asked again.
+- An answer that still contains a quote, or comes back empty, is escalated, never sent.
+- An answer goes to Builder through `BuilderDecisionService.answer` (History surface `requester`, no actor) as
+  "From the PM agent: …", and is kept in `evidence.builder.answers` for the idea card.
+- Builder's situation brief (its reading of the code) always waits for a person.
+- Cost: recorded to `llm_usage` as `debrief_improver` (the learning budget); each call at most
+  min(`pmAgentRunCapUsd`, $0.10, learning budget left). Skipped (escalated) while `pmAgentEnabled` is off, the budget
+  is spent, or after 20 answers on one session. Audited as `pipeline_step` with `step: builder_answer` /
+  `builder_escalated`.
+
+The idea card reads `GET /v1/debriefs/console/pm-agent/ideas/:id/builder` (stage interviewing · building · PR open ·
+merged · closed, the waiting question, the PM agent's answers, pull requests) and answers from the card with
+`POST …/builder/answer { questionId, text }`.
+
 ## 8. Safety recall for the gate — `POST /api/v1/debrief/safety-recall` (ally-ai)
 
 The PM agent's gate rule "safety recall 100% × 3" (plan §9, PRD §12). ally-be sends the

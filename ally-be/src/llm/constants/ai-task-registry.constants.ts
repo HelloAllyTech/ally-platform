@@ -1106,13 +1106,18 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     task: LlmTask.DEBRIEF_PM_AGENT,
     runtime: LlmRuntime.ALLY_AI,
     trigger:
-      'Weekly, a deeper review monthly, and on demand from the Debrief Console',
+      'Weekly, a deeper review monthly, on demand from the Debrief Console, and when a Builder ' +
+      'interview handed over with "Hand to Builder" asks a question',
     detail:
       'The PM agent, one Deep Agent in ally-ai (app/core/pm_agent): reads expert comments, metric failure points ' +
       'and redacted reporting views (never transcripts), plans, investigates with read-only subagents, and proposes ' +
       'ideas routed to itself, Builder, Bug Hunter or a person through ally-be gateway tools that refuse the ' +
       'never-list. Every model call (main agent and subagents) is one row. Falls back to ' +
-      'DEBRIEF_MODELS.pmAgentBackup. Paid from the learning budget, capped per run (pmAgentRunCapUsd).',
+      'DEBRIEF_MODELS.pmAgentBackup. Paid from the learning budget, capped per run (pmAgentRunCapUsd). ' +
+      'Also answers Builder interview questions for a handed-over idea (R2-20, POST /pm-agent/builder-answers): ' +
+      'one structured call from the idea brief alone (no tools, no learner text), at most $0.10 each, ' +
+      'escalating to a person what the brief does not settle. Its instructions are in code ' +
+      '(app/core/pm_agent/builder_answers.py), not the Skills Store.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',

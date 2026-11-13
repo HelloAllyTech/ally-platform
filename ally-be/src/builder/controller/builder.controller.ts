@@ -1047,6 +1047,8 @@ export class BuilderController {
           }`,
         );
       }
+      // After the lock: a requester answering starts the next turn.
+      void this.sessionService.turnEnded(sessionId);
       if (!res.writableEnded) {
         res.end();
       }

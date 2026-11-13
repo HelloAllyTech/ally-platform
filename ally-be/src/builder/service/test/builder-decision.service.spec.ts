@@ -113,6 +113,7 @@ describe('BuilderDecisionService', () => {
       }),
       cancelSession: jest.fn().mockResolvedValue({}),
       archiveSession: jest.fn().mockResolvedValue({}),
+      turnEnded: jest.fn().mockResolvedValue(undefined),
     };
     const frames: any[] = over.frames ?? [{ event: 'done', data: {} }];
     const streamTurn = jest.fn(async function* () {
@@ -609,6 +610,50 @@ describe('BuilderDecisionService', () => {
       expect(redisService.releaseLock).toHaveBeenCalledWith(
         'builder-turn:sess-1',
       );
+    });
+
+    it('tells the session requester once the turn has ended and its lock is released', async () => {
+      const { answer, sessionService, redisService } = build({
+        messages: { 'sess-1': [assistantRow({ questions: [question()] })] },
+      });
+
+      await answer('question:sess-1:q-1', { selectedOptionIds: ['mon'] }, 42);
+      await flush();
+
+      expect(sessionService.turnEnded).toHaveBeenCalledWith('sess-1');
+      expect(redisService.releaseLock.mock.invocationCallOrder[0]).toBeLessThan(
+        sessionService.turnEnded.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('records a requester answer on nobody’s behalf', async () => {
+      const { service, historyService } = build({
+        messages: { 'sess-1': [assistantRow({ questions: [question()] })] },
+      });
+
+      await service.answer(
+        'question:sess-1:q-1',
+        { selectedOptionIds: ['mon'] },
+        42,
+        { surface: 'requester' },
+      );
+      await flush();
+
+      expect(historyService.recordDecision).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ surface: 'requester', actorUserId: null }),
+      );
+    });
+
+    it('lists the pending question for a requester, and a brief as waiting on a person', async () => {
+      const { service } = build({
+        messages: { 'sess-1': [assistantRow({ questions: [question()] })] },
+      });
+      await expect(service.pendingInterview('sess-1')).resolves.toEqual({
+        questions: [expect.objectContaining({ id: 'q-1' })],
+        brief: false,
+      });
     });
 
     it('sends a custom answer as the admin’s words', async () => {

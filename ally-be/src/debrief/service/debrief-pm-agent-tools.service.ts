@@ -502,7 +502,8 @@ export class DebriefPmAgentToolsService {
   // --- routes B, C, D -------------------------------------------------------------------
 
   /** Comment bodies, quoted spans and replies the idea cites: never sent to Builder or Bug Hunter. */
-  private async knownTexts(idea: Record<string, any>): Promise<string[]> {
+  /** The cited comments' bodies and quoted spans: text that never reaches Builder. */
+  async knownTexts(idea: Record<string, any>): Promise<string[]> {
     const ids: string[] = idea.evidence?.commentIds ?? [];
     const rows: Array<{ body: string; quotedText: string | null }> =
       await this.dataSource.query(

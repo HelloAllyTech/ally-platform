@@ -34,6 +34,7 @@ import {
   BuilderSessionStatus,
 } from '../enum/builder.enum';
 import { BuilderPrdReadiness } from '../type/builder-prd.type';
+import { builderRequesters } from '../util/builder-requesters.registry';
 
 export type BuilderSessionListItem = BuilderSession & {
   createdByName: string | null;
@@ -137,6 +138,9 @@ export class BuilderSessionService {
       tenantId?: string | null;
       /** See BuilderSession.handoffContext. Only callers outside Builder pass it. */
       handoffContext?: string | null;
+      /** See BuilderSession.requestedBy / requestRef: an agent's request (plan §11.5). */
+      requestedBy?: string | null;
+      requestRef?: string | null;
     } = {},
   ): Promise<BuilderSession> {
     if (params.tenantId) {
@@ -164,6 +168,8 @@ export class BuilderSessionService {
         tenantId: params.tenantId ?? null,
         budgetUsd,
         handoffContext: this.boundHandoff(params.handoffContext),
+        requestedBy: params.requestedBy ?? null,
+        requestRef: params.requestRef ?? null,
         createdBy: userId,
         updatedBy: userId,
       }),
@@ -172,6 +178,37 @@ export class BuilderSessionService {
     // very first paint rather than after the agent's first patch.
     await this.prdService.getOrCreateDoc(session.id, userId, session.title);
     return session;
+  }
+
+  /**
+   * An interview turn ended (and its lock is released): tell the session's requester, if
+   * an agent requested it, so it can answer Builder's question itself. Never throws and
+   * never waits on the requester — both callers are in a turn's `finally`.
+   */
+  async turnEnded(sessionId: string): Promise<void> {
+    try {
+      const row = await this.sessionRepository.findOne({
+        where: { id: sessionId },
+        select: { id: true, requestedBy: true, requestRef: true },
+      });
+      const requester = builderRequesters.get(row?.requestedBy);
+      if (!requester) return;
+      void requester
+        .turnEnded(sessionId, row?.requestRef ?? null)
+        .catch((error) =>
+          this.logger.warn(
+            `Builder requester ${row?.requestedBy} failed after a turn on ${sessionId}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          ),
+        );
+    } catch (error) {
+      this.logger.warn(
+        `Could not read the requester of Builder session ${sessionId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   /**
