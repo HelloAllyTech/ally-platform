@@ -20,7 +20,7 @@ export interface InboxItem {
   lastMessageAt: string;
   unread: number;
   state: "assistant" | "needs_person" | "held";
-  needsPersonReason: "asked" | "declined_twice" | null;
+  needsPersonReason: "asked" | "declined_twice" | "assistant" | null;
   heldBy: { id: number; name: string | null } | null;
   safety: boolean;
 }

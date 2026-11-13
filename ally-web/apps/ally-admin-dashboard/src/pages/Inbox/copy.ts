@@ -25,6 +25,8 @@ export const INBOX = {
   reasons: {
     asked: "Asked for a person",
     declined_twice: "Couldn't help twice",
+    // The assistant passed the chat on with its hand_over tool (chunk 3b).
+    assistant: "Your assistant passed it on",
   },
   replyPlaceholder: "Write a reply",
   send: "Send",

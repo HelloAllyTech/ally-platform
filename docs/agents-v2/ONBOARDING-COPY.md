@@ -557,7 +557,7 @@ says when a save can't be made. More lines for the home's sections are added her
   - On a phone, from a chat: Back to chats
   - Settings hint for opening hours: Without opening hours, visitors are always told when you usually reply.
   - List labels: Needs a person · Safety · {name} is replying · Your assistant
-  - Reasons: Asked for a person · Couldn't help twice
+  - Reasons: Asked for a person · Couldn't help twice · Your assistant passed it on
   - Empty inbox: No conversations yet. They'll appear here as people chat.
   - No chat open: Pick a chat to read it.
   - Nothing needs a person: Nobody is waiting for a person.
