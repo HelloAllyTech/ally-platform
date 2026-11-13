@@ -171,3 +171,62 @@ def test_old_layout_mounts_the_worktree_as_the_app(config, tmp_path) -> None:
     assert f"{root.resolve()}:/work/ally-be" in run
     assert run[run.index("-w") + 1] == "/work/ally-be"
     assert any(v.endswith(":/work/ally-be/node_modules") for v in run)
+
+
+class FlakyDocker(FakeDocker):
+    """The install fails with the given outputs first, then succeeds."""
+
+    def __init__(self, failures):
+        super().__init__(image_exists=True)
+        self.failures = list(failures)
+
+    def __call__(self, args, timeout=None):
+        args = list(args)
+        if (
+            args[1] == "run"
+            and "--network" in args
+            and args[args.index("--network") + 1] == "bridge"
+        ):
+            self.calls.append(args)
+            if self.failures:
+                return DockerResult(tuple(args), 1, "", self.failures.pop(0))
+            self.volume_exists = True
+            return DockerResult(tuple(args), 0, "ok", "")
+        return super().__call__(args, timeout)
+
+
+def test_install_retries_registry_and_dns_errors_with_backoff(config, worktree) -> None:
+    dns = (
+        "npm error code ENOTFOUND\nnpm error network request to "
+        "https://registry.npmjs.org/zod failed, reason: getaddrinfo ENOTFOUND"
+    )
+    docker = FlakyDocker([dns, "Connection reset by peer"])
+    slept: list[float] = []
+    sb = Sandbox(
+        config, worktree, "ally-be", "run-x", docker=docker, sleep=slept.append
+    )
+    assert sb.install().ok
+    installs = [c for c in docker.calls if c[1] == "run"]
+    assert len(installs) == 3 and slept == [5, 20]
+
+
+def test_install_does_not_retry_a_real_error(config, worktree) -> None:
+    docker = FlakyDocker(["npm error code ERESOLVE could not resolve dependency"])
+    slept: list[float] = []
+    sb = Sandbox(
+        config, worktree, "ally-be", "run-x", docker=docker, sleep=slept.append
+    )
+    with pytest.raises(SandboxError):
+        sb.install()
+    assert slept == [] and len([c for c in docker.calls if c[1] == "run"]) == 1
+
+
+def test_install_gives_up_after_the_last_retry(config, worktree) -> None:
+    docker = FlakyDocker(["getaddrinfo ENOTFOUND"] * 5)
+    slept: list[float] = []
+    sb = Sandbox(
+        config, worktree, "ally-be", "run-x", docker=docker, sleep=slept.append
+    )
+    with pytest.raises(SandboxError, match="ENOTFOUND"):
+        sb.install()
+    assert slept == [5, 20, 60]

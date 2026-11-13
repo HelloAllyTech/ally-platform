@@ -11,12 +11,13 @@ unit tests fake.
 from __future__ import annotations
 
 import hashlib
+import re
 import shlex
 import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping, Protocol, Sequence
+from typing import Callable, Mapping, Protocol, Sequence
 
 from bug_hunter.config import PACKAGE_ROOT, BugHunterConfig
 
@@ -24,6 +25,23 @@ SANDBOX_DIR = PACKAGE_ROOT / "sandbox"
 WORK_MOUNT = "/work"
 IMAGE_PREFIX = "bug-hunter"
 VOLUME_PREFIX = "bughunter-deps"
+
+
+INSTALL_RETRY_DELAYS_S = (5, 20, 60)
+_NETWORK_ERROR = re.compile(
+    r"ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENETUNREACH|socket hang up"
+    r"|getaddrinfo|Temporary failure in name resolution|Name or service not known"
+    r"|Could not resolve host|Connection reset by peer|Read timed out"
+    r"|ConnectTimeout|ConnectionError|HTTP error 5\d\d"
+    r"|\b50[234]\b.*(?:Gateway|Unavailable)"
+    r"|Max retries exceeded|network request to .* failed",
+    re.IGNORECASE,
+)
+
+
+def is_network_error(result: "ExecResult") -> bool:
+    """A failed install whose output names a registry, DNS or connection error."""
+    return bool(_NETWORK_ERROR.search(f"{result.stdout}\n{result.stderr}"))
 
 
 class SandboxError(RuntimeError):
@@ -95,6 +113,7 @@ class Sandbox:
     app_root: Path | None = (
         None  # host dir that *is* the app; default worktree/<app path>
     )
+    sleep: Callable[[float], None] = time.sleep  # tests pass a no-op
     _counter: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
@@ -190,6 +209,17 @@ class Sandbox:
             network=True,
             timeout=self.limits.install_timeout_s,
         )
+        # registry / DNS hiccups are retried with backoff (the holdout oracle check lost
+        # 7 of 14 cases to ENOTFOUND registry.npmjs.org); real install errors are not
+        for delay in INSTALL_RETRY_DELAYS_S:
+            if result.ok or not is_network_error(result):
+                break
+            self.sleep(delay)
+            result = self.exec(
+                self.app_config.install,
+                network=True,
+                timeout=self.limits.install_timeout_s,
+            )
         if not result.ok:
             for name in self.volume_names():
                 self.docker(["docker", "volume", "rm", "-f", name], timeout=60)
