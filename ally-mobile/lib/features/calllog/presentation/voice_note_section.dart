@@ -214,9 +214,14 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
       if (spoken.isNotEmpty) {
         _transcript = _transcript.isEmpty ? spoken : '$_transcript\n$spoken';
         try {
-          await ref
-              .read(callLogRepositoryProvider)
-              .saveNoteTranscript(chatId: widget.chatId, transcript: _transcript);
+          await ref.read(callLogRepositoryProvider).saveNoteTranscript(
+                chatId: widget.chatId,
+                transcript: _transcript,
+                // This session's own recorded length (reset to 0 only once
+                // _recorder.reset() runs below) — the backend accumulates
+                // it onto the note's stored call duration.
+                durationSeconds: _recorder.durationMs ~/ 1000,
+              );
           widget.onTranscriptSaved?.call();
         } catch (_) {
           // Non-fatal.

@@ -93,7 +93,11 @@ void main() {
       ),
     );
     when(
-      () => repository.saveNoteTranscript(chatId: any(named: 'chatId'), transcript: any(named: 'transcript')),
+      () => repository.saveNoteTranscript(
+        chatId: any(named: 'chatId'),
+        transcript: any(named: 'transcript'),
+        durationSeconds: any(named: 'durationSeconds'),
+      ),
     ).thenAnswer((_) async {});
 
     Map<String, dynamic>? appliedValues;
@@ -156,7 +160,11 @@ void main() {
     expect(appliedValues, {'sessionSummary': 'Discussed anxiety'});
     verify(
       // RN `transcriptRef`: seeded from the saved transcript, then appended.
-      () => repository.saveNoteTranscript(chatId: 42, transcript: 'Earlier dictation.\nClient discussed anxiety.'),
+      () => repository.saveNoteTranscript(
+        chatId: 42,
+        transcript: 'Earlier dictation.\nClient discussed anxiety.',
+        durationSeconds: any(named: 'durationSeconds'),
+      ),
     ).called(1);
     // The caller's Transcript tab has its own provider that nothing else in
     // this flow refreshes — without this callback firing, a saved dictation

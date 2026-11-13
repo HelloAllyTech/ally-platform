@@ -783,8 +783,24 @@ class CallLogRepository {
   /// Mirrors RN's `scribeNoteApi.ts` `saveNoteTranscript` mutation: replaces
   /// the manual note's stored dictation transcript (callers re-send the full
   /// accumulated text, not a delta) so it shows in the note's Transcript view.
-  Future<void> saveNoteTranscript({required int chatId, required String transcript}) async {
-    await _dio.put<void>('/chats/$chatId/transcript', data: {'transcript': transcript});
+  ///
+  /// [durationSeconds] is the length of the dictation just recorded (not
+  /// the note's accumulated total) — a manual note's startedAt/endedAt are
+  /// both set to the instant it was created and never touched again, so
+  /// without this the backend's call-duration math always computes zero no
+  /// matter how long the counsellor actually dictated.
+  Future<void> saveNoteTranscript({
+    required int chatId,
+    required String transcript,
+    int? durationSeconds,
+  }) async {
+    await _dio.put<void>(
+      '/chats/$chatId/transcript',
+      data: {
+        'transcript': transcript,
+        if (durationSeconds != null && durationSeconds > 0) 'durationSeconds': durationSeconds,
+      },
+    );
   }
 
   /// RN `useCallTranscriptDetails` page size.

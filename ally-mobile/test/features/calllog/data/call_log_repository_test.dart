@@ -845,6 +845,50 @@ void main() {
 
       verify(() => dio.put<void>('/chats/55/transcript', data: {'transcript': 'Full dictation text.'})).called(1);
     });
+
+    test('includes durationSeconds when provided, so the backend can accumulate the real call duration', () async {
+      when(
+        () => dio.put<void>(
+          '/chats/55/transcript',
+          data: {'transcript': 'Full dictation text.', 'durationSeconds': 125},
+        ),
+      ).thenAnswer((_) async => _response<void>(null));
+
+      await repository.saveNoteTranscript(
+        chatId: 55,
+        transcript: 'Full dictation text.',
+        durationSeconds: 125,
+      );
+
+      verify(
+        () => dio.put<void>(
+          '/chats/55/transcript',
+          data: {'transcript': 'Full dictation text.', 'durationSeconds': 125},
+        ),
+      ).called(1);
+    });
+
+    test('omits durationSeconds when it is zero (nothing recorded this session)', () async {
+      when(
+        () => dio.put<void>(
+          '/chats/55/transcript',
+          data: {'transcript': 'Full dictation text.'},
+        ),
+      ).thenAnswer((_) async => _response<void>(null));
+
+      await repository.saveNoteTranscript(
+        chatId: 55,
+        transcript: 'Full dictation text.',
+        durationSeconds: 0,
+      );
+
+      verify(
+        () => dio.put<void>(
+          '/chats/55/transcript',
+          data: {'transcript': 'Full dictation text.'},
+        ),
+      ).called(1);
+    });
   });
 
   group('addSummaryFeedback', () {
