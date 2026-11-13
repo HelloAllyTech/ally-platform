@@ -8353,6 +8353,11 @@ export const en = {
     failedToDeleteTemplate: "Failed to delete template(s)",
     deleteTemplate: "Delete template",
     deleteTemplateConfirmation: "Are you sure you want to delete this template?",
+    unsavedChanges: "Unsaved changes",
+    unsavedChangesDescription:
+      "You have unsaved changes to this template. Close without saving and lose them?",
+    closeAnyway: "Close without saving",
+    keepEditing: "Keep editing",
   },
   productUpdates: {
     title: "Product updates",

@@ -92,7 +92,6 @@ vi.mock("@components", () => ({
 }));
 
 // Mock sub-editors to avoid more dependencies
-vi.mock("../McqEditor", () => ({ McqEditor: () => null }));
 vi.mock("../TrueFalseEditor", () => ({ TrueFalseEditor: () => null }));
 vi.mock("../OrderingEditor", () => ({ OrderingEditor: () => null }));
 vi.mock("../MatchingEditor", () => ({ MatchingEditor: () => null }));
@@ -169,5 +168,59 @@ describe("QuizItemEditor — switching between Likert questions", () => {
     fireEvent.click(screen.getByText("1. Likert Scale"));
     expect(scaleInputs()).toHaveLength(4);
     expect(questionsOf()[1].scale).toHaveLength(2);
+  });
+});
+
+const mcq = (id: string, n: number) => ({
+  id,
+  type: "mcq_single",
+  prompt: id,
+  points: 1,
+  options: Array.from({ length: n }, (_, i) => ({
+    id: `${id}-o${i}`,
+    text: `${id} option ${i + 1}`,
+  })),
+  correctOptionIds: [`${id}-o0`],
+});
+
+const McqHarness = ({ onValues }: { onValues: (values: any) => void }) => {
+  const methods = useForm({
+    defaultValues: {
+      sections: [
+        { items: [{ type: TrackItemType.QUIZ, quiz: { questions: [mcq("a", 2), mcq("b", 2)] } }] },
+      ],
+    } as any,
+  });
+  onValues(methods.watch());
+  return (
+    <FormProvider {...methods}>
+      <QuizItemEditor sectionIndex={0} itemIndex={0} onDelete={vi.fn()} />
+    </FormProvider>
+  );
+};
+
+const optionInputs = () => screen.getAllByPlaceholderText(/^Option \d+$/) as HTMLInputElement[];
+
+describe("QuizItemEditor — switching between multiple-choice questions", () => {
+  it("keeps options added to a question after moving to the next one and back", () => {
+    let values: any;
+    render(<McqHarness onValues={v => (values = v)} />);
+    const questionsOf = () => values.sections[0].items[0].quiz.questions;
+
+    fireEvent.click(screen.getByText(/Add option/i));
+    fireEvent.change(optionInputs()[2], { target: { value: "a option 3" } });
+    expect(questionsOf()[0].options).toHaveLength(3);
+
+    fireEvent.click(screen.getByText("2. Single Choice"));
+    expect(optionInputs().map(input => input.value)).toEqual(["b option 1", "b option 2"]);
+
+    fireEvent.click(screen.getByText("1. Single Choice"));
+    expect(optionInputs().map(input => input.value)).toEqual([
+      "a option 1",
+      "a option 2",
+      "a option 3",
+    ]);
+    expect(questionsOf()[0].options).toHaveLength(3);
+    expect(questionsOf()[1].options).toHaveLength(2);
   });
 });
