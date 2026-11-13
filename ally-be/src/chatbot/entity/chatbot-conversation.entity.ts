@@ -62,7 +62,7 @@ export class ChatbotConversation extends BaseWithoutTenantEntity {
   @Column({ name: 'handled_since', type: 'timestamp', nullable: true })
   handledSince?: Date | null;
 
-  /** When the chat started needing a person, and why ("asked" or "declined_twice"). */
+  /** When the chat started needing a person, and why ("asked", "declined_twice" or "assistant"). */
   @Column({ name: 'needs_person_since', type: 'timestamp', nullable: true })
   needsPersonSince?: Date | null;
 

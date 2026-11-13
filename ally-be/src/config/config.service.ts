@@ -1036,6 +1036,17 @@ export class AppConfigService {
   }
 
   /**
+   * Optional dedicated secret for the chatbot agent's run tokens (chunk 3b): the bearer token
+   * ally-ai sends back to the agent tool gateway. Empty when unset, and that is supported:
+   * `AgentRunTokenService` then derives one as HMAC-SHA256(JWT_ACCESS_SECRET, 'agent-gateway-v1'),
+   * a different label from Debrief's, so neither gateway accepts the other's tokens. Never leaves
+   * ally-be.
+   */
+  get agentGatewaySecret(): string {
+    return this.configService.get<string>('AGENT_GATEWAY_SECRET', '');
+  }
+
+  /**
    * User ids allowed to put a new version of a PINNED prompt live — the judge
    * rubrics, measuring instruments and guards in `PINNED_PROMPTS`.
    *

@@ -20,6 +20,8 @@ import {
   ConversationMessageRole,
   ConversationStatus,
 } from '../../chatbot/enum/conversation.enum';
+import { ToolRunStatus } from '../../chatbot/entity/tool-run.entity';
+import { NEEDS_PERSON_REASONS } from '../../chatbot/handover/handover';
 import {
   BotPageAccess,
   BotPageAccessKind,
@@ -475,6 +477,12 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_chatbot_conversations_status', Object.values(ConversationStatus)],
     ['CHK_chatbot_messages_channel', Object.values(ConversationChannel)],
     ['CHK_chatbot_messages_role', Object.values(ConversationMessageRole)],
+    // The inbox (chunk 11a) and the tool gateway (chunk 3b).
+    [
+      'CHK_chatbot_conversations_needs_person_reason',
+      [...NEEDS_PERSON_REASONS],
+    ],
+    ['CHK_tool_runs_status', Object.values(ToolRunStatus)],
     // The bot page (Agents v2, chunk 12b).
     ['CHK_chatbot_pages_status', Object.values(BotPageStatus)],
     ['CHK_chatbot_pages_access', Object.values(BotPageAccess)],

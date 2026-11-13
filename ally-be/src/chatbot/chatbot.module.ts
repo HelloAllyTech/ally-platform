@@ -34,6 +34,12 @@ import { InboxEventsService } from './inbox/inbox-events.service';
 import { InboxController } from './inbox/inbox.controller';
 import { InboxService } from './inbox/inbox.service';
 import { NotificationModule } from '../notification/notification.module';
+import { AgentGatewayController } from './agent-tools/agent-gateway.controller';
+import { AgentGatewayService } from './agent-tools/agent-gateway.service';
+import { AgentRunTokenService } from './agent-tools/agent-run-token.service';
+import { HandOverTool } from './agent-tools/hand-over.tool';
+import { AGENT_GATEWAY_TOOLS, AgentToolRegistry } from './agent-tools/tools';
+import { ToolRun } from './entity/tool-run.entity';
 
 /**
  * Chatbots: configurable bots reached through connectors.
@@ -58,6 +64,7 @@ import { NotificationModule } from '../notification/notification.module';
       ChatbotContactIdentity,
       ChatbotConversation,
       ChatbotMessage,
+      ToolRun,
       WaKeywordTemplate,
       GlobalSettings,
     ]),
@@ -68,7 +75,12 @@ import { NotificationModule } from '../notification/notification.module';
     // The inbox's "nobody opened it" email (chunk 11a).
     NotificationModule,
   ],
-  controllers: [ChatbotController, ConnectorController, InboxController],
+  controllers: [
+    ChatbotController,
+    ConnectorController,
+    InboxController,
+    AgentGatewayController,
+  ],
   providers: [
     GlobalSettingsRepository,
     ConnectorRegistry,
@@ -85,6 +97,16 @@ import { NotificationModule } from '../notification/notification.module';
     InboxEventsService,
     InboxService,
     HandoverService,
+    // The agent's tool gateway (chunk 3b). A new tool is one provider here, listed below.
+    AgentRunTokenService,
+    AgentGatewayService,
+    HandOverTool,
+    {
+      provide: AGENT_GATEWAY_TOOLS,
+      useFactory: (handOver: HandOverTool) => [handOver],
+      inject: [HandOverTool],
+    },
+    AgentToolRegistry,
   ],
   exports: [
     // The Checkup (chunk 20a-2) asks questions through Preview's path.
