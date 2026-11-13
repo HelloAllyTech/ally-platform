@@ -396,7 +396,12 @@ def run_case(
             Exception
         ) as exc:  # noqa: BLE001 - one broken case must not stop the batch
             result_row.outcome = "error"
-            result_row.error = f"{type(exc).__name__}: {exc}"[:500]
+            message = f"{type(exc).__name__}: {exc}"
+            result_row.error = (
+                message
+                if len(message) <= 500
+                else message[:120] + " … " + message[-370:]
+            )
         result_row.sandbox_seconds = round(sandbox_seconds, 1)
         run.write_artefact("result.json", json.dumps(result_row.to_dict(), indent=1))
         if not options.keep_nonhead_volumes:
@@ -632,6 +637,22 @@ def run_evals(
             path=options.spend_file,
         )
     spent = 0.0
+    results_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    base = results_dir / f"{stamp}-{agent.name}-{meta['mode']}-{git_sha[:8]}"
+
+    def write_report(partial: bool) -> None:
+        meta["partial"] = partial
+        meta["cost_usd_total"] = round(spent, 4)
+        meta["cases_done"] = len(report.cases)
+        meta["cases_remaining"] = len(cases) - len(report.cases)
+        base.with_suffix(".json").write_text(
+            json.dumps(report.to_dict(), indent=1), encoding="utf-8"
+        )
+        base.with_suffix(".md").write_text(
+            render_markdown(report.to_dict()), encoding="utf-8"
+        )
+
     try:
         for index, case in enumerate(cases):
             guard.check(f"before {case.id}")
@@ -643,6 +664,7 @@ def run_evals(
             row = run_case(config, case, agent, options, guard, repo)
             report.cases.append(row)
             spent += row.cost_usd
+            write_report(partial=True)  # a CI timeout keeps every finished case
     except StopHarness as exc:
         meta["stopped_reason"] = str(exc)
     meta["cost_usd_total"] = round(spent, 4)
@@ -659,13 +681,5 @@ def run_evals(
     meta["cases_done"] = len(report.cases)
     meta["cases_remaining"] = len(cases) - len(report.cases)
     meta["free_gb_end"] = guard.free_gb()
-    results_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    base = results_dir / f"{stamp}-{agent.name}-{meta['mode']}-{git_sha[:8]}"
-    base.with_suffix(".json").write_text(
-        json.dumps(report.to_dict(), indent=1), encoding="utf-8"
-    )
-    base.with_suffix(".md").write_text(
-        render_markdown(report.to_dict()), encoding="utf-8"
-    )
+    write_report(partial=False)
     return report, base.with_suffix(".md")

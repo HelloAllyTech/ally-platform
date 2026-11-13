@@ -249,3 +249,32 @@ def test_holdout_cases_never_run_without_milestone(repo_config, tmp_path: Path) 
     )
     assert [c.id for c in report.cases] == [held.id]
     assert report.meta["split"] == "holdout"
+
+
+def test_report_is_written_after_every_case(repo_config, tmp_path: Path) -> None:
+    cfg, repo, bug, clean = repo_config
+    seen: list[int] = []
+    out = tmp_path / "r"
+
+    class Watching:
+        name = "watching"
+
+        def run(self, case_input, run) -> AgentResult:
+            files = sorted(out.glob("*.json")) if out.exists() else []
+            if files:
+                import json as _json
+
+                seen.append(len(_json.loads(files[-1].read_text())["cases"]))
+            return AgentResult()
+
+    report, path = run_evals(
+        cfg,
+        [bug, clean],
+        Watching(),
+        _options(),
+        repo=repo,
+        guard=DiskGuard(5, probe=lambda: 50.0),
+        results_dir=out,
+    )
+    assert seen == [1]  # while case 2 ran, case 1 was already on disk
+    assert report.meta["partial"] is False and len(list(out.glob("*.json"))) == 1

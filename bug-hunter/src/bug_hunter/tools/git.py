@@ -8,6 +8,7 @@ with the pattern layer before it is returned.
 from __future__ import annotations
 
 import re
+import uuid
 import shutil
 import subprocess
 from contextlib import contextmanager
@@ -187,14 +188,25 @@ class Git:
         removed afterwards whatever happens. Used to run commands on untouched code
         without touching the caller's worktree or the stash stack (which every
         worktree of the repo shares)."""
-        path = self.create_worktree(parent, name, ref)
+        # a unique folder per call: a leftover from an earlier checkout (files the
+        # sandbox wrote as root, which the host user cannot delete on Linux) must
+        # never block the next one
+        unique = f"{name}-{uuid.uuid4().hex[:8]}"
+        path = self.create_worktree(parent, unique, ref)
         try:
             yield path
         finally:
+            # cleanup never raises: verify failed on CI because `git worktree remove`
+            # hit root-owned test caches ("Permission denied")
             try:
                 self.remove_worktree(path)
-            finally:
-                shutil.rmtree(Path(parent) / name, ignore_errors=True)
+            except GitError:
+                shutil.rmtree(path, ignore_errors=True)
+                try:
+                    self._git(["worktree", "prune"])
+                except GitError:
+                    pass
+            shutil.rmtree(Path(parent) / unique, ignore_errors=True)
 
     # --- push: only open_pr may call this ------------------------------------------
 

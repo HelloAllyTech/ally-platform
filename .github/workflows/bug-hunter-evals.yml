@@ -95,7 +95,8 @@ jobs:
     # oracle check runs once, in the issue job.
     name: "Evals (${{ matrix.mode }})"
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    # GitHub's job maximum is 360; the eval step stops at 330 so the uploads still run
+    timeout-minutes: 355
     strategy:
       fail-fast: false
       matrix:
@@ -172,6 +173,7 @@ jobs:
 
       - name: "Eval, ${{ matrix.mode }} mode"
         if: always() && (inputs.what == 'all' || inputs.what == 'baseline') && contains(inputs.modes, matrix.mode)
+        timeout-minutes: 330
         run: |
           poetry run bug-hunter eval run --agent "$AGENT" --mode "$MODE" --split "$SPLIT" ${MILESTONE:+--milestone} ${CASES:+--cases "$CASES"} ${MAX_COST:+--max-cost-usd "$MAX_COST"}
         env:

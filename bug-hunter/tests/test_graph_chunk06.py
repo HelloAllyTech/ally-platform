@@ -903,7 +903,7 @@ def test_clean_checkout_is_separate_and_removed(repo) -> None:
     with git.clean_checkout(parent, "baseline", "HEAD") as clean:
         assert (clean / "ally-be/src/x.ts").read_text() == SRC_BUGGY
         assert (repo / "ally-be/src/x.ts").read_text() == SRC_FIXED
-    assert not (parent / "baseline").exists()
+    assert not any(parent.glob("baseline*")) if parent.exists() else True
     assert "scratch" not in _git(repo, "worktree", "list")
     assert _git(repo, "stash", "list") == ""  # the shared stash stack is untouched
 
@@ -924,3 +924,23 @@ def test_neighbour_setup_is_capped_at_a_statement_end() -> None:
     assert cap_setup(small, lambda t: 1) == small
     tokens = cap_setup(["const a = 1;"] * 50, lambda text: len(text.splitlines()) * 100)
     assert len(tokens) == 31 and tokens[-1].startswith("// …")  # 30 lines = 3000 tokens
+
+
+def test_clean_checkout_cleanup_never_raises(repo, monkeypatch) -> None:
+    """On Linux the sandbox leaves root-owned files the host cannot delete; the
+    checkout must still close cleanly and the next one must work."""
+    from bug_hunter.tools.git import GitError
+
+    git = Git(repo)
+    parent = repo.parent / "scratch2"
+    real_remove = Git.remove_worktree
+
+    def failing_remove(self, path):
+        raise GitError("git worktree remove failed (255): Permission denied")
+
+    monkeypatch.setattr(Git, "remove_worktree", failing_remove)
+    with git.clean_checkout(parent, "baseline", "HEAD") as first:
+        assert first.exists()
+    monkeypatch.setattr(Git, "remove_worktree", real_remove)
+    with git.clean_checkout(parent, "baseline", "HEAD") as second:
+        assert second != first and (second / "ally-be/src/x.ts").exists()
