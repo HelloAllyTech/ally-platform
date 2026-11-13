@@ -395,3 +395,104 @@ describe('DebriefBuilderRequesterService: the PM agent answers Builder', () => {
     expect(evidence.pop()!.escalated[0].reason).toMatch(/switched off/);
   });
 });
+
+/** The idea card shows Builder's own options and answers in the feed's shape. */
+describe('the idea card answers Builder with its options', () => {
+  const question = {
+    id: 'q1',
+    prompt: 'Should the tool write anything?',
+    kind: 'singleSelect',
+    options: [
+      {
+        id: 'ro',
+        label: 'Read-only',
+        description: 'Safest',
+        recommended: true,
+      },
+      { id: 'rw', label: 'Read and write' },
+    ],
+  };
+  function setup() {
+    const current = {
+      ...idea({ status: 'approved' }),
+      evidence: {
+        handoff: handoff({
+          status: 'filed',
+          filedId: SESSION,
+          answerer: 'person',
+          decidedBy: 7,
+        }),
+      },
+    };
+    const decisions = {
+      pendingInterview: jest.fn(async () => ({
+        questions: [question],
+        brief: false,
+      })),
+      answer: jest.fn(async () => ({ ok: true, outcome: 'turn_started' })),
+    };
+    const query = jest.fn(async (sql: string) =>
+      sql.includes('FROM builder_sessions') ? [{ status: 'INTERVIEWING' }] : [],
+    );
+    const svc = new DebriefBuilderRequesterService(
+      { query } as any,
+      {} as any,
+      { getIdea: jest.fn(async () => current) } as any,
+      {} as any,
+      {} as any,
+      { get: jest.fn(() => decisions) } as any,
+    );
+    return { svc, decisions };
+  }
+
+  it("carries Builder's options, selection and free-text rule in the progress payload", async () => {
+    const { svc } = setup();
+    const view = await svc.progress(IDEA);
+    expect(view.waiting).toEqual({
+      kind: 'question',
+      questionId: 'q1',
+      prompt: question.prompt,
+      options: question.options,
+      selection: 'single',
+      minSelections: null,
+      allowCustom: true,
+      customPlaceholder: 'Your own answer…',
+      reason: null,
+    });
+  });
+
+  it('sends a picked option exactly as the Builder feed does', async () => {
+    const { svc, decisions } = setup();
+    await svc.answerAsPerson(IDEA, 7, 'q1', { selectedOptionIds: ['ro'] });
+    expect(decisions.answer).toHaveBeenCalledWith(
+      `question:${SESSION}:q1`,
+      { selectedOptionIds: ['ro'] },
+      7,
+      { surface: 'session' },
+    );
+  });
+
+  it('sends "Something else" words as the feed does, and the old text form as message', async () => {
+    const { svc, decisions } = setup();
+    await svc.answerAsPerson(IDEA, 7, 'q1', {
+      customValues: ['Read-only, but log it'],
+      message: 'Read-only, but log it',
+    });
+    expect(decisions.answer).toHaveBeenLastCalledWith(
+      `question:${SESSION}:q1`,
+      {
+        customValues: ['Read-only, but log it'],
+        message: 'Read-only, but log it',
+      },
+      7,
+      { surface: 'session' },
+    );
+    await svc.answerAsPerson(IDEA, 7, 'q1', { message: '  Just read  ' });
+    expect(decisions.answer).toHaveBeenLastCalledWith(
+      `question:${SESSION}:q1`,
+      { message: 'Just read' },
+      7,
+      { surface: 'session' },
+    );
+  });
+});

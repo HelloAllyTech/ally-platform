@@ -4,6 +4,7 @@ import { Button, Tag, TextArea, Tile } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 import { AnswerBuilderDecisionRequest, BuilderDecision, BuilderDecisionOption } from "@types";
 
+import { DecisionOptions } from "./DecisionOptions";
 import {
   isTypingTarget,
   optionIndexForKey,
@@ -303,63 +304,13 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
         </div>
       )}
 
-      {options.length > 0 && (
-        <ol className="flex flex-col gap-2" aria-label="Options">
-          {options.map((option, index) => {
-            const isPicked = picked.includes(option.id);
-            return (
-              <li key={option.id}>
-                <button
-                  type="button"
-                  disabled={locked}
-                  aria-pressed={isPicked}
-                  onClick={() => (isMulti ? toggleMulti(option) : clickSingle(option))}
-                  className={[
-                    "flex w-full items-start gap-3 rounded border px-3 py-2 text-left transition-colors",
-                    "hover:border-primary-500 hover:bg-primary-50",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-                    "disabled:cursor-not-allowed disabled:opacity-60",
-                    isPicked
-                      ? "border-primary-600 bg-primary-50 ring-1 ring-primary-600"
-                      : option.recommended
-                        ? "border-primary-400 bg-primary-50/40"
-                        : "border-neutral-300",
-                  ].join(" ")}
-                >
-                  {/* The key that picks it, as a badge: the shortcut is taught where it is used. */}
-                  <kbd className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded border border-neutral-300 bg-white px-1 font-mono text-xs text-typography-700">
-                    {index + 1}
-                  </kbd>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-typography-900">
-                        {option.label}
-                      </span>
-                      {option.recommended && (
-                        <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
-                          {strings.card.recommended}
-                          {!isMulti &&
-                            ` · ${option.confirm ? strings.card.pressEnterTwice : strings.card.pressEnter}`}
-                        </span>
-                      )}
-                    </span>
-                    {option.description && (
-                      <span className="mt-0.5 block text-xs text-typography-600">
-                        {option.description}
-                      </span>
-                    )}
-                    {!isMulti && option.confirm && (
-                      <span className="mt-0.5 block text-xs font-medium text-typography-700">
-                        {isPicked ? strings.card.confirmPicked : strings.card.hardToUndo}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+      <DecisionOptions
+        options={options}
+        picked={picked}
+        isMulti={isMulti}
+        disabled={locked}
+        onChoose={option => (isMulti ? toggleMulti(option) : clickSingle(option))}
+      />
 
       {decision.allowCustom && (
         <div className="flex flex-col gap-1">

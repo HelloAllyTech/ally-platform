@@ -17,6 +17,7 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiProperty,
+  ApiPropertyOptional,
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
@@ -91,16 +92,47 @@ class ApproveIdeaDto extends ReasonDto {
   answerer?: BuilderAnswerer;
 }
 
+/**
+ * Builder's waiting question answered from the idea card: the Builder feed's
+ * answer shape (`AnswerBuilderDecisionDto`): option ids, the person's own
+ * words, or both. `text` is the older one-line form, read as `message`.
+ */
 class BuilderAnswerDto {
   @ApiProperty()
   @IsString()
   @MaxLength(80)
   questionId!: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ type: [String], description: 'Picked option ids' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  selectedOptionIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: "The person's own words",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(4000, { each: true })
+  customValues?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
   @MaxLength(4000)
-  text!: string;
+  message?: string;
+
+  @ApiPropertyOptional({ description: 'Older form of `message`' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  text?: string;
 }
 
 class CardCorrectionDto {
@@ -810,7 +842,11 @@ export class DebriefConsoleController {
       id,
       req.user.id,
       body.questionId,
-      body.text,
+      {
+        selectedOptionIds: body.selectedOptionIds,
+        customValues: body.customValues,
+        message: body.message ?? body.text,
+      },
     );
   }
 

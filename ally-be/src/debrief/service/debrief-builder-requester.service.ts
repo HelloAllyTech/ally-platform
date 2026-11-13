@@ -13,7 +13,11 @@ import {
   builderRequesters,
   DEBRIEF_PM_AGENT_REQUESTER,
 } from '../../builder/util/builder-requesters.registry';
-import { buildDecisionId } from '../../builder/type/builder-decision.type';
+import {
+  buildDecisionId,
+  BuilderDecisionOption,
+  questionChoices,
+} from '../../builder/type/builder-decision.type';
 import type { BuilderQuestionEvent } from '../../builder/type/builder-sse.type';
 import type { BuilderDecisionService } from '../../builder/service/builder-decision.service';
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
@@ -86,7 +90,14 @@ export interface BuilderProgressView {
         kind: 'question';
         questionId: string;
         prompt: string;
-        options: Array<{ id: string; label: string }>;
+        /** Builder's own options, as its feed and session page show them. */
+        options: BuilderDecisionOption[];
+        /** One option, or several (`minSelections` at least). */
+        selection: 'single' | 'multi';
+        minSelections: number | null;
+        /** The idea card always keeps a "Something else" box (Builder takes words for any question). */
+        allowCustom: boolean;
+        customPlaceholder: string | null;
         /** The PM agent left it for the person: why. Null in "I'll answer" mode. */
         reason: string | null;
       }
@@ -108,6 +119,18 @@ const emptyRecord = (): BuilderRecord => ({
   escalated: [],
   costUsd: 0,
 });
+
+/** Builder's choices for its waiting question, as its own feed offers them. */
+function ideaCardChoices(q: BuilderQuestionEvent) {
+  const c = questionChoices(q);
+  return {
+    options: c.options,
+    selection: c.selection,
+    minSelections: c.minSelections,
+    allowCustom: c.allowCustom,
+    customPlaceholder: c.customPlaceholder,
+  };
+}
 
 /**
  * "Hand to Builder" (R2-20, plan §11.5): the PM agent as Builder's requester.
@@ -475,10 +498,7 @@ export class DebriefBuilderRequesterService implements OnModuleInit {
                   kind: 'question',
                   questionId: q.id,
                   prompt: q.prompt,
-                  options: (q.options ?? []).map((o) => ({
-                    id: o.id,
-                    label: o.label,
-                  })),
+                  ...ideaCardChoices(q),
                   reason: left?.reason ?? null,
                 };
         }
@@ -507,13 +527,17 @@ export class DebriefBuilderRequesterService implements OnModuleInit {
 
   /**
    * The person answers Builder's question from the idea card ("Send to Builder"):
-   * the same answer the Builder feed would send, as them.
+   * the same answer, in the same shape, the Builder feed sends, as them.
    */
   async answerAsPerson(
     ideaId: string,
     userId: number,
     questionId: string,
-    text: string,
+    answer: {
+      selectedOptionIds?: string[];
+      customValues?: string[];
+      message?: string;
+    },
   ): Promise<{ ok: true }> {
     const view = await this.progress(ideaId);
     if (
@@ -528,7 +552,15 @@ export class DebriefBuilderRequesterService implements OnModuleInit {
       await this.decisions()
     ).answer(
       buildDecisionId('question', view.sessionId, questionId),
-      { message: text.trim() },
+      {
+        ...(answer.selectedOptionIds?.length
+          ? { selectedOptionIds: answer.selectedOptionIds }
+          : {}),
+        ...(answer.customValues?.length
+          ? { customValues: answer.customValues }
+          : {}),
+        ...(answer.message?.trim() ? { message: answer.message.trim() } : {}),
+      },
       userId,
       { surface: 'session' },
     );

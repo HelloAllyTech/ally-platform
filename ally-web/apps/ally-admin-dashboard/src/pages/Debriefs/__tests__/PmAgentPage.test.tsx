@@ -533,7 +533,110 @@ describe("PM agent › Ideas", () => {
       expect(h.answerBuilder).toHaveBeenCalledWith({
         id: IDEA.id,
         questionId: "q7",
-        text: "Only organisations with voice-notes on.",
+        customValues: ["Only organisations with voice-notes on."],
+        message: "Only organisations with voice-notes on.",
+      }),
+    );
+  });
+
+  const withOptions = (over: Record<string, unknown> = {}) => {
+    h.pmAgent.mockReturnValue(
+      forBuilder({ status: "filed", filedId: SESSION, answerer: "person" }, { status: "approved" }),
+    );
+    h.builderProgress.mockReturnValue(
+      ok({
+        sessionId: SESSION,
+        answerer: "person",
+        stage: "interviewing",
+        sessionStatus: "INTERVIEWING",
+        waiting: {
+          kind: "question",
+          questionId: "q2",
+          prompt: "Should the tool write anything?",
+          options: [
+            { id: "rw", label: "Read and write" },
+            { id: "ro", label: "Read-only", description: "Nothing changes", recommended: true },
+          ],
+          selection: "single",
+          minSelections: null,
+          allowCustom: true,
+          customPlaceholder: "Your own answer…",
+          reason: null,
+          ...over,
+        },
+        answers: [],
+        pullRequests: [],
+      }),
+    );
+    renderPage();
+    return screen.getByTestId("builder-question");
+  };
+
+  it("offers Builder’s own options, recommendation first, and sends the pick as the feed does", async () => {
+    const q = withOptions();
+    const options = within(q).getAllByRole("button", { pressed: false });
+    expect(options.map(o => o.textContent)).toEqual([
+      expect.stringContaining("Read-only"),
+      expect.stringContaining("Read and write"),
+    ]);
+    expect(options[0]).toHaveTextContent("Recommended");
+    expect(options[0]).toHaveTextContent("Nothing changes");
+    // No keyboard hints: the idea card does not answer on keys.
+    expect(within(q).queryByText("1")).toBeNull();
+    const send = within(q).getByRole("button", { name: "Send to Builder" });
+    expect(send).toBeDisabled();
+    fireEvent.click(within(q).getByRole("button", { name: /Read-only/ }));
+    expect(within(q).getByRole("button", { name: /Read-only/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(send);
+    await waitFor(() =>
+      expect(h.answerBuilder).toHaveBeenCalledWith({
+        id: IDEA.id,
+        questionId: "q2",
+        selectedOptionIds: ["ro"],
+      }),
+    );
+  });
+
+  it("keeps a “Something else” box; typing replaces a single pick", async () => {
+    const q = withOptions();
+    fireEvent.click(within(q).getByRole("button", { name: /Read and write/ }));
+    fireEvent.change(within(q).getByLabelText("Something else"), {
+      target: { value: "Read-only, but log each read" },
+    });
+    expect(within(q).getByRole("button", { name: /Read and write/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    fireEvent.click(within(q).getByRole("button", { name: "Send to Builder" }));
+    await waitFor(() =>
+      expect(h.answerBuilder).toHaveBeenCalledWith({
+        id: IDEA.id,
+        questionId: "q2",
+        customValues: ["Read-only, but log each read"],
+        message: "Read-only, but log each read",
+      }),
+    );
+  });
+
+  it("a several-choice question sends every pick, with any words", async () => {
+    const q = withOptions({ selection: "multi" });
+    expect(q).toHaveTextContent("Pick all that apply.");
+    fireEvent.click(within(q).getByRole("button", { name: /Read-only/ }));
+    fireEvent.click(within(q).getByRole("button", { name: /Read and write/ }));
+    fireEvent.change(within(q).getByLabelText("Something else"), {
+      target: { value: "Audit too" },
+    });
+    fireEvent.click(within(q).getByRole("button", { name: "Send to Builder" }));
+    await waitFor(() =>
+      expect(h.answerBuilder).toHaveBeenCalledWith({
+        id: IDEA.id,
+        questionId: "q2",
+        selectedOptionIds: ["ro", "rw"],
+        customValues: ["Audit too"],
+        message: "Audit too",
       }),
     );
   });

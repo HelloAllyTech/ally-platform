@@ -32,6 +32,7 @@ import {
 import {
   BUILDER_DECISION_CATEGORY,
   BuilderDecision,
+  questionChoices,
   BuilderDecisionAnswerResult,
   BuilderDecisionKind,
   buildDecisionId,
@@ -764,7 +765,6 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
       for (const pending of interview) {
         if (pending.kind === 'question' && pending.question) {
           const question = pending.question;
-          const isSelect = question.kind !== 'freeText';
           decisions.push(
             make('question', question.id, {
               prompt: question.prompt,
@@ -775,15 +775,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
                 ...prdContext,
               ],
               blocked: 'Scoping is paused until this is answered.',
-              selection:
-                question.kind === 'multiSelect' || question.kind === 'dropdown'
-                  ? 'multi'
-                  : 'single',
-              options: isSelect ? (question.options ?? []) : [],
-              allowCustom: isSelect ? question.allowCustom !== false : true,
-              allowNone: Boolean(question.allowNone),
-              minSelections: question.minSelections ?? null,
-              customPlaceholder: 'Your own answer…',
+              ...questionChoices(question),
               waitingSince: pending.since.toISOString(),
             }),
           );

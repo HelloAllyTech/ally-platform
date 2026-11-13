@@ -11440,6 +11440,8 @@ export const en = {
             `The PM agent answered ${answered} of ${answered + 1}.`,
           whyYou: (reason: string) => `Why it came to you: ${reason}`,
           answerLabel: "Your answer",
+          somethingElse: "Something else",
+          pickSeveral: "Pick all that apply.",
           send: "Send to Builder",
           sent: "Sent to Builder",
           seeAnswers: (n: number) => `See the PM agent’s ${n} ${n === 1 ? "answer" : "answers"}`,

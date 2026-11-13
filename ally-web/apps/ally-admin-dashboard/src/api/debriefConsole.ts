@@ -1,5 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  AnswerBuilderDecisionRequest,
   DebriefMetricsFilter,
   DebriefMetricsView,
   DebriefSettingsView,
@@ -139,12 +140,16 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
     }),
     answerIdeaBuilderQuestion: builder.mutation<
       { ok: true },
-      { id: string; questionId: string; text: string }
+      // The Builder feed's answer shape: option ids, the person's own words, or both.
+      {
+        id: string;
+        questionId: string;
+      } & Pick<AnswerBuilderDecisionRequest, "selectedOptionIds" | "customValues" | "message">
     >({
-      query: ({ id, questionId, text }) => ({
+      query: ({ id, ...body }) => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_BUILDER_ANSWER(id),
         method: HttpMethod.POST,
-        body: { questionId, text },
+        body,
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),

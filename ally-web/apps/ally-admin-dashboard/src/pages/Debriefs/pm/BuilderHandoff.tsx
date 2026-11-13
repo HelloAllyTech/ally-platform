@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import {
   useDecideIdeaMutation,
   useGetIdeaBuilderProgressQuery,
 } from "@api";
+import { DecisionOptions } from "@components/builder/DecisionOptions";
 import { en, ROUTES } from "@constants";
 import {
   PmAgentBuilderAnswerer,
@@ -18,6 +19,7 @@ import {
 } from "@types";
 import { getErrorMessage } from "@utils";
 
+import { orderOptions } from "../../Builder/decisionFeed";
 import { inWords } from "../consoleLabels";
 
 const strings = () => en.debriefs.pmAgent.handoff.toBuilder;
@@ -187,7 +189,12 @@ const TONE: Record<StepTone, string> = {
   wait: "bg-white text-neutral-600",
 };
 
-/** The question Builder waits on a person for, with a reply box and the PM agent's answers. */
+/**
+ * The question Builder waits on a person for: Builder's own options, drawn as its feed draws them,
+ * a "Something else" box for the person's own words, and the PM agent's answers. "Send to Builder"
+ * sends the answer in the feed's shape: the picked option ids, the words, or (several at once)
+ * both.
+ */
 const WaitingQuestion: React.FC<{
   idea: PmAgentIdeaRow;
   progress: PmAgentBuilderProgress;
@@ -195,16 +202,54 @@ const WaitingQuestion: React.FC<{
 }> = ({ idea, progress, canAnswer }) => {
   const s = strings();
   const [text, setText] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
   const [showAnswers, setShowAnswers] = useState(false);
   const [send, { isLoading }] = useAnswerIdeaBuilderQuestionMutation();
-  const w = progress.waiting;
-  if (w?.kind !== "question") return null;
+  const w = progress.waiting?.kind === "question" ? progress.waiting : null;
+  const questionId = w?.questionId ?? null;
+  const options = useMemo(() => orderOptions(w?.options ?? []), [w?.options]);
+  // A new question starts clean; polling hands back a fresh object for the same one.
+  useEffect(() => {
+    setPicked([]);
+    setText("");
+  }, [questionId]);
+  if (!w) return null;
   const n = progress.answers.length;
+  const isMulti = w.selection === "multi";
+  const words = text.trim();
+  const minSelections = w.minSelections ?? 1;
+  const ready = isMulti
+    ? picked.length + (words ? 1 : 0) >= minSelections
+    : picked.length > 0 || !!words;
+
+  // One option, or several. Picking one of a single-choice question clears any words typed
+  // (and typing clears the pick): one answer goes, as the feed sends it.
+  const choose = (id: string) => {
+    if (isMulti) {
+      setPicked(p => (p.includes(id) ? p.filter(x => x !== id) : [...p, id]));
+      return;
+    }
+    setPicked(p => (p[0] === id ? [] : [id]));
+    setText("");
+  };
+  const type = (value: string) => {
+    setText(value);
+    if (!isMulti && value.trim()) setPicked([]);
+  };
+
   const post = async () => {
+    const answer =
+      isMulti || !picked.length
+        ? {
+            ...(picked.length ? { selectedOptionIds: picked } : {}),
+            ...(words ? { customValues: [words], message: words } : {}),
+          }
+        : { selectedOptionIds: picked };
     try {
-      await send({ id: idea.id, questionId: w.questionId, text: text.trim() }).unwrap();
+      await send({ id: idea.id, questionId: w.questionId, ...answer }).unwrap();
       toast.success(s.sent);
       setText("");
+      setPicked([]);
     } catch (e) {
       toast.error(getErrorMessage(e, en.debriefs.pmAgent.actionFailed));
     }
@@ -222,12 +267,26 @@ const WaitingQuestion: React.FC<{
       <p className="bg-neutral-50 px-2.5 py-2 text-sm">“{w.prompt}”</p>
       {w.reason && <p className="text-xs text-neutral-600">{s.whyYou(w.reason)}</p>}
       {canAnswer && (
+        <DecisionOptions
+          options={options}
+          picked={picked}
+          isMulti={isMulti}
+          disabled={isLoading}
+          onChoose={o => choose(o.id)}
+          keyboard={false}
+        />
+      )}
+      {canAnswer && options.length > 0 && isMulti && (
+        <p className="text-xs text-neutral-600">{s.pickSeveral}</p>
+      )}
+      {canAnswer && (
         <TextArea
           id={`builder-answer-${idea.id}`}
-          labelText={s.answerLabel}
+          labelText={options.length ? s.somethingElse : s.answerLabel}
           rows={2}
           value={text}
-          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.target.value)}
+          placeholder={options.length ? (w.customPlaceholder ?? undefined) : undefined}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => type(e.target.value)}
         />
       )}
       <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -235,7 +294,7 @@ const WaitingQuestion: React.FC<{
           <Button
             kind="primary"
             size="sm"
-            disabled={!text.trim() || isLoading}
+            disabled={!ready || isLoading}
             onClick={() => void post()}
           >
             {s.send}

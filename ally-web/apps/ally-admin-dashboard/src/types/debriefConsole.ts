@@ -1,3 +1,4 @@
+import type { BuilderDecisionOption } from "./builder";
 import type { DebriefViewer } from "./debriefConsoleView";
 
 /**
@@ -176,7 +177,13 @@ export interface PmAgentBuilderProgress {
         kind: "question";
         questionId: string;
         prompt: string;
-        options: { id: string; label: string }[];
+        /** Builder's own options, as its feed shows them. */
+        options: BuilderDecisionOption[];
+        /** One option, or several (at least `minSelections`). Absent from an older ally-be. */
+        selection?: "single" | "multi";
+        minSelections?: number | null;
+        allowCustom?: boolean;
+        customPlaceholder?: string | null;
         /** Why the PM agent left it for a person; null when the person answers everything. */
         reason: string | null;
       }
