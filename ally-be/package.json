@@ -40,6 +40,7 @@
     "migration:roadmap-import": "ts-node -r tsconfig-paths/register src/database/scripts/import-roadmap-from-supabase.ts",
     "verify:pdf-extractor": "ts-node -T -r tsconfig-paths/register scripts/verify-pdf-extractor.ts",
     "chatbot:basics": "node dist/chatbot/basics/run-basics.js",
+    "lists:seed": "ts-node -r tsconfig-paths/register src/database/scripts/seed-lists.ts",
     "backfill:bug-finding-descriptions": "ts-node -r tsconfig-paths/register scripts/backfill-bug-finding-descriptions.ts",
     "backfill:chatbot-shared-store": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-chatbot-shared-store.ts",
     "reingest:onboarding-docs": "ts-node -r tsconfig-paths/register src/database/scripts/reingest-onboarding-docs.ts",
