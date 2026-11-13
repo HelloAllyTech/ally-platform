@@ -39,6 +39,7 @@ export * from "./Onboarding";
 export * from "./AgentTestCases/AgentTestCases";
 export * from "./Debriefs/DebriefConsole";
 export { DebriefSessionPage } from "./Debriefs/session/DebriefSessionPage";
+export { AgentLogsPage } from "./Debriefs/session/AgentLogsPage";
 export { PmAgentPage } from "./Debriefs/pm/PmAgentPage";
 export { DebriefSettingsPage } from "./Debriefs/settings/DebriefSettingsPage";
 export * from "./Competencies/Competencies";

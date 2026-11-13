@@ -40,6 +40,8 @@ export interface DebriefAccess {
   emergencyStop: boolean;
   /** Budgets, test thresholds, proposed values, autonomy, steering weights. */
   settings: boolean;
+  /** Agent logs: every agent's exact input and reply (the Ally team only). */
+  agentLogs: boolean;
 }
 
 /** ally-be's `viewer` in the console's words. */
@@ -60,6 +62,7 @@ export const accessFromViewer = (viewer: DebriefViewer): DebriefAccess => ({
   switchOn: viewer.can.switchOrgOn,
   emergencyStop: viewer.can.emergencyStop,
   settings: viewer.can.ownerSettings,
+  agentLogs: !!viewer.can.agentLogs,
 });
 
 /** The same rules from the user's permissions, for before a payload has said. */
@@ -86,6 +89,7 @@ export const debriefAccessFor = (permissions: string[] | undefined): DebriefAcce
     switchOn: owner,
     emergencyStop: team,
     settings: owner,
+    agentLogs: allyTeam,
   };
 };
 

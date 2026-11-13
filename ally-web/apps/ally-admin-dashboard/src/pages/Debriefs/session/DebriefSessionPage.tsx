@@ -20,7 +20,7 @@ import { getErrorMessage } from "@utils";
 
 import { languageLabel, modelLabels, recipeLabel } from "../consoleLabels";
 import { score } from "../consoleTable";
-import { BackLink, ConsoleTag } from "../consoleUi";
+import { BackLink, ConsoleTag, TagTone } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { selectionToAnchor } from "../expertReviewSelection";
 import { JUDGE_BAR, scenarioTitle, statusOf } from "../home/SessionCard";
@@ -52,6 +52,53 @@ const isTyping = (e: KeyboardEvent) => {
       t.tagName === "TEXTAREA" ||
       t.tagName === "SELECT" ||
       t.isContentEditable)
+  );
+};
+
+/** One of the queue's icon-only buttons: the keyboard shortcut is in its tooltip. */
+const QueueButton: React.FC<{
+  to: string | null;
+  label: string;
+  hint: string;
+  testId: string;
+  direction: "previous" | "next";
+}> = ({ to, label, hint, testId, direction }) => {
+  const icon = (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      aria-hidden="true"
+    >
+      <path d={direction === "previous" ? "M10 3L5 8l5 5" : "M6 3l5 5-5 5"} />
+    </svg>
+  );
+  const cls =
+    "flex h-8 w-8 items-center justify-center rounded-sm border border-neutral-300 no-underline";
+  return to ? (
+    <Link
+      to={to}
+      aria-label={label}
+      title={hint}
+      className={`${cls} text-primary-500 hover:bg-neutral-50`}
+      data-testid={testId}
+    >
+      {icon}
+    </Link>
+  ) : (
+    <button
+      type="button"
+      disabled
+      aria-label={label}
+      title={hint}
+      className={`${cls} cursor-not-allowed bg-transparent text-neutral-400`}
+      data-testid={testId}
+    >
+      {icon}
+    </button>
   );
 };
 
@@ -291,7 +338,7 @@ export const DebriefSessionPage: React.FC = () => {
     }
   };
 
-  // Next / Previous by j / k (the queue's order); e escalates what is waiting (the Ally team only).
+  // Next / Previous by J / K (the queue's order, named in the buttons' tooltips); e escalates what is waiting (the Ally team only).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!view || isTyping(e) || e.metaKey || e.ctrlKey || e.altKey || asking || draft) return;
@@ -353,93 +400,154 @@ export const DebriefSessionPage: React.FC = () => {
       : null);
   const st = statusOf({ status: view.run.status });
   const urgent = view.pendingActions.some(p => p.kind === "urgent_flag");
+  const title = scenarioTitle(view.session.scenario.title, view.run.sessionId);
+  // At most two tags (Urgent first, then the status); the rest behind "+N".
+  const tags: Array<{ label: string; tone: TagTone }> = [
+    ...(urgent ? [{ label: en.debriefs.home.urgent, tone: "urgent" as TagTone }] : []),
+    { label: st.label, tone: st.tone },
+    ...(view.run.hasRiskCue
+      ? [{ label: en.debriefs.home.importantMoment, tone: "info" as TagTone }]
+      : []),
+  ];
+  const shownTags = tags.slice(0, 2);
+  const moreTags = tags.slice(2);
   const askingFlag = asking && "flagId" in asking;
 
   return (
     <div className="flex flex-col gap-5 font-primary" data-testid="debrief-session">
-      <div className="relative flex flex-wrap items-center gap-3" ref={reviewRef}>
-        <BackLink to={backTo}>{backLabel}</BackLink>
-        <h1 className="font-secondary text-[28px] font-normal leading-tight">
-          {scenarioTitle(view.session.scenario.title, view.run.sessionId)}
-        </h1>
-        <ConsoleTag tone={st.tone}>{st.label}</ConsoleTag>
-        {urgent && <ConsoleTag tone="urgent">{en.debriefs.home.urgent}</ConsoleTag>}
-        {view.run.hasRiskCue && (
-          <ConsoleTag tone="info">{en.debriefs.home.importantMoment}</ConsoleTag>
-        )}
-        <div className="flex-1" />
-        {view.queue.position !== null && (
-          <span className="text-[13px] text-neutral-600" data-testid="queue-position">
-            {s.position(view.queue.position, view.queue.total, s.theQueue)}
+      <div
+        ref={reviewRef}
+        className="relative flex min-w-0 flex-nowrap items-center gap-3 max-[1055px]:flex-wrap"
+        data-testid="session-header"
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="shrink-0">
+            <BackLink to={backTo}>{backLabel}</BackLink>
           </span>
-        )}
-        {view.queue.previousRunId && (
-          <Link
-            to={linkTo(view.queue.previousRunId)}
-            className="flex h-9 items-center px-2 text-sm no-underline"
-            data-testid="session-prev"
+          <h1
+            title={title}
+            className="min-w-0 truncate font-secondary text-[28px] font-normal leading-tight"
+            data-testid="session-title"
           >
-            {s.previous}
-          </Link>
-        )}
-        {view.queue.nextRunId && (
-          <Link
-            to={linkTo(view.queue.nextRunId)}
-            className="flex h-9 items-center px-2 text-sm no-underline"
-            data-testid="session-next"
-          >
-            {s.next}
-          </Link>
-        )}
-        {reviewedWhat ? (
-          <button
-            type="button"
-            aria-expanded={paneOpen}
-            data-testid="review-button"
-            data-reviewed="true"
-            onClick={() => setPaneOpen(o => !o)}
-            className="flex h-10 items-center gap-2 rounded-sm border border-success-400 bg-success-50 px-4 text-sm font-semibold text-success-600"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              aria-hidden="true"
+            {title}
+          </h1>
+          {shownTags.map(t => (
+            <ConsoleTag key={t.label} tone={t.tone}>
+              {t.label}
+            </ConsoleTag>
+          ))}
+          {moreTags.length > 0 && (
+            <ConsoleTag
+              tone="neutral"
+              title={moreTags.map(t => t.label).join(", ")}
+              testId="more-tags"
             >
-              <path d="M3 8.5l3 3 7-7" />
-            </svg>
-            {s.reviewedButton(reviewedWhat)}
-          </button>
-        ) : (
-          <button
-            type="button"
-            aria-expanded={paneOpen}
-            data-testid="review-button"
-            onClick={() => setPaneOpen(o => !o)}
-            className="flex h-10 items-center gap-2 rounded-sm bg-primary-500 px-4 text-sm font-semibold text-white"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              aria-hidden="true"
+              {s.moreTags(moreTags.length)}
+            </ConsoleTag>
+          )}
+        </div>
+        <div
+          className="flex shrink-0 flex-nowrap items-center gap-3 max-[1055px]:basis-full max-[1055px]:justify-end"
+          data-testid="session-actions"
+        >
+          {(view.queue.position !== null || view.queue.previousRunId || view.queue.nextRunId) && (
+            <div
+              role="group"
+              aria-label={s.queue}
+              className="flex items-center gap-1.5 whitespace-nowrap"
             >
-              <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
-            </svg>
-            {s.review}
-            {view.pendingActions.length > 0 && (
-              <span className="rounded-full bg-white px-[7px] py-px text-xs font-semibold text-primary-500">
-                {view.pendingActions.length}
-              </span>
-            )}
-          </button>
-        )}
+              <QueueButton
+                to={view.queue.previousRunId ? linkTo(view.queue.previousRunId) : null}
+                label={s.previous}
+                hint={s.previousHint}
+                testId="session-prev"
+                direction="previous"
+              />
+              {view.queue.position !== null && (
+                <span className="text-[13px] text-neutral-600" data-testid="queue-position">
+                  {s.queuePosition(view.queue.position, view.queue.total)}
+                </span>
+              )}
+              <QueueButton
+                to={view.queue.nextRunId ? linkTo(view.queue.nextRunId) : null}
+                label={s.next}
+                hint={s.nextHint}
+                testId="session-next"
+                direction="next"
+              />
+            </div>
+          )}
+          {access.agentLogs && (
+            <Link
+              to={`${ROUTES.DEBRIEF_SESSION_LOGS(runId)}${homeQuery ? `?${homeQuery}` : ""}`}
+              className="flex h-10 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-semibold text-primary-500 no-underline hover:text-primary-600"
+              data-testid="agent-logs-button"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                aria-hidden="true"
+              >
+                <path d="M3 3h10v10H3z" />
+                <path d="M5.5 6h5M5.5 8h5M5.5 10h3" />
+              </svg>
+              {s.agentLogs}
+            </Link>
+          )}
+          {reviewedWhat ? (
+            <button
+              type="button"
+              aria-expanded={paneOpen}
+              data-testid="review-button"
+              data-reviewed="true"
+              onClick={() => setPaneOpen(o => !o)}
+              className="flex h-10 items-center gap-2 whitespace-nowrap rounded-sm border border-success-400 bg-success-50 px-4 text-sm font-semibold text-success-600"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                aria-hidden="true"
+              >
+                <path d="M3 8.5l3 3 7-7" />
+              </svg>
+              {s.reviewedButton(reviewedWhat)}
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-expanded={paneOpen}
+              data-testid="review-button"
+              onClick={() => setPaneOpen(o => !o)}
+              className="flex h-10 items-center gap-2 whitespace-nowrap rounded-sm bg-primary-500 px-4 text-sm font-semibold text-white"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                aria-hidden="true"
+              >
+                <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
+              </svg>
+              {s.review}
+              {view.pendingActions.length > 0 && (
+                <span className="rounded-full bg-white px-[7px] py-px text-xs font-semibold text-primary-500">
+                  {view.pendingActions.length}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
         {paneOpen && (
           <ReviewPanel
             view={view}

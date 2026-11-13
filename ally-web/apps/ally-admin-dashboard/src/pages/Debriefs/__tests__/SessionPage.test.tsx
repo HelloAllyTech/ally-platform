@@ -107,6 +107,7 @@ const CAN_ALL = {
   releases: true,
   switchOrgOn: false,
   emergencyStop: true,
+  agentLogs: true,
   ownerSettings: false,
 };
 const TEAM_VIEWER = {
@@ -313,12 +314,13 @@ describe("Session page", () => {
   it("titles the page by scenario and moves through the queue in ally-be's order", () => {
     renderPage();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Exam stress, first call");
-    expect(screen.getByTestId("queue-position")).toHaveTextContent("1 of 2 in the queue");
+    expect(screen.getByTestId("queue-position")).toHaveTextContent("1 of 2");
     expect(screen.getByTestId("session-next")).toHaveAttribute(
       "href",
       "/debriefs/sessions/run-2?cat=needs",
     );
-    expect(screen.queryByTestId("session-prev")).toBeNull();
+    // No previous run: the button stays, disabled, so the control never shifts.
+    expect(screen.getByTestId("session-prev")).toBeDisabled();
     const facts = screen.getByTestId("session-facts");
     expect(facts).toHaveTextContent("6.4 / 10");
     // Plain words on the advisor's page: no "Judge", "Evaluator" or "Release".
@@ -755,44 +757,12 @@ describe("Session page", () => {
     );
   });
 
-  it("How it was made shows the learner's skill estimate, only there", () => {
+  it("has no How it was made tab: the run's working is on Agent logs", () => {
     renderPage();
-    expect(screen.queryByTestId("skill-row")).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: "How it was made" }));
-    expect(screen.getByTestId("skill-row")).toHaveTextContent("Keep practising");
-    expect(screen.getByTestId("skill-row")).toHaveTextContent("Too early to tell");
-  });
-
-  it("How it was made names each guidance entry the lookup kept by its DG- code (PRD §14)", () => {
-    h.session.mockReturnValue(
-      ok(
-        view({
-          howItWasMade: {
-            ...view().howItWasMade,
-            steps: [
-              {
-                step: "guidance_lookup",
-                label: "Looking up guidance",
-                status: "done",
-                startedAt: "2026-11-10T10:00:00Z",
-                ms: 400,
-                output: "2 lookups, 2 passages kept",
-                citations: [
-                  { code: "DG-0012", title: "Asking about suicide directly" },
-                  { code: "DG-0040", title: "Reflecting feelings" },
-                ],
-              },
-            ],
-          },
-        }),
-      ),
-    );
-    renderPage();
-    fireEvent.click(screen.getByRole("tab", { name: "How it was made" }));
-    const codes = screen.getByTestId("run-step-citations");
-    expect(codes).toHaveTextContent("DG-0012");
-    expect(codes).toHaveTextContent("Asking about suicide directly");
-    expect(codes).toHaveTextContent("DG-0040");
+    const tabs = screen.getAllByRole("tab").map(t => t.textContent);
+    expect(tabs).toEqual(["The debrief", expect.stringMatching(/^Ask Ally/)]);
+    expect(screen.queryByRole("tab", { name: "How it was made" })).toBeNull();
+    expect(screen.queryByText("How it was made")).toBeNull();
   });
 
   it("the Ask Ally tab reads the conversation, with what a replaced reply blocked", () => {
@@ -838,5 +808,94 @@ describe("Session page", () => {
     const [, replaced] = screen.getAllByTestId("ask-exchange");
     expect(replaced).toHaveTextContent("Replaced by the fallback");
     expect(replaced).toHaveTextContent("Here is a script…");
+  });
+
+  describe("the header (one row: back, title, tags; queue, Agent logs, Review)", () => {
+    it("Previous and Next are icon buttons with the shortcut in their tooltips", () => {
+      h.session.mockReturnValue(
+        ok(view({ queue: { position: 2, total: 3, previousRunId: "run-0", nextRunId: "run-2" } })),
+      );
+      renderPage();
+      const prev = screen.getByRole("link", { name: "Previous in the queue" });
+      const next = screen.getByRole("link", { name: "Next in the queue" });
+      expect(prev).toHaveAttribute("title", "Previous in the queue (keyboard: K)");
+      expect(next).toHaveAttribute("title", "Next in the queue (keyboard: J)");
+      expect(prev).toHaveAttribute("href", "/debriefs/sessions/run-0?cat=needs");
+      expect(prev.textContent).toBe("");
+      expect(next.textContent).toBe("");
+      expect(screen.getByRole("group", { name: "Queue" })).toHaveTextContent(/^2 of 3$/);
+      expect(screen.queryByText(/Next · j|Previous · k/)).toBeNull();
+    });
+
+    it("shows at most two tags, Urgent first, the rest behind +N with a tooltip", () => {
+      renderPage();
+      const header = screen.getByTestId("session-header");
+      const tags = within(header)
+        .getAllByText(/^(Urgent|Needs a person|Important moment|\+1)$/)
+        .filter(t => t.tagName === "SPAN")
+        .map(t => t.textContent);
+      expect(tags).toEqual(["Urgent", "Needs a person", "+1"]);
+      expect(screen.getByTestId("more-tags")).toHaveAttribute("title", "Important moment");
+    });
+
+    it("truncates the title, with the whole title in its tooltip", () => {
+      renderPage();
+      const h1 = screen.getByRole("heading", { level: 1 });
+      expect(h1).toHaveAttribute("title", "Exam stress, first call");
+      expect(h1.className).toMatch(/\btruncate\b/);
+      expect(h1.className).toMatch(/\bmin-w-0\b/);
+    });
+
+    it("never wraps by accident: one nowrap row, a deliberate second row only below 1056px", () => {
+      renderPage();
+      const header = screen.getByTestId("session-header");
+      expect(header.className).toMatch(/\bflex-nowrap\b/);
+      expect(header.className).toMatch(/max-\[1055px\]:flex-wrap/);
+      const actions = screen.getByTestId("session-actions");
+      expect(actions.className).toMatch(/\bshrink-0\b/);
+      expect(actions.className).toMatch(/\bflex-nowrap\b/);
+      expect(actions.className).toMatch(/max-\[1055px\]:basis-full/);
+      // The actions in order: the queue, Agent logs, Review.
+      const order = [
+        within(actions).getByRole("group", { name: "Queue" }),
+        within(actions).getByTestId("agent-logs-button"),
+        within(actions).getByTestId("review-button"),
+      ];
+      for (let i = 1; i < order.length; i++) {
+        expect(
+          order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+      }
+    });
+
+    it("shows Agent logs to the Ally team, linking to the run's logs", () => {
+      renderPage();
+      expect(screen.getByRole("link", { name: "Agent logs" })).toHaveAttribute(
+        "href",
+        "/debriefs/sessions/run-1/logs?cat=needs",
+      );
+    });
+
+    it("hides Agent logs from the clinical advisor", () => {
+      h.session.mockReturnValue(
+        ok(
+          view({
+            viewer: {
+              roles: {
+                allyTeam: false,
+                clinicalAdvisor: true,
+                owner: false,
+                receivesEscalations: true,
+              },
+              can: { ...CAN_ALL, agentLogs: false, verdict: true },
+              scorer: false,
+            },
+            pendingActions: [],
+          }),
+        ),
+      );
+      renderPage();
+      expect(screen.queryByRole("link", { name: "Agent logs" })).toBeNull();
+    });
   });
 });

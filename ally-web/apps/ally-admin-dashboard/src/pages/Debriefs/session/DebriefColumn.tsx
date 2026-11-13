@@ -6,22 +6,20 @@ import { en } from "@constants";
 import {
   DebriefCardCorrection,
   DebriefCardsData,
-  DebriefRunStep,
   DebriefSessionFlag,
   DebriefSessionView,
   ExpertComment,
   ExpertCommentDraftAnchor,
 } from "@types";
 
-import { checkLabel, codeWords, recipeLabel, sectionLabel, stepName } from "../consoleLabels";
+import { checkLabel, sectionLabel } from "../consoleLabels";
 import { Segmented } from "../consoleUi";
 import { ANCHOR_ATTR, askAnchor, cardAnchor } from "../expertReviewSelection";
-import { SessionLogLink } from "../SessionLogLink";
 import { Line } from "./commentParts";
 import { CommentPopup } from "./CommentPopup";
 import { CorrectInPlace } from "./CorrectInPlace";
 
-export type DebriefTab = "debrief" | "how" | "ask";
+export type DebriefTab = "debrief" | "ask";
 export const cardDomId = (section: string) => `session-card-${section}`;
 
 /** What is being corrected in place: a flagged card, or a card of a held debrief. */
@@ -354,168 +352,6 @@ const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
   );
 };
 
-const stepOk = (st: DebriefRunStep) => st.status === "done";
-
-const WORD_TONE: Record<string, string> = {
-  strength: "bg-success-50 text-success-600",
-  keep_practising: "bg-[#FFF2E8] text-[#8A3800]",
-  didnt_come_up: "bg-neutral-100 text-neutral-700",
-};
-
-/** "How it was made": the learner's skill estimate (only here), then each step. */
-const HowItWasMade: React.FC<Props> = ({ view, modelLabel }) => {
-  const s = en.debriefs.session.how;
-  const r = en.debriefs.run;
-  const est = view.skillEstimate;
-  const how = view.howItWasMade;
-  const skills = [
-    ...new Set([...est.skillWords.map(w => w.skill), ...est.progress.map(p => p.skill)]),
-  ];
-  return (
-    <div className="flex flex-col gap-3" data-testid="session-how">
-      <div className="flex flex-col gap-2.5 rounded-sm bg-neutral-50 px-5 py-4">
-        <div className="flex items-center gap-2">
-          <h3 className="text-[15px] font-semibold">{s.skillHeading}</h3>
-          <span className="ml-auto text-xs text-neutral-600">{s.skillOnlyHere}</span>
-        </div>
-        {skills.length ? (
-          <>
-            {skills.map(skill => {
-              const word = est.skillWords.find(w => w.skill === skill)?.word;
-              const trend = est.progress.find(p => p.skill === skill)?.trend;
-              return (
-                <div
-                  key={skill}
-                  className="grid grid-cols-[minmax(140px,1fr)_auto_minmax(120px,1fr)] items-center gap-3 text-sm"
-                  data-testid="skill-row"
-                >
-                  <span>{skill}</span>
-                  {word ? (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${WORD_TONE[word] ?? ""}`}
-                    >
-                      {s.words[word] ?? codeWords(word)}
-                    </span>
-                  ) : (
-                    <span />
-                  )}
-                  <span className="text-[13px] text-neutral-700">
-                    {trend ? (s.trends[trend] ?? codeWords(trend)) : ""}
-                  </span>
-                </div>
-              );
-            })}
-            <div className="text-xs text-neutral-600">
-              {s.skillFrom(est.pastSessions ?? 0)}
-              {est.learnerLevel ? ` · ${s.level(est.learnerLevel)}` : ""}
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-neutral-600">{s.noSkill}</p>
-        )}
-      </div>
-      <div className="overflow-hidden rounded-sm bg-neutral-50">
-        <div className="border-b border-neutral-100 px-5 py-3.5 text-sm text-neutral-700">
-          {[
-            recipeLabel(how.recipe),
-            how.fallbackRung === 0 ? s.asWritten : r.fallback(how.fallbackRung),
-            how.releaseVersion != null ? s.release(how.releaseVersion) : null,
-            r.cost(formatUsd(how.estimatedCostUsd), formatUsd(how.actualCostUsd)),
-          ]
-            .filter(Boolean)
-            .join(" · ")}{" "}
-          · <SessionLogLink sessionId={view.run.sessionId} />
-        </div>
-        <ol>
-          {how.steps.map((st, i) => (
-            <li
-              key={i}
-              className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-3 border-b border-neutral-100 px-5 py-3"
-              data-testid="run-step"
-            >
-              <span
-                aria-label={stepOk(st) ? s.stepOk : s.stepNotOk}
-                className={`flex h-5 w-5 items-center justify-center rounded-full text-xs text-white ${stepOk(st) ? "bg-success-400" : "bg-[#8A3800]"}`}
-              >
-                {stepOk(st) ? "✓" : "!"}
-              </span>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold">
-                  {r.stepNames[st.step] ?? stepName(st.step)}
-                  {st.round ? ` · ${r.round(st.round)}` : ""}
-                </div>
-                <div className="text-[13px] text-neutral-600">
-                  {st.output ??
-                    st.note ??
-                    (st.status === "skipped" ? r.skipped : st.status === "failed" ? r.failed : "")}
-                </div>
-                {!!st.citations?.length && (
-                  <ul
-                    className="mt-1 flex flex-wrap gap-1.5"
-                    aria-label={s.guidanceCodes}
-                    data-testid="run-step-citations"
-                  >
-                    {st.citations.map(c => (
-                      <li
-                        key={c.code || c.title}
-                        title={c.title}
-                        className="rounded-sm bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-800"
-                      >
-                        {c.code}
-                        <span className="font-primary text-neutral-600"> · {c.title}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {(st.why || st.reasoning) && (
-                  <details className="mt-1 text-[13px]">
-                    <summary className="cursor-pointer text-primary-500">{s.reasoning}</summary>
-                    {st.why && (
-                      <p>
-                        <span className="font-semibold">{r.why}:</span> {st.why}
-                      </p>
-                    )}
-                    {st.inputs?.length ? (
-                      <p>
-                        <span className="font-semibold">{r.given}:</span> {st.inputs.join(" · ")}
-                      </p>
-                    ) : null}
-                    {st.reasoning && (
-                      <p className="italic">
-                        <span className="font-semibold not-italic">{r.thinking}:</span>{" "}
-                        {st.reasoning}
-                      </p>
-                    )}
-                  </details>
-                )}
-              </div>
-              <div className="text-right text-xs text-neutral-600">
-                {st.model ? <span title={st.model}>{modelLabel(st.model)}</span> : s.code}
-                <br />
-                {formatMs(st.ms)}
-                {st.estimatedUsd ? ` · ${formatUsd(st.estimatedUsd)}` : ""}
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-      {how.checkFailures.length > 0 && (
-        <div className="rounded-sm bg-neutral-50 px-5 py-3 text-sm">
-          <p className="font-semibold">{r.checks}</p>
-          <ul className="list-disc pl-5">
-            {how.checkFailures.map((f, i) => (
-              <li key={i}>
-                {checkLabel(f.code)} · {sectionLabel(f.section)}: {f.detail}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {how.error && <p className="text-sm text-neutral-700">{how.error}</p>}
-    </div>
-  );
-};
-
 type Tool = { name?: string; topic?: string };
 
 /**
@@ -643,7 +479,7 @@ const AskAlly: React.FC<Props> = props => {
   );
 };
 
-/** The right column: the debrief, how it was made, and Ask Ally, as tabs. */
+/** The right column: the debrief and Ask Ally, as tabs (the run's working is on Agent logs). */
 export const DebriefColumn: React.FC<Props> = props => {
   const s = en.debriefs.session;
   const asks = props.view.askAlly.exchanges.length;
@@ -663,7 +499,6 @@ export const DebriefColumn: React.FC<Props> = props => {
           onChange={props.onTab}
           items={[
             { id: "debrief", label: s.tabs.debrief },
-            { id: "how", label: s.tabs.how },
             { id: "ask", label: asks ? s.tabs.askCount(asks) : s.tabs.ask },
           ]}
         />
@@ -674,7 +509,6 @@ export const DebriefColumn: React.FC<Props> = props => {
         ) : (
           <EmptyPanel title={s.noCards} message={props.view.howItWasMade.error ?? undefined} />
         ))}
-      {props.tab === "how" && <HowItWasMade {...props} />}
       {props.tab === "ask" && <AskAlly {...props} />}
     </section>
   );

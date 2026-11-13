@@ -29,6 +29,7 @@ export type DebriefCanAction =
   | "releases"
   | "switchOrgOn"
   | "emergencyStop"
+  | "agentLogs"
   | "ownerSettings";
 
 export interface DebriefViewer {
@@ -675,4 +676,48 @@ export interface DebriefAnalyticsView {
     >;
     sample: { size: number; thisWeek: number; waiting: number };
   };
+}
+
+/** One Agent logs entry (`GET runs/:runId/logs`, CONSOLE_API.md "Agent logs"). */
+export interface AgentLogEntry {
+  seq: number;
+  kind: "model" | "code";
+  /** The step or agent: `writer`, `planner`, `dispatch`, `judge`, … */
+  step: string;
+  round: number | null;
+  startedAt: string | null;
+  /** The model the step asked for first. */
+  model: string | null;
+  /** The backup or fallback that ran instead. */
+  fallbackModel: string | null;
+  prompt: { code: string; version: number | null; href: string; inlined: boolean } | null;
+  /** Model steps: the message exactly as sent (with `{{system_prompt}}`); code steps: the inputs. */
+  input: unknown;
+  output: unknown;
+  tokensIn: number | null;
+  tokensOut: number | null;
+  costUsd: number | null;
+  ms: number | null;
+  retries: number;
+  error: string | null;
+  attention: boolean;
+}
+
+export interface AgentLogsView {
+  runId: string;
+  /** The day full agent logs began to be kept (YYYY-MM-DD); null before any run had one. */
+  loggedFrom: string | null;
+  run: {
+    sessionId: string;
+    scenarioTitle: string | null;
+    status: string;
+    recipeKey: string | null;
+    releaseVersion: number | null;
+    language: string | null;
+    costUsd: number | null;
+    seconds: number | null;
+  };
+  entries: AgentLogEntry[];
+  /** Each prompt version the entries name, once: `code@version` → its text. */
+  prompts: Record<string, string>;
 }
