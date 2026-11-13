@@ -32,6 +32,7 @@ from langgraph.runtime import Runtime
 from langgraph.types import Command, Send
 
 from app.core.debrief_graph import inputs as body
+from app.core.debrief_graph.agent_logs import code_log
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
 from app.core.debrief_graph.constants import FallbackRung, Recipe, Step
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
@@ -503,6 +504,7 @@ PLANNER = ModelStep(
     config=planner_config,
     max_attempts=1,
     timeout_s=PLANNER_TIMEOUT_S,
+    prompt_code=PLANNER_PROMPT,
 )
 
 
@@ -521,6 +523,7 @@ async def profile(
     """Cheap facts in code, the floor's budget held back, then the planner —
     or straight to the default plan when it cannot run."""
     ctx = runtime.context
+    t0 = ctx.clock()
     prof = build_profile(state, ctx)
     offered = offered_agents(prof, ctx, state.get("agent_ok") or {})
     floor = floor_reserve(state, ctx, "plan")
@@ -547,6 +550,33 @@ async def profile(
         code, reason = "no_price", "the planner's model has no known price"
     elif estimated + floor + est > ctx.ceiling_usd:
         code, reason = "no_budget", "not enough of the run budget was left to plan"
+
+    def log(nxt: str, plan: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return code_log(
+            ctx,
+            "profile",
+            t0,
+            input={
+                "answered": dict(state.get("agent_ok") or {}),
+                "budgetLeftUsd": budget_left(ctx.ceiling_usd, estimated),
+                "timeLeftMs": round(ctx.time_left_ms(state.get("has_risk_cue", False))),
+            },
+            output={
+                "profile": prof,
+                "offered": offered,
+                "floorReserveUsd": round(floor, 6),
+                "plannerModel": model,
+                "plannerEstimateUsd": None if math.isinf(est) else round(est, 6),
+                "next": nxt,
+                **(
+                    {"fallback": reason, "fallbackCode": code, "plan": plan}
+                    if reason
+                    else {}
+                ),
+            },
+            attention=bool(reason),
+        )
+
     if reason:
         update = finalise_plan(
             now,
@@ -564,11 +594,17 @@ async def profile(
                 **base,
                 **update,
                 "workspace": {**base["workspace"], **update["workspace"]},
+                "logs": [log("dispatch", update["plans"][0])],
             },
             goto="dispatch",
         )
     return Command(
-        update={**base, "estimated": estimated + est, "reserved": {"planner#0": est}},
+        update={
+            **base,
+            "estimated": estimated + est,
+            "reserved": {"planner#0": est},
+            "logs": [log("planner")],
+        },
         goto="planner",
     )
 
@@ -582,8 +618,12 @@ async def dispatch(state: State, runtime: Runtime[Ctx]) -> Command:
     they all come back here. With nothing left, on to the Writer (or, after a
     top-up, to the revision gate)."""
     ctx = runtime.context
+    t0 = ctx.clock()
     ok_map = dict(state.get("agent_ok") or {})
     steps: List[Dict[str, Any]] = []
+    logs: List[Dict[str, Any]] = []
+    applied_now: List[str] = []
+    skipped_now: List[Dict[str, Any]] = []
     update: Dict[str, Any] = {"agent_ok": {}}
     payload: Dict[str, Any] = dict(state)
     remaining: List[str] = []
@@ -604,6 +644,19 @@ async def dispatch(state: State, runtime: Runtime[Ctx]) -> Command:
                 payload[k] = update[k] = v
         ok_map[agent] = True
         update["agent_ok"][agent] = True
+        applied_now.append(agent)
+        logs.append(
+            code_log(
+                ctx,
+                agent,
+                t0 + 0.1 * len(applied_now),
+                input={
+                    "kind": "data agent",
+                    "action": (state.get("actions") or {}).get(agent),
+                },
+                output=applied,
+            )
+        )
         steps.append(
             code_record(
                 ctx, state, agent, t0, why=m.description, inputs=[], output="applied"
@@ -618,6 +671,7 @@ async def dispatch(state: State, runtime: Runtime[Ctx]) -> Command:
         elif any(r in ok_map and not ok_map[r] for r in reqs):
             failed = [r for r in reqs if r in ok_map and not ok_map[r]]
             update["agent_ok"][agent] = False
+            skipped_now.append({"agent": agent, "needs": failed})
             steps.append(
                 code_record(
                     ctx,
@@ -640,8 +694,49 @@ async def dispatch(state: State, runtime: Runtime[Ctx]) -> Command:
         else:
             wait.append(agent)
     update["steps"] = steps
+    plans = state.get("plans") or []
+    latest = plans[-1] if plans else None
+    first_wave = bool(latest) and list(state.get("pending") or []) == [
+        c["agent"] for c in latest.get("chosen") or []
+    ]
+
+    def dispatch_log(nxt: Any) -> Dict[str, Any]:
+        return code_log(
+            ctx,
+            "dispatch",
+            t0,
+            input={
+                "phase": state.get("phase") or "plan",
+                "pending": list(state.get("pending") or []),
+                "answered": dict(state.get("agent_ok") or {}),
+                **(
+                    {
+                        "plan": {
+                            "source": latest.get("source"),
+                            "fallback": latest.get("fallback"),
+                            "chosen": latest.get("chosen"),
+                            "dropped": latest.get("dropped"),
+                            "estimatedUsd": latest.get("estimatedUsd"),
+                        }
+                    }
+                    if first_wave
+                    else {}
+                ),
+            },
+            output={
+                "applied": applied_now,
+                "sent": ready,
+                "waiting": wait,
+                "skipped": skipped_now,
+                "next": nxt,
+            },
+            attention=bool(skipped_now)
+            or bool(first_wave and (latest.get("dropped") or [])),
+        )
+
     if ready:
         update["pending"] = wait
+        update["logs"] = [dispatch_log(ready)] + logs
         return Command(
             update=update,
             goto=[Send(REGISTRY[a].node, payload) for a in ready],
@@ -657,12 +752,14 @@ async def dispatch(state: State, runtime: Runtime[Ctx]) -> Command:
     }
     if state.get("phase") == "top_up":
         update["workspace"] = workspace
+        update["logs"] = [dispatch_log("revise_gate")] + logs
         return Command(update=update, goto="revise_gate")
     if state.get("progress"):
         workspace.update(progress=state["progress"], history=state.get("history"))
     update["workspace"] = workspace
     if "analyst" in (state.get("actions") or {}) and not ok_map.get("analyst"):
         update["rung"] = int(FallbackRung.WRITER_AND_CHECKS_ONLY)
+    update["logs"] = [dispatch_log("prepare_writer")] + logs
     return Command(update=update, goto="prepare_writer")
 
 
@@ -673,9 +770,32 @@ async def top_up(
     state: State, runtime: Runtime[Ctx]
 ) -> Command[Literal["planner", "revise_gate"]]:
     ctx = runtime.context
+    t0 = ctx.clock()
     base: Dict[str, Any] = {"top_up_used": True, "phase": "top_up"}
+
+    def log(nxt: str, **out: Any) -> Dict[str, Any]:
+        return code_log(
+            ctx,
+            "top_up",
+            t0,
+            input={
+                "critique": body.critique(state["best"]) if state.get("best") else None,
+                "answered": dict(state.get("agent_ok") or {}),
+                "offered": list(state.get("offered") or []),
+                "budgetLeftUsd": budget_left(
+                    ctx.ceiling_usd, state.get("estimated", 0.0)
+                ),
+                "timeLeftMs": round(ctx.time_left_ms(state.get("has_risk_cue", False))),
+            },
+            output={"next": nxt, **out},
+            round_=1,
+        )
+
     if orchestrator(ctx).get("topUp") is False:
-        return Command(update=base, goto="revise_gate")
+        return Command(
+            update={**base, "logs": [log("revise_gate", fallback="top-up is off")]},
+            goto="revise_gate",
+        )
     now = {**state, **base}
     floor = floor_reserve(state, ctx, "top_up")
     now["floor_reserve"] = floor
@@ -709,7 +829,20 @@ async def top_up(
             fallback_code=code,
         )
         return Command(
-            update={**base, "floor_reserve": floor, **update}, goto="revise_gate"
+            update={
+                **base,
+                "floor_reserve": floor,
+                **update,
+                "logs": [
+                    log(
+                        "revise_gate",
+                        fallback=reason,
+                        fallbackCode=code,
+                        candidates=candidates,
+                    )
+                ],
+            },
+            goto="revise_gate",
         )
     return Command(
         update={
@@ -717,6 +850,14 @@ async def top_up(
             "floor_reserve": floor,
             "estimated": state.get("estimated", 0.0) + est,
             "reserved": {"planner#1": est},
+            "logs": [
+                log(
+                    "planner",
+                    candidates=candidates,
+                    floorReserveUsd=round(floor, 6),
+                    plannerEstimateUsd=round(est, 6),
+                )
+            ],
         },
         goto="planner",
     )
@@ -728,6 +869,35 @@ async def top_up(
 def code_agent_node(m: AgentManifest) -> Dict[str, Any]:
     """A code agent (tool, knowledge) as a node: gateway errors retried, and a
     failure recorded rather than failing the run."""
+
+    async def action(state: State, runtime: Runtime[Ctx]):
+        ctx = runtime.context
+        t0 = ctx.clock()
+        out = await m.run(state, runtime)
+        update = out.update if isinstance(out, Command) else out
+        log = code_log(
+            ctx,
+            m.id,
+            t0,
+            input={
+                "kind": "code agent",
+                "action": (state.get("actions") or {}).get(m.id),
+                "tools": list(m.tools),
+            },
+            output={
+                k: v
+                for k, v in (update or {}).items()
+                if k not in ("steps", "logs", "agent_ok")
+            },
+            attention=not ((update or {}).get("agent_ok") or {}).get(m.id, True),
+        )
+        if (update or {}).get("logs"):
+            return out  # it logged itself (guidance runs the floor's node)
+        if isinstance(out, Command):
+            merged = {**(out.update or {})}
+            merged["logs"] = list(merged.get("logs") or []) + [log]
+            return Command(update=merged, goto=out.goto)
+        return {**(out or {}), "logs": list((out or {}).get("logs") or []) + [log]}
 
     async def on_error(state: State, error: NodeError, runtime: Runtime[Ctx]):
         ctx = runtime.context
@@ -744,12 +914,25 @@ def code_agent_node(m: AgentManifest) -> Dict[str, Any]:
             status="failed",
         )
         # An error handler's update follows no static edge: route explicitly.
+        log = code_log(
+            ctx,
+            m.id,
+            ctx.clock(),
+            input={
+                "kind": "code agent",
+                "action": (state.get("actions") or {}).get(m.id),
+                "tools": list(m.tools),
+            },
+            output=None,
+            error=f"{type(cause).__name__}: {cause}",
+        )
         return Command(
-            update={"steps": [record], "agent_ok": {m.id: False}}, goto="dispatch"
+            update={"steps": [record], "agent_ok": {m.id: False}, "logs": [log]},
+            goto="dispatch",
         )
 
     return {
-        "action": m.run,
+        "action": action,
         "error_handler": on_error,
         "retry_policy": GATEWAY_RETRY,
         "destinations": ("dispatch",),

@@ -14,6 +14,7 @@ from langgraph.types import Command
 
 from app.core.debrief.cue_strength import with_strength
 from app.core.debrief_graph import inputs as body
+from app.core.debrief_graph.agent_logs import code_log
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
 from app.core.debrief_graph.constants import (
     DEFAULT_ADVISORY_CHECKS,
@@ -95,10 +96,71 @@ def choose_recipe(ctx: Ctx) -> Dict[str, Any]:
     return recipes.get(key) or recipes[Recipe.STANDARD]
 
 
+def recipe_why(ctx: Ctx, recipe_key: str) -> str:
+    """Why `choose_recipe` chose this recipe, in words."""
+    turns = ctx.sess("learner_turns") or 0
+    floor = ctx.setting("standardMinLearnerTurns", 0)
+    if turns < floor:
+        return (
+            f"The learner spoke {turns} time(s), fewer than the {floor} "
+            "a full debrief needs."
+        )
+    if ctx.sess("assessment"):
+        reason = "The session is an assessment."
+    elif ctx.sess("in_case"):
+        reason = "The session continues a case."
+    else:
+        reason = "A practice session long enough for a full debrief."
+    if recipe_key == Recipe.STANDARD and (
+        ctx.sess("assessment") or ctx.sess("in_case")
+    ):
+        reason += " This release has no recipe for it, so it runs Standard."
+    return reason
+
+
+def _plan_log(
+    ctx: Ctx,
+    t0: float,
+    recipe_key: str,
+    orchestrated: bool,
+    *,
+    goto: List[str],
+    estimated: float = 0.0,
+    reserved: Optional[Dict[str, float]] = None,
+    ended: Optional[str] = None,
+) -> Dict[str, Any]:
+    return code_log(
+        ctx,
+        "plan",
+        t0,
+        input={
+            "learnerTurns": ctx.sess("learner_turns") or 0,
+            "standardMinLearnerTurns": ctx.setting("standardMinLearnerTurns", 0),
+            "assessment": bool(ctx.sess("assessment")),
+            "inCase": bool(ctx.sess("in_case")),
+            "recipesInRelease": sorted(ctx.bundle.get("recipes") or {}),
+            "ceilingUsd": round(ctx.ceiling_usd, 4),
+            "deadlineMs": ctx.deadline_ms(False),
+            "orchestratorEnabled": orchestrated,
+        },
+        output={
+            "recipe": recipe_key,
+            "why": recipe_why(ctx, recipe_key),
+            "orchestrated": orchestrated,
+            "reservedUsd": {k: round(v, 6) for k, v in (reserved or {}).items()},
+            "budgetLeftUsd": budget_left(ctx.ceiling_usd, estimated),
+            "next": goto,
+            **({"ended": ended} if ended else {}),
+        },
+        attention=bool(ended),
+    )
+
+
 async def plan(
     state: State, runtime: Runtime[Ctx]
 ) -> Command[Literal["safety_reader", "analyst", "finish"]]:
     ctx = runtime.context
+    t0 = ctx.clock()
     recipe_key = choose_recipe(ctx)["key"]
     orchestrated = is_orchestrated(ctx)
     base: Dict[str, Any] = {
@@ -111,13 +173,41 @@ async def plan(
         "learner_distress": False,
     }
     if ctx.ceiling_usd <= 0:
-        return _end(Status.NEEDS_PERSON, "monthly_cap", **base)
+        return _end(
+            Status.NEEDS_PERSON,
+            "monthly_cap",
+            **base,
+            logs=[
+                _plan_log(
+                    ctx,
+                    t0,
+                    recipe_key,
+                    orchestrated,
+                    goto=["finish"],
+                    ended="monthly_cap",
+                )
+            ],
+        )
 
     safety_step = ctx.step_of(recipe_key, Step.SAFETY_READER)
     analyst_step = ctx.step_of(recipe_key, Step.ANALYST)
     safety_est = _reserve(ctx, 0.0, safety_step, ctx.transcript_chars)
     if safety_est is None:
-        return _end(Status.NEEDS_PERSON, "budget_below_minimum", **base)
+        return _end(
+            Status.NEEDS_PERSON,
+            "budget_below_minimum",
+            **base,
+            logs=[
+                _plan_log(
+                    ctx,
+                    t0,
+                    recipe_key,
+                    orchestrated,
+                    goto=["finish"],
+                    ended="budget_below_minimum",
+                )
+            ],
+        )
     estimated = safety_est
     probe = {"recipe_key": recipe_key}
     live = body.live_detections(probe, ctx)
@@ -148,6 +238,15 @@ async def plan(
             estimated += analyst_est
             reserved["analyst#0"] = analyst_est
             goto.append("analyst")
+    plan_log = _plan_log(
+        ctx,
+        t0,
+        recipe_key,
+        orchestrated,
+        goto=goto,
+        estimated=estimated,
+        reserved=reserved,
+    )
     return Command(
         update={
             **base,
@@ -155,6 +254,8 @@ async def plan(
             "workspace": {**workspace, **floor.get("workspace", {})},
             "estimated": estimated,
             "reserved": reserved,
+            # The plan first, then a floor data agent it applied.
+            "logs": [plan_log] + floor.get("logs", []),
         },
         goto=goto,
     )
@@ -169,7 +270,14 @@ def floor_data_agent(state: State, ctx: Ctx, agent: str) -> Dict[str, Any]:
     record = code_record(
         ctx, state, agent, t0, why=m.description, inputs=[], output="applied"
     ) | {"why": "In the floor: " + m.description}
-    return {**applied, "agent_ok": {agent: True}, "steps": [record]}
+    log = code_log(
+        ctx,
+        agent,
+        t0 + 0.5,
+        input={"kind": "data agent", "appliedIn": "the floor"},
+        output=applied,
+    )
+    return {**applied, "agent_ok": {agent: True}, "steps": [record], "logs": [log]}
 
 
 async def after_reading(
@@ -370,6 +478,27 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
                 ),
             }
         ]
+        update["logs"] = [
+            code_log(
+                ctx,
+                Step.GUIDANCE_LOOKUP,
+                t0,
+                input={
+                    "situations": [
+                        (m or {}).get("summary")
+                        for m in moments
+                        if (m or {}).get("summary")
+                    ],
+                    "perMoment": per_moment,
+                    "topic": topic,
+                },
+                output={
+                    "lookups": lookups,
+                    "passages": [{**p, **c} for p, c in zip(passages, citations)],
+                    "stopped": stopped,
+                },
+            )
+        ]
         update["passages"] = passages
         update["workspace"] = {"passages": seen}
     if state.get("progress"):
@@ -426,16 +555,14 @@ async def checks(
     recipe = body.recipe(state, ctx)
     estimated = state.get("estimated", 0.0)
     t0 = ctx.clock()
-    answer = await ctx.gateway.call(
-        "run_checks",
-        {
-            "cards": cur["cards"],
-            "safety": state["safety"],
-            "language": ctx.language,
-            "short_form": bool(recipe.get("shortForm")),
-            "has_progress": bool(state.get("progress")),
-        },
-    )
+    check_input = {
+        "cards": cur["cards"],
+        "safety": state["safety"],
+        "language": ctx.language,
+        "short_form": bool(recipe.get("shortForm")),
+        "has_progress": bool(state.get("progress")),
+    }
+    answer = await ctx.gateway.call("run_checks", check_input)
     fails = [_failure(f) for f in answer.get("failures") or []]
     advisory = set(answer.get("advisory") or DEFAULT_ADVISORY_CHECKS)
     weight = answer.get("weight")
@@ -474,7 +601,25 @@ async def checks(
         }
     ]
     current = {**cur, "checks": fails, "weight": weight, "evaluation": None}
-    update: Dict[str, Any] = {"advisory": sorted(advisory)}
+    blocking = [f for f in fails if f["code"] not in advisory]
+    update: Dict[str, Any] = {
+        "advisory": sorted(advisory),
+        "logs": [
+            code_log(
+                ctx,
+                Step.CHECKS,
+                t0,
+                input=check_input,
+                output={
+                    "failures": fails,
+                    "advisory": sorted(advisory),
+                    "weight": weight,
+                },
+                round_=rnd,
+                attention=bool(blocking),
+            )
+        ],
+    }
 
     debrief = (await ctx.gateway.call("render_cards", {"cards": cur["cards"]}))["text"]
     rubric = ctx.prompt(PROMPT_CODES["rubric"])
@@ -555,8 +700,34 @@ async def score_draft(
     ):
         # D3: the first failed evaluation gets one evidence top-up first.
         goto = "top_up"
+    pass_score = ctx.setting("passScore", 8)
+    log = code_log(
+        ctx,
+        "score_draft",
+        ctx.clock(),
+        input={
+            "round": rnd,
+            "evaluation": evaluation,
+            "checks": draft["checks"],
+            "passScore": pass_score,
+            "maxRevisionRounds": _max_rounds(state, ctx),
+        },
+        output={
+            "overall": record["overall"],
+            "draftMeetsBar": meets_bar(draft, advisory, pass_score),
+            "bestRound": best["round"],
+            "next": goto,
+        },
+        round_=rnd,
+        attention=not meets_bar(draft, advisory, pass_score),
+    )
     return Command(
-        update={"current": draft, "best": best, "evaluations": [record]},
+        update={
+            "current": draft,
+            "best": best,
+            "evaluations": [record],
+            "logs": [log],
+        },
         goto=goto,
     )
 
@@ -676,7 +847,25 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
             why = (
                 f"Held for a person: the best draft still failed {', '.join(blocking)}."
             )
+    log = code_log(
+        ctx,
+        "decide",
+        ctx.clock(),
+        input={
+            "bestRound": best["round"],
+            "overall": ev["overall"] if ev else None,
+            "hardFails": (ev or {}).get("hardFails") or [],
+            "checks": best["checks"],
+            "advisory": sorted(advisory),
+            "passScore": pass_score,
+            "roundsUsed": rnd,
+            "practiceOptionsOffered": offered,
+        },
+        output={"status": status, "why": why, "skipReason": skip_reason},
+        attention=status != Status.PUBLISHED,
+    )
     return {
+        "logs": [log],
         "workspace": {
             "evaluations": state.get("evaluations") or [],
             "bestRound": best["round"],

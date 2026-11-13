@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from app.core.debrief_graph import inputs as body
-from app.core.debrief_graph.constants import FallbackRung, Status, Step
+from app.core.debrief_graph.constants import PROMPT_CODES, FallbackRung, Status, Step
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
 from app.core.debrief_graph.findings import evidence_findings
 from app.core.debrief_graph.model_step import ModelStep
@@ -32,6 +32,7 @@ def _stay(*_: Any):
 # --- 1. Safety reader and Analyst, side by side --------------------------------
 
 SAFETY_READER = ModelStep(
+    prompt_code=PROMPT_CODES["safety_reader"],
     step=Step.SAFETY_READER,
     path="safety-reader",
     body=body.safety_body,
@@ -79,6 +80,7 @@ def _analyst_config(state: State, ctx: Ctx) -> Dict[str, Any]:
 
 
 ANALYST = ModelStep(
+    prompt_code=PROMPT_CODES["analyst"],
     step=Step.ANALYST,
     path="analyst",
     body=body.analyst_body,
@@ -106,6 +108,7 @@ def _progress_done(state: State, ctx: Ctx, res: Dict[str, Any]):
 
 
 PROGRESS_READER = ModelStep(
+    prompt_code=PROMPT_CODES["progress_reader"],
     step=Step.PROGRESS_READER,
     path="progress-reader",
     body=body.progress_body,
@@ -172,6 +175,7 @@ def _writer_failed(state: State, ctx: Ctx):
 
 
 WRITER = ModelStep(
+    prompt_code=PROMPT_CODES["writer"],
     step=Step.WRITER,
     path="writer",
     body=body.writer_body,
@@ -192,6 +196,7 @@ def _current_round(state: State) -> int:
 
 
 EVALUATOR = ModelStep(
+    prompt_code=PROMPT_CODES["rubric"],
     step=Step.EVALUATOR,
     path="evaluator",
     body=body.evaluator_body,
@@ -228,6 +233,7 @@ def _revised(state: State, ctx: Ctx, res: Dict[str, Any]):
 
 
 REVISER = ModelStep(
+    prompt_code=PROMPT_CODES["reviser"],
     step=Step.REVISER,
     path="reviser",
     body=body.reviser_body,

@@ -33,6 +33,9 @@ class DebriefRunResponse(BaseModel):
     recipe_key: Optional[str] = None
     cards: Optional[Dict[str, Any]] = None
     steps: List[Dict[str, Any]] = Field(default_factory=list)
+    #: The Agent logs: each model call's exact input and full reply, and each
+    #: deciding code step's inputs and results, numbered (`seq`) in order.
+    logs: List[Dict[str, Any]] = Field(default_factory=list)
     workspace: Dict[str, Any] = Field(default_factory=dict)
     estimated_cost_usd: float = 0.0
     fallback_rung: int = 0
