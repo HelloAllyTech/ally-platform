@@ -88,3 +88,8 @@ export interface AnalyticsAutomationRunDetail extends AnalyticsAutomationRunSumm
   };
   agentRuns: AnalyticsAutomationAgentRun[];
 }
+
+/** What the server allows. `manualStartEnabled` is a testing aid (see the tab). */
+export interface AnalyticsAutomationConfig {
+  manualStartEnabled: boolean;
+}

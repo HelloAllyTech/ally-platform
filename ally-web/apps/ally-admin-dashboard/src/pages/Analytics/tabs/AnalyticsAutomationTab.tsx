@@ -15,9 +15,11 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import {
   useApproveAnalyticsAutomationAgentMutation,
+  useGetAnalyticsAutomationConfigQuery,
   useGetAnalyticsAutomationRunQuery,
   useGetAnalyticsAutomationRunsQuery,
   useRejectAnalyticsAutomationAgentMutation,
+  useStartAnalyticsAutomationRunMutation,
 } from "@api";
 import { TooltipIcon } from "@assets";
 import { sharedMarkdownComponents } from "@components";
@@ -334,8 +336,16 @@ const RunView = ({ run }: { run: AnalyticsAutomationRunDetail }) => {
     setError(null);
     try {
       await (kind === "approve" ? approve(agentRunId) : reject(agentRunId)).unwrap();
-    } catch {
-      setError(kind === "approve" ? strings.approveFailed : strings.rejectFailed);
+    } catch (err) {
+      // The server says why when it refuses (e.g. the PostHog pull request is still open).
+      const reason = (err as { data?: { message?: unknown } })?.data?.message;
+      setError(
+        typeof reason === "string" && reason
+          ? reason
+          : kind === "approve"
+            ? strings.approveFailed
+            : strings.rejectFailed,
+      );
     }
   };
 
@@ -452,6 +462,11 @@ export const AnalyticsAutomationTab = () => {
   const strings = en.analyticsAutomation;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
+  const [startError, setStartError] = useState(false);
+
+  // Testing aid: shown only while the server allows a manual start.
+  const config = useGetAnalyticsAutomationConfigQuery();
+  const [startRun, { isLoading: starting }] = useStartAnalyticsAutomationRunMutation();
 
   const runsQuery = useGetAnalyticsAutomationRunsQuery(undefined, {
     pollingInterval: polling ? POLL_MS : IDLE_POLL_MS,
@@ -477,6 +492,16 @@ export const AnalyticsAutomationTab = () => {
   const shouldPoll = anyActive || !!openActive;
   if (polling !== shouldPoll) setPolling(shouldPoll);
 
+  const onStart = async () => {
+    setStartError(false);
+    try {
+      const started = await startRun().unwrap();
+      setSelectedId(started.id);
+    } catch {
+      setStartError(true);
+    }
+  };
+
   return (
     <div className="pt-2 flex flex-col gap-4 md:flex-row">
       <RunSidebar
@@ -490,6 +515,32 @@ export const AnalyticsAutomationTab = () => {
       <div className="min-w-0 flex-1">
         <h2 className="text-lg font-medium text-typography-900">{strings.heading}</h2>
         <p className="mt-1 mb-3 text-sm text-typography-600">{strings.intro}</p>
+
+        {config.data?.manualStartEnabled && (
+          <div className="mb-3 flex flex-col gap-2">
+            <div>
+              <Button
+                kind="tertiary"
+                size="sm"
+                disabled={starting || shouldPoll}
+                title={strings.startTestRunHelp}
+                onClick={() => void onStart()}
+              >
+                {starting ? strings.startingTestRun : strings.startTestRun}
+              </Button>
+            </div>
+            {startError && (
+              <InlineNotification
+                kind="error"
+                lowContrast
+                hideCloseButton
+                title=""
+                subtitle={strings.startTestRunFailed}
+                className="max-w-full"
+              />
+            )}
+          </div>
+        )}
 
         {!activeId ? null : detail ? (
           <RunView key={detail.id} run={detail} />

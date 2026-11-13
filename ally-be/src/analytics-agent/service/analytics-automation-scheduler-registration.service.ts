@@ -32,12 +32,9 @@ export function resolveAutomationSchedule(raw: string | undefined): {
 }
 
 /**
- * Registers the Analytics Automation on the shared scheduler:
- *
- *  - the weekly RUN, on the interval the env var names (off disables it);
- *  - an hourly POLL that refreshes pull request state and releases the dbt
- *    agent. The poll is registered even when runs are off, so a run that is
- *    already in flight keeps moving.
+ * Registers the weekly Analytics Automation RUN on the shared scheduler, on the
+ * interval the env var names (`off` disables it). Nothing else is scheduled:
+ * the dbt agent is started by a person's approval, not by a timer.
  *
  * Handlers only start work and return: ticks of one interval run their tasks one
  * after another under a single lock, and a run takes minutes.
@@ -68,12 +65,6 @@ export class AnalyticsAutomationSchedulerRegistrationService implements OnModule
       );
       this.logger.log(`Analytics automation run registered on "${interval}"`);
     }
-
-    scheduledTaskRegistry.register(
-      AUTOMATION_SCHEDULE.POLL_INTERVAL,
-      AUTOMATION_SCHEDULE.POLL_TASK_NAME,
-      () => this.poll(),
-    );
   }
 
   /** Starts a run and returns without waiting for it. */
@@ -90,9 +81,5 @@ export class AnalyticsAutomationSchedulerRegistrationService implements OnModule
       }
       throw err;
     }
-  }
-
-  async poll(): Promise<void> {
-    await this.runService.pollPullRequests();
   }
 }

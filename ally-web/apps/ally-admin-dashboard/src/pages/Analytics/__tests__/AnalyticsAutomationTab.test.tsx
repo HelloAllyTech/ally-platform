@@ -16,6 +16,8 @@ vi.mock("@api", async importOriginal => ({
     data: options?.skip ? undefined : details[id],
     isError: false,
   }),
+  useGetAnalyticsAutomationConfigQuery: () => ({ data: { manualStartEnabled: false } }),
+  useStartAnalyticsAutomationRunMutation: () => [vi.fn(), { isLoading: false }],
   useApproveAnalyticsAutomationAgentMutation: () => [approveMock, { isLoading: false }],
   useRejectAnalyticsAutomationAgentMutation: () => [rejectMock, { isLoading: false }],
 }));

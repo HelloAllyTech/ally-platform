@@ -108,3 +108,11 @@ export class AnalyticsAutomationRunDetailDto extends AnalyticsAutomationRunSumma
   @ApiProperty({ type: [AnalyticsAutomationAgentRunDto] })
   agentRuns!: AnalyticsAutomationAgentRunDto[];
 }
+
+export class AnalyticsAutomationConfigDto {
+  @ApiProperty({
+    description:
+      'Whether a run may be started by hand (testing only; the server decides).',
+  })
+  manualStartEnabled!: boolean;
+}

@@ -18,12 +18,11 @@ export const AUTOMATION_SCHEDULE = Object.freeze({
   OFF: 'off',
   TASK_NAME: 'analytics-automation-run',
   /**
-   * Refreshes pull request state and releases the dbt agent when its gate
-   * opens. It starts nothing by itself that a person has not allowed: it only
-   * notices that a PR was merged or closed.
+   * Testing only. When `true`, the admin tab shows a button that starts a run
+   * now, and the endpoint behind it accepts the request. Off by default: the
+   * run is meant to start only from the schedule.
    */
-  POLL_INTERVAL: 'hourly',
-  POLL_TASK_NAME: 'analytics-automation-poll',
+  ALLOW_MANUAL_START_ENV_VAR: 'ANALYTICS_AUTOMATION_ALLOW_MANUAL_START',
 });
 
 /**

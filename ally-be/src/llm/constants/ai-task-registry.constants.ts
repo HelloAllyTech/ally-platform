@@ -1754,9 +1754,9 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     task: null,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'The Analytics Automation dbt agent: its analysis runs once the PostHog pull request is merged, closed or absent (hourly poll); its edits run only when a person clicks Approve',
+      'The Analytics Automation dbt agent: runs only when a person clicks Approve in the admin tab, and only if the PostHog pull request is merged, closed or absent on GitHub at that moment',
     detail:
-      'Two LangChain agent runs with read-only GitHub tools. Analysis: what dbt needs because of platform changes (migrations, entities, definitions, merged events), saved as a proposal. Changes (after approval): the agent edits the dbt repo and opens a pull request through guarded GitHub MCP write tools (confined in code to the dbt repo, an automation/ branch and models/seeds/tests). Prompts are DBT_ANALYSIS_SYSTEM_PROMPT and DBT_CHANGES_SYSTEM_PROMPT in code.',
+      'Two LangChain agent runs, one after the other in the same background task started by Approve. Analysis (read-only GitHub tools): what dbt needs because of platform changes (migrations, entities, definitions, merged events). Changes: the agent edits the dbt repo and opens a pull request through guarded GitHub MCP write tools (confined in code to the dbt repo, an automation/ branch and models/seeds/tests). Prompts are DBT_ANALYSIS_SYSTEM_PROMPT and DBT_CHANGES_SYSTEM_PROMPT in code.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'whatever OPENAI_CHAT_MODEL names (no default in code)',

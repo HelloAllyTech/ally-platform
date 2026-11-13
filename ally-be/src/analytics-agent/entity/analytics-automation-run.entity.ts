@@ -13,7 +13,7 @@ import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.e
 export type AnalyticsAutomationRunStatus = 'running' | 'completed' | 'failed';
 
 /** Only the scheduler starts runs; kept as a column so that can change. */
-export type AnalyticsAutomationTrigger = 'scheduled';
+export type AnalyticsAutomationTrigger = 'scheduled' | 'manual';
 
 /** The commits one run looked at, so "what changed since last time" is exact. */
 export interface AnalyticsAutomationCommitShas {

@@ -1,5 +1,5 @@
 import {
-  BadRequestException,
+  BadGatewayException,
   ConflictException,
   Injectable,
   Logger,
@@ -21,8 +21,15 @@ import {
   AnalyticsAutomationAgentRun,
 } from '../entity/analytics-automation-agent-run.entity';
 import { AnalyticsAutomationFinding } from '../entity/analytics-automation-finding.entity';
-import { AnalyticsAutomationRun } from '../entity/analytics-automation-run.entity';
-import { clip, evaluateDbtGate } from '../util/analytics-automation.util';
+import {
+  AnalyticsAutomationRun,
+  AnalyticsAutomationTrigger,
+} from '../entity/analytics-automation-run.entity';
+import {
+  clip,
+  DbtGate,
+  evaluateDbtGate,
+} from '../util/analytics-automation.util';
 import {
   AutomationPrSink,
   AutomationRunContext,
@@ -30,7 +37,6 @@ import {
 import { AnalyticsAutomationBackendReviewAgent } from './analytics-automation-backend-review.agent';
 import {
   AnalyticsAutomationDbtAgent,
-  DbtProposalItem,
   MergedEvent,
 } from './analytics-automation-dbt.agent';
 import { AnalyticsAutomationGithubService } from './analytics-automation-github.service';
@@ -48,6 +54,10 @@ export interface StartedAutomationRun {
   /** Never rejects: a failure marks the run or the agent `failed`. */
   done: Promise<void>;
 }
+
+/** Shown on the dbt agent while it waits for a person: nothing has run. */
+const DBT_APPROVAL_NOTE =
+  'Nothing has run yet. Approving checks the PostHog pull request on GitHub and then starts the dbt agent.';
 
 const AGENT_ORDER: AnalyticsAutomationAgentName[] = [
   'backend_review',
@@ -83,11 +93,11 @@ function iso(value: Date | null): string | null {
  *
  * Starting a run takes one snapshot of the platform and dbt heads, then starts
  * two agents together — the backend review and the PostHog events agent. The
- * dbt agent does NOT start with them: it waits for the PostHog agent's pull
- * request to be merged or closed (see `evaluateDbtGate`), which can take days,
- * so an hourly poll refreshes pull request state and releases it when its gate
- * opens. It then writes a proposal and stops at `awaiting_approval`; only a
- * person approving it makes it edit the dbt repo.
+ * dbt agent does NOT start with them: it is offered for approval once they
+ * finish and does nothing until a person approves it. Approving checks the
+ * PostHog pull request on GitHub at that moment (see `evaluateDbtGate`): still
+ * open, and the approval is refused; merged or closed, and the agent starts.
+ * There is no polling and no timer.
  *
  * Nothing here starts a run on request: only the scheduler does.
  */
@@ -116,6 +126,20 @@ export class AnalyticsAutomationRunService {
    * exists, so a GitHub failure leaves no `running` row behind.
    */
   async startScheduledRun(): Promise<StartedAutomationRun> {
+    return this.startRun('scheduled');
+  }
+
+  /**
+   * The same run, started by a person pressing the test button. Only reachable
+   * when the controller allows it (`ANALYTICS_AUTOMATION_ALLOW_MANUAL_START`).
+   */
+  async startManualRun(): Promise<StartedAutomationRun> {
+    return this.startRun('manual');
+  }
+
+  private async startRun(
+    trigger: AnalyticsAutomationTrigger,
+  ): Promise<StartedAutomationRun> {
     await this.failStale();
     if (await this.runs.exists({ where: { status: 'running' } })) {
       throw new ConflictException(AUTOMATION_ALREADY_RUNNING_MESSAGE);
@@ -147,7 +171,7 @@ export class AnalyticsAutomationRunService {
           manager.create(AnalyticsAutomationRun, {
             ranAt,
             status: 'running',
-            trigger: 'scheduled',
+            trigger,
             commitShas: {
               platform: {
                 base: previous?.commitShas?.platform?.head ?? null,
@@ -202,7 +226,7 @@ export class AnalyticsAutomationRunService {
         { status: 'completed', finishedAt: new Date() },
       );
       this.logger.log(`Automation run ${run.id} finished its first two agents`);
-      await this.releaseDbtIfReady(run.id);
+      await this.openDbtForApproval(run.id);
     } catch (err) {
       this.logger.error(`Automation run ${run.id} failed: ${errorText(err)}`);
       await this.runs
@@ -259,11 +283,12 @@ export class AnalyticsAutomationRunService {
   // --------------------------------------------------------------- dbt agent
 
   /**
-   * Starts the dbt agent's analysis if its gate is open, otherwise records why
-   * it is still waiting. Safe to call any number of times: the claim below is
-   * one atomic update, so only one caller starts the analysis.
+   * Offers the dbt agent for approval once the first two agents are done. It
+   * runs NOTHING: the agent starts only when a person approves, and the PostHog
+   * pull request is checked on GitHub at that moment, not here. The note says
+   * what the pull request looked like when the run finished.
    */
-  async releaseDbtIfReady(runId: string): Promise<void> {
+  async openDbtForApproval(runId: string): Promise<void> {
     const rows = await this.agentRuns.find({ where: { runId } });
     const dbtRow = rows.find((r) => r.agent === 'dbt_metrics');
     if (!dbtRow || dbtRow.status !== 'waiting') return;
@@ -271,50 +296,52 @@ export class AnalyticsAutomationRunService {
     const gate = evaluateDbtGate(
       rows.find((r) => r.agent === 'posthog_events') ?? null,
     );
-    if (!gate.open) {
-      if (dbtRow.note !== gate.reason) {
-        await this.agentRuns.update(dbtRow.id, { note: gate.reason });
-      }
-      return;
-    }
-
-    const claimed = await this.agentRuns.update(
+    await this.agentRuns.update(
       { id: dbtRow.id, status: 'waiting' },
-      { status: 'analysing', startedAt: new Date(), note: gate.note },
+      {
+        status: 'awaiting_approval',
+        note: [gate.open ? gate.note : gate.reason, DBT_APPROVAL_NOTE]
+          .filter(Boolean)
+          .join(' '),
+      },
     );
-    if (!claimed.affected) return;
-    void this.analyseDbt(dbtRow.id, gate.withEvents);
   }
 
-  /** Never rejects. */
-  private async analyseDbt(
-    agentRunId: string,
-    withEvents: boolean,
-  ): Promise<void> {
-    try {
-      const row = await this.agentRuns.findOneByOrFail({ id: agentRunId });
-      const run = await this.runs.findOneByOrFail({ id: row.runId });
-      const posthogRow = await this.agentRuns.findOne({
-        where: { runId: row.runId, agent: 'posthog_events' },
+  /**
+   * The gate, decided on GitHub's current answer: the PostHog pull request's
+   * state is read live and saved, so a PR merged, closed or reopened since the
+   * run is judged as it is now. Throws 502 when GitHub cannot be asked.
+   */
+  private async checkDbtGate(runId: string): Promise<DbtGate> {
+    const posthog = await this.agentRuns.findOne({
+      where: { runId, agent: 'posthog_events' },
+    });
+    if (posthog && posthog.prNumber !== null && posthog.prRepo) {
+      await this.refreshPullRequest(posthog).catch((err) => {
+        this.logger.warn(
+          `Could not check ${posthog.prRepo}#${posthog.prNumber}: ${errorText(err)}`,
+        );
+        throw new BadGatewayException(
+          'Could not check the PostHog pull request on GitHub. Try again in a moment.',
+        );
       });
-      const events = withEvents
-        ? ((posthogRow?.output?.events as MergedEvent[] | undefined) ?? [])
-        : null;
+    }
+    return evaluateDbtGate(posthog);
+  }
 
-      const result = await this.dbt.analyse(this.contextFor(run), {
-        events,
-        rejectedKeys: await this.rejectedKeys(),
-      });
-      await this.saveFindings(agentRunId, result.findings);
-      await this.agentRuns.update(agentRunId, {
-        status: result.needsChanges ? 'awaiting_approval' : 'completed',
-        finishedAt: result.needsChanges ? null : new Date(),
-        summary: result.summary,
-        output: jsonb({ items: result.items, withEvents }),
-      });
-    } catch (err) {
-      this.logger.error(`dbt analysis ${agentRunId} failed: ${errorText(err)}`);
-      await this.fail(agentRunId, err);
+  /** Reads a pull request's state from GitHub and saves it if it changed. */
+  private async refreshPullRequest(
+    row: AnalyticsAutomationAgentRun,
+  ): Promise<void> {
+    if (row.prNumber === null || !row.prRepo) return;
+    const [owner, repo] = row.prRepo.split('/');
+    const { state } = await this.github.getPullRequestState(
+      { owner, repo },
+      row.prNumber,
+    );
+    if (state !== row.prState) {
+      await this.agentRuns.update(row.id, { prState: state });
+      row.prState = state;
     }
   }
 
@@ -334,19 +361,27 @@ export class AnalyticsAutomationRunService {
   }
 
   /**
-   * A person approves the proposal: the dbt agent now edits the dbt repo and
-   * opens a pull request, in the background. Allowed from `awaiting_approval`,
-   * and again from a `failed` run that was already approved and opened no PR,
-   * so a GitHub hiccup does not strand it.
+   * A person approves: the dbt agent now starts, in the background. It works out
+   * what dbt needs, edits the dbt repo and opens a pull request. Allowed from
+   * `awaiting_approval`, and again from a `failed` run that was already approved
+   * and opened no PR, so a GitHub hiccup does not strand it.
    */
   async approve(
     agentRunId: string,
     userId: number,
   ): Promise<AnalyticsAutomationAgentRunDto> {
     const row = await this.requireDbtRow(agentRunId);
-    if (this.proposalItems(row).length === 0) {
-      throw new BadRequestException('There is no proposal to approve.');
+    const retryable =
+      row.status === 'failed' &&
+      row.decision === 'approved' &&
+      row.prNumber === null;
+    if (row.status !== 'awaiting_approval' && !retryable) {
+      throw new ConflictException('This agent cannot be approved now.');
     }
+    // The gate, on GitHub's answer right now: an open PostHog PR refuses.
+    const gate = await this.checkDbtGate(row.runId);
+    if (!gate.open) throw new ConflictException(gate.reason);
+
     const claimed = await this.agentRuns
       .createQueryBuilder()
       .update(AnalyticsAutomationAgentRun)
@@ -365,9 +400,13 @@ export class AnalyticsAutomationRunService {
       )
       .execute();
     if (!claimed.affected) {
-      throw new ConflictException('This proposal cannot be approved now.');
+      throw new ConflictException('This agent cannot be approved now.');
     }
-    void this.applyDbt(row.id);
+    // What the analysis is told about the PostHog events, decided just now.
+    await this.agentRuns.update(row.id, {
+      output: jsonb({ withEvents: gate.withEvents }),
+    });
+    void this.runDbt(row.id);
     return this.loadAgentDto(row.id);
   }
 
@@ -396,17 +435,50 @@ export class AnalyticsAutomationRunService {
     return this.loadAgentDto(row.id);
   }
 
-  /** Never rejects. */
-  private async applyDbt(agentRunId: string): Promise<void> {
+  /**
+   * What happens after a person approves: work out what dbt needs, then make
+   * those changes as a pull request. One background task, so the two steps
+   * cannot be started separately. Never rejects.
+   */
+  private async runDbt(agentRunId: string): Promise<void> {
     try {
       const row = await this.agentRuns.findOneByOrFail({ id: agentRunId });
       const run = await this.runs.findOneByOrFail({ id: row.runId });
+      const ctx = this.contextFor(run);
+      const withEvents = row.output?.withEvents === true;
+      const posthogRow = await this.agentRuns.findOne({
+        where: { runId: row.runId, agent: 'posthog_events' },
+      });
+      const events = withEvents
+        ? ((posthogRow?.output?.events as MergedEvent[] | undefined) ?? [])
+        : null;
+
+      const analysis = await this.dbt.analyse(ctx, {
+        events,
+        rejectedKeys: await this.rejectedKeys(),
+      });
+      // A retry after a failure starts from a clean list.
+      await this.findings.delete({ agentRunId });
+      if (!analysis.needsChanges) {
+        await this.agentRuns.update(agentRunId, {
+          status: 'completed',
+          finishedAt: new Date(),
+          summary: analysis.summary,
+          output: jsonb({ items: [], withEvents }),
+        });
+        return;
+      }
+      await this.saveFindings(agentRunId, analysis.findings);
+      await this.agentRuns.update(agentRunId, {
+        summary: analysis.summary,
+        output: jsonb({ items: analysis.items, withEvents }),
+      });
+
       const result = await this.dbt.apply(
-        this.contextFor(run),
-        this.proposalItems(row),
+        ctx,
+        analysis.items,
         this.sinkFor(agentRunId),
       );
-
       const skipped = new Set(result.skipped.map((s) => s.key));
       const proposed = await this.findings.find({ where: { agentRunId } });
       for (const finding of proposed) {
@@ -425,52 +497,16 @@ export class AnalyticsAutomationRunService {
       });
     } catch (err) {
       // A pull request opened before the failure stays recorded on the row.
-      this.logger.error(`dbt changes ${agentRunId} failed: ${errorText(err)}`);
+      this.logger.error(`dbt agent ${agentRunId} failed: ${errorText(err)}`);
       await this.fail(agentRunId, err);
-    }
-  }
-
-  // ----------------------------------------------------------------- polling
-
-  /**
-   * Hourly. Notices that a pull request was merged or closed, and releases any
-   * dbt agent whose gate that opens. Starts no run.
-   */
-  async pollPullRequests(): Promise<void> {
-    await this.failStale();
-
-    const open = await this.agentRuns.find({ where: { prState: 'open' } });
-    for (const row of open) {
-      if (row.prNumber === null || !row.prRepo) continue;
-      try {
-        const [owner, repo] = row.prRepo.split('/');
-        const { state } = await this.github.getPullRequestState(
-          { owner, repo },
-          row.prNumber,
-        );
-        if (state !== 'open') {
-          await this.agentRuns.update(row.id, { prState: state });
-        }
-      } catch (err) {
-        this.logger.warn(
-          `Could not refresh ${row.prRepo}#${row.prNumber}: ${errorText(err)}`,
-        );
-      }
-    }
-
-    const waiting = await this.agentRuns.find({
-      where: { agent: 'dbt_metrics', status: 'waiting' },
-    });
-    for (const row of waiting) {
-      await this.releaseDbtIfReady(row.runId).catch((err) =>
-        this.logger.warn(`dbt gate check failed: ${errorText(err)}`),
-      );
     }
   }
 
   // ----------------------------------------------------------------- reading
 
   async listRuns(): Promise<AnalyticsAutomationRunSummaryDto[]> {
+    // Nothing else runs on a timer: rows left mid-step by a restart are cleaned here.
+    await this.failStale().catch(() => undefined);
     const runs = await this.runs.find({
       order: { ranAt: 'DESC' },
       take: AUTOMATION_LIMITS.HISTORY_LIMIT,
@@ -486,6 +522,18 @@ export class AnalyticsAutomationRunService {
     const run = await this.runs.findOne({ where: { id } });
     if (!run) throw new NotFoundException('Automation run not found');
     const agents = await this.agentRuns.find({ where: { runId: id } });
+    // With no poller, an open pull request's badge is refreshed when it is looked at.
+    await Promise.all(
+      agents
+        .filter((a) => a.prState === 'open')
+        .map((a) =>
+          this.refreshPullRequest(a).catch((err) =>
+            this.logger.warn(
+              `Could not refresh ${a.prRepo}#${a.prNumber}: ${errorText(err)}`,
+            ),
+          ),
+        ),
+    );
     const findings = agents.length
       ? await this.findings.find({
           where: { agentRunId: In(agents.map((a) => a.id)) },
@@ -565,11 +613,6 @@ export class AnalyticsAutomationRunService {
       throw new NotFoundException('dbt agent run not found');
     }
     return row;
-  }
-
-  private proposalItems(row: AnalyticsAutomationAgentRun): DbtProposalItem[] {
-    const items = row.output?.items;
-    return Array.isArray(items) ? (items as DbtProposalItem[]) : [];
   }
 
   /**
@@ -661,10 +704,7 @@ export class AnalyticsAutomationRunService {
         : null,
       decision: row.decision,
       decidedAt: iso(row.decidedAt),
-      canApprove:
-        isDbt &&
-        (row.status === 'awaiting_approval' || retryable) &&
-        this.proposalItems(row).length > 0,
+      canApprove: isDbt && (row.status === 'awaiting_approval' || retryable),
       canReject: isDbt && row.status === 'awaiting_approval',
       findings: findings.map((f) => ({
         id: f.id,

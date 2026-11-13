@@ -46,11 +46,9 @@ describe('AnalyticsAutomationSchedulerRegistrationService', () => {
   const original = process.env[AUTOMATION_SCHEDULE.ENV_VAR];
   let register: jest.SpyInstance;
   const startScheduledRun = jest.fn();
-  const pollPullRequests = jest.fn();
   const build = () =>
     new AnalyticsAutomationSchedulerRegistrationService({
       startScheduledRun,
-      pollPullRequests,
     } as never);
 
   beforeEach(() => {
@@ -65,30 +63,21 @@ describe('AnalyticsAutomationSchedulerRegistrationService', () => {
     else process.env[AUTOMATION_SCHEDULE.ENV_VAR] = original;
   });
 
-  it('registers the weekly run and the hourly poll by default', () => {
+  it('registers only the weekly run by default: there is no poll', () => {
     delete process.env[AUTOMATION_SCHEDULE.ENV_VAR];
     build().onModuleInit();
+    expect(register).toHaveBeenCalledTimes(1);
     expect(register).toHaveBeenCalledWith(
       'weekly',
       AUTOMATION_SCHEDULE.TASK_NAME,
       expect.any(Function),
     );
-    expect(register).toHaveBeenCalledWith(
-      'hourly',
-      AUTOMATION_SCHEDULE.POLL_TASK_NAME,
-      expect.any(Function),
-    );
   });
 
-  it('still registers the poll when runs are off, so a run in flight keeps moving', () => {
+  it('registers nothing when runs are off', () => {
     process.env[AUTOMATION_SCHEDULE.ENV_VAR] = 'off';
     build().onModuleInit();
-    expect(register).toHaveBeenCalledTimes(1);
-    expect(register).toHaveBeenCalledWith(
-      'hourly',
-      AUTOMATION_SCHEDULE.POLL_TASK_NAME,
-      expect.any(Function),
-    );
+    expect(register).not.toHaveBeenCalled();
   });
 
   it('starts a run without waiting for it', async () => {
@@ -107,10 +96,5 @@ describe('AnalyticsAutomationSchedulerRegistrationService', () => {
   it('lets any other failure through so the scheduler logs it', async () => {
     startScheduledRun.mockRejectedValue(new Error('github down'));
     await expect(build().runScheduled()).rejects.toThrow('github down');
-  });
-
-  it('polls', async () => {
-    await build().poll();
-    expect(pollPullRequests).toHaveBeenCalledTimes(1);
   });
 });
