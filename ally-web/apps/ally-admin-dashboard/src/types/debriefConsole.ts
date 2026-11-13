@@ -121,6 +121,8 @@ export type PmAgentIdeaKind =
 export type PmAgentHandoff = {
   status: "waiting" | "filed" | "answered";
   filedId?: string | null;
+  /** "Hand to Builder": who answers Builder's interview questions (R2-20). */
+  answerer?: PmAgentBuilderAnswerer;
 } & (
   | {
       kind: "builder";
@@ -148,6 +150,48 @@ export type PmAgentHandoff = {
       for: string;
     }
 );
+
+/** Who answers Builder's interview for an idea handed to Builder. */
+export type PmAgentBuilderAnswerer = "pm_agent" | "person";
+
+/** In Builder: interviewing · building · PR open · merged · closed (from the session's real status). */
+export type PmAgentBuilderStage = "interviewing" | "building" | "pr_open" | "merged" | "closed";
+
+/** One answer the PM agent sent Builder (its own words; never learner quotes). */
+export interface PmAgentBuilderAnswer {
+  questionId: string;
+  question: string;
+  answer: string;
+  at: string;
+}
+
+/** `GET …/pm-agent/ideas/:id/builder`: where an idea handed to Builder stands. */
+export interface PmAgentBuilderProgress {
+  sessionId: string;
+  answerer: PmAgentBuilderAnswerer;
+  stage: PmAgentBuilderStage;
+  sessionStatus: string | null;
+  waiting:
+    | {
+        kind: "question";
+        questionId: string;
+        prompt: string;
+        options: { id: string; label: string }[];
+        /** Why the PM agent left it for a person; null when the person answers everything. */
+        reason: string | null;
+      }
+    | { kind: "brief" }
+    | { kind: "pm_agent" }
+    | null;
+  answers: PmAgentBuilderAnswer[];
+  pullRequests: {
+    repo: string;
+    number: number;
+    url: string;
+    state: string | null;
+    merged: boolean;
+  }[];
+}
 
 /** Closing the loop (spec C5): the metric the idea named, before and after it went live. */
 export interface PmAgentForecast {

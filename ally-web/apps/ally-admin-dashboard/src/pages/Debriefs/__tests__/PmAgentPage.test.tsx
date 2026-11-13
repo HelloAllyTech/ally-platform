@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
@@ -31,6 +31,8 @@ const h = vi.hoisted(() => ({
   permissions: [] as string[],
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
+  builderProgress: vi.fn(),
+  answerBuilder: vi.fn(),
 }));
 
 vi.mock(
@@ -55,6 +57,8 @@ vi.mock("@api", async importOriginal => ({
   useRunPmAgentMutation: () => [h.runPmAgent, { isLoading: false }],
   useScreenIdeaMutation: () => [h.screen, { isLoading: false }],
   useDecideIdeaMutation: () => [h.decide, { isLoading: false }],
+  useGetIdeaBuilderProgressQuery: () => h.builderProgress(),
+  useAnswerIdeaBuilderQuestionMutation: () => [h.answerBuilder, { isLoading: false }],
   useRollbackDebriefReleaseMutation: () => [h.rollback, { isLoading: false }],
   useBuildDebriefTestSetsMutation: () => [h.build, { isLoading: false }],
   useGetDebriefAutonomyQuery: () => h.autonomy(),
@@ -258,9 +262,17 @@ beforeEach(() => {
   h.propose.mockReturnValue(
     resolves({ ideaId: "new-idea", releaseId: "d1", version: 7, budgetOnly: false }),
   );
-  [h.decide, h.rollback, h.screen, h.build, h.approvePinned, h.ask, h.startStep].forEach(f =>
-    f.mockReturnValue(resolves()),
-  );
+  [
+    h.decide,
+    h.rollback,
+    h.screen,
+    h.build,
+    h.approvePinned,
+    h.ask,
+    h.startStep,
+    h.answerBuilder,
+  ].forEach(f => f.mockReturnValue(resolves()));
+  h.builderProgress.mockReturnValue({ data: undefined, isError: false });
   h.runPmAgent.mockReturnValue(resolves({ report: "r", ideas: [] }));
 });
 
@@ -404,36 +416,169 @@ describe("PM agent › Ideas", () => {
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
   });
 
-  it("a Builder brief opens a Builder session only after a person confirms", async () => {
+  const BUILDER_HANDOFF = {
+    kind: "builder",
+    status: "waiting",
+    problem: "Learners never see the Practise-next card on Android.",
+    evidenceSummary: "practise_click_through 0.08 on android (n=60)",
+    expectedEffect: "practise_click_through up",
+    acceptanceChecks: ["The card shows first on Android"],
+  };
+  const forBuilder = (handoff: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) =>
+    state([
+      {
+        ...IDEA,
+        change: { ...IDEA.change, ideaKind: "needs_code", route: "B", find: null },
+        evidence: { commentIds: ["c1", "c2"], handoff: { ...BUILDER_HANDOFF, ...handoff } },
+        ...extra,
+      },
+    ]);
+  const SESSION = "22222222-2222-2222-2222-222222222222";
+  const renderWithBuilder = () =>
+    render(
+      <MemoryRouter initialEntries={["/debriefs/pm-agent"]}>
+        <Routes>
+          <Route path="/debriefs/pm-agent" element={<PmAgentPage />} />
+          <Route path="/builder/:sessionId" element={<p>Builder session page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it("a For Builder idea shows its brief and hands over to the PM agent by default", async () => {
+    h.pmAgent.mockReturnValue(forBuilder());
+    renderPage();
+    const brief = screen.getByTestId("builder-brief");
+    expect(brief).toHaveTextContent("Why");
+    expect(brief).toHaveTextContent("What Builder should build");
+    expect(brief).toHaveTextContent("The card shows first on Android");
+    expect(brief).toHaveTextContent("How we’ll know it worked");
+    expect(screen.getByText(/2 expert comments/)).toBeInTheDocument();
+    const choice = screen.getByTestId("hand-to-builder");
+    expect(within(choice).getByText("Who answers Builder’s questions?")).toBeInTheDocument();
+    expect(within(choice).getByRole("radio", { name: /The PM agent/ })).toBeChecked();
+    expect(within(choice).getByText(/Builder never sees learners’ words/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open a Builder session" })).toBeNull();
+    fireEvent.click(within(choice).getByRole("button", { name: "Hand to Builder" }));
+    await waitFor(() =>
+      expect(h.decide).toHaveBeenCalledWith({
+        id: IDEA.id,
+        decision: "approve",
+        answerer: "pm_agent",
+      }),
+    );
+    expect(h.toastSuccess).toHaveBeenCalledWith(
+      "Handed to Builder. The PM agent is answering its questions.",
+    );
+  });
+
+  it("“I’ll answer them myself” hands over and opens that Builder session", async () => {
+    h.pmAgent.mockReturnValue(forBuilder());
+    h.decide.mockReturnValue(resolves({ stage: "builder", id: SESSION }));
+    renderWithBuilder();
+    fireEvent.click(screen.getByRole("radio", { name: /I’ll answer them myself/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Hand to Builder" }));
+    await waitFor(() => expect(screen.getByText("Builder session page")).toBeInTheDocument());
+    expect(h.decide).toHaveBeenCalledWith({ id: IDEA.id, decision: "approve", answerer: "person" });
+  });
+
+  it("once handed over, shows where Builder is and the question waiting for you", async () => {
     h.pmAgent.mockReturnValue(
-      state([
-        {
-          ...IDEA,
-          change: { ...IDEA.change, ideaKind: "needs_code", route: "B", find: null },
-          evidence: {
-            commentIds: ["c1", "c2"],
-            handoff: {
-              kind: "builder",
-              status: "waiting",
-              problem: "Learners never see the Practise-next card on Android.",
-              evidenceSummary: "practise_click_through 0.08 on android (n=60)",
-              expectedEffect: "practise_click_through up",
-              acceptanceChecks: ["The card shows first on Android"],
-            },
-          },
+      forBuilder(
+        { status: "filed", filedId: SESSION, answerer: "pm_agent" },
+        { status: "approved" },
+      ),
+    );
+    h.builderProgress.mockReturnValue(
+      ok({
+        sessionId: SESSION,
+        answerer: "pm_agent",
+        stage: "interviewing",
+        sessionStatus: "INTERVIEWING",
+        waiting: {
+          kind: "question",
+          questionId: "q7",
+          prompt: "Should organisations without voice-notes see them?",
+          options: [],
+          reason: "The brief does not say which organisations.",
         },
-      ]),
+        answers: [1, 2, 3, 4, 5, 6].map(i => ({
+          questionId: `q${i}`,
+          question: `Question ${i}`,
+          answer: `Answer ${i}`,
+          at: "2026-11-13",
+        })),
+        pullRequests: [],
+      }),
     );
     renderPage();
-    expect(screen.getByTestId("idea-handoff")).toHaveTextContent("The card shows first on Android");
-    expect(screen.getByText(/2 expert comments/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Open a Builder session" }));
-    expect(h.decide).not.toHaveBeenCalled();
-    const buttons = screen.getAllByRole("button", { name: "Open a Builder session" });
-    fireEvent.click(buttons[buttons.length - 1]);
-    await waitFor(() =>
-      expect(h.decide).toHaveBeenCalledWith({ id: IDEA.id, decision: "approve" }),
+    expect(screen.queryByTestId("hand-to-builder")).toBeNull();
+    expect(screen.getByTestId("builder-stage")).toHaveTextContent("In Builder: interviewing");
+    const q = screen.getByTestId("builder-question");
+    expect(q).toHaveTextContent("Builder asks you one question. The PM agent answered 6 of 7.");
+    expect(q).toHaveTextContent("Should organisations without voice-notes see them?");
+    expect(within(q).getByRole("link", { name: "Open the Builder session" })).toHaveAttribute(
+      "href",
+      `/builder/${SESSION}`,
     );
+    fireEvent.click(within(q).getByRole("button", { name: "See the PM agent’s 6 answers" }));
+    expect(screen.getByTestId("builder-pm-answers")).toHaveTextContent("Answer 6");
+    fireEvent.change(within(q).getByLabelText("Your answer"), {
+      target: { value: "Only organisations with voice-notes on." },
+    });
+    fireEvent.click(within(q).getByRole("button", { name: "Send to Builder" }));
+    await waitFor(() =>
+      expect(h.answerBuilder).toHaveBeenCalledWith({
+        id: IDEA.id,
+        questionId: "q7",
+        text: "Only organisations with voice-notes on.",
+      }),
+    );
+  });
+
+  it.each([
+    ["building", "In Builder: building"],
+    ["pr_open", "In Builder: PR open"],
+    ["merged", "In Builder: merged"],
+    ["closed", "In Builder: closed"],
+  ])("maps the Builder stage %s to “%s”", (stage, line) => {
+    h.pmAgent.mockReturnValue(
+      forBuilder({ status: "filed", filedId: SESSION, answerer: "person" }, { status: "approved" }),
+    );
+    h.builderProgress.mockReturnValue(
+      ok({
+        sessionId: SESSION,
+        answerer: "person",
+        stage,
+        sessionStatus: "COMPLETED",
+        waiting: null,
+        answers: [],
+        pullRequests:
+          stage === "pr_open"
+            ? [
+                {
+                  repo: "ally-be",
+                  number: 12,
+                  url: "https://example.test/pr/12",
+                  state: "open",
+                  merged: false,
+                },
+              ]
+            : [],
+      }),
+    );
+    renderPage();
+    expect(screen.getByTestId("builder-stage")).toHaveTextContent(line);
+    expect(screen.getByRole("link", { name: "Open the Builder session" })).toHaveAttribute(
+      "href",
+      `/builder/${SESSION}`,
+    );
+    if (stage === "pr_open") {
+      expect(screen.getByText(/Waiting for a person to review and merge/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Open the pull request" })).toHaveAttribute(
+        "href",
+        "https://example.test/pr/12",
+      );
+    }
   });
 
   it("Bug Hunter's run ids link to their session pages", () => {

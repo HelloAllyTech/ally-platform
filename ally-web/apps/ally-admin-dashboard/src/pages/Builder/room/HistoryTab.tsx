@@ -32,6 +32,7 @@ const highlight = (text: string, q: string): React.ReactNode => {
 
 const byLine = (entry: BuilderHistoryItem): string => {
   if (entry.surface === "rule") return strings.by.rule;
+  if (entry.surface === "requester") return strings.by.requester;
   if (entry.surface === "slack" && !entry.actorName) return strings.by.slack;
   return entry.actorName ?? strings.by.you;
 };
