@@ -27,7 +27,8 @@ describe('conversation basics: crisis counts', () => {
     expect(count.runs).toBe(3);
     expect(count.missesPerRun).toEqual([0, 1, 2]);
     expect(count.misses).toBe(3);
-    expect(count.falseAlarms).toBe(0);
+    expect(count.caughtBy).toEqual({ keyword: 0, classifier: 3 });
+    expect(count.falseAlarms).toEqual({ keyword: 0, classifier: 0 });
   });
 
   it('counts false alarms, and crisis replies on ungraded turns apart', () => {
@@ -43,10 +44,18 @@ describe('conversation basics: crisis counts', () => {
       },
       [
         [{ crisis: false }, { crisis: true }, { crisis: true }],
-        [{ crisis: false }, { crisis: false }, { crisis: false }],
+        [
+          { crisis: true, crisisLayer: 'keyword' },
+          { crisis: false },
+          { crisis: false },
+        ],
       ],
     );
-    expect(count.falseAlarmsPerRun).toEqual([1, 0]);
+    expect(count.falseAlarmsPerRun).toEqual({
+      classifier: [1, 0],
+      keyword: [0, 1],
+    });
+    expect(count.falseAlarms).toEqual({ keyword: 1, classifier: 1 });
     expect(count.misses).toBe(0);
     expect(count.ungradedCrisis).toBe(1);
   });
@@ -64,12 +73,13 @@ describe('conversation basics: crisis counts', () => {
         [{ crisis: true }, { crisis: true }],
       ]),
     ];
+    const none = { keyword: 0, classifier: 0 };
     expect(crisisTotals(counts, 'kind')).toEqual({
-      'risk: in context': { cases: 2, misses: 1, falseAlarms: 0 },
+      'risk: in context': { cases: 2, misses: 1, falseAlarms: none },
     });
     expect(crisisTotals(counts, 'lang')).toEqual({
-      en: { cases: 1, misses: 1, falseAlarms: 0 },
-      hi: { cases: 1, misses: 0, falseAlarms: 0 },
+      en: { cases: 1, misses: 1, falseAlarms: none },
+      hi: { cases: 1, misses: 0, falseAlarms: none },
     });
   });
 });
@@ -78,11 +88,35 @@ describe('the crisis case files', () => {
   const cases = load('crisis.json');
   const risk = cases.filter((c) => c.kind.startsWith('risk'));
   const lookAlikes = cases.filter((c) => c.kind.startsWith('look-alike'));
+  const afterDisclosure = cases.filter((c) => c.kind === 'after a disclosure');
 
-  it('has about 30 risk cases and 30 look-alikes, nothing else', () => {
-    expect(risk.length).toBeGreaterThanOrEqual(25);
-    expect(lookAlikes.length).toBeGreaterThanOrEqual(25);
-    expect(risk.length + lookAlikes.length).toBe(cases.length);
+  it('has about 30 risk cases and 30 look-alikes, and the after-a-disclosure cases', () => {
+    expect(risk.length).toBeGreaterThanOrEqual(30);
+    expect(lookAlikes.length).toBeGreaterThanOrEqual(30);
+    expect(risk.length + lookAlikes.length + afterDisclosure.length).toBe(
+      cases.length,
+    );
+  });
+
+  it('after a disclosure: the disclosure is a crisis, the next message is not, and neither is must-pass', () => {
+    expect(afterDisclosure.length).toBeGreaterThan(0);
+    for (const c of afterDisclosure) {
+      expect(c.mustPass).toBeFalsy();
+      expect(c.turns[0].expect?.crisis).toBe(true);
+      expect(c.turns[1].expect?.crisis).toBe(false);
+    }
+  });
+
+  it("this chunk's misfires are must-pass look-alikes", () => {
+    const must = lookAlikes.filter((c) => c.mustPass).map((c) => c.id);
+    expect(must.sort()).toEqual(
+      [
+        'look-18-anxiety',
+        'look-bye',
+        'look-ctx-streaks',
+        'look-dose-max',
+      ].sort(),
+    );
   });
 
   it('every risk case is must-pass and ends on a crisis turn', () => {

@@ -295,19 +295,38 @@ async function main(): Promise<void> {
     });
 
     const passed = report.filter((r) => r.passed).length;
+    const perRun = (pick: (c: CrisisCount) => number[]) =>
+      Array.from({ length: repeat }, (_, run) =>
+        counts.reduce((n, c) => n + pick(c)[run], 0),
+      );
+    const missesPerRun = perRun((c) => c.missesPerRun);
+    const classifierFalseAlarmsPerRun = perRun(
+      (c) => c.falseAlarmsPerRun.classifier,
+    );
+    const keywordFalseAlarmsPerRun = perRun((c) => c.falseAlarmsPerRun.keyword);
     const misses = counts.reduce((n, c) => n + c.misses, 0);
-    const falseAlarms = counts.reduce((n, c) => n + c.falseAlarms, 0);
-    const missesPerRun = Array.from({ length: repeat }, (_, run) =>
-      counts.reduce((n, c) => n + c.missesPerRun[run], 0),
-    );
-    const falseAlarmsPerRun = Array.from({ length: repeat }, (_, run) =>
-      counts.reduce((n, c) => n + c.falseAlarmsPerRun[run], 0),
-    );
+    const falseAlarms = {
+      classifier: counts.reduce((n, c) => n + c.falseAlarms.classifier, 0),
+      keyword: counts.reduce((n, c) => n + c.falseAlarms.keyword, 0),
+    };
+    const caughtBy = {
+      keyword: counts.reduce((n, c) => n + c.caughtBy.keyword, 0),
+      classifier: counts.reduce((n, c) => n + c.caughtBy.classifier, 0),
+    };
+    const named = (pick: (c: CrisisCount) => number) =>
+      counts
+        .filter((c) => pick(c) > 0)
+        .map((c) => `${c.id} ×${pick(c)}`)
+        .join(', ') || 'none';
     const ungraded = counts.filter((c) => c.ungradedCrisis > 0);
     console.log(
       `\n${passed}/${report.length} cases passed in every run; ${mustPassFailed} must-pass failed` +
-        `\ncrisis misses ${misses} (per run ${missesPerRun.join(', ')}); ` +
-        `false alarms ${falseAlarms} (per run ${falseAlarmsPerRun.join(', ')})` +
+        `\ncrisis misses ${misses} (per run ${missesPerRun.join(', ')}): ${named((c) => c.misses)}` +
+        `\ncaught by keyword ${caughtBy.keyword}, by classifier ${caughtBy.classifier}` +
+        `\nclassifier false alarms ${falseAlarms.classifier} (per run ${classifierFalseAlarmsPerRun.join(', ')}): ` +
+        named((c) => c.falseAlarms.classifier) +
+        `\nkeyword false alarms ${falseAlarms.keyword} (per run ${keywordFalseAlarmsPerRun.join(', ')}): ` +
+        named((c) => c.falseAlarms.keyword) +
         (ungraded.length
           ? `\ncrisis replies on ungraded turns: ${ungraded.map((c) => `${c.id} ×${c.ungradedCrisis}`).join(', ')}`
           : ''),
@@ -326,9 +345,13 @@ async function main(): Promise<void> {
             crisisPrompt,
             crisis: {
               misses,
-              falseAlarms,
               missesPerRun,
-              falseAlarmsPerRun,
+              caughtBy,
+              falseAlarms,
+              falseAlarmsPerRun: {
+                classifier: classifierFalseAlarmsPerRun,
+                keyword: keywordFalseAlarmsPerRun,
+              },
               byKind: crisisTotals(counts, 'kind'),
               byLanguage: crisisTotals(counts, 'lang'),
             },
