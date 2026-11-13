@@ -33,7 +33,7 @@ import {
 import { PM_HOLD_DAYS } from '../util/debrief-outcome.util';
 import {
   changeEvidenceRefusal,
-  introducedInstructionPattern,
+  introducedInjectionPattern,
 } from '../util/debrief-pm-agent-rules.util';
 import {
   metricValues,
@@ -1862,7 +1862,7 @@ export function selfMadeEditProblem(idea: Record<string, any>): string | null {
     Number(draft.tenants) || 0,
   );
   if (short) return `${short.reason}; draft it again with release_draft`;
-  const pattern = introducedInstructionPattern(
+  const pattern = introducedInjectionPattern(
     String(idea.change?.find ?? ''),
     String(idea.change?.replace ?? ''),
   );

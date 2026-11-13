@@ -313,20 +313,35 @@ export const GUIDANCE_COPY_WORDS = 6;
  * for a counsellor (plan §11.6 "instruction-pattern filter"): a passage the
  * Writer reads must not be able to steer it.
  */
+/** A standing direction ("never say…"): the normal shape of a prompt's own text. */
+const DIRECTION_PATTERN =
+  /\b(always|never) (respond|reply|answer|output|say)\b/i;
+/** A {variable}: in prompt text, policed by the prompt contract and the variable check. */
+const VARIABLE_PATTERN = /\{[a-z_][a-z0-9_]*\}/i;
 const INSTRUCTION_PATTERNS: RegExp[] = [
   /\bignore\b.{0,30}\b(instruction|rule|prompt|above|previous)/i,
   /\b(disregard|override|bypass)\b.{0,30}\b(instruction|rule|prompt|guideline|safety)/i,
   /\bsystem prompt\b/i,
   /\byou are (now |an? )?(ai|assistant|model|chatbot|language model)\b/i,
   /\b(as an ai|as a language model)\b/i,
-  /\b(always|never) (respond|reply|answer|output|say)\b/i,
+  DIRECTION_PATTERN,
   /\b(do not|don't) (mention|reveal|tell)\b.{0,30}\b(instruction|prompt|rule)/i,
   /<\/?(system|assistant|user|instructions?)>/i,
   /\[\/?(inst|system)\]/i,
   /<\|[a-z_]+\|>/i,
   /```/,
-  /\{[a-z_][a-z0-9_]*\}/i,
+  VARIABLE_PATTERN,
 ];
+
+/**
+ * The injection-style subset (R2-18) for text that is addressed to a model by
+ * design: prompt edits and a system-made agent's manifest. Directions and
+ * {variables} are a prompt's normal content there; attempts to override,
+ * re-role or break out of the prompt are not. Guidance keeps the full list.
+ */
+const INJECTION_PATTERNS: RegExp[] = INSTRUCTION_PATTERNS.filter(
+  (p) => p !== DIRECTION_PATTERN && p !== VARIABLE_PATTERN,
+);
 
 /** The first instruction-like pattern in a draft, or null. */
 export function instructionPatternIn(text: string): string | null {
@@ -423,15 +438,15 @@ export function changeEvidenceRefusal(
 }
 
 /**
- * The first instruction-like pattern that `after` has more of than `before`,
- * or null. A prompt edit is judged on what it adds: a prompt already holds
- * its {variables} and directions, and keeping them is not a new instruction.
+ * The first injection-style pattern (`INJECTION_PATTERNS`) that `after` has
+ * more of than `before`, or null. A prompt edit is judged on what it adds, so
+ * a pattern the prompt already held is not counted as new.
  */
-export function introducedInstructionPattern(
+export function introducedInjectionPattern(
   before: string,
   after: string,
 ): string | null {
-  for (const p of INSTRUCTION_PATTERNS) {
+  for (const p of INJECTION_PATTERNS) {
     const g = new RegExp(
       p.source,
       p.flags.includes('g') ? p.flags : `${p.flags}g`,

@@ -25,7 +25,7 @@ import {
   copiesSessionText,
   guidanceEvidenceRefusal,
   instructionPatternIn,
-  introducedInstructionPattern,
+  introducedInjectionPattern,
   introducesSessionText,
   ROUTE_KIND,
   settingRefusal,
@@ -538,7 +538,7 @@ export class DebriefPmAgentToolsService {
     const { learners, tenants } = this.countEvidence(runs);
     const short = changeEvidenceRefusal(what, learners, tenants);
     if (short) throw new Refused(short);
-    const pattern = introducedInstructionPattern(before ?? '', after ?? '');
+    const pattern = introducedInjectionPattern(before ?? '', after ?? '');
     if (pattern) {
       refuse(
         `${what} must not add instructions that steer or override a model ("${pattern}"); say what the debrief should do in plain words`,
