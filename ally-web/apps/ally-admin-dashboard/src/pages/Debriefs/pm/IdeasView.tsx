@@ -42,6 +42,7 @@ const GROUP_DOT: Record<IdeaGroup, string> = {
   canary: "bg-success-400",
   testing: "bg-neutral-400",
   promoted: "bg-success-600",
+  handed: "bg-primary-100",
   rejected: "bg-neutral-200",
   expired: "bg-neutral-200",
   reverted: "bg-destructive-300",

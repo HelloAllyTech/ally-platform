@@ -192,11 +192,15 @@ export const IdeaCard: React.FC<{
         ? pr.approvedStatus
         : group === "expired"
           ? p.expired
-          : group === "promoted"
-            ? idea.releaseStatus === "ga"
-              ? s.ideaStatus.active
-              : s.noLongerLive
-            : (p.groupStatus[group] ?? s.ideaStatus[idea.status] ?? idea.status);
+          : group === "handed"
+            ? (p.handedStatus[
+                idea.closedReason === "answered" ? "answered" : (idea.evidence.handoff?.kind ?? "")
+              ] ?? p.groups.handed)
+            : group === "promoted"
+              ? idea.releaseStatus === "ga"
+                ? s.ideaStatus.active
+                : s.noLongerLive
+              : (p.groupStatus[group] ?? s.ideaStatus[idea.status] ?? idea.status);
   const draft = open
     ? (idea.draftRelease?.version ??
       (idea.releaseVersion != null && idea.releaseStatus !== "ga" ? idea.releaseVersion : null))

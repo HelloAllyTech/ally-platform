@@ -24,11 +24,12 @@ export type IdeaGroup =
   | "canary"
   | "testing"
   | "promoted"
+  | "handed"
   | "rejected"
   | "expired"
   | "reverted";
 export const OPEN_GROUPS: IdeaGroup[] = ["needs", "canary", "testing"];
-export const CLOSED_GROUPS: IdeaGroup[] = ["promoted", "rejected", "expired", "reverted"];
+export const CLOSED_GROUPS: IdeaGroup[] = ["promoted", "handed", "rejected", "expired", "reverted"];
 export const IDEA_GROUPS: IdeaGroup[] = [...OPEN_GROUPS, ...CLOSED_GROUPS];
 
 const expired = (idea: PmAgentIdeaRow) =>
@@ -53,8 +54,10 @@ export const needsViewer = (idea: PmAgentIdeaRow, access: DebriefAccess): boolea
 const CLOSED_AS: Record<string, IdeaGroup> = {
   promoted: "promoted",
   signed_off: "promoted",
-  handed_off: "promoted",
-  answered: "promoted",
+  // Handed to Builder or Bug Hunter, or answered by a person: nothing went live, so never
+  // "Live for everyone" (a Builder hand-off's progress shows on its card).
+  handed_off: "handed",
+  answered: "handed",
   rejected: "rejected",
   withdrawn: "rejected",
   did_not_pass: "rejected",

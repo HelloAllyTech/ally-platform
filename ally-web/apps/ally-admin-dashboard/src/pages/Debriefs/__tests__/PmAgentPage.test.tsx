@@ -949,6 +949,43 @@ describe("PM agent › Ideas", () => {
     expect(screen.getByTestId("release-detail")).toBeInTheDocument();
   });
 
+  it("a handed-on idea is Handed on, tagged With Builder, never Live for everyone", () => {
+    h.pmAgent.mockReturnValue(
+      state([
+        {
+          ...IDEA,
+          id: "b1",
+          title: "Show the session language",
+          status: "approved",
+          state: "closed",
+          closedReason: "handed_off",
+          change: { ...IDEA.change, ideaKind: "needs_code", route: "B", find: null },
+          evidence: {
+            commentIds: [],
+            handoff: {
+              kind: "builder",
+              status: "filed",
+              filedId: "22222222-2222-2222-2222-222222222222",
+              answerer: "pm_agent",
+              problem: "Reviewers cannot see the session language.",
+              acceptanceChecks: ["The language shows beside the title"],
+            },
+          },
+        },
+      ]),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Closed · 1" }));
+    expect(screen.getByTestId("idea-group-promoted")).not.toHaveTextContent(
+      "Show the session language",
+    );
+    const group = screen.getByTestId("idea-group-handed");
+    expect(group).toHaveTextContent("Handed on");
+    fireEvent.click(within(group).getByRole("button"));
+    expect(screen.getByText("With Builder")).toBeInTheDocument();
+    expect(screen.queryByText("No longer live")).toBeNull();
+  });
+
   it("proposes a change as a draft release, which opens as an idea", async () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Propose a change" }));

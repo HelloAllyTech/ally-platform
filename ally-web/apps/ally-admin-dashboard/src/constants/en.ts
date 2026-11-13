@@ -10386,6 +10386,12 @@ export const en = {
         rejected: "Rejected",
         reverted: "Reverted",
       } as Record<string, string>,
+      /** A closed hand-off's tag, by where it went. */
+      handedStatus: {
+        builder: "With Builder",
+        bug_hunter: "With Bug Hunter",
+        answered: "Answered",
+      } as Record<string, string>,
       becameRelease: (v: number) => `Became release v${v}`,
       seeRelease: "See the release",
       propose: {
@@ -10461,6 +10467,7 @@ export const en = {
         canary: "Trying on learners",
         testing: "Being tested",
         promoted: "Live for everyone",
+        handed: "Handed on",
         rejected: "Rejected or withdrawn",
         expired: "Expired (no decision)",
         reverted: "Reverted",
