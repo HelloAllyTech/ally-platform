@@ -127,3 +127,28 @@ ally-web budget.
   on the next attempt; notes reach the suggested-fix report; ≤ 3 enforced; scrubbed.
 - No paid run until you say so. The first paid check is the 6 dev cases that reached
   review today (≈ $3, about 1 h on 2 shards), then the full dev set.
+
+## Results: built 2026-11-13 (1cec611da), first check run 43444467830 ($3.14)
+
+The 7 dev cases that reached review in run 43368994787, re-run with review.v4 and
+`output_mode: suggested_fix`:
+
+| Case | Verdicts | ce p/k/f/d | Ended | Oracle | Before (review.v3) |
+|---|---|---|---|---|---|
+| ally-be-89d8e055 | counterexamples, approve | 1/1/1/0 | suggested fix, 2 attempts | fail | PR, fail |
+| ally-web-9299e9aa | approve (note: magic number 20) | – | suggested fix | fail | escalated (wall clock) |
+| ally-web-f35e117d | approve | – | suggested fix | fail | PR, fail |
+| ally-ai-b680c643 | approve | – | suggested fix | **pass** | PR, fail |
+| ally-web-e5ad37b3 | approve | – | suggested fix | pass | PR, pass |
+| ally-ai-learn-1065743a | – | – | escalated (repro: collection error) | – | PR, pass |
+| ally-be-99584ee6 | – | – | no bug (missed) | – | PR, fail |
+
+- Fix pass among reviewed cases 2/5 (was 2/6). b680c643 flipped to pass, as predicted:
+  no opinion could replace its correct first fix.
+- The one counterexample was valid for the agent's own hypothesis (fullwidth brackets
+  around audio tags) and broadened the fix. But the real bug is zero-width spaces, so
+  the hypothesis was wrong and the oracle still fails. Counterexamples cannot correct a
+  wrong hypothesis that the report allows.
+- No disputes (0 of 5 reviewed runs).
+- The two losses (1065743a, 99584ee6) happened before review: reproduce and investigate
+  vary between runs.
