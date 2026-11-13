@@ -16,7 +16,7 @@ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
  *   person; no group holds it (1981900780000 revoked it from the platform
  *   groups). Advisor routes accept it on its own, without `system:access`.
  * - OWNER: `manage:admin:debrief-settings` (SUPER_DUPER_ADMIN, or person by
- *   person).
+ *   person through the DEBRIEF_OWNER group).
  */
 const TEAM = PERMISSIONS.SYSTEM_ACCESS;
 const ADVISOR = PERMISSIONS.REVIEW_DEBRIEFS;
@@ -42,7 +42,7 @@ export const DEBRIEF_ACTIONS = {
   /** Urgent, so not owner-only. */
   emergencyStop: [TEAM, OWNER],
   /** Agent logs: every agent's exact input and full reply (the whole transcript). */
-  agentLogs: [TEAM],
+  agentLogs: [TEAM, OWNER],
   /** Budgets, test thresholds, accepting proposed values, autonomy unlocks, steering weights. */
   ownerSettings: [OWNER],
 } as const satisfies Record<string, readonly string[]>;

@@ -733,52 +733,79 @@ export const en = {
       "At times, the bot may be unresponsive, or have unusual lag times. We are always working to improve the experience!",
     startSession: "Start Session",
   },
-  clinicalAdvisors: {
-    title: "Clinical advisors",
+  debriefAccess: {
+    title: "Debrief access",
     intro:
-      "Clinical advisors review debriefs from every organisation and receive escalations. Adding someone gives them only this access; everything else they hold stays as it is.",
-    loadFailed: "Couldn't load the clinical advisors",
+      "People who review or run debriefs across every organisation. Clinical advisors review debriefs and receive escalations; the Debrief owner manages debrief settings, releases and the PM agent. Adding a role gives only that access; everything else a person holds stays as it is.",
+    loadFailed: "Couldn't load who has debrief access",
     loadFailedHelp: "Reload the page to try again.",
-    none: "No clinical advisors yet",
-    noneHelp: "Use “Add an advisor” to give someone access.",
+    none: "No one has debrief access yet",
+    noneHelp: "Use “Add a person” to give someone a debrief role.",
     columns: {
       name: "Name",
       email: "Email",
       organisation: "Organisation",
+      debriefRoles: "Debrief roles",
       roles: "Other roles",
-      actions: "",
     },
+    roleLabels: { advisor: "Clinical advisor", owner: "Debrief owner" },
+    noDebriefRole: "None",
     noOtherRoles: "None",
     moreRoles: (n: number) => `+${n}`,
-    remove: "Remove",
-    add: "Add",
+    moreActions: "More actions",
+    makeAdvisor: "Make clinical advisor",
+    removeAdvisor: "Remove clinical advisor",
+    makeOwner: "Make Debrief owner",
+    removeOwner: "Remove Debrief owner",
     fix: "Fix access",
-    addHeading: "Add an advisor",
+    addPerson: "Add a person",
+    addAs: "Add…",
+    addAsAdvisor: "Add as clinical advisor",
+    addAsOwner: "Add as Debrief owner",
     searchLabel: "Find a person by name or email",
     searchPlaceholder: "Type at least 3 letters",
     searching: "Searching…",
     noMatches: "No one matches.",
     searchFailed: "Couldn't search. Try again.",
-    alreadyAdvisor: "Already an advisor",
-    needsConsole: "Needs the advisor's console access",
-    needsRole: "Has console access but not the advisor role",
-    addTitle: "Add a clinical advisor?",
-    addBody: (name: string, roles: string) =>
-      roles
-        ? `Make ${name} a clinical advisor? They keep their current roles: ${roles}.`
-        : `Make ${name} a clinical advisor?`,
-    addConfirm: "Make advisor",
-    removeTitle: "Remove a clinical advisor?",
-    removeBody: (name: string) =>
-      `Remove ${name} as a clinical advisor? They keep their other roles.`,
-    removeConfirm: "Remove advisor",
+    hasBoth: "Has both debrief roles",
+    needsConsole: "Needs the debrief console access",
+    needsRole: "Has console access but no debrief role",
+    confirm: {
+      addAdvisorTitle: "Add a clinical advisor?",
+      addAdvisor: (name: string, roles: string) =>
+        roles
+          ? `Make ${name} a clinical advisor? They keep their current roles: ${roles}.`
+          : `Make ${name} a clinical advisor?`,
+      addAdvisorLabel: "Make clinical advisor",
+      removeAdvisorTitle: "Remove a clinical advisor?",
+      removeAdvisor: (name: string) =>
+        `Remove ${name} as a clinical advisor? They keep their other roles.`,
+      removeAdvisorLabel: "Remove clinical advisor",
+      addOwnerTitle: "Make the Debrief owner?",
+      addOwner: (name: string, roles: string) =>
+        roles
+          ? `Make ${name} the Debrief owner? They keep their current roles: ${roles}.`
+          : `Make ${name} the Debrief owner?`,
+      addOwnerLabel: "Make Debrief owner",
+      removeOwnerTitle: "Remove the Debrief owner?",
+      removeOwner: (name: string) =>
+        `Remove Debrief owner from ${name}? They keep their other roles.`,
+      removeOwnerLabel: "Remove Debrief owner",
+    },
     cancel: "Cancel",
-    added: (name: string) => `${name} is now a clinical advisor`,
-    removed: (name: string) => `${name} is no longer a clinical advisor`,
-    addFailed: "Couldn't add the advisor",
-    removeFailed: "Couldn't remove the advisor",
+    done: {
+      addAdvisor: (name: string) => `${name} is now a clinical advisor`,
+      removeAdvisor: (name: string) => `${name} is no longer a clinical advisor`,
+      addOwner: (name: string) => `${name} is now the Debrief owner`,
+      removeOwner: (name: string) => `${name} is no longer the Debrief owner`,
+    },
+    failed: {
+      add: "Couldn't add the role",
+      remove: "Couldn't remove the role",
+    },
     roleNames: {
       CLINICAL_ADVISOR: "Clinical advisor",
+      DEBRIEF_OWNER: "Debrief owner",
       SUPER_DUPER_ADMIN: "Platform owner",
       SUPER_ADMIN: "Super admin",
       MULTI_TENANT_ADMIN: "Multi-organisation admin",

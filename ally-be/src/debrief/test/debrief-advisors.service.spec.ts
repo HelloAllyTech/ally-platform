@@ -119,3 +119,58 @@ describe('DebriefAdvisorsService', () => {
     ]);
   });
 });
+
+describe('DebriefAdvisorsService: Debrief owner', () => {
+  it('adds only DEBRIEF_OWNER and the console toggle', async () => {
+    const { svc, groups, toggles, audit } = setup({
+      ...ankita,
+      roles: ['PLATFORM_ADMIN', 'SUPER_ADMIN'],
+    });
+    const after = await svc.add(7, 1, 'owner');
+    expect(groups.assignRole).toHaveBeenCalledWith({
+      role: 'DEBRIEF_OWNER',
+      userId: 7,
+    });
+    expect(after.roles).toEqual([
+      'DEBRIEF_OWNER',
+      'PLATFORM_ADMIN',
+      'SUPER_ADMIN',
+    ]);
+    expect(after.owner).toBe(true);
+    expect(after.advisor).toBe(false);
+    expect(toggles.setToggles).toHaveBeenCalledTimes(1);
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'DEBRIEF_OWNER_ADDED' }),
+    );
+  });
+
+  it('keeps the console toggle when removing one role while the other remains', async () => {
+    const { svc, groups, toggles } = setup({
+      ...ankita,
+      roles: ['CLINICAL_ADVISOR', 'DEBRIEF_OWNER', 'PLATFORM_ADMIN'],
+      sign_off: true,
+    });
+    const after = await svc.remove(7, 1, 'owner');
+    expect(groups.removeRole).toHaveBeenCalledWith({
+      role: 'DEBRIEF_OWNER',
+      userId: 7,
+    });
+    expect(toggles.setToggles).not.toHaveBeenCalled();
+    expect(after.roles).toEqual(['CLINICAL_ADVISOR', 'PLATFORM_ADMIN']);
+    expect(after.signOff).toBe(true);
+  });
+
+  it('turns the console toggle off when the last debrief role goes', async () => {
+    const { svc, toggles } = setup({
+      ...ankita,
+      roles: ['DEBRIEF_OWNER', 'PLATFORM_ADMIN'],
+      sign_off: true,
+    });
+    await svc.remove(7, 1, 'owner');
+    expect(toggles.setToggles).toHaveBeenCalledWith(
+      7,
+      [{ featureKey: 'debrief_clinical_sign_off', enabled: false }],
+      1,
+    );
+  });
+});

@@ -299,12 +299,15 @@ export const ApiEndpoints = {
     ASSIGN: "/v1/platform-admins",
     REMOVE: (userId: number) => `/v1/platform-admins/${userId}`,
   },
-  // User Management › Clinical advisors (gated by admin_user_management, like Ally admins).
+  // User Management › Debrief access: the Clinical advisor and Debrief owner roles (gated by
+  // admin_user_management, like Ally admins).
   CLINICAL_ADVISORS: {
     LIST: "/v1/clinical-advisors",
     SEARCH: "/v1/clinical-advisors/search",
     ADD: (userId: number) => `/v1/clinical-advisors/${userId}`,
     REMOVE: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    // The Debrief owner role, on the same page and gate.
+    OWNER: (userId: number) => `/v1/clinical-advisors/${userId}/owner`,
   },
   SUPER_DUPER_ADMINS: {
     LIST: "/v1/super-duper-admins",

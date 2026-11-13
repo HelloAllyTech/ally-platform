@@ -115,7 +115,9 @@ export enum TabType {
   ORGANIZATIONS = "organizations",
   // Super-admin-tier management tab, visible to super duper admins only.
   SUPER_ADMINS = "super-admins",
-  // Clinical advisors (Debriefs), gated like Ally admins.
+  // Debrief access (Clinical advisor and Debrief owner roles), gated like Ally admins.
+  DEBRIEF_ACCESS = "debrief-access",
+  // The tab's id before it was renamed; old links still open it.
   CLINICAL_ADVISORS = "clinical-advisors",
   // Which organisation a WhatsApp number belongs to. Lives here because it is about people,
   // gated on the WhatsApp bot's own permission because it decides whose documents answer them.

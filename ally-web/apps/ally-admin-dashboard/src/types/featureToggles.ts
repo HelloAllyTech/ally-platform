@@ -30,6 +30,8 @@ export interface ClinicalAdvisorPerson {
   roles: string[];
   /** Holds the clinical advisor role. */
   advisor: boolean;
+  /** Holds the Debrief owner role (Debrief settings, releases, the PM agent). */
+  owner: boolean;
   /** Has the "Debriefs — Clinical advisor" console access. */
   signOff: boolean;
 }

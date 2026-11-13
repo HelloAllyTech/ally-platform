@@ -21,7 +21,8 @@ import { DebriefAdvisorsService } from '../service/debrief-advisors.service';
 type AuthedRequest = { user: { id: number } };
 
 /**
- * User Management › Clinical advisors: add and remove clinical advisors.
+ * User Management › Clinical advisors: add and remove clinical advisors and
+ * Debrief owners.
  * Gated exactly like User Management › Ally admins (the
  * `admin_user_management` toggle): the advisor role is platform-managed and
  * reaches every organisation, so it is granted where Ally admins are.
@@ -73,5 +74,30 @@ export class DebriefAdvisorsController {
     @Req() req: AuthedRequest,
   ) {
     return this.advisors.remove(userId, req.user.id);
+  }
+
+  @Put(':userId/owner')
+  @RequireFeatureToggle(FeatureToggleKey.ADMIN_USER_MANAGEMENT)
+  @ApiOperation({
+    summary:
+      'Make a person the Debrief owner (settings, releases, PM agent, Agent logs). Adds only that role; nothing else they hold changes.',
+  })
+  addOwner(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.advisors.add(userId, req.user.id, 'owner');
+  }
+
+  @Delete(':userId/owner')
+  @RequireFeatureToggle(FeatureToggleKey.ADMIN_USER_MANAGEMENT)
+  @ApiOperation({
+    summary: 'Stop a person being the Debrief owner. Removes only that role.',
+  })
+  removeOwner(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.advisors.remove(userId, req.user.id, 'owner');
   }
 }

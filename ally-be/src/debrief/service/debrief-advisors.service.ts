@@ -14,22 +14,51 @@ export interface DebriefAdvisorPerson {
   /** Every group the person holds, so the owner sees nothing else changes. */
   roles: string[];
   advisor: boolean;
-  /** The "Debriefs — Clinical advisor" access toggle. */
+  /** Holds the DEBRIEF_OWNER role (Debrief settings, releases, PM agent, Agent logs). */
+  owner: boolean;
+  /** The "Debriefs — Clinical advisor" toggle: what opens the console to someone without platform access. */
   signOff: boolean;
 }
 
+/** The two debrief roles this page grants. */
+export type DebriefRoleKind = 'advisor' | 'owner';
+
 const ADVISOR_GROUP = UserRole.CLINICAL_ADVISOR;
+const OWNER_GROUP = UserRole.DEBRIEF_OWNER;
 const SIGN_OFF = FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF;
 
+const ROLE: Record<
+  DebriefRoleKind,
+  {
+    group: UserRole;
+    added: 'CLINICAL_ADVISOR_ADDED' | 'DEBRIEF_OWNER_ADDED';
+    removed: 'CLINICAL_ADVISOR_REMOVED' | 'DEBRIEF_OWNER_REMOVED';
+  }
+> = {
+  advisor: {
+    group: ADVISOR_GROUP,
+    added: 'CLINICAL_ADVISOR_ADDED',
+    removed: 'CLINICAL_ADVISOR_REMOVED',
+  },
+  owner: {
+    group: OWNER_GROUP,
+    added: 'DEBRIEF_OWNER_ADDED',
+    removed: 'DEBRIEF_OWNER_REMOVED',
+  },
+};
+
 /**
- * Clinical advisors (User Management › Clinical advisors). The advisor's
- * access is two things: the CLINICAL_ADVISOR group (the
- * `review:admin:debriefs` permission) and the "Debriefs — Clinical advisor"
- * toggle that opens the console to someone without platform access. The
- * generic role picker can't grant the group (PLATFORM_MANAGED_ROLES), so it is
- * granted here, next to Ally admins. Adding and removing touch only these two; every
- * other group and toggle the person holds stays as it is. Both writes bust
- * the person's cached permissions and are audited.
+ * Debrief roles (User Management › Clinical advisors), granted person by person
+ * because both reach every organisation's debriefs:
+ * - Clinical advisor: the CLINICAL_ADVISOR group (`review:admin:debriefs`).
+ * - Debrief owner: the DEBRIEF_OWNER group (`manage:admin:debrief-settings`).
+ * Either one also needs the "Debriefs — Clinical advisor" toggle, which opens
+ * the console to someone without platform access; it is turned on with the
+ * first role and off only when neither is left. The generic role picker can't
+ * grant these groups (PLATFORM_MANAGED_ROLES). Adding and removing touch only
+ * the role's group and that toggle; every other group and toggle the person
+ * holds stays as it is. Every write busts the person's cached permissions and
+ * is audited.
  */
 @Injectable()
 export class DebriefAdvisorsService {
@@ -62,27 +91,29 @@ export class DebriefAdvisorsService {
         LIMIT 20`,
       [SIGN_OFF, ...params],
     );
-    return rows.map(
-      (r): DebriefAdvisorPerson => ({
+    return rows.map((r): DebriefAdvisorPerson => {
+      const roles = r.roles ?? [];
+      return {
         userId: r.id,
         name: r.name,
         email: r.email,
         organisation: r.organisation,
-        roles: r.roles ?? [],
-        advisor: (r.roles ?? []).includes(ADVISOR_GROUP),
+        roles,
+        advisor: roles.includes(ADVISOR_GROUP),
+        owner: roles.includes(OWNER_GROUP),
         signOff: r.sign_off === true,
-      }),
-    );
+      };
+    });
   }
 
-  /** Everyone holding the advisor group or the advisor toggle. */
+  /** Everyone holding a debrief role or the console toggle. */
   list(): Promise<DebriefAdvisorPerson[]> {
     return this.people(
       `EXISTS (SELECT 1 FROM user_groups ug JOIN groups g ON g.id = ug."groupId"
-                WHERE ug."userId" = u.id AND g.name = $2)
+                WHERE ug."userId" = u.id AND g.name IN ($2, $3))
        OR EXISTS (SELECT 1 FROM admin_feature_toggles f
                    WHERE f."userId" = u.id AND f."featureKey" = $1 AND f.enabled)`,
-      [ADVISOR_GROUP],
+      [ADVISOR_GROUP, OWNER_GROUP],
     );
   }
 
@@ -100,22 +131,33 @@ export class DebriefAdvisorsService {
     return p;
   }
 
-  /** Grant the advisor's access. Nothing else the person holds changes. */
-  async add(userId: number, actingUserId: number) {
+  private async setSignOff(
+    userId: number,
+    enabled: boolean,
+    actingUserId: number,
+  ) {
+    await this.toggles.setToggles(
+      userId,
+      [{ featureKey: SIGN_OFF, enabled }],
+      actingUserId,
+    );
+  }
+
+  /** Grant one debrief role (default: clinical advisor). Nothing else the person holds changes. */
+  async add(
+    userId: number,
+    actingUserId: number,
+    kind: DebriefRoleKind = 'advisor',
+  ) {
+    const role = ROLE[kind];
     const before = await this.one(userId);
-    if (!before.advisor) {
-      await this.groups.assignRole({ role: ADVISOR_GROUP, userId });
+    if (!before.roles.includes(role.group)) {
+      await this.groups.assignRole({ role: role.group, userId });
     }
-    if (!before.signOff) {
-      await this.toggles.setToggles(
-        userId,
-        [{ featureKey: SIGN_OFF, enabled: true }],
-        actingUserId,
-      );
-    }
+    if (!before.signOff) await this.setSignOff(userId, true, actingUserId);
     const after = await this.one(userId);
     await this.audit.log({
-      eventType: 'CLINICAL_ADVISOR_ADDED',
+      eventType: role.added,
       userId: actingUserId,
       details: {
         targetUserId: userId,
@@ -126,27 +168,32 @@ export class DebriefAdvisorsService {
     return after;
   }
 
-  /** Take the advisor's access away. Nothing else the person holds changes. */
-  async remove(userId: number, actingUserId: number) {
+  /**
+   * Take one debrief role away. Nothing else the person holds changes; the
+   * console toggle goes only when they hold neither debrief role any more.
+   */
+  async remove(
+    userId: number,
+    actingUserId: number,
+    kind: DebriefRoleKind = 'advisor',
+  ) {
+    const role = ROLE[kind];
+    const other = ROLE[kind === 'advisor' ? 'owner' : 'advisor'].group;
     const before = await this.one(userId);
-    if (before.advisor) {
+    if (before.roles.includes(role.group)) {
       if (before.roles.length <= 1) {
         throw new BadRequestException(
           'This person has no other role; give them one first',
         );
       }
-      await this.groups.removeRole({ role: ADVISOR_GROUP, userId });
+      await this.groups.removeRole({ role: role.group, userId });
     }
-    if (before.signOff) {
-      await this.toggles.setToggles(
-        userId,
-        [{ featureKey: SIGN_OFF, enabled: false }],
-        actingUserId,
-      );
+    if (before.signOff && !before.roles.includes(other)) {
+      await this.setSignOff(userId, false, actingUserId);
     }
     const after = await this.one(userId);
     await this.audit.log({
-      eventType: 'CLINICAL_ADVISOR_REMOVED',
+      eventType: role.removed,
       userId: actingUserId,
       details: {
         targetUserId: userId,

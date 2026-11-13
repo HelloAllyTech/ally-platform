@@ -33,9 +33,9 @@ vi.mock("@api", async importOriginal => ({
   useGetTenantsQuery: () => ({ data: undefined }),
 }));
 
-// The tab's own behaviour is covered in ClinicalAdvisors.test.tsx; here only whether it shows.
-vi.mock("../../ClinicalAdvisors/ClinicalAdvisors", () => ({
-  ClinicalAdvisors: () => <div data-testid="clinical-advisors-tab" />,
+// The tab's own behaviour is covered in DebriefAccess.test.tsx; here only whether it shows.
+vi.mock("../../DebriefAccess/DebriefAccess", () => ({
+  DebriefAccess: () => <div data-testid="debrief-access-tab" />,
 }));
 
 // Mock components
@@ -733,26 +733,40 @@ describe("UserManagement", () => {
     });
   });
 
-  // Clinical advisors sits next to Ally admins and is gated exactly like it.
-  describe("Clinical advisors tab", () => {
-    it("shows next to Ally admins with Admin User Management", () => {
+  // Debrief access (formerly Clinical advisors) sits next to Ally admins and is gated exactly
+  // like it.
+  describe("Debrief access tab", () => {
+    const withToggle = () =>
       mockUserState(
         [Permissions.EDIT_USER],
         [FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT],
       );
-      renderUserManagement(["/?tab=clinical-advisors"]);
+
+    it("shows next to Ally admins with Admin User Management", () => {
+      withToggle();
+      renderUserManagement([`/?tab=${TabType.DEBRIEF_ACCESS}`]);
       const tabs = screen.getAllByRole("button").map(b => b.textContent ?? "");
       const ally = tabs.findIndex(t => t.startsWith("Ally admins"));
       expect(ally).toBeGreaterThan(-1);
-      expect(tabs[ally + 1]).toMatch(/^Clinical advisors/);
-      expect(screen.getByTestId("clinical-advisors-tab")).toBeInTheDocument();
+      expect(tabs[ally + 1]).toMatch(/^Debrief access/);
+      expect(tabs.some(t => t.startsWith("Clinical advisors"))).toBe(false);
+      expect(screen.getByTestId("debrief-access-tab")).toBeInTheDocument();
+    });
+
+    it("still opens from the old clinical-advisors link", () => {
+      withToggle();
+      renderUserManagement(["/?tab=clinical-advisors"]);
+      expect(screen.getByTestId("debrief-access-tab")).toBeInTheDocument();
     });
 
     it("is hidden without it, and a deep link falls back to Users", () => {
       mockUserState([Permissions.EDIT_USER], [FeatureToggleKey.USERS]);
-      renderUserManagement([`/?tab=${TabType.CLINICAL_ADVISORS}`]);
-      expect(screen.queryByText(/^Clinical advisors/)).not.toBeInTheDocument();
-      expect(screen.queryByTestId("clinical-advisors-tab")).not.toBeInTheDocument();
+      for (const id of [TabType.DEBRIEF_ACCESS, TabType.CLINICAL_ADVISORS]) {
+        const { unmount } = renderUserManagement([`/?tab=${id}`]);
+        expect(screen.queryByText(/^Debrief access/)).not.toBeInTheDocument();
+        expect(screen.queryByTestId("debrief-access-tab")).not.toBeInTheDocument();
+        unmount();
+      }
     });
   });
 

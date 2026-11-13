@@ -314,6 +314,23 @@ export const authAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.CLINICAL_ADVISORS, TAG_TYPES.USERS],
     }),
+
+    /** The Debrief owner role (settings, releases, PM agent), on the same page. */
+    addDebriefOwner: builder.mutation<ClinicalAdvisorPerson, number>({
+      query: userId => ({
+        url: ApiEndpoints.CLINICAL_ADVISORS.OWNER(userId),
+        method: HttpMethod.PUT,
+      }),
+      invalidatesTags: [TAG_TYPES.CLINICAL_ADVISORS, TAG_TYPES.USERS],
+    }),
+
+    removeDebriefOwner: builder.mutation<ClinicalAdvisorPerson, number>({
+      query: userId => ({
+        url: ApiEndpoints.CLINICAL_ADVISORS.OWNER(userId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.CLINICAL_ADVISORS, TAG_TYPES.USERS],
+    }),
   }),
 });
 
@@ -348,4 +365,6 @@ export const {
   useSearchClinicalAdvisorCandidatesQuery,
   useAddClinicalAdvisorMutation,
   useRemoveClinicalAdvisorMutation,
+  useAddDebriefOwnerMutation,
+  useRemoveDebriefOwnerMutation,
 } = authAPI;
