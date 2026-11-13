@@ -211,6 +211,76 @@ class DebriefSkillWordEntry {
   final DebriefSkillWord word;
 }
 
+/// How a skill has moved over the learner's recent sessions (post-veto). The
+/// wire value doubles as the translation-key suffix
+/// (`postSim.debriefCards.progressCard.trends.<wire>`).
+enum DebriefProgressTrend {
+  moreConsistent('more_consistent'),
+  aboutTheSame('about_the_same'),
+  worthAnotherLook('worth_another_look'),
+  tooEarly('too_early');
+
+  const DebriefProgressTrend(this.wire);
+  final String wire;
+
+  static DebriefProgressTrend? parse(Object? value) {
+    for (final trend in values) {
+      if (trend.wire == value) return trend;
+    }
+    return null;
+  }
+}
+
+class DebriefProgressSkill {
+  const DebriefProgressSkill({required this.skill, required this.trend, required this.line});
+
+  /// A foundational skill key (`empathy`, `harm`, …).
+  final String skill;
+  final DebriefProgressTrend trend;
+  final String line;
+}
+
+class DebriefProgressFocus {
+  const DebriefProgressFocus({required this.skill, required this.line});
+
+  final String skill;
+  final String line;
+}
+
+/// `cards.progress_card`, "Your last {n} sessions" (progress contract §2):
+/// only on the debrief where the card is due.
+class DebriefProgressCard {
+  const DebriefProgressCard({required this.sessions, this.skills = const [], this.focus});
+
+  /// The card, or null when it is absent or has nothing a learner can read.
+  /// Skills without a line or with an unknown trend are dropped rather than
+  /// shown half-empty.
+  static DebriefProgressCard? parse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final sessions = json['sessions'];
+    if (sessions is! num || sessions != sessions.roundToDouble() || sessions < 1) return null;
+    final skills = [
+      for (final entry in _maps(json['skills']))
+        if ((_optStr(entry['skill']), _optStr(entry['line']), DebriefProgressTrend.parse(entry['trend']))
+            case (final skill?, final line?, final trend?))
+          DebriefProgressSkill(skill: skill.trim(), trend: trend, line: line.trim()),
+    ];
+    final focusJson = json['focus'];
+    final focus = focusJson is Map<String, dynamic>
+        ? switch ((_optStr(focusJson['skill']), _optStr(focusJson['line']))) {
+            (final skill?, final line?) => DebriefProgressFocus(skill: skill.trim(), line: line.trim()),
+            _ => null,
+          }
+        : null;
+    if (focus == null && skills.isEmpty) return null;
+    return DebriefProgressCard(sessions: sessions.toInt(), skills: skills, focus: focus);
+  }
+
+  final int sessions;
+  final List<DebriefProgressSkill> skills;
+  final DebriefProgressFocus? focus;
+}
+
 class DebriefCardsData {
   const DebriefCardsData({
     required this.opening,
@@ -221,6 +291,7 @@ class DebriefCardsData {
     this.skillWords = const [],
     required this.reflectiveQuestion,
     this.progressNote,
+    this.progressCard,
   });
 
   factory DebriefCardsData.fromJson(Map<String, dynamic> json) {
@@ -245,6 +316,7 @@ class DebriefCardsData {
       ],
       reflectiveQuestion: _str(json['reflective_question']),
       progressNote: _optStr(json['progress_note']),
+      progressCard: DebriefProgressCard.parse(json['progress_card']),
     );
   }
 
@@ -256,6 +328,9 @@ class DebriefCardsData {
   final List<DebriefSkillWordEntry> skillWords;
   final String reflectiveQuestion;
   final String? progressNote;
+
+  /// "Your last {n} sessions", when the card is due on this debrief.
+  final DebriefProgressCard? progressCard;
 }
 
 /// What the Ally team decided about a flagged card.

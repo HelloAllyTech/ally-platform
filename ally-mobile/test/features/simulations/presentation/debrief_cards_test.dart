@@ -11,6 +11,8 @@ import 'package:url_launcher_platform_interface/url_launcher_platform_interface.
 import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/learner_debrief_repository.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_transcript_repository.dart';
+import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/feedback/debrief_cards.dart'
+    show readableSections;
 import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/feedback/debrief_read_aloud.dart';
 
 import '../data/learner_debrief_repository_test.dart' show readyDebriefJson;
@@ -72,6 +74,24 @@ class _FakeDebriefAudioPlayer implements DebriefAudioPlayer {
 
   @override
   Future<void> dispose() async {}
+}
+
+/// A ready debrief with "Your last {n} sessions" (progress contract §2).
+Map<String, dynamic> _withProgressCard() {
+  final json = readyDebriefJson();
+  return {
+    ...json,
+    'cards': {
+      ...json['cards'] as Map<String, dynamic>,
+      'progress_card': {
+        'sessions': 5,
+        'skills': [
+          {'skill': 'empathy', 'trend': 'more_consistent', 'line': 'You named the feeling more often.'},
+        ],
+        'focus': {'skill': 'harm', 'line': 'Ask about safety directly.'},
+      },
+    },
+  };
 }
 
 const _supportLine = {'name': 'Tele-MANAS', 'phone': '+91 14416', 'hours': 'Open 24 hours', 'isCrisis': true};
@@ -322,6 +342,44 @@ void main() {
     verify(() => h.learnerDebrief.undoFlag('session-1', 'f1')).called(1);
     expect(find.text('Thanks. Someone from the Ally team will look at this.'), findsNothing);
     expect(find.byKey(const Key('debrief-flag-open')), findsNWidgets(5));
+  });
+
+  testWidgets('the progress card has its own "This isn\'t right", flagged as progress_card', (tester) async {
+    stubDebrief(_withProgressCard());
+    final until = DateTime.now().add(const Duration(minutes: 10));
+    when(
+      () => h.learnerDebrief.flagCard(
+        'session-1',
+        section: any(named: 'section'),
+        reason: any(named: 'reason'),
+        note: any(named: 'note'),
+      ),
+    ).thenAnswer((_) async => (id: 'f1', undoUntil: until));
+    await h.pump(tester);
+
+    final progressFlag = find.byKey(const ValueKey('debrief-flag-progress_card'));
+    await tapVisible(tester, find.descendant(of: progressFlag, matching: find.byKey(const Key('debrief-flag-open'))));
+    await tapVisible(tester, find.byKey(const ValueKey('debrief-flag-reason-didnt_say')));
+    await tapVisible(tester, find.byKey(const Key('debrief-flag-send')));
+    verify(
+      () => h.learnerDebrief.flagCard(
+        'session-1',
+        section: 'progress_card',
+        reason: DebriefFlagReason.didntSay,
+        note: any(named: 'note'),
+      ),
+    ).called(1);
+  });
+
+  testWidgets('a progress card the Ally team removed is not shown', (tester) async {
+    stubDebrief({
+      ..._withProgressCard(),
+      'corrections': [
+        {'section': 'progress_card', 'outcome': 'removed', 'note': null, 'at': '2026-11-13T10:00:00Z'},
+      ],
+    });
+    await h.pump(tester);
+    expect(find.byKey(const Key('debrief-card-progress')), findsNothing);
   });
 
   testWidgets('a flag past its undo window reads "Sent to the Ally team", no Undo', (tester) async {
@@ -956,6 +1014,28 @@ void main() {
       // Done: back to "Listen all", nothing highlighted.
       expect(find.byKey(const Key('debrief-listen-all-play')), findsOneWidget);
       expect(find.byKey(const Key('debrief-reading')), findsNothing);
+    });
+
+    testWidgets('the progress card reads last in Listen all and has its own Listen', (tester) async {
+      final player = _FakeDebriefAudioPlayer();
+      final json = _withProgressCard();
+      expect(readableSections(LearnerDebriefView.fromJson(json)).last, 'progress_card');
+      expect(readableSections(LearnerDebriefView.fromJson(readyDebriefJson())), isNot(contains('progress_card')));
+      stubDebrief(json);
+      when(() => h.learnerDebrief.getCardAudioUrl('session-1', any()))
+          .thenAnswer((invocation) async => 'https://audio/${invocation.positionalArguments[1]}');
+      await h.pump(tester, overrides: [debriefAudioPlayerFactoryProvider.overrideWithValue(() => player)]);
+
+      await tapVisible(tester, find.byKey(const ValueKey('debrief-listen-progress_card')));
+      verify(() => h.learnerDebrief.getCardAudioUrl('session-1', 'progress_card')).called(1);
+      expect(player.played, ['https://audio/progress_card']);
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('debrief-card-progress')),
+          matching: find.byKey(const Key('debrief-reading')),
+        ),
+        findsOneWidget,
+      );
     });
   });
 

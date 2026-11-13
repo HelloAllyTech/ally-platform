@@ -420,6 +420,8 @@ List<String> readableSections(LearnerDebriefView view) {
     for (var i = 0; i < cards.workOnThis.length; i++) 'work_on_this[$i]',
     if (cards.practiseNext != null) 'practise_next',
     if (cards.reflectiveQuestion.isNotEmpty) 'reflective_question',
+    // Last, as it sits below the debrief.
+    if (cards.progressCard != null) 'progress_card',
   ].where((s) => !removed.contains(s)).toList();
 }
 
@@ -1003,6 +1005,13 @@ class _ReadyCards extends ConsumerWidget {
         _Helpful(controller: controller, helpful: view.helpful),
         if (view.pulse != null) _Pulse(controller: controller, pulse: view.pulse!),
       ],
+      // Progress contract §4: below the debrief, only when the card is due.
+      if (cards.progressCard case final progressCard? when !removed.contains('progress_card'))
+        DebriefProgressCardView(
+          card: progressCard,
+          reading: readAloud.isBeingRead('progress_card'),
+          controls: flag('progress_card', ref.t('$_k.progressCard.title', {'n': progressCard.sessions})),
+        ),
     ];
 
     return Column(
@@ -2007,6 +2016,181 @@ class _Pulse extends ConsumerWidget {
             const SizedBox(height: 8),
             Semantics(liveRegion: true, child: Text(ref.t('$_k.thanks'), style: _smallStyle)),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// "Your last {n} sessions" (progress contract §4; web `DebriefProgressCard`):
+/// how the learner's skills have moved over their recent sessions, below the
+/// debrief. Collapsed it shows the one focus (or the first skill's line when
+/// there is no focus); "Show more" opens every skill with its trend word.
+/// Trend words always carry text and an icon, never colour alone.
+class DebriefProgressCardView extends ConsumerStatefulWidget {
+  const DebriefProgressCardView({super.key, required this.card, this.controls, this.reading = false});
+
+  final DebriefProgressCard card;
+
+  /// Listen and "This isn't right" for the learner (the flag, for a
+  /// supervisor), under the card.
+  final Widget? controls;
+
+  /// Read-aloud is reading this card.
+  final bool reading;
+
+  @override
+  ConsumerState<DebriefProgressCardView> createState() => _DebriefProgressCardViewState();
+}
+
+class _DebriefProgressCardViewState extends ConsumerState<DebriefProgressCardView> {
+  static const _k = 'postSim.debriefCards.progressCard';
+  bool _open = false;
+
+  /// The skill's name in the app's language, else the key made readable
+  /// (`open_questions` → "Open questions").
+  String _skillName(String key) {
+    final path = '$_k.skills.$key';
+    final name = RegExp(r'^[A-Za-z][A-Za-z_]*$').hasMatch(key) ? ref.t(path) : path;
+    if (name != path) return name;
+    final words = key.replaceAll(RegExp(r'[_-]+'), ' ').trim().toLowerCase();
+    return words.isEmpty ? key : words[0].toUpperCase() + words.substring(1);
+  }
+
+  static (IconData, Color, Color) _trendStyle(DebriefProgressTrend trend) => switch (trend) {
+    DebriefProgressTrend.moreConsistent => (Icons.trending_up, AppColors.blue50, AppColors.primary),
+    DebriefProgressTrend.aboutTheSame => (Icons.arrow_forward, AppColors.grey100, AppColors.mediumEmphasis),
+    DebriefProgressTrend.worthAnotherLook => (Icons.visibility_outlined, _amberFill, _amberStrong),
+    DebriefProgressTrend.tooEarly => (Icons.more_horiz, _amberFill, _amberStrong),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final card = widget.card;
+    final focus = card.focus;
+    final (heading, line) = focus != null
+        ? ('${ref.t('$_k.focus')}: ${_skillName(focus.skill)}', focus.line)
+        : (null, card.skills.first.line);
+    return _ReadingRing(
+      reading: widget.reading,
+      child: Container(
+      key: const Key('debrief-card-progress'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.blue50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.blue100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            header: true,
+            child: Row(
+              children: [
+                Icon(Icons.trending_up, size: 20, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(ref.t('$_k.title', {'n': card.sessions}), style: _leadStyle.copyWith(fontSize: 16)),
+                ),
+              ],
+            ),
+          ),
+          // With no focus, the first skill's line is the preview; open, it
+          // is in the list below instead.
+          if (heading != null || !_open) ...[
+            const SizedBox(height: 12),
+            Column(
+              key: Key(heading != null ? 'debrief-progress-focus' : 'debrief-progress-preview'),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (heading != null) ...[_Lead(heading), const SizedBox(height: 4)],
+                _Body(line),
+              ],
+            ),
+          ],
+          if (_open)
+            for (final entry in card.skills) ...[
+              const SizedBox(height: 12),
+              _progressSkill(entry),
+            ],
+          if (card.skills.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              // One node: a button that says whether it is expanded.
+              child: MergeSemantics(
+                child: Semantics(
+                expanded: _open,
+                child: TextButton(
+                  key: const Key('debrief-progress-toggle'),
+                  onPressed: () => setState(() => _open = !_open),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: AppColors.primary,
+                    textStyle: _leadStyle,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(ref.t(_open ? '$_k.showLess' : '$_k.showMore')),
+                      const SizedBox(width: 4),
+                      Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18),
+                    ],
+                  ),
+                ),
+                ),
+              ),
+            ),
+          ],
+          if (widget.controls != null) ...[const SizedBox(height: 4), widget.controls!],
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _progressSkill(DebriefProgressSkill entry) {
+    final (icon, fill, ink) = _trendStyle(entry.trend);
+    return Container(
+      key: ValueKey('debrief-progress-skill-${entry.skill}'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.blue100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(_skillName(entry.skill), style: _leadStyle),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(999)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 14, color: ink),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        ref.t('$_k.trends.${entry.trend.wire}'),
+                        style: _smallStyle.copyWith(color: ink),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _Body(entry.line),
         ],
       ),
     );
