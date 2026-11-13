@@ -236,18 +236,57 @@ class TestBudget:
         assert offered(llm.calls[2]) == ["reply", "hand_over"]
 
     @pytest.mark.asyncio
-    async def test_at_most_four_tool_steps(self, run_with):
+    async def test_a_failed_gateway_tool_is_not_offered_again(self, run_with):
         failing = FakeGateway({"ok": False, "error": "http_503"})
         llm = FakeLLM(
-            *[hand_over() for _ in range(MAX_TOOL_STEPS)],
-            reply("decline", "Sorry."),
-            reply("decline", "Sorry."),
+            hand_over(), reply("decline", "Sorry."), reply("decline", "Sorry.")
         )
         with patch(f"{CONVERSATION}.generate_structured", llm):
-            state = await run_with(gateway=failing, gateway_tools=["hand_over"])
-        assert [c["step"] for c in failing.calls] == [0, 1, 2, 3]
-        assert offered(llm.calls[MAX_TOOL_STEPS]) == ["reply"]
+            await run_with(gateway=failing, gateway_tools=["hand_over"])
+        assert len(failing.calls) == 1
+        assert offered(llm.calls[1]) == ["reply", "search_knowledge"]
+
+    @pytest.mark.asyncio
+    async def test_a_gateway_step_follows_the_searches(self, run_with, chunk_service):
+        chunk_service.search.side_effect = [
+            [passage(CHUNK_A, 0.7)],
+            [passage("chunk-b", 0.7)],
+        ]
+        gateway = FakeGateway({"ok": False, "error": "http_503"})
+        llm = FakeLLM(
+            search("a"),
+            search("b"),
+            hand_over(),
+            reply(answer="A.", citations=[1]),
+            reply(answer="A.", citations=[1]),
+        )
+        with (
+            patch(f"{CONVERSATION}.generate_structured", llm),
+            patch.object(settings.AGENT_RUNTIME, "MAX_TOOL_CALLS", 8),
+        ):
+            state = await run_with(gateway=gateway, gateway_tools=["hand_over"])
+        # Two searches, then hand_over at step 2: every kind counts toward the cap.
+        assert len(state["tool_calls"]) == 3
+        assert gateway.calls[0]["step"] == 2
+
+    @pytest.mark.asyncio
+    async def test_the_cap_holds_at_four_steps(self, run_with, chunk_service):
+        chunk_service.search.side_effect = [
+            [passage(f"chunk-{i}", 0.7)] for i in range(MAX_TOOL_STEPS + 2)
+        ]
+        llm = FakeLLM(
+            *[search(f"q{i}") for i in range(MAX_TOOL_STEPS)],
+            reply(answer="A.", citations=[1]),
+            reply(answer="A.", citations=[1]),
+        )
+        with (
+            patch(f"{CONVERSATION}.generate_structured", llm),
+            patch.object(settings.AGENT_RUNTIME, "MAX_TOOL_CALLS", 8),
+        ):
+            state = await run_with(gateway=FakeGateway(), gateway_tools=["hand_over"])
         assert len(state["tool_calls"]) == MAX_TOOL_STEPS
+        # Past the cap the schema offers only `reply`.
+        assert offered(llm.calls[MAX_TOOL_STEPS]) == ["reply"]
 
 
 class TestFormat:

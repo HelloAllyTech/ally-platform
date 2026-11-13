@@ -12,6 +12,7 @@ from app.core.agent_runtime.budget import (
     MAX_TOOL_STEPS,
     MUST_SEARCH_AFTER,
     REWRITE_RESERVE_SECONDS,
+    is_search,
     recent,
     search_budget,
     searches,
@@ -59,7 +60,19 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
         # own limit; gateway tools (chunk 3b) are offered while a tool step of any
         # kind fits, and only when ally-be's request named them.
         offered_searches = search_tools(bot) if budget > 0 else []
-        offered_gateway = gateway_tools(bot) if steps_left(state) else []
+        # Each gateway tool at most once a run: one that failed is shown as not
+        # done, and calling it again would only spend the run's time (each call
+        # may wait 5 s) and run it past its cap.
+        called = {
+            call.get("tool")
+            for call in state.get("tool_calls") or []
+            if not is_search(call)
+        }
+        offered_gateway = (
+            [tool for tool in gateway_tools(bot) if tool.name not in called]
+            if steps_left(state)
+            else []
+        )
         tools = offered_searches + offered_gateway
         # Sent back for not searching, and still nothing searched: this step can
         # only search. Asking alone was not enough in the eval.
