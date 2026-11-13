@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+from bug_hunter.graph.output import counterexample_counts
 from bug_hunter.runs import Run
 from evals.schema import Case
 
@@ -47,6 +48,8 @@ class AgentResult:
     status: str | None = None  # the graph's final status, for the report
     confidence: str | None = None
     review_verdicts: list[str] = field(default_factory=list)
+    counterexamples: dict[str, int] = field(default_factory=dict)  # review.v4
+    disputed: bool = False
     fix_attempts: int = 0
     final_outcome: str | None = None  # pr | escalated | no_bug | rejected | other
     stop_reason: str | None = None
@@ -197,6 +200,8 @@ class GraphAgent:
             status=state.status,
             confidence=state.confidence,
             review_verdicts=list(state.review_verdicts),
+            counterexamples=counterexample_counts(state),
+            disputed=state.disputed,
             fix_attempts=state.attempts,
             final_outcome=final_outcome(state.status),
             stop_reason=state.stop_reason,

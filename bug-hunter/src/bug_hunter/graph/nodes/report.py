@@ -13,7 +13,8 @@ from bug_hunter.graph.state import BugState
 def report_markdown(state: BugState) -> str:
     b = state.budget_used
     lines = [
-        f"# Run {state.run_id}: {state.status}",
+        f"# Run {state.run_id}: {state.status}"
+        + (" (reviewer counterexample disputed)" if state.disputed else ""),
         "",
         f"- app: {state.app} · mode: {state.mode} · ref: `{state.ref[:12]}` · signal: "
         f"{state.signal.source} {state.signal.ref}",

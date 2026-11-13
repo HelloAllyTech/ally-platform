@@ -21,6 +21,7 @@ Status = Literal[
     "fixing",
     "verified",
     "reviewed",
+    "challenging",  # review.v4 proposed counterexamples; code runs them next
     "awaiting_human",
     "pr_opened",
     "suggested_fix",  # output_mode suggested_fix: a verified fix, reported, no PR
@@ -118,12 +119,58 @@ class Verification(BaseModel):
         )
 
 
+class ProposedCounterexample(BaseModel):
+    """A reviewer's test (review.v4): an input from the finding's class that the fix
+    still gets wrong. Code runs it; only a genuine failure can send the fix back."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    test_name: str = Field(description="The test's name exactly as declared in code")
+    code: str = Field(
+        description="The complete test file, same framework and directory as the "
+        "reproduction test, reusing its imports and setup"
+    )
+    claim: str = Field(description="One line: the input and what goes wrong")
+
+
 class Review(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    verdict: Literal["approve", "request_changes", "reject"]
+    # v3: approve | request_changes | reject; v4: approve | reject_drift |
+    # counterexamples
+    verdict: Literal[
+        "approve", "request_changes", "reject", "reject_drift", "counterexamples"
+    ]
     issues: list[str] = Field(default_factory=list)
     regression_risks: list[str] = Field(default_factory=list)
+    counterexamples: list[ProposedCounterexample] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)  # never block the fix
+
+
+CounterexampleStatus = Literal[
+    "proposed",  # not run yet
+    "dropped",  # bad shape, passes or setup-fails on the buggy code, wrong reason
+    "kept",  # fails on the buggy code for the reported problem; not yet run on a fix
+    "passed",  # kept, and passes with the current fix
+    "failed",  # kept, and fails with the current fix: the fix goes back
+    "disputed",  # failed, and the fixer disputed it against the report/finding
+]
+
+
+class Counterexample(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str  # ce<N>, stable across attempts
+    test_path: str  # app-relative file code chose next to the repro test
+    test_name: str
+    code: str  # scrubbed
+    claim: str
+    proposed_at_attempt: int
+    status: CounterexampleStatus = "proposed"
+    reason: str = ""  # why dropped / the judge's why / the failure on the fix
+    failure_excerpt: str = ""  # the latest genuine failure (buggy code or fix)
+    dispute_reason: str = ""
+    failed_on_fix: int = 0  # how many fixes it failed against
 
 
 class NodeUsage(BaseModel):
@@ -172,6 +219,8 @@ class BugState(BaseModel):
     verification: Verification | None = None
     review: Review | None = None
     review_verdicts: list[str] = Field(default_factory=list)  # every review, in order
+    counterexamples: list[Counterexample] = Field(default_factory=list)  # review.v4
+    disputed: bool = False  # a reviewer counterexample was disputed by the fixer
     risk_level: Literal["low", "medium", "high", "human_only"] | None = None
     confidence: Confidence | None = None
     attempts: int = 0  # fix attempts (chunk 06)

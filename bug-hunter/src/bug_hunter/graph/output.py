@@ -60,9 +60,25 @@ def reviewer_notes(state: BugState) -> list[str]:
     """What the reviewer raised without blocking the fix."""
     if not state.review:
         return []
-    return list(state.review.issues) + [
-        f"regression risk: {r}" for r in state.review.regression_risks
-    ]
+    return (
+        list(state.review.issues)
+        + [f"regression risk: {r}" for r in state.review.regression_risks]
+        + list(state.review.notes)
+    )
+
+
+def counterexample_counts(state: BugState) -> dict[str, int]:
+    """proposed / kept / failed / disputed over the whole run (review.v4)."""
+    ces = state.counterexamples
+    return {
+        "proposed": len(ces),
+        "kept": sum(
+            1 for c in ces if c.status in ("kept", "passed", "failed", "disputed")
+        ),
+        # failed at least once against a fix (then fixed, disputed or still failing)
+        "failed": sum(1 for c in ces if c.failed_on_fix),
+        "disputed": sum(1 for c in ces if c.status == "disputed"),
+    }
 
 
 def suggested_fix_report(state: BugState, diff: str, test_source: str | None) -> str:
@@ -80,6 +96,33 @@ def suggested_fix_report(state: BugState, diff: str, test_source: str | None) ->
         "",
         "No branch, PR or approval request was created (output_mode: suggested_fix).",
         "",
+    ]
+    disputed = [c for c in state.counterexamples if c.status == "disputed"]
+    if disputed:
+        lines += [
+            "> **Reviewer counterexample disputed.** The fixer says the test(s) below",
+            "> contradict the report or the finding; they did not send the fix back,",
+            "> and the confidence was lowered one level. Decide who is right.",
+            "",
+        ]
+        for c in disputed:
+            lines += [
+                f"### {c.name}: `{c.test_path}::{c.test_name}`",
+                f"- reviewer's claim: {c.claim}",
+                f"- fixer's reason: {c.dispute_reason}",
+                "",
+                "```",
+                c.code.rstrip(),
+                "```",
+                "",
+                "Output with the suggested patch:",
+                "",
+                "```",
+                c.failure_excerpt.strip(),
+                "```",
+                "",
+            ]
+    lines += [
         "## Root cause",
         state.root_cause or "(not recorded)",
         "",
@@ -107,6 +150,24 @@ def suggested_fix_report(state: BugState, diff: str, test_source: str | None) ->
         "```diff",
         diff.rstrip(),
         "```",
+        "",
+    ]
+    passing = [c for c in state.counterexamples if c.status == "passed"]
+    if passing:
+        lines += [
+            "",
+            "## Extra regression tests (reviewer counterexamples the patch passes)",
+        ]
+        for c in passing:
+            lines += [
+                "",
+                f"`{c.test_path}::{c.test_name}` — {c.claim}",
+                "",
+                "```",
+                c.code.rstrip(),
+                "```",
+            ]
+    lines += [
         "",
         "## Verification",
         f"- {box(v.repro_passes)} repro test  - {box(v.app_tests_pass)} app tests"
@@ -159,6 +220,12 @@ def escalation_issue(state: BugState, scratchpad_tail: str) -> tuple[str, str]:
             "",
             "## Review",
             f"{state.review.verdict}: " + "; ".join(state.review.issues),
+        ]
+    if state.counterexamples:
+        lines += ["", "## Reviewer counterexamples"] + [
+            f"- {c.name} ({c.status}): `{c.test_path}::{c.test_name}` — {c.claim}"
+            + (f" · disputed: {c.dispute_reason}" if c.dispute_reason else "")
+            for c in state.counterexamples
         ]
     lines += ["", "## Ruled out / notes", "", scratchpad_tail.strip()[-3000:]]
     return title[:120], "\n".join(lines)

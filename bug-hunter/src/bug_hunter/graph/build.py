@@ -11,6 +11,7 @@ from langgraph.graph import END, START, StateGraph
 
 from bug_hunter.graph.deps import GraphDeps
 from bug_hunter.graph.nodes.approve import make_human_approval_node, make_open_pr_node
+from bug_hunter.graph.nodes.challenge import make_challenge_node
 from bug_hunter.graph.nodes.escalate import make_escalate_node
 from bug_hunter.graph.nodes.fix import make_fix_node
 from bug_hunter.graph.nodes.intake import make_intake_node
@@ -23,6 +24,7 @@ from bug_hunter.graph.nodes.suggest import make_suggest_fix_node
 from bug_hunter.graph.nodes.triage import make_triage_node
 from bug_hunter.graph.nodes.verify import make_verify_node
 from bug_hunter.graph.routing import (
+    after_challenge,
     after_fix,
     after_investigate,
     after_open_pr,
@@ -64,19 +66,23 @@ def build_graph(deps: GraphDeps, checkpointer: BaseCheckpointSaver | None = None
     graph.add_node("open_pr", make_open_pr_node(deps))
     graph.add_node("human_approval", make_human_approval_node(deps))
     graph.add_node("suggest_fix", make_suggest_fix_node(deps))
+    graph.add_node("challenge", make_challenge_node(deps))
     output_mode = deps.config.limits.pr.output_mode
     max_attempts = deps.config.limits.run.max_fix_attempts
     graph.add_conditional_edges(
         "risk_precheck", after_risk_precheck, ["fix", "escalate"]
     )
-    graph.add_conditional_edges("fix", after_fix, ["verify", "escalate"])
+    graph.add_conditional_edges("fix", after_fix, ["verify", "risk_gate", "escalate"])
     graph.add_conditional_edges(
         "verify", lambda s: after_verify(s, max_attempts), ["review", "fix", "escalate"]
     )
     graph.add_conditional_edges(
         "review",
         lambda s: after_review(s, max_attempts),
-        ["risk_gate", "fix", "escalate"],
+        ["risk_gate", "fix", "challenge", "escalate"],
+    )
+    graph.add_conditional_edges(
+        "challenge", after_challenge, ["fix", "risk_gate", "escalate"]
     )
     graph.add_conditional_edges(
         "risk_gate",

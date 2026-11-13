@@ -34,6 +34,8 @@ class CaseResult:
     status: str | None = None  # agent's final status (graph agents)
     confidence: str | None = None
     review_verdicts: list[str] = field(default_factory=list)
+    counterexamples: dict[str, int] = field(default_factory=dict)  # review.v4 counts
+    disputed: bool = False
     fix_attempts: int = 0
     final_outcome: str | None = None
     stop_reason: str | None = None
@@ -188,10 +190,12 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Cases",
         "",
-        "| id | kind | expected | outcome | repro | oracle | review | fix tries "
-        "| ended as | tokens | cost | s | trace | error / stop reason |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| id | kind | expected | outcome | repro | oracle | review | ce p/k/f/d "
+        "| fix tries | ended as | tokens | cost | s | trace | error / stop reason |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
+    ce_totals = {"proposed": 0, "kept": 0, "failed": 0, "disputed": 0}
+    reviewed = disputed_runs = 0
     verdict_totals: dict[str, int] = {}
     ending_totals: dict[str, int] = {}
     for c in report["cases"]:
@@ -201,13 +205,26 @@ def render_markdown(report: dict[str, Any]) -> str:
         for v in verdicts:
             verdict_totals[v] = verdict_totals.get(v, 0) + 1
         ended = c.get("final_outcome") or "–"
+        ces = c.get("counterexamples") or {}
+        for k in ce_totals:
+            ce_totals[k] += ces.get(k, 0)
+        reviewed += bool(verdicts)
+        disputed_runs += bool(c.get("disputed"))
+        if c.get("disputed") and ended != "–":
+            ended += " (disputed)"
+        ce_cell = (
+            "/".join(str(ces.get(k, 0)) for k in ce_totals)
+            if ces.get("proposed")
+            else "–"
+        )
         if c.get("final_outcome"):
             ending_totals[ended] = ending_totals.get(ended, 0) + 1
         note = c.get("error") or (c.get("stop_reason") if ended == "escalated" else "")
         lines.append(
             f"| `{c['id']}` | {c['kind']} | {c['expected']} | {c['outcome']} "
             f"| {yes_no(c['repro_valid'])} | {yes_no(c['oracle_pass'])} "
-            f"| {', '.join(verdicts) or '–'} | {c.get('fix_attempts') or 0} | {ended} "
+            f"| {', '.join(verdicts) or '–'} | {ce_cell} "
+            f"| {c.get('fix_attempts') or 0} | {ended} "
             f"| {c['tokens']} | ${c['cost_usd']:.3f} | {c['seconds']:.0f} | {trace} "
             f"| {(note or '')[:80]} |"
         )
@@ -227,6 +244,14 @@ def render_markdown(report: dict[str, Any]) -> str:
                 ", ".join(f"{k} {v}" for k, v in sorted(ending_totals.items()))
                 or "none"
             ),
+        ]
+    if ce_totals["proposed"] or disputed_runs:
+        lines += [
+            "",
+            f"Counterexamples: proposed {ce_totals['proposed']}, kept "
+            f"{ce_totals['kept']}, failed on a fix {ce_totals['failed']}, disputed "
+            f"{ce_totals['disputed']} · runs with a dispute: {disputed_runs} of "
+            f"{reviewed} reviewed",
         ]
     if meta.get("shards"):
         lines += [

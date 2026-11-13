@@ -228,9 +228,11 @@ def test_prompts_load_and_render_strictly(config: BugHunterConfig) -> None:
             update={"prompts": {**config.models.prompts, node: version}}
         )
         cfg = config.model_copy(update={"models": models})
-        # later versions may add inputs (reproduce.v5: neighbour_setup), never drop
-        base = set(load_prompt(config, node).inputs) - {"neighbour_setup"}
-        assert base <= set(load_prompt(cfg, node).inputs) | {"neighbour_setup"}
+        # later versions may add inputs (reproduce.v5: neighbour_setup; review.v4:
+        # repro_source, max_counterexamples), never drop the shared ones
+        added = {"neighbour_setup", "repro_source", "max_counterexamples"}
+        base = set(load_prompt(config, node).inputs) - added
+        assert base <= set(load_prompt(cfg, node).inputs) | added
 
 
 def test_workspace_at_old_layout_writes_tests_at_the_root(

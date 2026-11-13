@@ -144,8 +144,13 @@ def _deps(
     investigate=None,
     saver=None,
     output_mode="pr",  # these tests exercise the PR + approval path
+    review_prompt="v3",  # v3 verdicts here; review.v4 has its own tests
 ) -> GraphDeps:
     cfg = _with_output_mode(config, output_mode).model_copy(update={"repo_root": repo})
+    prompts = {**cfg.models.prompts, "review": review_prompt}
+    cfg = cfg.model_copy(
+        update={"models": cfg.models.model_copy(update={"prompts": prompts})}
+    )
     artefacts = tmp_path / "artefacts"
     artefacts.mkdir(exist_ok=True)
 

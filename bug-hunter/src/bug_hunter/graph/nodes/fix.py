@@ -15,7 +15,7 @@ from bug_hunter.graph.deps import GraphDeps
 from bug_hunter.graph.loop import LoopState, ToolLoop, initial_messages, run_loop
 from bug_hunter.graph.nodes.common import node_context, over_budget
 from bug_hunter.graph.prompts import load_prompt
-from bug_hunter.graph.state import BugState, Patch
+from bug_hunter.graph.state import BugState, Counterexample, Patch
 from bug_hunter.graph.tools import (
     fix_edit_tool,
     lint_tool,
@@ -52,8 +52,108 @@ class GiveUp(BaseModel):
     reason: str
 
 
+class DisputeCounterexampleArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(description="The counterexample's name, e.g. ce1")
+    reason: str = Field(
+        description="How this test contradicts the report or the finding (quote it)"
+    )
+
+
+class RunCounterexampleArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(description="The counterexample's name, e.g. ce1")
+
+
 def _noop(**_: Any) -> str:
     return "ok"
+
+
+LOWER = {"high": "medium", "medium": "low", "low": "low"}
+
+
+def lower_confidence(confidence: str | None) -> str:
+    return LOWER.get(confidence or "low", "low")
+
+
+def counterexample_feedback(failing: list[Counterexample]) -> str:
+    lines = [
+        "The reviewer's counterexamples below still FAIL with your fix. Code checked "
+        "each one: it fails on the original code because of the reported problem. "
+        "Make them pass too (run them with run_counterexample), unless one contradicts "
+        "the report or the finding: then call dispute_counterexample(name, reason) "
+        "once for it, quoting the report or finding. A dispute is shown to the "
+        "engineer and lowers the run's confidence. Never edit these tests.",
+    ]
+    for ce in failing:
+        lines += [
+            "",
+            f"{ce.name}: `{ce.test_path}::{ce.test_name}` — claim: {ce.claim}",
+            "```",
+            ce.code[-3000:],
+            "```",
+            "Output with your fix:",
+            "```",
+            ce.failure_excerpt[-1500:],
+            "```",
+        ]
+    return "\n".join(lines)
+
+
+def counterexample_tools(
+    deps: GraphDeps, failing: list[Counterexample], disputes: dict[str, str]
+) -> list[StructuredTool]:
+    by_name = {ce.name: ce for ce in failing}
+
+    def run_counterexample(name: str) -> str:
+        ce = by_name.get(name)
+        if ce is None:
+            return f"error: no failing counterexample {name!r} ({', '.join(by_name)})"
+        if deps.runner is None:
+            return "error: no sandbox available in this run"
+        deps.ensure_sandbox()
+        target = deps.app_root / ce.test_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(ce.code, encoding="utf-8")
+        try:
+            result = deps.runner.run_tests(ce.test_path, ce.test_name)
+        finally:
+            target.unlink(missing_ok=True)
+        text = result.summary()
+        if result.excerpt and not result.passed:
+            text += "\n" + result.excerpt[-2500:]
+        return text
+
+    def dispute_counterexample(name: str, reason: str) -> str:
+        if name not in by_name:
+            return f"error: no failing counterexample {name!r} ({', '.join(by_name)})"
+        if name in disputes:
+            return f"error: {name} is already disputed (one dispute per test)"
+        if not reason.strip():
+            return "error: give the reason, quoting the report or finding"
+        disputes[name] = reason.strip()[:500]
+        return f"{name} disputed; it will not send the fix back"
+
+    return [
+        StructuredTool.from_function(
+            func=run_counterexample,
+            name="run_counterexample",
+            description="Run one failing reviewer counterexample against your change.",
+            args_schema=RunCounterexampleArgs,
+        ),
+        StructuredTool.from_function(
+            func=dispute_counterexample,
+            name="dispute_counterexample",
+            description=(
+                "Dispute a reviewer counterexample that contradicts the report or the "
+                "finding (wrong expected value, different behaviour than reported). "
+                "Once per counterexample."
+            ),
+            args_schema=DisputeCounterexampleArgs,
+        ),
+    ]
 
 
 def finish_tools() -> list[StructuredTool]:
@@ -102,7 +202,11 @@ def make_fix_node(deps: GraphDeps):
             return stop
         assert state.repro is not None and state.finding is not None
         repro = state.repro
-        protected = list(repro.file_hashes) or [repro.test_path]
+        failing = [ce for ce in state.counterexamples if ce.status == "failed"]
+        disputes: dict[str, str] = {}
+        protected = (list(repro.file_hashes) or [repro.test_path]) + [
+            ce.test_path for ce in state.counterexamples
+        ]
         tools = [
             t
             for t in outline_first_read_tools(deps)
@@ -112,6 +216,8 @@ def make_fix_node(deps: GraphDeps):
             repro_only_run_tests(deps, repro.test_path, repro.test_name),
             lint_tool(deps),
         ]
+        if failing:
+            tools += counterexample_tools(deps, failing, disputes)
         loop = ToolLoop(
             config=deps.config,
             node="fix",
@@ -146,7 +252,11 @@ def make_fix_node(deps: GraphDeps):
             "pass with the smallest source change, run it, then finish with submit_fix "
             "(or give_up)."
         )
-        if state.verification is not None and attempt > 1:
+        if (
+            state.verification is not None
+            and not state.verification.passed
+            and attempt > 1
+        ):
             ver = state.verification
             user += "\n\nThe previous attempt failed verification:\n" + ver.summary
             if ver.new_failures:
@@ -168,6 +278,8 @@ def make_fix_node(deps: GraphDeps):
             user += "\n\nThe reviewer asked for changes:\n- " + "\n- ".join(
                 state.review.issues
             )
+        if failing:
+            user += "\n\n" + counterexample_feedback(failing)
         initial: LoopState = {
             "messages": initial_messages(system, user),
             "turns": 0,
@@ -184,6 +296,42 @@ def make_fix_node(deps: GraphDeps):
         budget = with_clock(out["budget_used"], state.started_at)
         result = out.get("result")
         base: dict[str, Any] = {"attempts": attempt, "budget_used": budget}
+        if disputes:
+            tests = []
+            for ce in state.counterexamples:
+                if ce.name in disputes:
+                    ce = ce.model_copy(
+                        update={
+                            "status": "disputed",
+                            "dispute_reason": disputes[ce.name],
+                        }
+                    )
+                tests.append(ce)
+            base["counterexamples"] = tests
+            base["disputed"] = True
+            if not state.disputed:  # confidence drops one level, once per run
+                base["confidence"] = lower_confidence(state.confidence)
+            deps.scratchpad.append_note(
+                "fix: disputed "
+                + "; ".join(f"{n}: {r[:120]}" for n, r in disputes.items())
+            )
+            gave_up = result is not None and result["tool"] == "give_up"
+            if not gave_up and all(ce.name in disputes for ce in failing):
+                # nothing left that sends the fix back: if the code is unchanged the
+                # verified fix stands (no attempt spent) and goes on to the risk gate
+                current = deps.git.diff(deps.worktree) if deps.git else ""
+                previous = ""
+                if state.patch is not None:
+                    try:
+                        previous = open(state.patch.diff_path, encoding="utf-8").read()
+                    except OSError:
+                        previous = ""
+                if current.strip() == previous.strip():
+                    return {
+                        **base,
+                        "attempts": state.attempts,
+                        "status": "reviewed",
+                    }
         if not result or result["tool"] != "submit_fix":
             reason = (
                 result["args"]["reason"]

@@ -161,7 +161,7 @@ def test_render_markdown() -> None:
     assert "# Eval report: baseline · issue mode" in text
     assert "| total | 1 | 1 | 0 | 100% | – | – | 100% | – | 0 |" in text
     assert (
-        "| `b1` | bug | fix | detected | – | yes | – | 0 | – | 0 | $0.000 | 3 | – |"
+        "| `b1` | bug | fix | detected | – | yes | – | – | 0 | – | 0 | $0.000 | 3 | – |"
         in text
     )
 
