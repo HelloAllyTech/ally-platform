@@ -394,3 +394,73 @@ export function guidanceEvidenceRefusal(
   }
   return null;
 }
+
+// --- Content safety for every self-made change (R2-18; FR-56, plan §11.6) ----------
+
+/**
+ * Prompt edits and system-made registry agents reach the Writer (and so
+ * learners) on every platform organisation, so they meet the same bar as a
+ * platform-wide guidance proposal: evidence from at least
+ * `GUIDANCE_MIN_LEARNERS` learners in at least `GUIDANCE_MIN_TENANTS`
+ * organisations. `what` names the change in the refusal ("a prompt edit").
+ */
+export function changeEvidenceRefusal(
+  what: string,
+  learners: number,
+  tenants: number,
+): Refusal | null {
+  if (learners < GUIDANCE_MIN_LEARNERS) {
+    return {
+      reason: `${what} needs evidence from at least ${GUIDANCE_MIN_LEARNERS} learners (the runs behind the idea's comments, or run_ids); the cited runs have ${learners}`,
+    };
+  }
+  if (tenants < GUIDANCE_MIN_TENANTS) {
+    return {
+      reason: `${what} applies platform-wide, so it needs evidence from at least ${GUIDANCE_MIN_TENANTS} organisations; the cited runs have ${tenants}`,
+    };
+  }
+  return null;
+}
+
+/**
+ * The first instruction-like pattern that `after` has more of than `before`,
+ * or null. A prompt edit is judged on what it adds: a prompt already holds
+ * its {variables} and directions, and keeping them is not a new instruction.
+ */
+export function introducedInstructionPattern(
+  before: string,
+  after: string,
+): string | null {
+  for (const p of INSTRUCTION_PATTERNS) {
+    const g = new RegExp(
+      p.source,
+      p.flags.includes('g') ? p.flags : `${p.flags}g`,
+    );
+    const was = (before ?? '').match(g)?.length ?? 0;
+    const now = (after ?? '').match(g) ?? [];
+    if (now.length > was) return now[was] ?? now[0];
+  }
+  return null;
+}
+
+/**
+ * Whether `after` copies session words that `before` did not already hold:
+ * `copiesSessionText` on what an edit adds.
+ */
+export function introducesSessionText(
+  before: string,
+  after: string,
+  turns: string[],
+  n = GUIDANCE_COPY_WORDS,
+): boolean {
+  const grams = (t: string) => {
+    const w = words(t);
+    const out: string[] = [];
+    for (let i = 0; i + n <= w.length; i++)
+      out.push(w.slice(i, i + n).join(' '));
+    return out;
+  };
+  const had = new Set(grams(before));
+  const said = new Set(turns.flatMap(grams));
+  return grams(after).some((g) => !had.has(g) && said.has(g));
+}

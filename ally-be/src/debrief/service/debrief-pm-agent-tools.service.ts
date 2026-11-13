@@ -21,9 +21,12 @@ import {
   Refusal,
   registryAgentRefusal,
   RegistryAgentManifest,
+  changeEvidenceRefusal,
   copiesSessionText,
   guidanceEvidenceRefusal,
   instructionPatternIn,
+  introducedInstructionPattern,
+  introducesSessionText,
   ROUTE_KIND,
   settingRefusal,
   stripQuotes,
@@ -56,6 +59,16 @@ const refuse = (reason: string): never => {
 };
 const text = (v: unknown, max = 2000): string =>
   typeof v === 'string' ? v.trim().slice(0, max) : '';
+/** Runs counted as one change's evidence (R2-18): enough for 10 learners in 3 organisations. */
+const MAX_EVIDENCE_RUNS = 100;
+
+/** A cited run, counted by learner and organisation (plan §11.6). */
+interface EvidenceRun {
+  id: string;
+  session_id: string;
+  learner: number | null;
+  tenant_id: string | null;
+}
 
 /**
  * The PM agent's gateway tools (CONTRACT.md §2a; spec C1, C3, C4, C5, FR-53,
@@ -68,6 +81,9 @@ const text = (v: unknown, max = 2000): string =>
  *   metric for C5;
  * - `release_draft` (route A) checks the never-list, the setting ranges and
  *   FR-53, and that the change applies to GA, then stores it as the idea's change;
+ *   a prompt edit or registry agent also passes the content-safety checks
+ *   (R2-18, FR-56): 10 learners in 3 organisations, no instructions to a
+ *   model, no copied session words;
  * - `ladder_start_quick_test` only requests ally-be's deterministic ladder;
  * - `builder_handoff`, `bug_hunter_report`, `person_ask` store what a person
  *   approves in the Console; Builder and Bug Hunter texts have quotes stripped.
@@ -430,6 +446,27 @@ export class DebriefPmAgentToolsService {
     } else {
       return refuse('kind must be prompt_edit, setting or registry_agent');
     }
+    // R2-18 (FR-56, plan §11.6): what reaches the Writer or learners is backed
+    // by enough learners, steers no model and copies no one's words.
+    const evidence =
+      kind === 'prompt_edit'
+        ? await this.contentSafety(idea, b, 'a prompt edit', b.find, b.replace)
+        : kind === 'registry_agent'
+          ? await this.contentSafety(
+              idea,
+              b,
+              'a system-made agent',
+              '',
+              [
+                b.agent?.description,
+                b.agent?.use_when,
+                b.agent?.skip_when,
+                b.agent?.prompt,
+              ]
+                .map((v) => (typeof v === 'string' ? v : ''))
+                .join('\n'),
+            )
+          : null;
     const next = { ...idea.change, ...change };
     if (kind !== 'registry_agent') {
       // The change must apply to GA and the challenger bundle must validate.
@@ -447,6 +484,7 @@ export class DebriefPmAgentToolsService {
       kind,
       draftedAt: new Date().toISOString(),
       agentRunId: claims.agentRunId,
+      ...(evidence ?? {}),
     });
     await this.pm.audit('pipeline_step', idea.id, null, {
       agentRunId: claims.agentRunId,
@@ -462,6 +500,96 @@ export class DebriefPmAgentToolsService {
           ? 'waits in the Console: registry agents are tested once the agent registry exists'
           : 'ladder_start_quick_test',
     };
+  }
+
+  /**
+   * The content-safety checks for a self-made change (R2-18; FR-56, plan
+   * §11.6), the same three the guidance proposal runs: the evidence rule
+   * (platform-wide: 10 learners, 3 organisations), the instruction-pattern
+   * filter and the copy check, both on what the change adds. Evidence is the
+   * runs behind the idea's cited comments plus any `run_ids` the call names.
+   * Refuses, or returns the counts for the draft's record.
+   */
+  private async contentSafety(
+    idea: Record<string, any>,
+    b: Record<string, any>,
+    what: string,
+    before: string,
+    after: string,
+  ): Promise<{ runIds: string[]; learners: number; tenants: number }> {
+    const commentIds: string[] = (idea.evidence?.commentIds ?? []).filter(
+      (id: unknown) => typeof id === 'string' && UUID.test(id),
+    );
+    const fromComments: string[] = (
+      await this.dataSource.query(
+        `SELECT DISTINCT c."runId" AS run_id FROM debrief_review_comments c
+          WHERE c."ideaId" = $1 OR c.id = ANY($2::uuid[])`,
+        [idea.id, commentIds],
+      )
+    )
+      .map((r: { run_id: string | null }) => r.run_id)
+      .filter((id: unknown): id is string => typeof id === 'string');
+    const asked = (Array.isArray(b.run_ids) ? b.run_ids : [])
+      .map(String)
+      .filter((id: string) => UUID.test(id));
+    const runs = await this.evidenceRuns(
+      [...new Set([...fromComments, ...asked])].slice(0, MAX_EVIDENCE_RUNS),
+    );
+    const { learners, tenants } = this.countEvidence(runs);
+    const short = changeEvidenceRefusal(what, learners, tenants);
+    if (short) throw new Refused(short);
+    const pattern = introducedInstructionPattern(before ?? '', after ?? '');
+    if (pattern) {
+      refuse(
+        `${what} must not add instructions that steer or override a model ("${pattern}"); say what the debrief should do in plain words`,
+      );
+    }
+    if (
+      introducesSessionText(
+        before ?? '',
+        after ?? '',
+        await this.sessionTurns(idea, runs),
+      )
+    ) {
+      refuse(
+        `${what} copies words from a session or a comment; write it in your own words, with no one's quotes`,
+      );
+    }
+    return { runIds: runs.map((r) => r.id), learners, tenants };
+  }
+
+  /** Live and shadow runs among `ids`, with their learner and organisation. */
+  private async evidenceRuns(ids: string[]): Promise<EvidenceRun[]> {
+    return ids.length
+      ? this.dataSource.query(
+          `SELECT r.id, r."scenarioSessionId" AS session_id,
+                  s."counselorId" AS learner, r.tenant_id
+             FROM debrief_runs r JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+            WHERE r.id = ANY($1::uuid[]) AND r.mode IN ('live','shadow')`,
+          [ids],
+        )
+      : [];
+  }
+
+  private countEvidence(runs: EvidenceRun[]) {
+    return {
+      learners: new Set(runs.map((r) => r.learner).filter((x) => x != null))
+        .size,
+      tenants: new Set(runs.map((r) => r.tenant_id).filter(Boolean)).size,
+    };
+  }
+
+  /** The cited comments' text and the cited runs' turns: words a draft must not copy. */
+  private async sessionTurns(
+    idea: Record<string, any>,
+    runs: EvidenceRun[],
+  ): Promise<string[]> {
+    const turns: string[] = [...(await this.knownTexts(idea))];
+    for (const r of runs) {
+      const t = await this.context.transcript(r.session_id).catch(() => []);
+      turns.push(...t.map((x) => x.text));
+    }
+    return turns;
   }
 
   async quickTest(claims: DebriefAgentClaims, b: Record<string, any>) {
@@ -672,24 +800,8 @@ export class DebriefPmAgentToolsService {
       .map(String)
       .filter((id: string) => UUID.test(id))
       .slice(0, 50);
-    const runs: Array<{
-      id: string;
-      session_id: string;
-      learner: number | null;
-      tenant_id: string | null;
-    }> = asked.length
-      ? await this.dataSource.query(
-          `SELECT r.id, r."scenarioSessionId" AS session_id,
-                  s."counselorId" AS learner, r.tenant_id
-             FROM debrief_runs r JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
-            WHERE r.id = ANY($1::uuid[]) AND r.mode IN ('live','shadow')`,
-          [asked],
-        )
-      : [];
-    const learners = new Set(
-      runs.map((r) => r.learner).filter((x) => x != null),
-    ).size;
-    const tenants = new Set(runs.map((r) => r.tenant_id).filter(Boolean)).size;
+    const runs = await this.evidenceRuns(asked);
+    const { learners, tenants } = this.countEvidence(runs);
     const evidence = guidanceEvidenceRefusal(scope, learners, tenants);
     if (evidence) throw new Refused(evidence);
     const draft = [title, situation, guidance, why].join('\n');
@@ -700,12 +812,7 @@ export class DebriefPmAgentToolsService {
       );
     }
     // Plan §11.6: never a learner's (or the simulated client's) own words.
-    const turns: string[] = [...(await this.knownTexts(idea))];
-    for (const r of runs) {
-      const t = await this.context.transcript(r.session_id).catch(() => []);
-      turns.push(...t.map((x) => x.text));
-    }
-    if (copiesSessionText(draft, turns)) {
+    if (copiesSessionText(draft, await this.sessionTurns(idea, runs))) {
       refuse(
         "the draft copies words from a session or a comment; write it in your own words, with no one's quotes",
       );

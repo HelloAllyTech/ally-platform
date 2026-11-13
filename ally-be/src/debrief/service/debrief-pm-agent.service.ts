@@ -32,6 +32,10 @@ import {
 } from '../constants/debrief-release.constants';
 import { PM_HOLD_DAYS } from '../util/debrief-outcome.util';
 import {
+  changeEvidenceRefusal,
+  introducedInstructionPattern,
+} from '../util/debrief-pm-agent-rules.util';
+import {
   metricValues,
   MetricsViewLike,
 } from '../util/debrief-metric-failures.util';
@@ -685,6 +689,13 @@ export class DebriefPmAgentService
           ? 'registry agents wait for the agent registry (spec step 7)'
           : 'this idea has no drafted change yet',
       );
+    }
+    // R2-18 (FR-56): the PM agent's own prompt edit reaches learners only
+    // with the content-safety record release_draft wrote; checked again here
+    // so a draft from before the checks (or edited since) can't slip through.
+    if (kind === 'prompt_edit' && idea.authorKind === 'curator') {
+      const problem = selfMadeEditProblem(idea);
+      if (problem) throw new ConflictException(problem);
     }
     // The ladder holds (v9 FR-52): a canary that passed is promoted; a paired
     // trial that passed starts a canary; nothing else may reach learners.
@@ -1836,4 +1847,26 @@ export function bugReportText(idea: Record<string, any>): string {
   const h = idea.evidence?.handoff ?? {};
   const runs = ((h.runIds ?? []) as string[]).join(', ');
   return `[Debrief PM agent] ${h.summary ?? idea.text}${runs ? `\nDebrief runs: ${runs}` : ''}`;
+}
+
+/**
+ * Why a PM agent prompt edit may not go on to learners (R2-18), or null: the
+ * draft's evidence record (learners and organisations counted by
+ * release_draft) falls short, or the edit adds instructions to a model.
+ */
+export function selfMadeEditProblem(idea: Record<string, any>): string | null {
+  const draft = idea.evidence?.draft ?? {};
+  const short = changeEvidenceRefusal(
+    'a prompt edit',
+    Number(draft.learners) || 0,
+    Number(draft.tenants) || 0,
+  );
+  if (short) return `${short.reason}; draft it again with release_draft`;
+  const pattern = introducedInstructionPattern(
+    String(idea.change?.find ?? ''),
+    String(idea.change?.replace ?? ''),
+  );
+  return pattern
+    ? `a prompt edit must not add instructions that steer or override a model ("${pattern}")`
+    : null;
 }
