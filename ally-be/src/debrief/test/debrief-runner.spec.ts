@@ -15,6 +15,7 @@ import {
   DebriefGraphResponse,
 } from '../service/debrief-graph.client';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
+import { defaultOwnerSettings } from '../constants/debrief-owner-settings.constants';
 
 const transcript = [
   { turn_index: 1, role: 'counselor', text: 'What brings you here today?' },
@@ -81,6 +82,9 @@ function build(
     live?: unknown[] | Error;
     cohort?: unknown;
     bundle?: unknown;
+    owner?: Record<string, unknown>;
+    progressProfile?: unknown;
+    progressInsert?: Error;
   } = {},
 ) {
   const saved: any[] = [];
@@ -158,6 +162,10 @@ function build(
       return opts.live ?? [];
     }),
     cohortStats: jest.fn(async () => opts.cohort ?? null),
+    progressProfile: jest.fn(async () => {
+      if (opts.progressProfile instanceof Error) throw opts.progressProfile;
+      return opts.progressProfile ?? null;
+    }),
     availability: jest.fn(async () => ({
       org_protocols: 2,
       past_debriefs: 4,
@@ -187,6 +195,18 @@ function build(
     ]),
   };
   const agentLogs = { record: jest.fn(async () => 0) };
+  const ownerSettings = {
+    get: jest.fn(async () => ({
+      ...defaultOwnerSettings(),
+      ...(opts.owner ?? {}),
+    })),
+  };
+  const progressResults = {
+    insert: jest.fn(async () => {
+      if (opts.progressInsert) throw opts.progressInsert;
+      return {};
+    }),
+  };
   const svc = new DebriefRunnerService(
     runs as any,
     context as any,
@@ -201,6 +221,8 @@ function build(
         Object.values(DEBRIEF_MODELS).map((model) => ({ model })),
     } as any,
     agentLogs as any,
+    ownerSettings as any,
+    progressResults as any,
   );
   const request = () => (graph.run.mock.calls as any[][])[0]?.[0];
   return {
@@ -213,6 +235,7 @@ function build(
     practice,
     request,
     agentLogs,
+    progressResults,
   };
 }
 
@@ -289,6 +312,7 @@ describe('DebriefRunnerService', () => {
         practice_options: [
           { id: 41, title: 'Exam stress', skills: ['reflections'] },
         ],
+        progress_profile: null,
       });
     });
 
@@ -546,6 +570,107 @@ describe('DebriefRunnerService', () => {
       const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
       expect(run.status).toBe(DebriefRunStatus.FAILED);
       expect(run.error).toMatch(/no decision/);
+    });
+  });
+
+  describe('learner progress', () => {
+    const profile = { session_number: 5, card_due: true, sessions: [] };
+
+    it('sends the progress profile with the owner settings, and asks for the progress prompt', async () => {
+      const { svc, request, context } = build({
+        progressProfile: profile,
+        owner: { progressWindow: 8, progressCardEvery: 3 },
+      });
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(request().context.progress_profile).toEqual(profile);
+      expect(context.progressProfile).toHaveBeenCalledWith(7, 't1', 's1', {
+        window: 8,
+        cardEvery: 3,
+        useFhs: true,
+        showWorseToLearners: false,
+      });
+      expect(request().prompts).toHaveProperty(DEBRIEF_PROMPT_CODES.progress);
+    });
+
+    it('sends no profile when progress is switched off', async () => {
+      const { svc, request, context } = build({
+        progressProfile: profile,
+        owner: { progressOn: false },
+      });
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(context.progressProfile).not.toHaveBeenCalled();
+      expect(request().context.progress_profile).toBeNull();
+    });
+
+    it('an unreadable profile never blocks the debrief', async () => {
+      const { svc, request } = build({ progressProfile: new Error('boom') });
+      const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(request().context.progress_profile).toBeNull();
+      expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
+    });
+
+    const progress = {
+      report: {
+        skills: [
+          {
+            skill: 'empathy',
+            trend: 'too_early' as const,
+            why: 'Two sessions.',
+            evidence: [{ run_id: 'this', turn_index: 3 }],
+            fhs: 'absent' as const,
+            learner_line: '',
+          },
+        ],
+        followups: [{ point: 'Reflect feelings.', status: 'partly' }],
+        focus: { skill: 'empathy', why: 'x', learner_line: 'y' },
+        shown_as: 'card' as const,
+      },
+      vetoes: [{ skill: 'empathy', veto: 'too_few_sessions', detail: '2 < 3' }],
+      shown_as: 'card' as const,
+      model: 'gemini-2.5-flash',
+      window_session_ids: [
+        '11111111-1111-1111-1111-111111111111',
+        'not-a-uuid',
+      ],
+      analyst_versions: [2, 3],
+    };
+
+    it('stores the progress reading when the graph sends one', async () => {
+      const { svc, progressResults } = build({
+        graph: graphAnswer({ progress }),
+      });
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(progressResults.insert).toHaveBeenCalledWith({
+        tenantId: 't1',
+        counselorId: 7,
+        runId: 'run-1',
+        scenarioSessionId: 's1',
+        windowSessionIds: ['11111111-1111-1111-1111-111111111111'],
+        skills: progress.report.skills,
+        followups: progress.report.followups,
+        focus: progress.report.focus,
+        vetoes: progress.vetoes,
+        shownAs: 'card',
+        analystVersions: [2, 3],
+        model: 'gemini-2.5-flash',
+      });
+    });
+
+    it('stores nothing when the progress agent did not run', async () => {
+      const { svc, progressResults } = build();
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(progressResults.insert).not.toHaveBeenCalled();
+    });
+
+    it('a failed write never fails the run', async () => {
+      const { svc, progressResults, agentLogs } = build({
+        graph: graphAnswer({ progress }),
+        progressInsert: new Error('no table'),
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(progressResults.insert).toHaveBeenCalled();
+      expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
+      expect(agentLogs.record).toHaveBeenCalled();
     });
   });
 

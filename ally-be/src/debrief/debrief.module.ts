@@ -27,6 +27,7 @@ import { DebriefReviewService } from './service/debrief-review.service';
 import { DebriefFeedback } from './entity/debrief-feedback.entity';
 import { DebriefRun } from './entity/debrief-run.entity';
 import { DebriefRunLog } from './entity/debrief-run-log.entity';
+import { DebriefProgressResult } from './entity/debrief-progress-result.entity';
 import { DebriefAgentService } from './service/debrief-agent.service';
 import { AskAllyClient } from './service/ask-ally.client';
 import { DebriefConsoleService } from './service/debrief-console.service';
@@ -67,6 +68,9 @@ import { DebriefRunLogsService } from './service/debrief-run-logs.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
 
+import { DebriefAdvisorsController } from './controller/debrief-advisors.controller';
+import { DebriefAdvisorsService } from './service/debrief-advisors.service';
+
 /**
  * The Debrief agent and its PM agent (plan: ally-debriefs-plan.md). Runs on
  * the agent harness's releases and learning tables. A debrief run is a graph
@@ -81,6 +85,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
       DebriefRun,
       // The Agent logs: every agent's exact input and full reply, per run.
       DebriefRunLog,
+      // Learner progress: each run's progress reading after the vetoes.
+      DebriefProgressResult,
       DebriefFeedback,
       DebriefOwnerSettings,
       DebriefProbeResult,
@@ -122,8 +128,11 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefReviewController,
     // Settings › Schedules: engineering only (the debrief_schedules toggle).
     DebriefSchedulesController,
+    // User Management › Clinical advisors (gated like Ally admins).
+    DebriefAdvisorsController,
   ],
   providers: [
+    DebriefAdvisorsService,
     // Ask Ally's agent in ally-ai (CONTRACT.md §5).
     AskAllyClient,
     DebriefContextRepository,

@@ -11,6 +11,18 @@ import {
 } from '../constants/debrief-release.constants';
 import { allowlistFromValues } from '../util/debrief-provider-allowlist.util';
 import { istMonth } from '../util/debrief-pm-reports.util';
+import {
+  assembleProgressProfile,
+  progressWindow,
+  ProgressCommentRow,
+  ProgressFhsRow,
+  ProgressFlagRow,
+  ProgressProfile,
+  ProgressSettings,
+  ProgressVoiceRow,
+  ProgressWindowRow,
+} from '../util/debrief-progress.util';
+import { FHS_RUBRIC_VERSION } from '../../foundational-skills/constants/helping-skills-rubric.constants';
 
 export interface DebriefSessionContext {
   id: string;
@@ -457,6 +469,195 @@ export class DebriefContextRepository {
       }
     }
     return out;
+  }
+
+  /**
+   * The learner's progress profile for the progress agent: their last
+   * published debriefs (live or shadow, one per session, before this one) as
+   * the Analyst's per-skill observations with the Analyst prompt version, the
+   * Work-on-this points with their review verdicts and the learner's flags,
+   * Practise next uptake, the last progress report, the learner's own words
+   * and their Foundational Skills levels. Null when the learner has no
+   * published history. Bounded: at most PROGRESS_MAX_WINDOW sessions.
+   */
+  async progressProfile(
+    counselorId: number,
+    tenantId: string | null,
+    beforeSessionId: string,
+    settings: ProgressSettings,
+  ): Promise<ProgressProfile | null> {
+    const window = progressWindow(settings);
+    const rows: Array<ProgressWindowRow & { total: number }> =
+      await this.dataSource.query(
+        `WITH this AS (
+           SELECT COALESCE((SELECT "createdAt" FROM scenario_sessions WHERE id = $3), now()) AS at
+         ),
+         past AS (
+           SELECT DISTINCT ON (r."scenarioSessionId")
+                  r.id, r."scenarioSessionId" AS session_id, r."createdAt", r."releaseId",
+                  r."hasRiskCue", r.cards, r.workspace, s."scenarioId"
+             FROM debrief_runs r
+             JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+            WHERE s."counselorId" = $1
+              AND s.tenant_id IS NOT DISTINCT FROM $2
+              AND r."scenarioSessionId" <> $3
+              AND s."createdAt" <= (SELECT at FROM this)
+              AND r.mode IN ('shadow','live')
+              AND r.status IN ('published','below_bar')
+            ORDER BY r."scenarioSessionId", (r.mode = 'live') DESC, r."createdAt" DESC
+         ),
+         win AS (
+           SELECT p.*, (SELECT count(*)::int FROM past) AS total
+             FROM past p ORDER BY p."createdAt" DESC LIMIT $4
+         )
+         SELECT w.id AS run_id, w.session_id, w."createdAt" AS created_at, w.total,
+                sc.title AS scenario_title, sc."difficultyLevel" AS difficulty,
+                w."hasRiskCue" AS risk,
+                COALESCE(
+                  (SELECT l.prompt_version FROM debrief_run_logs l
+                    WHERE l.run_id = w.id AND l.prompt_code = 'debrief_analyst_system'
+                      AND l.prompt_version IS NOT NULL
+                    ORDER BY l.seq DESC LIMIT 1),
+                  CASE WHEN jsonb_typeof(ar.bundle->'prompts'->'debrief_analyst_system') = 'number'
+                       THEN (ar.bundle->'prompts'->>'debrief_analyst_system')::int END,
+                  CASE WHEN jsonb_typeof(ar."changeSet"->'pinnedPrompts'->'debrief_analyst_system') = 'number'
+                       THEN (ar."changeSet"->'pinnedPrompts'->>'debrief_analyst_system')::int END
+                ) AS analyst_version,
+                w.workspace->'evidence'->'behaviours' AS behaviours,
+                w.cards,
+                w.workspace->'versions' AS versions,
+                pn.id AS pn_scenario_id, pn.title AS pn_scenario_title,
+                EXISTS (SELECT 1 FROM scenario_sessions s2
+                         WHERE pn.id IS NOT NULL AND s2."counselorId" = $1
+                           AND s2.tenant_id IS NOT DISTINCT FROM $2
+                           AND s2."scenarioId" = pn.id AND s2.id <> $3
+                           AND s2."createdAt" > w."createdAt"
+                           AND s2."createdAt" <= (SELECT at FROM this)) AS pn_done,
+                EXISTS (SELECT 1 FROM scenario_sessions s2
+                          JOIN debrief_runs r2 ON r2."scenarioSessionId" = s2.id
+                         WHERE pn.id IS NOT NULL AND s2."counselorId" = $1
+                           AND s2.tenant_id IS NOT DISTINCT FROM $2
+                           AND s2."scenarioId" = pn.id AND s2.id <> $3
+                           AND s2."createdAt" > w."createdAt"
+                           AND s2."createdAt" <= (SELECT at FROM this)
+                           AND r2.mode IN ('shadow','live')
+                           AND r2.status IN ('published','below_bar')) AS pn_published
+           FROM win w
+           LEFT JOIN scenarios sc ON sc.id = w."scenarioId"
+           LEFT JOIN agent_releases ar ON ar.id = w."releaseId"
+           LEFT JOIN scenarios pn
+             ON jsonb_typeof(w.cards->'practise_next'->'scenario_id') = 'number'
+            AND pn.id = (w.cards->'practise_next'->>'scenario_id')::int
+          ORDER BY w."createdAt" DESC`,
+        [counselorId, tenantId, beforeSessionId, window],
+      );
+    if (!rows?.length) return null;
+    const runIds = rows.map((r) => r.run_id);
+    const sessionIds = rows.map((r) => r.session_id);
+    const optional = async <T>(read: () => Promise<T>, fallback: T) => {
+      try {
+        return await read();
+      } catch {
+        return fallback;
+      }
+    };
+    const [flags, comments, lastReport, voice, fhs] = await Promise.all([
+      optional(
+        () =>
+          this.dataSource.query(
+            `SELECT "runId" AS run_id, section, status, reason, "userId" AS user_id
+               FROM debrief_run_feedback
+              WHERE "runId" = ANY($1::uuid[]) AND kind = 'flag' AND status <> 'withdrawn'`,
+            [runIds],
+          ) as Promise<ProgressFlagRow[]>,
+        [] as ProgressFlagRow[],
+      ),
+      optional(
+        () =>
+          this.dataSource.query(
+            `SELECT "runId" AS run_id, "anchorKind" AS anchor_kind,
+                    "turnIndex" AS turn_index, section, tag
+               FROM debrief_review_comments
+              WHERE "runId" = ANY($1::uuid[]) AND "parentId" IS NULL
+                AND tag IN ('wrong_or_unsupported','good_keep_this')`,
+            [runIds],
+          ) as Promise<ProgressCommentRow[]>,
+        [] as ProgressCommentRow[],
+      ),
+      optional(async () => {
+        const [r] = await this.dataSource.query(
+          // Only a reading the learner could have had: a published live or
+          // shadow run's, never a replay's.
+          `SELECT p.run_id, p.created_at, p.skills, p.focus
+             FROM debrief_progress_results p
+             JOIN debrief_runs r ON r.id = p.run_id
+            WHERE p.counselor_id = $1 AND p.tenant_id IS NOT DISTINCT FROM $2
+              AND p.scenario_session_id <> $3
+              AND r.mode IN ('shadow','live')
+              AND r.status IN ('published','below_bar')
+            ORDER BY p.created_at DESC LIMIT 1`,
+          [counselorId, tenantId, beforeSessionId],
+        );
+        return r
+          ? {
+              run_id: String(r.run_id),
+              date: new Date(r.created_at).toISOString().slice(0, 10),
+              skills: Array.isArray(r.skills) ? r.skills : [],
+              focus: r.focus ?? null,
+            }
+          : null;
+      }, null),
+      optional(
+        () =>
+          this.dataSource.query(
+            `SELECT x.session_id, x.content, x.created_at,
+                    x.n = 1 AS first_in_thread,
+                    EXISTS (SELECT 1 FROM debrief_learner_events e
+                             WHERE e."scenarioSessionId" = x.session_id AND e."userId" = $2
+                               AND e.kind = 'reflection_answered') AS reflected
+               FROM (
+                 SELECT c."scenarioSessionId" AS session_id, m.content, m."createdAt" AS created_at,
+                        row_number() OVER (PARTITION BY c.id ORDER BY m."createdAt") AS n
+                   FROM scenario_session_chat_messages m
+                   JOIN scenario_session_chats c ON c.id = m."chatId"
+                  WHERE c."scenarioSessionId" = ANY($1::uuid[]) AND c."userId" = $2
+                    AND m."senderId" = $2
+               ) x
+              ORDER BY x.created_at DESC
+              LIMIT 6`,
+            [sessionIds, counselorId],
+          ) as Promise<ProgressVoiceRow[]>,
+        [] as ProgressVoiceRow[],
+      ),
+      settings.useFhs
+        ? optional(
+            () =>
+              this.dataSource.query(
+                `SELECT c."closedSessionEndedAt" AS at, c."endSessionId" AS session_id,
+                        a."skillLevels" AS levels
+                   FROM foundational_skill_assessments a
+                   JOIN foundational_skill_cuts c ON c.id = a."cutId"
+                  WHERE c."userId" = $1 AND c.tenant_id IS NOT DISTINCT FROM $2
+                    AND a."rubricVersion" = $3 AND a.status = 'SCORED'
+                  ORDER BY c."cutIndex" DESC
+                  LIMIT 12`,
+                [counselorId, tenantId, FHS_RUBRIC_VERSION],
+              ) as Promise<ProgressFhsRow[]>,
+            [] as ProgressFhsRow[],
+          )
+        : Promise.resolve(null),
+    ]);
+    return assembleProgressProfile({
+      settings,
+      counselorId,
+      eligiblePast: Number(rows[0].total ?? rows.length),
+      rows,
+      flags,
+      comments,
+      lastReport,
+      voice,
+      fhs,
+    });
   }
 
   /**

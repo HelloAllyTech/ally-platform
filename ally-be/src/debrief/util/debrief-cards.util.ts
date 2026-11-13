@@ -65,6 +65,16 @@ export interface DebriefCards {
   }>;
   reflective_question: string;
   progress_note?: string | null;
+  /**
+   * "Your last n sessions" (learner progress), only on a debrief where the
+   * card was due and the progress agent had something to tell the learner.
+   * Passed through to the learner as written: every reader spreads the cards.
+   */
+  progress_card?: {
+    sessions: number;
+    skills: Array<{ skill: string; trend: string; line: string }>;
+    focus: { skill: string; line: string } | null;
+  } | null;
 }
 
 export interface SafetyReading {

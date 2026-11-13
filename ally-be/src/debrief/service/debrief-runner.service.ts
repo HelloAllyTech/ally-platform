@@ -1,5 +1,5 @@
 import { restrictBundleToProviders } from '../util/debrief-provider-allowlist.util';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
@@ -54,6 +54,13 @@ import {
   DebriefRunTokenService,
 } from './debrief-run-token.service';
 import { istMonthElapsed } from '../util/debrief-pm-reports.util';
+import { DebriefSettingsService } from './debrief-settings.service';
+import {
+  defaultOwnerSettings,
+  OwnerSettings,
+} from '../constants/debrief-owner-settings.constants';
+import { DebriefProgressResult } from '../entity/debrief-progress-result.entity';
+import type { ProgressSettings } from '../util/debrief-progress.util';
 
 /** What a running debrief is doing now, for the learner's "working" panel. */
 export interface DebriefProgress {
@@ -87,6 +94,7 @@ const GRAPH_PROMPT_CODES: readonly string[] = [
   DEBRIEF_PROMPT_CODES.safetyReader,
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
+  DEBRIEF_PROMPT_CODES.progress,
   DEBRIEF_PROMPT_CODES.writer,
   DEBRIEF_PROMPT_CODES.reviser,
   DEBRIEF_PROMPT_CODES.rubric,
@@ -127,7 +135,19 @@ type Prepared =
       request: Omit<DebriefGraphRequest, 'run_token' | 'gateway_url'>;
       /** The Skills Store version of each prompt sent, for the Agent logs. */
       promptVersions: PromptVersions;
+      /** The learner, for storing the progress reading. */
+      counselorId: number | null;
     };
+
+/** The owner settings' progress group, as the graph's `progress_profile.settings`. */
+export function progressSettings(s: OwnerSettings): ProgressSettings {
+  return {
+    window: s.progressWindow,
+    cardEvery: s.progressCardEvery,
+    useFhs: s.progressUseFhs,
+    showWorseToLearners: s.progressShowWorseToLearners,
+  };
+}
 
 /**
  * Debriefs one session (plan §8) on the Debrief harness
@@ -163,6 +183,10 @@ export class DebriefRunnerService {
     private readonly practice: DebriefPracticeService,
     private readonly llmModels: LlmModelService,
     private readonly agentLogs: DebriefRunLogsService,
+    @Optional() private readonly ownerSettings?: DebriefSettingsService,
+    @Optional()
+    @InjectRepository(DebriefProgressResult)
+    private readonly progressResults?: Repository<DebriefProgressResult>,
   ) {}
 
   /**
@@ -293,7 +317,12 @@ export class DebriefRunnerService {
         },
         bundle.settings.riskDeadlineMs,
       );
-      return await this.apply(run, res, prepared.promptVersions);
+      return await this.apply(
+        run,
+        res,
+        prepared.promptVersions,
+        prepared.counselorId,
+      );
     } catch (e) {
       // ally-ai unreachable or crashed mid-run (a deploy, a restart): the run
       // stays `running` so the stuck-run sweeper resumes it from the graph's
@@ -463,6 +492,13 @@ export class DebriefRunnerService {
       };
     }
 
+    // Learner progress: the owner settings' switch, then the learner's
+    // profile. Never blocks a debrief: unreadable means no profile.
+    const owner = await orFallback(
+      async () => (await this.ownerSettings?.get()) ?? defaultOwnerSettings(),
+      defaultOwnerSettings(),
+    );
+
     // The context the graph's steps read. The optional reads never block a
     // debrief: unreadable means none.
     const [
@@ -473,6 +509,7 @@ export class DebriefRunnerService {
       practiceOptions,
       { texts: prompts, versions: promptVersions },
       availability,
+      progressProfile,
     ] = await Promise.all([
       orFallback(
         () => this.context.liveDetections(sessionId, session.scenarioId),
@@ -499,6 +536,18 @@ export class DebriefRunnerService {
       // org protocols, past debriefs, cohort and course data), cheap counts.
       isOrchestrated(bundle)
         ? orFallback(() => this.context.availability(session), null)
+        : Promise.resolve(null),
+      owner.progressOn && session.counselorId
+        ? orFallback(
+            () =>
+              this.context.progressProfile(
+                session.counselorId!,
+                session.tenantId,
+                sessionId,
+                progressSettings(owner),
+              ),
+            null,
+          )
         : Promise.resolve(null),
     ]);
     if (liveDetections.length) {
@@ -536,9 +585,11 @@ export class DebriefRunnerService {
           case_memory: caseMemory,
           practice_options: practiceOptions,
           ...(availability ? { availability } : {}),
+          progress_profile: progressProfile,
         },
       },
       promptVersions,
+      counselorId: session.counselorId,
     };
   }
 
@@ -597,6 +648,7 @@ export class DebriefRunnerService {
     run: DebriefRun,
     res: DebriefGraphResponse,
     promptVersions: PromptVersions = {},
+    counselorId: number | null = null,
   ): Promise<DebriefRun> {
     if (!res || !GRAPH_STATUSES.has(res.status)) {
       throw new Error(
@@ -643,9 +695,56 @@ export class DebriefRunnerService {
       finishedAt: new Date(),
     });
     await this.runs.save(run);
+    // The progress reading, append-only. Never fails the run.
+    await this.storeProgress(run, res, counselorId);
     // The Agent logs: what every agent was sent and answered. Never fails the run.
     await this.agentLogs.record(run, res.logs, promptVersions);
     return run;
+  }
+
+  /** One `debrief_progress_results` row when the progress agent ran; a failure is logged, never thrown. */
+  private async storeProgress(
+    run: DebriefRun,
+    res: DebriefGraphResponse,
+    counselorId: number | null,
+  ): Promise<void> {
+    const p = res.progress;
+    if (!p || !p.report || !this.progressResults || counselorId == null) {
+      return;
+    }
+    try {
+      const uuids = (v: unknown): string[] =>
+        Array.isArray(v)
+          ? v.filter(
+              (x): x is string =>
+                typeof x === 'string' && /^[0-9a-f-]{36}$/i.test(x),
+            )
+          : [];
+      const ints = (v: unknown): number[] =>
+        Array.isArray(v)
+          ? v.map(Number).filter((n) => Number.isInteger(n))
+          : [];
+      const shownAs =
+        (p.shown_as ?? p.report.shown_as) === 'card' ? 'card' : 'line';
+      await this.progressResults.insert({
+        tenantId: run.tenantId ?? null,
+        counselorId,
+        runId: run.id,
+        scenarioSessionId: run.scenarioSessionId,
+        windowSessionIds: uuids(p.window_session_ids),
+        skills: Array.isArray(p.report.skills) ? p.report.skills : [],
+        followups: Array.isArray(p.report.followups) ? p.report.followups : [],
+        focus: p.report.focus ?? null,
+        vetoes: Array.isArray(p.vetoes) ? p.vetoes : [],
+        shownAs,
+        analystVersions: ints(p.analyst_versions),
+        model: p.model ? String(p.model).slice(0, 200) : null,
+      });
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] could not store the progress reading for run ${run.id}: ${(e as Error).message}`,
+      );
+    }
   }
 
   /** A run that ended in ally-be (a skip, the cap, an error), with why. */

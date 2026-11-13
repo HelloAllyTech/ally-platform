@@ -442,6 +442,7 @@ export function promptLabel(code: string): string {
     debrief_safety_reader_system: 'Safety reader',
     debrief_analyst_system: 'Analyst',
     debrief_progress_reader_system: 'Progress reader',
+    debrief_progress_system: 'Progress agent',
     debrief_writer_system: 'Writer',
     debrief_reviser_system: 'Reviser',
     debrief_quality_rubric: 'Rubric',

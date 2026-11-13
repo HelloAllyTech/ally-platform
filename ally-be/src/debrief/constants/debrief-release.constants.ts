@@ -193,6 +193,8 @@ export const DEBRIEF_PROMPT_CODES = {
   safetyReader: 'debrief_safety_reader_system',
   analyst: 'debrief_analyst_system',
   progressReader: 'debrief_progress_reader_system',
+  /** The progress agent (learner progress over past sessions); its step key stays `progress_reader`. */
+  progress: 'debrief_progress_system',
   writer: 'debrief_writer_system',
   reviser: 'debrief_reviser_system',
   rubric: 'debrief_quality_rubric',

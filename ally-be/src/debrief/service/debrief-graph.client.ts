@@ -6,6 +6,11 @@ import { DebriefRunStepRecord } from '../entity/debrief-run.entity';
 import { DebriefRunMode } from '../enum/debrief-run.enum';
 import { DebriefCheckFailure } from '../util/debrief-cards.util';
 import type { GraphLogEntry } from './debrief-run-logs.service';
+import type { ProgressProfile } from '../util/debrief-progress.util';
+import type {
+  DebriefProgressSkill,
+  DebriefProgressVeto,
+} from '../entity/debrief-progress-result.entity';
 
 /** Past the graph's own deadline: room for its last write and the response. */
 export const GRAPH_MARGIN_MS = 60_000;
@@ -45,6 +50,8 @@ export interface DebriefGraphRequest {
     cohort: unknown;
     case_memory: unknown;
     practice_options: unknown[];
+    /** The learner's progress profile; null when progress is off or there is no published history. */
+    progress_profile?: ProgressProfile | null;
   };
   run_token: string;
   gateway_url: string;
@@ -72,6 +79,24 @@ export interface DebriefGraphResponse {
   language?: string | null;
   /** Set with status `failed`: what stopped the graph. */
   error?: string | null;
+  /** The progress agent's reading after the code vetoes; absent when it did not run. */
+  progress?: DebriefGraphProgress | null;
+}
+
+/** `response.progress`: the progress agent's report after the vetoes. */
+export interface DebriefGraphProgress {
+  report: {
+    skills?: DebriefProgressSkill[];
+    followups?: Array<Record<string, any>>;
+    focus?: Record<string, any> | null;
+    shown_as?: 'line' | 'card';
+    reasoning?: string;
+  };
+  vetoes?: DebriefProgressVeto[];
+  shown_as?: 'line' | 'card';
+  model?: string | null;
+  window_session_ids?: string[];
+  analyst_versions?: number[];
 }
 
 export class DebriefGraphError extends Error {

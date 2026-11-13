@@ -1,3 +1,7 @@
+import {
+  progressConsoleView,
+  ProgressResultRow,
+} from '../util/debrief-progress.util';
 import { DebriefRunStepRecord } from '../entity/debrief-run.entity';
 import {
   ForbiddenException,
@@ -598,6 +602,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
       thread,
       queue,
       ownerSettings,
+      progressRows,
     ] = await Promise.all([
       this.reviews.reviewTranscript(run).catch(() => []),
       this.dataSource.query(
@@ -620,6 +625,19 @@ export class DebriefConsoleViewService implements OnModuleInit {
         : Promise.resolve([] as Array<Record<string, any>>),
       this.queueIds(viewer),
       this.settings.get(),
+      // Learner progress: this run's reading after the vetoes. Unreadable
+      // (no table yet) reads as none.
+      Promise.resolve()
+        .then(
+          () =>
+            this.dataSource.query(
+              `SELECT shown_as, window_session_ids, skills, followups, focus, vetoes, created_at
+             FROM debrief_progress_results WHERE run_id = $1
+            ORDER BY created_at DESC LIMIT 1`,
+              [run.id],
+            ) as Promise<ProgressResultRow[]>,
+        )
+        .catch(() => [] as ProgressResultRow[]),
     ]);
     const cards = run.cards as DebriefCards | null;
     const ws = run.workspace ?? {};
@@ -825,6 +843,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
           ? ws.history.sessions.length
           : null,
       },
+      progress: progressConsoleView(progressRows?.[0]),
       howItWasMade: {
         recipe: run.recipeKey ?? null,
         releaseVersion: run.releaseVersion ?? null,

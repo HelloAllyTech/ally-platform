@@ -133,6 +133,19 @@ export function sectionText(
       return cards.reflective_question ?? null;
     case 'progress_note':
       return cards.progress_note ?? null;
+    case 'progress_card': {
+      // "Your last {n} sessions": the progress agent's own learner lines,
+      // already in the debrief's language; the focus first, as the card shows.
+      const card = (cards as unknown as Record<string, any>).progress_card;
+      if (!card || typeof card !== 'object') return null;
+      const lines = [
+        card.focus?.line,
+        ...(Array.isArray(card.skills) ? card.skills : []).map(
+          (s: { line?: unknown }) => s?.line,
+        ),
+      ].filter((l): l is string => typeof l === 'string' && !!l.trim());
+      return lines.length ? lines.join(' ') : null;
+    }
     default:
       return null;
   }

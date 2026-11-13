@@ -31,7 +31,10 @@ import {
   ScenarioSessionEventStatus,
   ScenarioSessionStatus,
 } from 'src/learn/enum/scenario-session-status.enum';
-import { ScenarioSessionLeaderboardEvent } from 'src/learn/type/scenario-session-leaderboard-event.type';
+import {
+  ScenarioSessionCompletionEvent,
+  ScenarioSessionLeaderboardEvent,
+} from 'src/learn/type/scenario-session-leaderboard-event.type';
 import { BehaviorInstructionCategory } from 'src/learn/enum/behavior-instruction.enum';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import {
@@ -2435,6 +2438,21 @@ describe('ScenarioSessionService', () => {
           userId: mockCounselorId,
           durationMinutes: activeMs / 60000,
         }),
+      );
+    });
+
+    it('announces the completed session even when no practice minutes were recorded', () => {
+      const emit = (service as any).eventEmitter.emit as jest.Mock;
+      emit.mockClear();
+      (service as any).emitLeaderboardPracticeMinutes(
+        { ...mockScenarioSession, id: 's-zero', tenantId: 't-1' },
+        0,
+        new Date(),
+      );
+      expect(emit).toHaveBeenCalledTimes(1);
+      expect(emit).toHaveBeenCalledWith(
+        ScenarioSessionCompletionEvent.SCENARIO_SESSION_COMPLETED,
+        { scenarioSessionId: 's-zero', tenantId: 't-1' },
       );
     });
 

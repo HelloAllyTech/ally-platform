@@ -22,7 +22,8 @@ export interface OwnerSettingSpec {
     | 'canary'
     | 'budget'
     | 'metrics'
-    | 'agent';
+    | 'agent'
+    | 'progress';
 }
 
 export const OWNER_SETTINGS_SPEC = {
@@ -163,6 +164,31 @@ export const OWNER_SETTINGS_SPEC = {
     max: 50,
     budget: true,
     group: 'agent',
+  },
+  // Learner progress in debriefs. On by default: only
+  // organisations switched on for the Debrief agent run it anyway. The card
+  // ("Your last n sessions") shows every `progressCardEvery`th eligible
+  // session; the agent looks back over `progressWindow` published debriefs.
+  progressOn: { default: true, kind: 'bool', group: 'progress' },
+  progressCardEvery: {
+    default: 5,
+    kind: 'int',
+    min: 1,
+    max: 20,
+    group: 'progress',
+  },
+  progressWindow: {
+    default: 6,
+    kind: 'int',
+    min: 3,
+    max: 12,
+    group: 'progress',
+  },
+  progressUseFhs: { default: true, kind: 'bool', group: 'progress' },
+  progressShowWorseToLearners: {
+    default: false,
+    kind: 'bool',
+    group: 'progress',
   },
 } as const satisfies Record<string, OwnerSettingSpec>;
 

@@ -123,6 +123,8 @@ import { ScenarioSessionReviewSharedService } from 'src/scenario-session-review/
 import {
   ScenarioSessionLeaderboardEvent,
   ScenarioSessionLeaderboardEndedEventParams,
+  ScenarioSessionCompletionEvent,
+  ScenarioSessionCompletedEventParams,
 } from '../type/scenario-session-leaderboard-event.type';
 import { CaseSharedService } from 'src/case/service/case-shared.service';
 import { CaseSessionService } from 'src/case/service/case-session.service';
@@ -1547,6 +1549,16 @@ export class ScenarioSessionService {
     callDuration: number,
     endedAt: Date,
   ): void {
+    // The session is complete whatever its duration: the debrief starts from
+    // this, never from the practice minutes below (a zero-duration end would
+    // otherwise leave the learner waiting for the drain).
+    this.eventEmitter.emit(
+      ScenarioSessionCompletionEvent.SCENARIO_SESSION_COMPLETED,
+      {
+        scenarioSessionId: session.id,
+        tenantId: session.tenantId ?? null,
+      } as ScenarioSessionCompletedEventParams,
+    );
     const durationMinutes = callDuration / (1000 * 60);
     if (durationMinutes <= 0) return;
     this.eventEmitter.emit(
