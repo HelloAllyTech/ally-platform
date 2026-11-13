@@ -250,6 +250,9 @@ class KnowledgeCrisisClassifyInputs(PromptInputs):
     output_format: ClassVar[Optional[str]] = "structured"
 
     message: str
+    # The sender's earlier messages, rendered. Optional so a text that uses only
+    # `{message}` still validates.
+    history: str = ""
 
 
 class KnowledgeTranslateQueryInputs(PromptInputs):

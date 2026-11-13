@@ -250,6 +250,15 @@ class KnowledgeAnswerResponse(BaseModel):
 
 class CrisisCheckRequest(BaseModel):
     message: str = Field(..., min_length=1)
+    # Not length-validated: a 422 here would turn a long chat into a check that did not
+    # run. The prompt builder trims it instead.
+    history: List[str] = Field(
+        default_factory=list,
+        description=(
+            "The sender's own earlier messages in this conversation, oldest first, "
+            "without the message being checked. Never the assistant's replies."
+        ),
+    )
     prompts: Optional[Dict[str, Any]] = Field(
         None, description="ally-be prompt overrides, keyed by prompt code."
     )

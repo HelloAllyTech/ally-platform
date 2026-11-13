@@ -249,7 +249,11 @@ class KnowledgeAgentService:
     # ------------------------------------------------------------------ crisis
 
     async def classify_crisis(
-        self, message: str, *, prompts: Optional[Dict[str, Any]] = None
+        self,
+        message: str,
+        *,
+        history: Optional[List[str]] = None,
+        prompts: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Decide whether a message is about a crisis happening now.
@@ -265,6 +269,11 @@ class KnowledgeAgentService:
         they structurally cannot catch, which is indirect disclosure ("I can't
         keep doing this"). Neither replaces the other.
 
+        `history` is the sender's own earlier messages, oldest first (chunk 15a):
+        "I mean it" is risk only after a disclosure, and "what if I miss a day?"
+        is ordinary after a question about streaks. Never the assistant's
+        replies: the crisis reply's own wording would tip every later message.
+
         A failure here returns ``is_crisis: false`` rather than raising, and
         `failed` says so. Raising would take the whole question down over the
         classifier, and defaulting to true would answer every question with a
@@ -277,7 +286,7 @@ class KnowledgeAgentService:
         provider, model, temperature = get_backend_llm_overrides(
             CRISIS_PROMPT_PATH, prompts
         )
-        prompt = build_crisis_prompt(message, prompts=prompts)
+        prompt = build_crisis_prompt(message, history=history, prompts=prompts)
         if not prompt:
             logger.error(
                 "Crisis prompt template resolved empty; skipping classification"

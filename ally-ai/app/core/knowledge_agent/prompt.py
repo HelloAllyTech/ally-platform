@@ -29,6 +29,12 @@ MAX_PASSAGE_CHARS = 4000
 MAX_HISTORY_TURNS = 6
 MAX_HISTORY_CHARS = 1500
 
+# The crisis check's view of the sender's earlier messages (ally-be sends the same
+# limits; these hold if it doesn't). Enough to read "I mean it" after a disclosure.
+MAX_CRISIS_HISTORY_MESSAGES = 5
+MAX_CRISIS_HISTORY_CHARS = 1500
+NO_CRISIS_HISTORY = "(no earlier messages)"
+
 
 def format_passages(passages: List[Dict[str, Any]]) -> str:
     """
@@ -232,12 +238,41 @@ def build_translate_prompt(
     )
 
 
+def format_crisis_history(history: Optional[List[str]]) -> str:
+    """
+    Render the sender's earlier messages for the crisis check, oldest first.
+
+    The newest messages are kept: a follow-up is read against what was just said. A
+    message that crosses the character budget keeps its end, and older ones are dropped.
+    """
+    messages = [" ".join((m or "").split()) for m in history or []]
+    messages = [m for m in messages if m][-MAX_CRISIS_HISTORY_MESSAGES:]
+    kept: List[str] = []
+    budget = MAX_CRISIS_HISTORY_CHARS
+    for message in reversed(messages):
+        if budget <= 0:
+            break
+        if len(message) > budget:
+            message = "…" + message[-(budget - 1) :] if budget > 1 else "…"
+        kept.insert(0, message)
+        budget -= len(message)
+    return "\n".join(f"- {m}" for m in kept) or NO_CRISIS_HISTORY
+
+
 def build_crisis_prompt(
-    message: str, *, prompts: Optional[Dict[str, Any]] = None
+    message: str,
+    *,
+    history: Optional[List[str]] = None,
+    prompts: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Assemble the crisis-classification prompt."""
+    """Assemble the crisis-classification prompt.
+
+    A text without `{history}` ignores it, so the same code renders an older version of
+    the prompt exactly as before.
+    """
     return load_and_format(
         CRISIS_PROMPT_PATH,
         prompts=prompts,
         message=message.strip(),
+        history=format_crisis_history(history),
     )

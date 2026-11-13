@@ -313,3 +313,39 @@ class TestAnswerAudience(_ResolvedKeyAPITest):
         assert audience.tenant_id == tenant_id
         assert audience.include_global is True
         assert audience.ignore_targeting is False
+
+
+class TestCrisisCheckEndpoint(_ResolvedKeyAPITest):
+    VERDICT = {"is_crisis": False, "signal": "", "confidence": 0.9, "failed": False}
+
+    def test_history_is_forwarded(self, client: TestClient):
+        with patch(f"{SERVICE}.classify_crisis") as classify:
+            classify.return_value = self.VERDICT
+            response = client.post(
+                "/api/v1/knowledge-agent/crisis-check",
+                json={"message": "I mean it", "history": ["I've saved up my pills"]},
+            )
+
+        assert response.status_code == 200
+        assert classify.call_args.kwargs["history"] == ["I've saved up my pills"]
+
+    def test_history_is_optional(self, client: TestClient):
+        with patch(f"{SERVICE}.classify_crisis") as classify:
+            classify.return_value = self.VERDICT
+            response = client.post(
+                "/api/v1/knowledge-agent/crisis-check", json={"message": "hi"}
+            )
+
+        assert response.status_code == 200
+        assert classify.call_args.kwargs["history"] == []
+
+    def test_a_long_history_is_not_rejected(self, client: TestClient):
+        # A 422 would be a check that did not run; the prompt builder trims instead.
+        with patch(f"{SERVICE}.classify_crisis") as classify:
+            classify.return_value = self.VERDICT
+            response = client.post(
+                "/api/v1/knowledge-agent/crisis-check",
+                json={"message": "hi", "history": ["x" * 5000] * 50},
+            )
+
+        assert response.status_code == 200
