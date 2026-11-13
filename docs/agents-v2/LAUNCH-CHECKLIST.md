@@ -52,6 +52,12 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **`AGENT_GATEWAY_SECRET` set, or knowingly left derived** from `JWT_ACCESS_SECRET` (label `agent-gateway-v1`, never Debrief's).
 - [ ] **`hand_over` stays off for every bot** until someone turns it on per bot (`abilities` in that bot's settings, platform admins only).
 
+## 5a: lists
+
+- [ ] **Migration `1981900950000-AddLists`** (additive: six new tables) runs with ally-be. Nothing reads or writes them until owners or the agent use lists (5b, 6) (`CHUNK-05A-NOTES.md`).
+- [ ] **Erasure doesn't reach list records yet (21a, next sprint).** Records are business data and have no retention sweep. Until 21a, when a person asks to be erased, delete their records by hand: `collection_records` where `contact_id` is theirs, in each list with a person field, and any record whose `data` names them in another relation-to-contact field.
+- [ ] **`lists:seed` is for local and staging bots only**; it refuses `NODE_ENV=production`.
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).

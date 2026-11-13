@@ -720,3 +720,22 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Overview numbers, with the 7 / 30 days switch (20d-2, at approval):** Your numbers · Show the last · 7 days · 30 days
 - **Overview, All numbers (CL1, replacing the classic usage tab; opens in place under the numbers):** See all numbers · Hide all numbers · Show the last · 7 days · 30 days · 90 days · Messages in · People · Didn't know · Of the questions it was asked · Too few questions to say · Typical reply time · 1 in 20 took {s} s or longer · {s} s · What happened to each message · Answered · Didn't know · Asked to clarify · Safety replies · From numbers it didn't recognise · Errors on our side · Other · Replies per day · {day}: {n} replies · Languages · Language · Questions · Documents it used most · {n} times · Not used in this period: 1 document · Not used in this period: {n} documents · No messages in this period yet. · We couldn't load these numbers. · Try again
 - **The header's `···` menu, staff only (CL1, replacing the classic view's Settings tab):** Settings · This assistant's own engine settings. Only platform admins see this.
+
+## 26. Lists (5a)
+
+*(The refusals a list write can get. The owner's screens (5b) and the agent (6) both show them. `{field}` is the field's label; mid-sentence, a label or list name reads in lower case, as in "That slot is already taken.")*
+
+- **required_missing:** {field} is needed.
+- **invalid_value:** {field} isn't valid: {why}.
+- **not_writable:** {field} can't be changed here.
+- **unique_taken:** That {field} is already taken.
+- **capacity_full:** {target} is full.
+- **limit_reached:** This person already has {max} {list}.
+- **transition_not_allowed:** {list} can't go from {from} to {to}.
+- **not_found:** That entry doesn't exist any more.
+- **version_conflict:** Someone changed this entry just now. Reload and try again.
+- **limit_exceeded:** This would go over the limit of {limit}.
+
+**The `{why}` reasons (5a, in the engine):** it should be text · it's longer than {max} characters · it should be a number · it should be a whole number of minutes · it should be a date like 2026-11-20 · it should be a date and time with its offset, like 2026-11-20T11:15:00+05:30 · it should be one of {values} · it should be yes or no · it isn't a phone number · it isn't an email address · it isn't a web address · it should be an entry's id · that entry doesn't exist · it isn't a field of this list · its type can't change while entries have a value for it · {n} entries already break it (adding a rule).
+
+**`{limit}` (5a):** 50 lists · 100 fields · 200,000 entries · 32 KB per entry · 5,000 rows a file · 5 MB a file · 20 rules.
