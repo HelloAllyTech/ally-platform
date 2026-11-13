@@ -64,6 +64,7 @@ import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefPmAgentService } from '../service/debrief-pm-agent.service';
 import { DebriefPmAgentRunService } from '../service/debrief-pm-agent-run.service';
 import { DebriefPmReportsService } from '../service/debrief-pm-reports.service';
+import { DebriefRunLogsService } from '../service/debrief-run-logs.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
@@ -540,6 +541,7 @@ export class DebriefConsoleController {
     private readonly releaseHistory: DebriefReleasesService,
     private readonly pmReports: DebriefPmReportsService,
     private readonly builderRequester: DebriefBuilderRequesterService,
+    private readonly agentLogs: DebriefRunLogsService,
   ) {}
 
   /** Release settings (budgets, the evaluator bar) are the owner's. */
@@ -1027,6 +1029,16 @@ export class DebriefConsoleController {
     @Req() req: AuthedRequest,
   ) {
     return this.view.session(id, await this.view.viewer(req.user.id));
+  }
+
+  @Get('runs/:runId/logs')
+  @DebriefAct('agentLogs')
+  @ApiOperation({
+    summary:
+      'Agent logs: the exact input every agent was sent and its full reply, in order (Ally team only). Runs from before logs were kept answer an empty list with `loggedFrom`',
+  })
+  agentLogsOf(@Param('runId', ParseUUIDPipe) runId: string) {
+    return this.agentLogs.view(runId);
   }
 
   @Get('attention')

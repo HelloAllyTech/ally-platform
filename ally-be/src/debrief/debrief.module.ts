@@ -26,6 +26,7 @@ import { DebriefReviewComment } from './entity/debrief-review-comment.entity';
 import { DebriefReviewService } from './service/debrief-review.service';
 import { DebriefFeedback } from './entity/debrief-feedback.entity';
 import { DebriefRun } from './entity/debrief-run.entity';
+import { DebriefRunLog } from './entity/debrief-run-log.entity';
 import { DebriefAgentService } from './service/debrief-agent.service';
 import { AskAllyClient } from './service/ask-ally.client';
 import { DebriefConsoleService } from './service/debrief-console.service';
@@ -62,6 +63,7 @@ import { DebriefLearnerEventsService } from './service/debrief-learner-events.se
 import { DebriefMetricsService } from './service/debrief-metrics.service';
 import { DebriefConsoleAuditInterceptor } from './interceptor/debrief-console-audit.interceptor';
 import { DebriefRunJudgeService } from './service/debrief-run-judge.service';
+import { DebriefRunLogsService } from './service/debrief-run-logs.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
 
@@ -77,6 +79,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
   imports: [
     TypeOrmModule.forFeature([
       DebriefRun,
+      // The Agent logs: every agent's exact input and full reply, per run.
+      DebriefRunLog,
       DebriefFeedback,
       DebriefOwnerSettings,
       DebriefProbeResult,
@@ -129,6 +133,7 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefAggregatesService,
     DebriefRunnerService,
     DebriefRunJudgeService,
+    DebriefRunLogsService,
     DebriefAgentService,
     DebriefTestSetsService,
     DebriefPmAgentService,

@@ -1,5 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  AgentLogsView,
   AnswerBuilderDecisionRequest,
   DebriefMetricsFilter,
   DebriefMetricsView,
@@ -261,6 +262,10 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
     }),
     getDebriefSession: builder.query<DebriefSessionView, string>({
       query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.SESSION(id), method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefRunLogs: builder.query<AgentLogsView, string>({
+      query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.RUN_LOGS(id), method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     getDebriefAttention: builder.query<DebriefAttention, void>({
@@ -527,6 +532,7 @@ export const {
   useGetDebriefMeQuery,
   useGetDebriefSessionsQuery,
   useGetDebriefSessionQuery,
+  useGetDebriefRunLogsQuery,
   useGetDebriefAttentionQuery,
   useCorrectDebriefRunMutation,
   useAddDebriefCommentMutation,

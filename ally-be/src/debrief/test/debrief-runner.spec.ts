@@ -144,6 +144,9 @@ function build(
       async (code: string, version: number | null) =>
         `live ${code}@${version ?? 'current'}`,
     ),
+    currentPromptVersions: jest.fn(async (codes: string[]) =>
+      Object.fromEntries(codes.map((c) => [c, 2])),
+    ),
     providerAllowlist: jest.fn(
       async () => opts.providerAllowlist ?? ['gemini', 'openai', 'anthropic'],
     ),
@@ -183,6 +186,7 @@ function build(
       { id: 41, title: 'Exam stress', skills: ['reflections'] },
     ]),
   };
+  const agentLogs = { record: jest.fn(async () => 0) };
   const svc = new DebriefRunnerService(
     runs as any,
     context as any,
@@ -196,9 +200,20 @@ function build(
       getModels: async () =>
         Object.values(DEBRIEF_MODELS).map((model) => ({ model })),
     } as any,
+    agentLogs as any,
   );
   const request = () => (graph.run.mock.calls as any[][])[0]?.[0];
-  return { svc, saved, runs, context, graph, tokens, practice, request };
+  return {
+    svc,
+    saved,
+    runs,
+    context,
+    graph,
+    tokens,
+    practice,
+    request,
+    agentLogs,
+  };
 }
 
 describe('DebriefRunnerService', () => {
@@ -444,6 +459,29 @@ describe('DebriefRunnerService', () => {
         decision: { status: 'published' },
       });
       expect(saved).toHaveLength(1);
+    });
+
+    it('stores the graph’s agent logs with each prompt’s version (an override keeps its text)', async () => {
+      const logs = [
+        { seq: 1, kind: 'code', step: 'plan', input: {}, output: {} },
+      ];
+      const { svc, agentLogs } = build({
+        graph: { ...graphAnswer(), logs } as any,
+      });
+      const run = await svc.run('s1', {
+        mode: DebriefRunMode.REPLAY,
+        promptOverrides: { [DEBRIEF_PROMPT_CODES.writer]: 'challenger text' },
+      });
+      expect(agentLogs.record).toHaveBeenCalledTimes(1);
+      const [stored, entries, versions] = (
+        agentLogs.record.mock.calls as any[][]
+      )[0];
+      expect(stored).toBe(run);
+      expect(entries).toEqual(logs);
+      expect(versions[DEBRIEF_PROMPT_CODES.writer]).toEqual({
+        text: 'challenger text',
+      });
+      expect(versions[DEBRIEF_PROMPT_CODES.safetyReader]).toBe(2);
     });
 
     it('keeps a needs-person decision and its reason', async () => {

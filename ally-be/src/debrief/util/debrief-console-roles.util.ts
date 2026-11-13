@@ -41,6 +41,8 @@ export const DEBRIEF_ACTIONS = {
   switchOrgOn: [OWNER],
   /** Urgent, so not owner-only. */
   emergencyStop: [TEAM, OWNER],
+  /** Agent logs: every agent's exact input and full reply (the whole transcript). */
+  agentLogs: [TEAM],
   /** Budgets, test thresholds, accepting proposed values, autonomy unlocks, steering weights. */
   ownerSettings: [OWNER],
 } as const satisfies Record<string, readonly string[]>;

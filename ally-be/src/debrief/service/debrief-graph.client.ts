@@ -5,6 +5,7 @@ import { DebriefBundle } from '../constants/debrief-release.constants';
 import { DebriefRunStepRecord } from '../entity/debrief-run.entity';
 import { DebriefRunMode } from '../enum/debrief-run.enum';
 import { DebriefCheckFailure } from '../util/debrief-cards.util';
+import type { GraphLogEntry } from './debrief-run-logs.service';
 
 /** Past the graph's own deadline: room for its last write and the response. */
 export const GRAPH_MARGIN_MS = 60_000;
@@ -55,6 +56,8 @@ export interface DebriefGraphResponse {
   recipe_key?: string | null;
   cards?: Record<string, any> | null;
   steps?: DebriefRunStepRecord[];
+  /** The Agent logs: each model call's exact message and reply, each code step's inputs and results. */
+  logs?: GraphLogEntry[];
   workspace?: Record<string, any>;
   estimated_cost_usd?: number;
   fallback_rung?: number;

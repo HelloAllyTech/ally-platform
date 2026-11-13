@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from app.core.debrief_graph.agent_logs import numbered
 from app.core.debrief_graph.constants import END_WHY, FAILED_WHY, FallbackRung, Status
 from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.state import DebriefState
@@ -44,6 +45,7 @@ def build_result(
         "recipe_key": state.get("recipe_key"),
         "cards": patch.get("cards"),
         "steps": list(state.get("steps") or []),
+        "logs": numbered(state.get("logs") or []),
         "workspace": workspace,
         "estimated_cost_usd": round(float(state.get("estimated") or 0.0), 4),
         "fallback_rung": rung,

@@ -26,6 +26,7 @@ from langgraph.errors import NodeError, NodeTimeoutError
 from langgraph.runtime import Runtime
 from langgraph.types import Command, RetryPolicy
 
+from app.core.debrief_graph.agent_logs import code_log, model_logs
 from app.core.debrief_graph.budget import budget_left
 from app.core.debrief_graph.circuit import (
     models_to_try,
@@ -38,6 +39,7 @@ from app.core.debrief_graph.findings import agent_findings
 from app.core.debrief_graph.records import iso, progress_event, safe_summary
 from app.core.debrief_graph.state import DebriefState
 from app.core.debrief_graph.step_functions import StepError
+from app.core.llm.capture import capture_calls
 
 #: What a step's success or failure hook returns: extra state, and where to go
 #: next (None = follow the node's static edge).
@@ -80,6 +82,9 @@ class ModelStep:
     max_attempts: int = 2
     #: Seconds per attempt; default STEP_TIMEOUT_S[path].
     timeout_s: Optional[float] = None
+    #: The Skills Store prompt this step's message carries (its system prompt,
+    #: or the Evaluator's rubric): the Agent logs name it instead of copying it.
+    prompt_code: Optional[str] = None
 
     def key(self, state: State) -> str:
         return f"{self.path}#{self.round_of(state) or 0}"
@@ -96,8 +101,9 @@ class ModelStep:
 def _route(update: Dict[str, Any], nxt: Next):
     extra, goto = nxt
     merged = {**update, **extra}
-    if "steps" in extra:
-        merged["steps"] = update["steps"] + extra["steps"]
+    for key in ("steps", "logs"):
+        if key in extra and key in update:
+            merged[key] = update[key] + extra[key]
     return Command(update=merged, goto=goto) if goto else merged
 
 
@@ -146,7 +152,26 @@ def make_model_step(spec: ModelStep):
         }
         t0 = ctx.clock()
 
+        calls: List[Dict[str, Any]] = []
+        sent_body: Dict[str, Any] = {}
+
         def failed(note: str) -> Dict[str, Any]:
+            scratch.setdefault("logs", []).extend(
+                model_logs(
+                    ctx,
+                    step=spec.step,
+                    round_=rnd,
+                    t0=t0,
+                    primary=scratch["models"][0],
+                    model=model,
+                    prompt_code=spec.prompt_code,
+                    calls=calls,
+                    body=sent_body,
+                    result=None,
+                    retries=attempt - 1,
+                    error=note,
+                )
+            )
             if model:
                 record_model_failure(model)
             record = {
@@ -184,6 +209,17 @@ def make_model_step(spec: ModelStep):
                 ctx.attempts.pop(key, None)
                 res = {"findings": []}
                 update = {
+                    "logs": scratch.get("logs", [])
+                    + [
+                        code_log(
+                            ctx,
+                            spec.step,
+                            t0,
+                            input={"read": "nothing to read"},
+                            output={"modelCalled": False, "findings": []},
+                            round_=rnd,
+                        )
+                    ],
                     "steps": [
                         {
                             **base,
@@ -202,10 +238,12 @@ def make_model_step(spec: ModelStep):
                 }
                 return _route(update, spec.on_success(state, ctx, res))
             sent = {**state, "fetched": fetched}
+        sent_body.update(spec.body(sent, ctx))
         try:
-            res = await ctx.steps.run(
-                spec.path, spec.body(sent, ctx), model, ctx.session_id
-            )
+            with capture_calls() as captured:
+                # The list is shared, so a failed attempt's handler sees it.
+                calls = captured
+                res = await ctx.steps.run(spec.path, sent_body, model, ctx.session_id)
         except asyncio.CancelledError:
             # The node timeout cancelled this attempt (axios' wording, as before).
             ms = int(spec.timeout() * 1000)
@@ -236,8 +274,23 @@ def make_model_step(spec: ModelStep):
             "budgetLeftUsd": left,
         }
         ctx.attempts.pop(key, None)
+        logs = model_logs(
+            ctx,
+            step=spec.step,
+            round_=rnd,
+            t0=t0,
+            primary=scratch["models"][0],
+            model=model,
+            prompt_code=spec.prompt_code,
+            calls=calls,
+            body=sent_body,
+            result=res,
+            retries=attempt - 1,
+            error=None,
+        )
         update: Dict[str, Any] = {
             "steps": scratch["failed"] + [done],
+            "logs": scratch.get("logs", []) + logs,
             "results": {key: res},
         }
         if spec.findings is not None and state.get("orchestrated"):
@@ -254,6 +307,7 @@ def make_model_step(spec: ModelStep):
         scratch = runtime.context.attempts.pop(spec.key(state), None) or {}
         update = {
             "steps": scratch.get("failed", []),
+            "logs": scratch.get("logs", []),
             "results": {spec.key(state): None},
         }
         return _route(update, spec.on_failure(state, runtime.context))
