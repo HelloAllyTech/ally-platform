@@ -45,6 +45,13 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **6. Set the Turnstile keys** for the bot page.
 - [ ] **7. Turn `botPagePublicAllowed` on.** It's platform-wide: at first, switch only one internal assistant and one pilot assistant to "Anyone with the link".
 
+## 3b: the tool gateway
+
+- [ ] **Deploy ally-ai, then ally-be.** Both changes are additive: older ally-ai ignores `gateway`, and older ally-be never sends one. Migration `1981900949000-AddToolRuns` (new `tool_runs`; `needs_person_reason` also allows `assistant`) runs with ally-be (`CHUNK-03B-NOTES.md`).
+- [ ] **ally-ai can reach `PUBLIC_API_BASE_URL`** (`/api/v1/internal/agent/tools/*`), as Debrief already needs. Locally it must be `http://host.docker.internal:8001`; unset, it's `localhost`, and every gateway call fails.
+- [ ] **`AGENT_GATEWAY_SECRET` set, or knowingly left derived** from `JWT_ACCESS_SECRET` (label `agent-gateway-v1`, never Debrief's).
+- [ ] **`hand_over` stays off for every bot** until someone turns it on per bot (`abilities` in that bot's settings, platform admins only).
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).
