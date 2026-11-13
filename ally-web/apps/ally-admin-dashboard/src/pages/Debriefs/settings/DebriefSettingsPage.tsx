@@ -643,7 +643,7 @@ export const DebriefSettingsPage: React.FC = () => {
             to={to(id)}
             aria-current={id === current ? "page" : undefined}
             data-testid={`settings-tab-${id}`}
-            className={`whitespace-nowrap py-2.5 no-underline ${NARROW_MORE.includes(id) ? "hidden lg:inline" : ""} ${id === current ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
+            className={`whitespace-nowrap py-2.5 no-underline ${NARROW_MORE.includes(id) ? "hidden min-[1056px]:inline" : ""} ${id === current ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
           >
             {s.nav[id]}
           </Link>
@@ -660,14 +660,14 @@ export const DebriefSettingsPage: React.FC = () => {
             </span>
           )}
           iconDescription={s.more}
-          className={`!h-auto !w-auto shrink-0 !bg-transparent !px-0 py-2.5 ${schedules || canOpenGuidance ? "" : "lg:!hidden"} ${inMore ? "border-b-2 border-primary-500 font-semibold text-typography-900" : NARROW_MORE.includes(current) ? "text-neutral-600 max-lg:border-b-2 max-lg:border-primary-500 max-lg:font-semibold max-lg:text-typography-900" : "text-neutral-600"}`}
+          className={`!h-auto !w-auto shrink-0 !bg-transparent !px-0 py-2.5 ${schedules || canOpenGuidance ? "" : "min-[1056px]:!hidden"} ${inMore ? "border-b-2 border-primary-500 font-semibold text-typography-900" : NARROW_MORE.includes(current) ? "text-neutral-600 max-[1055px]:border-b-2 max-[1055px]:border-primary-500 max-[1055px]:font-semibold max-[1055px]:text-typography-900" : "text-neutral-600"}`}
           data-testid="settings-more"
         >
           {NARROW_MORE.map(id => (
             <OverflowMenuItem
               key={id}
               itemText={s.nav[id]}
-              wrapperClassName="lg:hidden"
+              wrapperClassName="min-[1056px]:!hidden"
               onClick={() => navigate(to(id))}
             />
           ))}

@@ -12,6 +12,10 @@ import { en } from "@constants";
  * "More"; a title truncates with its full text in a tooltip; keyboard hints live in a tooltip.
  * Below Carbon's lg breakpoint (1056px) a header may split, on purpose, into a title row and an
  * action row. Card content (meta lines, chips, text) still wraps naturally.
+ *
+ * The breakpoint is Carbon's 1056px, written `min-[1056px]:` / `max-[1055px]:`: Tailwind's own
+ * `lg:` here is 1024px. A Carbon OverflowMenuItem needs `!hidden`, since Carbon's
+ * `display: flex` on the option otherwise wins.
  */
 
 type Heading = "h1" | "h2" | "h3" | "span" | "div";
@@ -60,7 +64,7 @@ export const MoreActions: React.FC<{
         <OverflowMenuItem
           key={item.id}
           itemText={item.label}
-          wrapperClassName={item.belowLgOnly ? "lg:hidden" : undefined}
+          wrapperClassName={item.belowLgOnly ? "min-[1056px]:!hidden" : undefined}
           onClick={() => (item.to ? navigate(item.to) : item.onClick?.())}
         />
       ))}

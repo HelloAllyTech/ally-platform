@@ -381,7 +381,7 @@ export const ReportsView: React.FC = () => {
       <main className="flex max-w-[900px] flex-[1_1_560px] flex-col gap-5" data-print-root="">
         {/* One row at lg and up: the title truncates (full text in its tooltip), the toolbar keeps
             its line. Below lg the toolbar takes a second row, on purpose. */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-end lg:justify-between lg:gap-6">
+        <div className="flex flex-col gap-3 min-[1056px]:flex-row min-[1056px]:flex-nowrap min-[1056px]:items-end min-[1056px]:justify-between min-[1056px]:gap-6">
           <div className="min-w-0">
             <div className="truncate text-[13px] text-neutral-600" data-testid="pm-report-kicker">
               {kicker}

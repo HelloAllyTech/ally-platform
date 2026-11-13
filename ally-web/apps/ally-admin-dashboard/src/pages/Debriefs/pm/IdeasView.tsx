@@ -76,7 +76,7 @@ const AutonomyChips: React.FC<{ autonomy: DebriefAutonomyView }> = ({ autonomy }
     // One row at lg and up: the label truncates first (full words in its tooltip), the chips never
     // shrink. Below lg the chips take their own row, on purpose.
     <div
-      className="flex flex-col gap-2 border-b border-neutral-100 px-8 py-2.5 text-[13px] lg:flex-row lg:flex-nowrap lg:items-center"
+      className="flex flex-col gap-2 border-b border-neutral-100 px-8 py-2.5 text-[13px] min-[1056px]:flex-row min-[1056px]:flex-nowrap min-[1056px]:items-center"
       data-testid="autonomy-chips"
     >
       <span

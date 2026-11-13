@@ -19,17 +19,17 @@ import { DebriefSessionView, ExpertComment, ExpertCommentDraftAnchor } from "@ty
 import { getErrorMessage } from "@utils";
 
 import { languageLabel, modelLabels, recipeLabel } from "../consoleLabels";
-import { score } from "../consoleTable";
 import { TruncatedTitle } from "../consoleRows";
+import { score } from "../consoleTable";
 import { BackLink, ConsoleTag, TagTone } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { selectionToAnchor } from "../expertReviewSelection";
-import { JUDGE_BAR, scenarioTitle, statusOf } from "../home/SessionCard";
 import { FILTER_KEYS, HOME_CATEGORIES, HomeCategory } from "../queue";
 import { cardDomId, Correcting, DebriefColumn, DebriefTab } from "./DebriefColumn";
 import { ReviewPanel } from "./ReviewPanel";
 import { RoleplayColumn, turnDomId } from "./RoleplayColumn";
 import { Decision, JumpTarget, WaitingBar } from "./WaitingBar";
+import { JUDGE_BAR, scenarioTitle, statusOf } from "../home/SessionCard";
 
 /** How long a "Read first" jump keeps its highlight. */
 const HIGHLIGHT_MS = 2500;

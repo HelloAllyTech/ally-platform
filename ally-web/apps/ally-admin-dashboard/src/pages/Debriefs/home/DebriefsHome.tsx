@@ -389,7 +389,7 @@ export const DebriefsHome: React.FC = () => {
       {/* One row at lg and up: Show, then layout, PM agent and Analytics; Settings goes in More.
           Below lg the actions take a second row, on purpose (design B1, 2026-11-13). */}
       <div
-        className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-center"
+        className="flex flex-col gap-3 min-[1056px]:flex-row min-[1056px]:flex-nowrap min-[1056px]:items-center"
         data-testid="home-toolbar"
       >
         <div className="min-w-[16rem] lg:shrink-0" data-testid="home-category">

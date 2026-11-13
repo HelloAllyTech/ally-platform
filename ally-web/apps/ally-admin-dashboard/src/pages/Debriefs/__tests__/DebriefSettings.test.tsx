@@ -420,7 +420,8 @@ describe("Debrief settings page: who can change what", () => {
     expect(note).toHaveClass("truncate");
     expect(screen.getByTestId("settings-tabs")).toHaveClass("flex-nowrap");
     // Steering and Pinned rules are tabs at lg and up, More items below it.
-    for (const id of ["weights", "pinned"]) expect(tab(id)).toHaveClass("hidden", "lg:inline");
+    for (const id of ["weights", "pinned"])
+      expect(tab(id)).toHaveClass("hidden", "min-[1056px]:inline");
     expect(tab("orgs")).not.toHaveClass("hidden");
     fireEvent.click(screen.getByRole("button", { name: "More" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Steering" }));

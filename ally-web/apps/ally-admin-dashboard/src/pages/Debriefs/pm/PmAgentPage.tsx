@@ -134,7 +134,7 @@ export const PmAgentPage: React.FC = () => {
       <header className="flex flex-col gap-3.5 border-b border-neutral-100 px-8 pt-4">
         {/* One row at lg and up; below lg the actions take a second row, on purpose. */}
         <div
-          className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-center"
+          className="flex flex-col gap-3 min-[1056px]:flex-row min-[1056px]:flex-nowrap min-[1056px]:items-center"
           data-testid="pm-header"
         >
           <div className="flex min-w-0 flex-nowrap items-center gap-3">

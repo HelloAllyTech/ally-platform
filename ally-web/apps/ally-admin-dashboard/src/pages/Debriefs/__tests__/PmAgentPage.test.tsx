@@ -995,7 +995,7 @@ describe("PM agent › Ideas", () => {
       "title",
       "Not yet: agreement below 0.6 (Evidence 0.52).",
     ); // One row at lg: the label truncates first, its full words on hover; no inline "hover" hint.
-    expect(chips).toHaveClass("lg:flex-nowrap");
+    expect(chips).toHaveClass("min-[1056px]:flex-nowrap");
     const label = screen.getByTestId("autonomy-label");
     expect(label).toHaveClass("truncate");
     expect(label).toHaveTextContent("Changes without asking a person:");
