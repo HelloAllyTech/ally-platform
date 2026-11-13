@@ -186,7 +186,12 @@ export const QuizItemEditor: FC<QuizItemEditorProps> = ({
           {/* Active question editor */}
           <div className="border border-border-light rounded-md p-4">
             {activeQuestion ? (
-              <div className="flex flex-col gap-4">
+              // Keyed by the question's stable field id so switching questions
+              // remounts the panel. The sub-editors' `useFieldArray`s don't
+              // reset when their `name` changes, so a shared instance carried
+              // one question's options/scale points into the next — and
+              // deleting the stray row there deleted it from both.
+              <div key={fields[activeIndex]?.fieldId} className="flex flex-col gap-4">
                 {activeQuestion.type !== "fill_blank" && (
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium text-typography-800">Question</label>
