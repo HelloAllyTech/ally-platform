@@ -49,3 +49,61 @@ class PmAgentRunResponse(BaseModel):
     #: Tool calls ally-be refused, with the reason it gave.
     refusals: List[Dict[str, str]] = Field(default_factory=list)
     error: Optional[str] = None
+
+
+# --- Builder's interview, answered by the PM agent (plan §11.5, FR-63) ------------
+
+
+class BuilderQuestionOption(BaseModel):
+    id: str
+    label: str
+    description: Optional[str] = None
+
+
+class BuilderQuestion(BaseModel):
+    #: Builder's question id (the answer goes back under it).
+    id: str
+    prompt: str
+    rationale: Optional[str] = None
+    options: List[BuilderQuestionOption] = Field(default_factory=list)
+
+
+class BuilderBrief(BaseModel):
+    """The PM agent's own brief for Builder: quotes already stripped by ally-be."""
+
+    title: str
+    problem: str = ""
+    evidence_summary: str = ""
+    expected_effect: str = ""
+    acceptance_checks: List[str] = Field(default_factory=list)
+
+
+class BuilderAnswersRequest(BaseModel):
+    idea_id: str
+    model: Optional[str] = None
+    backup_model: Optional[str] = None
+    prices: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    #: What this call may spend: decided by ally-be from the learning budget.
+    budget_usd: float = Field(ge=0)
+    brief: BuilderBrief
+    questions: List[BuilderQuestion] = Field(default_factory=list, max_length=10)
+    #: Text that must never reach Builder (the cited comments' bodies), stripped
+    #: from every answer as well as anything in quotation marks.
+    known_texts: List[str] = Field(default_factory=list)
+
+
+class BuilderAnswerOut(BaseModel):
+    question_id: str
+    #: False: the brief does not settle it, so a person answers in Builder.
+    can_answer: bool
+    selected_option_ids: List[str] = Field(default_factory=list)
+    answer: str = ""
+    reason: str = ""
+
+
+class BuilderAnswersResponse(BaseModel):
+    status: Literal["finished", "budget_spent", "failed"]
+    answers: List[BuilderAnswerOut] = Field(default_factory=list)
+    estimated_cost_usd: float = 0.0
+    model: Optional[str] = None
+    error: Optional[str] = None
