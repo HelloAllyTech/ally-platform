@@ -40,6 +40,16 @@ import { AgentRunTokenService } from './agent-tools/agent-run-token.service';
 import { HandOverTool } from './agent-tools/hand-over.tool';
 import { AGENT_GATEWAY_TOOLS, AgentToolRegistry } from './agent-tools/tools';
 import { ToolRun } from './entity/tool-run.entity';
+import { Collection } from './entity/collection.entity';
+import { CollectionConstraint } from './entity/collection-constraint.entity';
+import { CollectionField } from './entity/collection-field.entity';
+import { CollectionRecord } from './entity/collection-record.entity';
+import { RecordEvent } from './entity/record-event.entity';
+import { RecordLink } from './entity/record-link.entity';
+import { ListController } from './lists/list.controller';
+import { ListCsvService } from './lists/list-csv.service';
+import { ListDefinitionsService } from './lists/list-definitions.service';
+import { ListRecordsService } from './lists/list-records.service';
 
 /**
  * Chatbots: configurable bots reached through connectors.
@@ -65,6 +75,13 @@ import { ToolRun } from './entity/tool-run.entity';
       ChatbotConversation,
       ChatbotMessage,
       ToolRun,
+      // Lists (chunk 5a).
+      Collection,
+      CollectionField,
+      CollectionConstraint,
+      CollectionRecord,
+      RecordLink,
+      RecordEvent,
       WaKeywordTemplate,
       GlobalSettings,
     ]),
@@ -80,6 +97,7 @@ import { ToolRun } from './entity/tool-run.entity';
     ConnectorController,
     InboxController,
     AgentGatewayController,
+    ListController,
   ],
   providers: [
     GlobalSettingsRepository,
@@ -107,6 +125,10 @@ import { ToolRun } from './entity/tool-run.entity';
       inject: [HandOverTool],
     },
     AgentToolRegistry,
+    // Lists (chunk 5a): the engine 6's tools and 5b's screens use.
+    ListRecordsService,
+    ListDefinitionsService,
+    ListCsvService,
   ],
   exports: [
     // The Checkup (chunk 20a-2) asks questions through Preview's path.
@@ -124,6 +146,9 @@ import { ToolRun } from './entity/tool-run.entity';
     InboxEventsService,
     // The assistant home's WhatsApp audience list (chunk 20d-2).
     ChatbotAudienceService,
+    // Lists (chunk 5a).
+    ListRecordsService,
+    ListDefinitionsService,
   ],
 })
 export class ChatbotModule {}
