@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { useSaveSessionBookmarkMutation } from "@api";
+import { useAnalytics } from "@hooks";
 
 interface SaveSessionButtonProps {
   sessionId: string;
@@ -12,6 +13,7 @@ interface SaveSessionButtonProps {
 /** Lets a learner save a finished roleplay session to come back to. */
 export const SaveSessionButton: FC<SaveSessionButtonProps> = ({ sessionId }) => {
   const { t } = useTranslation();
+  const { track } = useAnalytics();
   const [saveBookmark, { isLoading }] = useSaveSessionBookmarkMutation();
   const [saved, setSaved] = useState(false);
 
@@ -19,6 +21,7 @@ export const SaveSessionButton: FC<SaveSessionButtonProps> = ({ sessionId }) => 
     try {
       await saveBookmark({ sessionId, source: "web" }).unwrap();
       setSaved(true);
+      track("session_bookmarked", { session_id: sessionId });
       toast.success(t("postSim.common.sessionSaved", "Session saved"));
     } catch (error) {
       if ((error as { status?: number })?.status === 409) {
