@@ -44,6 +44,7 @@ Read `CONTEXT.md`, `BUILDING-BLOCKS.md` and `SLICE-1.md` first. Product spec: `a
 | 20d-2 Restyle the parts still in the old look (`archive/chunk-20d2.md`) | ✅ built on the slice 1 branch (see its notes) |
 | CL1 Cleanup before launch, no behaviour change (`chunk-cl1.md`) | ▶ built, waiting for review (`CHUNK-CL1-NOTES.md`) |
 | 15a Crisis classifier v2 | moved to Stage 6, with public links |
+| H0 Hardening before real traffic (`chunk-h0.md`), fast track beside 15a on `feat/agents-v2-fast-track` | ▶ built, waiting for review (`CHUNK-H0-NOTES.md`). Open fail: onboarding eval 9 of 13 (pack safety questions held at publish; fix is a safety-pack chunk) |
 | 20e Landing page | moved to Stage 6, with public links |
 | Stages 2–8 | Not started (see Stages below) |
 

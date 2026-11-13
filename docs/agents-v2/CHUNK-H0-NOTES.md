@@ -72,7 +72,12 @@ During run 2, two crisis-check calls timed out at 15 s under the eval's load (ar
 
 ### 6. Launch checklist
 
-Nothing ticked: Shehbaz confirmed no line is done in production yet. Added in the last commit (see `LAUNCH-CHECKLIST.md`).
+Nothing ticked: Shehbaz confirmed no line is done in production yet. Added:
+- H0's migration runs with ally-be;
+- release `0fb34139c`, then watch the v1 fallback rate and reply times;
+- self-serve onboarding stays closed to medical, pharmacy and minors businesses until the safety-pack fix.
+
+No "deploy ally-ai first" line: item 2 wasn't built, so H0 adds no ally-ai route.
 
 ## Tests
 
@@ -80,8 +85,10 @@ Nothing ticked: Shehbaz confirmed no line is done in production yet. Added in th
 |---|---|
 | `erasure.pg.spec.ts` (Postgres) | 2 passed (2 failed before the migration) |
 | `src/whatsapp/shared-store` + bot page Postgres specs | 79 passed, 1 failed: `backfill-check.pg.spec.ts` (pre-existing, below) |
-| ally-be `src/bot-draft` + `src/whatsapp` jest | 571 passed |
-| ally-be typecheck, eslint on changed files | clean |
+| ally-be full jest (Node 22, after 15a's baseline) | 1114 suites, 16436 tests passed; 10 suites skipped (Postgres-only) |
+| ally-be typecheck | clean |
+| ally-be lint | 1 error, pre-existing on master: prettier in `src/chat/dto/set-note-transcript.dto.ts` (from `18a5fe14d`), not H0's |
+| ally-be `nest build` | passes with `NODE_OPTIONS=--max-old-space-size=8192`; out of memory at Node's default heap (the known build-memory item in `LAUNCH-CHECKLIST.md`) |
 | ally-ai pytest, flake8 | 2461 passed, clean |
 
 **Pre-existing failure, not H0:** `backfill-check.pg.spec.ts:188` runs `TRUNCATE chatbot_messages, chatbot_conversations, …` without `CASCADE`, and tables added since chunk 12 reference `chatbot_conversations`, so it fails with "cannot truncate a table referenced in a foreign key constraint". Unrelated to the column width.
