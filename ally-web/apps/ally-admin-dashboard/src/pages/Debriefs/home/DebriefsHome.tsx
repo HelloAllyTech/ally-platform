@@ -28,8 +28,10 @@ import {
   categoriesFor,
   categoryCount,
   FILTER_KEYS,
+  blindToChecks,
   defaultCategory,
   groupByDay,
+  queueNoteFor,
   queueOrder,
   readHomeState,
   sessionsQuery,
@@ -160,7 +162,7 @@ export const DebriefsHome: React.FC = () => {
   const allowedBefore = categoriesFor({
     escalations: preAccess.receivesEscalations,
     verdict: preAccess.verdict,
-    team: preAccess.team,
+    team: !blindToChecks(preAccess),
   });
   const { cat, filters, list } = readHomeState(
     params,
@@ -174,6 +176,8 @@ export const DebriefsHome: React.FC = () => {
   });
   const page = sessions.data;
   const access = useDebriefAccess(page?.viewer ?? attention.data?.viewer);
+  // Blind to the checks until their verdict (the clinical advisor): no hint of the result.
+  const blind = blindToChecks(access);
   const anyRunning = !!page?.items.some(r => r.status === "running" || r.status === "queued");
   if (anyRunning !== polling) setPolling(anyRunning);
   const [escalate] = useEscalateDebriefMutation();
@@ -183,9 +187,9 @@ export const DebriefsHome: React.FC = () => {
       categoriesFor({
         escalations: access.receivesEscalations,
         verdict: access.verdict,
-        team: access.team,
+        team: !blind,
       }),
-    [access.receivesEscalations, access.verdict, access.team],
+    [access.receivesEscalations, access.verdict, blind],
   );
 
   const set = (patch: Record<string, string | null>) => {
@@ -203,6 +207,7 @@ export const DebriefsHome: React.FC = () => {
     return cat === "needs" || cat === "escalated" ? queueOrder(items) : items;
   }, [page, cat]);
   const queue = cat === "needs" || cat === "escalated";
+  const queueNote = queueNoteFor(cat, blind, { team: h.queueNote, blind: h.queueNoteBlind });
   const groups = queue
     ? shown.length
       ? [{ label: h.inOrder, items: shown }]
@@ -454,7 +459,11 @@ export const DebriefsHome: React.FC = () => {
         </span>
       </div>
 
-      {queue && <p className="text-sm text-neutral-700">{h.queueNote}</p>}
+      {queueNote && shown.length > 0 && (
+        <p className="text-sm text-neutral-700" data-testid="queue-note">
+          {queueNote}
+        </p>
+      )}
 
       {sessions.isError && !page ? (
         <ErrorPanel
@@ -466,7 +475,10 @@ export const DebriefsHome: React.FC = () => {
       ) : !page ? (
         <LoadingBlock lines={6} />
       ) : shown.length === 0 ? (
-        <EmptyPanel title={h.empty[cat].title} message={h.empty[cat].message} />
+        <EmptyPanel
+          title={((blind && h.emptyBlind[cat]) || h.empty[cat]).title}
+          message={((blind && h.emptyBlind[cat]) || h.empty[cat]).message}
+        />
       ) : (
         <div ref={listRef} className="flex flex-col gap-5" data-testid="home-list">
           {groups.map(g => (

@@ -34,7 +34,7 @@ vi.mock("@api", async importOriginal => ({
 import { redirectForOldTab } from "../consoleRoutes";
 import { DebriefConsole } from "../DebriefConsole";
 import { bannerHref, bannerText } from "../home/DebriefsHome";
-import { CATEGORY_PARAM, categoriesFor, categoryCount, queueOrder } from "../queue";
+import { CATEGORY_PARAM, categoriesFor, categoryCount, queueNoteFor, queueOrder } from "../queue";
 import { ok, resolves } from "./consoleFixtures";
 /* eslint-enable import/first */
 
@@ -350,6 +350,59 @@ describe("Debriefs home", () => {
     renderAt();
     expect(screen.getByRole("option", { name: /Below the bar/ })).toBeInTheDocument();
     expect(categoriesFor({ escalations: false, team: true })).toContain("below");
+  });
+});
+
+describe("the queue note says nothing of the checks to the clinical advisor", () => {
+  const BELOW = /below the bar/i;
+
+  it("the advisor's escalations: escalated flags, then the rest", () => {
+    const escalated = item({ runId: "esc", escalated: true, rank: 1, needsPerson: true });
+    h.sessions.mockReturnValue(page([escalated], ADVISOR));
+    h.attention.mockReturnValue(attention(ADVISOR));
+    renderAt("/debriefs?cat=escalated");
+    expect(screen.getByTestId("queue-note")).toHaveTextContent(
+      "Most urgent first: escalated flags, then the rest.",
+    );
+    expect(screen.queryByText(BELOW)).toBeNull();
+  });
+
+  it("the advisor's Needs a person: flags, then held debriefs, never below the bar", () => {
+    h.sessions.mockReturnValue(
+      page([item({ runId: "held", rank: 2, status: "needs_person" })], ADVISOR),
+    );
+    h.attention.mockReturnValue(attention(ADVISOR));
+    renderAt("/debriefs?cat=needs");
+    expect(screen.getByTestId("queue-note")).toHaveTextContent(
+      "Most urgent first: important-moment flags, then other flags, then held debriefs.",
+    );
+    expect(screen.queryByText(BELOW)).toBeNull();
+  });
+
+  it("an empty queue has no note, and its empty state names no bar for the advisor", () => {
+    h.sessions.mockReturnValue(page([], ADVISOR));
+    h.attention.mockReturnValue(attention(ADVISOR));
+    renderAt("/debriefs?cat=needs");
+    expect(screen.queryByTestId("queue-note")).toBeNull();
+    expect(screen.getByText("Nothing needs a person")).toBeInTheDocument();
+    expect(screen.queryByText(BELOW)).toBeNull();
+  });
+
+  it("the Ally team keeps the full note", () => {
+    h.sessions.mockReturnValue(page(QUEUE, TEAM));
+    h.attention.mockReturnValue(attention(TEAM));
+    renderAt("/debriefs?cat=needs");
+    expect(screen.getByTestId("queue-note")).toHaveTextContent(
+      "Most urgent first: important-moment flags, then other flags, then debriefs below the bar.",
+    );
+  });
+
+  it("queueNoteFor: no note outside a queue", () => {
+    const notes = { team: "T", blind: { needs: "N", escalated: "E" } };
+    expect(queueNoteFor("published", false, notes)).toBeNull();
+    expect(queueNoteFor("needs", false, notes)).toBe("T");
+    expect(queueNoteFor("needs", true, notes)).toBe("N");
+    expect(queueNoteFor("escalated", true, notes)).toBe("E");
   });
 });
 

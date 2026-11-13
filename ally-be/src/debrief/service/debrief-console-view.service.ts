@@ -282,7 +282,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
           LEFT JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
           LEFT JOIN scenarios sc ON sc.id = s."scenarioId"
          ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-      ), ranked AS (
+      ), r0 AS (
         SELECT b.*,
                CASE
                  WHEN b.mode = 'live' AND (b.urgent_open OR (b."learnerDistress" AND NOT b.reviewed)) THEN 0
@@ -294,13 +294,21 @@ export class DebriefConsoleViewService implements OnModuleInit {
                END AS rank,
                (b.mode = 'live' AND (b.escalated_flag OR b.run_escalated)) AS escalated
           FROM b
+      ), ranked AS (
+        -- blind_rank: the rank a viewer blind to the checks (the clinical
+        -- advisor) gets, where being below the bar earns no place in the
+        -- queue; a held or failed run still waits for a person.
+        SELECT r0.*,
+               CASE WHEN rank = 2 AND status NOT IN ('needs_person','failed') THEN 3
+                    ELSE rank END AS blind_rank
+          FROM r0
       )`;
   }
 
   private categorySql(cat: SessionFilters['category'], blind = false) {
     switch (cat) {
       case 'needs':
-        return `rank < 3`;
+        return blind ? `blind_rank < 3` : `rank < 3`;
       case 'flagged':
         return `flagged`;
       case 'below':
@@ -331,9 +339,11 @@ export class DebriefConsoleViewService implements OnModuleInit {
     const params: unknown[] = [];
     const base = this.baseSql(f, params);
     const countParams = [...params];
+    const blind = isBlindToChecks(viewer);
+    const rankCol = blind ? 'blind_rank' : 'rank';
     const [counts] = await this.dataSource.query(
       `${base}
-       SELECT count(*) FILTER (WHERE rank < 3)::int AS needs,
+       SELECT count(*) FILTER (WHERE ${rankCol} < 3)::int AS needs,
               count(*) FILTER (WHERE rank = 0)::int AS urgent,
               count(*) FILTER (WHERE flagged)::int AS flagged,
               count(*) FILTER (WHERE status = 'below_bar' OR (status = 'published' AND judge_below))::int AS below,
@@ -344,7 +354,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
          FROM ranked`,
       countParams,
     );
-    const queueOrder = `rank ASC, COALESCE(flag_since, "createdAt") ASC`;
+    const queueOrder = `${rankCol} ASC, COALESCE(flag_since, "createdAt") ASC`;
     const order =
       f.category === 'needs' || f.category === 'escalated'
         ? queueOrder
@@ -353,7 +363,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
     const rows: Array<Record<string, any>> = await this.dataSource.query(
       `${base}
        SELECT * FROM ranked
-        WHERE ${this.categorySql(f.category, isBlindToChecks(viewer))}
+        WHERE ${this.categorySql(f.category, blind)}
         ORDER BY ${order}
         LIMIT $${rowParams.length - 1} OFFSET $${rowParams.length}`,
       rowParams,
@@ -365,7 +375,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         urgent: Number(counts?.urgent ?? 0),
         flagged: Number(counts?.flagged ?? 0),
         // Not for a viewer blind to the checks (see blindForAdvisor).
-        below: isBlindToChecks(viewer) ? null : Number(counts?.below ?? 0),
+        below: blind ? null : Number(counts?.below ?? 0),
         published: Number(counts?.published ?? 0),
         escalated: Number(counts?.escalated ?? 0),
         // Only for whoever gives verdicts (the clinical advisor).
@@ -504,6 +514,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
       !viewer.roles.allyTeam &&
       !viewer.roles.owner &&
       viewer.roles.receivesEscalations;
+    // Blind to the checks: being below the bar moves nothing up the queue.
+    const rankCol = isBlindToChecks(viewer) ? 'blind_rank' : 'rank';
     const params: unknown[] = [];
     const base = this.baseSql(
       { category: 'needs', mode: 'live', limit: 500, offset: 0 },
@@ -511,8 +523,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
     );
     const rows: Array<{ id: string }> = await this.dataSource.query(
       `${base}
-       SELECT id FROM ranked WHERE ${advisorOnly ? 'escalated' : 'rank < 3'}
-        ORDER BY rank ASC, COALESCE(flag_since, "createdAt") ASC LIMIT 500`,
+       SELECT id FROM ranked WHERE ${advisorOnly ? 'escalated' : `${rankCol} < 3`}
+        ORDER BY ${rankCol} ASC, COALESCE(flag_since, "createdAt") ASC LIMIT 500`,
       params,
     );
     return rows.map((r) => r.id);

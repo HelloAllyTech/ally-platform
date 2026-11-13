@@ -72,6 +72,27 @@ export const categoriesFor = (opts: {
   );
 
 /**
+ * Whether this viewer is blind to the checks' result until their verdict (spec Q3): anyone who is
+ * neither on the Ally team nor the owner, as ally-be decides it (`isBlindToChecks`).
+ */
+export const blindToChecks = (access: { team: boolean; owner: boolean }): boolean =>
+  !access.team && !access.owner;
+
+/**
+ * The note over a queue, true to the order ally-be sends it for this viewer, or null where there
+ * is no queue to describe. A viewer blind to the checks never reads "below the bar": ally-be gives
+ * being below the bar no place in their queue.
+ */
+export const queueNoteFor = (
+  cat: HomeCategory,
+  blind: boolean,
+  notes: { team: string; blind: Record<string, string> },
+): string | null => {
+  if (cat !== "needs" && cat !== "escalated") return null;
+  return blind ? (notes.blind[cat] ?? null) : notes.team;
+};
+
+/**
  * The home's state lives in the URL, so a link (and Back) opens exactly there and the session
  * page's Previous / Next read the same list.
  */

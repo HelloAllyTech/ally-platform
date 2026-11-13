@@ -10057,6 +10057,14 @@ export const en = {
       keysNoEscalate: "j / k move · Enter open",
       queueNote:
         "Most urgent first: important-moment flags, then other flags, then debriefs below the bar.",
+      /**
+       * The same note for a viewer blind to the checks (the clinical advisor): no hint of the
+       * independent check's result before their verdict. True to the order ally-be sends them.
+       */
+      queueNoteBlind: {
+        needs: "Most urgent first: important-moment flags, then other flags, then held debriefs.",
+        escalated: "Most urgent first: escalated flags, then the rest.",
+      } as Record<string, string>,
       inOrder: "In order of urgency",
       today: "Today",
       yesterday: "Yesterday",
@@ -10092,6 +10100,13 @@ export const en = {
           title: "Nothing in this week's sample",
           message:
             "Each Monday a few judged debriefs are picked at random for you to review. They wait here until you give a verdict.",
+        },
+      } as Record<string, { title: string; message: string }>,
+      /** Empty states that would hint at the checks' result, for a viewer blind to them. */
+      emptyBlind: {
+        needs: {
+          title: "Nothing needs a person",
+          message: "Learners' flags and held debriefs appear here, most urgent first.",
         },
       } as Record<string, { title: string; message: string }>,
       bannerActions: {

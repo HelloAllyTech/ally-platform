@@ -201,6 +201,28 @@ describe('DebriefConsoleViewService list: advisor blind to "below the bar"', () 
     );
   });
 
+  it("keeps below-the-bar runs out of the advisor's Needs a person list, count and order", async () => {
+    sqls.length = 0;
+    await make().sessions(parseSessionFilters({ category: 'needs' }), advisor);
+    const counts = sqls.find((q) => q.includes('count(*) FILTER'))!;
+    const list = sqls.find((q) => q.includes('SELECT * FROM ranked'))!;
+    expect(counts).toContain('FILTER (WHERE blind_rank < 3)::int AS needs');
+    expect(list).toMatch(/WHERE blind_rank < 3\s+ORDER BY blind_rank ASC/);
+    // A held or failed run still waits for a person.
+    expect(list).toContain(
+      `CASE WHEN rank = 2 AND status NOT IN ('needs_person','failed') THEN 3`,
+    );
+    sqls.length = 0;
+    await make().sessions(parseSessionFilters({ category: 'needs' }), {
+      userId: 6,
+      roles: { allyTeam: true },
+      can: {},
+    });
+    expect(sqls.find((q) => q.includes('SELECT * FROM ranked'))).toMatch(
+      /WHERE rank < 3\s+ORDER BY rank ASC/,
+    );
+  });
+
   it('the Ally team still sees it', async () => {
     const out = await make().sessions(
       parseSessionFilters({ category: 'all' }),
