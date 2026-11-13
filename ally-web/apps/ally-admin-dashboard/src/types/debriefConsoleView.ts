@@ -200,6 +200,76 @@ export interface DebriefJudgeReason {
   turns: number[];
 }
 
+/** One piece of evidence the progress reading cites: a turn of this session or of an earlier run. */
+export interface DebriefProgressEvidence {
+  /** "this" (or this run's id) for this session; otherwise the earlier debrief run's id. */
+  run_id?: string | null;
+  runId?: string | null;
+  turn_index?: number | null;
+  turnIndex?: number | null;
+}
+
+export type DebriefProgressTrend =
+  | "more_consistent"
+  | "about_the_same"
+  | "worth_another_look"
+  | "too_early";
+
+/** One skill in the progress reading (PROGRESS_CONTRACT §3), after the code's hold-backs. */
+export interface DebriefProgressSkill {
+  skill: string;
+  trend: DebriefProgressTrend;
+  why: string | null;
+  evidence: DebriefProgressEvidence[];
+  /** The Foundational Skills levels as a cross-check. */
+  fhs: "agrees" | "disagrees" | "absent" | null;
+  /** The sentence the learner read; blank when held back or not shown. */
+  learnerLine: string | null;
+  hiddenFromLearner: boolean;
+}
+
+export interface DebriefProgressFollowup {
+  point: string;
+  status: "done" | "partly" | "not_yet";
+  evidence?: DebriefProgressEvidence[];
+}
+
+export interface DebriefProgressFocus {
+  skill: string;
+  why: string | null;
+  learner_line?: string | null;
+  learnerLine?: string | null;
+  practise_next?: boolean;
+  practiseNext?: boolean;
+}
+
+export type DebriefProgressVetoCode =
+  | "too_few_sessions"
+  | "contradicted_by_analyst"
+  | "contradicted_by_fhs"
+  | "version_straddle"
+  | "corrected_evidence"
+  | "other_skill";
+
+export interface DebriefProgressVeto {
+  skill: string;
+  veto: DebriefProgressVetoCode | string;
+  detail?: string | null;
+}
+
+/** The progress reading for one debrief run (`debrief_progress_results`), null when none ran. */
+export interface DebriefSessionProgress {
+  shownAs: "line" | "card" | null;
+  /** Sessions the reading looked across, this one included. */
+  sessions: number | null;
+  skills: DebriefProgressSkill[];
+  followups: DebriefProgressFollowup[];
+  focus: DebriefProgressFocus | null;
+  vetoes: DebriefProgressVeto[];
+  windowSessionIds: string[];
+  createdAt: string;
+}
+
 export interface DebriefSessionView {
   run: {
     id: string;
@@ -268,6 +338,8 @@ export interface DebriefSessionView {
     learnerLevel: string | null;
     pastSessions: number | null;
   };
+  /** The learner-progress reading (absent before ally-be sends it; null when none ran). */
+  progress?: DebriefSessionProgress | null;
   howItWasMade: {
     recipe: string | null;
     releaseVersion: number | null;

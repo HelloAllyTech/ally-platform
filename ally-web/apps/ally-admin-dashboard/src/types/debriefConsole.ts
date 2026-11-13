@@ -484,7 +484,16 @@ export interface DebriefOwnerSettingSpec {
   min?: number;
   max?: number;
   budget?: boolean;
-  group: "quick" | "gate" | "sealed" | "trials" | "canary" | "budget" | "metrics" | "agent";
+  group:
+    | "quick"
+    | "gate"
+    | "sealed"
+    | "trials"
+    | "canary"
+    | "budget"
+    | "metrics"
+    | "agent"
+    | "progress";
 }
 
 export interface DebriefSettingsView {

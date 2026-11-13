@@ -189,7 +189,11 @@ describe("Settings › Schedules: engineering only", () => {
       within(screen.getByRole("menu"))
         .getAllByRole("menuitem")
         .map(i => i.textContent),
-    ).toEqual([en.debriefs.settingsPage.nav.weights, en.debriefs.settingsPage.nav.pinned]);
+    ).toEqual([
+      en.debriefs.settingsPage.nav.weights,
+      en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.progress,
+    ]);
     expect(screen.queryByText(en.debriefs.settingsPage.nav.schedules)).toBeNull();
     expect(screen.queryByTestId("schedules-table")).toBeNull();
   });
@@ -213,6 +217,7 @@ describe("Settings › Schedules: engineering only", () => {
     ).toEqual([
       en.debriefs.settingsPage.nav.weights,
       en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.progress,
       en.debriefs.settingsPage.nav.schedules,
     ]);
     fireEvent.click(
@@ -238,6 +243,7 @@ describe("Settings › Schedules: engineering only", () => {
     expect(items.map(i => i.textContent)).toEqual([
       en.debriefs.settingsPage.nav.weights,
       en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.progress,
       en.debriefs.settingsPage.guidanceLink,
     ]);
   });

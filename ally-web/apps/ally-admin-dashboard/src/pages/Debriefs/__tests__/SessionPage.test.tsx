@@ -760,9 +760,49 @@ describe("Session page", () => {
   it("has no How it was made tab: the run's working is on Agent logs", () => {
     renderPage();
     const tabs = screen.getAllByRole("tab").map(t => t.textContent);
-    expect(tabs).toEqual(["The debrief", expect.stringMatching(/^Ask Ally/)]);
+    expect(tabs).toEqual(["The debrief", expect.stringMatching(/^Ask Ally/), "Progress"]);
     expect(screen.queryByRole("tab", { name: "How it was made" })).toBeNull();
     expect(screen.queryByText("How it was made")).toBeNull();
+  });
+
+  it("the Progress tab shows the reading, and a turn of this session highlights it in the roleplay", () => {
+    h.session.mockReturnValue(
+      ok(
+        view({
+          progress: {
+            shownAs: "line",
+            sessions: 4,
+            skills: [
+              {
+                skill: "empathy",
+                trend: "about_the_same",
+                why: "Similar each time.",
+                evidence: [{ run_id: "this", turn_index: 2 }],
+                fhs: "absent",
+                learnerLine: "You stayed warm.",
+                hiddenFromLearner: false,
+              },
+            ],
+            followups: [],
+            focus: null,
+            vetoes: [],
+            windowSessionIds: [],
+            createdAt: "2026-11-12T08:00:00Z",
+          },
+        }),
+      ),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Progress" }));
+    expect(screen.getByTestId("progress-trend")).toHaveTextContent("About the same");
+    fireEvent.click(screen.getByTestId("progress-turn-link"));
+    expect(screen.getAllByTestId("session-turn")[1]).toHaveAttribute("data-highlight", "true");
+  });
+
+  it("the Progress tab says when there is no reading", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Progress" }));
+    expect(screen.getByText("No progress reading for this session")).toBeInTheDocument();
   });
 
   it("the Ask Ally tab reads the conversation, with what a replaced reply blocked", () => {

@@ -347,7 +347,15 @@ describe("Debrief settings page: who can change what", () => {
       within(nav)
         .getAllByRole("link")
         .map(l => l.textContent),
-    ).toEqual(["Organisations", "Budgets", "Tests", "Autonomy", "Steering", "Pinned rules"]);
+    ).toEqual([
+      "Organisations",
+      "Budgets",
+      "Tests",
+      "Autonomy",
+      "Steering",
+      "Pinned rules",
+      "Progress",
+    ]);
     expect(nav.className).toContain("sticky");
     expect(tab("orgs")).toHaveAttribute("aria-current", "page");
     expect(shown()).toEqual(["settings-section-orgs"]);
@@ -378,6 +386,7 @@ describe("Debrief settings page: who can change what", () => {
     ["#autonomy", "autonomy"],
     ["#weights", "weights"],
     ["#pinned", "pinned"],
+    ["#progress", "progress"],
     ["#orgs", "orgs"],
   ])("a %s link opens that tab", (hash, id) => {
     h.permissions = [];
@@ -419,8 +428,8 @@ describe("Debrief settings page: who can change what", () => {
     expect(note).toHaveAttribute("title", "Only the owner can change these.");
     expect(note).toHaveClass("truncate");
     expect(screen.getByTestId("settings-tabs")).toHaveClass("flex-nowrap");
-    // Steering and Pinned rules are tabs at lg and up, More items below it.
-    for (const id of ["weights", "pinned"])
+    // Steering, Pinned rules and Progress are tabs at lg and up, More items below it.
+    for (const id of ["weights", "pinned", "progress"])
       expect(tab(id)).toHaveClass("hidden", "min-[1056px]:inline");
     expect(tab("orgs")).not.toHaveClass("hidden");
     fireEvent.click(screen.getByRole("button", { name: "More" }));
@@ -499,6 +508,93 @@ describe("Debrief settings page: who can change what", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("it is proposed as a change");
     fireEvent.click(tab("tests"));
     expect(screen.getAllByRole("button", { name: "Save changes" }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Settings › Progress", () => {
+  const PROGRESS_VIEW = {
+    ...VIEW,
+    values: {
+      ...VIEW.values,
+      progressOn: true,
+      progressCardEvery: 5,
+      progressWindow: 6,
+      progressUseFhs: true,
+      progressShowWorseToLearners: false,
+    },
+    defaults: {
+      ...VIEW.defaults,
+      progressOn: true,
+      progressCardEvery: 5,
+      progressWindow: 6,
+      progressUseFhs: true,
+      progressShowWorseToLearners: false,
+    },
+    spec: {
+      ...VIEW.spec,
+      progressOn: { default: true, kind: "bool", group: "progress" },
+      progressCardEvery: { default: 5, kind: "int", min: 1, max: 20, group: "progress" },
+      progressWindow: { default: 6, kind: "int", min: 3, max: 12, group: "progress" },
+      progressUseFhs: { default: true, kind: "bool", group: "progress" },
+      progressShowWorseToLearners: { default: false, kind: "bool", group: "progress" },
+    },
+    baseline: null,
+  };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.settings.mockReturnValue({ data: PROGRESS_VIEW, isError: false, refetch: vi.fn() });
+    h.overview.mockReturnValue({ data: OVERVIEW, isError: false, refetch: vi.fn() });
+    h.tenants.mockReturnValue({ data: TENANTS, isError: false, refetch: vi.fn() });
+    h.update.mockReturnValue(resolves());
+  });
+  const renderAt = () =>
+    render(
+      <MemoryRouter initialEntries={["/debriefs/settings#progress"]}>
+        <Routes>
+          <Route path="/debriefs/settings" element={<DebriefSettingsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it("lists the five progress settings in plain words, and only those", () => {
+    h.permissions = [];
+    renderAt();
+    const section = screen.getByTestId("settings-section-progress");
+    expect(within(section).getByRole("heading", { level: 2 })).toHaveTextContent("Progress");
+    const table = within(section).getByTestId("settings-table-progress");
+    for (const label of [
+      "Learner progress",
+      "Show the progress card every … sessions",
+      "Sessions to look back over",
+      "Use Foundational Skills levels as a cross-check",
+      "Tell learners when a skill needs another look",
+    ])
+      expect(table).toHaveTextContent(label);
+    expect(within(table).queryByText(/progressOn|FHS/)).toBeNull();
+    expect(table).not.toHaveTextContent("Sessions in the pass test");
+    // Read only for anyone but the owner.
+    expect(within(section).queryByRole("button", { name: "Save changes" })).toBeNull();
+    expect(screen.getByTestId("setting-value-progressShowWorseToLearners")).toHaveTextContent("No");
+  });
+
+  it("lets the owner change one and saves only that change", async () => {
+    h.permissions = ["manage:admin:debrief-settings"];
+    renderAt();
+    const row = screen.getByTestId("setting-progressShowWorseToLearners");
+    fireEvent.click(within(row).getByRole("switch"));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(h.update).toHaveBeenCalledWith({ changes: { progressShowWorseToLearners: true } }),
+    );
+  });
+
+  it("says so when ally-be doesn't send the progress settings yet", () => {
+    h.permissions = ["manage:admin:debrief-settings"];
+    h.settings.mockReturnValue({ data: VIEW, isError: false, refetch: vi.fn() });
+    renderAt();
+    expect(screen.getByTestId("progress-settings")).toHaveTextContent(
+      "These settings aren't available yet.",
+    );
   });
 });
 

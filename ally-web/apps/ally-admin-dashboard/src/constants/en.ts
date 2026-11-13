@@ -733,6 +733,64 @@ export const en = {
       "At times, the bot may be unresponsive, or have unusual lag times. We are always working to improve the experience!",
     startSession: "Start Session",
   },
+  clinicalAdvisors: {
+    title: "Clinical advisors",
+    intro:
+      "Clinical advisors review debriefs from every organisation and receive escalations. Adding someone gives them only this access; everything else they hold stays as it is.",
+    loadFailed: "Couldn't load the clinical advisors",
+    loadFailedHelp: "Reload the page to try again.",
+    none: "No clinical advisors yet",
+    noneHelp: "Use “Add an advisor” to give someone access.",
+    columns: {
+      name: "Name",
+      email: "Email",
+      organisation: "Organisation",
+      roles: "Other roles",
+      actions: "",
+    },
+    noOtherRoles: "None",
+    moreRoles: (n: number) => `+${n}`,
+    remove: "Remove",
+    add: "Add",
+    fix: "Fix access",
+    addHeading: "Add an advisor",
+    searchLabel: "Find a person by name or email",
+    searchPlaceholder: "Type at least 3 letters",
+    searching: "Searching…",
+    noMatches: "No one matches.",
+    searchFailed: "Couldn't search. Try again.",
+    alreadyAdvisor: "Already an advisor",
+    needsConsole: "Needs the advisor's console access",
+    needsRole: "Has console access but not the advisor role",
+    addTitle: "Add a clinical advisor?",
+    addBody: (name: string, roles: string) =>
+      roles
+        ? `Make ${name} a clinical advisor? They keep their current roles: ${roles}.`
+        : `Make ${name} a clinical advisor?`,
+    addConfirm: "Make advisor",
+    removeTitle: "Remove a clinical advisor?",
+    removeBody: (name: string) =>
+      `Remove ${name} as a clinical advisor? They keep their other roles.`,
+    removeConfirm: "Remove advisor",
+    cancel: "Cancel",
+    added: (name: string) => `${name} is now a clinical advisor`,
+    removed: (name: string) => `${name} is no longer a clinical advisor`,
+    addFailed: "Couldn't add the advisor",
+    removeFailed: "Couldn't remove the advisor",
+    roleNames: {
+      CLINICAL_ADVISOR: "Clinical advisor",
+      SUPER_DUPER_ADMIN: "Platform owner",
+      SUPER_ADMIN: "Super admin",
+      MULTI_TENANT_ADMIN: "Multi-organisation admin",
+      ADMIN: "Admin",
+      COUNSELOR: "Counsellor",
+      LEARNER: "Learner",
+      SIMULATION_REVIEWER: "Simulation reviewer",
+      SCRIBE_REVIEWER: "Scribe reviewer",
+      EVALUATOR: "Evaluator",
+      CLIENT: "Client",
+    } as Record<string, string>,
+  },
   superAdmins: {
     title: "Ally admins",
     subtitle:
@@ -9505,6 +9563,7 @@ export const en = {
         budget: "Learning budget",
         metrics: "Metrics",
         agent: "The PM agent",
+        progress: "Learner progress",
       } as Record<string, string>,
       names: {
         runCeilingUsd: "Run ceiling ($)",
@@ -9531,6 +9590,11 @@ export const en = {
         flagReviewSlaHours: "Hours to review a learner's flag",
         pmAgentEnabled: "PM agent runs",
         pmAgentRunCapUsd: "Most one PM agent run may spend ($)",
+        progressOn: "Learner progress",
+        progressCardEvery: "Show the progress card every … sessions",
+        progressWindow: "Sessions to look back over",
+        progressUseFhs: "Use Foundational Skills levels as a cross-check",
+        progressShowWorseToLearners: "Tell learners when a skill needs another look",
       } as Record<string, string>,
       columns: {
         setting: "Setting",
@@ -9542,6 +9606,7 @@ export const en = {
       budgetTag: "Budget",
       misfit: "No longer fits",
       noProposal: "—",
+      noneYet: "These settings aren't available yet.",
       accept: "Accept",
       acceptAll: "Accept every proposed value that isn't a budget",
       save: "Save changes",
@@ -10275,6 +10340,85 @@ export const en = {
         debrief: "The debrief",
         ask: "Ask Ally",
         askCount: (n: number) => `Ask Ally · ${n}`,
+        progress: "Progress",
+      },
+      /** The Progress tab: how this learner's skills moved across their recent sessions. */
+      progress: {
+        heading: "Progress across sessions",
+        intro: (n: number | null) =>
+          n == null
+            ? "How this learner's skills moved across their recent debriefed sessions."
+            : `How this learner's skills moved across their last ${n} debriefed sessions, this one included.`,
+        shownAs: {
+          line: "The learner saw this as a line in the debrief.",
+          card: "The learner saw this as the progress card.",
+        } as Record<string, string>,
+        none: "No progress reading for this session",
+        noneFirst:
+          "This was the learner's first debriefed session, so there was nothing to compare with.",
+        noneHelp:
+          "A reading is made when learner progress is on and the learner has earlier published debriefs.",
+        skills: "Skills",
+        trend: {
+          more_consistent: "Getting more consistent",
+          about_the_same: "About the same",
+          worth_another_look: "Worth another look",
+          too_early: "Too early to tell",
+        } as Record<string, string>,
+        why: "Why:",
+        evidence: "Evidence:",
+        thisTurn: (n: number) => `Turn ${n}`,
+        pastRun: (n: number | null) =>
+          n != null ? `Earlier session, turn ${n}` : "Earlier session",
+        pastRunHint: "Open that session",
+        thisTurnHint: "Show this turn in the roleplay",
+        crossCheck: "Foundational Skills levels:",
+        crossCheckValue: {
+          agrees: "Agree",
+          disagrees: "Disagree",
+          absent: "No levels",
+        } as Record<string, string>,
+        learnerSaw: "The learner saw:",
+        notShown: "Not shown to the learner",
+        hiddenWorse:
+          "Not shown to the learner: learners aren't told when a skill needs another look (Debrief settings › Progress).",
+        heldBack: {
+          too_few_sessions: "Held back: fewer than 3 sessions gave a chance to show this skill",
+          contradicted_by_analyst: "Held back: the session observations don't support this trend",
+          contradicted_by_fhs: "Held back: the Foundational Skills levels went the other way",
+          version_straddle: "Held back: the evidence spans two versions of the Analyst",
+          corrected_evidence: "Held back: it rested on a point a clinical advisor corrected",
+          other_skill: "Held back: not one of the 14 foundational skills",
+        } as Record<string, string>,
+        heldBackOther: "Held back",
+        followups: "Follow-ups from earlier debriefs",
+        followupStatus: {
+          done: "Done",
+          partly: "Partly",
+          not_yet: "Not yet",
+        } as Record<string, string>,
+        noFollowups: "No earlier points to follow up.",
+        focus: "Focus for next time",
+        practiseNext: "Linked to Practise this next",
+        noSkills: "No skill had enough to say this time.",
+        made: (when: string) => `Read ${when}`,
+        skillNames: {
+          verbal: "Verbal communication",
+          confidentiality: "Explain and promote confidentiality",
+          rapport: "Rapport-building and self-disclosure",
+          feelings: "Exploration and normalisation of feelings",
+          empathy: "Empathy, warmth and genuineness",
+          harm: "Assessment of harm and developing a response plan",
+          functioning: "Connect to social functioning and impact on life",
+          explanation: "Explore the client's explanation for the problem",
+          family: "Involvement of family and significant others",
+          goals: "Collaborative goal-setting",
+          hope: "Promote realistic hope for change",
+          coping: "Incorporate coping mechanisms and prior solutions",
+          psychoeducation: "Psychoeducation with local terminology",
+          feedback: "Elicitation of feedback",
+          other: "Another skill",
+        } as Record<string, string>,
       },
       kinds: {
         importantMoment: "An important moment",
@@ -10841,6 +10985,7 @@ export const en = {
         autonomy: "Autonomy",
         weights: "Steering",
         pinned: "Pinned rules",
+        progress: "Progress",
         schedules: "Schedules",
         guidance: "Guidance",
       } as Record<string, string>,
@@ -10983,6 +11128,8 @@ export const en = {
       budgetHelp:
         "Every change asks you to confirm. The PM agent can never change a budget. Spend and burn rate are in Analytics › Debriefs.",
       testsHelp: "How much an idea must prove at each step before it reaches learners.",
+      progressHelp:
+        "How the Debrief agent reads a learner's progress across their recent sessions, and what learners are shown.",
       weightsHelp:
         "How the weekly steering score weighs each signal, and how soon a learner's flag should be reviewed.",
       pinnedHelp:

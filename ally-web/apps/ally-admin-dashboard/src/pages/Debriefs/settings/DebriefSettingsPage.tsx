@@ -55,9 +55,17 @@ export const DEBRIEF_GUIDANCE_COLLECTION = "debrief_guidance";
  * The tabs, in the design's order. Schedules (from More, with the toggle) and the guidance card
  * (old `#guidance` links) are views too, but not tabs.
  */
-const TABS: SettingsSection[] = ["orgs", "budget", "tests", "autonomy", "weights", "pinned"];
+const TABS: SettingsSection[] = [
+  "orgs",
+  "budget",
+  "tests",
+  "autonomy",
+  "weights",
+  "pinned",
+  "progress",
+];
 /** The tabs that move into More below lg (1056px), last first, so the tab row never wraps. */
-const NARROW_MORE: SettingsSection[] = ["weights", "pinned"];
+const NARROW_MORE: SettingsSection[] = ["weights", "pinned", "progress"];
 
 const Section: React.FC<{
   id: SettingsSection;
@@ -724,6 +732,15 @@ export const DebriefSettingsPage: React.FC = () => {
         {current === "pinned" && (
           <Section id="pinned" title={s.nav.pinned} help={s.pinnedHelp}>
             <PinnedRulesSection canAsk={access.approvePinnedRule} />
+          </Section>
+        )}
+        {current === "progress" && (
+          <Section id="progress" title={s.nav.progress} help={s.progressHelp}>
+            <SettingsGroups
+              groups={["progress"]}
+              canEdit={access.settings}
+              testId="progress-settings"
+            />
           </Section>
         )}
         {current === "schedules" && (

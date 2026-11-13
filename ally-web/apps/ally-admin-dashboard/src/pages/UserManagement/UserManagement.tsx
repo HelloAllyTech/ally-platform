@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Tabs } from "@ally-ui-mono/ui-shared";
-import { useListPlatformAdminsQuery } from "@api";
+import { useListClinicalAdvisorsQuery, useListPlatformAdminsQuery } from "@api";
 import {
   ListToolbar,
   FilterDropdown,
@@ -49,6 +49,7 @@ import { formatCapitalizedEnum, hasFeature } from "@utils";
 import { PhoneMappingsTab } from "./PhoneMappings";
 import { useOrganizationManagement } from "./useOrganizationManagement";
 import { useUserManagement } from "./useUserManagement";
+import { ClinicalAdvisors } from "../ClinicalAdvisors/ClinicalAdvisors";
 import { SuperAdmins } from "../SuperAdmins/SuperAdmins";
 
 const formatDate = (isoDate: string) =>
@@ -84,6 +85,11 @@ export const UserManagement: FC = () => {
     skip: !canManagePlatformAdmins,
   });
   const superAdminTierCount = platformAdminsForCount?.count ?? 0;
+  // Same for the Clinical advisors tab: one shared cache entry with the tab itself.
+  const { data: clinicalAdvisorsForCount } = useListClinicalAdvisorsQuery(undefined, {
+    skip: !canManagePlatformAdmins,
+  });
+  const clinicalAdvisorCount = clinicalAdvisorsForCount?.length ?? 0;
 
   // The Users toggle switches off the Users and Organizations sub-tabs. The
   // page itself stays reachable to an admin with Admin User Management, for
@@ -91,10 +97,11 @@ export const UserManagement: FC = () => {
   const canSeeUsersAndOrgs = hasFeature(features, FeatureToggleKey.USERS);
   const fallbackTab = canSeeUsersAndOrgs ? TabType.USERS : TabType.SUPER_ADMINS;
   const requestedTab = (searchParams.get("tab") as TabType) || fallbackTab;
-  // The Ally admins tab is gated; a deep link to it from anyone else falls
-  // back to Users (the backing endpoints would 403 anyway).
+  // The Ally admins and Clinical advisors tabs are gated; a deep link to either
+  // from anyone else falls back to Users (the backing endpoints would 403 anyway).
   const activeTab =
-    (requestedTab === TabType.SUPER_ADMINS && !canManagePlatformAdmins) ||
+    ((requestedTab === TabType.SUPER_ADMINS || requestedTab === TabType.CLINICAL_ADVISORS) &&
+      !canManagePlatformAdmins) ||
     (requestedTab === TabType.PHONE_MAPPINGS && !canManagePhoneMappings) ||
     ((requestedTab === TabType.USERS || requestedTab === TabType.ORGANIZATIONS) &&
       !canSeeUsersAndOrgs)
@@ -199,7 +206,14 @@ export const UserManagement: FC = () => {
         ]
       : []),
     ...(canManagePlatformAdmins
-      ? [{ id: TabType.SUPER_ADMINS, label: en.superAdmins.title, count: superAdminTierCount }]
+      ? [
+          { id: TabType.SUPER_ADMINS, label: en.superAdmins.title, count: superAdminTierCount },
+          {
+            id: TabType.CLINICAL_ADVISORS,
+            label: en.clinicalAdvisors.title,
+            count: clinicalAdvisorCount,
+          },
+        ]
       : []),
     ...(canManagePhoneMappings
       ? [{ id: TabType.PHONE_MAPPINGS, label: en.whatsappBot.phoneMappings.tabLabel }]
@@ -625,6 +639,8 @@ export const UserManagement: FC = () => {
         );
       case TabType.SUPER_ADMINS:
         return canManagePlatformAdmins ? <SuperAdmins /> : null;
+      case TabType.CLINICAL_ADVISORS:
+        return canManagePlatformAdmins ? <ClinicalAdvisors /> : null;
       case TabType.PHONE_MAPPINGS:
         return canManagePhoneMappings ? <PhoneMappingsTab /> : null;
     }

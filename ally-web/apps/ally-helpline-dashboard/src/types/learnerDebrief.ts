@@ -69,6 +69,26 @@ export interface DebriefCardsData {
   skill_words: Array<{ skill: string; word: DebriefSkillWord }>;
   reflective_question: string;
   progress_note?: string | null;
+  /**
+   * "Your last {n} sessions" (progress contract §2): only on the debrief where
+   * the progress card is due. Untrusted shape — read it through
+   * `parseProgressCard`, which drops anything malformed.
+   */
+  progress_card?: unknown;
+}
+
+/** How a skill has moved over the learner's recent sessions (post-veto). */
+export type DebriefProgressTrend =
+  | "more_consistent"
+  | "about_the_same"
+  | "worth_another_look"
+  | "too_early";
+
+/** `cards.progress_card`, once parsed: every line non-empty. */
+export interface DebriefProgressCardData {
+  sessions: number;
+  skills: Array<{ skill: string; trend: DebriefProgressTrend; line: string }>;
+  focus: { skill: string; line: string } | null;
 }
 
 export type DebriefFlagReason =

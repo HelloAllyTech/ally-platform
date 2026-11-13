@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readableSections } from "../DebriefCards";
 import { DebriefTab } from "../DebriefTab";
 
 /**
@@ -131,6 +132,17 @@ const CARDS = {
   ],
   reflective_question: "What made it hard to ask an open question there?",
   progress_note: "You asked more open questions than last time.",
+};
+
+const PROGRESS_CARDS = {
+  ...CARDS,
+  progress_card: {
+    sessions: 5,
+    skills: [
+      { skill: "empathy", trend: "more_consistent", line: "You named the feeling more often." },
+    ],
+    focus: { skill: "harm", line: "Ask about safety directly." },
+  },
 };
 
 describe("DebriefTab — learner debrief (Debrief agent)", () => {
@@ -522,6 +534,40 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       );
     });
 
+    it("flags the progress card as its own section", async () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: PROGRESS_CARDS, language: "en" },
+      });
+      renderTab();
+      const card = screen.getByTestId("debrief-card-progress");
+      fireEvent.click(
+        within(card).getByRole("button", { name: "postSim.debriefCards.flag.openLabel" }),
+      );
+      fireEvent.click(screen.getByLabelText("postSim.debriefCards.flag.reasons.didnt_say"));
+      fireEvent.click(screen.getByRole("button", { name: "postSim.debriefCards.flag.send" }));
+      await waitFor(() =>
+        expect(mockMutations.flag).toHaveBeenCalledWith({
+          sessionId: "s-1",
+          section: "progress_card",
+          reason: "didnt_say",
+          note: undefined,
+        }),
+      );
+    });
+
+    it("a progress card the Ally team removed is not shown", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: PROGRESS_CARDS,
+          language: "en",
+          corrections: [{ section: "progress_card", outcome: "removed", note: null, at: "" }],
+        },
+      });
+      renderTab();
+      expect(screen.queryByTestId("debrief-card-progress")).not.toBeInTheDocument();
+    });
+
     it("an open flag shows Undo inside the window, then the waiting line", () => {
       const until = new Date(Date.now() + 60_000).toISOString();
       ready({
@@ -812,6 +858,26 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
         "postSim.debriefCards.listen.error",
       );
       expect(screen.getByTestId("debrief-card-opening")).toBeVisible();
+    });
+
+    it("the progress card reads last in Listen all and has its own Listen", async () => {
+      mockFetchAudio.mockImplementation(({ section }: { section: string }) => ({
+        unwrap: () => Promise.resolve({ url: `https://a/${section}.mp3`, cached: true }),
+      }));
+      const view = { state: "ready" as const, cards: PROGRESS_CARDS, language: "en" };
+      expect(readableSections(view).at(-1)).toBe("progress_card");
+      expect(readableSections({ ...view, cards: CARDS }).includes("progress_card")).toBe(false);
+      mockLearnerDebriefQuery.mockReturnValue({ data: view });
+      renderTab();
+
+      const card = screen.getByTestId("debrief-card-progress");
+      fireEvent.click(within(card).getByTestId("debrief-listen-card"));
+      await waitFor(() => expect(plays).toEqual(["https://a/progress_card.mp3"]));
+      expect(mockFetchAudio).toHaveBeenCalledWith(
+        { sessionId: "s-1", section: "progress_card" },
+        true,
+      );
+      expect(card).toHaveAttribute("data-reading", "true");
     });
   });
 

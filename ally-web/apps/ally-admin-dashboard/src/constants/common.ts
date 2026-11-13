@@ -299,6 +299,13 @@ export const ApiEndpoints = {
     ASSIGN: "/v1/platform-admins",
     REMOVE: (userId: number) => `/v1/platform-admins/${userId}`,
   },
+  // User Management › Clinical advisors (gated by admin_user_management, like Ally admins).
+  CLINICAL_ADVISORS: {
+    LIST: "/v1/clinical-advisors",
+    SEARCH: "/v1/clinical-advisors/search",
+    ADD: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    REMOVE: (userId: number) => `/v1/clinical-advisors/${userId}`,
+  },
   SUPER_DUPER_ADMINS: {
     LIST: "/v1/super-duper-admins",
     ELIGIBLE: "/v1/super-duper-admins/eligible",
@@ -1355,6 +1362,7 @@ export const TAG_TYPES = {
   FEATURE_TOGGLE_REGISTRY: "featureToggleRegistry",
   USER_FEATURE_TOGGLES: "userFeatureToggles",
   PLATFORM_ADMINS: "platformAdmins",
+  CLINICAL_ADVISORS: "clinicalAdvisors",
   // Product Roadmap. NOTE: every one of these must ALSO be listed in baseApi.ts's
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",

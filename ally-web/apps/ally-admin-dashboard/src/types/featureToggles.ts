@@ -20,6 +20,20 @@ export interface SetUserFeatureTogglesBody {
   toggles: { featureKey: string; enabled: boolean }[];
 }
 
+/** User Management › Clinical advisors: one person (ally-be `ClinicalAdvisorPerson`). */
+export interface ClinicalAdvisorPerson {
+  userId: number;
+  name: string;
+  email: string | null;
+  organisation: string | null;
+  /** Every group the person holds (group names, e.g. "CLINICAL_ADVISOR"). */
+  roles: string[];
+  /** Holds the clinical advisor role. */
+  advisor: boolean;
+  /** Has the "Debriefs — Clinical advisor" console access. */
+  signOff: boolean;
+}
+
 /** A user holding the consolidated PLATFORM_ADMIN role. */
 export interface PlatformAdmin {
   id: number;

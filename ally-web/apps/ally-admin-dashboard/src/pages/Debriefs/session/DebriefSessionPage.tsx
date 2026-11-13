@@ -623,6 +623,7 @@ export const DebriefSessionPage: React.FC = () => {
           onSelect={onSelect}
           modelLabel={modelLabel}
           onAbout={section => jump({ section })}
+          onTurn={turn => jump({ turns: [turn] })}
         />
       </div>
 

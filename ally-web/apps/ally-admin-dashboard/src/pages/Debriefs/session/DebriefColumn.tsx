@@ -18,8 +18,9 @@ import { ANCHOR_ATTR, askAnchor, cardAnchor } from "../expertReviewSelection";
 import { Line } from "./commentParts";
 import { CommentPopup } from "./CommentPopup";
 import { CorrectInPlace } from "./CorrectInPlace";
+import { ProgressPanel } from "./ProgressPanel";
 
-export type DebriefTab = "debrief" | "ask";
+export type DebriefTab = "debrief" | "ask" | "progress";
 export const cardDomId = (section: string) => `session-card-${section}`;
 
 /** What is being corrected in place: a flagged card, or a card of a held debrief. */
@@ -45,6 +46,8 @@ interface Props {
   modelLabel: (id: string) => string;
   /** Jump to a card (Ask Ally's "About:" link). */
   onAbout: (section: string) => void;
+  /** Scroll the roleplay to a turn (the Progress tab's evidence links). */
+  onTurn: (turn: number) => void;
 }
 
 /** The words of a card a reviewer may rewrite, read from the card itself. */
@@ -500,6 +503,7 @@ export const DebriefColumn: React.FC<Props> = props => {
           items={[
             { id: "debrief", label: s.tabs.debrief },
             { id: "ask", label: asks ? s.tabs.askCount(asks) : s.tabs.ask },
+            { id: "progress", label: s.tabs.progress },
           ]}
         />
       </div>
@@ -510,6 +514,14 @@ export const DebriefColumn: React.FC<Props> = props => {
           <EmptyPanel title={s.noCards} message={props.view.howItWasMade.error ?? undefined} />
         ))}
       {props.tab === "ask" && <AskAlly {...props} />}
+      {props.tab === "progress" && (
+        <ProgressPanel
+          progress={props.view.progress}
+          runId={props.view.run.id}
+          pastSessions={props.view.skillEstimate?.pastSessions}
+          onTurn={props.onTurn}
+        />
+      )}
     </section>
   );
 };

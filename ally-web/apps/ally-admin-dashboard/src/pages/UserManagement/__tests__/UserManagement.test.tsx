@@ -27,9 +27,15 @@ vi.mock("@api", async importOriginal => ({
   useListEligiblePlatformAdminsQuery: () => ({ data: undefined, isFetching: false }),
   useAssignPlatformAdminMutation: () => [vi.fn()],
   useRemovePlatformAdminMutation: () => [vi.fn()],
+  useListClinicalAdvisorsQuery: () => ({ data: undefined, isLoading: false }),
   useGetUserFeatureTogglesQuery: () => ({ data: undefined, isLoading: false }),
   useSetUserFeatureTogglesMutation: () => [vi.fn()],
   useGetTenantsQuery: () => ({ data: undefined }),
+}));
+
+// The tab's own behaviour is covered in ClinicalAdvisors.test.tsx; here only whether it shows.
+vi.mock("../../ClinicalAdvisors/ClinicalAdvisors", () => ({
+  ClinicalAdvisors: () => <div data-testid="clinical-advisors-tab" />,
 }));
 
 // Mock components
@@ -724,6 +730,29 @@ describe("UserManagement", () => {
       fireEvent.click(closeButton);
 
       expect(mockOrganizationManagementHook.onCloseOrganizationEditModal).toHaveBeenCalled();
+    });
+  });
+
+  // Clinical advisors sits next to Ally admins and is gated exactly like it.
+  describe("Clinical advisors tab", () => {
+    it("shows next to Ally admins with Admin User Management", () => {
+      mockUserState(
+        [Permissions.EDIT_USER],
+        [FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT],
+      );
+      renderUserManagement(["/?tab=clinical-advisors"]);
+      const tabs = screen.getAllByRole("button").map(b => b.textContent ?? "");
+      const ally = tabs.findIndex(t => t.startsWith("Ally admins"));
+      expect(ally).toBeGreaterThan(-1);
+      expect(tabs[ally + 1]).toMatch(/^Clinical advisors/);
+      expect(screen.getByTestId("clinical-advisors-tab")).toBeInTheDocument();
+    });
+
+    it("is hidden without it, and a deep link falls back to Users", () => {
+      mockUserState([Permissions.EDIT_USER], [FeatureToggleKey.USERS]);
+      renderUserManagement([`/?tab=${TabType.CLINICAL_ADVISORS}`]);
+      expect(screen.queryByText(/^Clinical advisors/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("clinical-advisors-tab")).not.toBeInTheDocument();
     });
   });
 
