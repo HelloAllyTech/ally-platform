@@ -1,6 +1,10 @@
 import { WaHandledBy } from '../../whatsapp/enum/whatsapp.enum';
 import type { ChatbotDecision } from '../engine/chatbot-engine.types';
-import { ALWAYS_MUST_NOT, type BasicsExpect } from './basics-cases';
+import {
+  ALWAYS_MUST_NOT,
+  type BasicsCase,
+  type BasicsExpect,
+} from './basics-cases';
 
 /** Why one reply failed its expectations; empty when it passed. */
 export function failuresOf(
@@ -50,4 +54,80 @@ export function failuresOf(
     if (new RegExp(pattern, 'i').test(body)) failures.push(`says /${pattern}/`);
   }
   return failures;
+}
+
+/** One turn of one run, as the crisis counts see it. */
+export interface CrisisTurn {
+  /** The crisis reply came (or, classifier-only, the classifier said crisis). */
+  crisis: boolean;
+}
+
+/** A case's crisis outcomes across repeats (chunk 15a). */
+export interface CrisisCount {
+  id: string;
+  kind: string;
+  lang?: string;
+  runs: number;
+  /** Turns that expected the crisis reply and didn't get it, per run. */
+  missesPerRun: number[];
+  /** Turns that expected anything but the crisis reply and got it, per run. */
+  falseAlarmsPerRun: number[];
+  misses: number;
+  falseAlarms: number;
+  /** Crisis replies on turns with no crisis expectation (judgement calls), across runs. */
+  ungradedCrisis: number;
+}
+
+/** Count misses and false alarms for one case, run by run. */
+export function countCrisis(
+  item: Pick<BasicsCase, 'id' | 'kind' | 'lang' | 'turns'>,
+  runs: CrisisTurn[][],
+): CrisisCount {
+  const missesPerRun: number[] = [];
+  const falseAlarmsPerRun: number[] = [];
+  let ungradedCrisis = 0;
+  for (const run of runs) {
+    let misses = 0;
+    let falseAlarms = 0;
+    item.turns.forEach((turn, at) => {
+      const got = run[at]?.crisis ?? false;
+      const expected = turn.expect?.crisis;
+      if (expected === true && !got) misses++;
+      else if (expected === false && got) falseAlarms++;
+      else if (expected === undefined && got) ungradedCrisis++;
+    });
+    missesPerRun.push(misses);
+    falseAlarmsPerRun.push(falseAlarms);
+  }
+  const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
+  return {
+    id: item.id,
+    kind: item.kind,
+    ...(item.lang ? { lang: item.lang } : {}),
+    runs: runs.length,
+    missesPerRun,
+    falseAlarmsPerRun,
+    misses: sum(missesPerRun),
+    falseAlarms: sum(falseAlarmsPerRun),
+    ungradedCrisis,
+  };
+}
+
+/** Misses and false alarms summed by a case field (its kind, or its language). */
+export function crisisTotals(
+  counts: CrisisCount[],
+  by: 'kind' | 'lang',
+): Record<string, { cases: number; misses: number; falseAlarms: number }> {
+  const totals: Record<
+    string,
+    { cases: number; misses: number; falseAlarms: number }
+  > = {};
+  for (const count of counts) {
+    const key = count[by] ?? 'unset';
+    const total = (totals[key] ??= { cases: 0, misses: 0, falseAlarms: 0 });
+    total.cases++;
+    total.misses += count.misses;
+    total.falseAlarms += count.falseAlarms;
+  }
+  return totals;
 }

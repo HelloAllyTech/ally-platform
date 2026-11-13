@@ -139,3 +139,28 @@ describe('ChatbotEngineService: the crisis check reads earlier messages', () => 
     expect(aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
   });
 });
+
+describe('ChatbotEngineService.classifyCrisis (the crisis eval fast mode)', () => {
+  it('asks the classifier exactly as an answer would, with no keyword rules', async () => {
+    const aiService = engineAiService(ANSWER, ANSWER);
+    const replyService = { match: jest.fn() };
+    const engine = makeEngine({
+      aiService,
+      promptShared: { getPromptsByOptions: jest.fn().mockResolvedValue([]) },
+      replyService,
+    });
+    await engine.classifyCrisis({
+      chatbot: chatbotFixture(),
+      settings: DEFAULT_WHATSAPP_SETTINGS,
+      text: 'I mean it',
+      history: [{ role: 'user', content: DISCLOSURE }],
+      sender: { externalId: 'x', label: 'x' },
+      channel: { type: 'web' },
+    });
+    expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'I mean it', history: [DISCLOSURE] }),
+    );
+    expect(replyService.match).not.toHaveBeenCalled();
+    expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
+  });
+});

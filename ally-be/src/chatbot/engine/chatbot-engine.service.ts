@@ -165,6 +165,15 @@ export class ChatbotEngineService {
     return this.decide(turn, live);
   }
 
+  /**
+   * The crisis classifier's verdict alone, asked exactly as `answer` asks it: no keyword rules and
+   * no reply. The crisis eval's fast mode (chunk 15a); a channel never calls this.
+   */
+  async classifyCrisis(turn: ChatTurn): Promise<CrisisCheckResponse | null> {
+    const { prompts } = await this.loadPromptOverrides(turn);
+    return this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts));
+  }
+
   /** Who holds this chat: a team member's id, or null (the assistant). A lookup failure is null. */
   private async holderOf(turn: ChatTurn): Promise<number | null> {
     if (!this.conversations) return null;

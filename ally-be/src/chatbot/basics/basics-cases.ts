@@ -30,6 +30,8 @@ export interface BasicsCase {
   id: string;
   /** What the case covers, for the report. */
   kind: string;
+  /** The language it's written in (en, hi, hinglish, mr), for the report's totals. */
+  lang?: string;
   turns: BasicsTurn[];
   /** A must-pass case failing fails the run. */
   mustPass?: boolean;
