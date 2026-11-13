@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { ErrorCode } from '../../exception/error-code.enum';
 import type { ListRecordView } from './list-types';
 
 /** Why a list write or definition change was refused (chunk 5a). */
@@ -40,10 +41,21 @@ const STATUS: Record<ListRefusalCode, HttpStatus> = {
   version_conflict: HttpStatus.CONFLICT,
 };
 
-/** A refusal, as an HTTP error whose body is the refusal itself. 6's gateway reads `refusal`. */
+/**
+ * A refusal, as an HTTP error: the response carries `errorCode: LIST_REFUSED` and the refusal as
+ * `details`. 6's gateway reads `refusal`.
+ */
 export class ListRefusalException extends HttpException {
   constructor(readonly refusal: ListRefusal) {
-    super(refusal, STATUS[refusal.code]);
+    // The app's exception filter passes only `message`, and `details` beside an `errorCode`.
+    super(
+      {
+        message: refusal.message,
+        errorCode: ErrorCode.LIST_REFUSED,
+        details: refusal,
+      },
+      STATUS[refusal.code],
+    );
   }
 }
 

@@ -202,6 +202,15 @@ export enum ErrorCode {
   BOT_PAGE_NOT_RATEABLE = 'BOT_PAGE_NOT_RATEABLE',
   /** The website widget is on a site that isn't one of the bot's allowed websites (chunk 13). */
   BOT_PAGE_HOST_NOT_ALLOWED = 'BOT_PAGE_HOST_NOT_ALLOWED',
+
+  // ── Lists (Agents v2, chunk 5a) ───────────────────────────────────────────
+  /**
+   * 400, 404 or 409. A list write or definition change was refused. `details`
+   * is the refusal: `{ code, field?, message, conflict? }`, where `code` is one
+   * of `chatbot/lists/list-refusals.ts`'s and `conflict` carries the
+   * alternatives or the records that break a new rule. Terminal as sent.
+   */
+  LIST_REFUSED = 'LIST_REFUSED',
 }
 
 /**
