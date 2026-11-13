@@ -368,7 +368,11 @@ const CallSummary: FC<CallSummaryProps> = ({
     const isEnhancing = enhancing === field.key;
     const enhanceEndAdornment =
       field.isEnhanceable && shouldAllowEdit && value && value.trim() ? (
-        <Tooltip label={t("summary.enhance")} align="bottom">
+        // The button itself is pinned to the textarea's bottom-right corner,
+        // leaving almost no room below it — a "bottom"-aligned tooltip ended
+        // up overlapping the button it was meant to label, blocking clicks
+        // on it entirely. "top" opens away from the edge the button sits on.
+        <Tooltip label={t("summary.enhance")} align="top">
           <span className="absolute bottom-2 right-2">
             <EnhanceButton
               fieldName={field.key}

@@ -213,12 +213,15 @@ vi.mock("../../constants", async importOriginal => {
 // instead so tests can drive a built-in field edit the way a user typing would
 // and observe what handleSave then sends.
 vi.mock("../SummaryFieldInput", () => ({
-  default: ({ field, value, onChange }: any) => (
-    <input
-      aria-label={field.label}
-      value={value ?? ""}
-      onChange={e => onChange(field.key, e.target.value)}
-    />
+  default: ({ field, value, onChange, enhanceEndAdornment }: any) => (
+    <>
+      <input
+        aria-label={field.label}
+        value={value ?? ""}
+        onChange={e => onChange(field.key, e.target.value)}
+      />
+      {enhanceEndAdornment}
+    </>
   ),
 }));
 // Prevent loading the real date-picker deps and date-fns (36 MB) into the test worker heap.
@@ -265,7 +268,11 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   // Carbon Loading replaces MUI CircularProgress. Expose it with role
   // "progressbar" so the loading-state test can keep querying by role.
   Loading: () => <div role="progressbar" />,
-  Tooltip: ({ children }: any) => <>{children}</>,
+  Tooltip: ({ children, align, label }: any) => (
+    <span data-testid="tooltip" data-align={align} data-label={label}>
+      {children}
+    </span>
+  ),
 }));
 
 // --------------------- Tests --------------------- //
@@ -561,6 +568,31 @@ describe("CallSummary — a section with custom fields renders even with zero vi
     // whole Flow section — this field included — never made it past the
     // sections.map guard, since Flow had zero built-in fields visible.
     expect(screen.getByLabelText("Counsellor Comment")).toHaveValue("Spoke calmly throughout");
+  });
+
+  it("opens the Enhance tooltip above its button, not overlapping it", async () => {
+    // The Enhance button is pinned to the textarea's own bottom-right corner,
+    // leaving almost no room below it — a "bottom"-aligned tooltip ended up
+    // rendering on top of the button it was meant to label, blocking clicks
+    // on it entirely, across every enhanceable field.
+    vi.mocked(getSectionFields).mockImplementation(() => [
+      { key: "keyConcerns", type: "text", label: "Key Concerns", isEditable: true, isEnhanceable: true },
+    ]);
+    mockGetCustomFieldValues.mockReturnValue({ data: [] });
+
+    render(
+      <CallSummary
+        chatId={1}
+        callSummary={{
+          ...summaryCall,
+          details: { ...summaryCall.details, summary: { keyConcerns: "Spoke about anxiety" } },
+        }}
+      />,
+    );
+
+    // The field's value starts at the "--" placeholder and settles to the
+    // real value (and the tooltip with it) on a later render.
+    expect(await screen.findByTestId("tooltip")).toHaveAttribute("data-align", "top");
   });
 });
 
