@@ -178,6 +178,11 @@ describe('DebriefBuilderRequesterService: the PM agent answers Builder', () => {
       learningBudgetThisMonth: jest.fn(async () => 50),
       learningSpentThisMonth: jest.fn(async () => 1),
     };
+    const ai = {
+      getPromptOverrides: jest.fn(async () => ({
+        ally_ai_debrief_pm_builder_answers_system: { prompt: 'LIVE' },
+      })),
+    };
     const decisions = {
       pendingInterview: jest.fn(
         async () => opts.pending ?? { questions: [question], brief: false },
@@ -195,9 +200,13 @@ describe('DebriefBuilderRequesterService: the PM agent answers Builder', () => {
           pmAgentRunCapUsd: 5,
         })),
       } as any,
-      { get: jest.fn(() => decisions) } as any,
+      {
+        get: jest.fn((cls: { name: string }) =>
+          cls.name === 'AiService' ? ai : decisions,
+        ),
+      } as any,
     );
-    return { svc, pm, decisions, evidence };
+    return { svc, pm, decisions, evidence, ai };
   }
 
   const reply = (a: Record<string, unknown>, status = 'finished') =>
@@ -262,6 +271,27 @@ describe('DebriefBuilderRequesterService: the PM agent answers Builder', () => {
       ],
       escalated: [],
     });
+  });
+
+  it('sends the live Skills Store instructions with the question', async () => {
+    const { svc, ai } = setup();
+    reply({ answer: 'Read-only.' });
+    await svc.turnEnded(SESSION, IDEA);
+    expect(ai.getPromptOverrides).toHaveBeenCalledWith([
+      'ally_ai_debrief_pm_builder_answers_system',
+    ]);
+    expect((post.mock.calls[0][1] as any).prompts).toEqual({
+      ally_ai_debrief_pm_builder_answers_system: { prompt: 'LIVE' },
+    });
+  });
+
+  it('leaves the question for the person when the Skills Store cannot be read', async () => {
+    const { svc, ai, decisions, evidence } = setup();
+    ai.getPromptOverrides.mockRejectedValueOnce(new Error('store down'));
+    await svc.turnEnded(SESSION, IDEA);
+    expect(post).not.toHaveBeenCalled();
+    expect(decisions.answer).not.toHaveBeenCalled();
+    expect(evidence.pop()!.escalated[0].reason).toMatch(/could not answer/);
   });
 
   it("escalates what it can't answer, leaving the question for the person", async () => {

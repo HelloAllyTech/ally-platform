@@ -559,6 +559,24 @@ class UserIdentifyUserInputs(PromptInputs):
     conversations: str
 
 
+class DebriefPmBuilderAnswersSystemInputs(PromptInputs):
+    """`debrief/pm_builder_answers_system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_debrief_pm_builder_answers_system",
+        name="Debrief PM agent: answering Builder",
+        description=(
+            "Instructions for the Debrief PM agent when it answers Builder's interview "
+            "questions on an idea handed to Builder (R2-20). It answers only from its "
+            "own brief, says it can't answer rather than guessing (a person answers "
+            "those), and never quotes anyone. The brief and question go in the user "
+            "message; the answer is structured."
+        ),
+    )
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+    output_format: ClassVar[Optional[str]] = "structured"
+
+
 class BuilderChangeInputs(PromptInputs):
     """`builder/change.txt`."""
 

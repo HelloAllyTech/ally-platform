@@ -259,3 +259,49 @@ def test_endpoint_returns_the_answers(monkeypatch):
     )
     assert res.status_code == 200
     assert res.json()["answers"][0]["question_id"] == "q1"
+
+
+def _parsed_q1_only() -> BuilderAnswers:
+    return BuilderAnswers(
+        answers=[
+            BuilderAnswer(question_id="q1", can_answer=True, answer="Read-only."),
+            BuilderAnswer(question_id="q2", can_answer=False, reason="Not settled."),
+        ]
+    )
+
+
+@pytest.mark.asyncio
+async def test_instructions_come_from_the_skills_store():
+    model = FakeModel(PRIMARY, _parsed_q1_only())
+    live = "LIVE STORE TEXT: answer only from the brief; never quote."
+    await answer_builder_questions(
+        request(
+            prompts={
+                "ally_ai_debrief_pm_builder_answers_system": {
+                    "prompt": live,
+                    "version": 3,
+                }
+            }
+        ),
+        default_model=PRIMARY,
+        models_factory=factory({PRIMARY: model}),
+    )
+    system = model.calls[0][0]
+    assert system.content == live
+
+
+@pytest.mark.asyncio
+async def test_instructions_fall_back_to_the_default_file():
+    model = FakeModel(PRIMARY, _parsed_q1_only())
+    await answer_builder_questions(
+        request(),
+        default_model=PRIMARY,
+        models_factory=factory({PRIMARY: model}),
+    )
+    system = model.calls[0][0].content
+    assert system == module.load_template(module.PROMPT_PATH, prompts=None)
+    # The default keeps the rules the code depends on.
+    assert "can_answer to false" in system
+    assert "Never guess" in system
+    assert "Never quote anyone" in system
+    assert "selected_option_ids" in system

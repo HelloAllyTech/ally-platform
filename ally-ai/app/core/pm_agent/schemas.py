@@ -90,6 +90,9 @@ class BuilderAnswersRequest(BaseModel):
     #: Text that must never reach Builder (the cited comments' bodies), stripped
     #: from every answer as well as anything in quotation marks.
     known_texts: List[str] = Field(default_factory=list)
+    #: The live Skills Store prompts for this call (ally-be's `getPromptOverrides`):
+    #: `ally_ai_debrief_pm_builder_answers_system`. Missing → the local default.
+    prompts: Optional[Dict[str, Any]] = None
 
 
 class BuilderAnswerOut(BaseModel):

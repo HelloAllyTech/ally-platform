@@ -6,6 +6,9 @@ the PM agent, quotes already stripped by the gateway) and Builder's pending
 question; this answers it from the brief alone, or says plainly that it can't, so
 ally-be leaves the question for the person who handed the idea over.
 
+The instructions are a Skills Store prompt (`ally_ai_debrief_pm_builder_answers_system`,
+not pinned): ally-be sends its live text in `prompts`; the default file is the fallback.
+
 One structured model call, the PM agent's model with its backup as a fallback
 (LangChain `with_fallbacks`). Its cost is recorded to `llm_usage` as
 `debrief_improver`, so ally-be counts it against the learning budget. Quotes are
@@ -27,29 +30,14 @@ from app.core.llm_usage.tasks import LLMTask
 from app.core.pm_agent.models import build_models
 from app.core.pm_agent.quotes import strip_quotes
 from app.core.pm_agent.schemas import BuilderAnswersRequest
+from app.prompts.resolver import load_template
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-SYSTEM_PROMPT = """\
-You are the PM agent for Ally's Debrief agent. You asked Builder (Ally's coding \
-agent) to build something, and Builder is interviewing you before it writes a \
-product spec. Answer Builder's question from the brief you wrote, and from nothing \
-else.
-
-Rules:
-- Answer only what the brief settles: the problem, the evidence summary, the \
-expected effect and the acceptance checks. You may draw a direct consequence of \
-them (if the checks say "read-only", the tool must not write).
-- If the brief does not settle the question (a product decision, scope the brief \
-does not mention, who may see what, a trade-off between people, anything about \
-how the code works today), set can_answer to false and say in one sentence what \
-is missing. Never guess. A person answers those.
-- Never quote anyone. Never use quotation marks. Never include anything a learner \
-or a reviewer said: write in your own words.
-- When the question has options and one fits, pick its id in selected_option_ids. \
-Keep the answer short: one to three sentences.
-"""
+#: The instructions' Skills Store prompt (`ally_ai_debrief_pm_builder_answers_system`):
+#: the live text comes in the request's `prompts`; the default file is the fallback.
+PROMPT_PATH = "debrief/pm_builder_answers_system"
 
 
 class BuilderAnswer(BaseModel):
@@ -188,7 +176,10 @@ async def answer_builder_questions(
         if len(runnables) > 1
         else runnables[0]
     )
-    messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(render_request(req))]
+    messages = [
+        SystemMessage(content=load_template(PROMPT_PATH, prompts=req.prompts)),
+        HumanMessage(render_request(req)),
+    ]
     try:
         out = await chain.ainvoke(messages)
     except Exception as e:  # noqa: BLE001 - reported to ally-be; a person answers

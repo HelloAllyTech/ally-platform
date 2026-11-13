@@ -1116,8 +1116,9 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'DEBRIEF_MODELS.pmAgentBackup. Paid from the learning budget, capped per run (pmAgentRunCapUsd). ' +
       'Also answers Builder interview questions for a handed-over idea (R2-20, POST /pm-agent/builder-answers): ' +
       'one structured call from the idea brief alone (no tools, no learner text), at most $0.10 each, ' +
-      'escalating to a person what the brief does not settle. Its instructions are in code ' +
-      '(app/core/pm_agent/builder_answers.py), not the Skills Store.',
+      'escalating to a person what the brief does not settle. Its instructions are the Skills Store ' +
+      'prompt ally_ai_debrief_pm_builder_answers_system (not pinned); its model is DEBRIEF_MODELS.pmAgent, ' +
+      'not the prompt row.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',

@@ -30,6 +30,10 @@ import { DebriefPmAgentService } from './debrief-pm-agent.service';
 import { DebriefPmAgentToolsService } from './debrief-pm-agent-tools.service';
 import { DebriefSettingsService } from './debrief-settings.service';
 
+/** The answerer's instructions in the Skills Store (an ally-ai prompt; not pinned). */
+export const BUILDER_ANSWERS_PROMPT_CODE =
+  'ally_ai_debrief_pm_builder_answers_system';
+
 /** An ally-ai call is one model call; past this ally-be stops waiting. */
 const ANSWER_TIMEOUT_MS = 90_000;
 
@@ -146,6 +150,16 @@ export class DebriefBuilderRequesterService implements OnModuleInit {
     builderRequesters.register(DEBRIEF_PM_AGENT_REQUESTER, {
       turnEnded: (sessionId, ideaId) => this.turnEnded(sessionId, ideaId),
     });
+  }
+
+  /** Resolved lazily, like Builder: the AI module imports far more than this needs. */
+  private async ai(): Promise<{
+    getPromptOverrides(
+      codes: readonly string[],
+    ): Promise<Record<string, unknown>>;
+  }> {
+    const { AiService } = await import('../../ai/service/ai.service');
+    return this.moduleRef.get(AiService, { strict: false });
   }
 
   /** Resolved lazily: Builder imports far more than the debrief needs. */
@@ -288,7 +302,13 @@ export class DebriefBuilderRequesterService implements OnModuleInit {
     };
     let res: BuilderAnswersResponse;
     try {
-      res = await this.call(body);
+      // The live instructions, read the way every ally-ai call reads them: a store
+      // that can't be read fails this call (a person answers) rather than running
+      // the minimal default.
+      const prompts = await (
+        await this.ai()
+      ).getPromptOverrides([BUILDER_ANSWERS_PROMPT_CODE]);
+      res = await this.call({ ...body, prompts });
     } catch (e) {
       res = {
         status: 'failed',

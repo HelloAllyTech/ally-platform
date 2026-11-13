@@ -478,9 +478,12 @@ Planted-idea fixtures for the offline "right final state" eval (METRICS.md): `al
 With the PM agent answering, ally-be (`DebriefBuilderRequesterService`) sends Builder's one pending question:
 `{ idea_id, model, backup_model, prices, budget_usd, brief: { title, problem, evidence_summary, expected_effect,
 acceptance_checks[] }, questions: [ { id, prompt, rationale?, options: [ { id, label, description? } ] } ],
-known_texts[] }` → `{ status: finished | budget_spent | failed, answers: [ { question_id, can_answer,
+known_texts[], prompts }` → `{ status: finished | budget_spent | failed, answers: [ { question_id, can_answer,
 selected_option_ids[], answer, reason } ], estimated_cost_usd, model, error }`.
 
+- Its instructions are the Skills Store prompt `ally_ai_debrief_pm_builder_answers_system` (not pinned): ally-be
+  sends the live text in `prompts` (`AiService.getPromptOverrides`), and ally-ai falls back to
+  `app/prompts/debrief/pm_builder_answers_system.txt`. The model stays `DEBRIEF_MODELS.pmAgent`.
 - One structured model call (the PM agent's model, backup via `with_fallbacks`), no tools. The brief is the PM
   agent's own, quote-stripped by the gateway and again by ally-be against the cited comments (`known_texts`).
 - `can_answer: false` when the brief does not settle it: the question stays in Builder for the person who clicked,
