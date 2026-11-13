@@ -763,3 +763,80 @@ export interface DebriefAgentMetrics {
     holdRate: DebriefRate;
   };
 }
+
+/** PM agent › Reports (CONSOLE_API.md, `GET pm-agent/reports`). */
+export type PmReportKind = "weekly" | "monthly";
+
+export interface PmReportListItem {
+  kind: PmReportKind;
+  /** `YYYY-MM` for a month, the Monday `YYYY-MM-DD` for a week (India time). */
+  period: string;
+  title: string;
+  publishedAt: string | null;
+  hasReview: boolean;
+}
+
+type PmReportPerson = { id: number; name: string | null } | null;
+
+export type PmReportStanding =
+  | { status: "standing" }
+  | { status: "reverted"; at: string }
+  | { status: "not_yet" };
+
+export interface PmReportChanged {
+  from: string;
+  to: string;
+  liveForEveryone: {
+    count: number;
+    byPerson: number;
+    items: Array<{
+      releaseId: string;
+      version: number;
+      ideaId: string | null;
+      title: string;
+      at: string;
+      approvedBy: PmReportPerson;
+      standing: PmReportStanding;
+    }>;
+  };
+  reverted: {
+    count: number;
+    items: Array<{
+      releaseId: string | null;
+      version: number | null;
+      ideaId: string | null;
+      title: string;
+      at: string;
+      how: "try_out_reverted" | "try_out_stopped" | "rolled_back" | "emergency";
+      by: PmReportPerson;
+      reason: string | null;
+    }>;
+  };
+  rejected: {
+    count: number;
+    items: Array<{
+      ideaId: string;
+      title: string;
+      at: string;
+      withdrawn: boolean;
+      by: PmReportPerson;
+      reason: string | null;
+    }>;
+  };
+  tests: { count: number; passed: number; quickChecks: number; passTests: number; trials: number };
+  sentToBuilder: { count: number };
+  budget: {
+    spentUsd: number;
+    capUsd: number;
+    parts: { testsUsd: number; pmAgentUsd: number };
+  } | null;
+}
+
+/** `GET pm-agent/reports/:kind/:period`. */
+export interface PmReport {
+  kind: PmReportKind;
+  period: string;
+  title: string;
+  changed: PmReportChanged;
+  review: { text: string; publishedAt: string } | null;
+}

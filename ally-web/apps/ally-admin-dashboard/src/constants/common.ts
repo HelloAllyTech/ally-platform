@@ -474,6 +474,9 @@ export const ApiEndpoints = {
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
     PM_AGENT: "/v1/debriefs/console/pm-agent",
     PM_AGENT_ANALYSE: "/v1/debriefs/console/pm-agent/analyse",
+    PM_AGENT_REPORTS: "/v1/debriefs/console/pm-agent/reports",
+    PM_AGENT_REPORT: (kind: string, period: string) =>
+      `/v1/debriefs/console/pm-agent/reports/${kind}/${period}`,
     IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
       `/v1/debriefs/console/pm-agent/ideas/${id}/${action}`,
     MODELS: "/v1/debriefs/console/models",

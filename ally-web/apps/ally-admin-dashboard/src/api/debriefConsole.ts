@@ -8,6 +8,9 @@ import {
   DebriefOverview,
   DebriefTenantRow,
   PmAgentState,
+  PmReport,
+  PmReportKind,
+  PmReportListItem,
   DebriefAnalyticsView,
   DebriefAttention,
   DebriefAutonomyKind,
@@ -396,6 +399,17 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.BUDGETS, method: HttpMethod.PUT, body }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    getPmAgentReports: builder.query<PmReportListItem[], void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PM_AGENT_REPORTS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getPmAgentReport: builder.query<PmReport, { kind: PmReportKind; period: string }>({
+      query: ({ kind, period }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.PM_AGENT_REPORT(kind, period),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     getDebriefReleaseHistory: builder.query<DebriefReleaseHistory, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.RELEASE_HISTORY, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
@@ -502,6 +516,8 @@ export const {
   useSetDebriefOrgAutonomyMutation,
   useSetDebriefBudgetsMutation,
   useEmergencyStopDebriefTenantMutation,
+  useGetPmAgentReportsQuery,
+  useGetPmAgentReportQuery,
   useGetDebriefReleaseHistoryQuery,
   useGetDebriefReleaseDetailQuery,
   useGetDebriefReleaseCompareQuery,
