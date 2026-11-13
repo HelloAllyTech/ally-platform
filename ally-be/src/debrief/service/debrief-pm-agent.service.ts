@@ -72,6 +72,8 @@ import { DebriefSettingsService } from './debrief-settings.service';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefRunnerService, RunOptions } from './debrief-runner.service';
 import { DebriefGraphClient } from './debrief-graph.client';
+import { BuilderAnswerer } from '../util/debrief-builder-progress.util';
+import { DEBRIEF_PM_AGENT_REQUESTER } from '../../builder/util/builder-requesters.registry';
 import {
   DebriefTestSet,
   DebriefTestSetsService,
@@ -636,7 +638,8 @@ export class DebriefPmAgentService
       | 'expiryWarning'
       | 'signoff'
       | 'withdrawn'
-      | 'rejection',
+      | 'rejection'
+      | 'builder',
     value: Record<string, unknown>,
   ): Promise<void> {
     await this.dataSource.query(
@@ -658,6 +661,7 @@ export class DebriefPmAgentService
     ideaId: string,
     userId: number,
     note?: string,
+    opts: { answerer?: BuilderAnswerer } = {},
   ): Promise<
     | { releaseId: string; version: number; stage: 'canary' | 'promoted' }
     | { stage: 'builder' | 'bug_hunter' | 'answered'; id: string | null }
@@ -678,7 +682,7 @@ export class DebriefPmAgentService
       );
     }
     if (['needs_code', 'defect', 'needs_person'].includes(kind)) {
-      return this.approveHandoff(idea, userId, note);
+      return this.approveHandoff(idea, userId, note, opts.answerer);
     }
     if (kind === 'release' && idea.change?.budgetOnly) {
       return this.promoteBudgetChange(idea, userId, note);
@@ -947,11 +951,18 @@ export class DebriefPmAgentService
    * actor, so the Builder session and the bug report carry a real person.
    * Resolved lazily (ModuleRef): Builder and the roadmap import far more than
    * the debrief needs, and the debrief is imported by modules they reach.
+   *
+   * "Hand to Builder" (R2-20, plan §11.5): the session is requested for the PM
+   * agent (`requestedBy`, the idea id as `requestRef`) and its interview starts
+   * at once. With `answerer: 'pm_agent'` the PM agent answers Builder's
+   * questions from this brief and leaves what it can't for the person who
+   * clicked (DebriefBuilderRequesterService); with `'person'` they answer all.
    */
   async approveHandoff(
     idea: Record<string, any>,
     userId: number,
     note?: string,
+    answerer: BuilderAnswerer = 'person',
   ): Promise<{
     stage: 'builder' | 'bug_hunter' | 'answered';
     id: string | null;
@@ -974,9 +985,34 @@ export class DebriefPmAgentService
       const session = await builder.createSession(userId, {
         title: String(idea.text).slice(0, 120),
         handoffContext: builderHandoffText(idea),
+        requestedBy: DEBRIEF_PM_AGENT_REQUESTER,
+        requestRef: idea.id,
       });
       stage = 'builder';
       id = session.id;
+      // Recorded before the first turn starts, so the requester knows who
+      // answers when that turn ends.
+      await this.writeEvidence(idea.id, 'handoff', {
+        ...h,
+        status: 'filed',
+        filedId: id,
+        answerer,
+        decidedBy: userId,
+        decidedAt: new Date().toISOString(),
+        note: note ?? null,
+      });
+      try {
+        const { BuilderDecisionService } =
+          await import('../../builder/service/builder-decision.service');
+        await this.moduleRef
+          .get(BuilderDecisionService, { strict: false })
+          .startBackgroundTurn(session.id, builderSeedMessage(idea), userId);
+      } catch (e) {
+        // The session exists and is linked; opening it starts the interview.
+        this.logger.warn(
+          `[pm-agent] Builder session ${session.id} opened but its first turn did not start: ${(e as Error).message}`,
+        );
+      }
     } else if (kind === 'defect') {
       const { RoadmapOpportunityService } =
         await import('../../product-roadmap/service/roadmap-opportunity.service');
@@ -994,6 +1030,7 @@ export class DebriefPmAgentService
       ...h,
       status: stage === 'answered' ? 'answered' : 'filed',
       filedId: id,
+      ...(stage === 'builder' ? { answerer } : {}),
       decidedBy: userId,
       decidedAt: new Date().toISOString(),
       note: note ?? null,
@@ -1840,6 +1877,14 @@ export function builderHandoffText(idea: Record<string, any>): string {
     'Acceptance checks:',
     ...((h.acceptanceChecks ?? []) as string[]).map((c) => `- ${c}`),
   ].join('\n');
+}
+
+/** Builder's first interview turn, sent as the person who clicked "Hand to Builder". */
+export function builderSeedMessage(idea: Record<string, any>): string {
+  return [
+    'This is an idea from the Debrief PM agent. Interview me into a PRD for it.',
+    builderHandoffText(idea),
+  ].join('\n\n');
 }
 
 /** Bug Hunter's report: the summary and the debrief run ids. */

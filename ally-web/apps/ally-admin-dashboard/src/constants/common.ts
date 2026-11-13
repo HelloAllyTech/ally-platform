@@ -479,6 +479,9 @@ export const ApiEndpoints = {
       `/v1/debriefs/console/pm-agent/reports/${kind}/${period}`,
     IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
       `/v1/debriefs/console/pm-agent/ideas/${id}/${action}`,
+    /** "Hand to Builder": where the idea stands in Builder, and answering its question. */
+    IDEA_BUILDER: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/builder`,
+    IDEA_BUILDER_ANSWER: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/builder/answer`,
     MODELS: "/v1/debriefs/console/models",
     ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,
     TEST_SETS_BUILD: "/v1/debriefs/console/test-sets/build",

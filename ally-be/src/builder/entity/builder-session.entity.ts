@@ -156,6 +156,20 @@ export class BuilderSession extends BaseWithoutTenantEntity {
   handoffContext?: string | null;
 
   /**
+   * Who the session was requested for, when not a person: today only `debrief_pm_agent`
+   * ("Hand to Builder" on a Debrief PM agent idea, plan §11.5). Builder knows nothing
+   * about the requester beyond this name: it tells the registered requester when an
+   * interview turn ends (`builderRequesters`), and the UI shows a small marker. Null for a
+   * session a person started.
+   */
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  requestedBy?: string | null;
+
+  /** The requester's own id for the work (the PM agent's idea id). Opaque to Builder. */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  requestRef?: string | null;
+
+  /**
    * Set when someone archives the session. Null = active. Sessions are shared,
    * so archiving hides it from every Builder user's default feed view — it does not touch status, and never cascades to the PRD,
    * transcript, runs, events, PRs or reports underneath it.

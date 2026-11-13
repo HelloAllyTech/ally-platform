@@ -11,6 +11,8 @@ import {
   PmReport,
   PmReportKind,
   PmReportListItem,
+  PmAgentBuilderAnswerer,
+  PmAgentBuilderProgress,
   DebriefAnalyticsView,
   DebriefAttention,
   DebriefAutonomyKind,
@@ -115,13 +117,34 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     decideIdea: builder.mutation<
-      unknown,
-      { id: string; decision: "approve" | "reject"; reason?: string }
+      { stage?: string; id?: string | null } | undefined,
+      {
+        id: string;
+        decision: "approve" | "reject";
+        reason?: string;
+        /** "Hand to Builder" only: who answers Builder's interview. */
+        answerer?: PmAgentBuilderAnswerer;
+      }
     >({
-      query: ({ id, decision, reason }) => ({
+      query: ({ id, decision, reason, answerer }) => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_ACTION(id, decision),
         method: HttpMethod.POST,
-        body: reason ? { reason } : {},
+        body: { ...(reason ? { reason } : {}), ...(answerer ? { answerer } : {}) },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getIdeaBuilderProgress: builder.query<PmAgentBuilderProgress, string>({
+      query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_BUILDER(id), method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    answerIdeaBuilderQuestion: builder.mutation<
+      { ok: true },
+      { id: string; questionId: string; text: string }
+    >({
+      query: ({ id, questionId, text }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_BUILDER_ANSWER(id),
+        method: HttpMethod.POST,
+        body: { questionId, text },
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
@@ -484,6 +507,8 @@ export const {
   useRunPmAgentMutation,
   useScreenIdeaMutation,
   useDecideIdeaMutation,
+  useGetIdeaBuilderProgressQuery,
+  useAnswerIdeaBuilderQuestionMutation,
   useRollbackDebriefReleaseMutation,
   useBuildDebriefTestSetsMutation,
   useGetDebriefTenantsQuery,

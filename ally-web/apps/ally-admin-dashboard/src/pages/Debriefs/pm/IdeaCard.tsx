@@ -21,6 +21,7 @@ import { formatWhen } from "../consoleTable";
 import { ConsoleTag } from "../consoleUi";
 import { DebriefAccess } from "../debriefAccess";
 import { waitedFor } from "../queue";
+import { BuilderBrief, BuilderProgress, HandToBuilder } from "./BuilderHandoff";
 import { EvidenceBlock } from "./EvidenceBlock";
 import { Handoff } from "./Handoff";
 import {
@@ -201,6 +202,10 @@ export const IdeaCard: React.FC<{
       (idea.releaseVersion != null && idea.releaseStatus !== "ga" ? idea.releaseVersion : null))
     : null;
   const diff = idea.draftRelease?.changedVsLive;
+  // "Hand to Builder" (R2-20): a For Builder idea shows its brief, the hand-off, then progress.
+  const forBuilder = idea.evidence.handoff?.kind === "builder";
+  const handedToBuilder =
+    forBuilder && idea.evidence.handoff?.status === "filed" && !!idea.evidence.handoff.filedId;
 
   const start = async (step: "gate_test" | "paired_trial") => {
     try {
@@ -234,20 +239,24 @@ export const IdeaCard: React.FC<{
       </div>
       <h2 className="text-2xl font-semibold leading-snug">{inWords(idea.title)}</h2>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 text-sm leading-normal">
-        {(idea.evidence.hypothesis || idea.evidence.evidence) && (
-          <div>
-            <div className="mb-0.5 text-xs text-neutral-600">{s.why}</div>
-            {inWords(idea.evidence.hypothesis)} {inWords(idea.evidence.evidence)}
-          </div>
-        )}
-        {idea.evidence.expectedEffect && (
-          <div>
-            <div className="mb-0.5 text-xs text-neutral-600">{s.expected}</div>
-            {inWords(idea.evidence.expectedEffect)}
-          </div>
-        )}
-      </div>
+      {forBuilder ? (
+        <BuilderBrief idea={idea} />
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 text-sm leading-normal">
+          {(idea.evidence.hypothesis || idea.evidence.evidence) && (
+            <div>
+              <div className="mb-0.5 text-xs text-neutral-600">{s.why}</div>
+              {inWords(idea.evidence.hypothesis)} {inWords(idea.evidence.evidence)}
+            </div>
+          )}
+          {idea.evidence.expectedEffect && (
+            <div>
+              <div className="mb-0.5 text-xs text-neutral-600">{s.expected}</div>
+              {inWords(idea.evidence.expectedEffect)}
+            </div>
+          )}
+        </div>
+      )}
 
       {idea.change.find && (
         <div
@@ -335,7 +344,8 @@ export const IdeaCard: React.FC<{
           )}
         </p>
       )}
-      <Handoff idea={idea} />
+      {!forBuilder && <Handoff idea={idea} />}
+      {forBuilder && handedToBuilder && <BuilderProgress idea={idea} canAnswer={access.pmAgent} />}
       {SCREENABLE.has(idea.change.ideaKind) && (
         <EvidenceBlock title={p.tests} idea={idea} testId="idea-evidence" />
       )}
@@ -417,7 +427,8 @@ export const IdeaCard: React.FC<{
                 {s.promote}
               </Button>
             )}
-            {can.approve && next === "handoff" && idea.evidence.handoff && (
+            {can.approve && next === "handoff" && forBuilder && <HandToBuilder idea={idea} />}
+            {can.approve && next === "handoff" && idea.evidence.handoff && !forBuilder && (
               <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
                 {s.handoff.approve[idea.evidence.handoff.kind]}
               </Button>

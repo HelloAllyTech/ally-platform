@@ -102,6 +102,14 @@ const SessionCard: React.FC<{
               {strings.startedBy(session.createdByName)}
             </p>
           )}
+          {session.requestedBy && strings.requestedFor[session.requestedBy] && (
+            <p
+              className="mt-0.5 truncate text-xs text-typography-500"
+              data-testid="builder-session-requested-for"
+            >
+              {strings.requestedFor[session.requestedBy]}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <Tag type={BUILDER_STATUS_TAG_TYPE[session.status]} size="sm">

@@ -37,6 +37,7 @@ import { DebriefGraphClient } from './service/debrief-graph.client';
 import { DebriefRunTokenService } from './service/debrief-run-token.service';
 import { DebriefPmAgentService } from './service/debrief-pm-agent.service';
 import { DebriefPmAgentRunService } from './service/debrief-pm-agent-run.service';
+import { DebriefBuilderRequesterService } from './service/debrief-builder-requester.service';
 import { DebriefPmAgentToolsService } from './service/debrief-pm-agent-tools.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
@@ -134,6 +135,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     // The PM agent Deep Agent's runs (ally-ai) and its gateway tools.
     DebriefPmAgentRunService,
     DebriefPmAgentToolsService,
+    // "Hand to Builder": the PM agent answers Builder's interview (R2-20).
+    DebriefBuilderRequesterService,
     DebriefConsoleService,
     DebriefFeedbackService,
     DebriefPracticeService,

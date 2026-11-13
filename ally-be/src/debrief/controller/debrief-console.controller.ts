@@ -69,6 +69,11 @@ import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
 import { DebriefSettingsService } from '../service/debrief-settings.service';
 import { DebriefMetricsService } from '../service/debrief-metrics.service';
 import { DebriefBaselineService } from '../service/debrief-baseline.service';
+import { DebriefBuilderRequesterService } from '../service/debrief-builder-requester.service';
+import {
+  BUILDER_ANSWERERS,
+  BuilderAnswerer,
+} from '../util/debrief-builder-progress.util';
 
 class ReasonDto {
   @ApiProperty({ required: false })
@@ -76,6 +81,26 @@ class ReasonDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
+}
+
+/** "Hand to Builder": who answers Builder's interview (R2-20). */
+class ApproveIdeaDto extends ReasonDto {
+  @ApiProperty({ required: false, enum: BUILDER_ANSWERERS })
+  @IsOptional()
+  @IsIn(BUILDER_ANSWERERS as unknown as string[])
+  answerer?: BuilderAnswerer;
+}
+
+class BuilderAnswerDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(80)
+  questionId!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(4000)
+  text!: string;
 }
 
 class CardCorrectionDto {
@@ -482,6 +507,7 @@ export class DebriefConsoleController {
     private readonly reviews: DebriefReviewService,
     private readonly releaseHistory: DebriefReleasesService,
     private readonly pmReports: DebriefPmReportsService,
+    private readonly builderRequester: DebriefBuilderRequesterService,
   ) {}
 
   /** Release settings (budgets, the evaluator bar) are the owner's. */
@@ -747,14 +773,45 @@ export class DebriefConsoleController {
   async approve(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: AuthedRequest,
-    @Body() body: ReasonDto,
+    @Body() body: ApproveIdeaDto,
   ) {
     const idea = await this.pmAgent.getIdea(id);
     // A budgets-only change goes live on the owner's word.
     if (idea.change?.budgetOnly) {
       await this.requireOwnerFor(req.user.id, { budgets: true });
     }
-    return this.pmAgent.approve(id, req.user.id, body?.reason);
+    return this.pmAgent.approve(id, req.user.id, body?.reason, {
+      answerer: body?.answerer,
+    });
+  }
+
+  @Get('pm-agent/ideas/:id/builder')
+  @DebriefAct('pmAgent')
+  @ApiOperation({
+    summary:
+      'Where an idea handed to Builder stands: stage (interviewing, building, PR open, merged, closed), the question waiting for a person, the PM agent answers, pull requests',
+  })
+  builderProgress(@Param('id', ParseUUIDPipe) id: string) {
+    return this.builderRequester.progress(id);
+  }
+
+  @Post('pm-agent/ideas/:id/builder/answer')
+  @DebriefAct('pmAgent')
+  @ApiOperation({
+    summary:
+      "Answer Builder's waiting question from the idea card, as the person (the same answer the Builder feed sends)",
+  })
+  answerBuilder(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: BuilderAnswerDto,
+  ) {
+    return this.builderRequester.answerAsPerson(
+      id,
+      req.user.id,
+      body.questionId,
+      body.text,
+    );
   }
 
   @Post('pm-agent/ideas/:id/reject')

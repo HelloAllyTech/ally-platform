@@ -537,6 +537,12 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
             </h1>
             <p className="truncate text-xs text-typography-500">
               {chainText ?? (session.repos?.length ? session.repos.join(", ") : strings.noReposYet)}
+              {session.requestedBy && strings.requestedFor[session.requestedBy] && (
+                <span data-testid="builder-session-requested-for">
+                  {" · "}
+                  {strings.requestedFor[session.requestedBy]}
+                </span>
+              )}
             </p>
           </div>
         </div>

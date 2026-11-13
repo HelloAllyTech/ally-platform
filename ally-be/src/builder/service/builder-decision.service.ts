@@ -280,8 +280,14 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
     const history = await this.historyService.recordDecision(
       decision,
       { selectedOptionIds: picked, customText: words || null, none: dto.none },
-      // A rule decides on nobody's behalf at the moment it runs.
-      { ...context, actorUserId: context.surface === 'rule' ? null : userId },
+      // A rule, or a requesting agent, decides on nobody's behalf.
+      {
+        ...context,
+        actorUserId:
+          context.surface === 'rule' || context.surface === 'requester'
+            ? null
+            : userId,
+      },
     );
     const historyId = history?.id ?? null;
 
@@ -1075,6 +1081,25 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * What a session's interview is waiting on, for a requester deciding whether it can
+   * answer (plan §11.5): the pending question, or that a situation brief waits for a
+   * person to confirm. Empty when the interview is not waiting on anything.
+   */
+  async pendingInterview(sessionId: string): Promise<{
+    questions: BuilderQuestionEvent[];
+    brief: boolean;
+  }> {
+    const session = await this.sessionService.getSession(sessionId);
+    const pending = await this.interviewDecisions(session, null);
+    return {
+      questions: pending
+        .filter((entry) => entry.kind === 'question' && entry.question)
+        .map((entry) => entry.question as BuilderQuestionEvent),
+      brief: pending.some((entry) => entry.kind === 'brief'),
+    };
+  }
+
+  /**
    * What the interview is waiting on: the last assistant row's unanswered
    * questions, or its unconfirmed situation brief. Only the last row counts —
    * a question from an earlier turn that the admin talked past has been
@@ -1257,6 +1282,8 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
             }`,
           );
         }
+        // After the lock: a requester answering starts the next turn.
+        void this.sessionService.turnEnded(sessionId);
       }
     };
     // Deliberately not awaited: the answer is recorded by the orchestrator's

@@ -2,6 +2,10 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { In, IsNull, Not } from 'typeorm';
 import { BuilderSessionService } from '../builder-session.service';
 import {
+  builderRequesters,
+  DEBRIEF_PM_AGENT_REQUESTER,
+} from '../../util/builder-requesters.registry';
+import {
   BuilderSessionStatus,
   BuilderSessionVisibility,
 } from '../../enum/builder.enum';
@@ -266,6 +270,56 @@ describe('BuilderSessionService', () => {
         where: { id: 'session-1' },
         select: { id: true, handoffContext: true },
       });
+    });
+  });
+
+  describe('requester (plan §11.5)', () => {
+    afterEach(() => builderRequesters.clear());
+
+    it('stores who requested the session and their ref', async () => {
+      await service.createSession(1, {
+        title: 'From the PM agent',
+        requestedBy: DEBRIEF_PM_AGENT_REQUESTER,
+        requestRef: 'idea-1',
+      });
+      expect(sessionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestedBy: DEBRIEF_PM_AGENT_REQUESTER,
+          requestRef: 'idea-1',
+        }),
+      );
+    });
+
+    it("tells the registered requester when a turn ends, and nobody for a person's session", async () => {
+      const turnEnded = jest.fn().mockResolvedValue(undefined);
+      builderRequesters.register(DEBRIEF_PM_AGENT_REQUESTER, { turnEnded });
+      sessionRepository.findOne.mockResolvedValueOnce({
+        id: 'session-1',
+        requestedBy: DEBRIEF_PM_AGENT_REQUESTER,
+        requestRef: 'idea-1',
+      });
+      await service.turnEnded('session-1');
+      expect(turnEnded).toHaveBeenCalledWith('session-1', 'idea-1');
+
+      sessionRepository.findOne.mockResolvedValueOnce({
+        id: 'session-2',
+        requestedBy: null,
+        requestRef: null,
+      });
+      await service.turnEnded('session-2');
+      expect(turnEnded).toHaveBeenCalledTimes(1);
+    });
+
+    it('never throws when the requester fails', async () => {
+      builderRequesters.register(DEBRIEF_PM_AGENT_REQUESTER, {
+        turnEnded: jest.fn().mockRejectedValue(new Error('boom')),
+      });
+      sessionRepository.findOne.mockResolvedValueOnce({
+        id: 'session-1',
+        requestedBy: DEBRIEF_PM_AGENT_REQUESTER,
+        requestRef: 'idea-1',
+      });
+      await expect(service.turnEnded('session-1')).resolves.toBeUndefined();
     });
   });
 
