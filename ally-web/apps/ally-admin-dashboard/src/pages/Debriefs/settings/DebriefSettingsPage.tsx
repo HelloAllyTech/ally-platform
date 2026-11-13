@@ -619,10 +619,12 @@ export const DebriefSettingsPage: React.FC = () => {
         </span>
         {!access.settings && <ConsoleTag>{s.readOnly}</ConsoleTag>}
       </div>
-      {/* The PM agent page's tabs, kept in view while a long section scrolls. */}
+      {/* The PM agent page's tabs, kept in view while a long section scrolls. The page scrolls
+          inside a padded container (p-4 / lg:p-6): stick at minus that padding and fill it, or the
+          section shows through the strip above the tabs. The negative margin keeps the row in place. */}
       <nav
         aria-label={s.tabsLabel}
-        className="sticky top-0 z-10 flex flex-wrap items-end gap-6 border-b border-neutral-100 bg-white text-sm"
+        className="sticky -top-4 z-10 -mt-4 flex flex-wrap items-end gap-6 border-b border-neutral-100 bg-white pt-4 text-sm lg:-top-6 lg:-mt-6 lg:pt-6"
         data-testid="settings-tabs"
       >
         {TABS.map(id => (
