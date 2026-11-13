@@ -26,6 +26,8 @@ reader, the judge, your own instructions): ally-be refuses edits to them.
    even to make another number move.
 6. Write the draft in a scratch file (e.g. `/drafts/<idea>.md`) when it is long, then
    call `release_draft` with `kind: "prompt_edit"`, `prompt_code`, `find`, `replace`.
+   Cite the run ids behind the change in `run_ids`: with the runs behind the idea's
+   comments they must cover at least 10 learners in at least 3 organisations.
 7. If ally-be says the passage is not in the prompt, re-read the live text and copy
    it again; do not guess.
 8. Then `ladder_start_quick_test`. Name the metric you expect to move in the idea,

@@ -125,6 +125,12 @@ class ReleaseDraftArgs(BaseModel):
     setting_key: Optional[str] = None
     setting_value: Optional[float] = None
     agent: Optional[RegistryAgentManifest] = None
+    run_ids: List[str] = Field(
+        default_factory=list,
+        description="prompt_edit and registry_agent: the debrief run ids behind the "
+        "change. With the runs behind the idea's comments they must cover at least "
+        "10 learners in at least 3 organisations.",
+    )
 
 
 class IdeaRef(BaseModel):

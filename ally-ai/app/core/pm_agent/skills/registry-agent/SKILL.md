@@ -33,5 +33,6 @@ registry agent's prompt (the prompt-change skill) when that would do.
    are plain guidance for the planner.
 2. Write the prompt in a scratch file first. It must say what to look for, what
    counts as evidence (turn index and exact quote), and when to return no findings.
-3. `release_draft` with `kind: "registry_agent"` and the manifest. A refusal names the
+3. `release_draft` with `kind: "registry_agent"`, the manifest, and the run ids behind
+   it in `run_ids` (at least 10 learners in 3 organisations). A refusal names the
    limit you crossed.

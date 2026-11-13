@@ -539,3 +539,35 @@ async def test_guidance_propose_goes_to_a_person_with_quotes_stripped():
     assert QUOTE not in sent[0]["body"]["guidance"]
     assert sent[0]["body"]["action"] == "new"
     assert "guidance_propose" in ALL_TOOLS and "guidance_propose" not in READ_TOOLS
+
+
+@pytest.mark.asyncio
+async def test_release_draft_passes_run_ids_through_to_ally_be():
+    from app.core.pm_agent.ledger import RunLedger
+    from app.core.pm_agent.tools import make_tools
+
+    gateway = FakeGateway({"release_draft": {"ok": True}})
+    ledger = RunLedger(run_id="r", budget_usd=1, prices=PRICES)
+    tool = next(t for t in make_tools(gateway, ledger) if t.name == "release_draft")
+    run_ids = [
+        "22222222-2222-2222-2222-222222222222",
+        "33333333-3333-3333-3333-333333333333",
+    ]
+    await tool.ainvoke(
+        {
+            "idea_id": IDEA,
+            "kind": "prompt_edit",
+            "prompt_code": "debrief_writer_system",
+            "find": "a",
+            "replace": "b",
+            "run_ids": run_ids,
+        }
+    )
+    (call,) = gateway.calls
+    assert call["tool"] == "release_draft"
+    assert call["body"]["run_ids"] == run_ids
+    # Without run_ids the body still sends an empty list, which ally-be ignores.
+    await tool.ainvoke(
+        {"idea_id": IDEA, "kind": "setting", "setting_key": "k", "setting_value": 1}
+    )
+    assert gateway.calls[1]["body"]["run_ids"] == []
