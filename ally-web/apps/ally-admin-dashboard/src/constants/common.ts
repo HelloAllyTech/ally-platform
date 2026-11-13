@@ -572,6 +572,23 @@ export const ApiEndpoints = {
   ANALYTICS_AGENT: {
     ASK: "/v1/analytics/agent/ask",
     CATALOG: "/v1/analytics/agent/catalog",
+    // The caller's own saved conversations (the sidebar), and one with its turns.
+    CONVERSATIONS: "/v1/analytics/agent/conversations",
+    CONVERSATION_BY_ID: (id: string) => `/v1/analytics/agent/conversations/${id}`,
+    // The reader's optional thumbs up / down on one saved answer (PUT; null clears it).
+    MESSAGE_FEEDBACK: (messageId: string) => `/v1/analytics/agent/messages/${messageId}/feedback`,
+    // Audit runs over the agent's recent answers: start one (POST), list past
+    // ones (GET), open one (GET by id — polled while it is running).
+    AUDITS: "/v1/analytics/agent/audits",
+    AUDIT_BY_ID: (id: string) => `/v1/analytics/agent/audits/${id}`,
+    // Weekly automation runs (scheduler-started; there is no start endpoint): list
+    // them, open one, and approve / reject the dbt agent's proposal.
+    AUTOMATION_RUNS: "/v1/analytics/agent/automation/runs",
+    AUTOMATION_RUN_BY_ID: (id: string) => `/v1/analytics/agent/automation/runs/${id}`,
+    AUTOMATION_APPROVE: (agentRunId: string) =>
+      `/v1/analytics/agent/automation/agents/${agentRunId}/approve`,
+    AUTOMATION_REJECT: (agentRunId: string) =>
+      `/v1/analytics/agent/automation/agents/${agentRunId}/reject`,
   },
   // Analytics Suggestions — its own namespace for the same reason as the agent's:
   // the elevated super-duper-admin tier, because accepting a suggestion writes
@@ -1117,6 +1134,9 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
   // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.
   ANALYTICS_SUGGESTIONS: "analyticsSuggestions",
+  ANALYTICS_AGENT_CONVERSATIONS: "analyticsAgentConversations",
+  ANALYTICS_AGENT_AUDITS: "analyticsAgentAudits",
+  ANALYTICS_AGENT_AUTOMATION: "analyticsAgentAutomation",
   ANALYTICS_CHART_PREFERENCES: "analyticsChartPreferences",
   BUG_HUNTER_SETTINGS: "bugHunterSettings",
   // Also registered in baseApi.ts's `tagTypes` — an unregistered tag is

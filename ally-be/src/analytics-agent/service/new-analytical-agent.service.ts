@@ -9,7 +9,7 @@ import { AGENT_LIMITS, AGENT_SYSTEM_PROMPT } from "../constants/analytics-agent.
 import { AnalyticalAgentTraceHandler, buildAgentTrace, DbtHeadCommit, parseToolResult } from "./analytical-agent-trace";
 
 
-const LLM = new ChatOpenAI({
+export const LLM = new ChatOpenAI({
     model : process.env.OPENAI_CHAT_MODEL,
     apiKey : process.env.OPENAI_API_KEY,
     supportsStrictToolCalling : false,
@@ -81,7 +81,7 @@ const githubAuthProvider: OAuthClientProvider = {
 }
 
 
-const client = new MultiServerMCPClient({
+export const client = new MultiServerMCPClient({
     servers : {
         bigQuery: {
             transport: "http",
@@ -94,11 +94,18 @@ const client = new MultiServerMCPClient({
             headers: { "X-MCP-Toolsets": "repos,git" },
             authProvider: githubAuthProvider
         },
+        datalyze : {
+            transport : "http",
+            url : "https://www.joindatalyze.com/api/datalyze/mcp",
+            headers : { 
+                Authorization : `Bearer ${process.env.DATALYZE_MCP_KEY}`
+            }
+        }
     }
 });
 
-// add intermediate tables as well 
-const AVAILABLE_TABLES = {
+
+export const AVAILABLE_TABLES = {
   // Marts
   "ally-analytics-prod.dbt_dev_marts.dim_organizations": "dim_organizations.yml",
   "ally-analytics-prod.dbt_dev_marts.dim_scenarios": "dim_scenarios.yml",
@@ -147,7 +154,7 @@ const AVAILABLE_TABLES = {
 };
 
 
-const RECURSION_LIMIT = 60
+const RECURSION_LIMIT = 100
 
 export type AnalyticalAgentHistoryTurn = {
     question : string

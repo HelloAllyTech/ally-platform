@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LineChart, ScatterChart, SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
-import { Reset, Send } from "@carbon/icons-react";
+import {
+  Add,
+  Send,
+  ThumbsDown,
+  ThumbsDownFilled,
+  ThumbsUp,
+  ThumbsUpFilled,
+} from "@carbon/icons-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -10,7 +17,6 @@ import {
   AccordionItem,
   Button,
   InlineNotification,
-  Modal,
   SkeletonPlaceholder,
   Table,
   TableBody,
@@ -23,10 +29,23 @@ import {
   TextArea,
   Tile,
 } from "@ally-ui-mono/ui-shared";
-import { useAskAnalyticsAgentMutation, useGetAnalyticsAgentCatalogQuery } from "@api";
+import {
+  useAskAnalyticsAgentMutation,
+  useGetAnalyticsAgentCatalogQuery,
+  useGetAnalyticsAgentConversationsQuery,
+  useLazyGetAnalyticsAgentConversationQuery,
+  useSetAnalyticsAgentFeedbackMutation,
+} from "@api";
 import { sharedMarkdownComponents } from "@components";
 import { en } from "@constants";
-import { AnalyticsAgentMessage, AnalyticsAgentTurnInput, AskAnalyticsAgentResponse } from "@types";
+import {
+  AnalyticsAgentConversationDetail,
+  AnalyticsAgentFeedback,
+  AnalyticsAgentConversationSummary,
+  AnalyticsAgentMessage,
+  AnalyticsAgentTurnInput,
+  AskAnalyticsAgentResponse,
+} from "@types";
 
 import { AgentChartModel, buildAgentChart } from "../agentChart";
 import { CHART_HEIGHT, ChartIdBadge, ScrollableChart } from "../chartKit";
@@ -34,10 +53,12 @@ import { CHART_HEIGHT, ChartIdBadge, ScrollableChart } from "../chartKit";
 /**
  * Analytics Agent — the conversational tab of the analytics dashboard.
  *
- * Everything here is a thread of turns held in this component's state. The
- * server is stateless (it is handed the turns it should consider with each
- * question), which is why "Reset chat" is a `setState` and why a reload starts
- * clean instead of resuming something half-finished.
+ * The open thread is a list of turns held in this component's state, and the
+ * agent is stateless (it is handed the turns it should consider with each
+ * question). Each answered turn is also saved server-side, per user, so the
+ * sidebar can list earlier conversations and reopen one after a reload. Starting
+ * a new conversation therefore needs no confirmation — nothing is lost, the old
+ * thread just moves down the list.
  *
  * The screen's job is not to make an answer look confident — it is to make one
  * checkable. Every answered turn shows, in this order: the answer, its caveats,
@@ -59,6 +80,21 @@ const nextId = (): string => {
   messageSeq += 1;
   return `agent-msg-${messageSeq}`;
 };
+
+/** A saved conversation as on-screen messages: each turn is the question, then
+ *  its reply exactly as it was shown when asked. */
+const toMessages = (detail: AnalyticsAgentConversationDetail): AnalyticsAgentMessage[] =>
+  detail.messages.flatMap<AnalyticsAgentMessage>(turn => [
+    { id: nextId(), role: "user", question: turn.question },
+    {
+      id: nextId(),
+      role: "agent",
+      status: "done",
+      response: turn.response,
+      messageId: turn.id,
+      feedback: turn.feedback ?? null,
+    },
+  ]);
 
 /** Cell rendering for the result table. Dates are trimmed to their date part;
  *  null renders as an em dash so an unmeasured value is visibly not a zero. */
@@ -181,12 +217,79 @@ const ResultTable = ({ response }: { response: AskAnalyticsAgentResponse }) => {
   );
 };
 
+/**
+ * The reader's optional thumbs up / down on one saved answer.
+ *
+ * Nothing is required: a rating is only ever something the reader chose to give,
+ * tapping the same thumb again takes it back, and a failed save puts the buttons
+ * back as they were and says so. The value lives here rather than in the thread —
+ * the thread only needs it to start from, and a reopened conversation is read
+ * fresh from the server.
+ */
+const FeedbackButtons = ({
+  messageId,
+  initial,
+}: {
+  messageId: string;
+  initial: AnalyticsAgentFeedback | null;
+}) => {
+  const strings = en.analyticsAgent;
+  const [value, setValue] = useState<AnalyticsAgentFeedback | null>(initial);
+  const [failed, setFailed] = useState(false);
+  const [save, { isLoading }] = useSetAnalyticsAgentFeedbackMutation();
+
+  const choose = async (picked: AnalyticsAgentFeedback) => {
+    const previous = value;
+    const next = previous === picked ? null : picked;
+    setValue(next);
+    setFailed(false);
+    try {
+      await save({ messageId, feedback: next }).unwrap();
+    } catch {
+      setValue(previous);
+      setFailed(true);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-end">
+      <div role="group" aria-label={strings.feedbackLabel} className="flex items-center">
+        <Button
+          kind="ghost"
+          size="sm"
+          hasIconOnly
+          iconDescription={strings.feedbackUp}
+          renderIcon={value === "up" ? ThumbsUpFilled : ThumbsUp}
+          aria-pressed={value === "up"}
+          disabled={isLoading}
+          onClick={() => void choose("up")}
+        />
+        <Button
+          kind="ghost"
+          size="sm"
+          hasIconOnly
+          iconDescription={strings.feedbackDown}
+          renderIcon={value === "down" ? ThumbsDownFilled : ThumbsDown}
+          aria-pressed={value === "down"}
+          disabled={isLoading}
+          onClick={() => void choose("down")}
+        />
+      </div>
+      {failed && <p className="text-xs text-red-700">{strings.feedbackFailed}</p>}
+    </div>
+  );
+};
+
 /** One answered turn. */
 const AgentAnswer = ({
   response,
+  messageId,
+  feedback,
   onFollowUp,
 }: {
   response: AskAnalyticsAgentResponse;
+  messageId: string | null;
+  feedback: AnalyticsAgentFeedback | null;
   onFollowUp: (question: string) => void;
 }) => {
   const strings = en.analyticsAgent;
@@ -294,7 +397,11 @@ const AgentAnswer = ({
         </div>
       )}
 
-      <p className="text-xs text-typography-500 mt-3">{provenance}</p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-typography-500">{provenance}</p>
+        {/* Only a saved turn has something to rate. */}
+        {messageId && <FeedbackButtons messageId={messageId} initial={feedback} />}
+      </div>
     </div>
   );
 };
@@ -329,14 +436,99 @@ const ScopePanel = () => {
   );
 };
 
+/**
+ * The reader's saved conversations, newest activity first, with the button that
+ * starts a fresh one. Titles are the first question asked.
+ *
+ * Switching is disabled while a question is in flight: the pending reply belongs
+ * to the thread it was asked in, and letting the reader move away would land it
+ * in the wrong place.
+ */
+const ConversationSidebar = ({
+  activeId,
+  disabled,
+  onSelect,
+  onNew,
+}: {
+  activeId: string | null;
+  disabled: boolean;
+  onSelect: (conversation: AnalyticsAgentConversationSummary) => void;
+  onNew: () => void;
+}) => {
+  const strings = en.analyticsAgent;
+  const { data, isLoading, isError } = useGetAnalyticsAgentConversationsQuery();
+
+  return (
+    <aside
+      aria-label={strings.historyTitle}
+      className="flex flex-col gap-2 md:w-64 md:shrink-0 md:border-r md:border-border-light md:pr-3"
+    >
+      <Button
+        kind="tertiary"
+        size="sm"
+        className="w-full max-w-full"
+        renderIcon={Add}
+        disabled={disabled}
+        onClick={onNew}
+      >
+        {strings.newConversation}
+      </Button>
+
+      <p className="text-xs font-medium text-typography-700 mt-2">{strings.historyTitle}</p>
+
+      {/* Bounded on a phone so the thread is still on screen under the list. */}
+      <div className="max-md:max-h-40 overflow-y-auto">
+        {isLoading && <SkeletonPlaceholder className="w-full h-16" />}
+        {isError && <p className="text-sm text-typography-600">{strings.historyLoadFailed}</p>}
+        {data && data.length === 0 && (
+          <p className="text-sm text-typography-600">{strings.historyEmpty}</p>
+        )}
+        {data && data.length > 0 && (
+          <ul className="flex flex-col gap-1">
+            {data.map(conversation => {
+              const active = conversation.id === activeId;
+              return (
+                <li key={conversation.id}>
+                  <button
+                    type="button"
+                    title={conversation.title}
+                    aria-current={active ? "true" : undefined}
+                    disabled={disabled}
+                    onClick={() => onSelect(conversation)}
+                    className={`w-full cursor-pointer truncate rounded px-2 py-2 text-left text-sm text-typography-900 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 ${
+                      active ? "bg-neutral-100 font-medium" : ""
+                    }`}
+                  >
+                    {conversation.title}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <p className="text-xs text-typography-500">{strings.historyPrivacy}</p>
+    </aside>
+  );
+};
+
 export const AnalyticsAgentTab = () => {
   const strings = en.analyticsAgent;
   const [messages, setMessages] = useState<AnalyticsAgentMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [slow, setSlow] = useState(false);
-  const [resetOpen, setResetOpen] = useState(false);
+  // The saved conversation the thread belongs to. null until the first turn is
+  // answered, at which point the server hands back the id it created.
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [openFailed, setOpenFailed] = useState(false);
   const [ask, { isLoading }] = useAskAnalyticsAgentMutation();
+  const [fetchConversation] = useLazyGetAnalyticsAgentConversationQuery();
   const threadEndRef = useRef<HTMLDivElement | null>(null);
+  // Which open request is current, so a slow response for a conversation the
+  // reader has already clicked away from cannot overwrite the one they chose.
+  const openSeq = useRef(0);
 
   // Only answered turns become context. A failed or refused turn would teach the
   // planner to repeat the thing that failed.
@@ -388,11 +580,23 @@ export const AnalyticsAgentTab = () => {
       setDraft("");
 
       try {
-        const response = await ask({ question, history }).unwrap();
+        const response = await ask({
+          question,
+          history,
+          conversationId: conversationId ?? undefined,
+        }).unwrap();
+        if (response.conversationId) setConversationId(response.conversationId);
         setMessages(current =>
           current.map(message =>
             message.id === pendingId
-              ? { id: pendingId, role: "agent", status: "done", response }
+              ? {
+                  id: pendingId,
+                  role: "agent",
+                  status: "done",
+                  response,
+                  messageId: response.messageId ?? null,
+                  feedback: null,
+                }
               : message,
           ),
         );
@@ -415,142 +619,170 @@ export const AnalyticsAgentTab = () => {
         );
       }
     },
-    [ask, history, isLoading, strings.requestFailed],
+    [ask, history, isLoading, conversationId, strings.requestFailed],
   );
 
-  const reset = () => {
+  const startNew = () => {
+    openSeq.current += 1;
     setMessages([]);
     setDraft("");
-    setResetOpen(false);
+    setConversationId(null);
+    setOpening(false);
+    setOpenFailed(false);
+  };
+
+  const openConversation = async (conversation: AnalyticsAgentConversationSummary) => {
+    if (isLoading || conversation.id === conversationId) return;
+    openSeq.current += 1;
+    const seq = openSeq.current;
+    setOpening(true);
+    setOpenFailed(false);
+    try {
+      const detail = await fetchConversation(conversation.id).unwrap();
+      if (seq !== openSeq.current) return;
+      setMessages(toMessages(detail));
+      setConversationId(detail.id);
+      setDraft("");
+    } catch {
+      if (seq === openSeq.current) setOpenFailed(true);
+    } finally {
+      if (seq === openSeq.current) setOpening(false);
+    }
   };
 
   return (
-    <div className="pt-2">
-      <div className="flex items-start justify-between gap-4 mb-3">
-        <h2 className="text-lg font-medium text-typography-900">{strings.heading}</h2>
-        {/* Resetting is irreversible (the thread lives only in this tab), so it
-            asks first — the one confirmation on this screen. */}
-        <Button
-          kind="ghost"
-          size="sm"
-          renderIcon={Reset}
-          disabled={!messages.length || isLoading}
-          onClick={() => setResetOpen(true)}
-        >
-          {strings.reset}
-        </Button>
-      </div>
+    <div className="pt-2 flex flex-col gap-4 md:flex-row">
+      <ConversationSidebar
+        activeId={conversationId}
+        disabled={isLoading || opening}
+        onSelect={conversation => void openConversation(conversation)}
+        onNew={startNew}
+      />
 
-      <div className="mb-4">
-        <ScopePanel />
-      </div>
-
-      {messages.length === 0 ? (
-        <Tile className="mb-4">
-          <p className="text-base font-medium text-typography-900">{strings.emptyTitle}</p>
-          <p className="text-sm text-typography-600 mt-1">{strings.emptySubtitle}</p>
-          <div className="flex flex-col items-start gap-1 mt-3">
-            {strings.samples.map(sample => (
-              <Button
-                key={sample}
-                kind="ghost"
-                size="sm"
-                className="max-sm:!max-w-full"
-                onClick={() => submit(sample)}
-              >
-                {sample}
-              </Button>
-            ))}
-          </div>
-        </Tile>
-      ) : (
-        <div className="flex flex-col gap-4 mb-4">
-          {messages.map(message =>
-            message.role === "user" ? (
-              <div key={message.id} className="flex justify-end">
-                <div className="max-w-[80%] break-words rounded bg-neutral-100 px-3 py-2 text-sm text-typography-900">
-                  {message.question}
-                </div>
-              </div>
-            ) : (
-              <Tile key={message.id} className="min-w-0">
-                {message.status === "pending" && (
-                  <div className="flex flex-col gap-2">
-                    <p className="text-sm text-typography-600">
-                      {slow ? strings.pendingSlow : strings.pendingPlanning}
-                    </p>
-                    <SkeletonPlaceholder className="w-full h-16" />
-                  </div>
-                )}
-                {message.status === "error" && (
-                  <InlineNotification
-                    kind="error"
-                    lowContrast
-                    hideCloseButton
-                    title={strings.failedTitle}
-                    subtitle={message.message}
-                    className="max-w-full"
-                  />
-                )}
-                {message.status === "done" && (
-                  <AgentAnswer response={message.response} onFollowUp={submit} />
-                )}
-              </Tile>
-            ),
-          )}
-          {/* The scroll margin keeps the newest answer clear of the composer,
-              which is pinned to the bottom of the screen on phones. */}
-          <div ref={threadEndRef} className="max-md:scroll-mb-32" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <h2 className="text-lg font-medium text-typography-900">{strings.heading}</h2>
         </div>
-      )}
 
-      {/* Pinned to the bottom on phones, so the composer stays in reach (and
-          above the keyboard) however long the thread grows. */}
-      <div className="flex items-end gap-2 border-t border-border-light pt-3 max-md:sticky max-md:bottom-0 max-md:z-10 max-md:bg-white max-md:pb-3">
-        <div className="flex-1 min-w-0">
-          <TextArea
-            id="analytics-agent-question"
-            labelText={strings.inputPlaceholder}
-            hideLabel
-            value={draft}
-            onChange={event => setDraft(event.target.value)}
-            placeholder={strings.inputPlaceholder}
-            rows={2}
-            disabled={isLoading}
-            onKeyDown={event => {
-              // Enter sends, Shift+Enter adds a line — the same contract as the
-              // roleplay copilot composer, so the two chats behave alike.
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void submit(draft);
-              }
-            }}
+        <div className="mb-4">
+          <ScopePanel />
+        </div>
+
+        {openFailed && (
+          <InlineNotification
+            kind="error"
+            lowContrast
+            hideCloseButton
+            title=""
+            subtitle={strings.conversationLoadFailed}
+            className="max-w-full mb-4"
           />
-        </div>
-        <Button
-          kind="primary"
-          size="md"
-          className="shrink-0"
-          renderIcon={Send}
-          disabled={isLoading || !draft.trim()}
-          onClick={() => void submit(draft)}
-        >
-          {isLoading ? strings.sending : strings.send}
-        </Button>
-      </div>
+        )}
 
-      <Modal
-        open={resetOpen}
-        modalHeading={strings.resetConfirmTitle}
-        primaryButtonText={strings.resetConfirm}
-        secondaryButtonText={strings.cancel}
-        danger
-        onRequestClose={() => setResetOpen(false)}
-        onRequestSubmit={reset}
-        onSecondarySubmit={() => setResetOpen(false)}
-      >
-        <p className="text-sm text-typography-700">{strings.resetConfirmBody}</p>
-      </Modal>
+        {opening ? (
+          <div className="mb-4 flex flex-col gap-2">
+            <p className="text-sm text-typography-600">{strings.conversationLoading}</p>
+            <SkeletonPlaceholder className="w-full h-24" />
+          </div>
+        ) : messages.length === 0 ? (
+          <Tile className="mb-4">
+            <p className="text-base font-medium text-typography-900">{strings.emptyTitle}</p>
+            <p className="text-sm text-typography-600 mt-1">{strings.emptySubtitle}</p>
+            <div className="flex flex-col items-start gap-1 mt-3">
+              {strings.samples.map(sample => (
+                <Button
+                  key={sample}
+                  kind="ghost"
+                  size="sm"
+                  className="max-sm:!max-w-full"
+                  onClick={() => submit(sample)}
+                >
+                  {sample}
+                </Button>
+              ))}
+            </div>
+          </Tile>
+        ) : (
+          <div className="flex flex-col gap-4 mb-4">
+            {messages.map(message =>
+              message.role === "user" ? (
+                <div key={message.id} className="flex justify-end">
+                  <div className="max-w-[80%] break-words rounded bg-neutral-100 px-3 py-2 text-sm text-typography-900">
+                    {message.question}
+                  </div>
+                </div>
+              ) : (
+                <Tile key={message.id} className="min-w-0">
+                  {message.status === "pending" && (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-sm text-typography-600">
+                        {slow ? strings.pendingSlow : strings.pendingPlanning}
+                      </p>
+                      <SkeletonPlaceholder className="w-full h-16" />
+                    </div>
+                  )}
+                  {message.status === "error" && (
+                    <InlineNotification
+                      kind="error"
+                      lowContrast
+                      hideCloseButton
+                      title={strings.failedTitle}
+                      subtitle={message.message}
+                      className="max-w-full"
+                    />
+                  )}
+                  {message.status === "done" && (
+                    <AgentAnswer
+                      response={message.response}
+                      messageId={message.messageId}
+                      feedback={message.feedback}
+                      onFollowUp={submit}
+                    />
+                  )}
+                </Tile>
+              ),
+            )}
+            {/* The scroll margin keeps the newest answer clear of the composer,
+              which is pinned to the bottom of the screen on phones. */}
+            <div ref={threadEndRef} className="max-md:scroll-mb-32" />
+          </div>
+        )}
+
+        {/* Pinned to the bottom on phones, so the composer stays in reach (and
+          above the keyboard) however long the thread grows. */}
+        <div className="flex items-end gap-2 border-t border-border-light pt-3 max-md:sticky max-md:bottom-0 max-md:z-10 max-md:bg-white max-md:pb-3">
+          <div className="flex-1 min-w-0">
+            <TextArea
+              id="analytics-agent-question"
+              labelText={strings.inputPlaceholder}
+              hideLabel
+              value={draft}
+              onChange={event => setDraft(event.target.value)}
+              placeholder={strings.inputPlaceholder}
+              rows={2}
+              disabled={isLoading || opening}
+              onKeyDown={event => {
+                // Enter sends, Shift+Enter adds a line — the same contract as the
+                // roleplay copilot composer, so the two chats behave alike.
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void submit(draft);
+                }
+              }}
+            />
+          </div>
+          <Button
+            kind="primary"
+            size="md"
+            className="shrink-0"
+            renderIcon={Send}
+            disabled={isLoading || opening || !draft.trim()}
+            onClick={() => void submit(draft)}
+          >
+            {isLoading ? strings.sending : strings.send}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };

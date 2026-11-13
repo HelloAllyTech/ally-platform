@@ -2346,16 +2346,17 @@ export const en = {
     inputPlaceholder: "e.g. How many simulations were completed per week in the last 90 days?",
     send: "Ask",
     sending: "Working…",
-    // Named for what it does. "Clear" would read as deleting data.
-    reset: "Reset chat",
-    resetConfirmTitle: "Reset this chat?",
-    resetConfirmBody:
-      "The conversation is only held in this browser tab, so resetting it cannot be undone. Nothing stored is affected.",
-    // Distinct from the trigger button's label: two controls named "Reset chat"
-    // on the same screen are one ambiguous target for a screen reader, and the
-    // dialog's job is to state what confirming does.
-    resetConfirm: "Reset and start over",
-    cancel: "Cancel",
+    // Conversations are saved, so starting over costs nothing and needs no
+    // confirmation: the old thread stays in the sidebar.
+    newConversation: "New conversation",
+    historyTitle: "Conversations",
+    historyEmpty: "Your conversations will appear here once you ask something.",
+    historyLoadFailed: "Couldn't load your conversations.",
+    conversationLoadFailed: "Couldn't open that conversation. Try again.",
+    conversationLoading: "Opening conversation…",
+    // Said once, where it matters: a reader should not have to wonder who else
+    // can see what they asked.
+    historyPrivacy: "Only you can see your conversations.",
     // Progress narrative, not a bare spinner: two model calls and a query take
     // real seconds, and a reader who cannot tell "working" from "stuck" reloads.
     pendingPlanning: "Working out which tables answer this…",
@@ -2377,6 +2378,12 @@ export const en = {
     failedTitle: "Query didn't run",
     provenance: "Planned by {planner} · written by {answer} · prompt {version}",
     provenancePlannerOnly: "Planned by {planner} · prompt {version}",
+    // Optional rating of an answer. Never required, and tapping the same thumb
+    // again takes it back.
+    feedbackLabel: "Rate this answer",
+    feedbackUp: "Good answer",
+    feedbackDown: "Not a good answer",
+    feedbackFailed: "Couldn't save your feedback. Try again.",
     scopeTitle: "What can I ask about?",
     scopeIntro:
       "The agent reads aggregate analytics only. It can query these tables, capped at {rowLimit} rows per question:",
@@ -2395,6 +2402,123 @@ export const en = {
       "How has AI spend per model changed month over month this year?",
       "How many learners practised at all in the last 30 days, by organisation?",
     ],
+  },
+  // The Audit agent tab: an auditor re-checks the Analytics Agent's recent answers.
+  analyticsAudit: {
+    tabLabel: "Audit agent",
+    newAudit: "New audit",
+    heading: "Audit the Analytics Agent",
+    intro:
+      "An auditor re-checks the agent's recent answers against BigQuery, the dbt docs and the product code, and says whether each one held up. Each answer is audited once — answers an earlier audit already covered are skipped.",
+    countLabel: "Messages to audit",
+    countHelp:
+      "The most recent answered questions, across every admin. Ones an earlier audit already covered are skipped, so fewer than this may be audited.",
+    start: "Start audit",
+    starting: "Starting…",
+    // Said where the reader is about to leave: the run lives on the server.
+    runningNotice: "An audit is running. You can leave this tab — it keeps going.",
+    alreadyRunning: "An audit is already running. Wait for it to finish before starting another.",
+    // `{count}` is the number the reader picked, so the sentence says what was checked.
+    nothingToAudit:
+      "Nothing new to audit — the last {count} answered messages have all been audited already.",
+    startFailed: "Couldn't start the audit. Try again.",
+    historyTitle: "Audits",
+    historyEmpty: "Audits will appear here once you run one.",
+    historyLoadFailed: "Couldn't load past audits.",
+    // Said once, where it matters, like the conversations sidebar's privacy line —
+    // but the opposite fact: this surface is not private to the author.
+    historyScope: "Audits cover every admin's questions, not just yours.",
+    auditLoading: "Opening audit…",
+    auditLoadFailed: "Couldn't open that audit. Try again.",
+    runTitle: "Audit from {date}",
+    statusRunning: "Running",
+    statusCompleted: "Done",
+    statusFailed: "Failed",
+    // What started the run, shown on its row and above its results.
+    triggerManual: "Manual",
+    triggerScheduled: "Scheduled",
+    // Sidebar row detail: "{done} of {total} audited".
+    runProgress: "{done} of {total} audited",
+    progress: "Audited {done} of {total} messages…",
+    runFailed:
+      "This audit stopped before it finished. Messages without a result here weren't audited; the next audit picks them up while they are still among the most recent.",
+    morePending: "{count} more being audited…",
+    runEmpty: "No messages have finished yet.",
+    verdictCorrect: "Correct",
+    verdictMinorIssues: "Minor issues",
+    verdictIncorrect: "Incorrect",
+    verdictUnverifiable: "Couldn't verify",
+    verdictError: "Audit failed",
+    severityHigh: "High",
+    severityMedium: "Medium",
+    severityLow: "Low",
+    issuesTitle: "Issues found",
+    noIssues: "No issues found.",
+    showAnswer: "Show the answer that was audited",
+    entryFailedTitle: "Couldn't audit this message",
+    entryFailedNote: "It will be retried in the next audit.",
+    askedAt: "Asked {date}",
+  },
+  // The Automation tab: the weekly run of three agents (backend review, PostHog
+  // events, dbt changes). Runs start on a schedule only; nothing here starts one.
+  analyticsAutomation: {
+    tabLabel: "Weekly automation",
+    heading: "Weekly automation",
+    intro:
+      "Once a week three agents look at what changed. The backend review describes it. The PostHog agent opens a pull request for any events the new code needs. The dbt agent waits for that pull request to be merged or closed, proposes what dbt needs, and edits the dbt repo only after you approve.",
+    historyTitle: "Runs",
+    historyEmpty: "No run yet. The first one starts on the next weekly schedule.",
+    historyLoadFailed: "Couldn't load past runs.",
+    runLoadFailed: "Couldn't open that run. Try again.",
+    runLoading: "Opening run…",
+    runTitle: "Run from {date}",
+    runFailed: "This run stopped before its first two agents finished.",
+    commits: "Platform {platform} · dbt {dbt}",
+    statusRunning: "Running",
+    statusWaiting: "Waiting",
+    statusAnalysing: "Analysing",
+    statusAwaitingApproval: "Needs your approval",
+    statusApplying: "Opening pull request",
+    statusPrOpened: "Pull request opened",
+    statusRejected: "Rejected",
+    statusCompleted: "Done",
+    statusFailed: "Failed",
+    agentBackendReview: "Backend review",
+    agentBackendReviewHelp: "How the backend changed since the last run. Describes only; changes nothing.",
+    agentPosthog: "PostHog events",
+    agentPosthogHelp:
+      "Checks whether new code needs product-analytics events and opens a pull request for them. It does not wait for approval; a person merges it.",
+    agentDbt: "dbt changes",
+    agentDbtHelp:
+      "Runs once the PostHog pull request is merged, closed or was not needed. It proposes dbt changes and edits the dbt repo only after you approve.",
+    noSummary: "Nothing to report yet.",
+    pullRequest: "Pull request",
+    prState: "State",
+    prOpen: "Open",
+    prMerged: "Merged",
+    prClosed: "Closed without merging",
+    reviewTitle: "Review agent",
+    reviewApprove: "No blocking issues",
+    reviewConcerns: "Concerns",
+    reviewReject: "Should not merge as is",
+    reviewFailed: "Review failed",
+    findingsEvents: "Events",
+    findingsProposal: "Proposed dbt changes",
+    findingProposed: "Proposed",
+    findingIncluded: "In the pull request",
+    findingDropped: "Not added",
+    findingRejected: "Rejected",
+    approve: "Approve and open dbt pull request",
+    approving: "Approving…",
+    reject: "Reject",
+    rejecting: "Rejecting…",
+    approveHelp: "The dbt agent will edit the dbt repo and open a pull request. A person still has to merge it.",
+    rejectHelp: "Closes the proposal. These items are not proposed again in later runs.",
+    decisionApproved: "Approved",
+    decisionRejected: "Rejected",
+    approveFailed: "Couldn't approve. It may have already been decided; refresh and try again.",
+    rejectFailed: "Couldn't reject. It may have already been decided; refresh and try again.",
+    retryNote: "The last attempt failed. Approving again retries it.",
   },
   analyticsSuggestions: {
     tabLabel: "Suggestions",
