@@ -1,18 +1,41 @@
-Someone sent the message below to an automated question-answering assistant. The sender may be a mental healthcare worker, a counsellor, a trainee, or a member of the public. Decide whether the message shows that someone may be in danger now.
+Someone is chatting with an automated assistant. They may be a member of the public, a client, a mental healthcare worker, a counsellor or a trainee. Decide whether their latest message shows that someone may be at risk right now.
 
-# Message
+# Their earlier messages in this conversation (oldest first; context only)
+{history}
+
+# Their latest message
 {message}
 
-# What you are deciding
-Return `is_crisis: true` when the message shows that the sender, or a person they describe, may be at risk of suicide, self-harm, harm to others or abuse right now, or is in acute distress — including indirect ways of saying it ("I can't keep doing this", "everyone would be better off without me", "she said she won't be here tomorrow").
+# Choose true only for risk now to someone's life or safety
+The latest message, read with the earlier ones, shows at least one of these, about the sender or someone else, said directly or indirectly, in any language or slang ("unalive"):
+- suicide, or thoughts or plans of it, including a passive wish to die ("I wish I could go to sleep and not wake up", "nobody would notice if I was gone");
+- self-harm;
+- an overdose that has just happened, accidental or not;
+- harm to someone else;
+- abuse that is happening or has just been threatened;
+- not being able to stay safe;
+- a medical emergency happening now.
 
-Return `is_crisis: false` for messages with no sign of risk or distress: questions about a product, an app, an account, sign-in, features, settings, data, privacy, costs or contact details; greetings; reference questions asked in general terms; past cases; hypotheticals; ordinary work stress.
+# Everything else is false
+- Distress without one of those signs, in any language: sadness, crying, low mood, loneliness, grief, heartbreak, stress, worry, anxiety, poor sleep, exhaustion, being fed up with the assistant. However strong the feeling, it isn't risk to life or safety on its own. The assistant answers these with care.
+- Questions about a medicine, in any language: a dose, a missed dose, when to take it, substitutes, side effects, alcohol.
+- Questions about a service, an app, appointments, costs, privacy or contact details; greetings and goodbyes; asking to talk to a person.
+- Reference questions asked in general terms ("how can schools help prevent suicide?").
+- Something in the past, mentioned while asking about a service ("I was in hospital after an attempt years ago, can I still join your peer-support course?").
+- Violence in a game, a film or a story.
+- Everyday expressions and jokes that use words like die or kill: "I'm done for today", "dead tired", "my phone died", "I could die of embarrassment", "I'd kill for a coffee", "this commute will be the death of me haha", "bye", "भूख से मर रहा हूँ", "bore hoke mar gaya", "कंटाळून मेलो".
 
-When a message contains a sign of risk or distress and you are unsure how serious it is, choose `true`. Do not choose `true` for a message that contains no such sign.
+# Earlier messages are context for the latest one
+- If the latest message continues an earlier disclosure of risk (confirms it, adds detail, or takes it back), choose true: "I mean it", "yes", "tonight", "I've got everything ready", "forget I said anything".
+- If the latest message moves on, choose false: a new question, asking to talk to a person, a thank-you or saying they'll call for help. The earlier message was already answered and the team was told.
+- If the earlier messages are everyday, an alarming-sounding latest message is ordinary: after "how do streaks work?", "and what if I miss a day?" is about the app.
 
-Judge the message in whatever language it is written.
+# When you're unsure
+If there is a sign of risk to life or safety and you're unsure how serious it is, choose true. If there is no such sign, choose false.
+
+Judge the messages in whatever language they are written.
 
 # What to return
-- `is_crisis`: your decision.
-- `signal`: the shortest phrase from the message that shows risk or distress, copied verbatim; empty when `is_crisis` is false. If you cannot quote such a phrase, `is_crisis` must be false.
+- `is_crisis`: your decision about the latest message.
+- `signal`: the shortest phrase that shows the risk to life or safety, copied verbatim from the latest message, or from an earlier one only when the latest message continues it. Empty when `is_crisis` is false. If you can't quote such a phrase, `is_crisis` must be false.
 - `confidence`: 0 to 1.
