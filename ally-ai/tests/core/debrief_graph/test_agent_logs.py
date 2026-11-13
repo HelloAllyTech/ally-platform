@@ -154,7 +154,7 @@ class TestModelEntries:
         assert second["error"] is None and second["output"]["cards"]
 
     async def test_a_step_that_failed_twice_is_logged_twice(self, steps, gateway):
-        steps.fail["progress-reader"] = "always"
+        steps.fail["progress-agent"] = "always"
         result = await run(steps, gateway, prompts=dict(PROMPTS))
         entries = by_step(result, "progress_reader", "model")
         assert len(entries) == 2

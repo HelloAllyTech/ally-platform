@@ -314,6 +314,7 @@ async def after_reading(
         "learner_distress": len(safety["learner_distress"]) > 0,
         "workspace": {"safety": safety, "evidence": evidence},
         "progress": None,
+        "progress_result": None,
         "history": None,
     }
     if state.get("orchestrated"):
@@ -324,20 +325,26 @@ async def after_reading(
             update["agent_ok"] = {"analyst": bool(analyst_res)}
         return Command(update={**update, "steps": steps, "rung": rung}, goto="profile")
 
-    # 2. Progress reader, when the learner has history.
+    # 2. The progress agent (the release's `progress_reader` step), when the
+    # learner's progress profile has earlier sessions.
     progress_step = ctx.step_of(state["recipe_key"], Step.PROGRESS_READER)
     goto = "guidance_lookup"
     if progress_step and ctx.sess("counselor_id") and analyst_res:
-        if not body.past_points(ctx):
+        if not body.progress_profile(ctx):
             steps.append(skipped(ctx, estimated, progress_step, "no history"))
         else:
-            est = _reserve(ctx, estimated, progress_step, js_len(evidence))
+            est = _reserve(
+                ctx,
+                estimated,
+                progress_step,
+                js_len(body.progress_agent_body({**state, **update}, ctx)),
+            )
             if est is None:
                 rung = max(rung, int(FallbackRung.SKIP_PROGRESS))
                 steps.append(skipped(ctx, estimated, progress_step, "budget"))
             else:
                 estimated += est
-                update["reserved"] = {"progress-reader#0": est}
+                update["reserved"] = {"progress-agent#0": est}
                 goto = "progress_reader"
     return Command(
         update={**update, "steps": steps, "rung": rung, "estimated": estimated},

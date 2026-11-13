@@ -41,7 +41,10 @@ class Status:
 PROMPT_CODES = {
     "safety_reader": "debrief_safety_reader_system",
     "analyst": "debrief_analyst_system",
+    # The orchestrated path's registry agent still runs the old Progress reader.
     "progress_reader": "debrief_progress_reader_system",
+    # The progress agent, under the bundle's `progress_reader` step key.
+    "progress": "debrief_progress_system",
     "writer": "debrief_writer_system",
     "reviser": "debrief_reviser_system",
     "rubric": "debrief_quality_rubric",
@@ -65,6 +68,7 @@ class FallbackRung(IntEnum):
 STEP_TIMEOUT_S: Dict[str, float] = {
     "safety-reader": 60.0,
     "progress-reader": 50.0,
+    "progress-agent": 50.0,
     "analyst": 90.0,
     "writer": 75.0,
     "evaluator": 90.0,

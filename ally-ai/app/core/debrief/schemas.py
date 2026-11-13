@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+from pydantic.json_schema import SkipJsonSchema
 
 from app.core.debrief_quality.schemas import DimensionScore, HardFailFinding
 from app.core.debrief_quality.schemas import RiskCue as JudgeRiskCue
@@ -130,7 +131,110 @@ class ProgressItem(BaseModel):
 
 
 class ProgressReading(BaseModel):
+    """The Writer's `progress` input. Since the progress agent (2026-11-13) it
+    is derived in code from the vetoed `ProgressReport`, so the Writer's
+    prompt is unchanged (`debrief_graph/progress.py`)."""
+
     items: List[ProgressItem] = Field(default_factory=list)
+
+
+# --- Progress agent (PROGRESS_CONTRACT.md §2) -----------------------------------
+
+ProgressTrend = Literal[
+    "more_consistent", "about_the_same", "worth_another_look", "too_early"
+]
+
+
+class ProgressEvidenceRef(BaseModel):
+    run_id: str = Field(
+        description=(
+            'The run_id of a past session in the profile, or "this" for this '
+            "session's evidence map."
+        )
+    )
+    turn_index: Optional[int] = Field(
+        default=None, description="The counsellor turn of that observation, if any."
+    )
+
+
+class ProgressSkill(BaseModel):
+    skill: str = Field(
+        description="A foundational skill key from SKILL KEYS (never 'other')."
+    )
+    trend: ProgressTrend
+    why: str = Field(
+        description=(
+            "For the Ally team: one or two sentences on what in the observations "
+            "supports the trend."
+        )
+    )
+    evidence: List[ProgressEvidenceRef] = Field(
+        default_factory=list,
+        description="The Analyst observations the trend rests on, oldest first.",
+    )
+    fhs: Literal["agrees", "disagrees", "absent"] = Field(
+        description=(
+            "Whether the Foundational Skills levels for this skill agree with the "
+            "trend; absent when there are none."
+        )
+    )
+    learner_line: str = Field(
+        description=(
+            "One warm, specific sentence to the learner in the SESSION LANGUAGE. "
+            "No scores, levels or numbers. Empty for too_early."
+        )
+    )
+
+
+class ProgressFollowup(BaseModel):
+    point: str = Field(description="A past debrief point, copied verbatim.")
+    status: Literal["done", "partly", "not_yet"]
+    evidence: List[ProgressEvidenceRef] = Field(default_factory=list)
+
+
+class ProgressFocus(BaseModel):
+    skill: str = Field(description="A foundational skill key from SKILL KEYS.")
+    why: str = Field(description="For the Ally team: why this is the focus now.")
+    learner_line: str = Field(
+        description=(
+            "One warm sentence to the learner in the SESSION LANGUAGE on what to "
+            "focus on next. No scores, levels or numbers."
+        )
+    )
+    practise_next: bool = Field(
+        description="True when a Practise next roleplay on this skill would help."
+    )
+
+
+class ProgressReport(BaseModel):
+    skills: List[ProgressSkill] = Field(
+        default_factory=list, description="At most 3 skills."
+    )
+    followups: List[ProgressFollowup] = Field(default_factory=list)
+    focus: Optional[ProgressFocus] = None
+    shown_as: Literal["line", "card"] = Field(
+        default="line", description='"card" only when CARD DUE is yes.'
+    )
+
+
+class ProgressCardSkill(BaseModel):
+    skill: str
+    trend: ProgressTrend
+    line: str
+
+
+class ProgressCardFocus(BaseModel):
+    skill: str
+    line: str
+
+
+class ProgressCard(BaseModel):
+    """`cards.progress_card`: attached in code at finish, never written by the
+    Writer or the Reviser."""
+
+    sessions: int
+    skills: List[ProgressCardSkill] = Field(default_factory=list)
+    focus: Optional[ProgressCardFocus] = None
 
 
 # --- Writer / Reviser: the cards ----------------------------------------------
@@ -207,6 +311,12 @@ class DebriefCards(BaseModel):
     skill_words: List[SkillWordItem] = Field(default_factory=list)
     reflective_question: str = ""
     progress_note: Optional[str] = None
+    # Attached in code after the Writer/Reviser loop (debrief_graph/progress.py),
+    # never asked of a model: hidden from the JSON schema the Writer and the
+    # Reviser answer in, and never dumped from their answers.
+    progress_card: SkipJsonSchema[Optional[ProgressCard]] = Field(
+        default=None, exclude=True
+    )
 
 
 # --- Evaluator ------------------------------------------------------------------
@@ -252,6 +362,10 @@ class EvidenceMapReasoned(EvidenceMap):
 
 
 class ProgressReadingReasoned(ProgressReading):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class ProgressReportReasoned(ProgressReport):
     reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
 
 

@@ -36,6 +36,9 @@ class DebriefRunResponse(BaseModel):
     #: The Agent logs: each model call's exact input and full reply, and each
     #: deciding code step's inputs and results, numbered (`seq`) in order.
     logs: List[Dict[str, Any]] = Field(default_factory=list)
+    #: The progress agent's reading after the code vetoes, for ally-be to store
+    #: (`debrief_progress_results`). Absent when the agent did not run.
+    progress: Optional[Dict[str, Any]] = None
     workspace: Dict[str, Any] = Field(default_factory=dict)
     estimated_cost_usd: float = 0.0
     fallback_rung: int = 0

@@ -18,7 +18,8 @@ from app.core.debrief_graph.constants import Step
 OUTPUT_TOKENS: Dict[str, int] = {
     Step.SAFETY_READER: 600,
     Step.ANALYST: 3000,
-    Step.PROGRESS_READER: 600,
+    # The progress agent answers up to 3 skills, follow-ups and a focus.
+    Step.PROGRESS_READER: 1200,
     Step.GUIDANCE_LOOKUP: 0,
     Step.WRITER: 2500,
     Step.CHECKS: 0,

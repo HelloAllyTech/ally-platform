@@ -7,6 +7,8 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from app.core.debrief_graph import inputs as body
+from app.core.debrief_graph import progress
+from app.core.debrief_graph.agent_logs import code_log
 from app.core.debrief_graph.constants import PROMPT_CODES, FallbackRung, Status, Step
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
 from app.core.debrief_graph.findings import evidence_findings
@@ -21,6 +23,7 @@ from app.core.debrief_graph.narration import (
     safety_narration,
     safety_summary,
 )
+from app.core.debrief_graph.progress_vetoes import apply_vetoes
 from app.core.debrief_graph.registry.manifest import agent_config
 from app.core.debrief_graph.state import DebriefState as State
 
@@ -95,7 +98,106 @@ ANALYST = ModelStep(
 )
 
 
-# --- 2. Progress reader --------------------------------------------------------
+# --- 2. Progress agent ---------------------------------------------------------
+#
+# Runs under the bundle's `progress_reader` step (releases name it) with its
+# own prompt, `debrief_progress_system`. AI judges, code vetoes: the vetoes run
+# here, straight after the answer, and the Writer reads the vetoed report in
+# the old ProgressReading shape (progress.py).
+
+
+def _progress_agent_done(state: State, ctx: Ctx, res: Dict[str, Any]):
+    profile = body.progress_profile(ctx) or {}
+    t0 = ctx.clock()
+    report, vetoes = apply_vetoes(
+        res.get("report") or {}, profile, state.get("evidence") or {}
+    )
+    if res.get("reasoning"):
+        report["reasoning"] = res["reasoning"]
+    record = progress.response_record(report, vetoes, profile, res.get("model"))
+    reading = progress.writer_reading(report, profile)
+    update: Dict[str, Any] = {
+        "progress_result": record,
+        "progress": reading,
+        "history": (
+            progress.history_text(profile, body.past_points(ctx)) if reading else None
+        ),
+        "logs": [
+            code_log(
+                ctx,
+                "progress_vetoes",
+                t0,
+                input={
+                    "proposed": res.get("report") or {},
+                    "settings": profile.get("settings") or {},
+                },
+                output={
+                    "vetoes": vetoes,
+                    "skills": [
+                        {
+                            "skill": s.get("skill"),
+                            "trend": s.get("trend"),
+                            "hiddenFromLearner": s.get("hidden_from_learner"),
+                        }
+                        for s in report.get("skills") or []
+                    ],
+                    "shownAs": report.get("shown_as"),
+                    "writer": reading,
+                },
+                attention=bool(vetoes),
+            )
+        ],
+    }
+    return update, None
+
+
+def _progress_agent_summary(res: Dict[str, Any]) -> str:
+    skills = (res.get("report") or {}).get("skills") or []
+    if not skills:
+        return "no skill to read a trend for this time"
+    return (
+        "; ".join(
+            f"{s.get('skill')}: {str(s.get('trend') or '').replace('_', ' ')}"
+            for s in skills
+        )
+        + " (before the vetoes)"
+    )
+
+
+def _progress_agent_inputs(state: State, ctx: Ctx):
+    profile = body.progress_profile(ctx) or {}
+    return [
+        "the evidence map",
+        n(len(profile.get("sessions") or []), "earlier session"),
+        *(["the Foundational Skills levels"] if profile.get("fhs") else []),
+        *(["the last progress report"] if profile.get("last_report") else []),
+    ]
+
+
+PROGRESS_AGENT = ModelStep(
+    prompt_code=PROMPT_CODES["progress"],
+    step=Step.PROGRESS_READER,
+    path="progress-agent",
+    body=body.progress_agent_body,
+    why=lambda s, c: (
+        "Reads how this learner’s skills are changing across their last "
+        f"{n(len((body.progress_profile(c) or {}).get('sessions') or []), 'session')}"
+        " and this one."
+    ),
+    inputs=_progress_agent_inputs,
+    summarise=_progress_agent_summary,
+    on_success=_progress_agent_done,
+    # An error handler's update follows no static edge: route the failure on
+    # to guidance, or a failed progress agent would end the run unanswered.
+    on_failure=lambda s, c: (
+        {"rung": int(FallbackRung.SKIP_PROGRESS)},
+        "guidance_lookup",
+    ),
+    destinations=("guidance_lookup",),
+)
+
+
+# --- The orchestrated path's Progress reader (registry agent) --------------------
 
 
 def _progress_done(state: State, ctx: Ctx, res: Dict[str, Any]):

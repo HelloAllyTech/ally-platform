@@ -42,7 +42,11 @@ class DebriefState(TypedDict, total=False):
     learner_distress: bool
     safety: Dict[str, Any]
     evidence: Dict[str, Any]
+    #: The Writer's `progress` (the old ProgressReading shape).
     progress: Optional[Dict[str, Any]]
+    #: The progress agent's run: `response.progress` (post-veto report, vetoes,
+    #: shown_as, model, window_session_ids, analyst_versions); None = not run.
+    progress_result: Optional[Dict[str, Any]]
     history: Optional[str]
     passages: List[Dict[str, str]]  # {title, text}, what the Writer reads
 

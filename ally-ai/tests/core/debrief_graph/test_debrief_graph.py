@@ -114,7 +114,8 @@ class TestStandardRun:
         assert analyst["reasoning"] == "Weighed the turns."
         assert analyst["inputs"][-1] == "the live detector’s record (1 of 1 detected)"
         assert by_step["progress_reader"]["why"] == (
-            "This learner has 1 earlier Work-on-this point to follow up."
+            "Reads how this learner’s skills are changing across their last "
+            "3 sessions and this one."
         )
         assert by_step["guidance_lookup"]["note"] == "2 lookup(s), 2 passage(s)"
         # PRD §14: each passage's Guidance code, for the Console's run view.
@@ -151,7 +152,9 @@ class TestStandardRun:
             "decision",
         ]:
             assert key in ws, key
-        assert ws["history"] == "2026-10-20 · pacing: Let the client finish."
+        assert ws["history"] == (
+            "2026-11-03 · Empathy, warmth and genuineness: Name the feeling you hear."
+        )
         assert ws["decision"]["status"] == "published"
         assert ws["decision"]["why"] == (
             "Published round 0: it passed every check and scored 9.0 with no hard "

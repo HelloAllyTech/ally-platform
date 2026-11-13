@@ -292,6 +292,8 @@ class DebriefSettings(BaseModel):
     # (DEBRIEF_QUALITY_JUDGE.MODEL), so neither grades work by its own model.
     ANALYST_MODEL: str = Field("gemini-2.5-pro")
     PROGRESS_READER_MODEL: str = Field("gemini-2.5-flash")
+    # The progress agent (replaced the Progress reader on the GA path): cheap.
+    PROGRESS_AGENT_MODEL: str = Field("gemini-2.5-flash")
     WRITER_MODEL: str = Field("gemini-3-flash-preview")
     EVALUATOR_MODEL: str = Field("gemini-2.5-flash")
     REVISER_MODEL: str = Field("gemini-3-flash-preview")

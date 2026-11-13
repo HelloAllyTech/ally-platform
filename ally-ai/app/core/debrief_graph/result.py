@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 from app.core.debrief_graph.agent_logs import numbered
 from app.core.debrief_graph.constants import END_WHY, FAILED_WHY, FallbackRung, Status
 from app.core.debrief_graph.context import DebriefRunContext
+from app.core.debrief_graph.progress import profile_of, progress_card
 from app.core.debrief_graph.state import DebriefState
 
 
@@ -39,11 +40,19 @@ def build_result(
     if ctx.resumed:
         workspace["resumes"] = workspace.get("resumes") or 1
     patch = state.get("patch") or {}
-    return {
+    progress_result = state.get("progress_result")
+    cards = patch.get("cards")
+    if cards is not None and progress_result:
+        # Attached in code after the Writer/Reviser loop and finalise_cards:
+        # no model writes it, and no card check ever sees it.
+        card = progress_card(progress_result["report"], profile_of(ctx.inputs) or {})
+        if card:
+            cards = {**cards, "progress_card": card}
+    out = {
         "status": status,
         "skip_reason": skip_reason,
         "recipe_key": state.get("recipe_key"),
-        "cards": patch.get("cards"),
+        "cards": cards,
         "steps": list(state.get("steps") or []),
         "logs": numbered(state.get("logs") or []),
         "workspace": workspace,
@@ -61,3 +70,7 @@ def build_result(
         "language": ctx.language,
         "error": error[:1000] if error is not None else None,
     }
+    if progress_result:
+        # PROGRESS_CONTRACT §2: absent when the progress agent did not run.
+        out["progress"] = progress_result
+    return out
