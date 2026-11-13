@@ -31,7 +31,7 @@ def node_context(
 
 def over_budget(deps: GraphDeps, state: BugState) -> dict[str, Any] | None:
     """The partial update that stops the run when a cap is hit, else None."""
-    reason = exceeded(deps.config, state.budget_used, state.started_at)
+    reason = exceeded(deps.config, state.budget_used, state.started_at, state.app)
     if reason is None:
         return None
     deps.scratchpad.append_note(f"stopped: {reason}")

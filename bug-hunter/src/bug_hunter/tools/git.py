@@ -8,9 +8,9 @@ with the pattern layer before it is returned.
 from __future__ import annotations
 
 import re
-import uuid
 import shutil
 import subprocess
+import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path

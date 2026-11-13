@@ -59,8 +59,10 @@ def after_review(state: BugState, max_attempts: int = 3) -> str:
     return "escalate"
 
 
-def after_risk_gate(state: BugState) -> str:
-    return "escalate" if state.status == "escalated" else "open_pr"
+def after_risk_gate(state: BugState, output_mode: str = "suggested_fix") -> str:
+    if state.status == "escalated":
+        return "escalate"
+    return "open_pr" if output_mode == "pr" else "suggest_fix"
 
 
 def after_open_pr(state: BugState) -> str:

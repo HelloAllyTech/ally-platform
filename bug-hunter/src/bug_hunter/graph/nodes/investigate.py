@@ -135,6 +135,7 @@ def make_investigate_node(deps: GraphDeps):
             "loop_stop": None,
             "budget_used": state.budget_used,
             "started_at": state.started_at,
+            "app": state.app,
             "node": "investigate",
         }
         out = run_loop(

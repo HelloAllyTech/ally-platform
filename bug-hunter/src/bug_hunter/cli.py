@@ -737,7 +737,8 @@ def run_cmd(
     ] = False,
 ) -> None:
     """One bug signal through the graph: triage → investigate → reproduce → fix →
-    verify → review → risk gate → draft PR (dry-run by default) → human approval."""
+    verify → review → risk gate → suggested-fix report (pr.output_mode suggested_fix,
+    the default) or draft PR (dry-run by default) → human approval (output_mode pr)."""
     import json as _json
 
     from bug_hunter.graph.build import build_graph, run_graph
@@ -752,6 +753,15 @@ def run_cmd(
     config = _load_or_exit()
     if bool(issue_text) == bool(commit):
         typer.echo("give exactly one of --issue-text or --commit", err=True)
+        raise typer.Exit(code=1)
+    if push and config.limits.pr.output_mode != "pr":
+        typer.echo(
+            "--push needs pr.output_mode: pr in config/limits.yaml; it is "
+            f"{config.limits.pr.output_mode!r} (a run ends with a suggested-fix "
+            "report). Switching to pr requires a holdout milestone with >= 60% fix "
+            "pass (docs/bug-hunter/CONTEXT.md).",
+            err=True,
+        )
         raise typer.Exit(code=1)
     git = Git(config.repo_root)
     diff = ""
@@ -827,7 +837,11 @@ def run_cmd(
                     deps.approvals = PostgresApprovals(db_url())
                 typer.echo(
                     f"run {run.run_id}: {mode} mode, {app_name} at {checkout}"
-                    + ("" if push else " (PR dry-run)")
+                    + (
+                        " (suggested fix, no PR)"
+                        if config.limits.pr.output_mode == "suggested_fix"
+                        else ("" if push else " (PR dry-run)")
+                    )
                 )
                 graph = build_graph(deps, saver)
                 try:

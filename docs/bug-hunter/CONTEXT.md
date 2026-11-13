@@ -23,6 +23,7 @@ These are product requirements. Every chunk must keep them true, and tests must 
 5. **"No bug" is a correct answer.** Every prompt says so. The agent is never rewarded for finding something.
 6. **Never change the app's tests to make a fix pass.** The agent may add tests. It may not delete, skip, or loosen existing ones.
 7. **Bounded work.** Max 3 fix attempts per bug, a token and wall-clock budget per run, and a cap on PRs opened per day (default 3).
+8. **Suggested fixes until the holdout says otherwise.** `pr.output_mode` in `config/limits.yaml` is `suggested_fix` (the default) or `pr`. In `suggested_fix` a successful run ends with a report (root cause, the verified failing test, the suggested patch, reviewer notes) and never creates a branch, a PR or an approval request; `run --push` refuses. **Switching to `pr` requires a holdout milestone run with at least 60% fix pass** (oracle, on the holdout split, reported in the milestone results), and the user's explicit go-ahead. Dev-set numbers never qualify. (User, 2026-11-13.)
 
 ## How to work (rules for Claude Code building this)
 

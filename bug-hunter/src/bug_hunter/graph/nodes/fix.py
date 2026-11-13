@@ -175,6 +175,7 @@ def make_fix_node(deps: GraphDeps):
             "loop_stop": None,
             "budget_used": state.budget_used,
             "started_at": state.started_at,
+            "app": state.app,
             "node": "fix",
         }
         out = run_loop(

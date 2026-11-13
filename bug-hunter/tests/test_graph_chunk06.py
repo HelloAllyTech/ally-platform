@@ -21,7 +21,7 @@ from bug_hunter.graph.nodes.fix import count_changed_lines, forbidden_test_chang
 from bug_hunter.graph.nodes.reproduce import RightReasonJudgement
 from bug_hunter.graph.nodes.triage import TriageDecision
 from bug_hunter.graph.risk import keyword_hits, risk_level
-from bug_hunter.graph.state import Review, Signal
+from bug_hunter.graph.state import BugState, Review, Signal
 from bug_hunter.tools.fs import Workspace
 from bug_hunter.tools.git import Git
 from tests.fakes import ScriptedChatModel, ScriptedRunner, ai, run_result, structured
@@ -129,10 +129,23 @@ SUBMIT_FIX = ai(
 GIVE_UP = ai(tool_calls=[{"name": "give_up", "args": {"reason": "needs a human"}}])
 
 
+def _with_output_mode(config, mode: str):
+    pr = config.limits.pr.model_copy(update={"output_mode": mode})
+    limits = config.limits.model_copy(update={"pr": pr})
+    return config.model_copy(update={"limits": limits})
+
+
 def _deps(
-    config, repo, tmp_path, fix_script, review_script=None, investigate=None, saver=None
+    config,
+    repo,
+    tmp_path,
+    fix_script,
+    review_script=None,
+    investigate=None,
+    saver=None,
+    output_mode="pr",  # these tests exercise the PR + approval path
 ) -> GraphDeps:
-    cfg = config.model_copy(update={"repo_root": repo})
+    cfg = _with_output_mode(config, output_mode).model_copy(update={"repo_root": repo})
     artefacts = tmp_path / "artefacts"
     artefacts.mkdir(exist_ok=True)
 
@@ -251,6 +264,67 @@ def test_happy_path_to_dry_run_pr_and_approval(config, repo, tmp_path) -> None:
         == "mark ready bughunter/ally-be/x-returns-0, auto-merge=off (dry-run)"
     )
     assert deps.approval_store().get("run-c06").status == "approved"
+
+
+def test_default_output_mode_is_suggested_fix(config) -> None:
+    assert config.limits.pr.output_mode == "suggested_fix"
+
+
+def test_suggested_fix_mode_ends_with_a_report_and_no_pr(
+    config, repo, tmp_path
+) -> None:
+    saver = InMemorySaver()
+    deps = _deps(
+        config,
+        repo,
+        tmp_path,
+        [EDIT_FIX, RUN_REPRO, SUBMIT_FIX],
+        saver=saver,
+        output_mode="suggested_fix",
+    )
+    _, state = _run(deps, saver)
+    assert state.status == "suggested_fix", state.stop_reason
+    assert state.review and state.review.verdict == "approve"
+    # no branch, commit, PR or approval request
+    assert state.pr_url is None and state.pr_branch is None
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") != (
+        "bughunter/ally-be/x-returns-0"
+    )
+    assert deps.github is None or deps.github.actions == []
+    assert deps.approval_store().get("run-c06") is None
+    art = tmp_path / "artefacts"
+    assert not (art / "pr-body.md").exists() and not (art / "pr-branch.txt").exists()
+    assert (art / "suggested-fix.patch").read_text().startswith("diff --git")
+    suggested = (art / "suggested-fix.md").read_text()
+    for section in (
+        "## Root cause",
+        "## Verified failing test",
+        "x.repro.spec.ts::x returns 3",
+        "## Suggested patch",
+        "```diff",
+        "## Reviewer notes",
+    ):
+        assert section in suggested, section
+    report = (art / "report.md").read_text()
+    assert "# Run run-c06: suggested_fix" in report and "## Suggested patch" in report
+
+
+def test_reviewer_notes_carry_issues_and_regression_risks() -> None:
+    from bug_hunter.graph.output import reviewer_notes
+
+    state = BugState(
+        run_id="r",
+        signal=SIGNAL,
+        review=Review(
+            verdict="approve",
+            issues=["hardcoded 20"],
+            regression_risks=["callers that pass null"],
+        ),
+    )
+    assert reviewer_notes(state) == [
+        "hardcoded 20",
+        "regression risk: callers that pass null",
+    ]
 
 
 def test_rejection_closes_the_pr(config, repo, tmp_path) -> None:

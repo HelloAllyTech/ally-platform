@@ -59,6 +59,7 @@ class LoopState(TypedDict, total=False):
     loop_stop: str | None  # why it ended without a finish tool
     budget_used: Budget
     started_at: str
+    app: str | None  # picks the per-app wall-clock cap
     node: str
 
 
@@ -101,7 +102,9 @@ class ToolLoop:
 
     def agent(self, state: LoopState) -> dict[str, Any]:
         budget: Budget = state["budget_used"]
-        reason = exceeded(self.config, budget, state.get("started_at", ""))
+        reason = exceeded(
+            self.config, budget, state.get("started_at", ""), state.get("app")
+        )
         if reason:
             return {"loop_stop": reason}
         messages = list(state["messages"])

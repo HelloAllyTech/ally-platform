@@ -220,10 +220,25 @@ class RunLimits(_Strict):
     max_fix_attempts: int = Field(default=3, ge=1)
     max_tokens: int = Field(gt=0)
     max_wall_clock_s: int = Field(gt=0)
+    # per-app override of max_wall_clock_s (ally-web's Vitest suites are slow)
+    max_wall_clock_s_by_app: dict[AppName, int] = Field(default_factory=dict)
     max_cost_usd: float = Field(default=1.5, gt=0)
     max_tool_turns: int = Field(default=30, ge=1)
     max_repro_attempts: int = Field(default=3, ge=1)
     max_fix_lines_changed: int = Field(default=80, ge=1)
+
+    @field_validator("max_wall_clock_s_by_app")
+    @classmethod
+    def _positive_clock(cls, value: dict[str, int]) -> dict[str, int]:
+        bad = [app for app, seconds in value.items() if seconds <= 0]
+        if bad:
+            raise ValueError(f"wall clock must be > 0 s for {', '.join(bad)}")
+        return value
+
+    def wall_clock_s(self, app: str | None) -> int:
+        """The wall-clock cap for a run on ``app``."""
+        by_app: dict[str | None, int] = dict(self.max_wall_clock_s_by_app)
+        return by_app.get(app, self.max_wall_clock_s)
 
 
 class SweepLimits(_Strict):
@@ -235,8 +250,15 @@ class ApprovalLimits(_Strict):
     expiry_days: int = Field(default=7, ge=1)
 
 
+OutputMode = Literal["suggested_fix", "pr"]
+
+
 class PrConfig(_Strict):
     auto_merge: bool = False
+    # suggested_fix: a successful run ends with a report (root cause, failing test,
+    # patch, reviewer notes), never a PR or an approval request. Switching to pr
+    # needs a holdout milestone with >= 60% fix pass (docs/bug-hunter/CONTEXT.md).
+    output_mode: OutputMode = "suggested_fix"
 
 
 class SandboxLimits(_Strict):

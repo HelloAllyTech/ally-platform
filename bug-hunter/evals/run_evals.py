@@ -580,7 +580,7 @@ def plan(config: BugHunterConfig, cases: list[Case]) -> dict[str, Any]:
 # Expected minutes per case by app, from the 2026-11-10/11 graph runs (ally-web verify
 # is the slowest). Used only to balance shards.
 EXPECTED_MINUTES = {
-    "ally-web": 30,
+    "ally-web": 50,  # 2026-11-13 run: 4 of 6 cases took 40-54 min
     "ally-be": 18,
     "ally-ai-learn": 15,
     "ally-ai": 12,
@@ -617,6 +617,21 @@ def shard_cases(cases: list[Case], index: int, count: int) -> list[Case]:
     return sorted(shards[index - 1], key=lambda c: order[c.id])
 
 
+_PER_SHARD_META = (
+    "shard",
+    "shard_cases",
+    "cost_cap_usd",
+    "cost_usd_total",
+    "cases_done",
+    "cases_remaining",
+    "spend_today_usd",
+    "spend_today_before_usd",
+    "spend_daily_cap_usd",
+    "finished_at",
+    "free_gb_end",
+)
+
+
 def merge_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
     """One report from shard reports: cases concatenated, metrics recomputed, cost and
     per-shard duration kept in meta."""
@@ -640,13 +655,29 @@ def merge_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
                 ),
                 "partial": m.get("partial", False),
                 "stopped_reason": m.get("stopped_reason"),
+                "cost_cap_usd": m.get("cost_cap_usd"),
+                "cases_remaining": m.get("cases_remaining", 0),
             }
         )
+    caps = [s["cost_cap_usd"] for s in shards]
+    cost_total = round(sum(s["cost_usd"] or 0 for s in shards), 4)
     meta = {
-        **{k: v for k, v in first.items() if k not in ("shard", "shard_cases")},
+        # per-shard fields would describe one shard only: the footer's cap and case
+        # counts are summed below, and each shard's spend line is its own runner's
+        # empty ledger, so it is dropped in favour of a note to record the total
+        **{k: v for k, v in first.items() if k not in _PER_SHARD_META},
         "cases": len(cases),
         "shards": shards,
-        "cost_usd_total": round(sum(s["cost_usd"] or 0 for s in shards), 4),
+        "cost_usd_total": cost_total,
+        "cost_cap_usd": (
+            round(sum(caps), 2) if all(c is not None for c in caps) else None
+        ),
+        "cases_done": len(cases),
+        "cases_remaining": sum(s["cases_remaining"] or 0 for s in shards),
+        "spend_note": (
+            f"Run cost ${cost_total:.2f} is not in any ledger yet: record it with "
+            f"`bug-hunter spend add {cost_total:.2f} --source github`"
+        ),
         "stopped_reason": "; ".join(
             f"{s['shard']}: {s['stopped_reason']}"
             for s in shards

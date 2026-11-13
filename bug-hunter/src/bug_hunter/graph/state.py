@@ -23,6 +23,7 @@ Status = Literal[
     "reviewed",
     "awaiting_human",
     "pr_opened",
+    "suggested_fix",  # output_mode suggested_fix: a verified fix, reported, no PR
     "escalated",
     "rejected",
     "closed_not_bug",

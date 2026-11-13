@@ -56,6 +56,70 @@ def pr_body(state: BugState) -> str:
     )
 
 
+def reviewer_notes(state: BugState) -> list[str]:
+    """What the reviewer raised without blocking the fix."""
+    if not state.review:
+        return []
+    return list(state.review.issues) + [
+        f"regression risk: {r}" for r in state.review.regression_risks
+    ]
+
+
+def suggested_fix_report(state: BugState, diff: str, test_source: str | None) -> str:
+    """The deliverable of a successful run in ``output_mode: suggested_fix``."""
+    f, r, p, v = state.finding, state.repro, state.patch, state.verification
+    assert f and r and p and v
+    box = lambda ok: "[x]" if ok else "[ ]"  # noqa: E731
+    notes = reviewer_notes(state)
+    lines = [
+        f"# Suggested fix: {f.title}",
+        "",
+        f"app: {state.app} · severity: {f.severity} · confidence: "
+        f"{state.confidence or '–'} · risk: {state.risk_level or '–'} · source: "
+        f"{state.signal.source} {state.signal.ref} · ref: `{state.ref[:12]}`",
+        "",
+        "No branch, PR or approval request was created (output_mode: suggested_fix).",
+        "",
+        "## Root cause",
+        state.root_cause or "(not recorded)",
+        "",
+        "## Verified failing test",
+        f"`{r.test_path}::{r.test_name}` failed on the unchanged code "
+        f"({r.failure_kind}) and passes with the patch below.",
+    ]
+    if r.failing_output_excerpt:
+        lines += [
+            "",
+            "Failure before the fix (scrubbed):",
+            "",
+            "```",
+            r.failing_output_excerpt.strip(),
+            "```",
+        ]
+    if test_source is not None:
+        lines += ["", f"`{r.test_path}`:", "", "```", test_source.rstrip(), "```"]
+    lines += [
+        "",
+        "## Suggested patch",
+        f"{p.rationale} · {', '.join(p.files_changed)} · {p.lines_changed} lines "
+        f"· attempts: {state.attempts}",
+        "",
+        "```diff",
+        diff.rstrip(),
+        "```",
+        "",
+        "## Verification",
+        f"- {box(v.repro_passes)} repro test  - {box(v.app_tests_pass)} app tests"
+        f"  - {box(v.lint_pass)} lint  - {box(v.typecheck_pass)} typecheck",
+        "",
+        "## Reviewer notes",
+        f"verdict: {state.review.verdict if state.review else 'n/a'}",
+    ]
+    lines += [f"- {n}" for n in notes] if notes else ["- none"]
+    lines += ["", f"_Run `{state.run_id}` · bug-hunter v2_"]
+    return "\n".join(lines) + "\n"
+
+
 def escalation_issue(state: BugState, scratchpad_tail: str) -> tuple[str, str]:
     f = state.finding
     title = (

@@ -26,6 +26,14 @@ def test_run_requires_exactly_one_signal() -> None:
     assert result.exit_code == 1 and "--app is required" in result.output
 
 
+def test_push_is_refused_in_suggested_fix_mode() -> None:
+    result = runner.invoke(
+        app, ["run", "--app", "ally-be", "--issue-text", "x", "--push"]
+    )
+    assert result.exit_code == 1
+    assert "pr.output_mode: pr" in result.output and "60% fix pass" in result.output
+
+
 def test_replay_reports_an_unreachable_checkpoint_database(monkeypatch) -> None:
     from contextlib import contextmanager
 
@@ -328,3 +336,13 @@ def test_merge_reports_combines_shards(repo_config, tmp_path: Path) -> None:
     assert {s["shard"] for s in merged["meta"]["shards"]} == {"1/2", "2/2"}
     assert all(s["minutes"] is not None for s in merged["meta"]["shards"])
     assert merged["metrics"]["total"]["cases"] == 2
+    # the footer describes the whole run, not the first shard
+    meta = merged["meta"]
+    shard_cap = reports[0]["meta"]["cost_cap_usd"]
+    assert meta["cost_cap_usd"] == 2 * shard_cap
+    assert (meta["cases_done"], meta["cases_remaining"]) == (2, 0)
+    assert "spend_today_usd" not in meta and "finished_at" not in meta
+    md = render_markdown(merged)
+    assert f"Cost: $12.00 of the ${2 * shard_cap:.2f} cap · cases done 2" in md
+    assert "Today's model spend" not in md
+    assert "bug-hunter spend add 12.00 --source github" in md

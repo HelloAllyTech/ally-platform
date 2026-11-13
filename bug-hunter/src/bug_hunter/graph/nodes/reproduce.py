@@ -170,6 +170,7 @@ def make_reproduce_node(deps: GraphDeps):
             "loop_stop": None,
             "budget_used": state.budget_used,
             "started_at": state.started_at,
+            "app": state.app,
             "node": "reproduce",
         }
         max_attempts = deps.config.limits.run.max_repro_attempts

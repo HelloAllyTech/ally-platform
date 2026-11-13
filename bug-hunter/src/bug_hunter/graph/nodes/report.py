@@ -68,9 +68,12 @@ def make_report_node(deps: GraphDeps):
         budget = with_clock(state.budget_used, state.started_at)
         state = state.model_copy(update={"budget_used": budget})
         artefacts = dict(state.artefacts)
-        artefacts["report"] = str(
-            deps.write_artefact("report.md", report_markdown(state))
-        )
+        markdown = report_markdown(state)
+        if state.status == "suggested_fix" and "suggested_fix" in artefacts:
+            # the run's deliverable: root cause, failing test, patch, reviewer notes
+            with open(artefacts["suggested_fix"], encoding="utf-8") as fh:
+                markdown += "\n" + fh.read()
+        artefacts["report"] = str(deps.write_artefact("report.md", markdown))
         deps.write_artefact(
             "report.json", json.dumps(state.model_dump(), indent=1, default=str)
         )

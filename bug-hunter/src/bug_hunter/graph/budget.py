@@ -85,7 +85,9 @@ def with_clock(budget: Budget, started_at: str) -> Budget:
     return budget.model_copy(update={"wall_clock_s": round(elapsed_s(started_at), 1)})
 
 
-def exceeded(config: BugHunterConfig, budget: Budget, started_at: str) -> str | None:
+def exceeded(
+    config: BugHunterConfig, budget: Budget, started_at: str, app: str | None = None
+) -> str | None:
     """The reason the run is over budget, or None. Checked before every model call
     and on every routing edge, so an over-budget run escalates instead of looping."""
     limits = config.limits.run
@@ -95,8 +97,7 @@ def exceeded(config: BugHunterConfig, budget: Budget, started_at: str) -> str | 
         cap = f"${limits.max_cost_usd:.2f}"
         return f"cost budget exceeded (${budget.cost_usd:.2f} >= {cap})"
     clock = elapsed_s(started_at) if started_at else budget.wall_clock_s
-    if clock >= limits.max_wall_clock_s:
-        return (
-            f"wall-clock budget exceeded ({clock:.0f}s >= {limits.max_wall_clock_s}s)"
-        )
+    wall_clock = limits.wall_clock_s(app)
+    if clock >= wall_clock:
+        return f"wall-clock budget exceeded ({clock:.0f}s >= {wall_clock}s)"
     return None

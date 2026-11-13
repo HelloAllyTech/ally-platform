@@ -1,5 +1,8 @@
 # Proposal (not built): class tester node, and a convention-first fix rule
 
+**Superseded 2026-11-13 by `PROPOSAL-review-v4-counterexamples.md`** (the class tester is
+replaced by reviewer counterexamples; the convention rule is dropped). Kept for history.
+
 Status: proposal for after the 2026-11-11 dev eval. Nothing here is implemented.
 Motivation: of six failed fixes so far, two were too narrow (handled the repro's exact
 input or exception, not the class: `1065743a`, `99584ee6`) and one picked a plausible

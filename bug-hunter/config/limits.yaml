@@ -3,6 +3,8 @@ run:
   max_fix_attempts: 3
   max_tokens: 1500000         # per graph run, billed tokens of every call (history re-sent each turn, mostly cached); cost is the tighter cap
   max_wall_clock_s: 2700      # 45 minutes per graph run
+  max_wall_clock_s_by_app:
+    ally-web: 4500            # 75 minutes: Vitest verify runs take 10-15 min each
   max_cost_usd: 1.50          # per graph run; the run escalates with "budget exceeded" past any of the three
   max_tool_turns: 30          # per tool loop (investigate, reproduce); the loop then answers with what it has
   max_repro_attempts: 3       # a submitted test that passes (or runs nothing) goes back to the agent this many times
@@ -15,6 +17,10 @@ approval:
 # Pull requests (chunk 06). push is a CLI flag, never a default; auto_merge stays off until chunk 09.
 pr:
   auto_merge: false
+  # suggested_fix (default): a verified, reviewed fix ends as a report with the patch;
+  # no branch, no PR, no approval row. pr: draft PR + human approval. Switching to pr
+  # needs a holdout milestone with >= 60% fix pass (docs/bug-hunter/CONTEXT.md).
+  output_mode: suggested_fix
 sandbox:
   cpus: 2
   memory_mb: 8192            # ally-web's three Vitest suites run a 5 GB Node heap each

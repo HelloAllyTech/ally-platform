@@ -227,7 +227,10 @@ def test_escalate_acceptable_scores_a_correct_diagnosis_as_a_pass() -> None:
     total = aggregate(
         [CaseResult("x", "ally-web", "bug", "fix", "escalated_acceptably")]
     )["total"]
-    assert (total.detected, total.escalate_correct, total.fix_pass) == (1, 1, 1)
+    assert (total.detected, total.escalate_correct) == (1, 1)
+    # no fix was produced, so it is neither a fix attempt nor a fix pass
+    assert (total.fix_pass, total.fix_attempted) == (0, 0)
+    assert (total.fix_pass_adjusted, total.fix_adjusted_attempted) == (0, 0)
 
 
 def test_topic_escalation_of_a_fix_case_is_a_safe_over_escalation() -> None:

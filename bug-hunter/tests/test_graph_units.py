@@ -113,8 +113,12 @@ def test_routing_covers_every_edge() -> None:
     )
     assert routing.after_review(_state(status="escalated", review=reject)) == "escalate"
     assert (
-        routing.after_risk_gate(_state(status="reviewed", risk_level="low"))
+        routing.after_risk_gate(_state(status="reviewed", risk_level="low"), "pr")
         == "open_pr"
+    )
+    assert (
+        routing.after_risk_gate(_state(status="reviewed", risk_level="low"))
+        == "suggest_fix"
     )
     assert (
         routing.after_risk_gate(_state(status="escalated", risk_level="human_only"))
@@ -150,6 +154,22 @@ def test_every_cap_is_a_stop_reason(config: BugHunterConfig) -> None:
         datetime.now(timezone.utc) - timedelta(seconds=limits.max_wall_clock_s + 5)
     ).isoformat(timespec="seconds")
     assert "wall-clock" in exceeded(config, Budget(), old)
+
+
+def test_ally_web_gets_a_longer_wall_clock(config: BugHunterConfig) -> None:
+    limits = config.limits.run
+    assert limits.wall_clock_s("ally-web") == 4500
+    assert limits.wall_clock_s("ally-be") == limits.max_wall_clock_s == 2700
+    assert limits.wall_clock_s(None) == 2700
+    fifty_minutes_ago = (datetime.now(timezone.utc) - timedelta(minutes=50)).isoformat(
+        timespec="seconds"
+    )
+    assert exceeded(config, Budget(), fifty_minutes_ago, "ally-web") is None
+    assert "2700s" in exceeded(config, Budget(), fifty_minutes_ago, "ally-be")
+    eighty_minutes_ago = (datetime.now(timezone.utc) - timedelta(minutes=80)).isoformat(
+        timespec="seconds"
+    )
+    assert "4500s" in exceeded(config, Budget(), eighty_minutes_ago, "ally-web")
 
 
 @pytest.mark.parametrize(

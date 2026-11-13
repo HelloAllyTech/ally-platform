@@ -170,6 +170,7 @@ class GraphAgent:
         if state.patch and state.status in (
             "awaiting_human",
             "pr_opened",
+            "suggested_fix",
             "verified",
             "reviewed",
         ):
@@ -203,9 +204,12 @@ class GraphAgent:
 
 
 def final_outcome(status: str) -> str:
-    """pr (draft PR ready or awaiting approval), escalated, no_bug, rejected, other."""
+    """pr (draft PR ready or awaiting approval), suggested_fix (verified fix reported,
+    no PR), escalated, no_bug, rejected, other."""
     if status in ("awaiting_human", "pr_opened"):
         return "pr"
+    if status == "suggested_fix":
+        return "suggested_fix"
     if status == "escalated":
         return "escalated"
     if status in ("closed_not_bug", "closed_duplicate"):

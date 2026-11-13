@@ -121,13 +121,10 @@ def aggregate(results: Iterable[CaseResult]) -> dict[str, Metrics]:
                     m.wrong_escalations += 1
                 if r.outcome == "escalated_acceptably":
                     # a bug unit tests cannot show, escalated with the right diagnosis:
-                    # counted as a correct escalation and as a fix-pass
+                    # a correct escalation. Fix pass counts only cases that produced
+                    # a fix (oracle_pass set); an escalation produced none.
                     m.escalate_expected += 1
                     m.escalate_correct += 1
-                    m.fix_attempted += 1
-                    m.fix_pass += 1
-                    m.fix_adjusted_attempted += 1
-                    m.fix_pass_adjusted += 1
                 elif r.outcome == "missed":
                     m.missed += 1
                 if r.expected == "escalate":
@@ -269,6 +266,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"${meta['spend_today_usd']:.2f} of the "
             f"${meta['spend_daily_cap_usd']:.0f} daily cap (runs/spend.json)",
         ]
+    if meta.get("spend_note"):
+        lines += ["", meta["spend_note"]]
     if meta.get("cost_cap_usd") is not None:
         lines += [
             "",
