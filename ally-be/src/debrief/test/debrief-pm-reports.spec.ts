@@ -6,6 +6,7 @@ import {
   periodBounds,
   periodTitle,
   reviewedMonth,
+  reviewedWeek,
   standingAt14Days,
   weekOf,
 } from '../util/debrief-pm-reports.util';
@@ -39,6 +40,17 @@ describe('PM agent reports: period maths (India time)', () => {
   it('files a monthly review under the month before it was published', () => {
     expect(reviewedMonth(new Date('2026-11-01T03:00:00Z'))).toBe('2026-10');
     expect(reviewedMonth(new Date('2027-01-01T03:00:00Z'))).toBe('2026-12');
+  });
+
+  it('files a weekly report under the week it looks back on', () => {
+    // Monday's run (07:30 IST) reads the week that just ended.
+    expect(reviewedWeek(new Date('2026-11-09T02:00:00Z'))).toBe('2026-11-02');
+    // A "Run now" reads the 7 days before it: most of them in the week that
+    // holds the window's midpoint. Thursday 11:00 IST → last week…
+    expect(reviewedWeek(new Date('2026-11-12T05:30:00Z'))).toBe('2026-11-02');
+    // …Thursday 13:00 IST or later → this week.
+    expect(reviewedWeek(new Date('2026-11-12T07:30:00Z'))).toBe('2026-11-09');
+    expect(reviewedWeek(new Date('2026-11-15T12:00:00Z'))).toBe('2026-11-09');
   });
 
   it('checks periods and titles them', () => {
@@ -89,7 +101,7 @@ describe('PM agent reports: still standing at 14 days', () => {
 });
 
 /** A month of records: two put live, one try-out reverted, a roll back, a rejection, a withdrawal, tests. */
-function build(opts: { empty?: boolean } = {}) {
+function build(opts: { empty?: boolean; thisWeek?: boolean } = {}) {
   const e = opts.empty;
   const calls: string[] = [];
   const dataSource = {
@@ -99,9 +111,11 @@ function build(opts: { empty?: boolean } = {}) {
         if (e) return [];
         return params?.[1] === 'weekly'
           ? [
+              // Monday 2 Nov 07:30 IST: the week of 26 Oct.
               { report: 'Week 1', createdAt: '2026-11-02T02:00:00Z' },
+              // Monday 9 Nov, then a "Run now" on Wednesday: both the week of 2 Nov.
               { report: 'Week 2 early', createdAt: '2026-11-09T02:00:00Z' },
-              { report: 'Week 2 rerun', createdAt: '2026-11-12T09:00:00Z' },
+              { report: 'Week 2 rerun', createdAt: '2026-11-11T04:30:00Z' },
             ]
           : [
               {
@@ -113,7 +127,11 @@ function build(opts: { empty?: boolean } = {}) {
       if (sql.includes('SELECT DISTINCT date_trunc')) {
         return e
           ? []
-          : [{ t: '2026-10-06T05:00:00Z' }, { t: '2026-09-20T05:00:00Z' }];
+          : [
+              { t: '2026-10-06T05:00:00Z' },
+              { t: '2026-09-20T05:00:00Z' },
+              ...(opts.thisWeek ? [{ t: '2026-11-11T05:00:00Z' }] : []),
+            ];
       }
       if (e) return sql.includes('count(*)') ? [{ n: 0, passed: 0 }] : [];
       if (sql.includes("a.action = 'promoted'")) {
@@ -336,13 +354,17 @@ describe('PM agent reports: what changed', () => {
     expect(r.changed.budget).toMatchObject({ spentUsd: 0, capUsd: 30 });
   });
 
-  it('a weekly report: the latest of the week, what changed that week, no budget', async () => {
+  it('a weekly report: the latest about the week, what changed in that week, no budget', async () => {
     const { svc, calls } = build();
-    const r = await svc.get('weekly', '2026-11-09', now);
-    expect(r.title).toBe('Week of 9 Nov');
-    expect(r.review?.text).toBe('Week 2 rerun');
+    const r = await svc.get('weekly', '2026-11-02', now);
+    expect(r.title).toBe('Week of 2 Nov');
+    expect(r.review).toEqual({
+      text: 'Week 2 rerun',
+      publishedAt: '2026-11-11T04:30:00.000Z',
+    });
     expect(r.changed.budget).toBeNull();
-    expect(r.changed.to).toBe('2026-11-15T18:30:00.000Z');
+    expect(r.changed.from).toBe('2026-11-01T18:30:00.000Z');
+    expect(r.changed.to).toBe('2026-11-08T18:30:00.000Z');
     expect(calls.some((s) => s.includes('FROM llm_usage'))).toBe(false);
   });
 
@@ -361,25 +383,41 @@ describe('PM agent reports: what changed', () => {
 });
 
 describe('PM agent reports: the list', () => {
+  const now = new Date('2026-11-13T06:00:00Z');
+
   it('lists weekly reports and months, newest first', async () => {
     const { svc } = build();
-    const items = await svc.list();
+    const items = await svc.list(now);
     expect(items.map((i) => `${i.kind}:${i.period}:${i.hasReview}`)).toEqual([
-      'weekly:2026-11-09:true',
       'weekly:2026-11-02:true',
       'monthly:2026-11:false',
+      'weekly:2026-10-26:true',
       'monthly:2026-10:true',
       'monthly:2026-09:false',
     ]);
     expect(items[0]).toMatchObject({
-      title: 'Week of 9 Nov',
-      publishedAt: '2026-11-12T09:00:00.000Z',
+      title: 'Week of 2 Nov',
+      publishedAt: '2026-11-11T04:30:00.000Z',
     });
     expect(items[3]).toMatchObject({
       title: 'October 2026',
       publishedAt: '2026-11-01T03:00:00.000Z',
     });
-    expect(items[2].publishedAt).toBeNull();
+    expect(items[1].publishedAt).toBeNull();
+  });
+
+  it('lists this week before its report only when it has records', async () => {
+    const { svc } = build({ thisWeek: true });
+    const items = await svc.list(now);
+    expect(items[0]).toEqual({
+      kind: 'weekly',
+      period: '2026-11-09',
+      title: 'Week of 9 Nov',
+      publishedAt: null,
+      hasReview: false,
+    });
+    const quiet = await build().svc.list(now);
+    expect(quiet.some((i) => i.period === '2026-11-09')).toBe(false);
   });
 
   it('is empty before any report or record', async () => {

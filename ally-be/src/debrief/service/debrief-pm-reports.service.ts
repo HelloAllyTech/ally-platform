@@ -9,6 +9,7 @@ import {
   periodTitle,
   PmReportKind,
   reviewedMonth,
+  reviewedWeek,
   standingAt14Days,
   StandingStatus,
   STANDING_DAYS,
@@ -133,14 +134,15 @@ export class DebriefPmReportsService {
     );
   }
 
-  /** Which report a run is: weekly by the week it was written in, monthly by the month it reviewed. */
+  /** Which report a run is: the week or month it looked back on. */
   private static periodOfRun(kind: PmReportKind, at: Date): string {
-    return kind === 'weekly' ? weekOf(at) : reviewedMonth(at);
+    return kind === 'weekly' ? reviewedWeek(at) : reviewedMonth(at);
   }
 
   /**
    * One review per period: a week's latest weekly report (a "Run now" can
-   * add one mid-week), a month's first review after it ended.
+   * land on the same week as Monday's run), a month's first review after it
+   * ended.
    */
   private async reviews(
     kind: PmReportKind,
@@ -157,8 +159,8 @@ export class DebriefPmReportsService {
     return out;
   }
 
-  /** Months with anything in "What changed" (IST). */
-  private async monthsWithRecords(): Promise<Set<string>> {
+  /** When anything in "What changed" happened, to the minute. */
+  private async recordTimes(): Promise<Date[]> {
     const rows: Array<{ t: Date }> = await this.dataSource.query(
       `SELECT DISTINCT date_trunc('minute', t) AS t FROM (
          SELECT "createdAt" AS t FROM agent_release_audit
@@ -175,20 +177,19 @@ export class DebriefPmReportsService {
        ) x WHERE t IS NOT NULL`,
       [DEBRIEF_AGENT_KEY],
     );
-    return new Set(
-      rows
-        .filter((r) => r.t && !Number.isNaN(new Date(r.t).getTime()))
-        .map((r) => monthOf(new Date(r.t))),
-    );
+    return rows
+      .map((r) => new Date(r.t))
+      .filter((t) => !Number.isNaN(t.getTime()));
   }
 
   /** `GET pm-agent/reports`: every report there is, newest first. */
-  async list(): Promise<PmReportListItem[]> {
-    const [weekly, monthly, recordMonths] = await Promise.all([
+  async list(now: Date = new Date()): Promise<PmReportListItem[]> {
+    const [weekly, monthly, times] = await Promise.all([
       this.reviews('weekly'),
       this.reviews('monthly'),
-      this.monthsWithRecords(),
+      this.recordTimes(),
     ]);
+    const recordMonths = new Set(times.map(monthOf));
     const items: PmReportListItem[] = [...weekly].map(([period, r]) => ({
       kind: 'weekly',
       period,
@@ -196,6 +197,18 @@ export class DebriefPmReportsService {
       publishedAt: r.publishedAt,
       hasReview: true,
     }));
+    // This week has no report until next Monday's run: listed only when it
+    // already has records.
+    const thisWeek = weekOf(now);
+    if (!weekly.has(thisWeek) && times.some((t) => weekOf(t) === thisWeek)) {
+      items.push({
+        kind: 'weekly',
+        period: thisWeek,
+        title: periodTitle('weekly', thisWeek),
+        publishedAt: null,
+        hasReview: false,
+      });
+    }
     // A month is listed when it was reviewed, has records, or had a weekly
     // report (so Weekly → Monthly always has somewhere to go).
     const months = new Set<string>([

@@ -83,6 +83,17 @@ export function weekOf(at: Date): string {
   return `${mon.getUTCFullYear()}-${pad(mon.getUTCMonth() + 1)}-${pad(mon.getUTCDate())}`;
 }
 
+/**
+ * The week a weekly report is about. A run reads the 7 days before it was
+ * written, which straddle at most two Monday-weeks; the report belongs to the
+ * one holding most of them, i.e. the week of the window's midpoint. Monday's
+ * scheduled run therefore reports on the week that just ended; a "Run now"
+ * from Thursday noon (IST) on reports on the current week.
+ */
+export function reviewedWeek(writtenAt: Date): string {
+  return weekOf(new Date(writtenAt.getTime() - 3.5 * DAY_MS));
+}
+
 /** The month before a `YYYY-MM` month. */
 export function previousMonth(period: string): string {
   const [y, m] = period.split('-').map(Number);

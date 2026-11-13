@@ -307,7 +307,7 @@ const ReportBody: React.FC<{ report: PmReport }> = ({ report }) => {
           <ReviewText text={report.review.text} />
         ) : (
           <p className="m-0 text-[15px] text-neutral-700" data-testid="pm-report-review-pending">
-            {s.reviewPending}
+            {s.reviewPending[k]}
           </p>
         )}
       </section>
@@ -372,7 +372,7 @@ export const ReportsView: React.FC = () => {
     ? ""
     : kind === "monthly"
       ? s.monthlyKicker(current.publishedAt ? longDate(current.publishedAt) : null)
-      : s.weeklyKicker(current.publishedAt ? dayDate(current.publishedAt) : "");
+      : s.weeklyKicker(current.publishedAt ? dayDate(current.publishedAt) : null);
 
   return (
     <div className="flex flex-wrap items-start gap-6 px-8 py-6" data-testid="pm-reports">

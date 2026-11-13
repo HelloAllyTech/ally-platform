@@ -10500,7 +10500,8 @@ export const en = {
           published
             ? `Monthly review · published ${published}`
             : "Monthly review · not published yet",
-        weeklyKicker: (written: string) => `Weekly report · written ${written}`,
+        weeklyKicker: (written: string | null) =>
+          written ? `Weekly report · written ${written}` : "Weekly report · not written yet",
         changedTitle: { weekly: "What changed this week", monthly: "What changed this month" },
         changedNote: "Taken from the records of releases and ideas, not written by the PM agent.",
         tiles: {
@@ -10545,7 +10546,10 @@ export const en = {
           weekly: "Written by the PM agent from the week's evidence.",
           monthly: "Written by the PM agent from the month's evidence.",
         },
-        reviewPending: "The PM agent's review is published on the 1st.",
+        reviewPending: {
+          weekly: "The PM agent's report is written on Monday.",
+          monthly: "The PM agent's review is published on the 1st.",
+        },
         download: "Download as PDF",
         allReleases: "All releases",
       },

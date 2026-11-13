@@ -478,8 +478,13 @@ Array<{ kind: 'weekly' | 'monthly';
         publishedAt: string | null;
         hasReview: boolean }>
 ```
-- **Weekly:** one per week that has a weekly PM agent run with a report (`curator_run`,
-  `review: 'weekly'`); the week's latest one wins, so a "Run now" mid-week replaces Monday's.
+- **Weekly:** a weekly PM agent run with a report (`curator_run`, `review: 'weekly'`) is listed
+  under the Monday-week it **looks back on**: the 7 days before it was written straddle at most two
+  weeks, and it goes to the one holding most of them (the week of the window's midpoint). Monday's
+  scheduled run (written Mon 9 Nov) is therefore "Week of 2 Nov", and its "What changed" covers
+  2–8 Nov; a "Run now" from Thursday noon (IST) on reports on the current week. When two runs land
+  on the same week, the later one wins. The current week, before its report exists, is listed with
+  `hasReview: false` only when it already has records.
 - **Monthly:** the review run (`review: 'monthly'`) is filed under the month **before** the one it was
   published in; the first in that month wins. A month is also listed, with `hasReview: false` and
   `publishedAt: null`, when it has records (releases put live or reverted, ideas rejected or

@@ -50,19 +50,21 @@ import { periodForKind } from "../pm/ReportsView";
 import { ok, TEAM_PERMS } from "./consoleFixtures";
 /* eslint-enable import/first */
 
+// A weekly report is listed under the week it looks back on: written Monday 9 Nov, it is
+// "Week of 2 Nov". This week has records but no report until next Monday.
 const LIST = [
   {
     kind: "weekly",
     period: "2026-11-09",
     title: "Week of 9 Nov",
-    publishedAt: "2026-11-09T02:00:00Z",
-    hasReview: true,
+    publishedAt: null,
+    hasReview: false,
   },
   {
     kind: "weekly",
     period: "2026-11-02",
     title: "Week of 2 Nov",
-    publishedAt: "2026-11-02T02:00:00Z",
+    publishedAt: "2026-11-09T02:00:00Z",
     hasReview: true,
   },
   {
@@ -76,14 +78,14 @@ const LIST = [
     kind: "weekly",
     period: "2026-10-26",
     title: "Week of 26 Oct",
-    publishedAt: "2026-10-26T02:00:00Z",
+    publishedAt: "2026-11-02T02:00:00Z",
     hasReview: true,
   },
   {
     kind: "weekly",
     period: "2026-10-19",
     title: "Week of 19 Oct",
-    publishedAt: "2026-10-19T02:00:00Z",
+    publishedAt: "2026-10-26T02:00:00Z",
     hasReview: true,
   },
   {
@@ -191,8 +193,8 @@ const OCTOBER = {
 
 const WEEK = {
   kind: "weekly",
-  period: "2026-11-09",
-  title: "Week of 9 Nov",
+  period: "2026-11-02",
+  title: "Week of 2 Nov",
   review: { text: "Scores are up this week.", publishedAt: "2026-11-09T02:00:00Z" },
   changed: EMPTY_CHANGED,
 };
@@ -221,7 +223,7 @@ beforeEach(() => {
   h.reports.mockReturnValue(ok(LIST));
   h.report.mockImplementation(({ kind, period }: { kind: string; period: string }) => {
     if (kind === "monthly" && period === "2026-10") return ok(OCTOBER);
-    if (kind === "weekly" && period === "2026-11-09") return ok(WEEK);
+    if (kind === "weekly" && period === "2026-11-02") return ok(WEEK);
     return ok({
       kind,
       period,
@@ -363,15 +365,28 @@ describe("PM agent › Reports", () => {
     );
   });
 
-  it("shows a weekly report: when it was written and its text", () => {
-    renderAt("?view=reports&kind=weekly&period=2026-11-09");
+  it("shows a weekly report under the week it looks back on, with when it was written", () => {
+    renderAt("?view=reports&kind=weekly&period=2026-11-02");
     expect(screen.getByTestId("pm-report-kicker")).toHaveTextContent(
       "Weekly report · written Monday 9 Nov",
     );
-    expect(screen.getByTestId("pm-report-title")).toHaveTextContent("Week of 9 Nov");
+    expect(screen.getByTestId("pm-report-title")).toHaveTextContent("Week of 2 Nov");
     expect(screen.getByTestId("pm-report-changed")).toHaveTextContent("What changed this week");
     expect(screen.queryByTestId("pm-report-budget")).toBeNull();
     expect(screen.getByTestId("pm-report-review")).toHaveTextContent("Scores are up this week.");
+    expect(screen.getByRole("button", { name: "Next week" })).toBeEnabled();
+  });
+
+  it("this week, before Monday's report: what changed so far and when the report comes", () => {
+    renderAt("?view=reports&kind=weekly&period=2026-11-09");
+    expect(screen.getByTestId("pm-report-kicker")).toHaveTextContent(
+      "Weekly report · not written yet",
+    );
+    expect(screen.getByTestId("pm-report-title")).toHaveTextContent("Week of 9 Nov");
+    expect(screen.getByTestId("pm-report-changed")).toBeInTheDocument();
+    expect(screen.getByTestId("pm-report-review-pending")).toHaveTextContent(
+      "The PM agent's report is written on Monday.",
+    );
     expect(screen.getByRole("button", { name: "Next week" })).toBeDisabled();
   });
 
@@ -406,10 +421,11 @@ describe("PM agent › Ideas: latest report", () => {
   it("links the latest weekly report and the latest monthly review", () => {
     renderAt("");
     const line = screen.getByTestId("pm-latest-report");
-    expect(line).toHaveTextContent("Latest report: Week of 9 Nov · October review");
-    expect(within(line).getByRole("link", { name: "Week of 9 Nov" })).toHaveAttribute(
+    // This week has no report yet, so the latest is the week of 2 Nov.
+    expect(line).toHaveTextContent("Latest report: Week of 2 Nov · October review");
+    expect(within(line).getByRole("link", { name: "Week of 2 Nov" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent?view=reports&kind=weekly&period=2026-11-09",
+      "/debriefs/pm-agent?view=reports&kind=weekly&period=2026-11-02",
     );
     expect(within(line).getByRole("link", { name: "October review" })).toHaveAttribute(
       "href",
@@ -421,7 +437,7 @@ describe("PM agent › Ideas: latest report", () => {
     h.reports.mockReturnValue(ok(LIST.filter(i => i.kind === "weekly")));
     const { unmount } = renderAt("");
     expect(screen.getByTestId("pm-latest-report")).toHaveTextContent(
-      "Latest report: Week of 9 Nov",
+      "Latest report: Week of 2 Nov",
     );
     expect(screen.getByTestId("pm-latest-report")).not.toHaveTextContent("review");
     unmount();
