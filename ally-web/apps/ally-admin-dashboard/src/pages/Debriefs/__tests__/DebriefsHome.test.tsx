@@ -293,14 +293,14 @@ describe("Debriefs home", () => {
     expect(screen.getByTestId("pm-needs-you")).toHaveTextContent("3");
   });
 
-  it("puts Analytics before PM agent, linking to Analytics › Debriefs", () => {
+  it("puts PM agent before Analytics (design B1), linking to Analytics › Debriefs", () => {
     h.attention.mockReturnValue(attention(TEAM, []));
     renderAt();
     const analytics = screen.getByTestId("analytics-button");
     expect(analytics).toHaveTextContent("Analytics");
     expect(analytics).toHaveAttribute("href", "/analytics?tab=debriefs");
     expect(
-      analytics.compareDocumentPosition(screen.getByTestId("pm-agent-button")) &
+      screen.getByTestId("pm-agent-button").compareDocumentPosition(analytics) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
@@ -409,7 +409,7 @@ describe("the queue note says nothing of the checks to the clinical advisor", ()
 });
 
 describe("rows never wrap (2026-11-13)", () => {
-  it("keeps Settings reachable through More, after Analytics and PM agent", () => {
+  it("keeps Settings reachable through More, after PM agent and Analytics", () => {
     renderAt();
     const actions = screen.getByTestId("home-actions");
     expect(within(actions).queryByRole("link", { name: "Settings" })).toBeNull();

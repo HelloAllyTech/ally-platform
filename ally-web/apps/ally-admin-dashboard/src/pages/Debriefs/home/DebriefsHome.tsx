@@ -386,7 +386,7 @@ export const DebriefsHome: React.FC = () => {
         </AlertBanner>
       ))}
 
-      {/* One row at lg and up: Show, then layout, Analytics and PM agent; Settings goes in More.
+      {/* One row at lg and up: Show, then layout, PM agent and Analytics; Settings goes in More.
           Below lg the actions take a second row, on purpose (design B1, 2026-11-13). */}
       <div
         className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-center"
@@ -452,14 +452,6 @@ export const DebriefsHome: React.FC = () => {
             ))}
           </div>
           <Link
-            to={analyticsDebriefsPath()}
-            data-testid="analytics-button"
-            className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
-          >
-            <BarChart3 aria-hidden="true" className="h-4 w-4" />
-            {h.analytics}
-          </Link>
-          <Link
             to={pmAgentPath()}
             data-testid="pm-agent-button"
             className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
@@ -474,6 +466,14 @@ export const DebriefsHome: React.FC = () => {
                 {needsYou}
               </span>
             )}
+          </Link>
+          <Link
+            to={analyticsDebriefsPath()}
+            data-testid="analytics-button"
+            className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
+          >
+            <BarChart3 aria-hidden="true" className="h-4 w-4" />
+            {h.analytics}
           </Link>
           <MoreActions
             testId="home-more"
