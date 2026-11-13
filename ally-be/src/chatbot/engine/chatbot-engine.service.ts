@@ -41,6 +41,7 @@ import type {
   ChatTurn,
   LiveReply,
 } from './chatbot-engine.types';
+import { crisisRequest } from './crisis-history';
 import { holdTextUntilCleared } from './live-reply';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
@@ -196,10 +197,9 @@ export class ChatbotEngineService {
     if (!turn.settings.crisisClassifierEnabled) return null;
     try {
       const { prompts, ran } = await this.loadPromptOverrides(turn);
-      const crisis = await this.aiService.checkWhatsAppCrisis({
-        message: turn.text,
-        prompts,
-      });
+      const crisis = await this.aiService.checkWhatsAppCrisis(
+        crisisRequest(turn, prompts),
+      );
       return crisis?.is_crisis
         ? this.crisisDecision(turn, crisis, ran, { notOnList: false })
         : null;
@@ -309,10 +309,9 @@ export class ChatbotEngineService {
     if (settings.crisisClassifierEnabled) {
       try {
         const { prompts, ran } = await this.loadPromptOverrides(turn);
-        const crisis = await this.aiService.checkWhatsAppCrisis({
-          message: turn.text,
-          prompts,
-        });
+        const crisis = await this.aiService.checkWhatsAppCrisis(
+          crisisRequest(turn, prompts),
+        );
         if (crisis?.is_crisis) {
           return this.crisisDecision(turn, crisis, ran, { notOnList: true });
         }
@@ -364,7 +363,7 @@ export class ChatbotEngineService {
     // keeps a rejected classifier from taking down an answer that arrived fine. The crisis check
     // runs once and exactly as before, whichever engine answers.
     const crisisCheck = settings.crisisClassifierEnabled
-      ? this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts })
+      ? this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts))
       : Promise.resolve(null);
     // A streamed reply's text waits for the crisis check too: none of it is shown before the
     // check clears the message, and none at all if it doesn't.

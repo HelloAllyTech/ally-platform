@@ -171,6 +171,8 @@ describe('ChatbotEngineService', () => {
       await engine.respond(turn());
       expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledWith({
         message: 'What does Ally do?',
+        // The person's earlier messages (chunk 15a).
+        history: ['hi'],
         prompts: aiService.answerKnowledgeQuestion.mock.calls[0][0].prompts,
       });
     });

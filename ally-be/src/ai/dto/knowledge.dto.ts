@@ -253,6 +253,11 @@ export interface KnowledgeAnswerResponse {
 
 export interface CrisisCheckRequest {
   message: string;
+  /**
+   * The person's own earlier messages in this conversation, newest last, without `message`
+   * (chunk 15a). Left out when there are none, so the request is exactly the old one.
+   */
+  history?: string[];
   prompts?: Record<string, unknown>;
 }
 
