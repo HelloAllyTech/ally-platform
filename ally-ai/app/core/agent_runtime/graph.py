@@ -20,7 +20,7 @@ from langsmith.run_helpers import tracing_context
 
 from app.core.agent_runtime.checkpointer import (
     close_checkpointer,
-    get_checkpointer,
+    durable_checkpointer,
     open_checkpointer,
 )
 from app.core.agent_runtime.nodes import (
@@ -59,12 +59,13 @@ def build_graph(
 
 @lru_cache(maxsize=1)
 def get_agent_graph(service: KnowledgeAgentService) -> CompiledStateGraph:
-    """Compiled once, on first use, against whichever checkpointer is open then.
+    """Compiled once, on first use, against the Postgres checkpointer if one is open
+    then, otherwise with none: runs are stateless, so they answer the same either way.
 
     `open_agent_runtime` and `close_agent_runtime` clear it, so a graph compiled
     before startup (or after shutdown) never keeps the wrong checkpointer.
     """
-    return build_graph(service, get_checkpointer())
+    return build_graph(service, durable_checkpointer())
 
 
 async def open_agent_runtime() -> None:

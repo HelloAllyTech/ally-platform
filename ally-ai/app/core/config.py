@@ -124,11 +124,13 @@ class KnowledgeAgentSettings(BaseModel):
 class AgentRuntimeSettings(BaseModel):
     """Agents v2 runtime: the LangGraph agent graph behind `/agent/run`.
 
-    Dark until ENABLED: the route answers 404 and nothing is opened at startup, so
-    deploying the code changes nothing until it is switched on.
+    On by default: chatbots answer with the agent unless ENABLED is set false here
+    (the route then answers 404 and ally-be answers in safe mode) or the platform's
+    "Answer with the agent" switch is off. The checkpoint database is optional: without
+    one, chatbot runs are simply not stored (nothing reads them back to answer).
     """
 
-    ENABLED: bool = Field(False)
+    ENABLED: bool = Field(True)
     # Postgres for LangGraph's checkpoint tables, in their own database — ally-be's
     # database is never written to. Unset = in-memory checkpoints (lost on restart),
     # with a warning at startup.

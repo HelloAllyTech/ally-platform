@@ -1,11 +1,11 @@
 """Agents v2 runtime endpoint — the conversational agent, run as a LangGraph loop.
 
-Dark until AGENT_RUNTIME__ENABLED: every run route here answers 404 while it is off, so
-shipping this changes nothing in production, and 503 if it is on but its checkpoint
-database could not be opened at startup. The builder's /instructions routes are on
-`builder_router` instead and always answer: they make no model call and open nothing.
-Every run adds a run id, a per-step trace and a stored checkpoint to what
-/knowledge-agent/answer returns. /run and
+On unless AGENT_RUNTIME__ENABLED is set false, when every run route here answers 404
+and ally-be answers in safe mode. It doesn't need the checkpoint database: without one
+(or with one that couldn't be opened) runs are answered and simply not stored. The
+builder's /instructions routes are on `builder_router` instead and always answer: they
+make no model call and open nothing. Every run adds a run id and a per-step trace (with
+Postgres, a stored checkpoint too) to what /knowledge-agent/answer returns. /run and
 /run/stream share one runner (agent_runtime/runner.py).
 """
 
@@ -14,7 +14,6 @@ from fastapi.responses import StreamingResponse
 from langgraph.graph.state import CompiledStateGraph
 
 from app.api.v1.endpoints.knowledge_agent import knowledge_errors
-from app.core.agent_runtime.checkpointer import checkpointer_available
 from app.core.agent_runtime.graph import get_agent_graph
 from app.core.agent_runtime.instructions import check_owner_text
 from app.core.agent_runtime.instructions import describe as describe_instructions
@@ -38,11 +37,6 @@ def require_agent_runtime() -> None:
     """404, not 403: while the runtime is off the route should not appear to exist."""
     if not settings.AGENT_RUNTIME.ENABLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
-    if not checkpointer_available():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="The agent runtime is unavailable",
-        )
 
 
 async def get_graph(
