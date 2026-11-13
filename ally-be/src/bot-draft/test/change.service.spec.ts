@@ -49,7 +49,7 @@ function build(fields: Record<string, unknown> = {}) {
       return draft;
     }),
   };
-  const ai = { proposeChange: jest.fn() };
+  const ai = { proposeChange: jest.fn(), getPromptOverrides: jest.fn() };
   const access = {
     assert: jest.fn(async () => ({
       chatbot: { safetyPack: 'mental_health', rules: { never: [] } },
@@ -82,6 +82,34 @@ describe('ChangeService (change by chat)', () => {
       h.ai.proposeChange.mock.calls[0][0].safety_rules.length,
     ).toBeGreaterThan(0);
     expect(h.home.saveField).not.toHaveBeenCalled();
+  });
+
+  it("sends ally_ai_builder_change's live text from the Skills Store", async () => {
+    const h = build();
+    const live = { ally_ai_builder_change: { prompt: 'End with: Done.' } };
+    h.ai.getPromptOverrides.mockResolvedValue(live);
+    h.ai.proposeChange.mockResolvedValue({
+      reply: 'ok',
+      refused: false,
+      changes: [],
+    });
+    await h.service.propose('bot', 'make it more formal');
+    expect(h.ai.getPromptOverrides).toHaveBeenCalledWith([
+      'ally_ai_builder_change',
+    ]);
+    expect(h.ai.proposeChange.mock.calls[0][0].prompts).toEqual(live);
+  });
+
+  it('a failed Skills Store read leaves the prompt to ally-ai, and still proposes', async () => {
+    const h = build();
+    h.ai.getPromptOverrides.mockRejectedValue(new Error('store down'));
+    h.ai.proposeChange.mockResolvedValue({
+      reply: 'ok',
+      refused: false,
+      changes: [],
+    });
+    await h.service.propose('bot', 'make it more formal');
+    expect(h.ai.proposeChange.mock.calls[0][0]).not.toHaveProperty('prompts');
   });
 
   it("a refusal comes back in the deck's words, with nothing to apply", async () => {
