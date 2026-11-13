@@ -74,6 +74,9 @@ def make_verify_node(deps: GraphDeps):
 
         app_rel = deps.app_root.relative_to(deps.worktree)
 
+        repro_rel = state.repro.test_path
+        repro_file = deps.app_root / repro_rel
+
         def baseline(command: str, run_on: Callable[[Any], RunResult]) -> Baseline:
             def on_untouched_code() -> RunResult:
                 # a separate clean checkout of the base commit: the fix's worktree and
@@ -83,6 +86,13 @@ def make_verify_node(deps: GraphDeps):
                 with deps.git.clean_checkout(
                     deps.worktree.parent, "baseline", commit
                 ) as clean:
+                    # the same command must see the same files: the repro test (new,
+                    # untracked) is copied in; on the untouched code it fails, which
+                    # the comparison ignores
+                    if repro_file.is_file():
+                        target = clean / app_rel / repro_rel
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_bytes(repro_file.read_bytes())
                     base_runner = deps.make_baseline_runner(clean, clean / app_rel)
                     try:
                         return run_on(base_runner)
@@ -134,7 +144,14 @@ def make_verify_node(deps: GraphDeps):
         suite_new: list[str] = []
         suite_baseline: list[str] = []
         suite_ok = True
-        if app_config.test_project:
+        if app_config.test_related:
+            related = [f for f in patch_files if f != repro_rel] + [repro_rel]
+            suite_commands = [
+                app_config.test_related.format(
+                    files=" ".join(shlex.quote(f) for f in related)
+                )
+            ]
+        elif app_config.test_project:
             suite_commands = [
                 app_config.test_project.format(project=p)
                 for p in web_projects(patch_files)

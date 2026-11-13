@@ -66,6 +66,9 @@ class HarnessOptions:
     min_free_gb: float | None = None
     max_cost_usd: float | None = None  # hard cap for the whole eval run (limits.yaml)
     split: str = "dev"  # dev | holdout; holdout agent runs need milestone=True
+    shard: tuple[int, int] | None = (
+        None  # (index from 1, count): run one part of the set
+    )
     milestone: bool = False
     spend_file: Path | None = None  # daily ledger; None (tests) disables it
     override_spend_cap: bool | None = None  # None = read BUGHUNTER_SPEND_OVERRIDE
@@ -200,6 +203,10 @@ def score_bug(case: Case, result: AgentResult) -> str:
             return "escalated_correctly"
         if case.escalate_acceptable and diagnosis_matches(case, result):
             return "escalated_acceptably"
+        if "topic:" in (result.escalation_reason or ""):
+            # the topic rule (tenancy, data exposure, auth, permissions) sent an
+            # expected-fix case to a human: safe, but an over-escalation
+            return "escalated_safe"
         return "escalated"
     return "detected" if result.found else "missed"
 
@@ -570,6 +577,91 @@ def plan(config: BugHunterConfig, cases: list[Case]) -> dict[str, Any]:
     }
 
 
+# Expected minutes per case by app, from the 2026-11-10/11 graph runs (ally-web verify
+# is the slowest). Used only to balance shards.
+EXPECTED_MINUTES = {
+    "ally-web": 30,
+    "ally-be": 18,
+    "ally-ai-learn": 15,
+    "ally-ai": 12,
+    "ally-mobile": 8,
+}
+CLEAN_MINUTES = 4
+
+
+def expected_minutes(case: Case) -> int:
+    return CLEAN_MINUTES if case.kind == "clean" else EXPECTED_MINUTES.get(case.app, 15)
+
+
+def shard_cases(cases: list[Case], index: int, count: int) -> list[Case]:
+    """Deterministic, balanced split: ally-web cases are dealt round-robin first (so
+    they never pile into one shard), the rest go longest-first to the shard with the
+    least expected time. Every case lands in exactly one shard."""
+    if not 1 <= index <= count:
+        raise ValueError(f"shard {index}/{count}: index must be 1..{count}")
+    shards: list[list[Case]] = [[] for _ in range(count)]
+    load = [0] * count
+    web = sorted((c for c in cases if c.app == "ally-web"), key=lambda c: c.id)
+    for i, case in enumerate(web):
+        shards[i % count].append(case)
+        load[i % count] += expected_minutes(case)
+    rest = sorted(
+        (c for c in cases if c.app != "ally-web"),
+        key=lambda c: (-expected_minutes(c), c.id),
+    )
+    for case in rest:
+        target = min(range(count), key=lambda k: (load[k], len(shards[k]), k))
+        shards[target].append(case)
+        load[target] += expected_minutes(case)
+    order = {c.id: n for n, c in enumerate(cases)}
+    return sorted(shards[index - 1], key=lambda c: order[c.id])
+
+
+def merge_reports(reports: list[dict[str, Any]]) -> dict[str, Any]:
+    """One report from shard reports: cases concatenated, metrics recomputed, cost and
+    per-shard duration kept in meta."""
+    if not reports:
+        raise ValueError("no shard reports to merge")
+    cases = [c for r in reports for c in r["cases"]]
+    rows = [CaseResult(**c) for c in cases]
+    first = reports[0]["meta"]
+    shards = []
+    for r in sorted(reports, key=lambda r: r["meta"].get("shard", "")):
+        m = r["meta"]
+        start = datetime.fromisoformat(m["timestamp"])
+        end = datetime.fromisoformat(m["finished_at"]) if m.get("finished_at") else None
+        shards.append(
+            {
+                "shard": m.get("shard"),
+                "cases": len(r["cases"]),
+                "cost_usd": m.get("cost_usd_total", 0),
+                "minutes": (
+                    round((end - start).total_seconds() / 60, 1) if end else None
+                ),
+                "partial": m.get("partial", False),
+                "stopped_reason": m.get("stopped_reason"),
+            }
+        )
+    meta = {
+        **{k: v for k, v in first.items() if k not in ("shard", "shard_cases")},
+        "cases": len(cases),
+        "shards": shards,
+        "cost_usd_total": round(sum(s["cost_usd"] or 0 for s in shards), 4),
+        "stopped_reason": "; ".join(
+            f"{s['shard']}: {s['stopped_reason']}"
+            for s in shards
+            if s["stopped_reason"]
+        )
+        or None,
+        "partial": any(s["partial"] for s in shards),
+    }
+    return {
+        "meta": meta,
+        "metrics": {k: m.to_dict() for k, m in aggregate(rows).items()},
+        "cases": cases,
+    }
+
+
 def run_evals(
     config: BugHunterConfig,
     cases: list[Case],
@@ -619,6 +711,12 @@ def run_evals(
         cases = [c for c in cases if c.id not in set(skipped)]
         meta["cases"] = len(cases)
         meta["skipped_for_mode"] = skipped
+    if options.shard is not None:
+        index, count = options.shard
+        meta["shard"] = f"{index}/{count}"
+        cases = shard_cases(cases, index, count)
+        meta["cases"] = len(cases)
+        meta["shard_cases"] = [c.id for c in cases]
     report = Report(meta=meta)
     if options.dry_run:
         meta["plan"] = plan(config, cases)
@@ -639,7 +737,8 @@ def run_evals(
     spent = 0.0
     results_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    base = results_dir / f"{stamp}-{agent.name}-{meta['mode']}-{git_sha[:8]}"
+    shard_tag = f"-shard{options.shard[0]}of{options.shard[1]}" if options.shard else ""
+    base = results_dir / f"{stamp}-{agent.name}-{meta['mode']}-{git_sha[:8]}{shard_tag}"
 
     def write_report(partial: bool) -> None:
         meta["partial"] = partial
@@ -681,5 +780,6 @@ def run_evals(
     meta["cases_done"] = len(report.cases)
     meta["cases_remaining"] = len(cases) - len(report.cases)
     meta["free_gb_end"] = guard.free_gb()
+    meta["finished_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     write_report(partial=False)
     return report, base.with_suffix(".md")

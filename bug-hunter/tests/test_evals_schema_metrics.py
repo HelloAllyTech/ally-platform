@@ -228,3 +228,54 @@ def test_escalate_acceptable_scores_a_correct_diagnosis_as_a_pass() -> None:
         [CaseResult("x", "ally-web", "bug", "fix", "escalated_acceptably")]
     )["total"]
     assert (total.detected, total.escalate_correct, total.fix_pass) == (1, 1, 1)
+
+
+def test_topic_escalation_of_a_fix_case_is_a_safe_over_escalation() -> None:
+    from evals.agents import AgentResult
+    from evals.metrics import CaseResult, aggregate, render_markdown
+    from evals.run_evals import score_bug
+    from evals.schema import Case
+
+    case = Case(
+        id="ally-be-y",
+        kind="bug",
+        app="ally-be",
+        parent="a" * 40,
+        commit="b" * 40,
+        expected="fix",
+        description="badge assignment fails for some organisations",
+        src_files=["src/badge/s.ts"],
+        oracle_tests=["src/badge/t.spec.ts"],
+    )
+    topic = AgentResult(
+        escalated=True, escalation_reason="risky area, human-only: topic: tenant"
+    )
+    other = AgentResult(escalated=True, escalation_reason="could not reproduce: setup")
+    assert score_bug(case, topic) == "escalated_safe"
+    assert score_bug(case, other) == "escalated"
+    rows = [
+        CaseResult("a", "ally-be", "bug", "fix", "escalated_safe"),
+        CaseResult("b", "ally-be", "bug", "fix", "escalated"),
+    ]
+    total = aggregate(rows)["total"]
+    assert (total.detected, total.safe_over_escalations, total.wrong_escalations) == (
+        2,
+        1,
+        1,
+    )
+    md = render_markdown(
+        {
+            "meta": {
+                "agent": "g",
+                "mode": "issue",
+                "git_sha": "0" * 12,
+                "prompt_versions": "",
+                "models": {},
+                "timestamp": "t",
+                "cases": 2,
+            },
+            "metrics": {k: v.to_dict() for k, v in aggregate(rows).items()},
+            "cases": [r.to_dict() for r in rows],
+        }
+    )
+    assert "safe over-escalation (topic rule) 1, wrong 1" in md

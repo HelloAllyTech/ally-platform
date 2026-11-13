@@ -17,6 +17,9 @@ apps:
     test_one: "npx jest {file} -t {name} --forceExit"
     # verify (chunk 06) formats only the files a fix changed before lint; {files} = app-relative paths
     format_files: "npx prettier --write {files}"
+    # verify runs the tests related to the changed files plus the repro, not the whole
+    # suite (13.7k tests, ~3 min, twice per attempt); the full suite runs in the PR's CI
+    test_related: "npx jest --findRelatedTests {files} --forceExit"
     lint: "npm run lint"
     typecheck: "npm run typecheck"
     # Jest rootDir is src with testRegex .*\.spec\.ts$; there is no top-level test/.

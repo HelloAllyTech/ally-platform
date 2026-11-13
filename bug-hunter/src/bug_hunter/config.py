@@ -70,6 +70,9 @@ class AppConfig(_Strict):
     format_files: str | None = (
         None  # formatter for changed files only ({files}); never for dart
     )
+    # tests related to {files} (ally-be: jest --findRelatedTests); verify uses it
+    # instead of the whole suite, which still runs in the PR's CI
+    test_related: str | None = None
     lint: str | None = None
     typecheck: str | None = None
     test_dirs: list[str] = Field(default_factory=list)
@@ -85,6 +88,8 @@ class AppConfig(_Strict):
                 )
             if "{files}" not in self.format_files:
                 raise ValueError("format_files must contain {files}")
+        if self.test_related is not None and "{files}" not in self.test_related:
+            raise ValueError("test_related must contain {files}")
         return self
 
     # Sandbox (chunk 02)

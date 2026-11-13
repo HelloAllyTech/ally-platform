@@ -161,10 +161,12 @@ class VerifyRunner:
         self.results = results
         self.calls = []
         self.x_at_call: list[str] = []
+        self.repro_present: list[bool] = []
 
     def _take(self, key):
         self.calls.append(key)
         self.x_at_call.append((self.repo / "ally-be/src/x.ts").read_text().strip())
+        self.repro_present.append((self.repo / "ally-be/src/x.repro.spec.ts").exists())
         seq = self.results[key]
         return seq.pop(0) if len(seq) > 1 else seq[0]
 
@@ -224,7 +226,7 @@ def test_verify_runs_baseline_on_untouched_code_and_blames_only_new_failures(
     suite_after = suite_after.__class__(
         **{
             **suite_after.__dict__,
-            "command": "npm test -- --forceExit --detectOpenHandles",
+            "command": "npx jest --findRelatedTests src/x.ts src/x.repro.spec.ts --forceExit",  # noqa: E501
             "failing_tests": ["old › flaky"],
         }
     )
@@ -233,7 +235,10 @@ def test_verify_runs_baseline_on_untouched_code_and_blames_only_new_failures(
         repo,
         {
             ("repro", "src/x.repro.spec.ts", "repro"): [run_result("ally-be", True)],
-            ("suite", "npm test -- --forceExit --detectOpenHandles"): [
+            (
+                "suite",
+                "npx jest --findRelatedTests src/x.ts src/x.repro.spec.ts --forceExit",
+            ): [
                 suite_after,
                 suite_base,
             ],
@@ -256,12 +261,22 @@ def test_verify_runs_baseline_on_untouched_code_and_blames_only_new_failures(
     assert runner.x_at_call[1] == "export const x = () => 3;"  # after, with the fix
     # the baseline ran in a separate clean checkout of the base commit
     assert base_runners and base_runners[0].x_at_call[0] == "export const x = () => 0;"
+    # same command on the clean checkout, with the repro test copied in
+    assert base_runners[0].calls[0] == (
+        "suite",
+        "npx jest --findRelatedTests src/x.ts src/x.repro.spec.ts --forceExit",
+    )
+    assert runner.calls[2][1].startswith("npx jest --findRelatedTests")
+    assert base_runners[0].repro_present[0]  # the repro test was copied in
     assert base_runners[0].repo != repo
     assert (repo / "ally-be/src/x.ts").read_text() == "export const x = () => 3;\n"
     # second verify: the baseline comes from the cache, no extra suite run
-    runner.results[("suite", "npm test -- --forceExit --detectOpenHandles")] = [
-        suite_after
-    ]
+    runner.results[
+        (
+            "suite",
+            "npx jest --findRelatedTests src/x.ts src/x.repro.spec.ts --forceExit",
+        )
+    ] = [suite_after]
     calls_before = len(runner.calls)
     make_verify_node(deps)(state)
     # repro, format, suite, lint, typecheck; no baseline this time
@@ -275,7 +290,7 @@ def test_verify_fails_on_new_failure_or_edited_repro(
     (repo / "ally-be/src/x.repro.spec.ts").write_text("it('repro', () => {});\n")
     state = _state(repo)
     (repo / "ally-be/src/x.ts").write_text("export const x = () => 3;\n")
-    cmd = "npm test -- --forceExit --detectOpenHandles"
+    cmd = "npx jest --findRelatedTests src/x.ts src/x.repro.spec.ts --forceExit"
     broken = run_result("ally-be", False, "")
     broken = broken.__class__(
         **{**broken.__dict__, "command": cmd, "failing_tests": ["other › now broken"]}

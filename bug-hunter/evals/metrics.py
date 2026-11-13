@@ -60,6 +60,8 @@ class Metrics:
     fix_pass_adjusted: int = 0  # oracle, except human review for oracle_shape
     fix_adjusted_attempted: int = 0
     fix_pending_human: int = 0
+    safe_over_escalations: int = 0  # expected fix, escalated by the topic rule
+    wrong_escalations: int = 0  # expected fix, escalated for any other reason
     escalate_expected: int = 0
     escalate_correct: int = 0
     errors: int = 0
@@ -110,8 +112,13 @@ def aggregate(results: Iterable[CaseResult]) -> dict[str, Metrics]:
                     "escalated",
                     "escalated_correctly",
                     "escalated_acceptably",
+                    "escalated_safe",
                 ):
                     m.detected += 1
+                if r.outcome == "escalated_safe":
+                    m.safe_over_escalations += 1
+                if r.outcome == "escalated":
+                    m.wrong_escalations += 1
                 if r.outcome == "escalated_acceptably":
                     # a bug unit tests cannot show, escalated with the right diagnosis:
                     # counted as a correct escalation and as a fix-pass
@@ -224,7 +231,25 @@ def render_markdown(report: dict[str, Any]) -> str:
                 or "none"
             ),
         ]
+    if meta.get("shards"):
+        lines += [
+            "",
+            "| Shard | Cases | Cost | Minutes | Stopped |",
+            "|---|---|---|---|---|",
+        ]
+        for sh in meta["shards"]:
+            lines.append(
+                f"| {sh['shard']} | {sh['cases']} | ${(sh['cost_usd'] or 0):.2f} "
+                f"| {sh['minutes'] if sh['minutes'] is not None else '–'} "
+                f"| {sh['stopped_reason'] or ('partial' if sh['partial'] else 'no')} |"
+            )
     total = metrics["total"]
+    if total.get("safe_over_escalations") or total.get("wrong_escalations"):
+        lines += [
+            "",
+            f"Escalations of expected-fix cases: safe over-escalation (topic rule) "
+            f"{total['safe_over_escalations']}, wrong {total['wrong_escalations']}",
+        ]
     if total["fix_attempted"]:
         lines += [
             "",

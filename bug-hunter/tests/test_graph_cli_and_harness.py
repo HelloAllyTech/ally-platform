@@ -278,3 +278,53 @@ def test_report_is_written_after_every_case(repo_config, tmp_path: Path) -> None
     )
     assert seen == [1]  # while case 2 ran, case 1 was already on disk
     assert report.meta["partial"] is False and len(list(out.glob("*.json"))) == 1
+
+
+def test_shards_are_balanced_disjoint_and_spread_ally_web() -> None:
+    from pathlib import Path as _P
+
+    from evals.run_evals import expected_minutes, shard_cases
+    from evals.schema import load_cases
+
+    cases = [
+        c
+        for c in load_cases(_P(__file__).parents[1] / "evals/golden/cases.yaml").cases
+        if c.split == "dev"
+        and c.kind == "bug"
+        and "issue" in c.modes
+        and c.status == "active"
+    ]
+    parts = [shard_cases(cases, i, 4) for i in range(1, 5)]
+    ids = [c.id for p in parts for c in p]
+    assert sorted(ids) == sorted(c.id for c in cases) and len(ids) == len(set(ids))
+    web = [sum(c.app == "ally-web" for c in p) for p in parts]
+    assert max(web) - min(web) <= 1  # no shard holds all the ally-web cases
+    loads = [sum(expected_minutes(c) for c in p) for p in parts]
+    assert max(loads) - min(loads) <= 30
+    assert shard_cases(cases, 2, 4) == parts[1]  # deterministic
+
+
+def test_merge_reports_combines_shards(repo_config, tmp_path: Path) -> None:
+    import json as _json
+
+    from evals.run_evals import merge_reports
+
+    cfg, repo, bug, clean = repo_config
+    out = tmp_path / "r"
+    for i in (1, 2):
+        run_evals(
+            cfg,
+            [bug, clean],
+            CostlyAgent(),
+            _options(shard=(i, 2)),
+            repo=repo,
+            guard=DiskGuard(5, probe=lambda: 50.0),
+            results_dir=out,
+        )
+    reports = [_json.loads(p.read_text()) for p in sorted(out.glob("*.json"))]
+    assert sorted(r["meta"]["shard"] for r in reports) == ["1/2", "2/2"]
+    merged = merge_reports(reports)
+    assert merged["meta"]["cases"] == 2 and merged["meta"]["cost_usd_total"] == 12.0
+    assert {s["shard"] for s in merged["meta"]["shards"]} == {"1/2", "2/2"}
+    assert all(s["minutes"] is not None for s in merged["meta"]["shards"])
+    assert merged["metrics"]["total"]["cases"] == 2

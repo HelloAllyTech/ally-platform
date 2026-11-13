@@ -508,6 +508,32 @@ def eval_modes(
     typer.echo(f"{case_id}: modes = {match[0].modes}")
 
 
+@eval_app.command("merge")
+def eval_merge(
+    reports: Annotated[list[Path], typer.Argument(help="Shard report .json files.")],
+    out_dir: Annotated[
+        Path, typer.Option(help="Where to write the merged report.")
+    ] = Path("evals/results"),
+    name: Annotated[
+        str, typer.Option(help="File stem of the merged report.")
+    ] = "merged",
+) -> None:
+    """Merge shard reports into one (cases, recomputed metrics, cost, shard times)."""
+    import json as _json
+
+    from evals.metrics import render_markdown
+    from evals.run_evals import merge_reports
+
+    merged = merge_reports([_json.loads(p.read_text()) for p in reports])
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / f"{name}.json").write_text(_json.dumps(merged, indent=1))
+    (out_dir / f"{name}.md").write_text(render_markdown(merged))
+    typer.echo(
+        f"merged {len(reports)} shard reports, {merged['meta']['cases']} cases, "
+        f"${merged['meta']['cost_usd_total']:.2f} -> {out_dir / (name + '.md')}"
+    )
+
+
 @eval_app.command("blame")
 def eval_blame(
     ids: Annotated[
@@ -600,6 +626,10 @@ def eval_run(
             "--milestone", help="Required to run an agent on the holdout split."
         ),
     ] = False,
+    shard: Annotated[
+        str | None,
+        typer.Option(help="Run one balanced part of the cases: '2/4'."),
+    ] = None,
 ) -> None:
     """Run the golden cases against an agent, one at a time, and write a report."""
     import json as _json
@@ -634,6 +664,11 @@ def eval_run(
         override_spend_cap=True if override_spend_cap else None,
         split=split,
         milestone=milestone,
+        shard=(
+            tuple(int(x) for x in shard.split("/", 1))  # type: ignore[arg-type]
+            if shard
+            else None
+        ),
     )
     try:
         report, path = run_evals(config, selected, load_agent(agent), options)
