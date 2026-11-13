@@ -26,7 +26,11 @@ export const paneLabels = (e: AgentLogEntry): { input: string; output: string } 
 
 /** A value that is a code (`safety_reader`, `quote_not_in_turn`), shown as words. */
 const CODE = /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/;
-const word = (v: string): string => (CODE.test(v) ? codeWords(v) : v);
+const known = (v: string): boolean =>
+  v in en.debriefs.agentLogs.names ||
+  v in en.debriefs.run.stepNames ||
+  v in en.debriefs.metrics.agents.registry.names;
+const word = (v: string): string => (known(v) ? entryName(v) : CODE.test(v) ? codeWords(v) : v);
 
 const scalar = (v: unknown): string => {
   if (v === null || v === undefined) return "—";
