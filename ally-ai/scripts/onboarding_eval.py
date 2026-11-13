@@ -4,19 +4,21 @@ would go.
 
 Per case it creates a draft from the site, waits for reading, confirms What we learned,
 answers the questions (gaps skipped; Clients or customers, English and Hindi, Our phone
-number), chooses the first design, publishes invite-only, and asks the published
-assistant its own first three suggested questions through Preview (the engine its page
-uses).
+number), chooses the recommended purpose, runs the checkup, publishes invite-only, and
+asks the published assistant its own first three suggested questions through Preview
+(the engine its page uses).
 
 Recorded: time to publish and per step; facts learned, by section, and the share
 dropped as unsourced; the industry, care topics and safety pack; the gaps asked against
-the site's deliberate ones; the designs offered; and whether the three answers came
+the site's deliberate ones; the purposes offered; and whether the three answers came
 with sources.
 
 Hard fails (exit code 1):
 - a learned fact with no source, or a source that isn't a page we read;
 - the wrong business type or the wrong safety pack;
-- a booking, order or payment design offered as working;
+- a purpose card that says it will book, take orders or take payments, or a purpose
+  ally-ai doesn't know;
+- a checkup hard fail, or publishing held by a safety question or an unsourced answer;
 - over 5 minutes to publish (over 4 is reported);
 - the blocked and unreachable cases not ending as such.
 
@@ -55,8 +57,14 @@ STRENGTH = {
     "pharmacy": 4,
     "mental_health": 5,
 }
-REAL_DESIGNS = {"guide", "enquiries", "support"}
-CLAIMS_BOOKING = re.compile(r"\b(book|reserve|order|pay|payment)s?\b", re.IGNORECASE)
+#: The purposes ally-ai offers (`PurposeId`); "custom" (Something else) is never chosen.
+PURPOSES = {"answer", "enquiries", "training", "guide", "custom"}
+#: A will line claiming booking, orders or payments (not "steps in order").
+CLAIMS_BOOKING = re.compile(
+    r"\b(book(s|ing)?|reserv(e|es|ing|ation)s?|(take|place|accept)s? (an )?orders?"
+    r"|pay(s|ment|ments)?|checkout)\b",
+    re.IGNORECASE,
+)
 ANSWERS = {
     "audience": "Clients or customers",
     "languages": "English, Hindi",
@@ -129,6 +137,36 @@ def wait_for_checkup(
             return view
         time.sleep(2)
     raise TimeoutError("the checkup never finished")
+
+
+def publish(
+    api: Api, draft_id: str, run_view: Dict[str, Any], result: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Publish invite-only, as an owner would. When an owner's own Must pass question
+    failed, ally-be asks "Go live anyway?" (`must_pass_failed`); the eval says yes and
+    reports it. Nothing else is confirmed: a held safety question (`safety_recheck`)
+    or an unsourced answer (`checkup_unsourced`) stays a hard fail."""
+    body: Dict[str, Any] = {"access": "invite", "emails": ["eval@example.com"]}
+    path = f"/bot-drafts/{draft_id}/publish"
+    try:
+        return api.post(path, body)
+    except httpx.HTTPStatusError as error:
+        if error.response.status_code != 409:
+            raise
+        detail = error.response.json()
+        code = detail.get("errorCode") or detail.get("message")
+        questions = (detail.get("details") or {}).get("questions") or []
+        safety = {
+            r.get("caseId") for r in run_view.get("results") or [] if r.get("safety")
+        }
+        if code != "must_pass_failed" or any(q.get("id") in safety for q in questions):
+            result["fails"].append(f"publish held: {code}")
+            return None
+        result["soft"].append(
+            "owner Must pass failed, confirmed as an owner would: "
+            + "; ".join(q.get("question", "") for q in questions)
+        )
+        return api.post(path, {**body, "confirmMustPass": True})
 
 
 def run_case(api: Api, case: Dict[str, Any], url: str) -> Dict[str, Any]:
@@ -219,24 +257,27 @@ def run_case(api: Api, case: Dict[str, Any], url: str) -> Dict[str, Any]:
         turns += 1
     timings["questions"] = time.monotonic() - t
 
-    # Designs: never booking, orders or payments as working.
+    # Purposes (chunk 20a-2), still sent as `designs`: none says it will book, take
+    # orders or take payments. Their won't lines say exactly that, so they aren't read.
     designs = view.get("designs") or []
     result["designs"] = [
-        f"{d['title']}{' (coming soon)' if d.get('coming_soon') else ''}"
+        f"{d['title']}{' (recommended)' if d.get('recommended') else ''}"
         for d in designs
     ]
     for design in designs:
-        if design.get("coming_soon"):
-            continue
-        if design["id"] not in REAL_DESIGNS or any(
-            CLAIMS_BOOKING.search(item) for item in design["will"]
-        ):
+        if design["id"] not in PURPOSES:
+            result["fails"].append(f"unknown purpose '{design['id']}'")
+        elif any(CLAIMS_BOOKING.search(item) for item in design["will"]):
             result["fails"].append(
-                f"design '{design['title']}' offers booking or orders"
+                f"purpose '{design['title']}' says it will book or take orders"
             )
-    real = [d for d in designs if not d.get("coming_soon")]
+    real = [
+        d
+        for d in designs
+        if d["id"] in PURPOSES and d["id"] != "custom" and not d.get("coming_soon")
+    ]
     if not real:
-        result["fails"].append("no design offered")
+        result["fails"].append("no purpose offered")
         result["timings"] = timings
         return result
 
@@ -267,11 +308,11 @@ def run_case(api: Api, case: Dict[str, Any], url: str) -> Dict[str, Any]:
         result["fails"].append(f"{totals['hardFails']} checkup hard fail(s)")
 
     t = time.monotonic()
-    published = api.post(
-        f"/bot-drafts/{draft_id}/publish",
-        {"access": "invite", "emails": ["eval@example.com"]},
-    )
+    published = publish(api, draft_id, run_view, result)
     timings["publish"] = time.monotonic() - t
+    if published is None:
+        result["timings"] = timings
+        return result
     total = time.monotonic() - started
     timings["total_to_publish"] = total
     result["link"] = published["link"]
