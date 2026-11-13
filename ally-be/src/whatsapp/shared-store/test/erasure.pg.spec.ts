@@ -64,16 +64,16 @@ describePg('Erasure and the retention sweep (Postgres)', () => {
 
   /** Everything erasure touches, to compare before and after a second run. */
   const snapshot = async () => ({
-    contacts: await dataSource.query(
-      `SELECT id, phone_e164, phone_last4 FROM wa_contacts ORDER BY id`,
-    ),
-    waBodies: await dataSource.query(
+    contacts: await dataSource.query<
+      { id: string; phone_e164: string; phone_last4: string }[]
+    >(`SELECT id, phone_e164, phone_last4 FROM wa_contacts ORDER BY id`),
+    waBodies: await dataSource.query<{ id: string; body: string }[]>(
       `SELECT id, body FROM wa_messages ORDER BY id`,
     ),
-    sharedTexts: await dataSource.query(
+    sharedTexts: await dataSource.query<{ id: string; text: string }[]>(
       `SELECT id, text FROM chatbot_messages ORDER BY id`,
     ),
-    identities: await dataSource.query(
+    identities: await dataSource.query<{ external_id: string }[]>(
       `SELECT external_id FROM chatbot_contact_identities ORDER BY external_id`,
     ),
   });
