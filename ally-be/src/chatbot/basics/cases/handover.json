@@ -1,0 +1,18 @@
+[
+  {
+    "id": "handover-call-back",
+    "kind": "per-bot: hand_over on (chunk 3b)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "can someone from your team call me back about my bill?",
+        "expect": {
+          "crisis": false,
+          "handover": true,
+          "handledBy": ["handover"],
+          "must": ["asked the team"]
+        }
+      }
+    ]
+  }
+]

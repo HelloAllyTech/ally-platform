@@ -34,6 +34,7 @@ import {
 } from '../../whatsapp/enum/whatsapp.enum';
 import { WEB_CHANNEL } from '../bot-page/bot-page-public.service';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
+import type { ChatbotDecision } from '../engine/chatbot-engine.types';
 import { Chatbot } from '../entity/chatbot.entity';
 import { ChatbotAccessMode } from '../enum/chatbot.enum';
 import {
@@ -70,6 +71,8 @@ interface TurnReport {
   crisis: boolean;
   /** Which layer sent the crisis reply: a keyword rule (it carries a template) or the classifier. */
   crisisLayer: 'keyword' | 'classifier' | null;
+  /** Each gateway tool step in the run's trace, with its ms (chunk 3b). */
+  gatewaySteps?: { summary: string; ms: number }[];
 }
 
 async function main(): Promise<void> {
@@ -205,6 +208,7 @@ async function main(): Promise<void> {
           channel: WEB_CHANNEL,
           conversationId: conversation.id,
           providerMessageId: inbound.id,
+          contactId: contact.id,
         });
         if (!decision.held) {
           decision = await handover.afterDecision(
@@ -234,6 +238,7 @@ async function main(): Promise<void> {
           runtime: decision.agent?.runtime ?? null,
           latencyMs: Date.now() - startedAt,
           failures: failuresOf(decision, turn.expect),
+          gatewaySteps: gatewayStepsOf(decision),
           crisis,
           crisisLayer: crisis
             ? decision.templateId
@@ -392,6 +397,21 @@ async function crisisPromptVersion(
 }
 
 /** Delete this run's throwaway contacts and conversations, so the inbox and metrics never see them. */
+/** The run's gateway tool steps (chunk 3b): the trace's tool steps that aren't searches. */
+function gatewayStepsOf(
+  decision: ChatbotDecision,
+): { summary: string; ms: number }[] | undefined {
+  const trace =
+    decision.agent && 'trace' in decision.agent ? decision.agent.trace : [];
+  const steps = trace
+    .filter(
+      (step) =>
+        step.node === 'tool' && !step.summary.startsWith('search_knowledge'),
+    )
+    .map((step) => ({ summary: step.summary, ms: step.ms }));
+  return steps.length ? steps : undefined;
+}
+
 async function removeRuns(
   dataSource: DataSource,
   {
@@ -408,6 +428,10 @@ async function removeRuns(
       );
       await tx.query(
         `DELETE FROM chatbot_messages WHERE conversation_id = ANY($1)`,
+        [conversationIds],
+      );
+      await tx.query(
+        `DELETE FROM tool_runs WHERE conversation_id = ANY($1::text[])`,
         [conversationIds],
       );
       await tx.query(`DELETE FROM chatbot_conversations WHERE id = ANY($1)`, [
