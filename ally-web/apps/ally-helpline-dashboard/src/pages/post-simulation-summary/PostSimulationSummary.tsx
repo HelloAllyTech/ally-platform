@@ -19,6 +19,7 @@ import {
   Button,
   DebriefTab,
   NextChallengeCard,
+  SaveSessionButton,
   SessionRatingTrigger,
   ShareForReview,
   ToggleSwitch,
@@ -474,6 +475,12 @@ export const PostSimulationSummary: FC = () => {
                   >
                     <Comment className="w-6 h-6 shrink-0" />
                   </button>
+                </>
+              )}
+              {sessionId && (
+                <>
+                  <div className="border-l border-border h-5" />
+                  <SaveSessionButton sessionId={sessionId} />
                 </>
               )}
             </div>

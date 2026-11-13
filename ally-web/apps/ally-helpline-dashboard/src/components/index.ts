@@ -59,6 +59,7 @@ import ScenarioCard from "./scenario-card";
 import ScenarioDetailsCard from "./scenario-details-card";
 import SearchResources from "./search-resources";
 import SelectableText from "./selectable-text/SelectableText";
+import { SaveSessionButton } from "./save-session-button";
 import { SessionRatingTrigger } from "./session-rating-trigger";
 import { ShareForReview } from "./share-for-review";
 import ShinyText from "./shiny-text";
@@ -158,6 +159,7 @@ export {
   NextChallengeCard,
   DebriefTab,
   Checklist,
+  SaveSessionButton,
   ShareForReview,
   ToggleSwitch,
   EmojiPickerTrigger,

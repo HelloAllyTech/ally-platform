@@ -267,6 +267,7 @@ export const baseAPI = createApi({
     // not declared on the API, so an unregistered tag makes the invalidation
     // dead code rather than an error.
     TAG_TYPES.PRACTICE_STREAK,
+    TAG_TYPES.SESSION_BOOKMARKS,
     // Learner progress (XP/level). Registered here as well as used in providesTags —
     // RTK Query silently ignores tags that are not declared on the API.
     TAG_TYPES.PROGRESS,

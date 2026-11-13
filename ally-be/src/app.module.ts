@@ -42,6 +42,7 @@ import { PlaceModule } from './place/place.module';
 import { ScenarioPathModule } from './scenario-path/scenario-path.module';
 import { LanguageModule } from './language/language.module';
 import { ScenarioSessionReviewModule } from './scenario-session-review/scenario-session-review.module';
+import { SessionBookmarksModule } from './session-bookmarks/session-bookmarks.module';
 import { ScribeSessionReviewModule } from './scribe-session-review/scribe-session-review.module';
 import { BadgeModule } from './badge/badge.module';
 import { CommunityModule } from './community/community.module';
@@ -138,6 +139,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     CohortModule,
     LanguageModule,
     ScenarioSessionReviewModule,
+    SessionBookmarksModule,
     ScribeSessionReviewModule,
     BadgeModule,
     CommunityModule,

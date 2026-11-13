@@ -257,6 +257,10 @@ export const ApiEndpoints = {
     // (nav indicator, post-session) and don't need the timeline.
     GET_PRACTICE_STREAK_SUMMARY: "/v1/community/practice-streak/summary",
   },
+  SESSION_BOOKMARKS: {
+    BASE: "/v1/session-bookmarks",
+    BY_ID: (id: string) => `/v1/session-bookmarks/${id}`,
+  },
   REVIEWS: {
     GET_REVIEWS: "/v1/scenario-session-reviews",
     GET_SCRIBE_REVIEWS: "/v1/scribe-session-reviews",
