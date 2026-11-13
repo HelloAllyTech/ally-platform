@@ -313,25 +313,15 @@ describe("Debrief settings page: who can change what", () => {
     h.setMatrix.mockReturnValue(resolves());
     h.autonomy.mockReturnValue({ data: AUTONOMY });
   });
-  const renderPage = () =>
+  let where = "";
+  const Where = () => {
+    const l = useLocation();
+    where = `${l.pathname}${l.hash}`;
+    return null;
+  };
+  const renderPage = (hash = "") =>
     render(
-      <MemoryRouter>
-        <DebriefSettingsPage />
-      </MemoryRouter>,
-    );
-
-  it("the section menu stays on /debriefs/settings, scrolls to the section and marks it", () => {
-    h.permissions = [];
-    let where = "";
-    const Where = () => {
-      const l = useLocation();
-      where = `${l.pathname}${l.hash}`;
-      return null;
-    };
-    const scrollIntoView = vi.fn();
-    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
-    render(
-      <MemoryRouter initialEntries={["/debriefs/settings"]}>
+      <MemoryRouter initialEntries={[`/debriefs/settings${hash}`]}>
         <Routes>
           <Route
             path="/debriefs/settings"
@@ -345,15 +335,81 @@ describe("Debrief settings page: who can change what", () => {
         </Routes>
       </MemoryRouter>,
     );
-    const budget = screen.getByTestId("settings-nav-budget");
-    expect(budget).toHaveAttribute("href", "/debriefs/settings#budget");
-    fireEvent.click(budget);
-    expect(where).toBe("/debriefs/settings#budget");
-    expect(scrollIntoView).toHaveBeenCalled();
-    expect(budget).toHaveAttribute("aria-current", "location");
-    expect(screen.getByTestId("settings-nav-orgs")).not.toHaveAttribute("aria-current");
-    fireEvent.click(screen.getByTestId("settings-nav-guidance"));
-    expect(where).toBe("/debriefs/settings#guidance");
+  const tab = (id: string) => screen.getByTestId(`settings-tab-${id}`);
+  const shown = () =>
+    screen.getAllByTestId(/^settings-section-/).map(el => el.getAttribute("data-testid"));
+
+  it("shows one row of tabs with short labels, Organisations first", () => {
+    h.permissions = [];
+    renderPage();
+    const nav = screen.getByRole("navigation", { name: "Settings" });
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .map(l => l.textContent),
+    ).toEqual(["Organisations", "Budgets", "Tests", "Autonomy", "Steering", "Pinned rules"]);
+    expect(nav.className).toContain("sticky");
+    expect(tab("orgs")).toHaveAttribute("aria-current", "page");
+    expect(shown()).toEqual(["settings-section-orgs"]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Organisations");
+  });
+
+  it("clicking a tab shows only its section, with the short heading, and keeps it in the hash", () => {
+    h.permissions = [];
+    renderPage();
+    expect(tab("budget")).toHaveAttribute("href", "/debriefs/settings#budget");
+    fireEvent.click(tab("autonomy"));
+    expect(where).toBe("/debriefs/settings#autonomy");
+    expect(shown()).toEqual(["settings-section-autonomy"]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Autonomy");
+    expect(tab("autonomy")).toHaveAttribute("aria-current", "page");
+    expect(tab("orgs")).not.toHaveAttribute("aria-current");
+    expect(screen.queryByTestId("organisations-table")).toBeNull();
+    fireEvent.click(tab("weights"));
+    expect(shown()).toEqual(["settings-section-weights"]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Steering");
+    fireEvent.click(tab("tests"));
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Tests");
+  });
+
+  it.each([
+    ["#budget", "budget"],
+    ["#tests", "tests"],
+    ["#autonomy", "autonomy"],
+    ["#weights", "weights"],
+    ["#pinned", "pinned"],
+    ["#orgs", "orgs"],
+  ])("a %s link opens that tab", (hash, id) => {
+    h.permissions = [];
+    renderPage(hash);
+    expect(tab(id)).toHaveAttribute("aria-current", "page");
+    expect(shown()).toEqual([`settings-section-${id}`]);
+  });
+
+  it("an unknown hash, or Schedules without the toggle, opens Organisations", () => {
+    h.permissions = [];
+    renderPage("#nope");
+    expect(shown()).toEqual(["settings-section-orgs"]);
+  });
+
+  it("an old #guidance link shows the guidance card", () => {
+    h.permissions = [];
+    renderPage("#guidance");
+    expect(shown()).toEqual(["settings-section-guidance"]);
+    expect(screen.getByTestId("collection-link")).toHaveAttribute(
+      "data-collection",
+      "debrief_guidance",
+    );
+  });
+
+  it("the Autonomy intro's pinned-rules link opens the Pinned rules tab", () => {
+    h.permissions = [];
+    renderPage("#autonomy");
+    fireEvent.click(
+      within(screen.getByTestId("autonomy-intro")).getByRole("link", { name: "Pinned rules" }),
+    );
+    expect(where).toBe("/debriefs/settings#pinned");
+    expect(shown()).toEqual(["settings-section-pinned"]);
   });
 
   it("is read-only for someone who isn't the owner, and says who can change it", () => {
@@ -362,12 +418,25 @@ describe("Debrief settings page: who can change what", () => {
     expect(screen.getByTestId("settings-owner-note")).toHaveTextContent(
       "Only the owner can change these.",
     );
-    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Change" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Switch on" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Emergency stop" })).not.toBeInTheDocument();
+    expect(screen.getByText("Read only")).toBeInTheDocument();
+    const noEdits = () => {
+      expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Change" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Switch on" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Emergency stop" })).not.toBeInTheDocument();
+    };
+    noEdits();
+    fireEvent.click(tab("budget"));
+    expect(screen.getByTestId("budgets")).toBeInTheDocument();
+    noEdits();
+    fireEvent.click(tab("tests"));
     expect(screen.getByTestId("setting-value-gateCases")).toHaveTextContent("100");
+    noEdits();
+    fireEvent.click(tab("autonomy"));
+    expect(screen.getByLabelText(/^Settings \(not budgets\), Try on learners/)).toBeDisabled();
+    fireEvent.click(tab("weights"));
+    noEdits();
   });
 
   it("lets the Ally team stop a live organisation, after saying what learners will see", async () => {
@@ -401,6 +470,7 @@ describe("Debrief settings page: who can change what", () => {
     expect(within(rows[1]).getByRole("button", { name: "Switch on" })).not.toBeDisabled();
     expect(within(rows[2]).getByRole("button", { name: "Switch on" })).toBeDisabled();
     expect(rows[2]).toHaveTextContent("Add a support line to switch on");
+    fireEvent.click(tab("budget"));
     expect(
       within(screen.getByTestId("budget-learningBudgetUsd")).getByRole("button", {
         name: "Change",
@@ -411,6 +481,7 @@ describe("Debrief settings page: who can change what", () => {
       within(screen.getByTestId("budget-runCeilingUsd")).getByRole("button", { name: "Change" }),
     );
     expect(screen.getByRole("dialog")).toHaveTextContent("it is proposed as a change");
+    fireEvent.click(tab("tests"));
     expect(screen.getAllByRole("button", { name: "Save changes" }).length).toBeGreaterThan(0);
   });
 });
@@ -488,7 +559,7 @@ describe("What the PM agent may do alone", () => {
   });
   const renderPage = () =>
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/debriefs/settings#autonomy"]}>
         <DebriefSettingsPage />
       </MemoryRouter>,
     );

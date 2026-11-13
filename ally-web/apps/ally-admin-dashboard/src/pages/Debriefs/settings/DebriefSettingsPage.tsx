@@ -1,10 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
+import { ChevronDown } from "lucide-react";
 import { useSelector } from "react-redux";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { CarbonDropdown as Dropdown, NumberInput } from "@ally-ui-mono/ui-shared";
+import {
+  CarbonDropdown as Dropdown,
+  NumberInput,
+  OverflowMenu,
+  OverflowMenuItem,
+} from "@ally-ui-mono/ui-shared";
 import {
   useGetDebriefAutonomyQuery,
   useGetDebriefMeQuery,
@@ -19,6 +25,7 @@ import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { ContextCollectionLink } from "@components/context-collection-link";
 import { en, FeatureToggleKey, ROUTES } from "@constants";
+import { useContextLibraryAccess } from "@pages/ContextLibrary/contextLibraryScope";
 import { RootState } from "@store";
 import {
   DebriefAgreementView,
@@ -43,7 +50,11 @@ import { SettingsGroups } from "./SettingsGroups";
 /** The Debrief Guidance collection, which the Debrief agent reads beside each important moment. */
 export const DEBRIEF_GUIDANCE_COLLECTION = "debrief_guidance";
 
-const SECTIONS: SettingsSection[] = ["orgs", "budget", "tests", "autonomy", "weights", "pinned"];
+/**
+ * The tabs, in the design's order. Schedules (from More, with the toggle) and the guidance card
+ * (old `#guidance` links) are views too, but not tabs.
+ */
+const TABS: SettingsSection[] = ["orgs", "budget", "tests", "autonomy", "weights", "pinned"];
 
 const Section: React.FC<{
   id: SettingsSection;
@@ -51,11 +62,7 @@ const Section: React.FC<{
   help?: string;
   children: React.ReactNode;
 }> = ({ id, title, help, children }) => (
-  <section
-    id={id}
-    className="flex scroll-mt-4 flex-col gap-3"
-    data-testid={`settings-section-${id}`}
-  >
+  <section id={id} className="flex flex-col gap-3" data-testid={`settings-section-${id}`}>
     <div>
       <h2 className="text-xl font-semibold">{title}</h2>
       {help && <p className="mt-1 max-w-3xl text-sm text-neutral-600">{help}</p>}
@@ -570,9 +577,11 @@ const Autonomy: React.FC<{ canEdit: boolean; onPinned: () => void }> = ({ canEdi
 };
 
 /**
- * Debrief settings (redesign 2026-11-12): organisations, budgets, the PM agent's tests and
- * freedom, the steering score, the pinned rules, and a link to the guidance. Everyone with the
- * console reads them; only the owner changes them (the Ally team may also stop an organisation).
+ * Debrief settings (redesign 2026-11-12, tabs per design `Settings.dc.html`): organisations,
+ * budgets, the PM agent's tests and freedom, the steering score and the pinned rules, one tab each;
+ * More holds Schedules (engineering only) and the link to the guidance. The tab is the URL's hash,
+ * so `settingsPath("autonomy")` opens that tab. Everyone with the console reads them; only the
+ * owner changes them (the Ally team may also stop an organisation).
  */
 export const DebriefSettingsPage: React.FC = () => {
   const s = en.debriefs.settingsPage;
@@ -581,44 +590,25 @@ export const DebriefSettingsPage: React.FC = () => {
   // Schedules are for engineering: the per-person `debrief_schedules` toggle (ally-be 403s without it).
   const features = useSelector((state: RootState) => state.user?.features);
   const schedules = hasFeature(features, FeatureToggleKey.DEBRIEF_SCHEDULES);
-  const sections = schedules ? [...SECTIONS, "schedules" as const] : SECTIONS;
-  // In-page menu: the admin app has a <base href>, so a bare "#budget" resolved to the site root
-  // (and from there to a page the viewer may not reach). Stay on this path, scroll to the section,
-  // keep the hash for sharing, and mark the section being read.
+  // The guidance link goes where the guidance card goes: only to people the Context Library admits.
+  const canOpenGuidance = useContextLibraryAccess().mode === "platform";
   const location = useLocation();
   const navigate = useNavigate();
-  const [active, setActive] = useState<SettingsSection>(
-    () => (location.hash.slice(1) as SettingsSection) || "orgs",
-  );
-  const goTo = (id: SettingsSection) => {
-    setActive(id);
-    document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-    navigate({ pathname: location.pathname, search: location.search, hash: id }, { replace: true });
-  };
-  // Opened with a hash (settingsPath("budget")): go there once the sections exist.
-  useEffect(() => {
-    const id = location.hash.slice(1);
-    if (id) document.getElementById(id)?.scrollIntoView?.({ block: "start" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // Highlight follows the reader as they scroll.
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return undefined;
-    const observer = new IntersectionObserver(
-      entries => {
-        const top = entries
-          .filter(e => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (top) setActive(top.target.id as SettingsSection);
-      },
-      { rootMargin: "0px 0px -60% 0px" },
-    );
-    [...sections, "guidance"].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
-  }, [sections.length]);
+  // The admin app has a <base href>, so a bare "#budget" resolves to the site root: tabs stay on
+  // this path and only change the hash. An unknown (or not permitted) hash opens the first tab.
+  const views: SettingsSection[] = [
+    ...TABS,
+    ...(schedules ? (["schedules"] as const) : []),
+    "guidance",
+  ];
+  const hash = location.hash.slice(1) as SettingsSection;
+  const current: SettingsSection = views.includes(hash) ? hash : TABS[0];
+  const to = (id: SettingsSection) => ({
+    pathname: location.pathname,
+    search: location.search,
+    hash: id,
+  });
+  const inMore = !TABS.includes(current);
   return (
     <div className="flex flex-col gap-6 font-primary" data-testid="debrief-settings-page">
       <div className="flex flex-wrap items-center gap-3">
@@ -629,44 +619,66 @@ export const DebriefSettingsPage: React.FC = () => {
         </span>
         {!access.settings && <ConsoleTag>{s.readOnly}</ConsoleTag>}
       </div>
-      <div className="flex flex-wrap items-start gap-8">
-        <nav
-          aria-label={s.sectionsLabel}
-          className="flex max-w-[220px] flex-[1_1_200px] flex-col gap-0.5 text-sm"
-        >
-          {[...sections, "guidance" as const].map(id => (
-            <a
-              key={id}
-              href={`${location.pathname}#${id}`}
-              onClick={event => {
-                event.preventDefault();
-                goTo(id);
-              }}
-              aria-current={active === id ? "location" : undefined}
-              data-testid={`settings-nav-${id}`}
-              className={`px-3 py-2 no-underline hover:bg-neutral-50 ${
-                active === id
-                  ? "border-l-2 border-primary-600 bg-neutral-50 font-semibold text-neutral-900"
-                  : "border-l-2 border-transparent text-neutral-700"
-              }`}
-            >
-              {s.nav[id]}
-              {id === "guidance" && (
-                <>
-                  {" "}
-                  <span className="text-xs text-neutral-600">{s.contextLibrary}</span>
-                </>
-              )}
-            </a>
-          ))}
-        </nav>
-        <div className="flex min-w-0 max-w-[960px] flex-[999_1_640px] flex-col gap-8">
+      {/* The PM agent page's tabs, kept in view while a long section scrolls. */}
+      <nav
+        aria-label={s.tabsLabel}
+        className="sticky top-0 z-10 flex flex-wrap items-end gap-6 border-b border-neutral-100 bg-white text-sm"
+        data-testid="settings-tabs"
+      >
+        {TABS.map(id => (
+          <Link
+            key={id}
+            to={to(id)}
+            aria-current={id === current ? "page" : undefined}
+            data-testid={`settings-tab-${id}`}
+            className={`whitespace-nowrap py-2.5 no-underline ${id === current ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
+          >
+            {s.nav[id]}
+          </Link>
+        ))}
+        {(schedules || canOpenGuidance) && (
+          <OverflowMenu
+            size="sm"
+            align="bottom-start"
+            renderIcon={() => (
+              <span className="flex items-center gap-1 text-sm">
+                {s.more}
+                <ChevronDown size={12} aria-hidden="true" />
+              </span>
+            )}
+            iconDescription={s.more}
+            className={`!h-auto !w-auto !bg-transparent !px-0 py-2.5 ${inMore ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
+            data-testid="settings-more"
+          >
+            {schedules && (
+              <OverflowMenuItem
+                itemText={s.nav.schedules}
+                onClick={() => navigate(to("schedules"))}
+              />
+            )}
+            {canOpenGuidance && (
+              <OverflowMenuItem
+                itemText={s.guidanceLink}
+                onClick={() =>
+                  navigate(`${ROUTES.CONTEXT_LIBRARY}?collection=${DEBRIEF_GUIDANCE_COLLECTION}`)
+                }
+              />
+            )}
+          </OverflowMenu>
+        )}
+      </nav>
+      <div className="flex min-w-0 max-w-[960px] flex-col gap-8">
+        {current === "orgs" && (
           <Section id="orgs" title={s.nav.orgs} help={s.orgsHelp}>
             <OrganisationsSection access={access} />
           </Section>
+        )}
+        {current === "budget" && (
           <Section id="budget" title={s.nav.budget} help={s.budgetHelp}>
             <Budgets canEdit={access.settings} />
           </Section>
+        )}
+        {current === "tests" && (
           <Section id="tests" title={s.nav.tests} help={s.testsHelp}>
             <SettingsGroups
               groups={["quick", "gate", "trials", "canary", "sealed"]}
@@ -674,9 +686,13 @@ export const DebriefSettingsPage: React.FC = () => {
               withBaseline
             />
           </Section>
+        )}
+        {current === "autonomy" && (
           <Section id="autonomy" title={s.nav.autonomy}>
-            <Autonomy canEdit={access.settings} onPinned={() => goTo("pinned")} />
+            <Autonomy canEdit={access.settings} onPinned={() => navigate(to("pinned"))} />
           </Section>
+        )}
+        {current === "weights" && (
           <Section id="weights" title={s.nav.weights} help={s.weightsHelp}>
             <SettingsGroups
               groups={["metrics"]}
@@ -684,14 +700,19 @@ export const DebriefSettingsPage: React.FC = () => {
               testId="steering-settings"
             />
           </Section>
+        )}
+        {current === "pinned" && (
           <Section id="pinned" title={s.nav.pinned} help={s.pinnedHelp}>
             <PinnedRulesSection canAsk={access.approvePinnedRule} />
           </Section>
-          {schedules && (
-            <Section id="schedules" title={s.nav.schedules} help={s.schedulesHelp}>
-              <SchedulesSection />
-            </Section>
-          )}
+        )}
+        {current === "schedules" && (
+          <Section id="schedules" title={s.nav.schedules} help={s.schedulesHelp}>
+            <SchedulesSection />
+          </Section>
+        )}
+        {/* Old links (settingsPath("guidance"), the console's former Knowledge tab) land here. */}
+        {current === "guidance" && (
           <Section id="guidance" title={s.nav.guidance}>
             <div className="max-w-3xl">
               <ContextCollectionLink
@@ -700,7 +721,7 @@ export const DebriefSettingsPage: React.FC = () => {
               />
             </div>
           </Section>
-        </div>
+        )}
       </div>
     </div>
   );

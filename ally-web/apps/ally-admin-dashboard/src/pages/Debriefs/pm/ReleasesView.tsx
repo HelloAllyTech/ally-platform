@@ -373,7 +373,7 @@ const Detail: React.FC<{ id: string; canAct: boolean }> = ({ id, canAct }) => {
                   </li>
                 ))}
               </ul>
-              <Link to={settingsPath()} className="mt-2 inline-block text-[13px]">
+              <Link to={settingsPath("tests")} className="mt-2 inline-block text-[13px]">
                 {p.changeInSettings}
               </Link>
             </div>

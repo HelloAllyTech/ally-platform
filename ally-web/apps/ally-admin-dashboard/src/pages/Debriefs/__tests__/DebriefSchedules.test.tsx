@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
   runs: vi.fn(),
   update: vi.fn(),
   features: [] as string[],
+  permissions: ["system:access"] as string[],
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
 }));
@@ -48,14 +49,14 @@ vi.mock("@api", async importOriginal => ({
 vi.mock("react-redux", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useSelector: (pick: (state: unknown) => unknown) =>
-    pick({ user: { permissions: ["system:access"], features: h.features } }),
+    pick({ user: { permissions: h.permissions, features: h.features } }),
 }));
 vi.mock("@components/context-collection-link", () => ({
   ContextCollectionLink: () => <div />,
 }));
 
 // eslint-disable-next-line import/first
-import { en } from "@constants";
+import { en, FeatureToggleKey, Permissions } from "@constants";
 // eslint-disable-next-line import/first
 import { MemoryRouter } from "react-router-dom";
 
@@ -165,33 +166,66 @@ const resolves = (v: unknown = {}) => ({ unwrap: () => Promise.resolve(v) });
 beforeEach(() => {
   vi.clearAllMocks();
   h.features = [];
+  h.permissions = ["system:access"];
   h.schedules.mockReturnValue({ data: VIEW });
   h.runs.mockReturnValue({ data: RUNS });
   h.update.mockImplementation(() => resolves());
 });
 
-const page = () =>
+const page = (hash = "") =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[`/debriefs/settings${hash}`]}>
       <DebriefSettingsPage />
     </MemoryRouter>,
   );
 
 describe("Settings › Schedules: engineering only", () => {
-  it("has no menu item or section without the debrief_schedules toggle", () => {
+  it("has no More item or section without the debrief_schedules toggle", () => {
     page();
     expect(screen.queryByRole("link", { name: s.columns.job })).toBeNull();
+    expect(screen.queryByRole("button", { name: en.debriefs.settingsPage.more })).toBeNull();
     expect(screen.queryByText(en.debriefs.settingsPage.nav.schedules)).toBeNull();
     expect(screen.queryByTestId("schedules-table")).toBeNull();
   });
 
-  it("shows the menu item and the table with it", () => {
+  it("a #schedules link without the toggle opens Organisations instead", () => {
+    page("#schedules");
+    expect(screen.queryByTestId("schedules-table")).toBeNull();
+    expect(screen.getByTestId("settings-section-orgs")).toBeInTheDocument();
+  });
+
+  it("with it, More offers Schedules, which opens as its own view", () => {
     h.features = ["debrief_schedules"];
     page();
+    expect(screen.queryByTestId("schedules-table")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: en.debriefs.settingsPage.more }));
+    const menu = screen.getByRole("menu");
     expect(
-      screen.getByRole("link", { name: en.debriefs.settingsPage.nav.schedules }),
-    ).toHaveAttribute("href", expect.stringMatching(/^\/[^#]*#schedules$/));
+      within(menu)
+        .getAllByRole("menuitem")
+        .map(i => i.textContent),
+    ).toEqual([en.debriefs.settingsPage.nav.schedules]);
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: en.debriefs.settingsPage.nav.schedules }),
+    );
     expect(screen.getByTestId("schedules-table")).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^settings-section-/)).toHaveLength(1);
+    expect(screen.queryByTestId("settings-section-orgs")).toBeNull();
+  });
+
+  it("a #schedules link opens it with the toggle", () => {
+    h.features = ["debrief_schedules"];
+    page("#schedules");
+    expect(screen.getByTestId("schedules-table")).toBeInTheDocument();
+  });
+
+  it("More also links to the guidance in the Context Library for people it admits", () => {
+    h.features = [FeatureToggleKey.CONTEXT_LIBRARY];
+    h.permissions = [Permissions.VIEW_CONTEXT_LIBRARY];
+    page();
+    fireEvent.click(screen.getByRole("button", { name: en.debriefs.settingsPage.more }));
+    const items = within(screen.getByRole("menu")).getAllByRole("menuitem");
+    expect(items.map(i => i.textContent)).toEqual([en.debriefs.settingsPage.guidanceLink]);
   });
 });
 

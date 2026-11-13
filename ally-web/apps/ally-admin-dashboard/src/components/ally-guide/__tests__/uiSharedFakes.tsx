@@ -246,4 +246,36 @@ export const uiSharedFakes = {
     </nav>
   ),
   InlineLoading: ({ description }: any) => <span>{description}</span>,
+  /** Opens on its trigger and closes once an item is chosen; no floating or focus handling. */
+  OverflowMenu: function OverflowMenu({
+    children,
+    iconDescription,
+    renderIcon: Icon,
+    ...rest
+  }: any) {
+    const [open, setOpen] = React.useState(false);
+    return (
+      <div data-testid={rest["data-testid"]}>
+        <button
+          type="button"
+          aria-label={iconDescription}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => setOpen(o => !o)}
+        >
+          {Icon ? <Icon /> : null}
+        </button>
+        {open && (
+          <div role="menu" onClick={() => setOpen(false)}>
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  },
+  OverflowMenuItem: ({ itemText, onClick, disabled }: any) => (
+    <button type="button" role="menuitem" onClick={onClick} disabled={disabled}>
+      {itemText}
+    </button>
+  ),
 };
