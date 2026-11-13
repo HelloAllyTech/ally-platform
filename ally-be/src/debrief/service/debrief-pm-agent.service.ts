@@ -78,6 +78,7 @@ import {
   DebriefTestSet,
   DebriefTestSetsService,
 } from './debrief-test-sets.service';
+import { istMonth } from '../util/debrief-pm-reports.util';
 
 /** Sessions screened at once; each runs both arms side by side. */
 const SCREEN_CONCURRENCY = 3;
@@ -180,23 +181,27 @@ export class DebriefPmAgentService
       `SELECT COALESCE(sum(COALESCE("ceilingUsd", 0)::float), 0) AS ceilings
          FROM debrief_runs
         WHERE mode IN ('shadow','live') AND status <> 'skipped'
-          AND "createdAt" >= date_trunc('month', now())`,
+          AND "createdAt" >= $1::timestamptz`,
+      [istMonth().from.toISOString()],
     );
     return learningBudgetUsd + Number(r?.ceilings ?? 0) * learningSkimPct;
   }
 
   async learningSpentThisMonth(): Promise<number> {
+    const since = [istMonth().from.toISOString()];
     const replay = await this.dataSource.query(
       `SELECT COALESCE(sum(COALESCE("actualCostUsd","estimatedCostUsd")),0)::float AS usd
          FROM debrief_runs
-        WHERE mode = 'replay' AND "createdAt" >= date_trunc('month', now())`,
+        WHERE mode = 'replay' AND "createdAt" >= $1::timestamptz`,
+      since,
     );
     const usage: Array<{ model: string; p: number; c: number }> =
       await this.dataSource.query(
         `SELECT model, sum("promptTokens")::bigint AS p, sum("completionTokens")::bigint AS c
            FROM llm_usage
-          WHERE task = 'debrief_improver' AND "occurredAt" >= date_trunc('month', now())
+          WHERE task = 'debrief_improver' AND "occurredAt" >= $1::timestamptz
           GROUP BY model`,
+        since,
       );
     const pmAgent = usage.reduce(
       (n, u) => n + computeCostUsd(u.model, Number(u.p), Number(u.c)).costUsd,
@@ -206,7 +211,8 @@ export class DebriefPmAgentService
     const judged = await this.dataSource.query(
       `SELECT count(*)::int AS n FROM debrief_runs
         WHERE mode = 'replay' AND workspace ? 'judge'
-          AND "createdAt" >= date_trunc('month', now())`,
+          AND "createdAt" >= $1::timestamptz`,
+      since,
     );
     return Number(replay[0].usd) + pmAgent + Number(judged[0].n) * 0.04;
   }

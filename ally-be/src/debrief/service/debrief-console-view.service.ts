@@ -52,6 +52,11 @@ import { DebriefReviewService } from './debrief-review.service';
 import { DebriefSettingsService } from './debrief-settings.service';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
 import { DebriefAgreementService } from './debrief-agreement.service';
+import {
+  istMonth,
+  istMonthDays,
+  istMonthElapsed,
+} from '../util/debrief-pm-reports.util';
 
 const num = (v: unknown, d = 2) =>
   v == null || !Number.isFinite(Number(v))
@@ -1237,20 +1242,14 @@ export class DebriefConsoleViewService implements OnModuleInit {
               COALESCE(sum(COALESCE("actualCostUsd","estimatedCostUsd"))
                 FILTER (WHERE "createdAt" >= now() - interval '7 days'), 0)::float AS last7
          FROM debrief_runs
-        WHERE mode IN ('shadow','live') AND "createdAt" >= date_trunc('month', now())`,
+        WHERE mode IN ('shadow','live') AND "createdAt" >= $1::timestamptz`,
+      [istMonth().from.toISOString()],
     );
     const { bundle } = await this.pmAgent.gaBundle();
     const perSession = bundle.settings.poolPerSessionUsd;
     const d = new Date();
-    const daysInMonth = new Date(
-      d.getUTCFullYear(),
-      d.getUTCMonth() + 1,
-      0,
-    ).getDate();
-    const elapsedDays = Math.max(
-      d.getUTCDate() - 1 + d.getUTCHours() / 24,
-      1 / 24,
-    );
+    const daysInMonth = istMonthDays(d);
+    const elapsedDays = Math.max(istMonthElapsed(d) * daysInMonth, 1 / 24);
     const spent = Number(pool?.spent ?? 0);
     const perDay = spent / elapsedDays;
     const params: unknown[] = [];

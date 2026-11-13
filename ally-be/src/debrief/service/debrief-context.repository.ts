@@ -10,6 +10,7 @@ import {
   DebriefProvider,
 } from '../constants/debrief-release.constants';
 import { allowlistFromValues } from '../util/debrief-provider-allowlist.util';
+import { istMonth } from '../util/debrief-pm-reports.util';
 
 export interface DebriefSessionContext {
   id: string;
@@ -542,7 +543,8 @@ export class DebriefContextRepository {
               COALESCE(sum(COALESCE("actualCostUsd", "estimatedCostUsd")), 0)::float AS spent
          FROM debrief_runs
         WHERE mode IN ('shadow','live')
-          AND "createdAt" >= date_trunc('month', now())`,
+          AND "createdAt" >= $1::timestamptz`,
+      [istMonth().from.toISOString()],
     );
     return {
       sessions: Number(rows?.[0]?.sessions ?? 0),

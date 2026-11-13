@@ -49,6 +49,7 @@ import {
   DEBRIEF_GATEWAY_TOOLS,
   DebriefRunTokenService,
 } from './debrief-run-token.service';
+import { istMonthElapsed } from '../util/debrief-pm-reports.util';
 
 /** What a running debrief is doing now, for the learner's "working" panel. */
 export interface DebriefProgress {
@@ -434,13 +435,7 @@ export class DebriefRunnerService {
     let ceiling = settings.runCeilingUsd;
     if (opts.mode !== DebriefRunMode.REPLAY) {
       const mtd = await this.context.monthToDate();
-      const d = new Date(now());
-      const daysInMonth = new Date(
-        d.getUTCFullYear(),
-        d.getUTCMonth() + 1,
-        0,
-      ).getDate();
-      const elapsed = (d.getUTCDate() - 1 + d.getUTCHours() / 24) / daysInMonth;
+      const elapsed = istMonthElapsed(new Date(now()));
       ceiling = effectiveRunCeiling(settings, {
         sessionsThisMonth: mtd.sessions,
         spentThisMonthUsd: mtd.spentUsd,

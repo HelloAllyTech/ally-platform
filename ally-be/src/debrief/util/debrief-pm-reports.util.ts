@@ -73,6 +73,27 @@ export function monthOf(at: Date): string {
   return `${i.getUTCFullYear()}-${pad(i.getUTCMonth() + 1)}`;
 }
 
+/**
+ * The India-time month `at` falls in, as instants [from, to). Every learning
+ * budget, monthly cap and pool counts this month, as Reports do, so a cost at
+ * 2026-11-30T20:00Z (1 December, IST) counts in December everywhere.
+ */
+export function istMonth(at: Date = new Date()): { from: Date; to: Date } {
+  return periodBounds('monthly', monthOf(at));
+}
+
+/** How far through its India-time month `at` is, 0..1. */
+export function istMonthElapsed(at: Date = new Date()): number {
+  const { from, to } = istMonth(at);
+  return (at.getTime() - from.getTime()) / (to.getTime() - from.getTime());
+}
+
+/** The number of days in the India-time month `at` falls in. */
+export function istMonthDays(at: Date = new Date()): number {
+  const { from, to } = istMonth(at);
+  return Math.round((to.getTime() - from.getTime()) / DAY_MS);
+}
+
 /** The Monday (IST) of the week an instant falls in, `YYYY-MM-DD`. */
 export function weekOf(at: Date): string {
   const i = toIst(at);

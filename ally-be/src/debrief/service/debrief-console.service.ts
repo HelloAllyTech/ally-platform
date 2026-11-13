@@ -22,6 +22,7 @@ import { DebriefAgentService, DebriefRegion } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
 import { DebriefPmAgentService } from './debrief-pm-agent.service';
+import { istMonth } from '../util/debrief-pm-reports.util';
 
 const num = (v: unknown, d = 2) =>
   v == null ? null : Math.round(Number(v) * 10 ** d) / 10 ** d;
@@ -282,9 +283,10 @@ export class DebriefConsoleService {
                   count(*) FILTER (WHERE status <> 'skipped')::int AS runs
              FROM debrief_runs
             WHERE mode IN ('shadow','live')
-              AND "createdAt" >= date_trunc('month', now())
+              AND "createdAt" >= $1::timestamptz
               AND tenant_id IS NOT NULL
             GROUP BY tenant_id`,
+          [istMonth().from.toISOString()],
         )
         .then(
           (rows: Array<{ id: string; spent: number; runs: number }>) =>
