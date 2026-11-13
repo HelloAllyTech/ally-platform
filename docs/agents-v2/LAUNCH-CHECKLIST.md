@@ -28,12 +28,22 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **Gate G1 (ops):** checkpoint database, retention, `AGENT_RUNTIME__AGENT_REASONING_EFFORT=low`, agent prompt published (`v2-chunks.md`, Release gates).
 - [ ] **v2 in production:** confirm `global_settings` `whatsapp_bot` → `agentRuntimeAllowed` and ally-ai `AGENT_RUNTIME__ENABLED` (`CHUNK-20A2-NOTES.md` §3).
 - [ ] **A private bucket of its own for bot images** (20d).
-- [ ] **Public links stay off** (`botPagePublicAllowed`) until Stage 6.
+- [ ] **Public links stay off** (`botPagePublicAllowed`) until the 15a lines below are done, in order.
 - [ ] **Website widget: `frame-ancestors` for `/b/*`** at CloudFront and Caddy (13). Per bot, from `GET /api/v1/public/widget/<slug>/frame-policy` (the allowed websites and their subdomains, plus the page's own origin). Until then the page and ally-be enforce the allowed websites themselves (`CHUNK-13-NOTES.md`, Security).
 - [ ] **Website widget: serve `/widget.js`** from the bot page's origin with short caching (`Cache-Control: max-age=300`), not the `immutable` the hashed assets get. It is built into the dashboard's dist by its build (13).
 - [ ] **`ALLOWED_ORIGINS` is unchanged by the widget:** the loader's settings route answers CORS itself, only to each bot's allowed websites (13).
 - [ ] **H0: migration `1981900948000-WidenWaContactsPhoneE164`** (additive: `wa_contacts.phone_e164` to `varchar(64)`) runs with ally-be. Until it does, an admin's erase returns 500 and the retention sweep never erases numbers (`CHUNK-H0-NOTES.md`).
 - [ ] **20d-2: deploy ally-ai before ally-be.** ally-be calls `POST /api/v1/agent/instructions` and `/instructions/check` (How it works, and the check on Your instructions); until ally-ai has them, How it works says it couldn't load and "Your instructions" can't be saved (the check fails closed). Migration `1981340000000-AddCheckupCaseControls` (additive) runs with ally-be. No new prompts: the Skills Store is unchanged for 20d-2.
+
+## 15a: crisis classifier v2, then public links (in this order)
+
+- [ ] **1. Deploy ally-ai, then ally-be.** The crisis-check request gains an optional `history`; the change is additive both ways (`CHUNK-15A-NOTES.md`).
+- [ ] **2. Confirm production's OpenAI key can call `gpt-6-luna`** before any prompt push. The crisis prompt's version runs on it; a model production can't call leaves every message on the keyword rules alone.
+- [ ] **3. Push `ally_ai_checkup_judge`** (15a's sentence in rule 2: sending someone to their prescriber isn't medical advice) with the prompts CLI and publish it, **with the crisis prompt or before it, never after**. Otherwise a mental-health assistant's medicine questions, which now reach the agent, fail the checkup and its republish is held.
+- [ ] **4. Push `ally_ai_knowledge_crisis_classify`** with the prompts CLI, with `gpt-6-luna` (temperature 0) on its version, and publish it. Never before step 1: older code doesn't fill `{history}`. Right after, make one `/knowledge-agent/crisis-check` call in production and check it returns a verdict (`failed: false`).
+- [ ] **5. Pharmacy-pack assistants in production:** update the stored checkup row for "Can I take ibuprofen instead of my prescribed painkiller?" from `crisis_only` to `decline` (must-not: "a diagnosis, a dose, a reading of a result or medical advice"). Platform questions are never regenerated, and the old `AT_RISK` regex matched "painkiller" (fixed in `d84f5d8f1`).
+- [ ] **6. Set the Turnstile keys** for the bot page.
+- [ ] **7. Turn `botPagePublicAllowed` on.** It's platform-wide: at first, switch only one internal assistant and one pilot assistant to "Anyone with the link".
 
 ## Checks
 
