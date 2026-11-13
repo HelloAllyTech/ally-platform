@@ -30,6 +30,7 @@ import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import { ConversationService } from '../service/conversation.service';
 import { effectiveRuntime } from './agent-runtime';
 import {
+  AgentActedError,
   AgentFallbackFailedError,
   AgentRuntimeRunner,
   type Answered,
@@ -87,7 +88,8 @@ const runBehind = (
 ): AgentRunRef | undefined =>
   answerResult.status === 'fulfilled'
     ? answerResult.value.agent
-    : answerResult.reason instanceof AgentFallbackFailedError
+    : answerResult.reason instanceof AgentFallbackFailedError ||
+        answerResult.reason instanceof AgentActedError
       ? answerResult.reason.agent
       : undefined;
 
@@ -360,9 +362,11 @@ export class ChatbotEngineService {
     const { prompts } = await this.loadPromptOverrides(turn, true);
     const knowledge = await this.knowledgeFor(turn);
     const request = buildKnowledgeRequest(turn, prompts, knowledge);
+    // Never a gateway: "How it works" builds instructions, it doesn't run tools.
     return this.agentRuntime.requestFor(turn, request, knowledge, {
       conversationId: turn.conversationId ?? 'how-it-works',
       runId: 'how-it-works',
+      withGateway: false,
     });
   }
 
@@ -409,6 +413,37 @@ export class ChatbotEngineService {
     }
 
     const degradedAlert = this.degradedAlertFor(turn, crisisResult);
+
+    // The agent passed the chat to a person (chunk 3b): its `hand_over` tool already marked the
+    // chat, and the visitor gets 11a's hand-over message, as when they ask for a person. The same
+    // when the run failed after `hand_over` acted; after any other tool acted, the bot's fallback
+    // wording. v1 never answers a message whose run has already done something.
+    const acted =
+      answerResult.status === 'rejected' &&
+      answerResult.reason instanceof AgentActedError
+        ? answerResult.reason.tool
+        : null;
+    if (
+      acted === 'hand_over' ||
+      (answerResult.status === 'fulfilled' &&
+        answerResult.value.response.handover)
+    ) {
+      return {
+        handledBy: WaHandledBy.HANDOVER,
+        body: handoverMessage(handoverOf(settings), new Date()),
+        handover: 'assistant',
+        alert: degradedAlert,
+        ...(agent ? { agent } : {}),
+      };
+    }
+    if (acted) {
+      return {
+        handledBy: WaHandledBy.ERROR,
+        body: settings.fallbackText,
+        alert: degradedAlert,
+        ...(agent ? { agent } : {}),
+      };
+    }
 
     if (answerResult.status === 'rejected') {
       // A model or index outage is NOT "the knowledge does not cover this": fallback wording and an

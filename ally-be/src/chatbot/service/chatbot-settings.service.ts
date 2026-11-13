@@ -15,6 +15,7 @@ import type {
   ChatbotSettingsView,
 } from '../type/chatbot.type';
 import { packFor } from '../../bot-draft/safety-pack/safety-packs';
+import { ABILITY_VALUES } from '../agent-tools/tools';
 import {
   SafetyLockedError,
   assertSettingsKeepPack,
@@ -102,6 +103,21 @@ export class ChatbotSettingsService {
       }
       throw error;
     }
+    // What the agent may do (chunk 3b): only the values the gateway knows.
+    const abilities = overrides?.abilities;
+    if (
+      abilities !== undefined &&
+      (typeof abilities !== 'object' ||
+        abilities === null ||
+        Array.isArray(abilities) ||
+        Object.values(abilities).some(
+          (value) => !(ABILITY_VALUES as readonly unknown[]).includes(value),
+        ))
+    ) {
+      throw new BadRequestException(
+        `abilities maps each tool to one of: ${ABILITY_VALUES.join(', ')}`,
+      );
+    }
     const userId = Number(ExecutionManager.getUserId() ?? 0);
     const settings = cleanOverride(overrides);
     await this.chatbotRepository.update(
@@ -137,7 +153,9 @@ export class ChatbotSettingsService {
       global = { ...global, crisisClassifierEnabled: true };
     }
     if (!override || !Object.keys(override).length) return global;
-    const { rateLimit, retrieval, ...plain } = override;
+    // `abilities` stays on the bot's stored override, where the gateway reads it (chunk 3b).
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { rateLimit, retrieval, abilities, ...plain } = override;
     const tighter = (base: number, value: number | undefined) =>
       typeof value === 'number' && value > 0 ? Math.min(base, value) : base;
     return {
@@ -187,6 +205,13 @@ export class ChatbotSettingsService {
   async update(
     patch: Partial<WhatsAppBotSettings>,
   ): Promise<WhatsAppBotSettings> {
+    // Per bot only (chunk 3b): a platform-wide value would turn a tool on for every bot, for
+    // anyone who can edit the WhatsApp settings. Nothing reads it from here anyway.
+    if (patch && Object.prototype.hasOwnProperty.call(patch, 'abilities')) {
+      throw new BadRequestException(
+        "abilities is set per assistant, in that assistant's settings",
+      );
+    }
     const userId = Number(ExecutionManager.getUserId() ?? 0);
     const existing = await this.globalSettingsRepository.findOne({
       where: { name: WHATSAPP_SETTINGS_NAME },
@@ -237,15 +262,30 @@ export class ChatbotSettingsService {
 }
 
 /**
- * Whether a settings write changes a key only a platform admin may set ("Show typing", which also
- * turns on read receipts). Leaving it as stored, or leaving it out when it was never set, is not a
- * change, so a bot editor's save round-trips it.
+ * Whether a settings write changes a key only a platform admin may set: "Show typing" (which also
+ * turns on read receipts), and what the agent may do (`abilities`, chunk 3b). Leaving it as stored,
+ * or leaving it out when it was never set, is not a change, so a bot editor's save round-trips it.
  */
 export function changesAdminOnlySetting(
   stored: ChatbotSettingsOverride | null | undefined,
   next: ChatbotSettingsOverride | null | undefined,
 ): boolean {
-  return (stored?.showTyping ?? null) !== (next?.showTyping ?? null);
+  return (
+    (stored?.showTyping ?? null) !== (next?.showTyping ?? null) ||
+    stableJson(stored?.abilities) !== stableJson(next?.abilities)
+  );
+}
+
+/** JSON with keys sorted, so `{a, b}` and `{b, a}` compare equal; null for unset or empty. */
+function stableJson(
+  value: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!value || !Object.keys(value).length) return null;
+  return JSON.stringify(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, value[key]]),
+  );
 }
 
 /**

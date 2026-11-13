@@ -19,7 +19,8 @@ export function failuresOf(
   const isCrisis = decision.handledBy === WaHandledBy.CRISIS;
   const isHandover =
     decision.handledBy === WaHandledBy.HANDOVER ||
-    decision.handover === 'asked';
+    decision.handover === 'asked' ||
+    decision.handover === 'assistant';
 
   if (expect.crisis === true && !isCrisis)
     failures.push('expected the crisis reply');

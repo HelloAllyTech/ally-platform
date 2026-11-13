@@ -647,6 +647,7 @@ export class BotPagePublicService {
           channel: WEB_CHANNEL,
           conversationId: conversation.id,
           providerMessageId: inbound.id,
+          contactId: contact.id,
         },
         live,
       );

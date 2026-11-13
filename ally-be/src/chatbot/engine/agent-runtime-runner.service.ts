@@ -13,7 +13,10 @@ import type {
 } from '../../ai/dto/knowledge.dto';
 import { AiService } from '../../ai/service/ai.service';
 import { LoggerService } from '../../logger/logger.service';
+import { AgentRunTokenService } from '../agent-tools/agent-run-token.service';
+import { AgentToolRegistry } from '../agent-tools/tools';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
+import { ToolRun, ToolRunStatus } from '../entity/tool-run.entity';
 import { AgentRuntimeUsed } from '../enum/chatbot.enum';
 import {
   agentFailureReason,
@@ -37,7 +40,7 @@ const ANSWER_BUDGET_MS = KNOWLEDGE_ANSWER_LIMITS.budgetMs;
 
 /** A reply from either engine: v1's response, or v2's without the run fields. */
 export type EngineAnswer = KnowledgeAnswerResponse &
-  Pick<AgentRunResponse, 'turn_type'>;
+  Pick<AgentRunResponse, 'turn_type' | 'handover'>;
 
 /** An answer from either engine, with the run behind it when v2 was involved. */
 export interface Answered {
@@ -54,6 +57,21 @@ export class AgentFallbackFailedError extends Error {
   ) {
     super(cause instanceof Error ? cause.message : 'v1 fallback failed');
     this.name = 'AgentFallbackFailedError';
+  }
+}
+
+/**
+ * The v2 run failed after a gateway tool had already acted (chunk 3b), so v1 must not answer: the
+ * message has been dealt with. `tool` is what acted: `hand_over` gets the hand-over message, and
+ * anything else the bot's fallback wording.
+ */
+export class AgentActedError extends Error {
+  constructor(
+    readonly tool: string,
+    readonly agent: AgentRunRef,
+  ) {
+    super(`The agent run failed after ${tool} acted`);
+    this.name = 'AgentActedError';
   }
 }
 
@@ -79,6 +97,10 @@ export class AgentRuntimeRunner {
     @InjectRepository(ChatbotDocument)
     private readonly documentRepository: Repository<ChatbotDocument>,
     private readonly aiService: AiService,
+    @InjectRepository(ToolRun)
+    private readonly toolRuns: Repository<ToolRun>,
+    private readonly tools: AgentToolRegistry,
+    private readonly runTokens: AgentRunTokenService,
   ) {}
 
   /**
@@ -102,11 +124,13 @@ export class AgentRuntimeRunner {
     const runId = agentRunIdFor(turn.providerMessageId);
     const conversationId = turn.conversationId ?? `preview-${randomUUID()}`;
     const startedAt = Date.now();
+    let withGateway = false;
     try {
       const body = await this.requestFor(turn, request, knowledge, {
         conversationId,
         runId,
       });
+      withGateway = Boolean(body.gateway);
       const response =
         live && turn.channel.capabilities?.streaming
           ? await this.aiService.runAgentStreaming(
@@ -131,6 +155,20 @@ export class AgentRuntimeRunner {
       // The person left Preview: nobody is waiting for a v1 answer.
       if (live?.signal?.aborted) throw error;
       const fallbackReason = agentFailureReason(error);
+      // v1 never answers a message whose run has already done something (chunk 3b).
+      const acted = withGateway ? await this.actedIn(runId) : null;
+      if (acted) {
+        this.logger.warn(
+          `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}) after ` +
+            `${acted} acted; not answering with v1`,
+        );
+        throw new AgentActedError(acted, {
+          runtime: AgentRuntimeUsed.V2_FALLBACK,
+          runId,
+          conversationId,
+          fallbackReason,
+        });
+      }
       this.logger.warn(
         `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}); ` +
           `answering with v1`,
@@ -166,15 +204,58 @@ export class AgentRuntimeRunner {
     turn: ChatTurn,
     request: KnowledgeAnswerRequest,
     knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
-    run: { conversationId: string; runId: string },
+    run: { conversationId: string; runId: string; withGateway?: boolean },
   ): Promise<AgentRunRequest> {
-    return buildAgentRunRequest(request, {
+    const body = buildAgentRunRequest(request, {
       conversationId: run.conversationId,
       runId: run.runId,
       chatbotId: turn.chatbot.id,
       knowledgeTopics: await this.knowledgeTopics(knowledge),
       declineText: turn.settings.declineText,
     });
+    if (run.withGateway === false) return body;
+    // The tools this bot has on, from its OWN stored settings (chunk 3b). None: exactly today's
+    // request, with no token signed.
+    const tools = this.tools.servedFor(turn.chatbot.settings);
+    if (!tools.length) return body;
+    return {
+      ...body,
+      gateway: {
+        url: this.runTokens.gatewayUrl(),
+        token: this.runTokens.sign({
+          chatbotId: turn.chatbot.id,
+          conversationId: run.conversationId,
+          runId: run.runId,
+          contactId: turn.contactId ?? null,
+          tools,
+        }),
+        tools,
+      },
+    };
+  }
+
+  /**
+   * The gateway tool that acted in this run, if any: `hand_over` first, since it decides the
+   * reply. A lookup failure is read as nothing acted, as before 3b.
+   */
+  private async actedIn(runId: string): Promise<string | null> {
+    try {
+      const rows = await this.toolRuns.find({
+        where: { runId, status: ToolRunStatus.OK },
+        select: ['tool'],
+      });
+      if (!rows.length) return null;
+      return rows.some((row) => row.tool === 'hand_over')
+        ? 'hand_over'
+        : rows[0].tool;
+    } catch (error) {
+      this.logger.warn(
+        `Could not read the run's tool calls: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return null;
+    }
   }
 
   /**

@@ -9,6 +9,10 @@ import {
   ChatbotKnowledgeSource,
   ChatbotStatus,
 } from '../../enum/chatbot.enum';
+import { AgentRunTokenService } from '../../agent-tools/agent-run-token.service';
+import { AgentToolRegistry } from '../../agent-tools/tools';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { ToolRun } from '../../entity/tool-run.entity';
 import { AgentRuntimeRunner } from '../agent-runtime-runner.service';
 import { ChatbotEngineService } from '../chatbot-engine.service';
 
@@ -91,6 +95,19 @@ export const engineAiService = (
     .mockResolvedValue({ is_crisis: false, confidence: 0, signal: '' }),
 });
 
+/**
+ * What `AgentRuntimeRunner` needs for the tool gateway (chunk 3b), for a Nest testing module: no
+ * tools served, so no run carries a gateway and `tool_runs` is never read.
+ */
+export const AGENT_GATEWAY_TEST_PROVIDERS = [
+  {
+    provide: getRepositoryToken(ToolRun),
+    useValue: { find: jest.fn().mockResolvedValue([]) },
+  },
+  { provide: AgentToolRegistry, useValue: new AgentToolRegistry([]) },
+  { provide: AgentRunTokenService, useValue: {} },
+];
+
 /** The engine with its v2 runner, everyone it reads mocked. Anyone may chat with the bot. */
 export const makeEngine = ({
   aiService,
@@ -98,6 +115,8 @@ export const makeEngine = ({
   replyService = { match: jest.fn().mockResolvedValue(null) },
   documents = { find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]) },
   conversations,
+  toolRuns = { find: jest.fn().mockResolvedValue([]) },
+  tools = [],
 }: {
   aiService: EngineAiService;
   promptShared: { getPromptsByOptions: jest.Mock };
@@ -106,6 +125,10 @@ export const makeEngine = ({
   documents?: unknown;
   /** The shared store, for who holds a chat (chunk 11a); without it no chat is held. */
   conversations?: { holderOf: jest.Mock };
+  /** The ToolRun repository (chunk 3b): which gateway tools acted in a run. */
+  toolRuns?: { find: jest.Mock };
+  /** The gateway tools ally-be serves (chunk 3b); none by default. */
+  tools?: { name: string }[];
 }): ChatbotEngineService =>
   new ChatbotEngineService(
     documents as never,
@@ -114,6 +137,16 @@ export const makeEngine = ({
     { canChat: jest.fn().mockResolvedValue(true) } as never,
     aiService as never,
     promptShared as never,
-    new AgentRuntimeRunner(documents as never, aiService as never),
+    new AgentRuntimeRunner(
+      documents as never,
+      aiService as never,
+      toolRuns as never,
+      new AgentToolRegistry(tools as never),
+      new AgentRunTokenService({
+        agentGatewaySecret: 'test-agent-gateway-secret',
+        publicApiBaseUrl: 'http://api.test',
+        jwt: { accessToken: { secret: 'access' } },
+      } as never),
+    ),
     conversations as never,
   );

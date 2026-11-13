@@ -20,6 +20,7 @@ import { WhatsAppIdentityService } from '../whatsapp-identity.service';
 import { WhatsAppInboundService } from '../whatsapp-inbound.service';
 import { WhatsAppRateLimitService } from '../whatsapp-rate-limit.service';
 import { AgentRuntimeRunner } from 'src/chatbot/engine/agent-runtime-runner.service';
+import { AGENT_GATEWAY_TEST_PROVIDERS } from 'src/chatbot/engine/test/engine.fixtures';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 import { ChatbotAudience } from 'src/chatbot/entity/chatbot-audience.entity';
@@ -271,6 +272,7 @@ export async function buildInboundHarness({
       },
       ChatbotEngineService,
       AgentRuntimeRunner,
+      ...AGENT_GATEWAY_TEST_PROVIDERS,
       ChatbotAudienceService,
       { provide: ConnectorService, useValue: { chatbotFor: jest.fn() } },
       {

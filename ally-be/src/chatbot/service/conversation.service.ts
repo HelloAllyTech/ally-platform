@@ -468,6 +468,7 @@ export class ConversationService {
       { text: placeholders.text, citations: null },
     );
     await this.dropIntake(conversationIds);
+    await this.dropToolRuns(conversationIds);
     const contactIds = (
       await this.conversationRepository.find({
         where: { id: In(conversationIds) },
@@ -498,6 +499,7 @@ export class ConversationService {
         { text: placeholders.text, citations: null, retrievalMeta: null },
       );
       await this.dropIntake(conversationIds);
+      await this.dropToolRuns(conversationIds);
     }
     await this.dataSource.query(
       `UPDATE chatbot_contacts SET display_name = NULL, "updatedAt" = now() WHERE id = $1`,
@@ -533,11 +535,17 @@ export class ConversationService {
       if (batch.length < BLANK_BATCH_SIZE) break;
     }
 
-    // Pre-chat answers are as personal as the messages: they go with the thread's last message.
+    // Pre-chat answers, and the assistant's hand-over summary (chunk 3b), are as personal as the
+    // messages: they go with the thread's last message.
     await this.dataSource.query(
       `UPDATE chatbot_conversations
-          SET metadata = metadata - 'intake', "updatedAt" = now()
-        WHERE last_message_at < $1 AND metadata ? 'intake'`,
+          SET metadata = metadata - 'intake' - 'handover', "updatedAt" = now()
+        WHERE last_message_at < $1 AND (metadata ? 'intake' OR metadata ? 'handover')`,
+      [cutoff],
+    );
+    // The agent's tool calls hold what people said in their inputs: gone at the messages' cutoff.
+    await this.dataSource.query(
+      `DELETE FROM tool_runs WHERE "createdAt" < $1`,
       [cutoff],
     );
 
@@ -585,11 +593,20 @@ export class ConversationService {
 
   // ──────────────────────────────────────────────────────────────── plumbing
 
+  /** The pre-chat answers and the assistant's hand-over summary (chunk 3b): both personal. */
   private async dropIntake(conversationIds: string[]): Promise<void> {
     await this.dataSource.query(
       `UPDATE chatbot_conversations
-          SET metadata = metadata - 'intake', "updatedAt" = now()
-        WHERE id = ANY($1::uuid[]) AND metadata ? 'intake'`,
+          SET metadata = metadata - 'intake' - 'handover', "updatedAt" = now()
+        WHERE id = ANY($1::uuid[]) AND (metadata ? 'intake' OR metadata ? 'handover')`,
+      [conversationIds],
+    );
+  }
+
+  /** The agent's tool calls in these threads (chunk 3b): their inputs hold what people said. */
+  private async dropToolRuns(conversationIds: string[]): Promise<void> {
+    await this.dataSource.query(
+      `DELETE FROM tool_runs WHERE conversation_id = ANY($1::text[])`,
       [conversationIds],
     );
   }

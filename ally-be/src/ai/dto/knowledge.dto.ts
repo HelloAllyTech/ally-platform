@@ -139,6 +139,16 @@ export interface KnowledgeAnswerRequest {
  * Mirrors ally-ai `app/schemas/agent_runtime.py::AgentRunRequest`; the limits noted here are its
  * validation (a 422 past them).
  */
+/**
+ * Where and how a run calls ally-be's tool gateway back (chunk 3b). Sent only for a bot with a
+ * tool on; `token` is a credential, signed for this run alone.
+ */
+export interface AgentGatewayBlock {
+  url: string;
+  token: string;
+  tools: string[];
+}
+
 export interface AgentRunRequest extends KnowledgeAnswerRequest {
   /**
    * The checkpointer's thread id: the conversation, or a `preview-…` thread.
@@ -160,6 +170,8 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
    * characters (`MAX_DECLINE_TEXT_CHARS`).
    */
   decline_text?: string;
+  /** The tool gateway, for a bot with a tool on (chunk 3b). Absent: today's run, search only. */
+  gateway?: AgentGatewayBlock;
 }
 
 /** What the conversational agent understood a message to be. */
@@ -193,6 +205,8 @@ export interface AgentRunResponse extends KnowledgeAnswerResponse {
    * grounded answer.
    */
   turn_type?: AgentTurnType;
+  /** The agent passed the chat to a person with `hand_over` (chunk 3b); the answer is empty. */
+  handover?: boolean;
 }
 
 interface KnowledgePersonaRequest {

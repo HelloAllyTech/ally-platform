@@ -88,6 +88,11 @@ export interface ChatTurn {
   /** The channel's id for this message, from which the run id is derived (WhatsApp). */
   providerMessageId?: string;
   /**
+   * The shared store's contact (chunk 3b), named in the run's gateway token. Absent in Preview and
+   * wherever the channel doesn't know it.
+   */
+  contactId?: string | null;
+  /**
    * The person's first message to this bot (WhatsApp: the contact's first message; Preview: an
    * empty chat). `history` can't say: on WhatsApp it already holds the message being answered.
    */
@@ -155,6 +160,9 @@ export interface ChatbotDecision {
    * and stores no reply. Never set on a crisis reply, which always goes out.
    */
   held?: boolean;
-  /** The visitor asked for a person (chunk 11a): the body tells them the team has been asked. */
-  handover?: 'asked';
+  /**
+   * The visitor asked for a person (chunk 11a), or the agent passed the chat on with its
+   * `hand_over` tool (`assistant`, chunk 3b): the body tells them the team has been asked.
+   */
+  handover?: 'asked' | 'assistant';
 }
