@@ -61,11 +61,21 @@ def format_feedback(feedback: Optional[str]) -> str:
 
 
 def format_searches(records: Sequence[Dict[str, Any]]) -> str:
-    """Searches made for this message, so the model does not repeat one."""
+    """Searches made for this message, so the model does not repeat one, and what
+    each gateway tool did (chunk 3b): a failed one is shown as not done, so the
+    agent never says it worked."""
     if not records:
         return "(none yet)"
     lines: List[str] = []
     for record in records:
+        if record.get("kind") == "gateway":
+            done = (
+                "done"
+                if record.get("ok")
+                else f"failed ({record.get('error') or 'error'}), not done"
+            )
+            lines.append(f"- `{record.get('tool')}`: {done}")
+            continue
         added = record.get("added") or []
         found = (
             f"added passages {', '.join(str(n) for n in added)}"

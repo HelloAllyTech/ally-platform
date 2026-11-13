@@ -4,7 +4,7 @@ how much of the conversation the agent reads. Read by the agent and check nodes.
 from __future__ import annotations
 
 import time
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from app.core.agent_runtime.check import Rejection
 from app.core.agent_runtime.state import AgentState
@@ -63,10 +63,34 @@ def can_send_back(state: AgentState, rejection: Rejection) -> bool:
     )
 
 
-def tool_budget(state: AgentState) -> int:
+#: Tool steps of any kind in one run (chunk 3b): searches (still capped by
+#: MAX_TOOL_CALLS) and gateway tools together.
+MAX_TOOL_STEPS = 4
+
+
+def is_search(record: Dict[str, Any]) -> bool:
+    """A record of a search, not of a gateway tool (chunk 3b)."""
+    return record.get("kind") != "gateway"
+
+
+def searches(state: AgentState) -> List[Dict[str, Any]]:
+    """The run's search records, in order."""
+    return [call for call in state.get("tool_calls") or [] if is_search(call)]
+
+
+def steps_left(state: AgentState) -> bool:
+    """Whether another tool step of any kind fits: under the 4-step cap and the
+    time budget."""
+    return len(state.get("tool_calls") or []) < MAX_TOOL_STEPS and not over_time(state)
+
+
+def search_budget(state: AgentState) -> int:
     """Searches left: none past the cap, past the time budget, or once a search
-    added nothing new (another phrasing of the same miss only costs time)."""
-    calls = state.get("tool_calls") or []
+    added nothing new (another phrasing of the same miss only costs time). Gateway
+    tools don't count, and "nothing new" ends searching only."""
+    calls = searches(state)
+    if len(state.get("tool_calls") or []) >= MAX_TOOL_STEPS:
+        return 0
     if calls and not calls[-1].get("added") and not calls[-1].get("refused"):
         return 0
     if over_time(state):
@@ -76,3 +100,7 @@ def tool_budget(state: AgentState) -> int:
     if calls and time_left(state) < SEARCH_AGAIN_RESERVE_SECONDS:
         return 0
     return max(0, settings.AGENT_RUNTIME.MAX_TOOL_CALLS - len(calls))
+
+
+#: The name before chunk 3b, when every tool was a search.
+tool_budget = search_budget

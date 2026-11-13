@@ -29,6 +29,9 @@ from app.core.knowledge_agent.schemas import DeclineReason
 
 Risk = Literal["low", "medium", "high"]
 
+#: A search runs here in ally-ai; a gateway tool asks ally-be to act (chunk 3b).
+ToolKind = Literal["search", "gateway"]
+
 
 class KnowledgeSearch(Protocol):
     """The KnowledgeAgentService steps a search tool uses. A Protocol, so this module
@@ -101,6 +104,11 @@ class ToolContext:
     #: True for the run's first search only (and only when the bot logs
     #: retrieval), so each message is logged once, as in v1.
     log_retrieval: bool = False
+    #: Gateway tools only (chunk 3b): the run's client to ally-be, its run id, and
+    #: this call's index in the run (the idempotency key with the run id).
+    gateway: Optional[Any] = None
+    run_id: Optional[str] = None
+    step: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -132,3 +140,6 @@ class Tool:
     input_model: Type[BaseModel]
     risk: Risk
     handler: Callable[[BaseModel, ToolContext], Awaitable[ToolResult]]
+    kind: ToolKind = "search"
+    #: A successful call ends the run with no further model step (`hand_over`).
+    ends_run: bool = False

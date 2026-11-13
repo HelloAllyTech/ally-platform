@@ -7,7 +7,14 @@ toward the full v2 shape (contact, run_token, resume) in later chunks.
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    SecretStr,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+)
 
 from app.core.agent_runtime.schemas import TurnType
 from app.core.agent_runtime.state import BotConfig
@@ -16,6 +23,17 @@ from app.schemas.knowledge_agent import (
     KnowledgeAnswerResponse,
     RetrievalMeta,
 )
+
+
+class AgentGateway(BaseModel):
+    """ally-be's tool gateway for this run (chunk 3b). Sent only for a bot with a
+    tool on; without it a run is search-only, exactly as before."""
+
+    url: str = Field(..., max_length=500)
+    #: A credential, signed by ally-be for this run alone: a SecretStr, so a repr,
+    #: a validation error or a log line never shows it.
+    token: SecretStr
+    tools: List[str] = Field(default_factory=list, max_length=20)
 
 
 class AgentRunRequest(KnowledgeAnswerRequest):
@@ -60,9 +78,18 @@ class AgentRunRequest(KnowledgeAnswerRequest):
         ),
     )
 
+    gateway: Optional[AgentGateway] = Field(
+        None,
+        description=(
+            "ally-be's tool gateway, for a bot with a tool turned on (chunk 3b). "
+            "Absent: search only."
+        ),
+    )
+
     def to_bot(self) -> BotConfig:
-        """The `bot` block of the run's state."""
-        return {
+        """The `bot` block of the run's state. It names the gateway's tools but
+        never holds the gateway's URL or token: state is checkpointed."""
+        bot: BotConfig = {
             "prompts": self.prompts,
             "limits": {
                 "top_k": self.top_k,
@@ -89,6 +116,9 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             "knowledge_topics": list(self.knowledge_topics),
             "decline_text": self.decline_text,
         }
+        if self.gateway:
+            bot["gateway_tools"] = list(self.gateway.tools)
+        return bot
 
     @field_validator("knowledge_topics")
     @classmethod
@@ -145,6 +175,24 @@ class AgentRunResponse(KnowledgeAnswerResponse):
             "citations."
         ),
     )
+    handover: bool = Field(
+        False,
+        description=(
+            "The agent passed the chat to a person with `hand_over` (chunk 3b). The "
+            "answer is empty; ally-be replies with its hand-over message."
+        ),
+    )
+
+    @model_serializer(mode="wrap")
+    def _handover_only_when_set(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> Dict[str, Any]:
+        """`handover` is sent only when true, so every other response is exactly
+        what it was before chunk 3b."""
+        data = handler(self)
+        if not data.get("handover"):
+            data.pop("handover", None)
+        return data
 
 
 # ── "How it works" (chunk 20d-2) ─────────────────────────────────────────────

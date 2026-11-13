@@ -9,14 +9,17 @@ from typing import Any, Dict, Literal, Tuple, Union
 
 from app.core.agent_runtime import conversation
 from app.core.agent_runtime.budget import (
+    MAX_TOOL_STEPS,
     MUST_SEARCH_AFTER,
     REWRITE_RESERVE_SECONDS,
     recent,
-    tool_budget,
+    search_budget,
+    searches,
+    steps_left,
 )
 from app.core.agent_runtime.schemas import REPLY_ACTION
 from app.core.agent_runtime.state import AgentState, json_safe
-from app.core.agent_runtime.tools import allowed_tools
+from app.core.agent_runtime.tools import gateway_tools, search_tools
 from app.core.agent_runtime.trace import Node, StatusCode, traced
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
@@ -51,18 +54,22 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
                 "revisions": 0,
                 "started_at": time.time(),
             }
-        budget = tool_budget(state)
-        # Past the cap the schema itself offers only `reply`.
-        tools = allowed_tools(bot) if budget > 0 else []
+        budget = search_budget(state)
+        # Past the caps the schema itself offers only `reply`. Searches keep their
+        # own limit; gateway tools (chunk 3b) are offered while a tool step of any
+        # kind fits, and only when ally-be's request named them.
+        offered_searches = search_tools(bot) if budget > 0 else []
+        offered_gateway = gateway_tools(bot) if steps_left(state) else []
+        tools = offered_searches + offered_gateway
         # Sent back for not searching, and still nothing searched: this step can
         # only search. Asking alone was not enough in the eval.
         # A step sent back to search again (SEARCH_AGAIN) is asked to, not forced:
         # forcing the schema made a step that replied anyway fail validation, and
         # the failed run fell back to v1 (chunk 20a-2).
         must_search = bool(
-            tools
+            offered_searches
             and state.get("feedback") in MUST_SEARCH_AFTER
-            and not state.get("tool_calls")
+            and not searches(state)
         )
         started_at = state.get("started_at") or start["started_at"]
 
@@ -70,7 +77,8 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             return await conversation.agent_step(
                 state["question"],
                 passages=state.get("passages") or [],
-                tools=tools,
+                # Forced to search: only the searches are offered.
+                tools=offered_searches if force else tools,
                 tool_budget=budget,
                 bot=bot,
                 history=recent(state.get("history")),
@@ -110,10 +118,14 @@ def _time_left(started_at: float) -> float:
 
 
 def route_after_agent(state: AgentState) -> Literal["tools", "check"]:
-    # Only the cap here: a step that was offered a search runs it, even if the time
+    # Only the caps here: a step that was offered a tool runs it, even if the time
     # budget ran out while the model was deciding.
     action = (state.get("agent_step") or {}).get("action", REPLY_ACTION)
-    calls = len(state.get("tool_calls") or [])
-    if action != REPLY_ACTION and calls < settings.AGENT_RUNTIME.MAX_TOOL_CALLS:
+    calls = state.get("tool_calls") or []
+    if action == REPLY_ACTION or len(calls) >= MAX_TOOL_STEPS:
+        return "check"
+    if action in {tool.name for tool in gateway_tools(state["bot"])}:
+        return "tools"
+    if len(searches(state)) < settings.AGENT_RUNTIME.MAX_TOOL_CALLS:
         return "tools"
     return "check"

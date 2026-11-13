@@ -26,7 +26,7 @@ class TestRegistry:
             assert tool.description
             tool.input_model()  # every input field has a default
 
-    async def test_every_bot_gets_every_tool(self):
+    async def test_without_a_gateway_every_bot_gets_the_search_tools(self):
         names = [t.name for t in allowed_tools(make_bot())]
         assert names == ["search_knowledge"]
 

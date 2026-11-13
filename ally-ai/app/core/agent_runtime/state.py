@@ -45,6 +45,8 @@ class BotConfig(TypedDict, total=False):
     # --- conversational agent
     knowledge_topics: List[str]
     decline_text: Optional[str]
+    # --- tool gateway (chunk 3b): the names ally-be offers, never its URL or token
+    gateway_tools: List[str]
 
 
 class RunInput(TypedDict, total=False):

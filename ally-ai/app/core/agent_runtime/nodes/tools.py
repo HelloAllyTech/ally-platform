@@ -1,8 +1,11 @@
 """Tools: run the tool the agent asked for, and add one trace step for it.
 
-Every tool streams the same way, with no code of its own: `searching` (with the
+Every search streams the same way, with no code of its own: `searching` (with the
 input's `query`, when it has one) as it starts, its step, then `found` with the
-passages it added.
+passages it added. A gateway tool (chunk 3b) emits no status (the bot page has no
+copy for one yet), only its step: the tool, `ok` or its error code, and ms. One
+that ends the run (`hand_over`) and succeeded sets the run's result, and the graph
+ends without another model step.
 
 The run's first search sets the response's `retrieval` block and is the one
 logged to the retrieval log, as v1's single search is.
@@ -11,12 +14,17 @@ logged to the retrieval log, as v1's single search is.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Literal, Optional
 
+from langgraph.graph import END
+from langgraph.runtime import get_runtime
+
+from app.core.agent_runtime.gateway import AgentRunContext
 from app.core.agent_runtime.state import AgentState, json_safe
-from app.core.agent_runtime.tools import ToolContext, allowed_tools
+from app.core.agent_runtime.tools import Tool, ToolContext, allowed_tools
 from app.core.agent_runtime.trace import Node, status, trace_step
-from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.knowledge_agent.agent import KnowledgeAgentService, build_result
+from app.core.knowledge_agent.schemas import AnswerIntent, DeclineReason
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -41,6 +49,28 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             records.append({"tool": name, "refused": True})
             summary = f"{name}: not available"
             added = []
+        elif tool.kind == "gateway":
+            args = tool.input_model.model_validate(step.get(name) or {})
+            result = await tool.handler(
+                args,
+                ToolContext(
+                    service=service,
+                    bot=state["bot"],
+                    limits=state["limits"],
+                    passages=passages,
+                    language=step.get("language") or "en",
+                    gateway=_gateway(),
+                    run_id=state["run_id"],
+                    step=len(records),
+                ),
+            )
+            records.append(json_safe(result.record))
+            summary = result.summary
+            added = []
+            if tool.ends_run and result.record.get("ok"):
+                update = {
+                    "result": json_safe(_handover_result(service, state, step, tool))
+                }
         else:
             args = tool.input_model.model_validate(step.get(name) or {})
             status("searching", getattr(args, "query", None) or None)
@@ -88,3 +118,50 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
         }
 
     return tools
+
+
+def _gateway() -> Optional[Any]:
+    """The run's gateway client, from LangGraph's runtime context (never state)."""
+    try:
+        context = get_runtime(AgentRunContext).context
+    except RuntimeError:  # called outside a graph run
+        return None
+    return getattr(context, "gateway", None)
+
+
+def _handover_result(
+    service: KnowledgeAgentService,
+    state: AgentState,
+    step: Dict[str, Any],
+    tool: Tool,
+) -> Dict[str, Any]:
+    """The run's result after `hand_over`: no answer and no citations, and
+    `handover: true`, so ally-be sends its hand-over message."""
+    language = (step.get("language") or state.get("language") or "en").strip()
+    retrieval = state.get("retrieval") or service.retrieval_meta(
+        state["limits"],
+        [],
+        language=language,
+        translated=None,
+        translation_degraded=False,
+    )
+    result: Dict[str, Any] = dict(
+        build_result(
+            intent=AnswerIntent.DECLINE,
+            answer="",
+            language=language,
+            confidence=0.0,
+            citations=[],
+            decline_reason=DeclineReason.NONE,
+            retrieval={**retrieval, "passages_used": len(state.get("passages") or [])},
+            meta=state.get("agent_meta") or {},
+        )
+    )
+    result["turn_type"] = state.get("turn_type") or "question"
+    result["handover"] = True
+    return result
+
+
+def route_after_tools(state: AgentState) -> Literal["agent", "__end__"]:
+    """A tool that ended the run set its result: no further model step or check."""
+    return END if state.get("result") else "agent"
