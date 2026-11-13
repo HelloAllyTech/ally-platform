@@ -2,17 +2,23 @@
 
 13 Nov 2026. Read with `CONTEXT.md` and `v2-chunks.md`. For these three days this file sets the order and the cuts. `v2-chunks.md` still describes each chunk and keeps the Progress table, and a chunk's own brief still wins for that chunk.
 
+**Updated 13 Nov, 17:45:** one Claude Code session at a time from now on (§5). The status below is current; §3, §5, §6 and §10 follow the change.
+
 **The plan in one line:** in three days, make the assistant public, let it act on the owner's own lists, remember people, ask the owner before risky actions, and send its first reminders. Everything else in v2 and v3 is kept, ordered and parked below.
 
 Assumes CL1 is merged and v2.0 is live. Any unticked line in `LAUNCH-CHECKLIST.md` is the first hour of Day 1.
 
-## Status: checked on master, 13 Nov 14:30
+## Status: 13 Nov, 17:45
 
-- **Slice 1 is merged into master,** and the working tree was clean.
-- **Production is probably still answering with v1.** `0fb34139c` (today) makes `AGENT_RUNTIME__ENABLED` default to true, because production never set it and every message fell back to v1. That commit is after the last release bump (2.0.9, this morning) and in no release tag. Until it ships, or the variable is set in production, the v2 agent isn't what people get. **Release it first,** then watch the v1 fallback rate and reply times for a few hours.
-- **H0: not started.** `phone_e164` is still `varchar(32)`; there's no warm-up; ally-be still doesn't send `ally_ai_builder_change` (not in `BUILDER_PROMPT_CODES`) or `ally_ai_checkup_questions` (`CHECKUP_PROMPT_CODES` holds only the judge); `onboarding_eval.py` is unchanged since 10 Nov; `LAUNCH-CHECKLIST.md` has 0 of 19 lines ticked. One item changed: since `0fb34139c`, runs aren't stored at all without `AGENT_RUNTIME__CHECKPOINT_DB_URL`, so checkpoint retention matters only if production sets it.
-- **15a: not started.** The crisis check still receives only the latest message (`CrisisCheckRequest` has `message` and `prompts`), `crisis_classify.txt` hasn't changed since 4 Nov, and `botPagePublicAllowed` still defaults to off. **A head start exists:** today's conversation basics suite (`8bdbbf53b`, `npm run chatbot:basics` in ally-be) already runs urgent-risk and support-level distress cases in English, Hindi and Hinglish, a two-turn continuation and Trijog's two transcripts through the real engine, with must-pass rules (urgent stays urgent; complaints, typos and greetings never get the crisis reply). 15a's eval extends that suite rather than starting a new one.
-- **Briefs written (13 Nov, 15:00):** `chunk-h0.md` and `chunk-15a.md`, in the repo's `docs/agents-v2/` (not committed yet) and in this project. Both sessions work on `feat/agents-v2-fast-track`, in the same folder.
+- **Everything is on `feat/agents-v2-fast-track`, local only.** Nothing has been pushed.
+- **Production is probably still answering with v1.** `0fb34139c` makes `AGENT_RUNTIME__ENABLED` default to true, and it's in no release yet. **Release it first,** then watch the v1 fallback rate and reply times for a few hours.
+- **H0: done** (`CHUNK-H0-NOTES.md`). Erasure works on real Postgres. Checkpoint retention isn't needed: production stores no runs. Cold start is fine without a warm-up. Live edits to the builder's and the checkup's prompts take effect.
+  - **Open:** `onboarding_eval.py` passes 9 of 13. gp-clinic, diagnostic-lab and coaching are held at publish: on the medical and young-people packs, the agent's declines add clinical content or move a sign-up on, and the checkup judge fails them. The fix goes in the packs' rules (§6). Pharmacy's held case was a bug, fixed in 15a.
+- **15a: in its gate runs.** The eval set has about 40 risk cases and 40 look-alikes, approved at stop 1 and extended at stop 2.
+  - The new prompt (local Skills Store version 3, with `{history}`) runs on gpt-6-luna: 0 misses and 3 false alarms, classifier only. Today's prompt: 9 misses and 95 false alarms.
+  - Next: the full-engine gate, the regressions, public links locally, then the notes.
+  - Production: ally-ai before ally-be; production's OpenAI key must call gpt-6-luna; then push the prompt.
+- **Briefs written:** `chunk-h0.md`, `chunk-15a.md` and `chunk-3b.md`, in the repo's `docs/agents-v2/` and in this project.
 
 ## 1. Where we are
 
@@ -62,6 +68,8 @@ All of v2 and v3 won't fit at any pace. What fits is **the part that changes wha
 
 After these, a clinic can put its assistant on its website for anyone, have it book from its own slots, remember returning patients, hold late cancellations for the owner's approval, and remind people the day before.
 
+**One session (decided 13 Nov, 17:28).** Two sessions in one folder collided: a commit hook hid the other session's edits, and evals competed for ally-ai. From here on, one session runs, in this order: **H0 → 15a → 3b → 5a → 6 → 5b → 8a.** 14a, 21a and 10a + 6F move to the next sprint (§6). That's about 39 hours of chunks against about 30 left: if time runs short, drop 5b's ready-made lists first, then 8a. This sprint now ends at booking from the owner's own lists, without approvals or reminders.
+
 ### Why this order
 
 - **15a first.** It's small and already specced, and it's the only gate between a demo and real customers.
@@ -104,6 +112,8 @@ Full brief: `chunk-15a.md`.
 
 ### 3b Tool gateway · Lane A · Day 1 afternoon · about 8 h
 
+Full brief: `chunk-3b.md`. It also settles what this section leaves open: the service secret is the key ally-be already sends ally-ai; searches keep their own limit (2) inside a cap of 4 tool steps; `hand_over` ends the run with 11a's hand-over message; and v1 never answers a message whose run has already done something.
+
 - **In,** following the gateway section of `three-stage-plan.md`:
   - `POST /internal/agent/tools/:name`, with the service secret plus a short-lived `run_token` naming the bot, contact, conversation and allowed tools;
   - `tool_runs`, keyed by run id plus step, so a replayed call returns the stored result;
@@ -127,6 +137,10 @@ Full brief: `chunk-15a.md`.
 - **Decided:**
   - A public visitor's memory lasts as long as their visitor cookie. A verified email or a WhatsApp number makes it durable.
   - How the agent uses memory goes in a new seed prompt section, `ally_ai_agent_memory`, not an edit to `ally_ai_agent_system`. Its text is approved at the Day 2 midday check.
+- **Also, if it fits** (asked for on 13 Nov): today a run sees only the last 10 messages, and older ones are dropped.
+  - A rolling summary in `chatbot_conversations.summary`, which exists but nothing writes. Once a chat passes 10 messages, the ones leaving the window are folded in after the reply, never while someone waits. Each run gets the summary and the last 10 messages.
+  - `recall`, which searches this person's past chats, through the gateway.
+  - It stays in ally-be's store, not the checkpointer, so Forget and retention cover it.
 - **Waits:** custom profile fields and file types, relations, a People page, the nightly tidy, the notebook, carrying a profile across channels (Continue on WhatsApp).
 - **Done when:** "I prefer evenings" in one chat is used in the next; the Inbox shows it with its source; Forget removes it and the next run doesn't know it; a never-store item, and a clinical detail on a health pack, are refused; 0 hard fails on the 3a conversation eval plus new memory cases.
 
@@ -208,6 +222,18 @@ Full brief: `chunk-15a.md`.
 
 Two Claude Code sessions: **Lane A** (gateway and lists, mostly ally-be) and **Lane B** (safety, memory, dashboard and messages). The local stack runs one checkout, so when both lanes need it they share the folder and the branch (`feat/agents-v2-fast-track`), as 11a and 13 did, and each commits only its own paths. Separate worktrees only for a lane that doesn't need the stack at the same time.
 
+**From 13 Nov, 17:28: one session.** The lane plan below is kept for reference only.
+
+| | The session | Shehbaz (reviews and ops) |
+|---|---|---|
+| **Day 1** | H0 (done) → 15a → 3b | Release `0fb34139c` and watch v1 fallbacks; production's OpenAI key can call gpt-6-luna; Turnstile keys; submit WhatsApp templates; push the branch |
+| **Day 2** | 3b → 5a → 6 | Review 3b; approve the lists prompt section (6) |
+| **Day 3** | 5b → 8a if it fits → full suites, evals, deploy dark | Pilot flags on in the evening: one clinic assistant, one lead assistant |
+
+Start a chunk in a fresh session only after the previous one's last commit.
+
+The two-lane plan, as first written:
+
 | | Lane A | Lane B | Shehbaz (reviews and ops) |
 |---|---|---|---|
 | **Day 1** | H0 → 3b | 15a → G1b → 8a (tables, the Inbox panel) | First: release `0fb34139c` and watch v1 fallbacks. Then read the crisis eval set and prompt (midday); Turnstile keys; submit WhatsApp templates; the launch checklist |
@@ -218,11 +244,15 @@ Two Claude Code sessions: **Lane A** (gateway and lists, mostly ally-be) and **L
 
 **Shipped means:** built, tested, merged and deployed dark, with flags on for the pilot assistants. G2a and G2 close only after a week or two of real pilot use.
 
-**With only one session:** H0 → 15a → 3b → 5a → 6 → 5b → 8a. Approvals, privacy and proactive messages move to the next sprint.
+**With only one session (now the plan):** H0 → 15a → 3b → 5a → 6 → 5b → 8a. Approvals, privacy and proactive messages move to the next sprint.
 
-**If a day slips, drop in this order:** 10a (keep 6F on email), then 14a (Ask me first falls back to handing over to a person), then 5b's ready-made lists (create them from CSV).
+**If a day slips, drop in this order:** 5b's ready-made lists (create them from CSV), then 8a. (With two lanes it was 10a, then 14a, then the ready-made lists.)
 
 ## 6. Next: P1, the next sprint, in order
+
+**First, what the one-session change moved out of P0, and one fix found on Day 1:**
+- **Safety-pack declines** (small, from H0's open fail). Add lines to the medical, pharmacy and young-people packs' rules: decline, say who can help with the contact you were given, add nothing clinical, and never move a sign-up on with someone under 18. Then re-run the four held onboarding cases (`docs/agents-v2/evals/`) and Sunrise's checkup. The packs are code, and adding lines only tightens them, but the wording needs Shehbaz's approval. **It must land before 20e** opens sign-ups to those businesses. If the lead-led pilot is a health or under-18 business, it must land before Day 3 instead.
+- **14a Ask me first, light; 21a Privacy and caps, light; 10a + 6F Proactive messages,** as cut in §4.
 
 1. **20e Landing page.** Its brief is ready, and public links unlock it.
 2. **9a Voice notes in.** Transcribe Hindi, Marathi and Hinglish voice notes before the agent runs (ally-ai already talks to Sarvam). Big for WhatsApp in India.
@@ -257,6 +287,7 @@ Each is real, but none changes what a business can do in its first month.
 - **WhatsApp utility templates** (appointment reminder, booking confirmed, review request), submitted on each pilot's WhatsApp Business Account, since templates belong to the account. Needed by Day 3.
 - **Meta Tech Provider status,** needed for Embedded Signup (one-click WhatsApp).
 - **Turnstile keys** and the `/b/*` rules in production.
+- **Production's OpenAI key can call gpt-6-luna,** before 15a's prompt is pushed. If it can't, every crisis check falls back to keywords only.
 - **Two pilot businesses,** a clinic and a lead-led business. G2a and G2 close only after real use.
 - **A native Hindi speaker** for the bot page strings marked "needs review".
 
@@ -271,6 +302,7 @@ Each is real, but none changes what a business can do in its first month.
 
 ## 9. How to run the three days
 
+- **One session at a time (from 13 Nov, 17:28).** It owns the tree and the local stack, so the lane rules below (timestamp blocks, copy deck sections per lane, evals in quiet windows) apply only if two sessions run again. Migrations still go after the newest one on the branch.
 - **Decisions made in the brief.** §4 is written so a session doesn't stop to ask. It records its choices in its notes and stops only for prompt text, anything that loosens safety, a destructive migration or a new dependency.
 - **Ship dark, review behind.** Every chunk sits behind a flag, so review can trail the build by half a day without blocking the next chunk. The exception is 3b, which blocks 8a's tools, 6 and 14a.
 - **Avoid merge pain:**
@@ -288,7 +320,8 @@ Each is real, but none changes what a business can do in its first month.
 |---|---|
 | Production moves from v1 to the v2 agent when `0fb34139c` ships, mid-sprint | Ship it on Day 1 morning, before anything else lands; watch fallbacks, reply times and crisis replies for a few hours |
 | 15a reaches 0 misses but false alarms don't drop | Misses are the hard line. Whether public links still go on is Shehbaz's call |
-| The agent over-books or invents slots once it can write | Ask me first on create for each pilot's first week; action cases in the evals; the slot check stays on for assistants without lists |
+| The agent over-books or invents slots once it can write | With 14a in the next sprint there's no Ask me first yet: turn a pilot's write tools to Do it only once its action cases pass, and check the pilot's new records daily in its first week. Action cases in the evals; the slot check stays on for assistants without lists |
+| A gateway write runs while the crisis check flags the same message | 3b lets a hand-over made by the agent stand. Decide in 6 whether writes wait for the crisis check |
 | Gateway calls push replies past 20 s | One hop to ally-be with a 5 s timeout; the step cap and run budget stay; watch the v1 fallback rate |
 | Memory stores something it shouldn't | Allowed fields only, enforced in ally-be; health packs non-clinical; every line sourced and forgettable |
 | Template sends can't be tried locally | Staging with a real number; email as the fallback channel |
