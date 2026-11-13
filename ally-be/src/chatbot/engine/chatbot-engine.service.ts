@@ -145,7 +145,7 @@ export class ChatbotEngineService {
     const holder = await this.holderOf(turn);
     if (holder !== null) {
       return (
-        (await this.crisisOnly(turn)) ?? {
+        (await this.crisisOnly(turn, { held: true })) ?? {
           handledBy: WaHandledBy.HELD,
           body: '',
           held: true,
@@ -193,8 +193,16 @@ export class ChatbotEngineService {
    * Crisis alone (chunk 11a): the keyword templates, then the classifier. The crisis decision, or
    * null when it isn't one. Used while a person holds a chat and before a hand-over, so a crisis
    * reply never waits for anyone.
+   *
+   * While a person holds the chat (`held`) the classifier judges the latest message alone (chunk
+   * 15a): it can't see the team member's messages, so "yes" to "are you safe right now?" would read
+   * as confirming an earlier disclosure, and the fixed reply would land on top of their conversation.
+   * The team sees every held message anyway.
    */
-  private async crisisOnly(turn: ChatTurn): Promise<ChatbotDecision | null> {
+  private async crisisOnly(
+    turn: ChatTurn,
+    { held = false }: { held?: boolean } = {},
+  ): Promise<ChatbotDecision | null> {
     const match = await this.replyService.match(
       turn.text,
       turn.language,
@@ -207,7 +215,7 @@ export class ChatbotEngineService {
     try {
       const { prompts, ran } = await this.loadPromptOverrides(turn);
       const crisis = await this.aiService.checkWhatsAppCrisis(
-        crisisRequest(turn, prompts),
+        crisisRequest(held ? { ...turn, history: [] } : turn, prompts),
       );
       return crisis?.is_crisis
         ? this.crisisDecision(turn, crisis, ran, { notOnList: false })

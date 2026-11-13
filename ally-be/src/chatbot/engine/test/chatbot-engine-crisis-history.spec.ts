@@ -87,13 +87,47 @@ describe('ChatbotEngineService: the crisis check reads earlier messages', () => 
     expect(sent(h.aiService).history).toEqual([DISCLOSURE]);
   });
 
-  it('crisisOnly: a crisis while a person holds the chat still gets the crisis reply at once', async () => {
+  it('a held chat: the latest message alone, and a crisis still gets the crisis reply at once', async () => {
     const h = setup({ holder: 7, crisis: true });
     const decision = await h.engine.respond(stored());
-    expect(sent(h.aiService).history).toEqual([DISCLOSURE]);
+    expect(sent(h.aiService)).toEqual(
+      expect.objectContaining({ message: 'I mean it' }),
+    );
+    expect(sent(h.aiService)).not.toHaveProperty('history');
     expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
     expect(decision.held).toBeFalsy();
     expect(h.aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
+  });
+
+  it('a held chat: "yes" after a disclosure is judged without it, and stays held', async () => {
+    // The team member may have just asked "are you safe right now?", which the classifier can't see.
+    const h = setup({ holder: 7 });
+    const decision = await h.engine.respond(
+      stored({
+        text: 'yes',
+        history: [
+          { role: 'user', content: DISCLOSURE },
+          { role: 'assistant', content: 'Are you safe right now?' },
+          { role: 'user', content: 'yes' },
+        ],
+      }),
+    );
+    expect(sent(h.aiService)).toEqual({ message: 'yes', prompts: {} });
+    expect(decision.held).toBe(true);
+  });
+
+  it('"talk to a person" keeps the earlier messages', async () => {
+    const h = setup();
+    await h.engine.respond(
+      stored({
+        text: 'can I talk to a real person?',
+        history: [
+          { role: 'user', content: DISCLOSURE },
+          { role: 'user', content: 'can I talk to a real person?' },
+        ],
+      }),
+    );
+    expect(sent(h.aiService).history).toEqual([DISCLOSURE]);
   });
 
   it("Preview: its history doesn't hold the current message, and all of it is sent", async () => {
