@@ -25,6 +25,8 @@ type ToolRun = {
     endedAtMs? : number
     status : "success" | "error"
     content? : unknown
+    // MCP embedded resources (e.g. a GitHub file body) arrive here, not in `content`.
+    artifact? : unknown
     error? : string
 }
 
@@ -45,6 +47,30 @@ function flattenText(content : unknown) : string | undefined {
         return content.map((block)=> (typeof block === "string" ? block : (block as { text? : string })?.text ?? "")).join("")
     }
     return undefined
+}
+
+// The MCP client prefixes every tool with its server name ("github_get_file_contents",
+// "bigQuery_get_table_info"), so match on the base name rather than the full string.
+export function isTool(toolName : string, base : string) : boolean {
+    return toolName === base || toolName.endsWith(`_${base}`)
+}
+
+// Embedded-resource blocks ({ type: "resource", resource: { uri, text } }) carry file bodies.
+// The MCP adapter puts them in the ToolMessage artifact (sometimes wrapped as
+// { type: "mcp_content", data: block }); content is checked too in case a server inlines them.
+function resourceBlocks(...sources : unknown[]) : { uri? : string, text? : string }[] {
+    const found : { uri? : string, text? : string }[] = []
+    for (const source of sources) {
+        if (!Array.isArray(source)) continue
+        for (const entry of source) {
+            const block = (entry as { type? : string, data? : unknown })?.type === "mcp_content"
+                ? (entry as { data? : unknown }).data
+                : entry
+            const resource = (block as { resource? : { uri? : string, text? : string } } | undefined)?.resource
+            if (resource && typeof resource === "object") found.push(resource)
+        }
+    }
+    return found
 }
 
 function rawText(content : unknown) : string {
@@ -92,9 +118,10 @@ export class AnalyticalAgentTraceHandler extends BaseCallbackHandler {
         if (!run) return
         run.endedAtMs = Date.now()
         // The tool node hands back a ToolMessage ({ content, status }) or the bare content.
-        const message = output as { content? : unknown, status? : string } | undefined
+        const message = output as { content? : unknown, artifact? : unknown, status? : string } | undefined
         const isMessage = !!message && typeof message === "object" && "content" in message
         run.content = isMessage ? message!.content : output
+        run.artifact = isMessage ? message!.artifact : undefined
         if (isMessage && message!.status === "error") {
             run.status = "error"
             run.error = rawText(message!.content).slice(0, 2000)
@@ -135,6 +162,31 @@ function extractRows(data : unknown) : unknown[] | null {
         }
     }
     return null
+}
+
+type ResultColumn = { name : string, type : string | null }
+
+// BigQuery returns the column list as schema.fields next to the rows.
+function extractColumns(data : unknown) : ResultColumn[] | null {
+    if (!data || typeof data !== "object") return null
+    const fields = ((data as Record<string, unknown>).schema as { fields? : unknown } | undefined)?.fields
+    if (!Array.isArray(fields)) return null
+    const columns = fields
+        .map((field)=>({ name : (field as { name? : unknown })?.name, type : (field as { type? : unknown })?.type }))
+        .filter((field) : field is { name : string, type : unknown } => typeof field.name === "string")
+        .map((field)=>({ name : field.name, type : typeof field.type === "string" ? field.type : null }))
+    return columns.length > 0 ? columns : null
+}
+
+// Turns raw BigQuery cells ({"f":[{"v":"1"},...]}) into { column: value } objects. Values stay
+// as BigQuery sent them (strings); rows that aren't in that shape are passed through untouched.
+function nameRows(rows : unknown[], columns : ResultColumn[] | null) : unknown[] {
+    if (!columns) return rows
+    return rows.map((row)=>{
+        const cells = (row as { f? : unknown })?.f
+        if (!Array.isArray(cells) || cells.length !== columns.length) return row
+        return Object.fromEntries(columns.map((column, i)=> [column.name, (cells[i] as { v? : unknown })?.v ?? null]))
+    })
 }
 
 function extractRowCount(data : unknown, rows : unknown[] | null) : number | null {
@@ -204,13 +256,15 @@ export function buildAgentTrace(input : {
             const a = (run.args ?? {}) as Record<string, unknown>
             const data = run.status === "error" ? undefined : parseToolResult(run.content)
             const rows = extractRows(data)
+            const columns = extractColumns(data)
             return {
                 step,
                 sql : String(a.query ?? a.sql ?? ""),
                 status : run.status,
                 durationMs : run.endedAtMs !== undefined ? run.endedAtMs - run.startedAtMs : null,
                 rowCount : extractRowCount(data, rows),
-                rows : rows ? rows.slice(0, SQL_ROW_SAMPLE_CAP) : null,
+                columns,
+                rows : rows ? nameRows(rows.slice(0, SQL_ROW_SAMPLE_CAP), columns) : null,
                 rowsSampled : !!rows && rows.length > SQL_ROW_SAMPLE_CAP,
                 error : run.error,
             }
@@ -218,14 +272,19 @@ export function buildAgentTrace(input : {
 
     const dbtFilesRead = runs
         .map((run, i)=> ({ run, step : i + 1 }))
-        .filter(({ run })=> run.toolName === "get_file_contents" && run.status === "success")
+        .filter(({ run })=> isTool(run.toolName, "get_file_contents") && run.status === "success")
         .map(({ run, step })=>{
             const a = (run.args ?? {}) as Record<string, unknown>
             const text = rawText(run.content)
             const parsed = parseToolResult(run.content)
             // The server reports the blob SHA in its message and may echo a resolved repo:// URI.
             const blobSha = text.match(/\(SHA:\s*([0-9a-f]{7,40})\)/i)?.[1] ?? null
-            const resourceUri = text.match(/repo:\/\/[^"\s\\]+/)?.[0] ?? null
+            const resources = resourceBlocks(run.artifact, run.content)
+            const resourceUri = text.match(/repo:\/\/[^"\s\\]+/)?.[0] ?? resources.find((r)=> r.uri)?.uri ?? null
+            // The file body itself, from the embedded resource block(s), kept whole: no cap here, so
+            // it is exactly what the GitHub tool returned. `truncated` stays for a stable shape.
+            const fileText = resources.map((r)=> r.text ?? "").join("")
+            const fileContent = fileText ? { value : fileText, truncated : false, originalSize : fileText.length } : null
             const uriSha = resourceUri?.match(/\/sha\/([0-9a-f]{40})\//i)?.[1] ?? null
             const requestedRef = typeof a.ref === "string" ? a.ref : null
             const requestedSha = typeof a.sha === "string" ? a.sha : null
@@ -257,13 +316,14 @@ export function buildAgentTrace(input : {
                 commitShaSource,
                 blobSha,
                 resourceUri,
+                content : fileContent,
                 isDirectory : Array.isArray(parsed),
             }
         })
 
     const tablesInspected = runs
         .map((run, i)=> ({ run, step : i + 1 }))
-        .filter(({ run })=> run.toolName === "get_table_info")
+        .filter(({ run })=> isTool(run.toolName, "get_table_info"))
         .map(({ run, step })=>{
             const table = tableNameFromArgs(run.args)
             return {

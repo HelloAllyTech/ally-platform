@@ -6,7 +6,7 @@ import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.
 import { ChatOpenAI } from "@langchain/openai";
 import z from "zod"
 import { AGENT_LIMITS, AGENT_SYSTEM_PROMPT } from "../constants/analytics-agent.constants";
-import { AnalyticalAgentTraceHandler, buildAgentTrace, DbtHeadCommit, parseToolResult } from "./analytical-agent-trace";
+import { AnalyticalAgentTraceHandler, buildAgentTrace, DbtHeadCommit, isTool, parseToolResult } from "./analytical-agent-trace";
 
 
 const LLM = new ChatOpenAI({
@@ -272,7 +272,7 @@ export async function invokeAnalyticalAgent(query : string , history : Analytica
         }))
 
     // Extra telemetry for this question. Built after the run, so it can never change the answer.
-    const dbtFileReads = toolCalls.some((el)=> el.name === "get_file_contents")
+    const dbtFileReads = toolCalls.some((el)=> isTool(el.name, "get_file_contents"))
     const headCommit = dbtFileReads ? await resolveDbtHeadCommit(tools, toolCalls) : null
     const trace = buildAgentTrace({
         question : query,
@@ -295,14 +295,14 @@ export async function invokeAnalyticalAgent(query : string , history : Analytica
         },
     })
 
-     console.log({
+     console.log(JSON.stringify({
         toolCalls : toolCalls.map((el)=>({
             name : el.name,
             args : el.args,
         })),
         response : structured,
         ...trace
-    })
+    }))
 
     return {
         toolCalls,
@@ -320,8 +320,8 @@ async function resolveDbtHeadCommit(
     toolCalls : { name : string, args : unknown }[],
 ) : Promise<DbtHeadCommit> {
     try {
-        const listCommits = tools.find((tool)=> tool.name === "list_commits")
-        const read = toolCalls.find((call)=> call.name === "get_file_contents")
+        const listCommits = tools.find((tool)=> isTool(tool.name, "list_commits"))
+        const read = toolCalls.find((call)=> isTool(call.name, "get_file_contents"))
         const args = (read?.args ?? {}) as { owner? : string, repo? : string }
         if (!listCommits || !args.owner || !args.repo) return null
 
