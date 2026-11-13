@@ -21,6 +21,12 @@ import {
   ConversationStatus,
 } from '../../chatbot/enum/conversation.enum';
 import { ToolRunStatus } from '../../chatbot/entity/tool-run.entity';
+import {
+  ListConstraintKind,
+  ListFieldType,
+  RecordEventOp,
+  RecordLinkTargetKind,
+} from '../../chatbot/enum/list.enum';
 import { NEEDS_PERSON_REASONS } from '../../chatbot/handover/handover';
 import {
   BotPageAccess,
@@ -483,6 +489,11 @@ describe('CHECK constraints cover their enums', () => {
       [...NEEDS_PERSON_REASONS],
     ],
     ['CHK_tool_runs_status', Object.values(ToolRunStatus)],
+    // Lists (chunk 5a).
+    ['CHK_collection_fields_type', Object.values(ListFieldType)],
+    ['CHK_collection_constraints_kind', Object.values(ListConstraintKind)],
+    ['CHK_record_links_target_kind', Object.values(RecordLinkTargetKind)],
+    ['CHK_record_events_op', Object.values(RecordEventOp)],
     // The bot page (Agents v2, chunk 12b).
     ['CHK_chatbot_pages_status', Object.values(BotPageStatus)],
     ['CHK_chatbot_pages_access', Object.values(BotPageAccess)],
