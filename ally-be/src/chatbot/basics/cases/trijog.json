@@ -1,0 +1,53 @@
+[
+  {
+    "id": "trijog-transcript-1",
+    "kind": "per-bot: Trijog transcript 5c222342",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How do I book a session?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "handledBy": ["rag"],
+          "must": ["book"]
+        }
+      },
+      {
+        "user": "Hey Whatsapp",
+        "expect": { "crisis": false, "handover": false }
+      },
+      {
+        "user": "How are you",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "turnType": ["smalltalk", "about_bot"]
+        }
+      },
+      { "user": "you are not helpful", "expect": { "crisis": false } }
+    ]
+  },
+  {
+    "id": "trijog-transcript-2",
+    "kind": "per-bot: Trijog transcript 4543b4af",
+    "mustPass": true,
+    "turns": [
+      { "user": "HEY", "expect": { "crisis": false, "handover": false } },
+      {
+        "user": "whoa re you>?",
+        "expect": { "crisis": false, "handover": false }
+      }
+    ]
+  },
+  {
+    "id": "trijog-fees",
+    "kind": "per-bot: sensitive-topic service question",
+    "turns": [
+      {
+        "user": "how much does depression counselling cost?",
+        "expect": { "crisis": false, "handover": false }
+      }
+    ]
+  }
+]
