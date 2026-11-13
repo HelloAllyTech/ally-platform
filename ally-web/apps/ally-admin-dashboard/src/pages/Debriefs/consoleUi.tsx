@@ -39,15 +39,25 @@ export const AlertBanner: React.FC<{
 );
 
 /** The outlined "back" link the PM agent, Settings and session pages open with. */
-export const BackLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => (
+/**
+ * Back to where the viewer came from. `labelClassName` lets a crowded header
+ * hide the label at some widths (e.g. `sr-only`); the label then stays as the
+ * tooltip and for screen readers.
+ */
+export const BackLink: React.FC<{
+  to: string;
+  children: React.ReactNode;
+  labelClassName?: string;
+}> = ({ to, children, labelClassName }) => (
   <Link
     to={to}
+    title={labelClassName && typeof children === "string" ? children : undefined}
     className="inline-flex h-9 items-center gap-1.5 rounded-sm border border-primary-500 px-2.5 text-sm text-primary-500 no-underline hover:text-primary-600"
   >
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.6" />
     </svg>
-    {children}
+    {labelClassName ? <span className={labelClassName}>{children}</span> : children}
   </Link>
 );
 

@@ -832,7 +832,8 @@ describe("Session page", () => {
       const header = screen.getByTestId("session-header");
       const tags = within(header)
         .getAllByText(/^(Urgent|Needs a person|Important moment|\+1)$/)
-        .filter(t => t.tagName === "SPAN")
+        // Tags, not the back link's label.
+        .filter(t => t.tagName === "SPAN" && !t.closest("a"))
         .map(t => t.textContent);
       expect(tags).toEqual(["Urgent", "Needs a person", "+1"]);
       expect(screen.getByTestId("more-tags")).toHaveAttribute("title", "Important moment");
@@ -866,6 +867,29 @@ describe("Session page", () => {
           order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
       }
+    });
+
+    it("between 1056 and 1311px the header drops its labels so the title keeps its room", () => {
+      h.session.mockReturnValue(
+        ok(view({ queue: { position: 2, total: 3, previousRunId: "run-0", nextRunId: "run-2" } })),
+      );
+      renderPage();
+      const compact = /min-\[1056px\]:max-\[1311px\]:sr-only/;
+      // Agent logs becomes an icon, named and with its tooltip.
+      const logs = screen.getByTestId("agent-logs-button");
+      expect(logs).toHaveAttribute("aria-label", "Agent logs");
+      expect(logs).toHaveAttribute("title", "Agent logs");
+      expect(within(logs).getByText("Agent logs").className).toMatch(compact);
+      // Review keeps its icon and count; its label stays for screen readers.
+      const review = screen.getByTestId("review-button");
+      expect(review).toHaveAttribute("title", "Review");
+      expect(within(review).getByText("Review").className).toMatch(compact);
+      // The back link's label and the queue position go to tooltips.
+      const back = screen.getByRole("link", { name: "Needs a person" });
+      expect(back).toHaveAttribute("title", "Needs a person");
+      expect(within(back).getByText("Needs a person").className).toMatch(compact);
+      expect(screen.getByRole("group", { name: "Queue" })).toHaveAttribute("title", "2 of 3");
+      expect(screen.getByTestId("queue-position").className).toMatch(compact);
     });
 
     it("shows Agent logs to the Ally team, linking to the run's logs", () => {

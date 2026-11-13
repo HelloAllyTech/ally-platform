@@ -57,6 +57,16 @@ const isTyping = (e: KeyboardEvent) => {
 };
 
 /** One of the queue's icon-only buttons: the keyboard shortcut is in its tooltip. */
+/**
+ * Between Carbon’s lg breakpoint (1056px, where the header splits into two
+ * rows on purpose) and its xlg (1312px) the header is one row with the least room for
+ * the title, so the header drops its labels: the back link, Agent logs and
+ * Reviewed become icons, Review keeps its count, and the queue position moves
+ * into the queue's tooltip. Each label stays for screen readers and as a tooltip.
+ */
+const COMPACT_LABEL = "min-[1056px]:max-[1311px]:sr-only";
+const COMPACT_PAD = "min-[1056px]:max-[1311px]:px-2.5";
+
 const QueueButton: React.FC<{
   to: string | null;
   label: string;
@@ -423,7 +433,9 @@ export const DebriefSessionPage: React.FC = () => {
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="shrink-0">
-            <BackLink to={backTo}>{backLabel}</BackLink>
+            <BackLink to={backTo} labelClassName={COMPACT_LABEL}>
+              {backLabel}
+            </BackLink>
           </span>
           <TruncatedTitle
             as="h1"
@@ -454,6 +466,11 @@ export const DebriefSessionPage: React.FC = () => {
             <div
               role="group"
               aria-label={s.queue}
+              title={
+                view.queue.position !== null
+                  ? s.queuePosition(view.queue.position, view.queue.total)
+                  : undefined
+              }
               className="flex items-center gap-1.5 whitespace-nowrap"
             >
               <QueueButton
@@ -464,7 +481,10 @@ export const DebriefSessionPage: React.FC = () => {
                 direction="previous"
               />
               {view.queue.position !== null && (
-                <span className="text-[13px] text-neutral-600" data-testid="queue-position">
+                <span
+                  className={`text-[13px] text-neutral-600 ${COMPACT_LABEL}`}
+                  data-testid="queue-position"
+                >
                   {s.queuePosition(view.queue.position, view.queue.total)}
                 </span>
               )}
@@ -480,7 +500,9 @@ export const DebriefSessionPage: React.FC = () => {
           {access.agentLogs && (
             <Link
               to={`${ROUTES.DEBRIEF_SESSION_LOGS(runId)}${homeQuery ? `?${homeQuery}` : ""}`}
-              className="flex h-10 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-semibold text-primary-500 no-underline hover:text-primary-600"
+              aria-label={s.agentLogs}
+              title={s.agentLogs}
+              className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-semibold text-primary-500 no-underline hover:text-primary-600 ${COMPACT_PAD}`}
               data-testid="agent-logs-button"
             >
               <svg
@@ -495,7 +517,7 @@ export const DebriefSessionPage: React.FC = () => {
                 <path d="M3 3h10v10H3z" />
                 <path d="M5.5 6h5M5.5 8h5M5.5 10h3" />
               </svg>
-              {s.agentLogs}
+              <span className={COMPACT_LABEL}>{s.agentLogs}</span>
             </Link>
           )}
           {reviewedWhat ? (
@@ -505,7 +527,8 @@ export const DebriefSessionPage: React.FC = () => {
               data-testid="review-button"
               data-reviewed="true"
               onClick={() => setPaneOpen(o => !o)}
-              className="flex h-10 items-center gap-2 whitespace-nowrap rounded-sm border border-success-400 bg-success-50 px-4 text-sm font-semibold text-success-600"
+              title={s.reviewedButton(reviewedWhat)}
+              className={`flex h-10 items-center gap-2 whitespace-nowrap rounded-sm border border-success-400 bg-success-50 px-4 text-sm font-semibold text-success-600 ${COMPACT_PAD}`}
             >
               <svg
                 width="16"
@@ -518,7 +541,7 @@ export const DebriefSessionPage: React.FC = () => {
               >
                 <path d="M3 8.5l3 3 7-7" />
               </svg>
-              {s.reviewedButton(reviewedWhat)}
+              <span className={COMPACT_LABEL}>{s.reviewedButton(reviewedWhat)}</span>
             </button>
           ) : (
             <button
@@ -526,7 +549,8 @@ export const DebriefSessionPage: React.FC = () => {
               aria-expanded={paneOpen}
               data-testid="review-button"
               onClick={() => setPaneOpen(o => !o)}
-              className="flex h-10 items-center gap-2 whitespace-nowrap rounded-sm bg-primary-500 px-4 text-sm font-semibold text-white"
+              title={s.review}
+              className="flex h-10 items-center gap-2 whitespace-nowrap rounded-sm bg-primary-500 px-4 text-sm font-semibold text-white min-[1056px]:max-[1311px]:px-3"
             >
               <svg
                 width="16"
@@ -539,7 +563,7 @@ export const DebriefSessionPage: React.FC = () => {
               >
                 <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
               </svg>
-              {s.review}
+              <span className={COMPACT_LABEL}>{s.review}</span>
               {view.pendingActions.length > 0 && (
                 <span className="rounded-full bg-white px-[7px] py-px text-xs font-semibold text-primary-500">
                   {view.pendingActions.length}
