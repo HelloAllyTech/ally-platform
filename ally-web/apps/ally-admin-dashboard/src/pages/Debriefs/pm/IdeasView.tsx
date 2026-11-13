@@ -19,7 +19,6 @@ import { DebriefAutonomyView, DebriefOverview, PmAgentIdeaRow, PmAgentState } fr
 import { getErrorMessage } from "@utils";
 
 import { codeWords, inWords } from "../consoleLabels";
-import { formatWhen } from "../consoleTable";
 import { AlertBanner, Segmented } from "../consoleUi";
 import { DebriefAccess } from "../debriefAccess";
 import { waitedFor } from "../queue";
@@ -36,6 +35,7 @@ import {
   recentlyReverted,
   stage,
 } from "./ideaGroups";
+import { LatestReportLine } from "./ReportsView";
 
 const GROUP_DOT: Record<IdeaGroup, string> = {
   needs: "bg-primary-500",
@@ -350,17 +350,7 @@ export const IdeasView: React.FC<{
               {p.expiresBody(inWords(expiring.title))}
             </AlertBanner>
           )}
-          <details
-            className="rounded-sm bg-neutral-50 px-[18px] py-3.5 text-sm"
-            data-testid="pm-agent-report"
-          >
-            <summary className="cursor-pointer font-semibold">
-              {state.at ? p.report(formatWhen(state.at)) : s.report}
-            </summary>
-            <p className="mt-2.5 whitespace-pre-wrap leading-relaxed text-neutral-700">
-              {state.report ?? s.noReport}
-            </p>
-          </details>
+          <LatestReportLine />
 
           {!focus ? (
             <EmptyPanel title={s.noIdeas} message={s.noIdeasMessage} />

@@ -28,6 +28,7 @@ const h = vi.hoisted(() => ({
   promoteWaiting: vi.fn(),
   attention: vi.fn(),
   dismissWaiting: vi.fn(),
+  reports: vi.fn(),
   permissions: [] as string[],
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -72,6 +73,8 @@ vi.mock("@api", async importOriginal => ({
   usePromoteWaitingReleaseMutation: () => [h.promoteWaiting, { isLoading: false }],
   useDismissWaitingReleaseMutation: () => [h.dismissWaiting, { isLoading: false }],
   useGetDebriefAttentionQuery: () => h.attention(),
+  useGetPmAgentReportsQuery: () => h.reports(),
+  useGetPmAgentReportQuery: () => ({ data: undefined }),
   useGetPromptVersionsQuery: () => ({
     data: [
       { version: 14, status: "live", publishedAt: "2026-11-12", note: "Shorter lines" },
@@ -253,6 +256,7 @@ beforeEach(() => {
   h.settings.mockReturnValue(ok(SETTINGS));
   h.autonomy.mockReturnValue({ data: undefined });
   h.attention.mockReturnValue({ data: undefined });
+  h.reports.mockReturnValue(ok([]));
   h.history.mockReturnValue(ok(HISTORY));
   h.detail.mockImplementation((id: string) => ok(id === "r1" ? DETAIL_OLD : DETAIL_LIVE));
   h.propose.mockReturnValue(
@@ -265,9 +269,8 @@ beforeEach(() => {
 });
 
 describe("PM agent › Ideas", () => {
-  it("shows the report inline, each rung, and no try-out button before the side-by-side trial passes", () => {
+  it("shows each rung, and no try-out button before the side-by-side trial passes", () => {
     renderPage();
-    expect(screen.getByTestId("pm-agent-report")).toHaveTextContent("Scores are up.");
     expect(screen.getByTestId("idea-screen")).toHaveTextContent("+0.50 on 6 sessions");
     expect(screen.getByTestId("idea-gate")).toHaveTextContent("Waiting");
     expect(screen.getByTestId("idea-group-testing")).toHaveTextContent(

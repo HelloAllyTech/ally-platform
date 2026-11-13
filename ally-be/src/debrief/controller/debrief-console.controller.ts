@@ -62,6 +62,7 @@ import { DebriefConsoleService } from '../service/debrief-console.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefPmAgentService } from '../service/debrief-pm-agent.service';
 import { DebriefPmAgentRunService } from '../service/debrief-pm-agent-run.service';
+import { DebriefPmReportsService } from '../service/debrief-pm-reports.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
@@ -480,6 +481,7 @@ export class DebriefConsoleController {
     private readonly autonomy: DebriefAutonomyService,
     private readonly reviews: DebriefReviewService,
     private readonly releaseHistory: DebriefReleasesService,
+    private readonly pmReports: DebriefPmReportsService,
   ) {}
 
   /** Release settings (budgets, the evaluator bar) are the owner's. */
@@ -695,6 +697,26 @@ export class DebriefConsoleController {
       counts: { open: open.length, closed: ideas.length - open.length },
       viewer: { roles: viewer.roles, can: viewer.can },
     };
+  }
+
+  @Get('pm-agent/reports')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      "The PM agent's weekly reports and monthly reviews, newest first (months with records but no review yet included)",
+  })
+  pmAgentReports() {
+    return this.pmReports.list();
+  }
+
+  @Get('pm-agent/reports/:kind/:period')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      "One report: what changed in the period (from the records) and the PM agent's text",
+  })
+  pmAgentReport(@Param('kind') kind: string, @Param('period') period: string) {
+    return this.pmReports.get(kind, period);
   }
 
   @Post('pm-agent/analyse')

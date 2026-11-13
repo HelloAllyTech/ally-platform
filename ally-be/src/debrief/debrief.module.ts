@@ -52,6 +52,7 @@ import { DebriefReviewAnswer } from './entity/debrief-review-answer.entity';
 import { DebriefAgreementSample } from './entity/debrief-agreement-sample.entity';
 import { DebriefAutonomyService } from './service/debrief-autonomy.service';
 import { DebriefReleasesService } from './service/debrief-releases.service';
+import { DebriefPmReportsService } from './service/debrief-pm-reports.service';
 import { DebriefConsoleViewService } from './service/debrief-console-view.service';
 import { DebriefOwnerSettings } from './entity/debrief-owner-settings.entity';
 import { DebriefProbeResult } from './entity/debrief-probe-result.entity';
@@ -148,6 +149,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefAgreementService,
     // Releases that have been live, release notes, proposed changes' drafts.
     DebriefReleasesService,
+    // PM agent › Reports: weekly reports, monthly reviews and what changed (R2-25).
+    DebriefPmReportsService,
     // The redesigned console's read models: sessions, session view, attention.
     DebriefConsoleViewService,
     DebriefLearnerEventsService,

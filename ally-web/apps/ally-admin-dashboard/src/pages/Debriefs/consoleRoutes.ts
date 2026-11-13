@@ -7,7 +7,7 @@ export const ANALYTICS_DEBRIEFS_TAB = "debriefs";
 export const analyticsDebriefsPath = () => `${ROUTES.ANALYTICS}?tab=${ANALYTICS_DEBRIEFS_TAB}`;
 
 /** Where a PM agent link opens: `?view=` picks the tab, `?idea=` the idea in focus. */
-export type PmAgentView = "ideas" | "releases" | "test-sets";
+export type PmAgentView = "ideas" | "releases" | "reports" | "test-sets";
 export const pmAgentPath = (view: PmAgentView = "ideas", idea?: string): string => {
   const q = new URLSearchParams();
   if (view !== "ideas") q.set("view", view);
@@ -15,6 +15,14 @@ export const pmAgentPath = (view: PmAgentView = "ideas", idea?: string): string 
   const qs = q.toString();
   return `${ROUTES.DEBRIEFS_PM_AGENT}${qs ? `?${qs}` : ""}`;
 };
+
+/** PM agent › Reports at one report: `?view=reports&kind=monthly&period=2026-10`. */
+export const pmReportPath = (kind: "weekly" | "monthly", period: string): string =>
+  `${ROUTES.DEBRIEFS_PM_AGENT}?${new URLSearchParams({ view: "reports", kind, period })}`;
+
+/** PM agent › Releases with one release open. */
+export const pmReleasePath = (releaseId: string): string =>
+  `${ROUTES.DEBRIEFS_PM_AGENT}?${new URLSearchParams({ view: "releases", releaseId })}`;
 
 export type SettingsSection =
   | "orgs"

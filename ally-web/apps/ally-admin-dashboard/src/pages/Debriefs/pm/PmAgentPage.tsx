@@ -23,9 +23,10 @@ import { useDebriefAccess } from "../debriefAccess";
 import { IdeasView } from "./IdeasView";
 import { ProposeChange } from "./ProposeChange";
 import { ReleasesView } from "./ReleasesView";
+import { ReportsView } from "./ReportsView";
 import { bannerText } from "../home/DebriefsHome";
 
-const VIEWS: PmAgentView[] = ["ideas", "releases", "test-sets"];
+const VIEWS: PmAgentView[] = ["ideas", "releases", "reports", "test-sets"];
 
 /** PM agent › Test sets: the Open / Gate / Sealed counts, and adding recent sessions. */
 const TestSetsView: React.FC<{
@@ -186,6 +187,8 @@ export const PmAgentPage: React.FC = () => {
       )}
       {view === "test-sets" ? (
         <TestSetsView overview={overview} canAct={access.testSets} />
+      ) : view === "reports" ? (
+        <ReportsView />
       ) : state.isError ? (
         <div className="px-8 py-6">
           <ErrorPanel

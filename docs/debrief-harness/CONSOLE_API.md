@@ -463,6 +463,64 @@ type WaitingRelease = {
 
 `BundleDiff = { prompts: [{code, before, after, pinned}], settings: [{key, before, after}], recipes: [...], steps: [{step, field: 'enabled'|'model'|'backupModel', before, after}], reply, orchestrator, budgetOnly }`.
 
+## PM agent reports (R2-25)
+
+Read with `DebriefRead`, like `GET pm-agent`. Platform-wide, like every PM agent route: the Debrief
+agent and its ideas are one for all organisations. Periods are India time; a week starts on Monday.
+The admin shows them at PM agent › Reports (`?view=reports&kind=monthly&period=2026-10`).
+
+### `GET pm-agent/reports`
+Newest first (by when the period starts).
+```ts
+Array<{ kind: 'weekly' | 'monthly';
+        period: string;          // monthly 'YYYY-MM'; weekly the Monday 'YYYY-MM-DD'
+        title: string;           // "October 2026" | "Week of 9 Nov"
+        publishedAt: string | null;
+        hasReview: boolean }>
+```
+- **Weekly:** a weekly PM agent run with a report (`curator_run`, `review: 'weekly'`) is listed
+  under the Monday-week it **looks back on**: the 7 days before it was written straddle at most two
+  weeks, and it goes to the one holding most of them (the week of the window's midpoint). Monday's
+  scheduled run (written Mon 9 Nov) is therefore "Week of 2 Nov", and its "What changed" covers
+  2–8 Nov; a "Run now" from Thursday noon (IST) on reports on the current week. When two runs land
+  on the same week, the later one wins. The current week, before its report exists, is listed with
+  `hasReview: false` only when it already has records.
+- **Monthly:** the review run (`review: 'monthly'`) is filed under the month **before** the one it was
+  published in; the first in that month wins. A month is also listed, with `hasReview: false` and
+  `publishedAt: null`, when it has records (releases put live or reverted, ideas rejected or
+  withdrawn, tests, Builder hand-offs) or a weekly report.
+
+### `GET pm-agent/reports/:kind/:period`
+400 for a bad kind or period (a weekly period must be a Monday). A period with nothing in it
+returns zeros, not 404.
+```ts
+{ kind; period; title;
+  review: { text: string; publishedAt: string } | null;     // the PM agent's report text
+  changed: {                                                // computed from the records only
+    from: string; to: string;                               // [from, to)
+    liveForEveryone: { count; byPerson;                     // 'promoted' in agent_release_audit
+      items: Array<{ releaseId; version; ideaId: string|null; title; at;
+                     approvedBy: {id,name}|null;            // null: it went live on its own
+                     standing: {status:'standing'} | {status:'reverted', at} | {status:'not_yet'} }> };
+    reverted: { count;                                      // canary_reverted, canary_stopped, rolled_back, emergency_rollback
+      items: Array<{ releaseId; version; ideaId; title; at;   // a roll back names the release it undid
+                     how: 'try_out_reverted'|'try_out_stopped'|'rolled_back'|'emergency';
+                     by: {id,name}|null; reason: string|null }> };
+    rejected: { count;                                      // 'rejected' (not expiries) and withdrawals
+      items: Array<{ ideaId; title; at; withdrawn: boolean; by: {id,name}|null; reason }> };
+    tests: { count; passed; quickChecks; passTests; trials };
+    sentToBuilder: { count };
+    budget: { spentUsd; capUsd; parts: { testsUsd; pmAgentUsd } } | null } }   // monthly only
+```
+- **Still standing at 14 days:** no roll back to an **older** version within 14 days of going live
+  (being replaced by a newer release doesn't count). `not_yet` until 14 days have passed.
+- **Tests:** quick checks and pass tests by their result row (`pipeline_step`, they finish within
+  minutes of starting); side-by-side trials by `evidence.trial.startedAt`.
+- **Budget:** counted as the learning budget counts it: tests = replay runs plus judging them,
+  PM agent runs = `debrief_improver` model calls. The cap is today's monthly amount plus the skim of
+  that month's production ceilings (past settings aren't kept). Builder hand-offs are not paid from
+  the learning budget, so they are not in it.
+
 ## What the PM agent may do alone
 
 ### `GET autonomy`

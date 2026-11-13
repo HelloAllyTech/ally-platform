@@ -10360,10 +10360,12 @@ export const en = {
     // The PM agent page (redesign 2026-11-12): Ideas, Releases and Test sets.
     pmPage: {
       title: "PM agent",
-      tabs: { ideas: "Ideas", releases: "Releases", "test-sets": "Test sets" } as Record<
-        string,
-        string
-      >,
+      tabs: {
+        ideas: "Ideas",
+        releases: "Releases",
+        reports: "Reports",
+        "test-sets": "Test sets",
+      } as Record<string, string>,
       needYou: (n: number) => `${n} ${n === 1 ? "needs" : "need"} you`,
       oldest: (w: string) => `oldest ${w}`,
       inCanary: (n: number) => `${n} trying on learners`,
@@ -10482,6 +10484,76 @@ export const en = {
       expiresBody: (title: string) => `“${title}” closes as “no decision” if nobody answers.`,
       answerIt: "Answer it",
       report: (when: string) => `This week's report · written ${when}`,
+      latestReport: "Latest report:",
+      monthReview: (month: string) => `${month} review`,
+      reports: {
+        title: "Reports",
+        none: "The PM agent hasn't written a report yet. Weekly reports appear after its first weekly run.",
+        loadFailed: "the PM agent's reports",
+        toolbar: "Choose a report",
+        kind: "Kind",
+        weekly: "Weekly",
+        monthly: "Monthly",
+        periodLabel: { weekly: "Week", monthly: "Month" },
+        previous: { weekly: "Previous week", monthly: "Previous month" },
+        next: { weekly: "Next week", monthly: "Next month" },
+        monthlyKicker: (published: string | null) =>
+          published
+            ? `Monthly review · published ${published}`
+            : "Monthly review · not published yet",
+        weeklyKicker: (written: string | null) =>
+          written ? `Weekly report · written ${written}` : "Weekly report · not written yet",
+        changedTitle: { weekly: "What changed this week", monthly: "What changed this month" },
+        changedNote: "Taken from the records of releases and ideas, not written by the PM agent.",
+        tiles: {
+          live: "Live for everyone",
+          reverted: "Reverted",
+          rejected: "Rejected or withdrawn",
+          tests: "Tests run",
+          builder: "Sent to Builder",
+        },
+        allByPerson: "all approved by a person",
+        someByPerson: (n: number) => `${n} approved by a person`,
+        withReasons: "with reasons",
+        passed: (n: number) => `${n} passed`,
+        lists: {
+          live: "Went live for everyone",
+          reverted: "Reverted",
+          rejected: "Rejected or withdrawn",
+        },
+        approvedBy: (name: string) => `Approved by ${name}`,
+        wentLiveAlone: "Went live on its own",
+        standing: "still standing at 14 days",
+        revertedOn: (date: string) => `reverted on ${date}`,
+        notYet: "not yet 14 days",
+        revertedHow: {
+          try_out_reverted: () => "Reverted automatically",
+          try_out_stopped: (name: string | null) =>
+            name ? `Stopped by ${name}` : "Stopped automatically",
+          rolled_back: (name: string | null) => (name ? `Rolled back by ${name}` : "Rolled back"),
+          emergency: (name: string | null) =>
+            name ? `Emergency stop by ${name}` : "Emergency stop",
+        } as Record<string, (name: string | null) => string>,
+        rejectedBy: (name: string | null) =>
+          name ? `Rejected by ${name}` : "Rejected by the PM agent",
+        withdrawnBy: (name: string | null) =>
+          name ? `Withdrawn by ${name}` : "Withdrawn by the PM agent",
+        someone: "a person",
+        budget: "Learning budget",
+        budgetLine: (spent: string, cap: string, tests: string, pmAgent: string) =>
+          `${spent} of ${cap} spent: tests ${tests}, PM agent runs ${pmAgent}`,
+        reviewTitle: { weekly: "The PM agent's report", monthly: "The PM agent's review" },
+        reviewNote: {
+          weekly: "Written by the PM agent from the week's evidence.",
+          monthly: "Written by the PM agent from the month's evidence.",
+        },
+        reviewPending: {
+          weekly: "The PM agent's report is written on Monday.",
+          monthly: "The PM agent's review is published on the 1st.",
+        },
+        download: "Download as PDF",
+        allReleases: "All releases",
+      },
       tests: "Tests",
       needsApproval: "Needs your approval",
       approveCanary: "Approve and try it on some learners",
