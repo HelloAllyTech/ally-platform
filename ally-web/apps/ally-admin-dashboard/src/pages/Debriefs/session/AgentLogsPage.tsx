@@ -14,6 +14,7 @@ import { en, ROUTES } from "@constants";
 import { AgentLogEntry, AgentLogsView } from "@types";
 
 import { modelLabels } from "../consoleLabels";
+import { TruncatedTitle } from "../consoleRows";
 import { BackLink } from "../consoleUi";
 import {
   entryName,
@@ -333,13 +334,11 @@ export const AgentLogsPage: React.FC = () => {
       <div className="flex min-w-0 flex-nowrap items-center gap-3" data-testid="agent-logs-header">
         {back}
         {heading}
-        <span
-          title={summary}
-          className="min-w-0 truncate text-sm text-neutral-600"
-          data-testid="agent-logs-summary"
-        >
-          {summary}
-        </span>
+        <TruncatedTitle
+          text={summary}
+          testId="agent-logs-summary"
+          className="text-sm text-neutral-600"
+        />
       </div>
 
       <div

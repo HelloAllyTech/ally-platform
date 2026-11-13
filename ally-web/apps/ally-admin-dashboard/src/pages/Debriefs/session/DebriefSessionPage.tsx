@@ -20,6 +20,7 @@ import { getErrorMessage } from "@utils";
 
 import { languageLabel, modelLabels, recipeLabel } from "../consoleLabels";
 import { score } from "../consoleTable";
+import { TruncatedTitle } from "../consoleRows";
 import { BackLink, ConsoleTag, TagTone } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { selectionToAnchor } from "../expertReviewSelection";
@@ -424,13 +425,12 @@ export const DebriefSessionPage: React.FC = () => {
           <span className="shrink-0">
             <BackLink to={backTo}>{backLabel}</BackLink>
           </span>
-          <h1
-            title={title}
-            className="min-w-0 truncate font-secondary text-[28px] font-normal leading-tight"
-            data-testid="session-title"
-          >
-            {title}
-          </h1>
+          <TruncatedTitle
+            as="h1"
+            text={title}
+            testId="session-title"
+            className="font-secondary text-[28px] font-normal leading-tight"
+          />
           {shownTags.map(t => (
             <ConsoleTag key={t.label} tone={t.tone}>
               {t.label}
