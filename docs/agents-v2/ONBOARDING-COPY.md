@@ -751,7 +751,7 @@ says when a save can't be made. More lines for the home's sections are added her
 
 ## 27. Lists in the dashboard (5b)
 
-*(Draft for Shehbaz's approval at 5b's stop. The owner's Lists section on the assistant's home. On screen, say entries, details, "can move to" and "linked to"; never record, field, transition or relation. `{list}` and `{detail}` read in lower case mid-sentence. Statuses and choices show as written, with `_` as a space and a capital first letter: "No show".)*
+*(Approved at 5b's stop, 14 Nov, with Shehbaz's changes. The owner's Lists section on the assistant's home. On screen, say entries, details, "can move to" and "linked to"; never record, field, transition or relation. A list's name keeps its capital everywhere, as the owner gave it ("New entry in Appointments"); only Repeat weekly's count uses it as a plain plural ("This adds 35 slots."). A detail's label reads in lower case mid-sentence. Statuses and choices show as written, with `_` as a space and a capital first letter: "No show". Dates and times read "Mon 16 Nov, 15:00", never with the year.)*
 
 **The section:**
 
@@ -806,9 +806,10 @@ says when a save can't be made. More lines for the home's sections are added her
 - Clear
 - We couldn't load these entries.
 - Try again
-- {list} starts with example choices for {detail}. Replace them with your own.
+- Your {detail} choices are still examples. Replace them with yours.
 - Replace them
 - Not set
+- —
 
 **An entry (add and edit):**
 
@@ -831,6 +832,8 @@ says when a save can't be made. More lines for the home's sections are added her
 - Search {list}
 - Nothing matches.
 - From {status}, it can move to {next}.
+- Free nearby:
+- Use {title}
 - {status} is where it ends.
 - Added by you on {date}
 - Added by {name} on {date}
@@ -940,6 +943,7 @@ says when a save can't be made. More lines for the home's sections are added her
   - From
   - Can move to
   - New entries start as
+  - Count every entry
 - {n} entries already break this rule. Change them first, or adjust the rule.
 - Open {title}
 
@@ -973,6 +977,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - Next
 - Back
 - Skip
+- Skip for now
 - Done
 - Close
 - Use this list
@@ -984,10 +989,10 @@ says when a save can't be made. More lines for the home's sections are added her
 - {list} is ready.
 - Couldn't set it up. Try again.
 - Make {list} yours
-- These are examples to get you started. Replace them with your own {detail}.
+- These are examples to get you started. Replace them with your own.
 - Example
 - Add
-- Add one of your {detail}
+- Add a {detail}
 - Keep at least one.
 - Add the times people can book
 - Pick the days and hours. You can change or remove any of them later.
@@ -1020,6 +1025,9 @@ says when a save can't be made. More lines for the home's sections are added her
 - Added {n} {list}.
 - That's more than 500 at once. Choose an earlier end date.
 - Counting…
+- For each one
+- Fill in {detail} first.
+- Every time you add gets these. For another practitioner, repeat it again.
 
 **Start from scratch:**
 

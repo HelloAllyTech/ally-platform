@@ -109,16 +109,22 @@ export const ReadyMadeSetup: React.FC<{
           </h2>
           <p className="ally-setup__body">{t().setup.timesBody}</p>
           <div className="ally-card">
-            <RepeatWeekly botId={bot.id} list={dated} field={datedField(dated)!} onDone={next} />
+            <RepeatWeekly
+              bot={bot}
+              lists={lists}
+              list={dated}
+              field={datedField(dated)!}
+              onDone={next}
+            />
           </div>
-          <StepButtons onBack={back} onSkip={next} />
+          <StepButtons onBack={back} onSkip={next} skipLabel={t().setup.skipForNow} />
         </section>
       )}
 
       {step === "assistant" && main && (
         <section className="ally-setup__step">
           <h2 ref={heading} tabIndex={-1} className="ally-setup__title">
-            {fill(t().setup.assistantTitle, { list: lower(main.name) })}
+            {fill(t().setup.assistantTitle, { list: main.name })}
           </h2>
           <p className="ally-setup__body">{t().setup.assistantBody}</p>
           <div className="ally-card">
@@ -153,16 +159,17 @@ export const ReadyMadeSetup: React.FC<{
 };
 
 /** Back, Skip and Next. Without `onNext` the step's own action moves on (Add them). */
-const StepButtons: React.FC<{ onBack: () => void; onSkip: () => void; onNext?: () => void }> = ({
-  onBack,
-  onSkip,
-  onNext,
-}) => (
+const StepButtons: React.FC<{
+  onBack: () => void;
+  onSkip: () => void;
+  onNext?: () => void;
+  skipLabel?: string;
+}> = ({ onBack, onSkip, onNext, skipLabel }) => (
   <div className="ally-setup__buttons">
     <Button onClick={onBack}>{t().setup.back}</Button>
     <span className="ally-setup__spacer" />
     <Button variant="ghost" onClick={onSkip}>
-      {t().setup.skip}
+      {skipLabel ?? t().setup.skip}
     </Button>
     {onNext && (
       <Button variant="primary" onClick={onNext}>
@@ -309,7 +316,7 @@ const MakeItYours: React.FC<{
   return (
     <section className="ally-setup__step">
       <h2 ref={heading} tabIndex={-1} className="ally-setup__title">
-        {fill(t().setup.yoursTitle, { list: lower(list?.name ?? item.title) })}
+        {fill(t().setup.yoursTitle, { list: list?.name ?? item.title })}
       </h2>
       <p className="ally-setup__body">{fill(t().setup.yoursBody, { detail: lower(need.label) })}</p>
       <div className="ally-card">

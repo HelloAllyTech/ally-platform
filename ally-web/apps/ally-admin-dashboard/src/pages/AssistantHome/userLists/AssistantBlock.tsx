@@ -5,7 +5,7 @@ import { Button, Segmented } from "@components/v2";
 import type { ListAbility, UserList } from "@types";
 
 import { HOME, fill } from "../copy";
-import { bookedList, fillable, lower, shortTitle } from "./format";
+import { bookedList, fillable, shortTitle } from "./format";
 
 const t = () => HOME.userLists;
 
@@ -38,10 +38,8 @@ export const examplesFor = (
     find:
       list.settings.title_field && /starts|at$|date|time/.test(list.settings.title_field)
         ? fill(a.exampleFind, { title })
-        : fill(a.exampleFindPlain, { list: lower(list.name) }),
-    create: booked
-      ? fill(a.exampleBook, { title })
-      : fill(a.exampleAdd, { list: lower(list.name) }),
+        : fill(a.exampleFindPlain, { list: list.name }),
+    create: booked ? fill(a.exampleBook, { title }) : fill(a.exampleAdd, { list: list.name }),
     update: a.exampleChange,
   };
 };

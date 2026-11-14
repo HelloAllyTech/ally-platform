@@ -135,7 +135,7 @@ const NotCounting: React.FC<{
         label={r.notCounting}
         value={value?.field ?? ""}
         options={[
-          { value: "", label: t().details.nothing },
+          { value: "", label: r.countEvery },
           ...choices.map(f => ({ value: f.key, label: f.label })),
         ]}
         onChange={key => onChange(key ? { field: key, not_in: [] } : null)}

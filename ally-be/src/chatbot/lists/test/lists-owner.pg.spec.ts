@@ -258,6 +258,7 @@ describePg('Lists, the owner’s section (Postgres)', () => {
 
       await records.create(bot, 'slots', OWNER, {
         starts_at: '2026-11-17T04:30:00Z', // Tue 10:00 in India, written in UTC
+        practitioner: 'Dr Mehta',
       });
       const done = await owner.repeat(
         await chatbot(),
@@ -271,17 +272,60 @@ describePg('Lists, the owner’s section (Postgres)', () => {
       expect(all.total).toBe(35);
       expect(
         all.records.filter((r) => r.data.practitioner === 'Dr Mehta'),
-      ).toHaveLength(34);
+      ).toHaveLength(35);
       expect(all.records[0].data.starts_at).toBe('2026-11-16T10:00:00+05:30');
 
       const again = await owner.repeat(
         await chatbot(),
         'slots',
         OWNER,
-        week,
+        { ...week, values: { practitioner: 'Dr Mehta' } },
         NOW,
       );
       expect(again).toMatchObject({ count: 0, skipped: 35 });
+    });
+
+    it("skips only times with the same details: Dr Rao's 10:00 isn't Dr Mehta's", async () => {
+      await owner.repeat(
+        await chatbot(),
+        'slots',
+        OWNER,
+        { ...week, values: { practitioner: 'Dr Mehta' } },
+        NOW,
+      );
+      const rao = await owner.repeat(
+        await chatbot(),
+        'slots',
+        OWNER,
+        { ...week, values: { practitioner: 'Dr Rao' }, dry_run: true },
+        NOW,
+      );
+      expect(rao).toMatchObject({ count: 35, skipped: 0 });
+    });
+
+    it('needs every needed detail before it adds anything', async () => {
+      await owner.install(await chatbot(), 'table_reservations');
+      const refused = await refusal(
+        owner.repeat(
+          await chatbot(),
+          'tables',
+          OWNER,
+          { ...week, dry_run: true },
+          NOW,
+        ),
+      );
+      expect(refused).toMatchObject({
+        code: 'required_missing',
+        field: 'table',
+      });
+      const ok = await owner.repeat(
+        await chatbot(),
+        'tables',
+        OWNER,
+        { ...week, values: { table: 'T1' }, dry_run: true },
+        NOW,
+      );
+      expect(ok).toMatchObject({ count: 35, skipped: 0 });
     });
 
     it('leaves out times already past', async () => {

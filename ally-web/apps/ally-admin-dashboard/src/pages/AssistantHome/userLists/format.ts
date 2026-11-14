@@ -157,6 +157,10 @@ export const showValue = (list: UserList, field: ListField, entry: ListEntry): s
 export const shortTitle = (_list: UserList, title: string, now = new Date()): string =>
   title.replace(new RegExp(`(\\b\\d{1,2} \\w{3}) ${now.getFullYear()},`), "$1,");
 
+/** A title without its year, as alternatives read ("Mon 16 Nov, 15:00"): never the year. */
+export const noYear = (title: string): string =>
+  title.replace(/(\b\d{1,2} [A-Z][a-z]{2}) \d{4}(,|$)/, "$1$2");
+
 /** An entry's title as people read it. */
 export const titleOf = (list: UserList, entry: ListEntry): string => {
   const key = list.settings.title_field;

@@ -16,18 +16,35 @@ test.skip(!process.env.LISTS_DESIGN_SHOTS, "design shots only on request");
 const OUT = path.resolve(__dirname, "../../../../docs/agents-v2/design/5b");
 
 /** `fullPage` for short pages; long ones shoot the section itself (the header is sticky). */
+/** No sideways scroll on any Lists screen: the page is never wider than the window. */
+export const noSideScroll = async (page: Page, name: string) => {
+  const { scroll, inner, wide } = await page.evaluate(() => {
+    const inner = window.innerWidth;
+    const wide = [...document.querySelectorAll<HTMLElement>("body *")]
+      .filter(el => el.getBoundingClientRect().right > inner + 1)
+      .filter(el => !el.closest(".ally-home__nav, .ally-lists__tabs, .ally-lists__table-wrap"))
+      .slice(0, 5)
+      .map(el => `${el.tagName.toLowerCase()}.${String(el.className).split(" ")[0]}`);
+    return { scroll: document.documentElement.scrollWidth, inner, wide };
+  });
+  expect(
+    scroll,
+    `${name}: page is ${scroll}px wide in ${inner}px (${wide.join(", ")})`,
+  ).toBeLessThanOrEqual(inner);
+};
+
 const shot = async (page: Page, name: string, project: string, fullPage = true) => {
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(250);
+  await noSideScroll(page, name);
   const file = `${OUT}/${name}-${project}.png`;
-  if (
-    fullPage &&
-    (await page.evaluate(() => document.body.scrollHeight > window.innerHeight * 1.6))
-  ) {
-    await page.locator(".ally-home__main").screenshot({ path: file });
-  } else {
-    await page.screenshot({ path: file, fullPage });
-  }
+  // The home's header and left list are sticky: a full-page capture stitches them in partway down
+  // the image. Unstick them for the capture only; the page itself is unchanged.
+  await page.screenshot({
+    path: file,
+    fullPage,
+    style: ".ally-home__top, .ally-home__nav ul { position: static !important; }",
+  });
 };
 
 const open = async (page: Page) => {
@@ -51,7 +68,7 @@ test("empty, ready-made picker and the guided setup", async ({ page }, info) => 
   await shot(page, "02-picker", p);
 
   await page.getByRole("button", { name: "Use this list: Appointments" }).click();
-  await expect(page.getByText(/Make appointments yours/)).toBeVisible();
+  await expect(page.getByText(/Make Appointments yours/)).toBeVisible();
   await shot(page, "03-setup-yours", p, false);
 
   await page.getByRole("button", { name: "Next" }).click();
@@ -126,7 +143,7 @@ test("states: refusal at its field, no matches, a slot in use, loading error", a
   await page.keyboard.press("Escape");
 
   await page.getByRole("tab", { name: /Slots/ }).click();
-  await page.getByPlaceholder(/Search slots/).fill("Dr Nobody");
+  await page.getByPlaceholder(/Search Slots/).fill("Dr Nobody");
   await expect(page.getByText(/Nothing matches/)).toBeVisible();
   await shot(page, "15-no-match", p, false);
 });

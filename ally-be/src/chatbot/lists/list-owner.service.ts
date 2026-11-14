@@ -479,6 +479,30 @@ export class ListOwnerService {
         'it should be a date like 2026-11-20, on or after the start',
       );
     }
+    // Every entry of the batch gets the same other details (one practitioner a batch, 5b): a
+    // needed detail must be given here or have a default, or the batch would fail part way.
+    const values = { ...(input.values ?? {}) };
+    delete values[field.key];
+    for (const f of list.fields) {
+      if (f.key === field.key || !f.required) continue;
+      const given = values[f.key];
+      const blank = given === undefined || given === null || given === '';
+      if (blank && (f.default === undefined || f.default === null)) {
+        throw refuse.requiredMissing(f.key, f.label);
+      }
+    }
+    // A time counts as already there only for an entry with the same details, so Dr Rao's
+    // 10:00 isn't skipped because Dr Mehta has 10:00. Only plain values take part.
+    const same = Object.fromEntries(
+      Object.entries(values).filter(
+        ([, v]) =>
+          v !== null &&
+          v !== '' &&
+          (typeof v === 'string' ||
+            typeof v === 'number' ||
+            typeof v === 'boolean'),
+      ),
+    );
     const times: { value: string; at: number }[] = [];
     for (
       let day = from, i = 0;
@@ -507,12 +531,14 @@ export class ListOwnerService {
       const rows: { at: Date }[] = await m.query(
         `SELECT DISTINCT (data->>$2)::timestamptz AS at FROM collection_records
           WHERE collection_id = $1 AND deleted_at IS NULL AND data ? $2
-            AND (data->>$2)::timestamptz BETWEEN $3 AND $4`,
+            AND (data->>$2)::timestamptz BETWEEN $3 AND $4
+            AND data @> $5::jsonb`,
         [
           list.collection.id,
           field.key,
           new Date(times[0].at).toISOString(),
           new Date(times[times.length - 1].at).toISOString(),
+          JSON.stringify(same),
         ],
       );
       const taken = new Set(rows.map((r) => new Date(r.at).getTime()));
@@ -550,7 +576,7 @@ export class ListOwnerService {
           chatbot.id,
           key,
           actor,
-          { ...(input.values ?? {}), [field.key]: time.value },
+          { ...values, [field.key]: time.value },
           { manager: m, lockMode: 'list' },
         );
       }

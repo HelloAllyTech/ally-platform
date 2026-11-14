@@ -1041,3 +1041,39 @@
     min-height: 44px;
   }
 }
+
+/* A refusal's free alternatives, as chips to tap (5b review). */
+.ally-lists__nearby {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ally-lists__nearby .ally-chip {
+  min-height: 40px;
+  font-size: 14px;
+}
+
+/* Repeat weekly's "For each one": the other details every new entry gets (5b review). */
+.ally-repeat__each {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+}
+.ally-repeat__each-title {
+  padding: 0;
+  font-weight: 600;
+  font-size: 15px;
+}
+.ally-repeat__each > .ally-field__hint {
+  margin: -8px 0 0;
+}
+.ally-repeat__skipped {
+  font: 400 15px/1.4 var(--ally-font-ui);
+  color: var(--ally-muted);
+}

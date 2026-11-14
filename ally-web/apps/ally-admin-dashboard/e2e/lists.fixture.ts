@@ -76,7 +76,7 @@ const ITEMS: {
         settings: { title_field: "starts_at", default_sort: "starts_at" },
         agent_read: true,
         fields: [
-          f("starts_at", "Starts at", "datetime", { required: true, agent_write: false }),
+          f("starts_at", "Time", "datetime", { required: true, agent_write: false }),
           f("practitioner", "Practitioner", "text"),
           f("duration", "Duration", "duration", { default: 50 }),
           f("open", "Open", "boolean", { default: true }),
@@ -188,7 +188,7 @@ const ITEMS: {
         settings: { title_field: "starts_at" },
         agent_read: true,
         fields: [
-          f("starts_at", "Starts at", "datetime", { required: true }),
+          f("starts_at", "Time", "datetime", { required: true }),
           f("table", "Table", "text", { required: true }),
           f("seats", "Seats", "number"),
           f("open", "Open", "boolean"),
@@ -214,7 +214,7 @@ const ITEMS: {
   {
     group: "Classes and events",
     name: "classes",
-    title: "Classes",
+    title: "Class bookings",
     one_liner: "For gyms, yoga, dance and coaching batches.",
     examples: ["Is there a beginners' yoga class on Saturday?", "Book me in."],
     lists: [
@@ -225,7 +225,7 @@ const ITEMS: {
         agent_read: true,
         fields: [
           f("name", "Name", "text", { required: true }),
-          f("starts_at", "Starts at", "datetime", { required: true }),
+          f("starts_at", "Time", "datetime", { required: true }),
           f("teacher", "Teacher", "text"),
           f("seats", "Seats", "number", { default: 20 }),
           select("level", "Level", ["beginner", "intermediate", "advanced", "all"]),
@@ -260,7 +260,7 @@ const ITEMS: {
         agent_read: true,
         fields: [
           f("name", "Name", "text", { required: true }),
-          f("starts_at", "Starts at", "datetime", { required: true }),
+          f("starts_at", "Time", "datetime", { required: true }),
           f("venue", "Venue", "text"),
           f("seats", "Seats", "number"),
           f("fee", "Fee", "money"),
@@ -316,7 +316,7 @@ const ITEMS: {
     group: "Sales and enquiries",
     name: "callback_requests",
     title: "Callback requests",
-    one_liner: "The honest version of “I'll pass it on”.",
+    one_liner: "When someone wants the team to call them back.",
     examples: ["Call me back about my bill"],
     lists: [
       {
@@ -430,7 +430,7 @@ const ITEMS: {
     group: "Services and support",
     name: "price_list",
     title: "Price list",
-    one_liner: "Facts that must always be answered the same way.",
+    one_liner: "Your services and prices, answered the same way every time.",
     examples: ["How much is a consultation?"],
     lists: [
       {
@@ -811,17 +811,23 @@ export async function mockLists(
       ) {
         if ((b.days as number[]).includes(((d.getUTCDay() + 6) % 7) + 1)) days += 1;
       }
-      const count = perDay * days;
+      const total = perDay * days;
+      // As ally-be: a time is already there only for an entry with the same details.
+      const skipped =
+        def.key === "slots" && list.some(e => e.data.practitioner === b.values?.practitioner)
+          ? Math.min(3, total)
+          : 0;
+      const count = total - skipped;
       const first = [
-        "Mon 16 Nov, 10:00",
-        "Mon 16 Nov, 11:00",
-        "Mon 16 Nov, 12:00",
-        "Mon 16 Nov, 13:00",
-        "Mon 16 Nov, 14:00",
+        "Mon 16 Nov 2026, 10:00",
+        "Mon 16 Nov 2026, 11:00",
+        "Mon 16 Nov 2026, 12:00",
+        "Mon 16 Nov 2026, 13:00",
+        "Mon 16 Nov 2026, 14:00",
       ].slice(0, count);
       return json(route, {
         count,
-        skipped: def.key === "slots" && list.length ? 3 : 0,
+        skipped,
         first,
         dry_run: Boolean(b.dry_run),
       });

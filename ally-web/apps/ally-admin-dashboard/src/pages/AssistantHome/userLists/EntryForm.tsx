@@ -8,7 +8,7 @@ import {
   useLazySearchListContactsQuery,
   useUpdateListEntryMutation,
 } from "@api";
-import { Button, Combobox, DatePicker, Select, Switch, TimePicker } from "@components/v2";
+import { Button, Chip, Combobox, DatePicker, Select, Switch, TimePicker } from "@components/v2";
 import type { SelectOption } from "@components/v2";
 import type { Chatbot, ListEntry, ListField, ListRefusal, UserList } from "@types";
 
@@ -22,6 +22,7 @@ import {
   liveFields,
   lower,
   nextValues,
+  noYear,
   showValue,
   titleOf,
   todayIn,
@@ -68,6 +69,8 @@ export const EntryForm: React.FC<{
   const [start, setStart] = useState(() => initialValues(list, opened));
   const [values, setValues] = useState(start);
   const [refusal, setRefusal] = useState<ListRefusal | null>(null);
+  // Titles of linked entries chosen here (from the picker or a "Free nearby" chip).
+  const [labels, setLabels] = useState<Record<string, string>>({});
   const [failed, setFailed] = useState(false);
   const [saved, setSaved] = useState(false);
   const [create, created] = useCreateListEntryMutation();
@@ -75,10 +78,11 @@ export const EntryForm: React.FC<{
   const [reload, reloading] = useLazyGetListEntryQuery();
   const saving = created.isLoading || updated.isLoading;
   const fields = liveFields(list);
-  const title = entry ? t().form.editTitle : fill(t().form.addTitle, { list: lower(list.name) });
+  const title = entry ? t().form.editTitle : fill(t().form.addTitle, { list: list.name });
 
-  const set = (key: string, value: unknown) => {
+  const set = (key: string, value: unknown, label?: string) => {
     setValues(v => ({ ...v, [key]: value }));
+    if (label) setLabels(l => ({ ...l, [key]: label }));
     setSaved(false);
     if (refusal?.field === key) setRefusal(null);
   };
@@ -147,13 +151,6 @@ export const EntryForm: React.FC<{
                 {t().form.reload}
               </Button>
             )}
-            {!!formRefusal.conflict?.alternatives?.length && (
-              <ul className="ally-lists__refusal-list">
-                {formRefusal.conflict.alternatives.map(a => (
-                  <li key={a.id}>{a.title}</li>
-                ))}
-              </ul>
-            )}
           </div>
         )}
 
@@ -171,7 +168,8 @@ export const EntryForm: React.FC<{
               !canEdit || saving || (Boolean(entry) && field.key === list.settings.person_field)
             }
             refusal={fieldRefusal?.field === field.key ? fieldRefusal : null}
-            onChange={value => set(field.key, value)}
+            knownLabel={labels[field.key]}
+            onChange={(value, label) => set(field.key, value, label)}
           />
         ))}
 
@@ -231,7 +229,8 @@ const CreatedBy: React.FC<{ list: UserList; entry: ListEntry }> = ({ list, entry
   );
 };
 
-const FieldInput: React.FC<{
+/** One detail's input, by kind. Repeat weekly's "For each one" uses it too. */
+export const FieldInput: React.FC<{
   bot: Chatbot;
   list: UserList;
   lists: UserList[];
@@ -241,8 +240,22 @@ const FieldInput: React.FC<{
   current: unknown;
   disabled: boolean;
   refusal: ListRefusal | null;
-  onChange: (value: unknown) => void;
-}> = ({ bot, list, lists, field, entry, value, current, disabled, refusal, onChange }) => {
+  /** A linked entry's title, when it was chosen here. */
+  knownLabel?: string;
+  onChange: (value: unknown, label?: string) => void;
+}> = ({
+  bot,
+  list,
+  lists,
+  field,
+  entry,
+  value,
+  current,
+  disabled,
+  refusal,
+  knownLabel,
+  onChange,
+}) => {
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
@@ -396,9 +409,14 @@ const FieldInput: React.FC<{
             disabled={disabled}
             invalid={invalid}
             describedBy={describedBy}
+            knownLabel={knownLabel}
             onChange={onChange}
           />
-          <FieldError id={errorId} refusal={refusal} />
+          <FieldError
+            id={errorId}
+            refusal={refusal}
+            onPick={alt => onChange(alt.id, noYear(alt.title))}
+          />
         </div>
       );
     default:
@@ -445,16 +463,32 @@ const FieldInput: React.FC<{
   );
 };
 
-const FieldError: React.FC<{ id: string; refusal: ListRefusal | null }> = ({ id, refusal }) =>
+/**
+ * A refusal under its detail. Its alternatives (a taken slot's free neighbours) are chips under
+ * "Free nearby:"; tapping one fills the detail.
+ */
+const FieldError: React.FC<{
+  id: string;
+  refusal: ListRefusal | null;
+  onPick?: (alternative: { id: string; title: string }) => void;
+}> = ({ id, refusal, onPick }) =>
   refusal ? (
     <div id={id} className="ally-lists__field-error" role="alert">
       <p className="ally-error">{refusal.message}</p>
-      {!!refusal.conflict?.alternatives?.length && (
-        <ul className="ally-lists__refusal-list">
-          {refusal.conflict.alternatives.map(a => (
-            <li key={a.id}>{a.title}</li>
-          ))}
-        </ul>
+      {!!refusal.conflict?.alternatives?.length && onPick && (
+        <div className="ally-lists__nearby">
+          <span className="ally-small">{t().form.freeNearby}</span>
+          <div className="ally-chips">
+            {refusal.conflict.alternatives.map(a => (
+              <Chip key={a.id} outline onToggle={() => onPick(a)}>
+                <span aria-hidden="true">{noYear(a.title)}</span>
+                <span className="sr-only">
+                  {fill(t().form.useThis, { title: noYear(a.title) })}
+                </span>
+              </Chip>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   ) : null;
@@ -475,7 +509,8 @@ const LinkedPicker: React.FC<{
   disabled: boolean;
   invalid: boolean;
   describedBy?: string;
-  onChange: (value: unknown) => void;
+  knownLabel?: string;
+  onChange: (value: unknown, label?: string) => void;
 }> = ({
   bot,
   list,
@@ -488,6 +523,7 @@ const LinkedPicker: React.FC<{
   disabled,
   invalid,
   describedBy,
+  knownLabel,
   onChange,
 }) => {
   const to = field.options.to;
@@ -517,9 +553,11 @@ const LinkedPicker: React.FC<{
   const shown: SelectOption | null =
     picked && picked.value === value
       ? picked
-      : value && entry
-        ? { value: String(value), label: showValue(list, field, entry) || String(value) }
-        : null;
+      : value && knownLabel
+        ? { value: String(value), label: knownLabel }
+        : value && entry
+          ? { value: String(value), label: showValue(list, field, entry) || String(value) }
+          : null;
 
   return (
     <Combobox
@@ -534,7 +572,7 @@ const LinkedPicker: React.FC<{
       placeholder={
         toPerson
           ? t().form.choosePerson
-          : fill(t().form.chooseFrom, { list: lower(target?.name ?? field.label) })
+          : fill(t().form.chooseFrom, { list: target?.name ?? field.label })
       }
       emptyText={t().form.noMatches}
       onSearch={query => {
@@ -548,7 +586,7 @@ const LinkedPicker: React.FC<{
       }}
       onChange={option => {
         setPicked(option);
-        onChange(option?.value ?? null);
+        onChange(option?.value ?? null, option?.label);
       }}
     />
   );

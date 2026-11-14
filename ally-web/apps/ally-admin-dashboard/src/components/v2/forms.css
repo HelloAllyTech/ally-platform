@@ -111,8 +111,9 @@
   color: var(--ally-faint);
   pointer-events: none;
 }
-.ally-combobox__input {
-  padding-left: 38px;
+/* Room for the search icon: more specific than .ally-input's own padding. */
+.ally-combobox__box .ally-combobox__input {
+  padding-left: 40px;
 }
 
 /* Switch */

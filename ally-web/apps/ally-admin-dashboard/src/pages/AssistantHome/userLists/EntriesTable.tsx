@@ -119,7 +119,7 @@ export const EntriesTable: React.FC<{
             id={`search-${list.key}`}
             className="ally-input"
             type="search"
-            placeholder={fill(t().table.search, { list: lower(list.name) })}
+            placeholder={fill(t().table.search, { list: list.name })}
             value={typed}
             onChange={event => setTyped(event.target.value)}
           />
@@ -344,7 +344,8 @@ export const EntriesTable: React.FC<{
               <Button onClick={() => setRepeating(false)}>{t().form.close}</Button>
             </div>
             <RepeatWeekly
-              botId={bot.id}
+              bot={bot}
+              lists={lists}
               list={list}
               field={dated}
               onDone={() => setRepeating(false)}
@@ -407,7 +408,7 @@ export const Value: React.FC<{ list: UserList; field: ListField; entry: ListEntr
   entry,
 }) => {
   const shown = showValue(list, field, entry);
-  if (!shown) return <span className="ally-lists__unset">{t().table.notSet}</span>;
+  if (!shown) return <span className="ally-lists__unset">{t().table.blank}</span>;
   const rule = statusRule(list);
   if (field.type === "select" && rule?.field === field.key) {
     return (

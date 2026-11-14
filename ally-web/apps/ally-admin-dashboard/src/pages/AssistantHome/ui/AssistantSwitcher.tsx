@@ -111,7 +111,7 @@ export const AssistantSwitcher: React.FC<{ bot: Chatbot; section: SectionId; pho
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         aria-label={t().label}
-        title={t().label}
+        aria-describedby={`${id}-tip`}
         onClick={() => setOpen(o => !o)}
       >
         <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18">
@@ -124,6 +124,9 @@ export const AssistantSwitcher: React.FC<{ bot: Chatbot; section: SectionId; pho
           />
         </svg>
       </button>
+      <span id={`${id}-tip`} role="tooltip" className="ally-switcher__tip">
+        {t().label}
+      </span>
       {open &&
         (phone ? (
           <Sheet label={t().title} side="bottom" onClose={() => setOpen(false)}>

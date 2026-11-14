@@ -231,12 +231,7 @@ const OpenList: React.FC<{
     >
       {needsOptions && canEdit && (
         <div className="ally-lists__notice" role="status">
-          <p>
-            {fill(t().table.replaceOptions, {
-              list: list.name,
-              detail: lower(needsOptions.label),
-            })}
-          </p>
+          <p>{fill(t().table.replaceOptions, { detail: lower(needsOptions.label) })}</p>
           <Button onClick={() => setFocusDetail(needsOptions.field)}>
             {t().table.replaceAction}
           </Button>

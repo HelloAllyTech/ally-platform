@@ -22,7 +22,7 @@ Grouped as the picker shows them.
 ### Appointments and visits
 
 **1. Appointments** (installs with **Slots**). For clinics, therapists, salons and consultants.
-- **Slots:** **starts_at**: date and time · practitioner: text · duration: duration (default 50) · open: yes/no (default yes). Title: starts_at. Sort: starts_at. Assistant: look up.
+- **Slots:** **starts_at** (label "Time"): date and time · practitioner: text · duration: duration (default 50) · open: yes/no (default yes). Title: starts_at. Sort: starts_at. Assistant: look up.
 - **Appointments:** **slot**: relation → Slots · **client**★: relation → contact · service: select [your services] · status: select [booked, confirmed, completed, cancelled, no_show] · notes: long text (never from a conversation).
   - Rules: one per slot, not counting cancelled · at most 2 per person while booked or confirmed · booked → confirmed or cancelled; confirmed → completed, cancelled or no_show.
   - Assistant: look up; add and change are off at install.
@@ -35,21 +35,21 @@ Grouped as the picker shows them.
 - "2BHK in Baner under 85 lakh" · "Can I see it on Saturday at 11?"
 
 **3. Table reservations** (installs with **Tables**). For restaurants and cafés.
-- **Tables:** **starts_at**: date and time · **table**: text · seats: number · open: yes/no (default yes). One row per table per time. Assistant: look up.
+- **Tables:** **starts_at** (label "Time"): date and time · **table**: text · seats: number · open: yes/no (default yes). One row per table per time. Assistant: look up.
 - **Reservations:** **table_slot**: relation → Tables · **guest**★: relation → contact · party_size: number · occasion: text · status: select [booked, seated, completed, cancelled, no_show].
   - Rules: one per table slot, not counting cancelled · at most 2 per person while booked · booked → seated, cancelled or no_show; seated → completed.
 - "A table for 4 tomorrow at 8?" (the assistant looks up a table with at least 4 seats).
 
 ### Classes and events
 
-**4. Classes** (installs with **Bookings**). For gyms, yoga, dance and coaching batches.
-- **Classes:** **name**: text · **starts_at**: date and time · teacher: text · seats: number (default 20) · level: select [beginner, intermediate, advanced, all]. Assistant: look up.
+**4. Class bookings** (installs **Classes** with **Bookings**). For gyms, yoga, dance and coaching batches.
+- **Classes:** **name**: text · **starts_at** (label "Time"): date and time · teacher: text · seats: number (default 20) · level: select [beginner, intermediate, advanced, all]. Assistant: look up.
 - **Bookings:** **class**: relation → Classes · **member**★: relation → contact · status: select [booked, attended, cancelled].
   - Rules: no more bookings than the class's seats, not counting cancelled · one booking per member per class (unique on class + member, not counting cancelled) · booked → attended or cancelled.
 - "Is there a beginners' yoga class on Saturday?" · "Book me in."
 
 **5. Event registrations** (installs with **Events**). For workshops, webinars, camps and open days.
-- **Events:** **name**: text · **starts_at**: date and time · venue: text · seats: number · fee: money · registration_open: yes/no (default yes). Assistant: look up.
+- **Events:** **name**: text · **starts_at** (label "Time"): date and time · venue: text · seats: number · fee: money · registration_open: yes/no (default yes). Assistant: look up.
 - **Registrations:** **event**: relation → Events · **attendee**★: relation → contact · guests: number (default 0) · status: select [registered, attended, cancelled].
   - Rules: no more than the event's seats, not counting cancelled (each registration counts once; guests are a note for the owner) · one per person per event (unique on event + attendee, not counting cancelled) · registered → attended or cancelled.
 
@@ -60,7 +60,7 @@ Grouped as the picker shows them.
 - Rules: one live lead per phone, not counting won or lost · new → contacted or lost; contacted → qualified or lost; qualified → won or lost.
 - Assistant: look up is off (leads aren't for visitors); add is off at install. Once on, "Can someone call me about the 3-month plan?" becomes a lead.
 
-**7. Callback requests.** The honest version of "I'll pass it on".
+**7. Callback requests.** When someone wants the team to call them back.
 - **phone**: phone · **requester**★: relation → contact · **reason**: text · preferred_time: select [morning, afternoon, evening, any time] · status: select [requested, called, closed].
 - Rules: at most 1 per person while requested · requested → called or closed; called → closed.
 - Assistant: look up (their own); add is off at install. Once on: "Call me back about my bill" → "Done: the team will call you this evening."
@@ -87,7 +87,7 @@ Grouped as the picker shows them.
 
 ### Services and support
 
-**12. Price list.** Facts that must always be answered the same way.
+**12. Price list.** Your services and prices, answered the same way every time.
 - **service**: text · price: money · duration: duration · category: select [your categories] · description: long text · available: yes/no (default yes).
 - Rule: one per service. Assistant: look up, with every price cited.
 

@@ -154,7 +154,7 @@ export const READY_MADE: ReadyMadeItem[] = [
         // The seed's order, which 6's tool descriptions and passages read in.
         fields: [
           text('practitioner', 'Practitioner'),
-          field('starts_at', 'Starts at', ListFieldType.DATETIME, required),
+          field('starts_at', 'Time', ListFieldType.DATETIME, required),
           field('duration', 'Duration', ListFieldType.DURATION, {
             default: 50,
           }),
@@ -280,7 +280,7 @@ export const READY_MADE: ReadyMadeItem[] = [
         agent_read: true,
         settings: { title_field: 'starts_at', default_sort: 'starts_at' },
         fields: [
-          field('starts_at', 'Starts at', ListFieldType.DATETIME, required),
+          field('starts_at', 'Time', ListFieldType.DATETIME, required),
           text('table', 'Table', required),
           field('seats', 'Seats', ListFieldType.NUMBER),
           yesNo('open', 'Open'),
@@ -322,7 +322,7 @@ export const READY_MADE: ReadyMadeItem[] = [
   // Classes and events
   {
     name: 'classes',
-    title: 'Classes',
+    title: 'Class bookings',
     group: 'Classes and events',
     one_liner: 'For gyms, yoga, dance and coaching batches.',
     examples: ['Is there a beginners’ yoga class on Saturday?', 'Book me in.'],
@@ -334,7 +334,7 @@ export const READY_MADE: ReadyMadeItem[] = [
         settings: { title_field: 'name', default_sort: 'starts_at' },
         fields: [
           text('name', 'Name', required),
-          field('starts_at', 'Starts at', ListFieldType.DATETIME, required),
+          field('starts_at', 'Time', ListFieldType.DATETIME, required),
           text('teacher', 'Teacher'),
           field('seats', 'Seats', ListFieldType.NUMBER, { default: 20 }),
           select('level', 'Level', [
@@ -377,7 +377,7 @@ export const READY_MADE: ReadyMadeItem[] = [
         settings: { title_field: 'name', default_sort: 'starts_at' },
         fields: [
           text('name', 'Name', required),
-          field('starts_at', 'Starts at', ListFieldType.DATETIME, required),
+          field('starts_at', 'Time', ListFieldType.DATETIME, required),
           text('venue', 'Venue'),
           field('seats', 'Seats', ListFieldType.NUMBER),
           money('fee', 'Fee'),
@@ -457,7 +457,7 @@ export const READY_MADE: ReadyMadeItem[] = [
     name: 'callback_requests',
     title: 'Callback requests',
     group: 'Sales and enquiries',
-    one_liner: 'The honest version of "I’ll pass it on".',
+    one_liner: 'When someone wants the team to call them back.',
     examples: ['Call me back about my bill'],
     lists: [
       {
@@ -646,7 +646,7 @@ export const READY_MADE: ReadyMadeItem[] = [
     name: 'price_list',
     title: 'Price list',
     group: 'Services and support',
-    one_liner: 'Facts that must always be answered the same way.',
+    one_liner: 'Your services and prices, answered the same way every time.',
     examples: ['How much is a haircut?'],
     lists: [
       {
