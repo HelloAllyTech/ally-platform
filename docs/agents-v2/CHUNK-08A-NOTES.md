@@ -11,12 +11,12 @@ Branch `feat/agents-v2-fast-track`, commits tagged `[8a]`. Brief: `chunk-8a.md`.
 
 | Done when | State |
 |---|---|
-| A returning person's preference is used in their next chat, on the bot page and on WhatsApp | Unit- and Postgres-tested end to end through ally-be (`memory.pg.spec.ts`: stored after the reply, sent to the next run). The live run on the bot page waits for the prompts' approval: ally-ai's container syncs its seed prompts when it starts, so it isn't rebuilt until the texts are approved |
+| A returning person's preference is used in their next chat, on the bot page and on WhatsApp | ✅ On the bot page, live (§5). WhatsApp isn't checked locally (no provider): staging or the pilot number |
 | The Inbox shows it with its source; Forget removes it, and the next run doesn't know it | ✅ Postgres and unit tests; Playwright with axe at 1440 and 390 |
 | Clinical details on health packs, never-store items and anything from a crisis run are never stored | ✅ Postgres tests (the health check fails closed; a crisis reply delivered stores nothing, A1); eval cases ready |
 | A long chat keeps its start through the summary, with no added wait | ✅ Postgres tests (past 10 messages, one at a time, the old summary kept on failure); after the reply, never awaited |
-| With memory off, runs are exactly as before; the checkups are unchanged | ✅ The prompt and step schema are byte-identical with memory off, no summary and no name (ally-ai tests). The checkups' live run waits, as above |
-| The three prompts approved and live locally; notes; Progress row; checklist lines | Texts sent at the stop; notes, the Progress row and the checklist lines are in |
+| With memory off, runs are exactly as before; the checkups are unchanged | ✅ Byte-identical prompt and schema (tests). ⚠️ The checkups need an admin token (§5) |
+| The three prompts approved and live locally; notes; Progress row; checklist lines | ✅ Approved with edits on 14 Nov, live locally as v1 (§5) |
 
 ## Commits
 
@@ -28,6 +28,11 @@ Branch `feat/agents-v2-fast-track`, commits tagged `[8a]`. Brief: `chunk-8a.md`.
 | `0486b81bc` | ally-be: `memory_entries`, `MemoryService`, `SummaryService`, never-store, the run's memory fields, after-reply writes on the bot page and WhatsApp, erasure and retention, the Inbox routes, Try it's `wouldRemember`, the memory home field, the "requested" sentence, registry rows |
 | `e5254c55a` | ally-web: the Inbox panel, the switch and never-store list in How it works, Try it's line, copy deck §28, tests, Playwright baselines |
 | `013250bab` | ally-ai: the memory cases in the conversation eval |
+| `5df98817c` | docs: notes, Progress row, checklist lines |
+| `354c7dd72` | ally-ai: the approved prompt texts; Try it's steps noted for 16c |
+| `a3d0a2d11` | ally-ai: a reply about the person may go out uncited, from what the run was given; the judge sees it; the `memory` eval kind |
+| `68283d6ea` | ally-be: basics' `--answer-name`, and memory applied after each reply in the runner |
+| this one | notes with the live runs |
 
 ## 1. Code map
 
@@ -94,16 +99,67 @@ Branch `feat/agents-v2-fast-track`, commits tagged `[8a]`. Brief: `chunk-8a.md`.
 - ally-web: on Node 22, 603 files and 10,209 tests passed. On the host's Node 24, 8 API test files fail with "Expected signal to be an instance of AbortSignal", with or without 8a. Typecheck, lint and format ✅. Playwright in Docker: the memory panel and How it works, axe clean, no sideways scroll; new baselines `inbox-memory.png` (desktop, phone) and `home-how.png` (the switch). An early run showed the Inbox chat shifted on a phone; it was fixed by leaving a chat with no person exactly as before.
 - **The ally-be container ran out of memory once** (SIGKILL) while host builds and the Docker Playwright run overlapped. It was restarted after.
 
-## 5. Waiting for the stop
+## 5. The stop, and the live runs (14 Nov, evening)
 
-- The four prompt texts (sent at the stop). Once approved: replace the seeds, rebuild ally-ai (its start syncs them to the local Skills Store), then run:
-  - the eight `mem-` eval cases;
-  - "How Shehbaz tests it" on a local bot page;
-  - Sunrise and the fixture checkups with memory off and on;
-  - §7's six action cases on Lakeview 3 times;
-  - the latency check.
+**The prompts** were approved with Shehbaz's edits and are live in the local Skills Store as v1, each the same as its file:
+- `ally_ai_agent_purpose_enquiries_can_book` gained two lines: record the name with `remember` (name), and "You can't take payments. If they ask, explain how to pay from the information."
+- `ally_ai_conversation_summary` gained "Never include card numbers, passwords, PINs or ID numbers."
+- `ally_ai_agent_memory` and `ally_ai_memory_check` are as drafted.
 
-  Then remove the "don't turn Add on for an enquiries pilot" line from `LAUNCH-CHECKLIST.md`.
+The texts are the seed files in `ally-ai/app/prompts/` (`agent/memory.txt`, `memory/check.txt`, `conversation/summary.txt`, `agent/purpose_enquiries_can_book.txt`).
+
+**A fix found by the eval** (`a3d0a2d11`): "What time did I say suits me best?", answered from memory, was declined by ally-ai's check, because an uncited answer to a question is sent back and then declined. Now a reply that only tells the person what they said about themselves goes out uncited, as a personal reply. That holds only when:
+- it speaks to them ("you") and never for the organisation ("we", "our");
+- every number in it is one they gave;
+- it shares a word with their memory lines, summary or name;
+- it doesn't name the organisation.
+
+Anything about the organisation still needs a source (`check/personal.py`, tests in `test_memory.py`). The eval's judge is now shown what the run was given, and memory cases have their own kind.
+
+**The eight memory eval cases** (`--only mem-`, 3 runs, Ally FAQ bot):
+- 6 of 8 pass every run: uses it, no recital, keeps a preference, never-store (the password isn't kept), forget, the summary.
+- `mem-health` keeps only "prefers evenings" every run (the memory part passes). The judge hard-fails its reply for offering "scheduling or reminders" this bot can't do.
+- `mem-stranger` ("what do you know about me?") remembers nothing (passes). Two of three replies explained memory at length, quoting the prompt's example "prefers evenings"; the judge flags the policy talk.
+- **For Shehbaz (a prompt change, not made):** on assistants that can't book, the memory section's "offer evening slots" invites offers it can't keep (also seen on the bot page: "I'll look for evening appointment times"). A line for `ally_ai_agent_memory`: "Use what you know only with what you can actually do; don't offer bookings or reminders you can't make."
+
+**"How Shehbaz tests it", live on the bot page's public API:**
+
+| Step | Result |
+|---|---|
+| 2–3. The Live Love Laugh Foundation (`b7aa81de…`, memory on): "I'm Rahul, evenings work better for me." Then a new chat: "What time of day did I say suits me best?" | ✅ Stored "prefers evenings" with its source message, 2.2 s after the reply (the health check included). New chat: "You said you prefer evenings." Same contact |
+| 4. Forget it, ask again in a new chat | ✅ "I don't have any saved preference for time of day yet." The line was deleted in SQL, as `MemoryService.forget` does; the Inbox route itself is unit-tested |
+| 5. Sunrise (`abdfd2d1…`, memory on): "I'm on sertraline and I like mornings." | ✅ Stored only "prefers mornings" (1.8 s after the reply) |
+| 6. A 24-message chat, then "what did I say my team at work is called?" | ✅ The summary kept "team at work is called Lotus"; reply: "You said your team is called Lotus." |
+| 7. Try it's "Would remember" | Unit-tested and in Playwright; not run against the live API (it needs an owner token) |
+| 3 on Lakeview: evening times first | Not run: Lakeview's slots are 10:00–17:00 and it has no page. Cross-chat memory is shown above; slot ordering waits for a bot with evening slots |
+| WhatsApp | **Not run locally:** no number reaches a bot and the provider has no credentials, so a reply is marked failed and, correctly, nothing is stored. The WhatsApp path waits for the reply's copy to reach the shared store, then calls the same `afterTurn`. Check it on staging or the pilot number |
+
+Memory is left on for those two local bots (`settings.memory.on`).
+
+**§7, 6's six action cases on Lakeview** (Bring in customers, ready-made Appointments; `--answer-name Rahul`, see below):
+
+| Run | Result |
+|---|---|
+| 1 | ✅ 6 of 6 |
+| 2 | 5 of 6. `lists-try-it`: the find didn't show Thursday 16:00, so the assistant offered Wednesday 16:00 and, after "yes", asked again before booking, because the person had asked for Thursday (6's time check, as it should). A slot lookup, not the purpose text |
+| 3 | ✅ 6 of 6 |
+
+- Before the can-book variant (5b) it was 4 of 6. Without `--answer-name`, the cases fail only because nobody answers "What name should I put on the booking?" (asked once, with the confirmation, as the text says).
+- **`--answer-name`** (new in `run-basics.ts`): when a reply asks for the name, the person gives it with their next message ("yes, please book it. I'm Rahul"); a second ask fails. The runner also applies memory after each reply, as the channels do, so the name is saved.
+- **The checklist line stays for Shehbaz's call:** two of three runs passed all six; the brief asks for 3. The "don't turn Add on for an enquiries pilot" line is still in `LAUNCH-CHECKLIST.md`.
+
+**Latency:**
+- Loading memory adds a few milliseconds: the three reads are 0.1–0.4 ms each in Postgres, run in parallel.
+- Reply to stored: 1.8–2.3 s on health packs (the model check included).
+- §7's booking turns: median 11.9 s, worst 24.9 s (19 turns; 6 measured 12.6 s median).
+- Twice a run went past the 20 s cap after it had booked: the person's name message led to a find, a create and a reply. The reply was the honest "Done: Thu 19 Nov 2026, 12:00 in Appointments." (v1 never answers a run that acted). Watch it in the pilot.
+
+**Not run: the Sunrise and fixture checkups with memory off and on.** `checkup_eval.py` needs an admin `ALLY_TOKEN`. Signing one locally was refused in this session, so they wait for Shehbaz's token. With memory off, the request and prompt are byte-identical to before (tests).
+
+**Final checks:**
+- ally-ai: 2,584 passed; flake8 ✅.
+- ally-be: 1,137 of 1,139 suites. The two failures are the pre-existing `backfill-check` truncate and the flaky `llm-completion`. Lint ✅.
+- ally-web: as in §4.
 
 ## 6. Open, for later chunks
 
