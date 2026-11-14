@@ -141,9 +141,19 @@ const WhyList: React.FC<{ whys: Why[] }> = ({ whys }) => (
  * A booking or change in Try it is checked, then rolled back (chunk 6): when the run wrote, a
  * line under the reply says so (chunk 5b).
  */
-export const testOnlyNotice = (result: Pick<TestChatbotResponse, "previewWrite">): ChatItem[] =>
-  result.previewWrite
+export const testOnlyNotice = (
+  result: Pick<TestChatbotResponse, "previewWrite" | "wouldRemember">,
+): ChatItem[] => {
+  // What the run would have remembered (chunk 8a): one line each, then the same test-only note.
+  const remember = (result.wouldRemember ?? []).map((line, index) => ({
+    id: `r${Date.now()}-${index}`,
+    role: "notice" as const,
+    text: fill(HOME.memory.wouldRemember, { line }),
+    citations: [],
+  }));
+  return result.previewWrite || remember.length
     ? [
+        ...remember,
         {
           id: `n${Date.now()}`,
           role: "notice",
@@ -152,6 +162,7 @@ export const testOnlyNotice = (result: Pick<TestChatbotResponse, "previewWrite">
         },
       ]
     : [];
+};
 
 /**
  * Try it (chunk 20d): the real bot page chat, in the page's brand, inside a phone, answering

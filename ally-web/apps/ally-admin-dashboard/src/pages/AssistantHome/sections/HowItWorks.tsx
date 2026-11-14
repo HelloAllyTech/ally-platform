@@ -10,6 +10,7 @@ import { HOME, fill } from "../copy";
 import { Group, SectionHead, TextField } from "../fields";
 import { ListSkeleton } from "../ui/List";
 import { useHomeField } from "../useHomeField";
+import { MemorySettings } from "./MemorySettings";
 import { purposeLimit } from "../userLists/format";
 
 import type { SectionId } from "../sections";
@@ -214,6 +215,9 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
           />
         ))}
       </ol>
+
+      {/* Remember people between chats (chunk 8a). */}
+      <MemorySettings botId={bot.id} home={home} canEdit={canEdit} />
 
       <Group>
         <button

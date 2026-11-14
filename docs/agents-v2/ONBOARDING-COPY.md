@@ -1057,3 +1057,56 @@ says when a save can't be made. More lines for the home's sections are added her
 - It books into your {list} list. It can't take payments yet.
 - It can't book or take payments yet. It sends you each new enquiry by email.
 - It doesn't keep track of each person's progress yet.
+
+## 28. Memory (8a)
+
+*(Drafted at 8a. What the assistant remembers about each person between chats, and the rolling summary of a long chat. On screen, say "remembers" and "forget", never memory entries, records or profile. A line reads as the assistant wrote it ("prefers evenings"); the date is when the person last said it, "12 Nov", never with the year. Editors change and forget; viewers read.)*
+
+**How it works, the switch:**
+
+- Remember people between chats
+- Your assistant keeps short notes about each person, like "prefers evenings", and uses them next time. You can see and forget every note in the Inbox.
+- It never remembers:
+- Always on this list
+- Add something it should never remember
+- Add
+- Remove {item}
+- Up to 20 of your own.
+
+**The Inbox, beside a chat:**
+
+- What your assistant remembers about {name}
+- What your assistant remembers about this person
+- Still open
+- Preferences
+- Context
+- From their message on {date}
+- Changed by your team
+- Nothing yet. Notes appear here as they chat.
+- Forget
+- Forget “{line}”
+- Edit
+- Save
+- Cancel
+- Forgotten.
+- Write it in 1 to 200 characters.
+- That's on the list of things your assistant never remembers.
+- Couldn't change this. Try again.
+- Forget this person
+- Forget everything about {name}?
+- Forget everything about this person?
+- Your assistant forgets every note about them and the summaries of their chats. Their messages stay.
+- Forget everything
+- Keep
+- Your assistant has forgotten them.
+- We couldn't load what your assistant remembers.
+- Try again
+
+**When memory is off:**
+
+- Your assistant doesn't remember people between chats.
+- Turn it on in How it works
+
+**Try it:**
+
+- Would remember: {line}

@@ -50,6 +50,40 @@ export const INBOX = {
   turnOnNotifications: "Turn on notifications",
   notifyNeedsPerson: "{business}: someone needs a person",
   notifySafety: "{business}: a safety message",
+  /** What the assistant remembers about the person in a chat (chunk 8a, deck §28). */
+  memory: {
+    title: "What your assistant remembers about {name}",
+    titleNoName: "What your assistant remembers about this person",
+    sections: {
+      open_items: "Still open",
+      preferences: "Preferences",
+      context: "Context",
+    },
+    from: "From their message on {date}",
+    byTeam: "Changed by your team",
+    empty: "Nothing yet. Notes appear here as they chat.",
+    forget: "Forget",
+    forgetLine: "Forget “{line}”",
+    edit: "Edit",
+    save: "Save",
+    cancel: "Cancel",
+    forgotten: "Forgotten.",
+    invalid: "Write it in 1 to 200 characters.",
+    neverStore: "That's on the list of things your assistant never remembers.",
+    editFailed: "Couldn't change this. Try again.",
+    forgetPerson: "Forget this person",
+    confirmTitle: "Forget everything about {name}?",
+    confirmTitleNoName: "Forget everything about this person?",
+    confirmBody:
+      "Your assistant forgets every note about them and the summaries of their chats. Their messages stay.",
+    confirm: "Forget everything",
+    keep: "Keep",
+    forgotPerson: "Your assistant has forgotten them.",
+    loadFailed: "We couldn't load what your assistant remembers.",
+    retry: "Try again",
+    off: "Your assistant doesn't remember people between chats.",
+    turnOn: "Turn it on in How it works",
+  },
 } as const;
 
 export const fill = (text: string, values: Record<string, string | number>): string =>

@@ -261,6 +261,7 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
                 (bots?.chatbots ?? []).find(b => b.id === currentBot)?.myRole !== undefined &&
                 (bots?.chatbots ?? []).find(b => b.id === currentBot)?.myRole !== "viewer"
               }
+              onOpenConversation={conversation => set("conversation", conversation)}
             />
           </>
         ) : (

@@ -2,6 +2,7 @@ import { CHANGE_CONTROLS } from "./change";
 import { CHECKUP_CONTROLS } from "./checkup";
 import { HOW, WHY } from "./how";
 import { LISTS } from "./lists";
+import { MEMORY } from "./memory";
 import { ALL_NUMBERS } from "./numbers";
 import { USER_LISTS } from "./userLists";
 
@@ -347,6 +348,7 @@ export const HOME = {
   why: WHY,
   seeAll: "See everything it follows",
   allNumbers: ALL_NUMBERS,
+  memory: MEMORY,
 } as const;
 
 /** "{n} questions…" with its values. */

@@ -962,6 +962,15 @@ export const ApiEndpoints = {
       `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/hand-back`,
     REPLY: (chatbotId: string, id: string) =>
       `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/messages`,
+    /** What the assistant remembers about one person (chunk 8a). */
+    MEMORY: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/memory`,
+    MEMORY_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}`,
+    FORGET_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}/forget`,
+    FORGET_PERSON: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/forget`,
   },
   BOT_DRAFTS: {
     LIST: "/v1/bot-drafts",
