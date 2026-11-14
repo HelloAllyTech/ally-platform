@@ -186,6 +186,24 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
   decline_text?: string;
   /** The tool gateway, for a bot with a tool on (chunk 3b). Absent: today's run, search only. */
   gateway?: AgentGatewayBlock;
+  /**
+   * What the assistant knows about the person (chunk 8a), when the bot's memory is on. `lines` is
+   * `renderMemory`'s text (at most 4,000 characters); `never_store` at most 60 lines.
+   */
+  memory?: { lines: string; never_store: string[] };
+  /** This chat's rolling summary of the messages before the last 10 (chunk 8a). */
+  summary?: string;
+  /** The person's name, when it's known (chunk 8a). At most 80 characters. */
+  person_name?: string;
+}
+
+/** One memory write a run asks for (chunk 8a); ally-be checks and applies it after the reply. */
+export interface AgentMemoryWrite {
+  op: 'add' | 'replace' | 'done' | 'forget' | 'name';
+  section?: 'preferences' | 'context' | 'open_items';
+  text?: string;
+  /** The short id of the line it changes (`m2`). */
+  id?: string;
 }
 
 /** What the conversational agent understood a message to be. */
@@ -221,6 +239,31 @@ export interface AgentRunResponse extends KnowledgeAnswerResponse {
   turn_type?: AgentTurnType;
   /** The agent passed the chat to a person with `hand_over` (chunk 3b); the answer is empty. */
   handover?: boolean;
+  /** What the run asked to remember (chunk 8a). Absent when nothing. */
+  memory_writes?: AgentMemoryWrite[];
+}
+
+/** ally-ai `/agent/memory-check` (chunk 8a). */
+export interface MemoryCheckRequest {
+  lines: string[];
+  never_store?: string[];
+  prompts?: Record<string, unknown>;
+}
+export interface MemoryCheckResponse {
+  keep: boolean[];
+  failed: boolean;
+}
+
+/** ally-ai `/agent/conversation-summary` (chunk 8a). */
+export interface ConversationSummaryRequest {
+  summary?: string | null;
+  messages: { role: 'user' | 'assistant'; content: string }[];
+  health?: boolean;
+  prompts?: Record<string, unknown>;
+}
+export interface ConversationSummaryResponse {
+  summary: string;
+  failed: boolean;
 }
 
 interface KnowledgePersonaRequest {

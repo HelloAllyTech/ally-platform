@@ -1270,6 +1270,40 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_agent_system',
   },
   {
+    id: 'chatbot-memory-check',
+    task: LlmTask.CHATBOT_MEMORY_CHECK,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A health, pharmacy or mental-health assistant with memory on wants to remember something',
+    detail:
+      'After the reply has been sent, one call per run with up to 6 lines: keeps only practical, ' +
+      'non-clinical details (prefers evenings), never symptoms, conditions, medicines or ' +
+      'diagnoses. 5-second wait; an error or timeout keeps nothing (chunk 8a).',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_memory_check',
+  },
+  {
+    id: 'chatbot-conversation-summary',
+    task: LlmTask.CHATBOT_CONVERSATION_SUMMARY,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A chat with an assistant passes 10 messages and more leave the window the agent reads',
+    detail:
+      'After the reply, at most one at a time per chat: folds the messages leaving the ' +
+      '10-message window into the chat’s summary (about 800 characters), which later runs read ' +
+      'before the last 10 messages. On failure the old summary stays (chunk 8a).',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_conversation_summary',
+  },
+  {
     id: 'onboarding-builder-step',
     task: LlmTask.ONBOARDING_BUILDER_STEP,
     runtime: LlmRuntime.ALLY_AI,

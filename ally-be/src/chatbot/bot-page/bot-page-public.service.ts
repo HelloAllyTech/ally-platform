@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHmac } from 'crypto';
@@ -30,7 +35,7 @@ import type {
 import { ChatbotContact } from '../entity/chatbot-contact.entity';
 import { ChatbotConversation } from '../entity/chatbot-conversation.entity';
 import { BotPageAccess } from '../enum/bot-page.enum';
-import { ChatbotAccessMode } from '../enum/chatbot.enum';
+import { AgentRuntimeUsed, ChatbotAccessMode } from '../enum/chatbot.enum';
 import {
   ConversationChannel,
   ConversationMessageRole,
@@ -67,6 +72,8 @@ import { SseWriter } from '../../common/sse/sse-writer';
 import { handoverMessage, handoverOf } from '../handover/handover';
 import { HandoverService } from '../handover/handover.service';
 import { InboxEventsService } from '../inbox/inbox-events.service';
+import { MemoryService } from '../memory/memory.service';
+import { SummaryService } from '../memory/summary.service';
 import { LeadAlertService } from './lead-alert.service';
 import { TurnstileService } from './turnstile.service';
 
@@ -262,6 +269,9 @@ export class BotPagePublicService {
     private readonly inboxEvents: InboxEventsService,
     @InjectRepository(WaUnansweredQuestion)
     private readonly unansweredRepository: Repository<WaUnansweredQuestion>,
+    // Memory, light (chunk 8a). Optional so older test wiring still builds the service.
+    @Optional() private readonly memory?: MemoryService,
+    @Optional() private readonly summaries?: SummaryService,
   ) {}
 
   async page(slug: string): Promise<AvailableBotPage> {
@@ -712,6 +722,19 @@ export class BotPagePublicService {
     // A "Bring in customers" assistant tells its owners about a new lead, once (chunk 20a-2).
     // Not awaited: the reply never waits on email.
     void this.leads.afterTurn(chatbot, conversation.id);
+    // What the run asked to remember, and the chat's rolling summary (chunk 8a): after the reply
+    // has gone out, decided from what was stored as sent. Not awaited: nobody waits for either.
+    void this.memory?.afterTurn({
+      chatbot,
+      conversationId: conversation.id,
+      runId: decision.agent?.runId,
+      pending:
+        decision.agent?.runtime === AgentRuntimeUsed.V2
+          ? decision.agent.memory
+          : undefined,
+      repliedAt: Date.now(),
+    });
+    void this.summaries?.afterTurn(chatbot, conversation.id);
     if (isFallback(decision.agent)) {
       this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
         chatbot: { id: chatbot.id, name: chatbot.name },

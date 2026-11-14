@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
@@ -27,6 +27,7 @@ import {
 import { AgentToolRegistry } from '../agent-tools/tools';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
 import { ToolRun, ToolRunStatus } from '../entity/tool-run.entity';
+import { MemoryService } from '../memory/memory.service';
 import { AgentRuntimeUsed } from '../enum/chatbot.enum';
 import {
   agentFailureReason,
@@ -125,6 +126,8 @@ export class AgentRuntimeRunner {
     private readonly tools: AgentToolRegistry,
     private readonly runTokens: AgentRunTokenService,
     private readonly listTools: ListToolsService,
+    // Memory, light (chunk 8a). Optional: without it a run is exactly as before.
+    @Optional() private readonly memory?: MemoryService,
   ) {}
 
   /**
@@ -150,10 +153,14 @@ export class AgentRuntimeRunner {
     const startedAt = Date.now();
     let withGateway = false;
     try {
-      const body = await this.requestFor(turn, request, knowledge, {
-        conversationId,
-        runId,
-      });
+      const shown: { refs: Record<string, string> } = { refs: {} };
+      const body = await this.requestFor(
+        turn,
+        request,
+        knowledge,
+        { conversationId, runId },
+        shown,
+      );
       withGateway = Boolean(body.gateway);
       const response =
         live && turn.channel.capabilities?.streaming
@@ -164,7 +171,7 @@ export class AgentRuntimeRunner {
             )
           : await this.aiService.runAgent(body);
       if (!response?.intent) throw new MalformedAgentResponseError();
-      const { trace, run_id, ...answer } = response;
+      const { trace, run_id, memory_writes, ...answer } = response;
       return {
         response: { ...answer, retrieval: withoutDebugIds(answer.retrieval) },
         latencyMs: Date.now() - startedAt,
@@ -173,6 +180,10 @@ export class AgentRuntimeRunner {
           runId: run_id || runId,
           conversationId,
           trace: trace ?? [],
+          // Applied by the channel after the reply, never here (chunk 8a).
+          ...(memory_writes?.length
+            ? { memory: { writes: memory_writes, refs: shown.refs } }
+            : {}),
         },
       };
     } catch (error) {
@@ -233,14 +244,32 @@ export class AgentRuntimeRunner {
     request: KnowledgeAnswerRequest,
     knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
     run: { conversationId: string; runId: string; withGateway?: boolean },
+    shown?: { refs: Record<string, string> },
   ): Promise<AgentRunRequest> {
-    const body = buildAgentRunRequest(request, {
-      conversationId: run.conversationId,
-      runId: run.runId,
-      chatbotId: turn.chatbot.id,
-      knowledgeTopics: await this.knowledgeTopics(knowledge),
-      declineText: turn.settings.declineText,
-    });
+    // What it knows about the person (chunk 8a): their lines with memory on, this chat's summary
+    // and their name, each only when there is one. Nothing: exactly today's request.
+    const [knowledgeTopics, memory] = await Promise.all([
+      this.knowledgeTopics(knowledge),
+      this.memory
+        ? this.memory.forRun(
+            turn.chatbot,
+            turn.contactId,
+            run.conversationId,
+            handoverOf(turn.settings).hours?.timeZone,
+          )
+        : Promise.resolve({ fields: {}, refs: {} }),
+    ]);
+    if (shown) shown.refs = memory.refs;
+    const body: AgentRunRequest = {
+      ...buildAgentRunRequest(request, {
+        conversationId: run.conversationId,
+        runId: run.runId,
+        chatbotId: turn.chatbot.id,
+        knowledgeTopics,
+        declineText: turn.settings.declineText,
+      }),
+      ...memory.fields,
+    };
     if (run.withGateway === false) return body;
     // The tools this bot has on, from its OWN stored settings (chunk 3b), and its list tools
     // (chunk 6). None: exactly today's request, with no token signed.

@@ -153,9 +153,10 @@ export class ChatbotSettingsService {
       global = { ...global, crisisClassifierEnabled: true };
     }
     if (!override || !Object.keys(override).length) return global;
-    // `abilities` stays on the bot's stored override, where the gateway reads it (chunk 3b).
+    // `abilities` stays on the bot's stored override, where the gateway reads it (chunk 3b), and so
+    // does `memory` (chunk 8a).
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { rateLimit, retrieval, abilities, ...plain } = override;
+    const { rateLimit, retrieval, abilities, memory, ...plain } = override;
     const tighter = (base: number, value: number | undefined) =>
       typeof value === 'number' && value > 0 ? Math.min(base, value) : base;
     return {

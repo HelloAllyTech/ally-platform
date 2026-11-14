@@ -126,6 +126,33 @@ export interface ChatbotTestResult {
   conversationId: string;
   /** The run booked or changed a list entry, checked and not saved (chunk 5b). */
   previewWrite?: boolean;
+  /**
+   * What the run would have remembered about the person (chunk 8a): the lines it asked to add or
+   * change. Try it never saves them. Absent when nothing.
+   */
+  wouldRemember?: string[];
+}
+
+/**
+ * What a Try it run would have remembered (chunk 8a): the texts of its add and replace writes, when
+ * the reply was the agent's own, as a live chat would store them. Nothing is saved.
+ */
+export function wouldRemember(
+  decision: Pick<ChatbotDecision, 'agent' | 'handledBy'>,
+): string[] {
+  const agent = decision.agent;
+  if (agent?.runtime !== AgentRuntimeUsed.V2 || !agent.memory) return [];
+  if (
+    ![WaHandledBy.RAG, WaHandledBy.DECLINED, WaHandledBy.CLARIFIED].includes(
+      decision.handledBy,
+    )
+  ) {
+    return [];
+  }
+  return agent.memory.writes
+    .filter((w) => (w.op === 'add' || w.op === 'replace') && w.text?.trim())
+    .map((w) => w.text!.trim())
+    .slice(0, 6);
 }
 
 /** A bot's documents as the knowledge tab lists them. */
@@ -941,6 +968,8 @@ export class ChatbotService {
       usedDraft: Boolean(dto.draft),
     });
     result.previewWrite = await this.previewWrote(decision.agent?.runId);
+    const remember = wouldRemember(decision);
+    if (remember.length) result.wouldRemember = remember;
     return result;
   }
 

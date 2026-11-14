@@ -64,6 +64,12 @@ export type ChatbotSettingsOverride = Partial<
    * stored override, never from the effective or platform settings.
    */
   abilities?: Partial<Record<string, 'do_it' | 'never'>>;
+  /**
+   * Remember people between chats (chunk 8a), off by default, and the owner's own things never to
+   * remember (the pack's defaults are added in code and can't be removed). Per bot only, read from
+   * this stored override like `abilities`.
+   */
+  memory?: { on?: boolean; neverStore?: string[] };
 };
 
 export interface ChatbotSettingsView {

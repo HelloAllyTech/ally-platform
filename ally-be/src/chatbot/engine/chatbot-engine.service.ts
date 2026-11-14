@@ -65,7 +65,11 @@ const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
  * The conversational agent's prompts (Agents v2). Loaded only when the agent answers, so a v1
  * request (the emergency switch off) is exactly as before.
  */
-export const AGENT_PROMPT_CODES = [AGENT_SYSTEM_PROMPT_CODE];
+export const AGENT_PROMPT_CODES = [
+  AGENT_SYSTEM_PROMPT_CODE,
+  // What it knows about the person (chunk 8a); used only when the bot's memory is on.
+  'ally_ai_agent_memory',
+];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 
 /** Purposes with a section of their own in the Skills Store (chunk 20a-2). */
@@ -75,6 +79,16 @@ const PURPOSE_SECTIONS = new Set(['answer', 'enquiries', 'training', 'guide']);
 export function purposePromptCodes(purpose?: string | null): string[] {
   return purpose && PURPOSE_SECTIONS.has(purpose)
     ? [`ally_ai_agent_purpose_${purpose}`]
+    : [];
+}
+
+/**
+ * Bring in customers' variant for an assistant that can book (chunk 8a): loaded with the purpose,
+ * and ally-ai picks it when the run offers a create tool.
+ */
+export function bookingPurposePromptCodes(purpose?: string | null): string[] {
+  return purpose === 'enquiries'
+    ? ['ally_ai_agent_purpose_enquiries_can_book']
     : [];
 }
 /** Used by bots allowed to answer beyond their documents. */
@@ -690,6 +704,7 @@ export class ChatbotEngineService {
             ? [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES]
             : KNOWLEDGE_PROMPT_CODES),
           ...purposePromptCodes(turn.chatbot.purpose),
+          ...bookingPurposePromptCodes(turn.chatbot.purpose),
         ],
       });
       prompts = (rows ?? []).reduce<Record<string, unknown>>((acc, row) => {

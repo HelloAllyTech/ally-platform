@@ -475,6 +475,8 @@ export class ConversationService {
         select: ['contactId'],
       })
     ).map((row) => row.contactId);
+    // What the assistant remembered about them, and their chats' summaries (chunk 8a).
+    await this.dropMemory([...new Set(contactIds)], conversationIds);
     await this.eraseIdentities([...new Set(contactIds)], channel, placeholders);
   }
 
@@ -501,6 +503,7 @@ export class ConversationService {
       await this.dropIntake(conversationIds);
       await this.dropToolRuns(conversationIds);
     }
+    await this.dropMemory([contactId], conversationIds);
     await this.dataSource.query(
       `UPDATE chatbot_contacts SET display_name = NULL, "updatedAt" = now() WHERE id = $1`,
       [contactId],
@@ -548,6 +551,18 @@ export class ConversationService {
       `DELETE FROM tool_runs WHERE "createdAt" < $1`,
       [cutoff],
     );
+    // Memory (chunk 8a): nothing derived from a message outlives it. A line goes once it was last
+    // said before the cutoff; a chat's summary once its last message is.
+    await this.dataSource.query(
+      `DELETE FROM memory_entries WHERE said_at < $1`,
+      [cutoff],
+    );
+    await this.dataSource.query(
+      `UPDATE chatbot_conversations
+          SET summary = NULL, metadata = metadata - 'summaryUpto', "updatedAt" = now()
+        WHERE last_message_at < $1 AND (summary IS NOT NULL OR metadata ? 'summaryUpto')`,
+      [cutoff],
+    );
 
     const stale: { contact_id: string }[] = await this.dataSource.query(
       `SELECT c.contact_id
@@ -571,6 +586,19 @@ export class ConversationService {
     return { messages, identities };
   }
 
+  /**
+   * Memory lines past their expiry, and any left forgotten (chunk 8a): deleted, not blanked, since
+   * they're derived data. Run by the hourly sweep even with retention off. Returns how many went.
+   */
+  async sweepMemory(now: Date = new Date()): Promise<number> {
+    const result: unknown = await this.dataSource.query(
+      `DELETE FROM memory_entries
+        WHERE status = 'forgotten' OR (expires_at IS NOT NULL AND expires_at <= $1)`,
+      [now],
+    );
+    return Array.isArray(result) ? Number(result[1] ?? 0) : 0;
+  }
+
   /** Replace identities' values with `<erasedPrefix><contact id>`; already-erased ones are skipped. */
   private async eraseIdentities(
     contactIds: string[],
@@ -592,6 +620,27 @@ export class ConversationService {
   }
 
   // ──────────────────────────────────────────────────────────────── plumbing
+
+  /** A person's memory lines and their chats' rolling summaries (chunk 8a), on erasure. */
+  private async dropMemory(
+    contactIds: string[],
+    conversationIds: string[],
+  ): Promise<void> {
+    if (contactIds.length) {
+      await this.dataSource.query(
+        `DELETE FROM memory_entries WHERE contact_id = ANY($1::uuid[])`,
+        [contactIds],
+      );
+    }
+    if (conversationIds.length) {
+      await this.dataSource.query(
+        `UPDATE chatbot_conversations
+            SET summary = NULL, metadata = metadata - 'summaryUpto', "updatedAt" = now()
+          WHERE id = ANY($1::uuid[])`,
+        [conversationIds],
+      );
+    }
+  }
 
   /** The pre-chat answers and the assistant's hand-over summary (chunk 3b): both personal. */
   private async dropIntake(conversationIds: string[]): Promise<void> {

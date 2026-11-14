@@ -392,10 +392,19 @@ function createDescription(list: ListView, names: Map<string, string>): string {
   const required = writableFields(list)
     .filter((f) => f.required)
     .map((f) => lower(f.label));
+  // A list whose new entries wait for the team (Site visits) says so, so the assistant can say the
+  // team will confirm; every other booking is made, and it mustn't say that (chunk 8a).
+  const requested = list.fields.some(
+    (f) =>
+      f.type === ListFieldType.SELECT &&
+      typeof f.default === 'string' &&
+      /^(requested|pending)$/i.test(f.default),
+  );
   return [
     `Add an entry to ${list.name}${person}, only after they've confirmed it.`,
     required.length ? `Needs ${joinAnd(required)}.` : '',
     ...ruleSentences(list, names, 'create'),
+    requested ? 'New entries start as requested: the team confirms them.' : '',
   ]
     .filter(Boolean)
     .join(' ');

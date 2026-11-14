@@ -41,6 +41,9 @@ import { HandOverTool } from './agent-tools/hand-over.tool';
 import { ListToolsService } from './agent-tools/list-tools.service';
 import { AGENT_GATEWAY_TOOLS, AgentToolRegistry } from './agent-tools/tools';
 import { ToolRun } from './entity/tool-run.entity';
+import { MemoryEntry } from './entity/memory-entry.entity';
+import { MemoryService } from './memory/memory.service';
+import { SummaryService } from './memory/summary.service';
 import { Collection } from './entity/collection.entity';
 import { CollectionConstraint } from './entity/collection-constraint.entity';
 import { CollectionField } from './entity/collection-field.entity';
@@ -77,6 +80,7 @@ import { ListRecordsService } from './lists/list-records.service';
       ChatbotConversation,
       ChatbotMessage,
       ToolRun,
+      MemoryEntry,
       // Lists (chunk 5a).
       Collection,
       CollectionField,
@@ -134,6 +138,9 @@ import { ListRecordsService } from './lists/list-records.service';
     ListCsvService,
     // The owner's Lists section (chunk 5b): ready-made lists, Repeat weekly, switches.
     ListOwnerService,
+    // Memory, light (chunk 8a): what it remembers about each person, and the rolling summary.
+    MemoryService,
+    SummaryService,
   ],
   exports: [
     // The Checkup (chunk 20a-2) asks questions through Preview's path.
@@ -154,6 +161,9 @@ import { ListRecordsService } from './lists/list-records.service';
     // Lists (chunk 5a).
     ListRecordsService,
     ListDefinitionsService,
+    // Channels apply memory after a reply (chunk 8a).
+    MemoryService,
+    SummaryService,
   ],
 })
 export class ChatbotModule {}

@@ -1,5 +1,6 @@
 import type {
   AgentStreamEvent,
+  AgentMemoryWrite,
   AgentTraceStep,
   AgentTurnType,
 } from '../../ai/dto/knowledge.dto';
@@ -115,7 +116,18 @@ export type AgentFailureReason =
  * answered, with its steps, or the run that failed and v1 answered instead (see `isFallback`).
  */
 export type AgentRunRef = { runId: string; conversationId: string } & (
-  | { runtime: AgentRuntimeUsed.V2; trace: AgentTraceStep[] }
+  | {
+      runtime: AgentRuntimeUsed.V2;
+      trace: AgentTraceStep[];
+      /**
+       * What the run asked to remember (chunk 8a), with the short ids it was shown. Applied by the
+       * channel after the reply has gone out, and only if that reply was the agent's own.
+       */
+      memory?: {
+        writes: AgentMemoryWrite[];
+        refs: Record<string, string>;
+      };
+    }
   | {
       runtime: AgentRuntimeUsed.V2_FALLBACK;
       fallbackReason: AgentFailureReason;
