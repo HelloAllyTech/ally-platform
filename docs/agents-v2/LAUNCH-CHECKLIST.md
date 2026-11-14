@@ -65,6 +65,13 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **Bookings on WhatsApp need `sharedStoreWrites` on**, as 11a's hand-over does. Without it a WhatsApp run has no contact and isn't offered the tools of lists with a person field.
 - [ ] **The business's time zone is Asia/Kolkata unless its hand-over hours set one.** A pilot elsewhere needs hand-over hours with its zone until bots have a time zone setting.
 
+## 5b: lists in the dashboard
+
+- [ ] **Owners can now turn on Add and Change for their own lists** (`PUT v1/chatbots/:id/lists/:key/abilities`, editors). 6's line still holds: a pilot's Add goes to Do it only after its action cases pass on its lists, and its new entries are checked daily in the first week. Ready-made lists install with Add and Change at Never.
+- [ ] **Deleting an entry that live entries point at is refused** (`in_use`). A booking made at the same moment as its slot is deleted can still slip through (rare; `CHUNK-05B-NOTES.md` §7).
+- [ ] **The new list routes go on the public wiki's `repos/ally-be.md`** at PR time (Docs guard).
+- [ ] **A Bring in customers assistant with Add on may still ask for a name and number before booking**, because its purpose section asks for them. Don't turn Add on for an enquiries pilot until that prompt is settled (`CHUNK-05B-NOTES.md`, "Live action cases").
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).

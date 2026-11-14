@@ -198,6 +198,8 @@ export interface HowItWorks {
   };
   purpose: string | null;
   safetyPack: string | null;
+  /** Lists the assistant books into: Add is Do it (chunk 5b). */
+  bookingLists?: string[];
 }
 
 export type HowLayer =

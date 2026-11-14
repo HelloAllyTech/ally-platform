@@ -1434,7 +1434,8 @@
   font-weight: 500;
 }
 .ally-switcher__channels {
-  color: var(--ally-faint);
+  /* Muted, not faint: it sits on the current assistant's tint too (axe, 5b). */
+  color: var(--ally-muted);
   font-size: 13px;
 }
 .ally-switcher__sheet {

@@ -1055,3 +1055,5 @@ says when a save can't be made. More lines for the home's sections are added her
 
 - What it can't do yet
 - It books into your {list} list. It can't take payments yet.
+- It can't book or take payments yet. It sends you each new enquiry by email.
+- It doesn't keep track of each person's progress yet.

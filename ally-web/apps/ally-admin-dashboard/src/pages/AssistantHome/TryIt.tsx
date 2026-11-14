@@ -138,6 +138,22 @@ const WhyList: React.FC<{ whys: Why[] }> = ({ whys }) => (
 );
 
 /**
+ * A booking or change in Try it is checked, then rolled back (chunk 6): when the run wrote, a
+ * line under the reply says so (chunk 5b).
+ */
+export const testOnlyNotice = (result: Pick<TestChatbotResponse, "previewWrite">): ChatItem[] =>
+  result.previewWrite
+    ? [
+        {
+          id: `n${Date.now()}`,
+          role: "notice",
+          text: HOME.userLists.tryIt.testOnly,
+          citations: [],
+        },
+      ]
+    : [];
+
+/**
  * Try it (chunk 20d): the real bot page chat, in the page's brand, inside a phone, answering
  * through the same test stream Preview used (so answers, sources and the crisis path match the
  * live page). Nothing here is stored as a conversation.
@@ -208,17 +224,7 @@ export const TryIt: React.FC<{
           // As on the page: the thumbs show under the assistant's own answers (chunk Q2a).
           rateable: ["rag", "declined", "clarified"].includes(String(result.handledBy)),
         },
-        // A booking or change in Try it is checked, then rolled back (chunk 6): say so (5b).
-        ...(result.previewWrite
-          ? [
-              {
-                id: `n${Date.now()}`,
-                role: "notice" as const,
-                text: HOME.userLists.tryIt.testOnly,
-                citations: [],
-              },
-            ]
-          : []),
+        ...testOnlyNotice(result),
       ]);
     } catch {
       setError(copy.errors.INTERNAL);

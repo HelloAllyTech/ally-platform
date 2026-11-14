@@ -10,6 +10,7 @@ import { HOME, fill } from "../copy";
 import { Group, SectionHead, TextField } from "../fields";
 import { ListSkeleton } from "../ui/List";
 import { useHomeField } from "../useHomeField";
+import { purposeLimit } from "../userLists/format";
 
 import type { SectionId } from "../sections";
 import type { SectionProps } from "./props";
@@ -184,6 +185,15 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
     ),
     avoid: canEdit ? <AvoidTopics botId={bot.id} /> : undefined,
   };
+  // The purpose's honest limit, with what the assistant may do on its lists now (chunk 5b).
+  const limit = purposeLimit(view.purpose, view.bookingLists);
+  if (limit) {
+    controls.purpose = (
+      <p className="ally-small ally-how__limit" data-testid="purpose-limit">
+        <strong>{HOME.userLists.purpose.limitLabel}:</strong> {limit}
+      </p>
+    );
+  }
   // A purpose only appears when one was chosen; the others always apply.
   const shown = ORDER.filter(layer => layer !== "purpose" || textOf(view, "purpose"));
 

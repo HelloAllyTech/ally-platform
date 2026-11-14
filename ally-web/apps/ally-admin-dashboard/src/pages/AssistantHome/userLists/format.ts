@@ -312,3 +312,20 @@ export const bookedList = (list: UserList, lists: UserList[]): UserList | null =
 /** Whether a list holds dates and times people book (Slots): it gets Repeat weekly. */
 export const datedField = (list: UserList): ListField | undefined =>
   liveFields(list).find(f => f.type === "datetime");
+
+/**
+ * A purpose's honest limit, with the assistant's live abilities (chunk 5b): Bring in customers
+ * with a list it books into reads "It books into your Appointments list. It can't take payments
+ * yet."; without one, the onboarding card's line. Null for purposes with no limit.
+ */
+export const purposeLimit = (
+  purpose: string | null,
+  bookingLists: string[] = [],
+): string | null => {
+  const p = t().purpose;
+  if (purpose === "enquiries") {
+    return bookingLists.length ? fill(p.books, { list: joinAnd(bookingLists) }) : p.enquiries;
+  }
+  if (purpose === "training") return p.training;
+  return null;
+};
