@@ -400,6 +400,51 @@ class TestTheCheck:
         assert rejection == Rejection.UNFOUND_SLOT
 
 
+class TestRecordIds:
+    REPLY = (
+        "Done — I booked Thursday at 11:00. Appointment id "
+        f"{BOOKING}; slot id {SLOT_1}. Citations: 1"
+    )
+
+    def test_ids_and_citation_talk_are_taken_out_of_a_run_with_records(self):
+        result, _ = TestTheCheck()._check(
+            self.REPLY, [1], [TestTheCheck.RECORD], can_book=True
+        )
+        assert result["answer"] == "Done — I booked Thursday at 11:00."
+
+    def test_a_run_without_records_is_untouched(self):
+        document = {
+            **TestTheCheck.RECORD,
+            "record_id": None,
+            "document_id": "doc-1",
+            "text": self.REPLY,
+        }
+        result, _ = TestTheCheck()._check(self.REPLY, [1], [document], can_book=False)
+        assert BOOKING in result["answer"]
+
+    def test_a_label_mid_sentence_stays_and_a_bracket_with_ids_goes(self):
+        from app.core.agent_runtime.check.text import without_record_ids
+
+        assert (
+            without_record_ids(
+                f"Booked at 12:00 (slot id: {SLOT_1}, appointment id: {BOOKING}). "
+                f"Your appointment id {BOOKING} is confirmed."
+            )
+            == "Booked at 12:00. Your appointment is confirmed."
+        )
+
+    def test_lists_keep_their_lead_in_and_items(self):
+        from app.core.agent_runtime.check.text import without_record_ids
+
+        assert (
+            without_record_ids(
+                f"Free on Thursday (Dr Rohan, 50 min):\n- 10:00 (id: {SLOT_1}) [1]\n"
+                f"- 12:00 (id: {SLOT_2}) [2]"
+            )
+            == "Free on Thursday (Dr Rohan, 50 min):\n- 10:00\n- 12:00"
+        )
+
+
 class TestPrompt:
     def test_with_no_list_tools_the_prompt_and_schema_are_todays(self):
         bot = make_bot()
@@ -425,11 +470,20 @@ class TestPrompt:
         llm = FakeLLM(reply("decline", "I can't help with that."))
         with patch(f"{CONVERSATION}.generate_structured", llm):
             await run_lists(
-                gateway=FakeGateway(), bot=lists_bot(persona={"purpose": "enquiries"})
+                gateway=FakeGateway(),
+                bot=lists_bot(
+                    persona={"purpose": "enquiries"},
+                    gateway_today=(
+                        "Saturday 14 Nov 2026, 11:58 (Asia/Kolkata, UTC+05:30)"
+                    ),
+                ),
             )
         prompt = llm.calls[0]["prompt"]
         assert "# Lists you can use" in prompt
         assert prompt.index("# What you're for") < prompt.index("# Lists you can use")
+        assert "Today is Saturday 14 Nov 2026, 11:58 (Asia/Kolkata, UTC+05:30)." in (
+            prompt
+        )
         assert "- `find_slots`: Look up entries in Slots." in prompt
         assert "`starts_at_from`: Starts at from: a date and time" in prompt
 

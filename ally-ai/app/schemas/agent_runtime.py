@@ -38,6 +38,9 @@ class AgentGateway(BaseModel):
     definitions: List["ListToolDefinition"] = Field(default_factory=list, max_length=12)
     #: List tools the bot has on that didn't fit under the cap; named in the trace.
     omitted: List[str] = Field(default_factory=list, max_length=200)
+    #: Today where the business is, for the lists section ("Saturday 14 Nov 2026,
+    #: 11:58 (Asia/Kolkata, UTC+05:30)"); sent with list tools.
+    today: str = Field("", max_length=120)
 
 
 class ListToolDefinition(BaseModel):
@@ -141,6 +144,8 @@ class AgentRunRequest(KnowledgeAnswerRequest):
                 ]
             if self.gateway.omitted:
                 bot["gateway_omitted"] = list(self.gateway.omitted)
+            if self.gateway.definitions and self.gateway.today:
+                bot["gateway_today"] = self.gateway.today
         return bot
 
     @field_validator("knowledge_topics")

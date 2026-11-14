@@ -669,6 +669,9 @@ class AgentListsInputs(PromptInputs):
         ),
     )
 
+    #: Today's date and time where the business is, from ally-be.
+    today: str
+
 
 class AgentPurposeTrainingInputs(PromptInputs):
     """`agent/purpose_training.txt`."""

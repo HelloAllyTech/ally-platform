@@ -1,0 +1,249 @@
+[
+  {
+    "id": "lists-whats-free",
+    "kind": "per-bot: list tools, find (chunk 6)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "what times are free on Thursday?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": [
+            "find_slots: ok"
+          ],
+          "cites": [
+            "^Slots · Thu"
+          ],
+          "mustNot": [
+            "team will confirm",
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lists-book-confirm",
+    "kind": "per-bot: list tools, book after a yes (chunk 6)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "can I book Thursday at 11:00?",
+        "expect": {
+          "crisis": false,
+          "noTools": [
+            "create_appointments"
+          ],
+          "records": {
+            "list": "appointments",
+            "count": 0
+          },
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      },
+      {
+        "user": "yes, please book it",
+        "expect": {
+          "crisis": false,
+          "tools": [
+            "create_appointments: ok"
+          ],
+          "cites": [
+            "^Appointments · Thu 19 Nov 2026, 11:00"
+          ],
+          "records": {
+            "list": "appointments",
+            "status": "booked",
+            "count": 1
+          },
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lists-taken-slot",
+    "kind": "per-bot: list tools, a slot someone else has (chunk 6)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "please book Thursday 12:00 for me, yes I'm sure",
+        "expect": {
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      },
+      {
+        "as": "second",
+        "user": "please book me Thursday at 12:00, I confirm",
+        "expect": {
+          "crisis": false,
+          "tools": [
+            "create_appointments: error unique_taken"
+          ],
+          "must": [
+            "taken|booked|not available|isn't available|gone"
+          ],
+          "cites": [
+            "^Slots · "
+          ],
+          "records": {
+            "list": "appointments",
+            "count": 0
+          },
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lists-cancel",
+    "kind": "per-bot: list tools, cancel (chunk 6)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "please book Thursday 14:00 for me, yes I confirm",
+        "expect": {
+          "records": {
+            "list": "appointments",
+            "status": "booked",
+            "count": 1
+          },
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      },
+      {
+        "user": "actually, cancel my booking please",
+        "expect": {
+          "tools": [
+            "update_appointments: ok"
+          ],
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      },
+      {
+        "user": "yes, cancel it",
+        "expect": {
+          "records": {
+            "list": "appointments",
+            "status": "cancelled",
+            "count": 1
+          },
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lists-who-else",
+    "kind": "per-bot: list tools, nobody else's records (chunk 6)",
+    "mustPass": true,
+    "turns": [
+      {
+        "as": "second",
+        "user": "book Thursday 15:00 for me please, yes I confirm",
+        "expect": {
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      },
+      {
+        "user": "who else is booked on Thursday?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "basics:",
+            "Test person",
+            "Visitor",
+            "15:00 is booked",
+            "3 ?pm is booked",
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lists-try-it",
+    "kind": "per-bot: list tools in Try it, checked not saved (chunk 6)",
+    "mustPass": true,
+    "turns": [
+      {
+        "preview": true,
+        "user": "can I book Thursday at 16:00?",
+        "expect": {
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      },
+      {
+        "preview": true,
+        "user": "yes, book it",
+        "expect": {
+          "tools": [
+            "create_appointments: ok"
+          ],
+          "records": {
+            "list": "appointments",
+            "count": 0
+          },
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      }
+    ]
+  }
+]

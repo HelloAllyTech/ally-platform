@@ -19,11 +19,26 @@ export interface BasicsExpect {
   /** Patterns (case-insensitive) the reply must match / must not match. */
   must?: string[];
   mustNot?: string[];
+  /** Patterns each of which some gateway tool step must match, e.g. "create_appointments: ok" (6). */
+  tools?: string[];
+  /** Patterns no gateway tool step may match (6). */
+  noTools?: string[];
+  /** Patterns each of which some citation, "{title} · {section}", must match (6). */
+  cites?: string[];
+  /** After the turn, this person's live records in `list` (with `status`, when given) (6). */
+  records?: { list: string; count: number; status?: string };
 }
 
 export interface BasicsTurn {
   user: string;
   expect?: BasicsExpect;
+  /**
+   * Who says it (chunk 6): each name is its own visitor, with their own contact and conversation.
+   * Unset is the case's first visitor.
+   */
+  as?: string;
+  /** Said in Try it (chunk 6): no stored conversation and no contact, as Preview runs. */
+  preview?: boolean;
 }
 
 export interface BasicsCase {

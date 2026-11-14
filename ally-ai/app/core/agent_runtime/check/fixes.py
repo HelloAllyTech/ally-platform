@@ -16,6 +16,7 @@ from app.core.agent_runtime.check.text import (
     repeated_crisis_wording,
     unsupported_details,
     without_details,
+    without_record_ids,
     without_repeated_crisis_wording,
     without_sentences,
     without_source_phrases,
@@ -152,6 +153,16 @@ def _send_back_slot_offers(verdict: Verdict, ctx: CheckContext) -> None:
         verdict.rejection, verdict.keeps_text = Rejection.OFFERS_SLOT, True
 
 
+def _drop_record_ids(verdict: Verdict, ctx: CheckContext) -> None:
+    """A record's id is for the tools, never the person (chunk 6): the model copies
+    it from a passage's `id:` line, so it's taken out, with its label, and so is talk
+    of records and citation numbers. Only in a run with record passages, so every
+    other reply is exactly as before. Trimmed, not sent back."""
+    if not any(passage.get("record_id") for passage in ctx.passages):
+        return
+    verdict.answer = without_record_ids(verdict.answer) or verdict.answer
+
+
 def _send_back_unfound_slots(verdict: Verdict, ctx: CheckContext) -> None:
     """An assistant that can book (chunk 6) may name a time as free or booked only
     from its lists: the reply must cite a record a list tool returned. Otherwise
@@ -211,6 +222,7 @@ def _decline_if_nothing_left(verdict: Verdict, ctx: CheckContext) -> None:
 
 #: Applied in this order to every reply that isn't a decline the check forced.
 WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
+    _drop_record_ids,
     _drop_unsourced_details,
     _trim_repeated_crisis_wording,
     _trim_repeated_topic_list,

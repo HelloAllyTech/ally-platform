@@ -175,6 +175,48 @@ def without_source_phrases(text: str) -> str:
     return re.sub(r"\s+([.,;!?।])", r"\1", text)
 
 
+_UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+# A list record's id as the model repeats it from a passage (chunk 6). Ids are for
+# the tools, never the person. A bracket that holds one goes whole ("(slot id: …,
+# appointment id: …)"); a label that starts a clause goes with its id ("Appointment
+# id …;"); anywhere else only "id …" goes ("your appointment id … is booked").
+_ID_IN_BRACKETS = re.compile(
+    rf"\s*[(\[][^()\[\]]*{_UUID}[^()\[\]]*[)\]]", re.IGNORECASE
+)
+_LABELLED_ID = re.compile(
+    r"(?:(?<=^)|(?<=[.;,:!?—–-]\s)|(?<=\n))"
+    rf"[A-Za-z]+\s+ids?\s*(?:is\s+|:\s*|#\s*)?{_UUID}"
+    rf"|\s*\bids?\b\s*(?:is\s+|:\s*|#\s*)?{_UUID}"
+    rf"|\s*{_UUID}",
+    re.IGNORECASE | re.MULTILINE,
+)
+# Talk about the records or citations themselves: "(see record)", "Citations: 1, 2",
+# and passage numbers written into the text ("[1]").
+_RECORD_TALK = re.compile(
+    r"\s*\((?:see\s+(?:the\s+)?records?|citations?:[^)]*)\)"
+    r"|\s*\bcitations?:\s*\[?\d+(?:\s*,\s*\d+)*\]?\.?"
+    r"|\s*\[\d+(?:\s*,\s*\d+)*\]",
+    re.IGNORECASE,
+)
+
+
+def without_record_ids(text: str) -> str:
+    """The reply without record ids or talk of records and citation numbers, tidied
+    so no stray punctuation is left where they were."""
+    text = _ID_IN_BRACKETS.sub("", text or "")
+    text = _LABELLED_ID.sub("", text)
+    text = _RECORD_TALK.sub("", text)
+    text = re.sub(r"\(\s*[,;:]?\s*\)", "", text)
+    text = re.sub(r"[ \t]+[—–][ \t]*(?=\()", " ", text)
+    text = re.sub(r"[ \t]+[—–][ \t]*(?=[.!?,;]|$)", "", text, flags=re.MULTILINE)
+    text = re.sub(r"[ \t]*[,;][ \t]*(?=[.!?]|$)", "", text, flags=re.MULTILINE)
+    text = re.sub(r"([.!?])[ \t]*[,;:]+", r"\1", text)
+    text = re.sub(r"(?<=[.!?])[ \t]*\.+", "", text)
+    text = re.sub(r"[ \t]+([.,;!?])", r"\1", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return "\n".join(line.rstrip() for line in text.split("\n")).strip()
+
+
 def detail_kinds(text: str) -> List[str]:
     """The kinds of checkable detail in `text`, e.g. ``["a link", "a number"]``."""
     return [kind for kind, pattern in _DETAIL_KINDS if pattern.search(text or "")]

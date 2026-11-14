@@ -590,6 +590,43 @@ export function recordPassage(
   };
 }
 
+/** Where a business is, until bots have a time zone setting: the pilots are in India. */
+export const DEFAULT_TIME_ZONE = 'Asia/Kolkata';
+
+/**
+ * Today where the business is, for the lists section (chunk 6): "Saturday 14 Nov 2026, 11:58
+ * (Asia/Kolkata, UTC+05:30)". The agent works out "Thursday" or "tomorrow" from it, and writes
+ * date-times with the offset. An unknown time zone falls back to the default.
+ */
+export function todayFor(now: Date, timeZone = DEFAULT_TIME_ZONE): string {
+  let zone = timeZone;
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: zone });
+  } catch {
+    zone = DEFAULT_TIME_ZONE;
+  }
+  const part = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat('en-GB', { timeZone: zone, ...options }).format(
+      now,
+    );
+  const date = part({
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).replace(',', '');
+  const time = part({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const offset =
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: zone,
+      timeZoneName: 'longOffset',
+    })
+      .formatToParts(now)
+      .find((p) => p.type === 'timeZoneName')
+      ?.value.replace('GMT', 'UTC') || 'UTC';
+  return `${date}, ${time} (${zone}, ${offset === 'UTC' ? 'UTC+00:00' : offset})`;
+}
+
 /** Copy deck §26: what a reply says when a run fails after a list write was done. */
 export const listDoneLine = (recordTitle: string, list: string): string =>
   `Done: ${recordTitle} in ${list}.`;

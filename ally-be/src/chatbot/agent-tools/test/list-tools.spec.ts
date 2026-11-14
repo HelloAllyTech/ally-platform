@@ -11,6 +11,7 @@ import {
   parseListToolName,
   recordPassage,
   toListData,
+  todayFor,
   toListQuery,
 } from '../list-tools';
 
@@ -409,6 +410,25 @@ describe('results', () => {
   it('says what was done when a run fails after a write (copy deck §26)', () => {
     expect(listDoneLine('Thu 19 Nov 2026, 11:00', 'Appointments')).toBe(
       'Done: Thu 19 Nov 2026, 11:00 in Appointments.',
+    );
+  });
+});
+
+describe('today', () => {
+  const now = new Date('2026-11-14T06:28:00Z');
+
+  it('says the day, date, time and offset where the business is', () => {
+    expect(todayFor(now)).toBe(
+      'Saturday 14 Nov 2026, 11:58 (Asia/Kolkata, UTC+05:30)',
+    );
+    expect(todayFor(now, 'Europe/London')).toBe(
+      'Saturday 14 Nov 2026, 06:28 (Europe/London, UTC+00:00)',
+    );
+  });
+
+  it('falls back to the default for a time zone it doesn’t know', () => {
+    expect(todayFor(now, 'Mars/Olympus')).toContain(
+      '(Asia/Kolkata, UTC+05:30)',
     );
   });
 });

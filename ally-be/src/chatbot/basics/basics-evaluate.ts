@@ -10,9 +10,10 @@ import {
 export function failuresOf(
   decision: Pick<
     ChatbotDecision,
-    'handledBy' | 'body' | 'turnType' | 'handover'
+    'handledBy' | 'body' | 'turnType' | 'handover' | 'citations'
   >,
   expect: BasicsExpect = {},
+  gatewaySteps: { summary: string }[] = [],
 ): string[] {
   const failures: string[] = [];
   const body = decision.body ?? '';
@@ -53,6 +54,23 @@ export function failuresOf(
     : [...ALWAYS_MUST_NOT, ...(expect.mustNot ?? [])];
   for (const pattern of mustNot) {
     if (new RegExp(pattern, 'i').test(body)) failures.push(`says /${pattern}/`);
+  }
+  // The list tools (chunk 6): which ran, and what the reply cites.
+  const steps = gatewaySteps.map((step) => step.summary);
+  for (const pattern of expect.tools ?? []) {
+    if (!steps.some((s) => new RegExp(pattern, 'i').test(s)))
+      failures.push(`no tool step /${pattern}/`);
+  }
+  for (const pattern of expect.noTools ?? []) {
+    if (steps.some((s) => new RegExp(pattern, 'i').test(s)))
+      failures.push(`tool step /${pattern}/`);
+  }
+  const cited = (decision.citations ?? []).map((c) =>
+    [c.document_title, c.section_path].filter(Boolean).join(' · '),
+  );
+  for (const pattern of expect.cites ?? []) {
+    if (!cited.some((c) => new RegExp(pattern, 'i').test(c)))
+      failures.push(`cites nothing like /${pattern}/`);
   }
   return failures;
 }

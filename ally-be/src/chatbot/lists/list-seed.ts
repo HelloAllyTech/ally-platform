@@ -325,3 +325,161 @@ export async function seedLists(
   }
   return out;
 }
+
+/**
+ * The Listings fixture (chunk 6): a shared, read-only list of flats for "2BHK in Baner under 85
+ * lakh" (find with ranges and equality). On its own test bot, beside or instead of the clinic lists.
+ */
+export const SEED_LISTINGS: ListInput = {
+  key: 'listings',
+  name: 'Listings',
+  agent_read: true,
+  agent_write: false,
+  settings: { title_field: 'title', default_sort: 'price' },
+  fields: [
+    {
+      key: 'title',
+      label: 'Title',
+      type: ListFieldType.TEXT,
+      required: true,
+    },
+    {
+      key: 'locality',
+      label: 'Locality',
+      type: ListFieldType.SELECT,
+      options: { values: ['Baner', 'Wakad', 'Kothrud'] },
+      required: true,
+    },
+    {
+      key: 'bhk',
+      label: 'BHK',
+      type: ListFieldType.SELECT,
+      options: { values: ['1BHK', '2BHK', '3BHK'] },
+      required: true,
+    },
+    {
+      key: 'price',
+      label: 'Price',
+      type: ListFieldType.MONEY,
+      options: { currency: 'INR' },
+      required: true,
+    },
+    { key: 'area', label: 'Area (sq ft)', type: ListFieldType.NUMBER },
+  ],
+};
+
+/** Twelve flats: in Baner, two 2BHKs under 85 lakh and one over. */
+export const SEED_LISTING_RECORDS: Record<string, string | number>[] = [
+  {
+    title: 'Baner 2BHK, Pancard Club Road',
+    locality: 'Baner',
+    bhk: '2BHK',
+    price: 7800000,
+    area: 980,
+  },
+  {
+    title: 'Baner 2BHK, Sus Road',
+    locality: 'Baner',
+    bhk: '2BHK',
+    price: 8200000,
+    area: 1020,
+  },
+  {
+    title: 'Baner 2BHK, Balewadi High Street',
+    locality: 'Baner',
+    bhk: '2BHK',
+    price: 9500000,
+    area: 1100,
+  },
+  {
+    title: 'Baner 1BHK, Mahalunge Road',
+    locality: 'Baner',
+    bhk: '1BHK',
+    price: 5200000,
+    area: 620,
+  },
+  {
+    title: 'Baner 3BHK, Veerbhadra Nagar',
+    locality: 'Baner',
+    bhk: '3BHK',
+    price: 14500000,
+    area: 1550,
+  },
+  {
+    title: 'Wakad 2BHK, Kaspate Wasti',
+    locality: 'Wakad',
+    bhk: '2BHK',
+    price: 7200000,
+    area: 950,
+  },
+  {
+    title: 'Wakad 2BHK, Bhumkar Chowk',
+    locality: 'Wakad',
+    bhk: '2BHK',
+    price: 6900000,
+    area: 900,
+  },
+  {
+    title: 'Wakad 1BHK, Datta Mandir Road',
+    locality: 'Wakad',
+    bhk: '1BHK',
+    price: 4500000,
+    area: 600,
+  },
+  {
+    title: 'Wakad 3BHK, Hinjewadi Road',
+    locality: 'Wakad',
+    bhk: '3BHK',
+    price: 11000000,
+    area: 1400,
+  },
+  {
+    title: 'Kothrud 2BHK, Karve Road',
+    locality: 'Kothrud',
+    bhk: '2BHK',
+    price: 9900000,
+    area: 1000,
+  },
+  {
+    title: 'Kothrud 1BHK, Paud Road',
+    locality: 'Kothrud',
+    bhk: '1BHK',
+    price: 6100000,
+    area: 640,
+  },
+  {
+    title: 'Kothrud 3BHK, Mayur Colony',
+    locality: 'Kothrud',
+    bhk: '3BHK',
+    price: 17500000,
+    area: 1700,
+  },
+];
+
+/** The Listings list and its flats on a test bot. Running it again changes nothing. */
+export async function seedListings(
+  dataSource: DataSource,
+  chatbotId: string,
+): Promise<{ id: string; created: boolean; records: number }> {
+  const definitions = new ListDefinitionsService(dataSource);
+  const records = new ListRecordsService(dataSource);
+  const m = dataSource.manager;
+  let created = false;
+  if (!(await loadList(m, chatbotId, SEED_LISTINGS.key))) {
+    await definitions.createList(chatbotId, SEED_LISTINGS);
+    created = true;
+  }
+  for (const flat of SEED_LISTING_RECORDS) {
+    const found = await records.query(chatbotId, 'listings', ACTOR, {
+      filters: [{ field: 'title', op: 'eq', value: flat.title }],
+      limit: 1,
+    });
+    if (!found.total) await records.create(chatbotId, 'listings', ACTOR, flat);
+  }
+  const list = (await loadList(m, chatbotId, SEED_LISTINGS.key))!;
+  const [{ n }] = await m.query(
+    `SELECT count(*)::int AS n FROM collection_records WHERE collection_id = $1 AND deleted_at IS NULL`,
+    [list.collection.id],
+  );
+  return { id: list.collection.id, created, records: n };
+}

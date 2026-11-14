@@ -45,7 +45,11 @@ import { HandoverService } from '../handover/handover.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import { ConversationService } from '../service/conversation.service';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
-import { PLATFORM_BASICS, type BasicsCase } from './basics-cases';
+import {
+  PLATFORM_BASICS,
+  type BasicsCase,
+  type BasicsTurn,
+} from './basics-cases';
 import {
   countCrisis,
   crisisTotals,
@@ -172,23 +176,85 @@ async function main(): Promise<void> {
       attempt: number,
     ): Promise<TurnReport[]> => {
       if (classifierOnly) return classifyCase(item);
-      const externalId = `basics:${runTag}:${item.id}:${attempt}`;
-      const contact = await conversations.resolveContact(
-        { chatbotId: chatbot.id },
-        ConversationChannel.WEB,
-        externalId,
-      );
-      created.contactIds.push(contact.id);
-      const conversation = await conversations.openConversation(
-        chatbot.id,
-        contact.id,
-        ConversationChannel.WEB,
-        { idleWindowMinutes: settings.conversationIdleMinutes },
-      );
-      created.conversationIds.push(conversation.id);
+      // Each visitor in the case (chunk 6: `as`) has their own contact and conversation.
+      const visitors = new Map<
+        string,
+        { externalId: string; contactId: string; conversationId: string }
+      >();
+      const visitor = async (name: string) => {
+        const known = visitors.get(name);
+        if (known) return known;
+        const externalId = `basics:${runTag}:${item.id}:${attempt}${name === 'first' ? '' : `:${name}`}`;
+        const contact = await conversations.resolveContact(
+          { chatbotId: chatbot.id },
+          ConversationChannel.WEB,
+          externalId,
+        );
+        created.contactIds.push(contact.id);
+        const conversation = await conversations.openConversation(
+          chatbot.id,
+          contact.id,
+          ConversationChannel.WEB,
+          { idleWindowMinutes: settings.conversationIdleMinutes },
+        );
+        created.conversationIds.push(conversation.id);
+        const made = {
+          externalId,
+          contactId: contact.id,
+          conversationId: conversation.id,
+        };
+        visitors.set(name, made);
+        return made;
+      };
+      await visitor('first');
+      const previewHistory: { role: string; content: string }[] = [];
 
       const turns: TurnReport[] = [];
       for (const turn of item.turns) {
+        if (turn.preview) {
+          // Try it (chunk 6): no stored conversation, no contact; Preview's own history.
+          previewHistory.push({ role: 'user', content: turn.user });
+          const startedAt = Date.now();
+          const decision = await engine.respond({
+            chatbot,
+            settings,
+            text: turn.user,
+            history: [...previewHistory],
+            isFirstMessage: previewHistory.length <= 1,
+            sender: { externalId: `basics:${runTag}:preview`, label: 'Try it' },
+            channel: WEB_CHANNEL,
+            providerMessageId: randomUUID(),
+          });
+          previewHistory.push({ role: 'assistant', content: decision.body });
+          const steps = gatewayStepsOf(decision);
+          turns.push({
+            user: `[Try it] ${turn.user}`,
+            reply: decision.body,
+            handledBy: decision.handledBy,
+            turnType: decision.turnType ?? null,
+            runtime: decision.agent?.runtime ?? null,
+            latencyMs: Date.now() - startedAt,
+            failures: [
+              ...failuresOf(decision, turn.expect, steps),
+              ...(await recordFailures(
+                dataSource,
+                chatbot.id,
+                null,
+                turn,
+                new Date(startedAt),
+              )),
+            ],
+            gatewaySteps: steps,
+            crisis: decision.handledBy === WaHandledBy.CRISIS,
+            crisisLayer: null,
+          });
+          continue;
+        }
+        const { externalId, contactId, conversationId } = await visitor(
+          turn.as ?? 'first',
+        );
+        const contact = { id: contactId };
+        const conversation = { id: conversationId };
         const inbound = await conversations.appendMessage(conversation.id, {
           channel: ConversationChannel.WEB,
           direction: WaMessageDirection.INBOUND,
@@ -230,15 +296,19 @@ async function main(): Promise<void> {
           });
         }
         const crisis = decision.handledBy === WaHandledBy.CRISIS;
+        const steps = gatewayStepsOf(decision);
         turns.push({
-          user: turn.user,
+          user: turn.as ? `[${turn.as}] ${turn.user}` : turn.user,
           reply: decision.body,
           handledBy: decision.handledBy,
           turnType: decision.turnType ?? null,
           runtime: decision.agent?.runtime ?? null,
           latencyMs: Date.now() - startedAt,
-          failures: failuresOf(decision, turn.expect),
-          gatewaySteps: gatewayStepsOf(decision),
+          failures: [
+            ...failuresOf(decision, turn.expect, steps),
+            ...(await recordFailures(dataSource, chatbot.id, contact.id, turn)),
+          ],
+          gatewaySteps: steps,
           crisis,
           crisisLayer: crisis
             ? decision.templateId
@@ -412,6 +482,36 @@ function gatewayStepsOf(
   return steps.length ? steps : undefined;
 }
 
+/**
+ * A turn's `records` expectation (chunk 6): how many live records this person has in the list, with
+ * the status given. For Try it (no person), how many records anyone made there during the turn:
+ * Try it saves none.
+ */
+async function recordFailures(
+  dataSource: DataSource,
+  chatbotId: string,
+  contactId: string | null,
+  turn: BasicsTurn,
+  since: Date | null = null,
+): Promise<string[]> {
+  const want = turn.expect?.records;
+  if (!want) return [];
+  const [{ n }] = (await dataSource.query(
+    `SELECT count(*)::int AS n FROM collection_records r
+       JOIN collections c ON c.id = r.collection_id AND c.deleted_at IS NULL
+      WHERE c.chatbot_id = $1 AND c.key = $2 AND r.deleted_at IS NULL
+        AND ($3::uuid IS NULL OR r.contact_id = $3)
+        AND ($4::text IS NULL OR r.data->>'status' = $4)
+        AND ($5::timestamptz IS NULL OR r."createdAt" >= $5)`,
+    [chatbotId, want.list, contactId, want.status ?? null, since],
+  )) as { n: number }[];
+  return n === want.count
+    ? []
+    : [
+        `${n} ${want.list}${want.status ? ` ${want.status}` : ''}, expected ${want.count}`,
+      ];
+}
+
 async function removeRuns(
   dataSource: DataSource,
   {
@@ -439,6 +539,12 @@ async function removeRuns(
       ]);
     }
     if (contactIds.length) {
+      // What the agent booked for them (chunk 6), so a slot is free for the next run. Their links
+      // and events go with them (ON DELETE CASCADE).
+      await tx.query(
+        `DELETE FROM collection_records WHERE contact_id = ANY($1)`,
+        [contactIds],
+      );
       await tx.query(
         `DELETE FROM chatbot_contact_identities WHERE contact_id = ANY($1)`,
         [contactIds],

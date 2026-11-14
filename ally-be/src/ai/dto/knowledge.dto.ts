@@ -159,6 +159,8 @@ export interface AgentGatewayBlock {
   }[];
   /** List tools the bot has on that didn't fit under the cap; named in the run's trace. */
   omitted?: string[];
+  /** Today where the business is, for the agent's lists section; sent with `definitions`. */
+  today?: string;
 }
 
 export interface AgentRunRequest extends KnowledgeAnswerRequest {

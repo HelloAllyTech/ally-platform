@@ -50,6 +50,7 @@ class BotConfig(TypedDict, total=False):
     # --- list tools (chunk 6): their definitions, and the names left out by the cap
     gateway_definitions: List[Dict[str, Any]]
     gateway_omitted: List[str]
+    gateway_today: str
 
 
 class RunInput(TypedDict, total=False):

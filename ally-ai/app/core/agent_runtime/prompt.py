@@ -153,6 +153,7 @@ def build_agent_prompt(
     persona: Optional[Dict[str, Any]] = None,
     prompts: Optional[Dict[str, Any]] = None,
     lists: bool = False,
+    today: str = "",
 ) -> str:
     """The agent step's prompt. Empty when the template is missing (the caller
     refuses to run unguided)."""
@@ -181,6 +182,8 @@ def build_agent_prompt(
     # v1's answer prompt.
     # With list tools (chunk 6), the lists section follows the purpose.
     section = (
-        load_and_format(LISTS_PROMPT_PATH, prompts=prompts).strip() if lists else ""
+        load_and_format(LISTS_PROMPT_PATH, prompts=prompts, today=today).strip()
+        if lists
+        else ""
     )
     return format_persona(persona, prompts, lists=section) + body

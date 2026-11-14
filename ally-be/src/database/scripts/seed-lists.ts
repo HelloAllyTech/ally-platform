@@ -3,6 +3,9 @@
  * and Bookings on a local test bot, with next week's slots and a "Test person" contact. Running it
  * again changes nothing. Refuses to run in production.
  *
+ * `--listings` (chunk 6) seeds only the Listings fixture instead: flats in Baner, Wakad and
+ * Kothrud, for "2BHK in Baner under 85 lakh".
+ *
  * In the local Docker stack: `docker exec -w /app ally-be-app-1 npm run lists:seed -- --bot <id>`.
  */
 import { config as loadEnv } from 'dotenv';
@@ -10,7 +13,7 @@ loadEnv();
 
 import { DataSource } from 'typeorm';
 import { LIST_ENTITIES } from '../../chatbot/lists/list-entities';
-import { seedLists } from '../../chatbot/lists/list-seed';
+import { seedListings, seedLists } from '../../chatbot/lists/list-seed';
 
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
@@ -38,6 +41,13 @@ async function main(): Promise<void> {
   });
   await dataSource.initialize();
   try {
+    if (process.argv.includes('--listings')) {
+      const listings = await seedListings(dataSource, chatbotId);
+      console.log(
+        `Bot ${chatbotId}\n  listings      ${listings.id}  ${listings.created ? 'created' : 'already there'}, ${listings.records} entries`,
+      );
+      return;
+    }
     const result = await seedLists(dataSource, chatbotId);
     console.log(`Bot ${chatbotId}`);
     for (const list of result.lists) {

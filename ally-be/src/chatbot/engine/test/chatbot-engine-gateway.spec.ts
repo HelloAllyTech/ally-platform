@@ -298,6 +298,9 @@ describe('ChatbotEngineService: the tool gateway', () => {
       expect(gateway.tools).toEqual(['find_slots', 'create_appointments']);
       expect(gateway.definitions).toEqual([FIND, CREATE]);
       expect(gateway.omitted).toEqual(['find_more']);
+      expect(gateway.today).toMatch(
+        /^\w+day \d{1,2} \w{3} \d{4}, \d{2}:\d{2} \(Asia\/Kolkata, UTC\+05:30\)$/,
+      );
       expect((jwt.decode(gateway.token) as { tools: string[] }).tools).toEqual([
         'find_slots',
         'create_appointments',

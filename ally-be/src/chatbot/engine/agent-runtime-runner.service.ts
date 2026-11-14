@@ -14,7 +14,12 @@ import type {
 import { AiService } from '../../ai/service/ai.service';
 import { LoggerService } from '../../logger/logger.service';
 import { AgentRunTokenService } from '../agent-tools/agent-run-token.service';
-import { listDoneLine, parseListToolName } from '../agent-tools/list-tools';
+import {
+  listDoneLine,
+  parseListToolName,
+  todayFor,
+} from '../agent-tools/list-tools';
+import { handoverOf } from '../handover/handover';
 import {
   isPreviewConversation,
   ListToolsService,
@@ -258,7 +263,15 @@ export class AgentRuntimeRunner {
           tools,
         }),
         tools,
-        ...(lists.definitions.length ? { definitions: lists.definitions } : {}),
+        ...(lists.definitions.length
+          ? {
+              definitions: lists.definitions,
+              today: todayFor(
+                new Date(),
+                handoverOf(turn.settings).hours?.timeZone,
+              ),
+            }
+          : {}),
         ...(lists.omitted.length ? { omitted: lists.omitted } : {}),
       },
     };

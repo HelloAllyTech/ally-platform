@@ -62,6 +62,7 @@ async def agent_step(
         max_chars=bot.get("max_answer_chars") or 1400,
         persona=bot.get("persona"),
         lists=bool(bot.get("gateway_definitions")),
+        today=bot.get("gateway_today") or "",
         prompts=prompts,
     )
     if not prompt:
