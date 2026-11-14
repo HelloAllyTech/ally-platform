@@ -292,6 +292,17 @@ class EvalLimits(_Strict):
     clean_max_src_lines: int = Field(default=200, ge=1)
 
 
+class MemoryConfig(_Strict):
+    """Long-term memory (chunk 07)."""
+
+    # auto: pgvector + the embeddings role when the server has the extension, else
+    # lookup by error signature, app and file paths; on: require pgvector; off: never
+    semantic: Literal["auto", "on", "off"] = "auto"
+    recall_limit: int = Field(default=5, ge=1, le=20)  # items per recall slot
+    scan_limit: int = Field(default=500, ge=10)  # candidates read per namespace
+    github_feedback: bool = False  # PR/issue label reader: built, switched off
+
+
 class LimitsConfig(_Strict):
     run: RunLimits
     sweep: SweepLimits = Field(default_factory=SweepLimits)
@@ -302,6 +313,7 @@ class LimitsConfig(_Strict):
     context: ContextLimits = Field(default_factory=ContextLimits)
     artefacts: ArtefactLimits = Field(default_factory=ArtefactLimits)
     evals: EvalLimits = Field(default_factory=EvalLimits)
+    memory: MemoryConfig = Field(default_factory=MemoryConfig)
 
     @field_validator("nodes")
     @classmethod

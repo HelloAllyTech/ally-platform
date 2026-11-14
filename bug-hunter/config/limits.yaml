@@ -35,6 +35,12 @@ nodes:
   fix: 60000
   review: 30000
   learn: 8000
+# Long-term memory (chunk 07): LangGraph PostgresStore in the bughunter database.
+memory:
+  semantic: auto        # auto | on | off: pgvector search when available, else signature/app/file lookup
+  recall_limit: 5       # items per recall slot (triage, investigate, fix)
+  scan_limit: 500       # candidates read per namespace before ranking in code
+  github_feedback: false  # PR/issue label reader; built and tested, switched off until pr mode
 # Context engine (chunk 03).
 context:
   token_safety_margin: 0.15   # budgets are enforced at (1 - margin): Gemini counts differently from tiktoken

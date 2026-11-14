@@ -700,6 +700,72 @@ def eval_run(
         raise typer.Exit(code=2)
 
 
+@eval_app.command("memory-check")
+def eval_memory_check(
+    max_cost_usd: Annotated[
+        float, typer.Option(help="Stop once both passes cost this much.")
+    ] = 4.0,
+    override_spend_cap: Annotated[
+        bool,
+        typer.Option(
+            "--override-spend-cap",
+            help="Start even past the $15 daily ledger cap (user's explicit go-ahead).",
+        ),
+    ] = False,
+    in_memory_store: Annotated[
+        bool,
+        typer.Option(
+            "--in-memory-store", help="LangGraph InMemoryStore instead of Postgres."
+        ),
+    ] = False,
+) -> None:
+    """Chunk 07 mechanics: golden/memory-check.yaml, two passes with simulated
+    verdicts in between, in a throwaway eval memory scope. Holdout cases refused."""
+    import contextlib as _contextlib
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
+
+    from bug_hunter import spend
+    from bug_hunter.config import PACKAGE_ROOT
+    from bug_hunter.memory.store import in_memory, open_memory
+    from evals.agents import GraphAgent
+    from evals.memory_check import load_entries, run_memory_check
+    from evals.run_evals import HarnessOptions
+    from evals.schema import load_cases
+
+    config = _load_or_exit()
+    cases = {
+        c.id: c
+        for c in load_cases(PACKAGE_ROOT / "evals" / "golden" / "cases.yaml").cases
+    }
+    scope = "eval-memcheck-" + _dt.now(_tz.utc).strftime("%Y%m%d-%H%M%S")
+    options = HarnessOptions(
+        max_cost_usd=max_cost_usd,
+        spend_file=spend.SPEND_FILE,
+        override_spend_cap=True if override_spend_cap else None,
+    )
+    with _contextlib.ExitStack() as stack:
+        memory = (
+            in_memory(scope=scope)
+            if in_memory_store
+            else stack.enter_context(open_memory(config, scope=scope))
+        )
+        try:
+            report, path = run_memory_check(
+                config, load_entries(), cases, GraphAgent(), memory, options
+            )
+        except spend.SpendCapExceeded as exc:
+            typer.echo(f"refused: {exc}", err=True)
+            raise typer.Exit(code=3)
+        except ValueError as exc:
+            typer.echo(f"refused: {exc}", err=True)
+            raise typer.Exit(code=1)
+    typer.echo(f"report: {path}")
+    typer.echo(path.read_text())
+    if report["meta"]["stopped_reason"]:
+        raise typer.Exit(code=2)
+
+
 # --- run / replay (chunk 05) ----
 
 
@@ -734,6 +800,10 @@ def run_cmd(
             help="Really push the branch and open the draft PR (needs the GitHub "
             "App). Default: dry run into the run's artefacts.",
         ),
+    ] = False,
+    no_memory: Annotated[
+        bool,
+        typer.Option("--no-memory", help="Run without long-term memory (chunk 07)."),
     ] = False,
 ) -> None:
     """One bug signal through the graph: triage → investigate → reproduce → fix →
@@ -817,8 +887,18 @@ def run_cmd(
     except spend.SpendCapExceeded as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=3)
+    import contextlib as _contextlib
+
     try:
-        with open_checkpointer(in_memory=no_checkpoint) as saver:
+        with (
+            open_checkpointer(in_memory=no_checkpoint) as saver,
+            _contextlib.ExitStack() as stack,
+        ):
+            memory = None
+            if not (no_memory or no_checkpoint):
+                from bug_hunter.memory.store import open_memory
+
+                memory = stack.enter_context(open_memory(config))
             with Run.start(config, app_name, checkout, run_id=run_id) as run:
                 deps = GraphDeps.for_run(
                     config,
@@ -830,6 +910,7 @@ def run_cmd(
                     checkpointer=saver,
                 )
                 deps.push = push
+                deps.memory = memory
                 if not no_checkpoint:
                     from bug_hunter.graph.approvals import PostgresApprovals
                     from bug_hunter.graph.checkpointer import db_url
@@ -992,7 +1073,8 @@ app.add_typer(db_app, name="db")
 
 @db_app.command("migrate")
 def db_migrate() -> None:
-    """Apply bug-hunter/migrations/*.sql (approvals table) to the bughunter database."""
+    """Apply bug-hunter/migrations/*.sql (approvals, verdicts) to the bughunter
+    database."""
     from bug_hunter.graph.approvals import PostgresApprovals
     from bug_hunter.graph.checkpointer import db_url
 
@@ -1076,3 +1158,207 @@ def replay_cmd(
 
 if __name__ == "__main__":
     app()
+
+
+# --- chunk 07: verdicts, feedback, memory -------------------------------------------
+
+memory_app = typer.Typer(help="Long-term memory: inspect, approve and delete records.")
+app.add_typer(memory_app, name="memory")
+
+
+def _app_path_for(config: BugHunterConfig):
+    def app_path(name: str) -> str:
+        return config.app(name).path if name in config.apps.apps else ""
+
+    return app_path
+
+
+def _reader_for(config: BugHunterConfig):
+    """Files at the run's commit, from the main repository (fingerprints)."""
+    from bug_hunter.tools.git import Git, GitError
+
+    git = Git(config.repo_root)
+
+    def reader_for(run):
+        def read(repo_rel: str):
+            try:
+                return git._git(["show", f"{run.ref}:{repo_rel}"]).stdout
+            except GitError:
+                return None
+
+        return read
+
+    return reader_for
+
+
+@app.command("verdict")
+def verdict_cmd(
+    run_id: Annotated[str, typer.Argument(help="The finished run to judge.")],
+    diagnosis: Annotated[str, typer.Option(help="correct | wrong | not_a_bug")],
+    fix: Annotated[str, typer.Option(help="worked | needed_edits | wrong | none")],
+    reason: Annotated[str, typer.Option(help="Why, in one or two sentences.")],
+    by: Annotated[str, typer.Option(help="Who decided (default: $USER).")] = "",
+    apply: Annotated[
+        bool,
+        typer.Option("--apply/--no-apply", help="Write it to memory now."),
+    ] = True,
+) -> None:
+    """Record a human verdict on a run (the admin dashboard writes the same table in
+    chunk 09) and, by default, turn it into long-term memory."""
+    import os as _os
+
+    from bug_hunter.config import ARTEFACTS_DIR
+    from bug_hunter.graph.checkpointer import db_url
+    from bug_hunter.memory.feedback import load_run, run_feedback
+    from bug_hunter.memory.store import open_memory
+    from bug_hunter.memory.verdicts import PostgresVerdicts, Verdict
+
+    config = _load_or_exit()
+    try:
+        run = load_run(run_id, ARTEFACTS_DIR, _app_path_for(config))
+        verdict = Verdict(
+            run_id=run_id,
+            app=run.app,
+            diagnosis=diagnosis,
+            fix=fix,
+            reason=reason,
+            decided_by=by or _os.environ.get("USER", "unknown"),
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=1)
+    store = PostgresVerdicts(db_url())
+    saved = store.add(verdict)
+    typer.echo(f"verdict {saved.id} recorded for {run_id}")
+    if apply:
+        with open_memory(config) as memory:
+            for v, ids in run_feedback(
+                memory,
+                store,
+                lambda rid: load_run(rid, ARTEFACTS_DIR, _app_path_for(config)),
+                _reader_for(config),
+            ):
+                typer.echo(f"  {v.run_id}: wrote {', '.join(ids)}")
+
+
+@app.command("feedback")
+def feedback_cmd() -> None:
+    """Apply every unapplied verdict to memory (and, if memory.github_feedback is on,
+    import verdicts from bh-diagnosis/bh-fix labels first)."""
+    from bug_hunter.config import ARTEFACTS_DIR
+    from bug_hunter.graph.checkpointer import db_url
+    from bug_hunter.memory.feedback import load_run, run_feedback
+    from bug_hunter.memory.store import open_memory
+    from bug_hunter.memory.verdicts import PostgresVerdicts
+
+    config = _load_or_exit()
+    if config.limits.memory.github_feedback:
+        typer.echo(
+            "memory.github_feedback is on, but no GitHub App client exists yet "
+            "(chunk 09); applying table verdicts only",
+            err=True,
+        )
+    with open_memory(config) as memory:
+        done = run_feedback(
+            memory,
+            PostgresVerdicts(db_url()),
+            lambda rid: load_run(rid, ARTEFACTS_DIR, _app_path_for(config)),
+            _reader_for(config),
+        )
+    for v, ids in done:
+        typer.echo(f"{v.run_id} ({v.diagnosis}/{v.fix}): wrote {', '.join(ids)}")
+    typer.echo(f"{len(done)} verdict(s) applied")
+
+
+def _memory_line(kind: str, record) -> str:
+    status = getattr(record, "status", "")
+    extra = f" [{status}]" if kind == "conventions" else ""
+    count = getattr(record, "count", None)
+    extra += f" x{count}" if count and count > 1 else ""
+    return f"{record.id}  {record.app:<14} {kind:<15}{extra}  {record.text[:90]}"
+
+
+@memory_app.command("list")
+def memory_list(
+    kind: Annotated[str | None, typer.Option(help="Namespace kind.")] = None,
+    app_name: Annotated[str | None, typer.Option("--app")] = None,
+    pending: Annotated[
+        bool, typer.Option("--pending", help="Only conventions awaiting approval.")
+    ] = False,
+) -> None:
+    """Records, oldest first. Pending conventions are always listed at the end."""
+    from bug_hunter.memory.store import open_memory
+
+    config = _load_or_exit()
+    with open_memory(config) as memory:
+        rows = (
+            []
+            if pending
+            else [
+                kr
+                for kr in memory.list(kind, app=app_name)
+                if not (kr[0] == "conventions" and kr[1].status == "pending")
+            ]
+        )
+        waiting = memory.list("conventions", app=app_name, status="pending")
+    for k, r in rows:
+        typer.echo(_memory_line(k, r))
+    if waiting:
+        typer.echo(
+            f"\npending conventions ({len(waiting)}): approve with "
+            "`bug-hunter memory approve <id>`"
+        )
+        for k, r in waiting:
+            typer.echo(_memory_line(k, r))
+    if not rows and not waiting:
+        typer.echo("memory is empty")
+
+
+@memory_app.command("show")
+def memory_show(record_id: Annotated[str, typer.Argument()]) -> None:
+    import json as _json
+
+    from bug_hunter.memory.store import open_memory
+
+    config = _load_or_exit()
+    with open_memory(config) as memory:
+        found = memory.get(record_id)
+    if found is None:
+        typer.echo(f"no record {record_id}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(_json.dumps({"kind": found[0], **found[1].model_dump()}, indent=1))
+
+
+@memory_app.command("approve")
+def memory_approve(
+    record_id: Annotated[str, typer.Argument(help="A pending convention (cv-…).")],
+    text: Annotated[
+        str | None, typer.Option(help="Reword the convention before approving.")
+    ] = None,
+) -> None:
+    """Approve a pending convention: only approved ones reach prompts."""
+    from bug_hunter.memory.feedback import approve_convention
+    from bug_hunter.memory.store import open_memory
+
+    config = _load_or_exit()
+    with open_memory(config) as memory:
+        try:
+            record = approve_convention(memory, record_id, text)
+        except ValueError as exc:
+            typer.echo(f"refused: {exc}", err=True)
+            raise typer.Exit(code=1)
+    typer.echo(f"approved {record.id}: {record.text}")
+
+
+@memory_app.command("delete")
+def memory_delete(record_id: Annotated[str, typer.Argument()]) -> None:
+    """Remove a bad memory."""
+    from bug_hunter.memory.store import open_memory
+
+    config = _load_or_exit()
+    with open_memory(config) as memory:
+        ok = memory.delete(record_id)
+    if not ok:
+        typer.echo(f"no record {record_id}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"deleted {record_id}")

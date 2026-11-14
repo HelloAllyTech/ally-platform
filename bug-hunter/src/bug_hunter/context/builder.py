@@ -42,7 +42,7 @@ NODE_INPUTS: dict[str, tuple[str, ...]] = {
     "learn": ("signal", "finding", "root_cause", "patch", "review", "status"),
 }
 NODES_WITH_SCRATCHPAD = ("investigate", "reproduce", "fix", "learn")
-NODES_WITH_MEMORY = ("triage", "fix")
+NODES_WITH_MEMORY = ("triage", "investigate", "fix")
 SCRATCHPAD_SHARE = 0.25  # of the node budget, at most
 
 

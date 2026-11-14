@@ -197,6 +197,13 @@ def make_fix_node(deps: GraphDeps):
     limits = deps.config.limits.run
 
     def fix(state: BugState, config=None) -> dict[str, Any]:
+        shown: list[str] = []
+        update = _fix(state, config, shown)
+        if shown and isinstance(update, dict):
+            update = {**update, "recalled": [*state.recalled, *shown]}
+        return update
+
+    def _fix(state: BugState, config, shown: list[str]) -> dict[str, Any]:
         stop = over_budget(deps, state)
         if stop:
             return stop
@@ -239,7 +246,22 @@ def make_fix_node(deps: GraphDeps):
             ),
         )
         attempt = state.attempts + 1
-        ctx = node_context(deps, "fix", state)
+        recall: list[str] = []
+        if deps.memory is not None:
+            from bug_hunter.memory.fingerprint import repo_path
+            from bug_hunter.memory.recall import fix_recall
+
+            recall = fix_recall(
+                deps.memory,
+                deps.app,
+                f"{state.finding.title}: {state.finding.hypothesis}",
+                [repo_path(f, deps.app_prefix) for f in state.finding.suspected_files],
+            )
+        if recall:
+            from bug_hunter.memory.recall import ids_in
+
+            shown.extend(ids_in(recall))
+        ctx = node_context(deps, "fix", state, recall=recall)
         system = prompt.render(
             context=ctx.render(),
             app=deps.app,

@@ -16,6 +16,7 @@ from bug_hunter.graph.nodes.escalate import make_escalate_node
 from bug_hunter.graph.nodes.fix import make_fix_node
 from bug_hunter.graph.nodes.intake import make_intake_node
 from bug_hunter.graph.nodes.investigate import make_investigate_node
+from bug_hunter.graph.nodes.learn import make_learn_node
 from bug_hunter.graph.nodes.report import make_report_node
 from bug_hunter.graph.nodes.reproduce import make_reproduce_node
 from bug_hunter.graph.nodes.review import make_review_node
@@ -46,6 +47,7 @@ def build_graph(deps: GraphDeps, checkpointer: BaseCheckpointSaver | None = None
     graph.add_node("reproduce", make_reproduce_node(deps))
     graph.add_node("escalate", make_escalate_node(deps))
     graph.add_node("report", make_report_node(deps))
+    graph.add_node("learn", make_learn_node(deps))
 
     graph.add_edge(START, "intake")
     graph.add_edge("intake", "triage")
@@ -95,7 +97,8 @@ def build_graph(deps: GraphDeps, checkpointer: BaseCheckpointSaver | None = None
     graph.add_edge("human_approval", "report")
     graph.add_edge("suggest_fix", "report")
     graph.add_edge("escalate", "report")
-    graph.add_edge("report", END)
+    graph.add_edge("report", "learn")
+    graph.add_edge("learn", END)
     deps.checkpointer = checkpointer
     return graph.compile(checkpointer=checkpointer)
 

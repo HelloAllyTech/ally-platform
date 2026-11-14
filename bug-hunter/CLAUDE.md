@@ -31,6 +31,10 @@ poetry run bug-hunter resume <run_id> --approve|--reject --reason "…"   # answ
 poetry run bug-hunter db migrate          # approvals table in the bughunter database
 poetry run bug-hunter run … --push        # real push + draft PR: only with pr.output_mode: pr (default suggested_fix refuses; CONTEXT.md rule 8)
 make eval AGENT=graph CASES=<id>          # the real graph on one golden case (costs money)
+poetry run bug-hunter verdict <run_id> --diagnosis correct|wrong|not_a_bug --fix worked|needed_edits|wrong|none --reason "…"   # human verdict -> memory
+poetry run bug-hunter feedback            # apply unapplied verdicts to memory
+poetry run bug-hunter memory list|show|approve|delete   # inspect memory; conventions are used only after approve
+poetry run bug-hunter eval memory-check   # chunk 07 mechanics: two passes with simulated verdicts (paid; ask first)
 poetry run bug-hunter spend show          # today's model spend (runs/spend.json) against the $15/day cap
 poetry run bug-hunter spend add 2.40 --source github --note "run 123 issue"   # record a GitHub run's cost
 poetry run bug-hunter spend check --expected 6   # exit 1 if a ~$6 run would pass today's cap
@@ -94,6 +98,8 @@ called done. Unit tests never hit the network or a real model.
 | `evals/` | Eval harness: `schema.py` (golden cases), `mine_cases.py`, `run_evals.py` (one `Run` per case, disk guard, oracle check, scoring), `agents.py` (baseline), `metrics.py`; `golden/cases.yaml`, `golden/oracle-status.json`, `results/` |
 | `../.github/workflows/bug-hunter-evals.yml` | Manual workflow: full oracle check + baseline on a GitHub runner, reports uploaded as artifacts |
 | `~/.bug-hunter/` (`BUGHUNTER_HOME`) | Live runs, kept artefacts (`artefacts/`), caches (`cache/`), spend ledger (`spend.json`); outside the repo so branch switches and `git clean` cannot delete them |
+| `src/bug_hunter/memory/` | Long-term memory (chunk 07): records, store (PostgresStore, eval scopes, scrub on write), fingerprints, verdicts, feedback, recall |
+| `migrations/0002_verdicts.sql` | `bughunter.verdicts`: diagnosis + fix + reason (CLI now, dashboard in chunk 09) |
 | `docs/bug-hunter/notes/CHUNK-NN-NOTES.md` | Per-chunk code map, decisions, open questions |
 
 ## Rules that apply to this code (short form; `CONTEXT.md` is canonical)

@@ -321,6 +321,8 @@ def run_case(
             result_row.review_verdicts = list(agent_result.review_verdicts)
             result_row.counterexamples = dict(agent_result.counterexamples)
             result_row.disputed = agent_result.disputed
+            result_row.recalled = list(agent_result.recalled)
+            result_row.finding_title = agent_result.finding_title
             result_row.oracle_shape = case.oracle_shape
             result_row.human_fix_pass = case.human_fix_pass.get(run.run_id)
             result_row.note = "; ".join(

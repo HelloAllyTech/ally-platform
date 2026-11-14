@@ -36,6 +36,8 @@ class CaseResult:
     review_verdicts: list[str] = field(default_factory=list)
     counterexamples: dict[str, int] = field(default_factory=dict)  # review.v4 counts
     disputed: bool = False
+    recalled: list[str] = field(default_factory=list)  # memory ids shown (chunk 07)
+    finding_title: str = ""
     fix_attempts: int = 0
     final_outcome: str | None = None
     stop_reason: str | None = None

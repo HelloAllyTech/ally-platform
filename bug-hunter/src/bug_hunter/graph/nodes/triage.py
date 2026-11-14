@@ -1,5 +1,6 @@
-"""Is this a real bug candidate? Cheap model, structured answer, duplicates and known
-false alarms come from memory in chunk 07 (the slot is already in the prompt)."""
+"""Is this a real bug candidate? Cheap model, structured answer. Known false alarms
+and past bugs are recalled from long-term memory (chunk 07); a close on them is
+checked in code: a false alarm closes only while its code lines are unchanged."""
 
 from __future__ import annotations
 
@@ -31,6 +32,11 @@ class TriageDecision(BaseModel):
         default=None, description="Run id or PR of a known duplicate, if any"
     )
     kind: Literal["bug", "not_a_bug", "question", "feature_request", "duplicate"]
+    memory_match: str | None = Field(
+        default=None,
+        description="Id of a recalled memory record (known false alarm or past bug) "
+        "this signal repeats, if any",
+    )
 
 
 def make_triage_node(deps: GraphDeps):
@@ -40,7 +46,20 @@ def make_triage_node(deps: GraphDeps):
         stop = over_budget(deps, state)
         if stop:
             return stop
-        ctx = node_context(deps, "triage", state)
+        recalled = None
+        if deps.memory is not None:
+            from bug_hunter.memory.recall import diff_files, triage_recall
+
+            recalled = triage_recall(
+                deps.memory,
+                state.app or deps.app,
+                state.signal.raw_summary,
+                diff_files(deps.diff),
+                deps.read_at_ref,
+            )
+        ctx = node_context(
+            deps, "triage", state, recall=recalled.lines if recalled else None
+        )
         system = prompt.render(
             context=ctx.render(),
             app=state.app or deps.app or "unknown (pick one)",
@@ -71,8 +90,45 @@ def make_triage_node(deps: GraphDeps):
             "confidence": decision.confidence,
             "app": state.app or decision.app,
         }
-        if decision.kind == "duplicate" and decision.duplicate_of:
-            update.update(status="closed_duplicate", duplicate_of=decision.duplicate_of)
+        if recalled is not None:
+            ids = [
+                *recalled.blocking_false_alarms,
+                *recalled.hint_false_alarms,
+                *recalled.bugs,
+            ]
+            if ids:
+                deps.scratchpad.append_note(f"triage: recalled {', '.join(ids)}")
+                update["recalled"] = [*state.recalled, *ids]
+        match = decision.memory_match or decision.duplicate_of
+        if recalled is not None and match and match in recalled.blocking_false_alarms:
+            fa = recalled.blocking_false_alarms[match]
+            deps.scratchpad.append_note(f"triage: known false alarm {match}")
+            update.update(
+                status="closed_not_bug",
+                duplicate_of=match,
+                no_bug_reason=f"known false alarm {match} (code unchanged): "
+                f"{fa.reason}"[:400],
+            )
+        elif (
+            recalled is not None
+            and decision.kind in ("not_a_bug", "duplicate")
+            and (match in recalled.hint_false_alarms)
+        ):
+            # the lines changed since the verdict: a hint, never a close
+            deps.scratchpad.append_note(
+                f"triage: {match} is a false alarm on code that changed since; "
+                "not closing, investigating"
+            )
+            update["status"] = "triaged"
+        elif decision.kind == "duplicate" and match:
+            if recalled is not None and match not in recalled.bugs:
+                # with memory on, a duplicate must point at a recalled bug record
+                deps.scratchpad.append_note(
+                    f"triage: duplicate of unknown {match}; investigating"
+                )
+                update["status"] = "triaged"
+            else:
+                update.update(status="closed_duplicate", duplicate_of=match)
         elif decision.is_bug_candidate and decision.kind == "bug":
             update["status"] = "triaged"
         else:

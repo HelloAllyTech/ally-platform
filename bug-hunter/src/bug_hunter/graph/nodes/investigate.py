@@ -96,6 +96,13 @@ def make_investigate_node(deps: GraphDeps):
     compiled = loop.build()
 
     def investigate(state: BugState, config=None) -> dict[str, Any]:
+        shown: list[str] = []
+        update = _investigate(state, config, shown)
+        if shown and isinstance(update, dict):
+            update = {**update, "recalled": [*state.recalled, *shown]}
+        return update
+
+    def _investigate(state: BugState, config, shown: list[str]) -> dict[str, Any]:
         stop = over_budget(deps, state)
         if stop:
             return stop
@@ -112,7 +119,22 @@ def make_investigate_node(deps: GraphDeps):
             neighbourhood = truncate_to_tokens(
                 neighbourhood, NEIGHBOURHOOD_MAX_TOKENS, deps.counter
             )
-        ctx = node_context(deps, "investigate", state)
+        recall: list[str] = []
+        if deps.memory is not None:
+            from bug_hunter.memory.recall import investigate_recall
+
+            recall = investigate_recall(
+                deps.memory, state.app or deps.app, state.signal.raw_summary
+            )
+            if recall:
+                deps.scratchpad.append_note(
+                    f"investigate: recalled {len(recall)} wrong theor(ies)"
+                )
+        if recall:
+            from bug_hunter.memory.recall import ids_in
+
+            shown.extend(ids_in(recall))
+        ctx = node_context(deps, "investigate", state, recall=recall)
         system = prompt.render(
             context=ctx.render(),
             app=state.app or deps.app,

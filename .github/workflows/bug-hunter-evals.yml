@@ -33,7 +33,7 @@ on:
         required: false
         default: "all"
         type: choice
-        options: [all, oracle, baseline]
+        options: [all, oracle, baseline, memory-check]
       agent:
         description: "Agent for the baseline steps: baseline (no model) or graph (chunk 05)"
         required: false
@@ -115,6 +115,8 @@ jobs:
             esac
           fi
           n="${SHARDS:-4}"
+          # chunk 07: the memory check is two passes in one process (one job)
+          if [ "$WHAT" = "memory-check" ]; then modes='["issue"]'; n=1; fi
           echo "modes=$modes" >> "$GITHUB_OUTPUT"
           echo "shards=[$(seq -s, 1 "$n")]" >> "$GITHUB_OUTPUT"
         env:
@@ -195,6 +197,7 @@ jobs:
           touch "$RUNNER_TEMP/eval-start"
 
       - name: Plan (this shard's cases)
+        if: inputs.what != 'memory-check'
         run: |
           poetry run bug-hunter eval run --dry-run --shard "$SHARD" --split "$SPLIT" ${CASES:+--cases "$CASES"}
         env:
@@ -222,6 +225,14 @@ jobs:
           MAX_COST: ${{ inputs.max_cost_usd }}
           SPLIT: ${{ inputs.split }}
           MILESTONE: ${{ inputs.milestone && 'yes' || '' }}
+
+      - name: Memory check (chunk 07, two passes, eval-scoped memory)
+        if: inputs.what == 'memory-check'
+        timeout-minutes: 330
+        run: |
+          poetry run bug-hunter eval memory-check ${MAX_COST:+--max-cost-usd "$MAX_COST"}
+        env:
+          MAX_COST: ${{ inputs.max_cost_usd }}
 
       - name: Collect this shard's reports
         if: always()

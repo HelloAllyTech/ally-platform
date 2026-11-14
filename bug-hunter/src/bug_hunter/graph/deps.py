@@ -47,6 +47,7 @@ class GraphDeps:
     tool_log: list[dict[str, Any]] = field(default_factory=list)
     github: Any = None  # GitHubClient; None -> dry-run client built on first use
     approvals: Any = None  # ApprovalStore; None -> in memory (tests) or Postgres (CLI)
+    memory: Any = None  # memory.store.Memory; None -> no long-term memory this run
     push: bool = False  # real pushes need --push and the GitHub App
     # builds a runner for a clean checkout (baseline on untouched code); tests fake it
     baseline_runner: Callable[[Path, Path], Any] | None = None
@@ -70,6 +71,22 @@ class GraphDeps:
         return Runner(self.config, sandbox)
 
     resume_decision: dict[str, Any] | None = None  # set by `bug-hunter resume`
+
+    @property
+    def app_prefix(self) -> str:
+        """The app's folder in the worktree; "" when the app is the worktree root
+        (pre-cutover cases)."""
+        if Path(self.app_root) == Path(self.worktree):
+            return ""
+        return self.config.app(self.app).path
+
+    def read_at_ref(self, repo_rel: str) -> str | None:
+        """A repo-relative file as this run's worktree has it (fingerprints)."""
+        path = self.worktree / repo_rel
+        try:
+            return path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
 
     def github_client(self):
         if self.github is None:

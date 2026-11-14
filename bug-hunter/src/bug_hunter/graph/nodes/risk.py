@@ -93,6 +93,18 @@ def make_risk_gate_node(deps: GraphDeps):
             severity=state.finding.severity,
             review_verdict=state.review.verdict if state.review else None,
         )
+        if deps.memory is not None and level != "human_only":
+            from bug_hunter.memory.fingerprint import repo_path
+            from bug_hunter.memory.recall import fragile_hits, raised
+
+            changed = [repo_path(f, deps.app_prefix) for f in state.patch.files_changed]
+            fragile = fragile_hits(deps.memory, deps.app, changed)
+            if fragile:
+                before, level = level, raised(level)
+                deps.scratchpad.append_note(
+                    f"risk_gate: fragile area ({', '.join(r.id for r in fragile)}): "
+                    f"risk {before} -> {level}"
+                )
         update: dict[str, Any] = {
             "risk_level": level,
             "budget_used": with_clock(state.budget_used, state.started_at),

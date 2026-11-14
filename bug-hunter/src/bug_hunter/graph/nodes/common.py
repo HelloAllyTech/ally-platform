@@ -15,7 +15,11 @@ def state_dict(state: BugState) -> dict[str, Any]:
 
 
 def node_context(
-    deps: GraphDeps, node: str, state: BugState, **extra: str
+    deps: GraphDeps,
+    node: str,
+    state: BugState,
+    recall: list[str] | None = None,
+    **extra: str,
 ) -> NodeContext:
     return build_context(
         deps.config,
@@ -23,7 +27,7 @@ def node_context(
         state_dict(state),
         app_context=deps.app_context,
         scratchpad=deps.scratchpad,
-        memory_recall=[],  # long-term memory arrives in chunk 07
+        memory_recall=recall or [],  # chunk 07: lines from memory.recall
         extra=extra or None,
         counter=deps.counter,
     )

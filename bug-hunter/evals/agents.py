@@ -50,6 +50,8 @@ class AgentResult:
     review_verdicts: list[str] = field(default_factory=list)
     counterexamples: dict[str, int] = field(default_factory=dict)  # review.v4
     disputed: bool = False
+    recalled: list[str] = field(default_factory=list)  # memory ids the run was shown
+    finding_title: str = ""
     fix_attempts: int = 0
     final_outcome: str | None = None  # pr | escalated | no_bug | rejected | other
     stop_reason: str | None = None
@@ -94,12 +96,14 @@ class GraphAgent:
 
     name = "graph"
 
-    def __init__(self, checkpoint: str | None = None):
+    def __init__(self, checkpoint: str | None = None, memory: Any = None):
         import os
 
         self.checkpoint = checkpoint or os.environ.get(
             "BUGHUNTER_EVAL_CHECKPOINT", "memory"
         )
+        # an eval-scoped memory.store.Memory, never the live one; None = no memory
+        self.memory = memory
 
     def run(self, case_input: CaseInput, run: Run) -> AgentResult:
         import time
@@ -138,6 +142,8 @@ class GraphAgent:
                 ref=case.parent,
                 checkpointer=saver,
             )
+            # holdout cases never read or write memory (user, 2026-11-14)
+            deps.memory = self.memory if case.split != "holdout" else None
             graph = build_graph(deps, saver)
             try:
                 state = run_graph(graph, deps, signal)
@@ -202,6 +208,8 @@ class GraphAgent:
             review_verdicts=list(state.review_verdicts),
             counterexamples=counterexample_counts(state),
             disputed=state.disputed,
+            recalled=list(state.recalled),
+            finding_title=state.finding.title if state.finding else "",
             fix_attempts=state.attempts,
             final_outcome=final_outcome(state.status),
             stop_reason=state.stop_reason,
