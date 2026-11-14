@@ -6,7 +6,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from app.core.agent_runtime.check.fixes import WORDING_FIXES, add_fallback_contact
+from app.core.agent_runtime.check.fixes import (
+    WORDING_FIXES,
+    add_fallback_contact,
+    cite_offered_times,
+)
 from app.core.agent_runtime.check.organisation import Organisation
 from app.core.agent_runtime.check.rejections import Rejection
 from app.core.agent_runtime.check.safety import (
@@ -78,6 +82,8 @@ def check_reply(
         can_book=can_book,
     )
     verdict = _read_draft(step, ctx)
+    # A list's times are cited from the run's records before grounding (chunk 6).
+    cite_offered_times(verdict, ctx)
     _ground(verdict, step, ctx)
     # Safety before wording, and on every reply, declines included: the pack's rules
     # outrank everything the instructions or the model say.
@@ -239,8 +245,13 @@ def _build_result(
         )
     else:
         decline_reason = DeclineReason.NONE
-        if verdict.intent in (AgentIntent.SMALLTALK, AgentIntent.CLARIFY):
+        if verdict.intent == AgentIntent.SMALLTALK:
             citations = []
+        elif verdict.intent == AgentIntent.CLARIFY:
+            # A clarify carries no document citations, as before; a list record's
+            # it keeps (chunk 6): "which of these should I book?" offers free times,
+            # and they must show where they came from.
+            citations = [c for c in citations if c.get("record_id")]
 
     result = build_result(
         intent=_RESPONSE_INTENT[verdict.intent],

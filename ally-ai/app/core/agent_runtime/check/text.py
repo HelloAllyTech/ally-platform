@@ -206,12 +206,21 @@ _RECORD_TALK = re.compile(
 )
 
 
+_CITATIONS_SENTENCE = re.compile(
+    r"(?:^|(?<=[.!?])[ \t]+)citations?\s*:[^\n]*?(?:[.!?](?=\s|$)|$)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
 def without_record_ids(text: str) -> str:
     """The reply without record ids or talk of records and citation numbers, tidied
     so no stray punctuation is left where they were."""
     text = _ID_IN_BRACKETS.sub("", text or "")
     text = _LABELLED_ID.sub("", text)
     text = _RECORD_TALK.sub("", text)
+    # A sentence about its citations ("Citations: the slot details are in the records
+    # I used.") goes whole.
+    text = _CITATIONS_SENTENCE.sub("", text)
     text = re.sub(r"\(\s*[,;:]?\s*\)", "", text)
     text = re.sub(r"[ \t]+[—–][ \t]*(?=\()", " ", text)
     text = re.sub(r"[ \t]+[—–][ \t]*(?=[.!?,;]|$)", "", text, flags=re.MULTILINE)

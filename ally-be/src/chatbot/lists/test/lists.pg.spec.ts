@@ -107,6 +107,44 @@ describePg('Lists (Postgres)', () => {
       expect(n).toBe(1);
     });
 
+    it('offers the free slots nearest the taken one: the same day first, then the nearest days', async () => {
+      // Next week's slots, Monday to Friday, 10:00 to 16:00 each day (5a's seed).
+      const thursdayNoon = slots.find(
+        (s) => s.title.endsWith(', 12:00') && s.title.startsWith('Thu'),
+      )!;
+      const thursday11 = slots.find(
+        (s) => s.title.startsWith('Thu') && s.title.endsWith(', 11:00'),
+      )!;
+      await book(thursdayNoon.id, person);
+      await book(thursday11.id, await contact('Eleven'));
+      const r = await refusal(book(thursdayNoon.id, await contact('Second')));
+      const titles = r.conflict!.alternatives!.map((a) => a.title);
+      // 13:00 (1 h), then 10:00 and 14:00 (2 h each), all on Thursday; 11:00 is taken too.
+      expect(titles).toHaveLength(3);
+      expect(titles[0]).toMatch(/^Thu .*, 13:00$/);
+      expect(
+        titles
+          .slice(1)
+          .map((t) => t.slice(-5))
+          .sort(),
+      ).toEqual(['10:00', '14:00']);
+      expect(titles.every((t) => t.startsWith('Thu'))).toBe(true);
+    });
+
+    it('goes to the nearest days once the day is full', async () => {
+      const thursday = slots.filter((s) => s.title.startsWith('Thu'));
+      for (const [i, slot] of thursday.entries()) {
+        await book(slot.id, await contact(`T${i}`));
+      }
+      const noon = thursday.find((s) => s.title.endsWith(', 12:00'))!;
+      const r = await refusal(book(noon.id, await contact('Late')));
+      expect(r.conflict!.alternatives!.map((a) => a.title)).toEqual([
+        expect.stringMatching(/^(Wed|Fri) .*, 12:00$/),
+        expect.stringMatching(/^(Wed|Fri) .*, 12:00$/),
+        expect.stringMatching(/^(Wed|Fri) .*, (11|13):00$/),
+      ]);
+    });
+
     it('frees the slot when the booking is cancelled', async () => {
       const second = await contact('Second');
       const { record } = await book(slots[0].id, person);
@@ -143,10 +181,11 @@ describePg('Lists (Postgres)', () => {
         code: 'capacity_full',
         message: 'Spin is full.',
       });
+      // Nearest to the full class first (chunk 6): Spin is in 2030, after all three.
       expect(r.conflict!.alternatives!.map((a) => a.title)).toEqual([
-        'Morning yoga',
-        'Evening yoga',
         'Breathwork',
+        'Evening yoga',
+        'Morning yoga',
       ]);
 
       await records.update(

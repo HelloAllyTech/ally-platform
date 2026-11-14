@@ -332,6 +332,15 @@ class TestWrites:
 
 
 class TestTheCheck:
+    RETRIEVAL = {
+        "top_k": 5,
+        "min_similarity": 0.3,
+        "decline_similarity": 0.3,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+    }
+
     def _check(self, answer, citations, passages, *, can_book, purpose=None):
         step = reply("answer", answer, citations=citations)
         result, rejection = check_reply(
@@ -340,14 +349,7 @@ class TestTheCheck:
             passages,
             turn_type="question",
             language="en",
-            retrieval={
-                "top_k": 5,
-                "min_similarity": 0.3,
-                "decline_similarity": 0.3,
-                "hit_count": 0,
-                "top_similarity": 0.0,
-                "passages_used": 0,
-            },
+            retrieval=self.RETRIEVAL,
             general=False,
             search_gate=None,
             question="book thursday 11",
@@ -398,6 +400,105 @@ class TestTheCheck:
             "Thursday 11 am is free.", [1], [document], can_book=True
         )
         assert rejection == Rejection.UNFOUND_SLOT
+
+
+def slot_record(record_id, title):
+    return {
+        "chunk_id": record_id,
+        "record_id": record_id,
+        "document_id": "",
+        "document_title": "Slots",
+        "section_path": title,
+        "text": f"id: {record_id}\nStarts at: {title}\nPractitioner: Dr Rohan",
+    }
+
+
+MON_10 = "44444444-4444-4444-8444-444444444441"
+MON_11 = "44444444-4444-4444-8444-444444444442"
+MON_12 = "44444444-4444-4444-8444-444444444443"
+SLOTS_SEEN = [
+    slot_record(SLOT_1, "Thu 19 Nov 2026, 12:00"),
+    slot_record(MON_10, "Mon 16 Nov 2026, 10:00"),
+    slot_record(MON_11, "Mon 16 Nov 2026, 11:00"),
+    slot_record(MON_12, "Mon 16 Nov 2026, 12:00"),
+]
+#: A real reply from the action cases: the right times, offered as a clarify, uncited.
+OFFERED = (
+    "I can't book Thursday 19 Nov 12:00 because that slot is already taken. Here "
+    "are the available alternatives I can book for you, which one should I confirm?\n"
+    "1) Mon 16 Nov 10:00 (Dr Rohan, 50 min)\n"
+    "2) Mon 16 Nov 11:00 (Dr Rohan, 50 min)\n"
+    "3) Mon 16 Nov 12:00 (Dr Rohan, 50 min)"
+)
+
+
+class TestOfferedTimes:
+    def _check(self, intent, answer, citations, passages):
+        step = reply(intent, answer, citations=citations)
+        return check_reply(
+            step,
+            {},
+            passages,
+            turn_type="question",
+            language="en",
+            retrieval=TestTheCheck.RETRIEVAL,
+            general=False,
+            search_gate=None,
+            question="book thursday 12",
+            searched=False,
+            organisation=Organisation(),
+            history=(),
+            can_book=True,
+        )
+
+    def test_offered_times_are_matched_to_the_records_and_cited(self):
+        result, rejection = self._check("clarify", OFFERED, [], SLOTS_SEEN)
+        assert rejection is None
+        assert result["answer"] == OFFERED
+        assert [c["record_id"] for c in result["citations"]] == [
+            SLOT_1,
+            MON_10,
+            MON_11,
+            MON_12,
+        ]
+
+    def test_a_time_no_record_backs_is_taken_out_and_sent_back(self):
+        invented = OFFERED.replace("3) Mon 16 Nov 12:00", "3) Mon 16 Nov 15:00")
+        result, rejection = self._check("clarify", invented, [], SLOTS_SEEN)
+        assert rejection == Rejection.UNFOUND_SLOT
+        assert "15:00" not in result["answer"]
+        assert "Mon 16 Nov 11:00" in result["answer"]
+
+    def test_the_day_must_match_too(self):
+        # It cites Monday's 10:00 but offers Tuesday's: no record backs Tuesday.
+        wrong_day = "You could book Tue 17 Nov 10:00 instead."
+        _, rejection = self._check("answer", wrong_day, [2], SLOTS_SEEN)
+        assert rejection == Rejection.UNFOUND_SLOT
+
+    def test_a_day_named_once_holds_for_the_list_after_it(self):
+        listed = "Free on Monday 16 Nov:\n- 10:00\n- 11:00"
+        result, rejection = self._check("answer", listed, [], SLOTS_SEEN)
+        assert rejection is None
+        assert [c["record_id"] for c in result["citations"]] == [MON_10, MON_11]
+
+    def test_opening_hours_and_times_not_offered_are_left_alone(self):
+        hours = "We're open 9:00 to 18:00 on weekdays."
+        document = {
+            **TestTheCheck.RECORD,
+            "record_id": None,
+            "document_id": "doc-1",
+            "text": "Open 9:00 to 18:00 on weekdays.",
+        }
+        result, rejection = self._check("answer", hours, [1], [document, *SLOTS_SEEN])
+        assert rejection != Rejection.UNFOUND_SLOT
+        assert result["answer"] == hours
+
+    def test_a_clarify_keeps_record_citations_and_drops_document_ones(self):
+        document = {**TestTheCheck.RECORD, "record_id": None, "document_id": "doc-1"}
+        result, _ = self._check(
+            "clarify", "Which day suits you?", [1, 2], [document, SLOTS_SEEN[1]]
+        )
+        assert [c.get("record_id") for c in result["citations"]] == [MON_10]
 
 
 class TestRecordIds:
@@ -451,6 +552,10 @@ class TestRecordIds:
             (
                 "The slot was Thu, 12:00 (passage 1). Others:",
                 "The slot was Thu, 12:00. Others:",
+            ),
+            (
+                "Done, booked at 15:00. Citations: the slot is in the records I used.",
+                "Done, booked at 15:00.",
             ),
             (
                 "Opening hours (see our website) are 9 to 5.",

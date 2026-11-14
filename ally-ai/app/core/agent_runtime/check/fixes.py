@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from typing import Callable, Tuple
 
+from app.core.agent_runtime.check.offered_times import ground_offered_times
 from app.core.agent_runtime.check.rejections import Rejection
 from app.core.agent_runtime.check.text import (
     SENTENCE_END,
@@ -23,6 +24,7 @@ from app.core.agent_runtime.check.text import (
 )
 from app.core.agent_runtime.check.verdict import CheckContext, Verdict
 from app.core.agent_runtime.schemas import AgentIntent
+from app.core.knowledge_agent.agent import resolve_citations
 from app.utils.logger import get_logger
 
 # Logged under the package name, as when this was one module.
@@ -163,15 +165,41 @@ def _drop_record_ids(verdict: Verdict, ctx: CheckContext) -> None:
     verdict.answer = without_record_ids(verdict.answer) or verdict.answer
 
 
-def _send_back_unfound_slots(verdict: Verdict, ctx: CheckContext) -> None:
-    """An assistant that can book (chunk 6) may name a time as free or booked only
-    from its lists: the reply must cite a record a list tool returned. Otherwise
-    the sentence is taken out and the draft sent back once, to look it up first."""
-    if not ctx.can_book or not offers_slot(verdict.answer):
+def cite_offered_times(verdict: Verdict, ctx: CheckContext) -> None:
+    """Cite the records that back the times a reply offers (chunk 6): the model often
+    lists the right times without citing them. Runs before grounding, so a reply
+    whose times are all backed counts as cited."""
+    if not ctx.can_book:
         return
-    if any(citation.get("record_id") for citation in verdict.citations):
+    backing, _ = ground_offered_times(verdict.answer, ctx.passages)
+    cited = {citation.get("passage_number") for citation in verdict.citations}
+    added = [number for number in backing if number not in cited]
+    if added:
+        verdict.citations = verdict.citations + resolve_citations(added, ctx.passages)
+
+
+def _ground_offered_times(verdict: Verdict, ctx: CheckContext) -> None:
+    """An assistant that can book (chunk 6) may present a time as free, or as booked,
+    only from a find or write in this run. Each offered time is matched against the
+    run's record passages: the records that back it are cited (the model often lists
+    the right times without citing them), and a sentence offering a time no record
+    backs is taken out and the draft sent back once. A day presented as free with no
+    time ("Thursday is free") must cite a record, as before."""
+    if not ctx.can_book:
         return
-    verdict.answer = without_sentences(verdict.answer, lambda s: not offers_slot(s))
+    cite_offered_times(verdict, ctx)
+    _, unfounded = ground_offered_times(verdict.answer, ctx.passages)
+    if unfounded:
+        drop = set(unfounded)
+        verdict.answer = without_sentences(
+            verdict.answer, lambda s: s.strip() not in drop
+        )
+    elif not offers_slot(verdict.answer) or any(
+        citation.get("record_id") for citation in verdict.citations
+    ):
+        return
+    else:
+        verdict.answer = without_sentences(verdict.answer, lambda s: not offers_slot(s))
     if verdict.rejection is None:
         verdict.rejection, verdict.keeps_text = Rejection.UNFOUND_SLOT, True
 
@@ -228,7 +256,7 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _trim_repeated_topic_list,
     _trim_booking_offers,
     _send_back_slot_offers,
-    _send_back_unfound_slots,
+    _ground_offered_times,
     _cut_source_phrases,
     _flag_source_talk,
     _decline_if_nothing_left,

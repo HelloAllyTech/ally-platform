@@ -841,6 +841,7 @@ export class ListRecordsService {
             list,
             actor,
             field,
+            String(values[0]),
             async (id) =>
               !(await this.countOthers(
                 m,
@@ -906,6 +907,7 @@ export class ListRecordsService {
       list,
       actor,
       field,
+      String(value),
       async (id) => {
         const others = await this.countOthers(
           m,
@@ -1003,6 +1005,8 @@ export class ListRecordsService {
     list: LoadedList,
     actor: ListActor,
     field: CollectionField,
+    /** The target that was asked for (the taken slot, the full class): alternatives near it first. */
+    requested: string,
     passes: (targetId: string) => Promise<boolean>,
   ): Promise<ListRecordView[] | undefined> {
     const to = relationTarget(field);
@@ -1036,9 +1040,28 @@ export class ListRecordsService {
       target.collection.settings?.default_sort ??
       (dateField ? dateField.key : '');
     const sortField = target.field(spec.replace(/^-/, ''));
-    const order = sortField
-      ? `${sql.text(sortField.key)}${cast(sortField)} ${spec.startsWith('-') ? 'DESC' : 'ASC'} NULLS LAST, id`
-      : '"createdAt", id';
+    // Nearest to what was asked for (chunk 6): the same day first, then the nearest days, each by
+    // how close its time of day is. Days are compared as written, in each value's own wall time, so
+    // "Thursday" is the business's Thursday. Without a date field, or a requested value, the
+    // list's own order.
+    const asked = dateField
+      ? await this.dateOf(m, target.collection.id, dateField.key, requested)
+      : null;
+    let order: string;
+    if (dateField && asked) {
+      const value = sql.text(dateField.key);
+      const day = `abs(left(${value}, 10)::date - left(${sql.p(asked)}::text, 10)::date)`;
+      order =
+        dateField.type === ListFieldType.DATE
+          ? `${day}, id`
+          : // Then the time of day nearest the one asked for, in wall time ("HH:MM").
+            `${day}, abs(extract(epoch FROM left(substr(${value}, 12), 5)::time - left(substr(${sql.p(asked)}::text, 12), 5)::time)), id`;
+    } else {
+      // Built only when used: each key is a bind parameter, and an unused one fails the query.
+      order = sortField
+        ? `${sql.text(sortField.key)}${cast(sortField)} ${spec.startsWith('-') ? 'DESC' : 'ASC'} NULLS LAST, id`
+        : '"createdAt", id';
+    }
 
     const found: RecordRow[] = [];
     const pageSize = 30;
@@ -1061,6 +1084,21 @@ export class ListRecordsService {
       actor,
       found.map((r) => this.entity(r)),
     );
+  }
+
+  /** A record's date or date-time value as written, or null (a deleted or unknown record). */
+  private async dateOf(
+    m: EntityManager,
+    collectionId: string,
+    key: string,
+    recordId: string,
+  ): Promise<string | null> {
+    if (!/^[0-9a-f-]{36}$/i.test(recordId)) return null;
+    const [row] = (await m.query(
+      `SELECT data->>$1 AS value FROM collection_records WHERE id = $2 AND collection_id = $3`,
+      [key, recordId, collectionId],
+    )) as { value: string | null }[];
+    return row?.value ?? null;
   }
 
   private personOf(list: LoadedList, data: Data): string | null {

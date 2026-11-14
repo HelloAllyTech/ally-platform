@@ -97,7 +97,8 @@
             "citations?:",
             "\\[\\d+\\]",
             "see (the )?record"
-          ]
+          ],
+          "cites": ["^Slots · Thu 19 Nov 2026, (11|13):00"]
         }
       }
     ]

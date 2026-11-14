@@ -4,6 +4,34 @@
 
 > Status: **built, waiting for Shehbaz's review** (14 Nov 2026).
 
+## Follow-ups before acceptance (14 Nov)
+
+Shehbaz asked for three changes before accepting 6. The action cases were then re-run.
+
+1. **"I dropped that turn's citation requirement" was only the eval case's expectation.** The reply check itself was never loosened. But the check had two gaps that let the right times go out uncited:
+   - its slot detector (20a-2's `offers_slot`) only knew "am/pm" times and full weekday names, so "1) Mon 16 Nov 10:00" never triggered it;
+   - a clarify reply ("which of these should I book?") lost all its citations in `_build_result`.
+
+   Both are fixed:
+   - **Each offered time is matched against the run's record passages** (`check/offered_times.py`), by time of day and, where the sentence or the line before names one, by day.
+   - **A matched time's record is cited**, before grounding, so the model's uncited list of the right times now carries its sources.
+   - **A time no record of the run backs** is taken out and the draft is sent back (`UNFOUND_SLOT`). A day offered with no time ("Thursday is free") must still cite a record, as before.
+   - **A clarify keeps its record citations** and still drops document ones, so v1 and document replies are unchanged.
+   - Opening-hours ranges ("open 9:00 to 18:00") and times that aren't offered are left alone.
+   - **The eval case's citation expectation is back.** It's now stricter: the refusal must cite Thursday's 11:00 or 13:00.
+2. **"Never show ids, record numbers or passage numbers in a reply."** This line is in `ally_ai_agent_lists`, as local Skills Store v3 (identical to the seed) and in the seed. The code trim stays as the safety net. It also now takes out a sentence that starts with "Citations:", which a run produced.
+3. **Alternatives are ordered by closeness to what was asked for** (5a's engine, `alternatives()`): the same day first, then the nearest days, each by time of day, compared as written (the business's wall time). A list without a date field keeps its own order.
+   - Example: a taken Thursday 12:00 now offers Thursday 13:00, 11:00 or 10:00, then 14:00, where it used to offer Monday.
+   - **5a spec changed:** the capacity test's expected order is now nearest-first (Spin is in 2030, after all three classes: Breathwork, Evening yoga, Morning yoga).
+   - **Two new Postgres tests:** same day first; the nearest days once the day is full.
+
+**Re-run, 6 action cases × 3 runs (separate invocations), after all three changes plus the "Citations:" trim:** 16 of 18 case runs passed.
+- **Refusals:** every one offered the same day's nearest free slots, cited.
+- **Run 6, `lists-book-confirm` (serious, open):** the person asked for 11:00 and said yes, but the agent booked **10:00**. Its find returned one slot (10:00), and it created that one. One booking exists, so the record count passed; the citation expectation caught it. Nothing checks that the booked slot is the one the person confirmed. See §6.
+- **Run 6, `lists-who-else`:** the Host test bot's own decline wording ("My reference material…") tripped basics' platform pattern. Nothing leaked.
+- **The three runs before the "Citations:" trim:** 17 of 18. The one failure was that sentence.
+- **Latency, a run with a find and a create** (19 turns): median 11.3 s, worst 18.2 s. Gateway calls: median 22 ms, worst 91 ms.
+
 ## Report: 6 is done, except the checkups
 
 The assistant can now look up a list, book, and change or cancel a booking under the list's rules. Each list the agent may use becomes up to three tools, generated from its definition, with no code per list.
@@ -16,7 +44,7 @@ The assistant can now look up a list, book, and change or cancel a booking under
 | A Never tool isn't offered, and the gateway refuses it | ✅ specs: not offered (`list-tools.spec`, engine spec); 403 from the gateway (unit and Postgres) |
 | Nobody sees another person's records | ✅ `lists-who-else` reveals no one; Postgres: find returns only the token's contact's records, and updating another person's record is `not_found` |
 | The Sunrise and fixture checkups are unchanged; the action cases are in the eval | ⚠️ **Checkups not run:** `checkup_eval.py` needs an admin `ALLY_TOKEN`, which this session can't get (as at 20d-2). What did run: Sunrise basics 28/28 (0 crisis misses, 0 false alarms), and the 3a eval with 0 hard fails (§4). With no lists, the request and prompt are exactly today's (tests). Action cases are in basics, by Shehbaz's decision |
-| `ally_ai_agent_lists` approved and live locally; these notes; the Progress row; the checklist lines | ✅ v2 is live in the local Skills Store, identical to the seed |
+| `ally_ai_agent_lists` approved and live locally; these notes; the Progress row; the checklist lines | ✅ v3 is live in the local Skills Store, identical to the seed |
 
 | Commit | What |
 |---|---|
@@ -25,18 +53,19 @@ The assistant can now look up a list, book, and change or cancel a booking under
 | `7eeb7557c` | ally-ai: tools from definitions, record passages, once-per-run for failures only, the check, `ally_ai_agent_lists` |
 | `21708681f` | found live: today's date (`{today}`), record ids kept out of replies, basics action cases, `lists:seed --listings` |
 | `abeea9d55` | found live: shortened ids and "see record" talk trimmed |
-| this one | notes, `LAUNCH-CHECKLIST.md`, the Progress row |
+| `0e5b09461` | notes, `LAUNCH-CHECKLIST.md`, the Progress row |
+| this one | follow-ups: offered times grounded and cited, clarify keeps record citations, the no-ids line (v3), alternatives nearest first; notes updated |
 
 **Checks:**
-- ally-be: full jest 1,122 suites and 16,583 tests passed (13 suites and 108 tests skipped: Postgres specs without a database). The 8 new Postgres tests pass with `CHATBOT_STORE_TEST_DB` on `ally_lists_test`. Lint and typecheck ✅.
-- ally-ai: 2,520 passed (46 skipped); flake8 ✅.
+- ally-be: full jest 1,122 suites and 16,583 tests passed (13 suites and 110 tests skipped: Postgres specs without a database). The lists and list-tools Postgres specs (135 with the unit specs) pass with `CHATBOT_STORE_TEST_DB` on `ally_lists_test`. Lint and typecheck ✅.
+- ally-ai: 2,527 passed (46 skipped); flake8 ✅.
 - Each run's diff was checked. `black` reformats files outside the chunk, so those were reverted every time.
 
 **Local state:**
 - **Host (`60b6e860…`):** has 5a's lists and `abilities` `{ create_appointments: do_it, update_appointments: do_it }`.
 - **Second Host (`26792365…`):** has the Listings fixture (12 flats).
 - **Sunrise:** has no lists.
-- **Skills Store:** `ally_ai_agent_lists` v2 is live.
+- **Skills Store:** `ally_ai_agent_lists` v3 is live.
 - **Basics runs:** their records and contacts are deleted at the end of each run.
 
 ### How Shehbaz tests it
@@ -83,11 +112,15 @@ The assistant can now look up a list, book, and change or cancel a booking under
   - `trace.py`: a node may add steps of its own.
 - **The prompt:** `prompt.py` (`_format_list_call`, field aliases in `format_tools`, the lists section); `knowledge_agent/prompt.py` (`format_persona(lists=…)`); `prompts/agent/lists.txt` and `AgentListsInputs`.
 - **The check:**
-  - `check/fixes.py`: `_drop_record_ids`; the two 20a-2 fixes skip when `can_book`; new `_send_back_unfound_slots`.
+  - `check/offered_times.py`: the times a reply offers, matched to the run's record passages.
+  - `check/fixes.py`: `cite_offered_times` (run before grounding) and `_ground_offered_times` (trims unbacked times, `UNFOUND_SLOT`); `_drop_record_ids`; the two 20a-2 fixes skip when `can_book`.
+  - `check/pipeline.py`: a clarify keeps record citations.
   - `check/text.py`: `without_record_ids`.
   - `check/rejections.py`: `UNFOUND_SLOT`.
 - **Schemas and state:** `schemas/agent_runtime.py` (`ListToolDefinition`, `definitions`, `omitted`, `today`); `schemas/knowledge_agent.py` (`Citation.record_id`, sent only when set); `knowledge_agent/agent.py` (`resolve_citations` keeps it); `state.py`.
-- **Tests:** `tests/core/agent_runtime/test_list_tools.py`, 28.
+- **Tests:** `tests/core/agent_runtime/test_list_tools.py`, 37.
+
+**ally-be, 5a's engine (follow-up 3):** `lists/list-records.service.ts` `alternatives()` takes the requested target and orders by day, then time of day; `dateOf`.
 
 ## 2. The generated tools (5a's seed and the Listings fixture)
 
@@ -113,7 +146,7 @@ The assistant can now look up a list, book, and change or cancel a booking under
 - ``- `create_appointments`: refused (That slot is already taken.), not done; alternatives → passage 4``
 - ``- `find_slots`: count = 7``
 
-## 3. The approved prompt text (`ally_ai_agent_lists`, local v2)
+## 3. The approved prompt text (`ally_ai_agent_lists`, local v3)
 
 ```
 # Lists you can use
@@ -125,6 +158,7 @@ Today is {today}. Work out days like "Thursday" or "tomorrow" from it: the next 
 - After a create or update succeeds, say plainly what was done and cite it.
 - If a tool refuses, give its reason in plain words and offer the alternatives it returned, citing them.
 - Use only ids from find results; never make one up. Never look up, book or change anything for anyone but the person you're talking to.
+- Never show ids, record numbers or passage numbers in a reply.
 - If you have a create tool, this replaces any earlier rule never to name a day or time as available: you may name the times find shows as free.
 ```
 
@@ -138,7 +172,8 @@ It sits after the purpose section, and only in runs with list tools. `{today}` r
 
 - **Action cases**, six of them, run six times in separate invocations:
   - **Earlier code (runs 1–3):** 33 of 36 case runs passed overall. Run 1's one failure was "(passage 1)" in a reply; that's now trimmed.
-  - **Final code (runs 4–6):** 16 of 18 passed. Both failures were `lists-taken-slot` replies that offered the right alternatives but didn't cite them. That turn's `cites` requirement was then dropped (§6).
+  - **Code at `abeea9d55` (runs 4–6):** 16 of 18 passed. Both failures were `lists-taken-slot` replies that offered the right alternatives but didn't cite them. That turn's `cites` expectation was dropped from the eval case only, then restored by the follow-ups, which fixed the check instead (above).
+  - **After the follow-ups:** see "Follow-ups before acceptance".
   - **First run, before `{today}`:** 1 of 6 passed (§5).
 - **Listings:** 3 of 3.
 - **Sunrise basics** (`PLATFORM_BASICS`, no lists): 28 of 28, 0 crisis misses, 0 false alarms. Same as 3b.
@@ -163,11 +198,15 @@ It sits after the purpose section, and only in runs with list tools. `{today}` r
   - **A bot has no time zone setting.** The hand-over hours' time zone is used, otherwise Asia/Kolkata. Needs a real setting (5b or later).
 - **Record ids in replies (found live).** The model copies a passage's `id:` line, sometimes shortened, and writes "(see record: 1)" or "(passage 1)". In runs with record passages only, the check trims these deterministically (`_drop_record_ids`); everything else is unchanged.
   - The ids stay in the passages, because the tools need them.
-  - A prompt line ("never show ids or passage numbers") would help too. It's new wording, so it's left for Shehbaz (§6).
+  - Shehbaz approved a prompt line for it (v3). The trim stays as the safety net.
 - **Try it books for a stand-in.** Preview has no contact, and the engine refuses a person's list write for nobody. So in Try it, create makes a stand-in contact ("Try it"), writes the record for them, checks every rule, then rolls everything back.
   - In Try it, find on a person's list returns nothing (the brief), so update has nothing to change there.
 - **A run with only finds still falls back to v1** if it fails: a find did nothing. Only `hand_over`, `create_*` and `update_*` stop v1.
-- **A time named as free must cite a record** (the brief's "grounding included"). With a create tool, a reply that presents a time as free or booked without citing a record is trimmed and sent back once (`UNFOUND_SLOT`).
+- **A time named as free must come from a find in this run** (the brief's "grounding included"). With a create tool:
+  - each offered time is matched to a record passage of the run and cited;
+  - an unbacked time is trimmed and the draft sent back once (`UNFOUND_SLOT`);
+  - a clarify keeps record citations (follow-up 1).
+- **Alternatives are nearest first** (follow-up 3). This changes 5a's rule, which was the earliest free slots in the list's order.
 - **The WhatsApp contact** is resolved before the reply with the shared store's own arguments (`contactIdFor`), so the background copy lands on the same row. It's null while `sharedStoreWrites` is off; then person lists' tools aren't offered.
 - **Relations to a contact are never writable by the agent and never filterable.** The brief names only the person field.
 - **The refusal comes back as `ok: false`** with the code as `error` (stored in `error_code`). Its message and alternatives go in `result`, stored and replayed with it. The brief says "ok: false, with the code, the message and the alternatives"; 3b's error column holds 64 characters.
@@ -176,8 +215,9 @@ It sits after the purpose section, and only in runs with list tools. `{today}` r
 ## 6. Open, for later chunks
 
 - **Run the Sunrise and fixture checkups** (How Shehbaz tests it, step 8).
-- **Refusals sometimes don't cite their alternatives.** The model writes them as a clarify reply ("which one should I book?"), and the check doesn't require citations on a clarify. They're the right slots, from the refusal. Requiring citations for times in a clarify would be a check change.
-- **Alternatives are the earliest free slots overall** (5a's rule): a taken Thursday 12:00 offers Monday. Alternatives near the asked time are worth having (5a/5b).
+- **The agent can book a different slot than the one confirmed** (follow-up re-run 6). The person said 11:00, find returned only 10:00, and the agent created 10:00. Nothing deterministic stops it.
+  - **Options:** a check before a create that the slot's time matches a time the person named in the conversation (as `offered_times` does for replies); or make find's ranges harder to misuse (an exact `starts_at` filter for date-times).
+  - Worth fixing before a pilot's writes go to Do it. The launch checklist already gates that on the action cases.
 - **A failed create isn't retried in the run.** One run passed a shortened id (`invalid_value`), and the brief's once-per-run rule then stopped it. Retrying after `invalid_value` only could be considered.
 - **Latency:** a booking turn takes 12–17 s. The model steps are the cost.
 - **A time zone setting per bot** (above).
@@ -185,7 +225,7 @@ It sits after the purpose section, and only in runs with list tools. `{today}` r
   - find's `sort` offers person and relation keys (harmless).
   - A cleaned reply can keep a stray phrase ("See the slot info:.").
   - The model sometimes asks for an optional field (the service) twice before booking.
-  - The Host test bot's decline wording ("My reference material…") trips basics' platform pattern, which caused failures in the earlier `--repeat` run.
+  - The Host test bot's decline wording ("My reference material…") trips basics' platform pattern: one failure in the earlier `--repeat` run and one in the follow-up re-run. Nothing leaked; giving the test bot neutral decline wording would remove it.
 - **5b:** owners' Do it and Never; the purpose cards' "It can't book…" lines; a "test, not saved" note in Try it.
 - **14a:** Ask me first.
 - **Public wiki (Docs guard at PR time):** the gateway's list tools on `repos/ally-be.md` and `repos/ally-ai.md`.
