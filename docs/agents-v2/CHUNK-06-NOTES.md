@@ -32,6 +32,33 @@ Shehbaz asked for three changes before accepting 6. The action cases were then r
 - **The three runs before the "Citations:" trim:** 17 of 18. The one failure was that sentence.
 - **Latency, a run with a find and a create** (19 turns): median 11.3 s, worst 18.2 s. Gateway calls: median 22 ms, worst 91 ms.
 
+## The wrong booking, fixed (14 Nov, second follow-up)
+
+Shehbaz asked for two changes before 5b.
+
+1. **A write books only the day and time the person confirmed** (`ally-ai/app/core/agent_runtime/tools/confirmed.py`). It applies before a create or update that sets a relation to a dated record (a slot, a class, a table, a visit).
+   - **What it compares:** the target record's date and time (from its passage in this run) against what the person said. That means a time named in their latest message or the one before ("11:00", "4 pm", "at 4", "noon"), and their day if they named one ("Thursday", "tomorrow", "19 Nov"), worked out from `{today}` in the bot's zone.
+   - **Where it runs:** in the tools node, from the person's own messages in the run's state, never from the model's words.
+   - **If they don't match, the person never named a time, or the target wasn't looked up in this run:** the gateway isn't called. The record is a failed call (`unconfirmed_time`), so the tool isn't offered again this run. The agent reads, for example: ``- `create_appointments`: refused (Not done: the person hasn't confirmed this exact day and time (Thu 19 Nov 2026, 10:00). Ask them to confirm the day and time before you book it.), not done``.
+   - **An update that keeps the target the record already has** (a cancel that repeats its slot) isn't checked.
+   - **ally-be marks which fields this applies to:** create and update properties carry `relation` and `dated` (`date` or `datetime`, from the target list's first date field).
+2. **find has an exact match on date-time fields:** `<key>_at` (e.g. `starts_at_at`), alongside the ranges. It's sent to the engine as from = to, so any written form of the instant matches. The description adds: "When the person named a time, use starts_at_at to find exactly that time."
+
+**Tests:**
+- **ally-ai** (`TestConfirmedTime`, `TestNamedTimesAndDays`, 9 tests):
+  - **Run 6:** 11:00 was confirmed and find returned only 10:00. The create isn't sent, the agent reads why, and the create isn't offered again.
+  - A correct 11:00 booking goes through.
+  - "Tomorrow at 4 pm" with today Saturday 14 Nov books Sunday 15 Nov 16:00 and refuses Monday 16:00.
+  - With no time named, nothing is booked.
+  - A cancel that keeps its slot goes through.
+  - The parsers for times and days, and the person's last two messages.
+- **ally-be:** relation and dated metadata; `_at` in the schema, the description and the query; a Postgres test that `starts_at_at` finds exactly one slot from its own string or its UTC form.
+
+**Action cases, 6 × 3 runs (separate invocations): 18 of 18 passed.**
+- Every booking was the time confirmed: the 11:00 case booked 11:00 all three times.
+- No write was refused in these runs: every create matched.
+- A run with a find and a create: median 11.5 s, worst 14.2 s (18 turns). Gateway calls: median 20 ms, worst 47 ms.
+
 ## Report: 6 is done, except the checkups
 
 The assistant can now look up a list, book, and change or cancel a booking under the list's rules. Each list the agent may use becomes up to three tools, generated from its definition, with no code per list.
@@ -54,11 +81,12 @@ The assistant can now look up a list, book, and change or cancel a booking under
 | `21708681f` | found live: today's date (`{today}`), record ids kept out of replies, basics action cases, `lists:seed --listings` |
 | `abeea9d55` | found live: shortened ids and "see record" talk trimmed |
 | `0e5b09461` | notes, `LAUNCH-CHECKLIST.md`, the Progress row |
-| this one | follow-ups: offered times grounded and cited, clarify keeps record citations, the no-ids line (v3), alternatives nearest first; notes updated |
+| `6748d2a17` | follow-ups: offered times grounded and cited, clarify keeps record citations, the no-ids line (v3), alternatives nearest first |
+| this one | the wrong booking: writes check the confirmed day and time; find's exact `<key>_at`; notes and checklist |
 
 **Checks:**
-- ally-be: full jest 1,122 suites and 16,583 tests passed (13 suites and 110 tests skipped: Postgres specs without a database). The lists and list-tools Postgres specs (135 with the unit specs) pass with `CHATBOT_STORE_TEST_DB` on `ally_lists_test`. Lint and typecheck ✅.
-- ally-ai: 2,527 passed (46 skipped); flake8 ✅.
+- ally-be: full jest 1,122 suites and 16,585 tests passed (13 suites and 111 tests skipped: Postgres specs without a database). The lists and list-tools Postgres specs (138 with the unit specs) pass with `CHATBOT_STORE_TEST_DB` on `ally_lists_test`. Lint and typecheck ✅.
+- ally-ai: 2,536 passed (46 skipped); flake8 ✅.
 - Each run's diff was checked. `black` reformats files outside the chunk, so those were reverted every time.
 
 **Local state:**
@@ -118,16 +146,17 @@ The assistant can now look up a list, book, and change or cancel a booking under
   - `check/text.py`: `without_record_ids`.
   - `check/rejections.py`: `UNFOUND_SLOT`.
 - **Schemas and state:** `schemas/agent_runtime.py` (`ListToolDefinition`, `definitions`, `omitted`, `today`); `schemas/knowledge_agent.py` (`Citation.record_id`, sent only when set); `knowledge_agent/agent.py` (`resolve_citations` keeps it); `state.py`.
-- **Tests:** `tests/core/agent_runtime/test_list_tools.py`, 37.
+- **The confirmed-time check:** `tools/confirmed.py`; `tools/lists.py` runs it before a write; `tools/base.py` (`ToolContext.messages`, `today`); `nodes/tools.py` passes the person's last two messages.
+- **Tests:** `tests/core/agent_runtime/test_list_tools.py`, 46.
 
 **ally-be, 5a's engine (follow-up 3):** `lists/list-records.service.ts` `alternatives()` takes the requested target and orders by day, then time of day; `dateOf`.
 
 ## 2. The generated tools (5a's seed and the Listings fixture)
 
-- **`find_slots`:** "Look up entries in Slots. Filter by practitioner, starts at, duration and open; returns up to 10 matches as passages to cite, with the total. Use aggregate to count or to add up duration."
-  - **Inputs:** `practitioner_contains`, `starts_at_from`/`_to` ("a date and time like 2026-11-20T11:15:00+05:30"), `duration_from`/`_to`, `open` [yes, no], `sort`, `limit` (1–10, default 5), `aggregate` [count, sum_duration].
+- **`find_slots`:** "Look up entries in Slots. Filter by practitioner, starts at, duration and open; returns up to 10 matches as passages to cite, with the total. Use aggregate to count or to add up duration. When the person named a time, use starts_at_at to find exactly that time."
+  - **Inputs:** `practitioner_contains`, `starts_at_at` (exactly), `starts_at_from`/`_to` ("a date and time like 2026-11-20T11:15:00+05:30"), `duration_from`/`_to`, `open` [yes, no], `sort`, `limit` (1–10, default 5), `aggregate` [count, sum_duration].
 - **`create_appointments`:** "Add an entry to Appointments for the person in this chat, only after they've confirmed it. Needs slot. Fails with a reason if that slot is already taken. Fails if the person already has 2 appointments."
-  - **Inputs:** `slot` ("the id of a slots entry from find_slots"), `service` and `status` (enums). No `client`: the person in the chat always is.
+  - **Inputs:** `slot` ("the id of a slots entry from find_slots"; marked `relation: slots`, `dated: datetime`), `service` and `status` (enums). No `client`: the person in the chat always is.
 - **`update_appointments`:** "Change an entry in Appointments that belongs to the person in this chat; id comes from find_appointments. … Status can change from booked to confirmed or cancelled; from confirmed to completed, cancelled or no show."
   - **Inputs:** `id`, then the same fields, where empty leaves a field as it is.
 - **`find_listings`:**
@@ -215,9 +244,9 @@ It sits after the purpose section, and only in runs with list tools. `{today}` r
 ## 6. Open, for later chunks
 
 - **Run the Sunrise and fixture checkups** (How Shehbaz tests it, step 8).
-- **The agent can book a different slot than the one confirmed** (follow-up re-run 6). The person said 11:00, find returned only 10:00, and the agent created 10:00. Nothing deterministic stops it.
-  - **Options:** a check before a create that the slot's time matches a time the person named in the conversation (as `offered_times` does for replies); or make find's ranges harder to misuse (an exact `starts_at` filter for date-times).
-  - Worth fixing before a pilot's writes go to Do it. The launch checklist already gates that on the action cases.
+- **Fixed: the agent could book a different slot than the one confirmed** (see "The wrong booking, fixed").
+  - **Remaining limit:** the check reads only the person's last two messages. A time confirmed earlier ("11:00", then three turns of other questions, then "yes, book it") is refused, and the agent asks again. That's the safe direction.
+  - **Remaining limit:** "at 4" counts as both 04:00 and 16:00.
 - **A failed create isn't retried in the run.** One run passed a shortened id (`invalid_value`), and the brief's once-per-run rule then stopped it. Retrying after `invalid_value` only could be considered.
 - **Latency:** a booking turn takes 12–17 s. The model steps are the cost.
 - **A time zone setting per bot** (above).

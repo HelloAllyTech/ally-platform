@@ -672,3 +672,255 @@ def test_format_searches_renders_each_list_outcome():
         "- `find_slots`: count = 7\n"
         "- `create_appointments`: failed (timeout), not done"
     )
+
+
+# ---- the time the person confirmed (chunk 6 follow-up) --------------------------
+
+TODAY = "Saturday 14 Nov 2026, 11:58 (Asia/Kolkata, UTC+05:30)"
+THU_10 = "55555555-5555-4555-8555-555555555510"
+THU_11 = "55555555-5555-4555-8555-555555555511"
+SUN_16 = "55555555-5555-4555-8555-555555555516"
+MON_16 = "55555555-5555-4555-8555-555555555517"
+APPOINTMENT = "66666666-6666-4666-8666-666666666666"
+
+BOOK_SLOT = {
+    **CREATE_APPOINTMENTS,
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "slot": {
+                "type": "string",
+                "description": "Slot: the id of a slots entry from find_slots",
+                "default": "",
+                "relation": "slots",
+                "dated": "datetime",
+            },
+        },
+    },
+}
+CHANGE_APPOINTMENT = {
+    "name": "update_appointments",
+    "description": "Change an entry in Appointments.",
+    "kind": "update",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string", "description": "The id", "default": ""},
+            **BOOK_SLOT["input_schema"]["properties"],
+            "status": {
+                "type": "string",
+                "description": "Status",
+                "default": "",
+                "enum": ["", "booked", "cancelled"],
+            },
+        },
+    },
+}
+
+
+def found(*slots):
+    return {
+        "ok": True,
+        "result": {
+            "list": {"key": "slots", "name": "Slots"},
+            "passages": [slot_passage(record_id, title) for record_id, title in slots],
+            "total": len(slots),
+        },
+    }
+
+
+def booking_bot():
+    return lists_bot(FIND_SLOTS, BOOK_SLOT, CHANGE_APPOINTMENT, gateway_today=TODAY)
+
+
+@pytest.fixture
+def run_booking(graph):
+    async def _run(question, *, history, gateway):
+        return await run_agent(
+            graph,
+            run_id="run-6c",
+            conversation_id="conv-6c",
+            chatbot_id="bot-1",
+            question=question,
+            history=history,
+            bot=booking_bot(),
+            gateway=gateway,
+        )
+
+    return _run
+
+
+ASKED_11 = [
+    {"role": "user", "content": "can I book Thursday at 11:00?"},
+    {"role": "assistant", "content": "Thursday 19 Nov at 11:00 is free. Book it?"},
+]
+
+
+class TestConfirmedTime:
+    @pytest.mark.asyncio
+    async def test_run_6_a_different_time_is_not_booked_and_the_agent_asks(
+        self, run_booking
+    ):
+        # The person confirmed 11:00; find returned only 10:00, and the model books it.
+        gateway = FakeGateway(found((THU_10, "Thu 19 Nov 2026, 10:00")), BOOKED)
+        llm = FakeLLM(
+            find(starts_at_from="2026-11-19T10:00:00+05:30"),
+            create(THU_10),
+            reply("clarify", "Did you mean 10:00 or 11:00 on Thursday?"),
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            state = await run_booking(
+                "yes, please book it", history=ASKED_11, gateway=gateway
+            )
+        assert [c["name"] for c in gateway.calls] == ["find_slots"]
+        record = state["tool_calls"][1]
+        assert record["error"] == "unconfirmed_time"
+        prompt = llm.calls[2]["prompt"]
+        assert (
+            "- `create_appointments`: refused (Not done: the person hasn't confirmed "
+            "this exact day and time (Thu 19 Nov 2026, 10:00). Ask them to confirm "
+            "the day and time before you book it.), not done"
+        ) in prompt
+        # A failed call: not offered again this run.
+        assert "create_appointments" not in offered(llm.calls[2])
+
+    @pytest.mark.asyncio
+    async def test_the_time_they_confirmed_is_booked(self, run_booking):
+        gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")), BOOKED)
+        llm = FakeLLM(
+            find(starts_at_from="2026-11-19T11:00:00+05:30"),
+            create(THU_11),
+            reply("answer", "Booked: Thursday 19 Nov at 11:00.", citations=[2]),
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_booking("yes, please book it", history=ASKED_11, gateway=gateway)
+        assert [c["name"] for c in gateway.calls] == [
+            "find_slots",
+            "create_appointments",
+        ]
+        assert gateway.calls[1]["input"] == {"slot": THU_11}
+
+    @pytest.mark.asyncio
+    async def test_tomorrow_at_4_pm_is_worked_out_from_today(self, run_booking):
+        # Today is Saturday 14 Nov: tomorrow is Sunday 15 Nov.
+        gateway = FakeGateway(
+            found(
+                (MON_16, "Mon 16 Nov 2026, 16:00"),
+                (SUN_16, "Sun 15 Nov 2026, 16:00"),
+            ),
+            BOOKED,
+        )
+        llm = FakeLLM(
+            find(),
+            create(MON_16),
+            reply("clarify", "Did you mean Sunday 15 Nov at 4 pm?"),
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            state = await run_booking(
+                "book me tomorrow at 4 pm please, yes", history=[], gateway=gateway
+            )
+        # Monday is refused without a call; the create is then not offered again.
+        assert [c["name"] for c in gateway.calls] == ["find_slots"]
+        assert state["tool_calls"][1]["error"] == "unconfirmed_time"
+
+    @pytest.mark.asyncio
+    async def test_tomorrow_at_4_pm_books_sunday(self, run_booking):
+        gateway = FakeGateway(found((SUN_16, "Sun 15 Nov 2026, 16:00")), BOOKED)
+        llm = FakeLLM(
+            find(),
+            create(SUN_16),
+            reply("answer", "Booked for tomorrow at 4 pm.", citations=[2]),
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_booking(
+                "book me tomorrow at 4 pm please, yes", history=[], gateway=gateway
+            )
+        assert [c["name"] for c in gateway.calls] == [
+            "find_slots",
+            "create_appointments",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_no_time_named_is_not_booked(self, run_booking):
+        gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")), BOOKED)
+        llm = FakeLLM(
+            find(),
+            create(THU_11),
+            reply("clarify", "Which time on Thursday?"),
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_booking("book me on Thursday", history=[], gateway=gateway)
+        assert [c["name"] for c in gateway.calls] == ["find_slots"]
+
+    @pytest.mark.asyncio
+    async def test_a_cancel_that_keeps_its_slot_needs_no_time(self, run_booking):
+        appointment = {
+            "ok": True,
+            "result": {
+                "list": {"key": "appointments", "name": "Appointments"},
+                "passages": [
+                    {
+                        "record_id": APPOINTMENT,
+                        "list": "Appointments",
+                        "title": "Appointments: Thu 19 Nov 2026, 11:00",
+                        "record_title": "Thu 19 Nov 2026, 11:00",
+                        "text": "id: x\nSlot: Thu 19 Nov 2026, 11:00\nStatus: booked",
+                    },
+                    slot_passage(THU_11, "Thu 19 Nov 2026, 11:00"),
+                ],
+                "total": 1,
+            },
+        }
+        gateway = FakeGateway(appointment, BOOKED)
+        llm = FakeLLM(
+            find(),
+            {
+                "action": "update_appointments",
+                "turn_type": "question",
+                "update_appointments": {
+                    "id": APPOINTMENT,
+                    "slot": THU_11,
+                    "status": "cancelled",
+                },
+            },
+            reply("answer", "Cancelled.", citations=[1]),
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_booking("cancel my booking", history=[], gateway=gateway)
+        assert [c["name"] for c in gateway.calls] == [
+            "find_slots",
+            "update_appointments",
+        ]
+
+
+class TestNamedTimesAndDays:
+    def test_times(self):
+        from app.core.agent_runtime.tools.confirmed import named_times
+
+        assert named_times(["book Thursday at 11:00"]) == {660}
+        assert named_times(["tomorrow at 4 pm"]) == {960}
+        assert named_times(["at 4 please"]) == {240, 960}
+        assert named_times(["around noon"]) == {720}
+        assert named_times(["yes please"]) == set()
+
+    def test_days_from_today(self):
+        from app.core.agent_runtime.tools.confirmed import named_days, today_of
+
+        today = today_of(TODAY)
+        assert today.isoformat() == "2026-11-14"
+        assert named_days(["Thursday at 11"], today) == {(19, 11)}
+        assert named_days(["tomorrow"], today) == {(15, 11)}
+        assert named_days(["on 20 Nov"], today) == {(20, 11)}
+        assert named_days(["Saturday"], today) == {(14, 11)}
+        assert named_days(["at 11"], today) is None
+
+    def test_only_the_persons_last_two_messages(self):
+        from app.core.agent_runtime.tools.confirmed import person_messages
+
+        history = [
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "11:00 is free"},
+            {"role": "user", "content": "second"},
+        ]
+        assert person_messages(history, "third") == ["second", "third"]
+        assert person_messages(history, "second") == ["first", "second"]

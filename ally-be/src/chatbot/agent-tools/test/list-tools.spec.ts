@@ -3,6 +3,7 @@ import { ListConstraintKind, ListFieldType } from '../../enum/list.enum';
 import type { ListDefinitionView } from '../../lists/list-definitions.service';
 import {
   abilityFor,
+  datedLists,
   listDoneLine,
   listToolDefinitions,
   MAX_LIST_TOOLS,
@@ -224,14 +225,20 @@ describe('which tools a run gets', () => {
 });
 
 describe('schemas', () => {
-  const [find, create, update] = listToolDefinitions(appointments, names);
-  const findSlots = listToolDefinitions(slots, names)[0];
+  const dated = datedLists([slots, appointments]);
+  const [find, create, update] = listToolDefinitions(
+    appointments,
+    names,
+    dated,
+  );
+  const findSlots = listToolDefinitions(slots, names, dated)[0];
   const findListings = listToolDefinitions(listings, names)[0];
 
   it('gives find filters by field type, with sort, limit and aggregate', () => {
     const p = findSlots.input_schema.properties;
     expect(Object.keys(p)).toEqual([
       'practitioner_contains',
+      'starts_at_at',
       'starts_at_from',
       'starts_at_to',
       'duration_from',
@@ -298,6 +305,35 @@ describe('schemas', () => {
     expect(update.input_schema.properties.status.description).toContain(
       'empty leaves it as it is',
     );
+  });
+
+  it('marks a relation to a dated list, so ally-ai can check its day and time', () => {
+    expect(create.input_schema.properties.slot).toMatchObject({
+      relation: 'slots',
+      dated: 'datetime',
+    });
+    expect(update.input_schema.properties.slot.dated).toBe('datetime');
+    expect(create.input_schema.properties.service.relation).toBeUndefined();
+  });
+
+  it('gives find an exact time on a date-time field, and says when to use it', () => {
+    expect(findSlots.input_schema.properties.starts_at_at.description).toBe(
+      'Starts at is exactly: a date and time like 2026-11-20T11:15:00+05:30',
+    );
+    expect(findSlots.description).toContain(
+      'When the person named a time, use starts_at_at to find exactly that time.',
+    );
+    expect(
+      toListQuery(
+        slots,
+        parseListToolInput(findSlots, {
+          starts_at_at: '2026-11-19T11:00:00+05:30',
+        }),
+      ).filters,
+    ).toEqual([
+      { field: 'starts_at', op: 'from', value: '2026-11-19T11:00:00+05:30' },
+      { field: 'starts_at', op: 'to', value: '2026-11-19T11:00:00+05:30' },
+    ]);
   });
 
   it('writes descriptions from the list and its rules', () => {

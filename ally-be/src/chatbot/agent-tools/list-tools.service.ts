@@ -9,6 +9,7 @@ import { LIST_COPY, ListRefusalException } from '../lists/list-refusals';
 import type { ListActor, ListRecordView } from '../lists/list-types';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 import {
+  datedLists,
   listToolDefinitions,
   offeredListTools,
   parseListToolInput,
@@ -69,7 +70,9 @@ export class ListToolsService {
     const list = lists.find((l) => l.key === parsed.key);
     if (!list) return undefined;
     const names = new Map(lists.map((l) => [l.key, l.name]));
-    const def = listToolDefinitions(list, names).find((d) => d.name === name);
+    const def = listToolDefinitions(list, names, datedLists(lists)).find(
+      (d) => d.name === name,
+    );
     if (!def) return undefined;
     return {
       name,

@@ -49,6 +49,12 @@ export interface ListToolProperty {
   enum?: string[];
   minimum?: number;
   maximum?: number;
+  /**
+   * A relation (chunk 6 follow-up): the list it points at, and whether that list is dated. ally-ai
+   * checks a dated target's day and time against what the person confirmed before it writes.
+   */
+  relation?: string;
+  dated?: 'date' | 'datetime';
 }
 
 export interface ListToolInputSchema {
@@ -181,8 +187,21 @@ const choice = (description: string, values: string[]): ListToolProperty => ({
 });
 
 /** A value property for create and update: one per writable field. */
-function valueProperty(f: FieldView, update: boolean): ListToolProperty {
+function valueProperty(
+  f: FieldView,
+  update: boolean,
+  dated: Map<string, 'date' | 'datetime'>,
+): ListToolProperty {
   const blank = update ? 'empty leaves it as it is' : 'empty if not given';
+  if (f.type === ListFieldType.RELATION) {
+    const to = relationTarget(f);
+    const when = dated.get(to);
+    return {
+      ...text(`${f.label}: ${valueHint(f)}; ${blank}`),
+      relation: to,
+      ...(when ? { dated: when } : {}),
+    };
+  }
   if (f.type === ListFieldType.SELECT) {
     return choice(`${f.label}; ${blank}`, selectValues(f));
   }
@@ -214,6 +233,10 @@ function findSchema(list: ListView): ListToolInputSchema {
         text(`${f.label} contains this text; empty for any`),
       );
     } else if (RANGE_TYPES.has(f.type)) {
+      if (f.type === ListFieldType.DATETIME) {
+        // Exactly the time the person named (chunk 6 follow-up), beside the ranges.
+        put(`${f.key}_at`, text(`${f.label} is exactly: ${valueHint(f)}`));
+      }
       put(`${f.key}_from`, text(`${f.label} from: ${valueHint(f)}`));
       put(`${f.key}_to`, text(`${f.label} up to: ${valueHint(f)}`));
     }
@@ -242,7 +265,11 @@ function findSchema(list: ListView): ListToolInputSchema {
   return { type: 'object', properties };
 }
 
-function writeSchema(list: ListView, update: boolean): ListToolInputSchema {
+function writeSchema(
+  list: ListView,
+  update: boolean,
+  dated: Map<string, 'date' | 'datetime'>,
+): ListToolInputSchema {
   const properties: Record<string, ListToolProperty> = {};
   if (update) {
     properties.id = text(
@@ -250,7 +277,9 @@ function writeSchema(list: ListView, update: boolean): ListToolInputSchema {
     );
   }
   for (const f of writableFields(list)) {
-    if (!(f.key in properties)) properties[f.key] = valueProperty(f, update);
+    if (!(f.key in properties)) {
+      properties[f.key] = valueProperty(f, update, dated);
+    }
   }
   return { type: 'object', properties };
 }
@@ -336,11 +365,15 @@ function findDescription(list: ListView): string {
   const fields = filterableFields(list);
   const labels = fields.slice(0, DESCRIBED_FILTERS).map((f) => lower(f.label));
   const summable = fields.find((f) => NUMERIC_TYPES.has(f.type));
+  const exact = fields.find((f) => f.type === ListFieldType.DATETIME);
   const filter = labels.length ? ` Filter by ${joinAnd(labels)};` : '';
   return (
     `Look up entries in ${list.name}.${filter} returns up to ${FIND_LIMIT_MAX} ` +
     `matches as passages to cite, with the total. Use aggregate to count` +
-    (summable ? ` or to add up ${lower(summable.label)}.` : '.')
+    (summable ? ` or to add up ${lower(summable.label)}.` : '.') +
+    (exact
+      ? ` When the person named a time, use ${exact.key}_at to find exactly that time.`
+      : '')
   ).replace(/\.\s+returns/, '. Returns');
 }
 
@@ -376,9 +409,29 @@ function updateDescription(list: ListView, names: Map<string, string>): string {
  * The tools one list generates, whatever the bot's abilities: find when the agent may read it,
  * create and update when it may write it and at least one field is writable.
  */
+/** Each list's date or date-time, as the engine's alternatives read it: its first such field. */
+export function datedLists(
+  lists: ListView[],
+): Map<string, 'date' | 'datetime'> {
+  const out = new Map<string, 'date' | 'datetime'>();
+  for (const list of lists) {
+    const field = live(list).find(
+      (f) => f.type === ListFieldType.DATE || f.type === ListFieldType.DATETIME,
+    );
+    if (field) {
+      out.set(
+        list.key,
+        field.type === ListFieldType.DATE ? 'date' : 'datetime',
+      );
+    }
+  }
+  return out;
+}
+
 export function listToolDefinitions(
   list: ListView,
   names: Map<string, string> = new Map(),
+  dated: Map<string, 'date' | 'datetime'> = new Map(),
 ): ListToolDefinition[] {
   const out: ListToolDefinition[] = [];
   if (list.deleted_at) return out;
@@ -394,13 +447,13 @@ export function listToolDefinitions(
     out.push({
       name: listToolName('create', list.key),
       description: createDescription(list, names),
-      input_schema: writeSchema(list, false),
+      input_schema: writeSchema(list, false, dated),
       kind: 'create',
     });
     out.push({
       name: listToolName('update', list.key),
       description: updateDescription(list, names),
-      input_schema: writeSchema(list, true),
+      input_schema: writeSchema(list, true, dated),
       kind: 'update',
     });
   }
@@ -424,9 +477,10 @@ export function offeredListTools(
   { knowsPerson }: { knowsPerson: boolean },
 ): OfferedListTools {
   const names = new Map(lists.map((l) => [l.key, l.name]));
+  const dated = datedLists(lists);
   const on = lists
     .filter((list) => knowsPerson || !hasPersonField(list))
-    .flatMap((list) => listToolDefinitions(list, names))
+    .flatMap((list) => listToolDefinitions(list, names, dated))
     .filter((def) => abilityFor(stored, def.name) === 'do_it');
   return {
     definitions: on.slice(0, MAX_LIST_TOOLS),
@@ -518,6 +572,13 @@ export function toListQuery(
     const contains = input[`${f.key}_contains`];
     if (contains !== undefined && CONTAINS_TYPES.has(f.type)) {
       filters.push({ field: f.key, op: 'contains', value: String(contains) });
+    }
+    const at = input[`${f.key}_at`];
+    if (at !== undefined && f.type === ListFieldType.DATETIME) {
+      // Exactly that instant, whatever its written form: from and to the same time.
+      const value = fieldValue(f, String(at));
+      filters.push({ field: f.key, op: 'from', value });
+      filters.push({ field: f.key, op: 'to', value });
     }
     for (const op of ['from', 'to'] as const) {
       const bound = input[`${f.key}_${op}`];

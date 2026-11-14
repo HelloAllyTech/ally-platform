@@ -166,6 +166,21 @@ describePg('List tools through the gateway (Postgres)', () => {
     expect(count.result!.aggregate).toEqual({ kind: 'count', value: 35 });
   });
 
+  it('finds exactly the time asked for with <key>_at, in any written form of it', async () => {
+    const [row] = await ds.query(
+      `SELECT r.id, r.data->>'starts_at' AS starts_at FROM collection_records r
+         JOIN collections c ON c.id = r.collection_id
+        WHERE c.chatbot_id = $1 AND c.key = 'slots' ORDER BY r.data->>'starts_at' LIMIT 1 OFFSET 7`,
+      [bot],
+    );
+    const utc = new Date(row.starts_at).toISOString(); // the same instant, written in UTC
+    for (const at of [row.starts_at, utc]) {
+      const found = await call('find_slots', { starts_at_at: at });
+      expect(found.result!.total).toBe(1);
+      expect(found.result!.passages[0].record_id).toBe(row.id);
+    }
+  });
+
   it('books for the person in the chat, and refuses the same slot for another with alternatives', async () => {
     const [slot] = await freeSlots(1);
     const booked = await call('create_appointments', { slot: slot.record_id });

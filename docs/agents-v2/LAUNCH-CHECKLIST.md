@@ -61,7 +61,7 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 ## 6: list tools
 
 - [ ] **Push `ally_ai_agent_lists` with the code.** It's a new prompt with a `{today}` variable that ships with it (no deploy order to follow). Its text is v3 in the local Skills Store and is the same as `ally-ai/app/prompts/agent/lists.txt` (`CHUNK-06-NOTES.md`).
-- [ ] **A pilot's `create_*` and `update_*` tools go to Do it only after its action cases pass** (`npm run chatbot:basics -- --bot <id> --cases src/chatbot/basics/cases/lists.json`, adapted to its lists). Check its new records every day in its first week. `find_*` is on by default for every list with agent read: turn a list's agent read off, or its `find_` to Never, to keep it from the assistant.
+- [ ] **Pilots' writes go to Do it only after this check is in:** a create or update books only the day and time the person confirmed, checked in code from their own messages (`confirmed.py`, `CHUNK-06-NOTES.md`). Then **a pilot's `create_*` and `update_*` tools go to Do it only after its action cases pass** (`npm run chatbot:basics -- --bot <id> --cases src/chatbot/basics/cases/lists.json`, adapted to its lists). Check its new records every day in its first week. `find_*` is on by default for every list with agent read: turn a list's agent read off, or its `find_` to Never, to keep it from the assistant.
 - [ ] **Bookings on WhatsApp need `sharedStoreWrites` on**, as 11a's hand-over does. Without it a WhatsApp run has no contact and isn't offered the tools of lists with a person field.
 - [ ] **The business's time zone is Asia/Kolkata unless its hand-over hours set one.** A pilot elsewhere needs hand-over hours with its zone until bots have a time zone setting.
 

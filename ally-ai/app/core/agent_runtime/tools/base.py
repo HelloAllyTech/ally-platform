@@ -109,6 +109,10 @@ class ToolContext:
     gateway: Optional[Any] = None
     run_id: Optional[str] = None
     step: Optional[int] = None
+    #: List writes only (chunk 6): the person's own latest two messages, and today
+    #: where the business is, to check a booked time is the one they confirmed.
+    messages: Tuple[str, ...] = ()
+    today: str = ""
 
 
 @dataclass(frozen=True)

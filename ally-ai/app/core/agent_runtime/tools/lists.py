@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Type
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from app.core.agent_runtime.tools.base import Tool, ToolContext, ToolResult
+from app.core.agent_runtime.tools.confirmed import unconfirmed
 
 #: At most this many definitions a run (ally-be caps them too).
 MAX_LIST_TOOLS = 12
@@ -131,7 +132,36 @@ def list_tool(definition: Mapping[str, Any]) -> Tool:
     name = str(definition["name"])
     kind = str(definition.get("kind") or "find")
 
+    properties: Dict[str, Any] = (definition.get("input_schema") or {}).get(
+        "properties"
+    ) or {}
+
     async def handler(args: BaseModel, ctx: ToolContext) -> ToolResult:
+        if kind in ("create", "update"):
+            # The day and time it books must be what the person confirmed, read from
+            # their own messages (chunk 6 follow-up). Otherwise it isn't sent.
+            values = args.model_dump(mode="json", by_alias=True)
+            why = unconfirmed(
+                properties,
+                values,
+                ctx.passages,
+                ctx.messages,
+                ctx.today,
+                updating=str(values.get("id") or "") if kind == "update" else None,
+            )
+            if why:
+                return ToolResult(
+                    summary=f"{name}: not sent, time not confirmed",
+                    record={
+                        "tool": name,
+                        "kind": "gateway",
+                        "list_kind": kind,
+                        "ok": False,
+                        "added": [],
+                        "error": "unconfirmed_time",
+                        "message": why,
+                    },
+                )
         if ctx.gateway is None or ctx.run_id is None or ctx.step is None:
             outcome: Dict[str, Any] = {"ok": False, "error": "no_gateway"}
         else:
