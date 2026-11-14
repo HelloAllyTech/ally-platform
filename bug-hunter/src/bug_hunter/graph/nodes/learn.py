@@ -20,7 +20,8 @@ def make_learn_node(deps: GraphDeps):
         from bug_hunter.memory.feedback import RunSnapshot, bug_record_for
 
         snapshot = RunSnapshot.from_state(state.model_dump(), deps.app_prefix)
-        record = bug_record_for(snapshot, deps.read_at_ref)
+        # fingerprints of the base commit: the worktree holds the fix's edits by now
+        record = bug_record_for(snapshot, deps.read_at_base)
         if record is None:
             return {}
         try:

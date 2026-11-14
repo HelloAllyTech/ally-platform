@@ -279,3 +279,35 @@ def test_recall_is_capped_at_five() -> None:
             ),
         )
     assert len(memory.search("ally-be", "bugs", query="x returns 0", limit=50)) == 5
+
+
+def test_learn_fingerprints_the_base_commit_not_the_fixed_worktree(
+    config, repo, tmp_path
+) -> None:
+    """2026-11-14 re-run: learn hashed the patched file, so the same commit looked
+    changed in pass 2 (row 2 instead of row 3)."""
+    from bug_hunter.memory.fingerprint import unchanged
+    from tests.test_memory import reader
+
+    deps = _deps(
+        config,
+        repo,
+        tmp_path,
+        [EDIT_FIX, RUN_REPRO, SUBMIT_FIX],
+        output_mode="suggested_fix",
+    )
+    deps.memory = in_memory()
+    _, state = _run(deps)
+    assert state.status == "suggested_fix"
+    assert "return 3" in (repo / "ally-be/src/x.ts").read_text()  # the fix is applied
+    _, bug = deps.memory.get(fb.bug_id("run-c06"))
+    # a fresh checkout of the same commit (what the next run sees) matches
+    import subprocess
+
+    subprocess.run(["git", "checkout", "--", "."], cwd=repo, check=True)
+    assert unchanged(bug.fingerprints, reader(repo))
+    # so a confirmed diagnosis with a bad fix is row 3 (reuse), not row 2
+    from bug_hunter.memory.recall import bug_row
+
+    bug.diagnosis, bug.fix_verdict = "correct", "needed_edits"
+    assert bug_row(bug, reader(repo)) == "reuse"

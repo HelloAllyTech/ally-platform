@@ -1,0 +1,548 @@
+{
+ "meta": {
+  "kind": "memory-check",
+  "scope": "eval-memcheck-20261114-174523",
+  "semantic": true,
+  "cost_usd_total": 3.1654,
+  "cost_cap_usd": 4.0,
+  "partial": false,
+  "stopped_reason": null,
+  "timestamp": "20261114-174524"
+ },
+ "cases": {
+  "ally-ai-6e81b510": {
+   "mode": "sweep",
+   "pass1": {
+    "run_id": "run-20261114-174524-296186",
+    "outcome": "clean",
+    "ended_as": "no_bug",
+    "finding": "",
+    "oracle": null,
+    "recalled": [],
+    "memory_route": "",
+    "cost_usd": 0.0015,
+    "error": null
+   },
+   "verdict": {
+    "diagnosis": "not_a_bug",
+    "fix": "none",
+    "written": [
+     "rs-d3993d58c8"
+    ],
+    "applied_fix": "none",
+    "note": "pass 1 had no finding: only the run record and stats",
+    "expected_row": "none (no finding in pass 1)",
+    "own_bug": "bug-6398e7f7b9"
+   },
+   "pass2": {
+    "run_id": "run-20261114-185054-068b43",
+    "outcome": "clean",
+    "ended_as": "no_bug",
+    "finding": "",
+    "oracle": null,
+    "recalled": [],
+    "memory_route": "",
+    "cost_usd": 0.2595,
+    "error": null
+   },
+   "recalled_memory": false,
+   "applied_row": "not recalled as a bug",
+   "changes": [
+    "nothing changed"
+   ]
+  },
+  "ally-be-89d8e055": {
+   "mode": "issue",
+   "pass1": {
+    "run_id": "run-20261114-174534-a9d4fc",
+    "outcome": "detected",
+    "ended_as": "suggested_fix",
+    "finding": "Prompt translation validator rejects preserved tokens in some languages due to ASCII-only regex (misses tokens with invisible Unicode marks)",
+    "oracle": false,
+    "recalled": [],
+    "memory_route": "",
+    "cost_usd": 0.5367,
+    "error": null
+   },
+   "verdict": {
+    "diagnosis": "wrong",
+    "fix": "wrong",
+    "written": [
+     "bug-e60c854037",
+     "wt-2e0ca06287",
+     "fr-c2841ffd0f",
+     "cv-e728a0785a",
+     "rs-d658e87185"
+    ],
+    "applied_fix": "wrong",
+    "expected_row": "5 not shown as a bug",
+    "own_bug": "bug-e60c854037"
+   },
+   "pass2": {
+    "run_id": "run-20261114-185206-b6c81b",
+    "outcome": "detected",
+    "ended_as": "suggested_fix",
+    "finding": "Prompt translation token guard rejects preserved tokens with zero\u2011width spaces, causing false token-mismatch and English fallback",
+    "oracle": false,
+    "recalled": [
+     "wt-2e0ca06287"
+    ],
+    "memory_route": "",
+    "cost_usd": 0.3585,
+    "error": null
+   },
+   "recalled_memory": true,
+   "applied_row": "not recalled as a bug",
+   "changes": [
+    "finding: 'Prompt translation validator rejects preserved tokens in some languages due to ASCII-only regex (misses tokens with invisible Unicode marks)' -> 'Prompt translation token guard rejects preserved tokens with zero\u2011width spaces, causing false token-mismatch and English fallback'"
+   ]
+  },
+  "ally-web-eebbfd01": {
+   "mode": "issue",
+   "pass1": {
+    "run_id": "run-20261114-180045-514b1b",
+    "outcome": "escalated",
+    "ended_as": "escalated",
+    "finding": "Helpline app crashes on load: PageviewTracker calls useLocation before <Router> wraps it",
+    "oracle": null,
+    "recalled": [],
+    "memory_route": "",
+    "cost_usd": 0.7211,
+    "error": null
+   },
+   "verdict": {
+    "diagnosis": "wrong",
+    "fix": "none",
+    "written": [
+     "bug-18f2099575",
+     "wt-c893a95475",
+     "rs-d658e87185"
+    ],
+    "applied_fix": "none",
+    "expected_row": "5 not shown as a bug",
+    "own_bug": "bug-18f2099575"
+   },
+   "pass2": {
+    "run_id": "run-20261114-190439-6785db",
+    "outcome": "missed",
+    "ended_as": "no_bug",
+    "finding": "",
+    "oracle": null,
+    "recalled": [
+     "wt-c893a95475"
+    ],
+    "memory_route": "",
+    "cost_usd": 0.2713,
+    "error": null
+   },
+   "recalled_memory": true,
+   "applied_row": "not recalled as a bug",
+   "changes": [
+    "finding: 'Helpline app crashes on load: PageviewTracker calls useLocation before <Router> wraps it' -> ''",
+    "ended_as: 'escalated' -> 'no_bug'",
+    "outcome: 'escalated' -> 'missed'"
+   ]
+  },
+  "ally-web-9299e9aa": {
+   "mode": "issue",
+   "pass1": {
+    "run_id": "run-20261114-181042-f3d8c3",
+    "outcome": "detected",
+    "ended_as": "suggested_fix",
+    "finding": "WhatsApp bot Preview sends unbounded history; server rejects once >20 elements",
+    "oracle": false,
+    "recalled": [],
+    "memory_route": "",
+    "cost_usd": 0.4184,
+    "error": null
+   },
+   "verdict": {
+    "diagnosis": "correct",
+    "fix": "needed_edits",
+    "approved": [
+     "cv-c31111ad1c"
+    ],
+    "written": [
+     "bug-acfff91800",
+     "fr-fe0a44e1df",
+     "cv-c31111ad1c",
+     "rs-d658e87185"
+    ],
+    "applied_fix": "needed_edits",
+    "expected_row": "3 reuse diagnosis",
+    "own_bug": "bug-acfff91800"
+   },
+   "pass2": {
+    "run_id": "run-20261114-190712-e018bf",
+    "outcome": "escalated",
+    "ended_as": "escalated",
+    "finding": "WhatsApp bot Preview sends unbounded history to test endpoint; server rejects when >20 elements",
+    "oracle": null,
+    "recalled": [
+     "bug-acfff91800",
+     "bug-acfff91800"
+    ],
+    "memory_route": "regression:bug-acfff91800",
+    "cost_usd": 0.5983,
+    "error": null
+   },
+   "recalled_memory": true,
+   "applied_row": "2 possible regression (bug-acfff91800)",
+   "changes": [
+    "finding: 'WhatsApp bot Preview sends unbounded history; server rejects once >20 elements' -> 'WhatsApp bot Preview sends unbounded history to test endpoint; server rejects when >20 elements'",
+    "ended_as: 'suggested_fix' -> 'escalated'",
+    "outcome: 'detected' -> 'escalated'",
+    "oracle: False -> None"
+   ]
+  }
+ },
+ "memory": [
+  {
+   "kind": "bugs",
+   "id": "bug-e60c854037",
+   "app": "ally-be",
+   "text": "Prompt translation validator rejects preserved tokens in some languages due to ASCII-only regex (misses tokens with invisible Unicode marks): Some target-language outputs (notably RTL locales) include invisible Unicode directionality/formatting marks inside preserved tokens, e.g. {\u200ename\u200e} or [l\u200eaughs]. The token guard\u2019s regexes only accept ASCII letters/digits/underscore for placeholders and a\u2013z/digits/[_-] for audio tags, and they do not ignore zero\u2011width Unicode marks. As a result, visually preserved tokens fail to match, the validato",
+   "files": [
+    "ally-be/src/prompt/util/translation-token-guard.util.ts",
+    "ally-be/src/prompt/service/prompt-translation.service.ts",
+    "ally-be/src/prompts/agent_template_translation.txt"
+   ],
+   "signature": "66f426fd6fa38ea4",
+   "source_run": "run-20261114-174534-a9d4fc",
+   "created_at": "2026-11-14T18:00:27+00:00",
+   "last_used_at": "2026-11-14T18:56:35+00:00",
+   "title": "Prompt translation validator rejects preserved tokens in some languages due to ASCII-only regex (misses tokens with invisible Unicode marks)",
+   "root_cause": "translation-token-guard.util.ts:18-20 \u2014 The placeholder/audio-tag extractors use ASCII-only character classes and don\u2019t strip or tolerate zero-width Unicode formatting/directionality marks inside tokens; tokens like {name} or [laughs] that carry invisible marks are not recognized, causing false mismatches.",
+   "fix_summary": "Regex extractors for placeholders and audio tags were ASCII-only and didn\u2019t tolerate zero\u2011width Unicode directionality marks (e.g., LRM/RLM) inside tokens, causing false mismatches. I updated the regexes to allow these marks around/within token names and strip them during extraction, so visually preserved tokens are accepted without changing other behavior.",
+   "status": "suggested_fix",
+   "diagnosis": "wrong",
+   "fix_verdict": "wrong",
+   "verdict_reason": "Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B), e.g. {\u200bname\u200b}; fullwidth brackets are not involved.",
+   "finding": {
+    "app": "ally-be",
+    "title": "Prompt translation validator rejects preserved tokens in some languages due to ASCII-only regex (misses tokens with invisible Unicode marks)",
+    "category": "logic",
+    "evidence": [
+     "ally-be/src/prompt/util/translation-token-guard.util.ts:18-20 \u2014 PLACEHOLDER_RE and AUDIO_TAG_RE only match ASCII letters/digits/underscore/hyphen inside {\u2026} and [\u2026]: const PLACEHOLDER_RE = /\\{\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\}/g; const AUDIO_TAG_RE = /\\[\\s*([a-z][a-z0-9_-]*)\\s*\\]/gi;",
+     "ally-be/src/prompt/util/translation-token-guard.util.ts:36-41 \u2014 extractPlaceholders uses PLACEHOLDER_RE to collect tokens; anything outside these character classes is not captured and thus treated as missing.",
+     "ally-be/src/prompt/util/translation-token-guard.util.ts:45-50 \u2014 extractAudioTags uses AUDIO_TAG_RE; any non-ASCII or non-matching character (including zero-width marks) inside the brackets prevents a match.",
+     "ally-be/src/prompt/util/translation-token-guard.util.ts:83-103 \u2014 validateTranslationTokens compares multisets and returns ok only when no missing/added tokens are found.",
+     "ally-be/src/prompt/service/prompt-translation.service.ts:492-521 \u2014 The validator is applied to each translation; on failure it logs and records a \"token mismatch \u2014 missing: \u2026; added: \u2026\" error and marks the translation failed.",
+     "ally-be/src/prompts/agent_template_translation.txt:3-6 \u2014 The translator prompt requires preserving single-brace placeholders like {name} and audio tags like [laughs] exactly."
+    ],
+    "severity": "high",
+    "hypothesis": "Some target-language outputs (notably RTL locales) include invisible Unicode directionality/formatting marks inside preserved tokens, e.g. {\u200ename\u200e} or [l\u200eaughs]. The token guard\u2019s regexes only accept ASCII letters/digits/underscore for placeholders and a\u2013z/digits/[_-] for audio tags, and they do not ignore zero\u2011width Unicode marks. As a result, visually preserved tokens fail to match, the validator reports them as missing/added, and the translation is rejected. Those languages then fall back to English at runtime.",
+    "suspected_files": [
+     "ally-be/src/prompt/util/translation-token-guard.util.ts",
+     "ally-be/src/prompt/service/prompt-translation.service.ts",
+     "ally-be/src/prompts/agent_template_translation.txt"
+    ]
+   }
+  },
+  {
+   "kind": "bugs",
+   "id": "bug-18f2099575",
+   "app": "ally-web",
+   "text": "Helpline app crashes on load: PageviewTracker calls useLocation before <Router> wraps it: The helpline routes mount a PageviewTracker that uses the React Router useLocation hook. If PageviewTracker renders anywhere not wrapped by a Router, React throws \"useLocation() may be used only in the context of a <Router>\" and the root ErrorBoundary shows the app-level crash message. A refactor likely caused PageviewTracker to render before BrowserRouter is established (or during the initial ren",
+   "files": [
+    "ally-web/apps/ally-helpline-dashboard/src/routes/RouteLayout.tsx",
+    "ally-web/libs/ui-shared/src/lib/analytics/PageviewTracker.tsx",
+    "ally-web/apps/ally-helpline-dashboard/src/App.tsx",
+    "ally-web/apps/ally-helpline-dashboard/src/main.tsx"
+   ],
+   "signature": "21389b1402523983",
+   "source_run": "run-20261114-180045-514b1b",
+   "created_at": "2026-11-14T18:10:29+00:00",
+   "last_used_at": "2026-11-14T19:04:42+00:00",
+   "title": "Helpline app crashes on load: PageviewTracker calls useLocation before <Router> wraps it",
+   "root_cause": "Mounting PageviewTracker at RouteLayout.tsx:37-41 as a direct child that runs useLocation during initial render causes a crash when the component renders before Router context is available, triggering the Router-context invariant and tripping the app\u2019s ErrorBoundary.",
+   "fix_summary": "",
+   "status": "escalated",
+   "diagnosis": "wrong",
+   "fix_verdict": "none",
+   "verdict_reason": "Wrong place: useLocation() is called by the helpline app's PageviewTracker, which is mounted outside the Router; the fix belongs there, not in ui-shared.",
+   "finding": {
+    "app": "ally-web",
+    "title": "Helpline app crashes on load: PageviewTracker calls useLocation before <Router> wraps it",
+    "category": "crash",
+    "evidence": [
+     "apps/ally-helpline-dashboard/src/routes/RouteLayout.tsx:37-41 \u2014 <BrowserRouter> wraps the route tree and renders <PageviewTracker /> directly under it",
+     "libs/ui-shared/src/lib/analytics/PageviewTracker.tsx:3 \u2014 import { useLocation } from \"react-router-dom\";",
+     "libs/ui-shared/src/lib/analytics/PageviewTracker.tsx:14-20 \u2014 export function PageviewTracker() { const location = [redacted:location]]; ... useEffect(() => { capturePageview(location.pathname + location.search); }, ...); }",
+     "apps/ally-helpline-dashboard/src/App.tsx:25-27 \u2014 <ErrorBoundary variant=\"page\"><RouteLayout /></ErrorBoundary>",
+     "apps/ally-helpline-dashboard/src/components/error-boundary/ErrorBoundary.tsx:81-90 \u2014 ErrorBoundary renders children, but on error shows a full-page message (the reported \"Sorry \u2014 this page stopped working\")"
+    ],
+    "severity": "critical",
+    "hypothesis": "The helpline routes mount a PageviewTracker that uses the React Router useLocation hook. If PageviewTracker renders anywhere not wrapped by a Router, React throws \"useLocation() may be used only in the context of a <Router>\" and the root ErrorBoundary shows the app-level crash message. A refactor likely caused PageviewTracker to render before BrowserRouter is established (or during the initial render cycle before Router context is ready), so every page immediately errors after load.",
+    "suspected_files": [
+     "apps/ally-helpline-dashboard/src/routes/RouteLayout.tsx",
+     "libs/ui-shared/src/lib/analytics/PageviewTracker.tsx",
+     "apps/ally-helpline-dashboard/src/App.tsx",
+     "apps/ally-helpline-dashboard/src/main.tsx"
+    ]
+   }
+  },
+  {
+   "kind": "bugs",
+   "id": "bug-acfff91800",
+   "app": "ally-web",
+   "text": "WhatsApp bot Preview sends unbounded history; server rejects once >20 elements: The Preview tab constructs `history` by including all prior turns and sends it with each Ask. The backend enforces a maximum of 20 history elements; after about 10 user-assistant exchanges, `history` exceeds 20 and the server returns 'history must contain no more than 20 elements'. The UI thread still renders fine, but new messages fail due to the oversized history payload.",
+   "files": [
+    "ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx",
+    "ally-web/apps/ally-admin-dashboard/src/api/chatbots.ts",
+    "ally-web/apps/ally-admin-dashboard/src/types/chatbots.ts",
+    "ally-web/apps/ally-admin-dashboard/src/pages/AllyConsole/playgroundScenario.ts"
+   ],
+   "signature": "0bc395185a02455d",
+   "source_run": "run-20261114-181042-f3d8c3",
+   "created_at": "2026-11-14T18:50:14+00:00",
+   "last_used_at": "2026-11-14T19:07:15+00:00",
+   "title": "WhatsApp bot Preview sends unbounded history; server rejects once >20 elements",
+   "root_cause": "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx:61 \u2014 `history` is built from all previous turns without trimming to the server\u2019s 20-element limit before invoking the mutation at lines 65\u201372.",
+   "fix_summary": "The Preview was sending the full unbounded history to the test endpoint. I trimmed the history to the last 20 turns before sending, matching the backend\u2019s contract and fixing the overflow on long chats.",
+   "status": "suggested_fix",
+   "diagnosis": "correct",
+   "fix_verdict": "needed_edits",
+   "verdict_reason": "Send only the most recent 10 messages, the same window ally-be keeps, in a named constant; not the API's maximum of 20.",
+   "finding": {
+    "app": "ally-web",
+    "title": "WhatsApp bot Preview sends unbounded history; server rejects once >20 elements",
+    "category": "contract",
+    "evidence": [
+     "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx:61 \u2014 const history = turns.map(turn => ({ role: turn.role, content: turn.content }));",
+     "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx:65-72 \u2014 The test call includes the untrimmed `history` in the body: test({ id: bot.id, message: text, history, draft, checkAccess, conversationId }).",
+     "apps/ally-admin-dashboard/src/api/chatbots.ts:151-156 \u2014 testChatbot mutation posts the body as-given to /v1/chatbots/:id/test; no client-side trimming of history occurs.",
+     "apps/ally-admin-dashboard/src/types/chatbots.ts:204-215 \u2014 TestChatbotRequest defines `history?: ChatbotTestTurn[]`, which ChatbotTestTab builds from all prior turns (both roles).",
+     "apps/ally-admin-dashboard/src/pages/AllyConsole/playgroundScenario.ts:10-12 \u2014 Comment establishes backend contract: \"ally-be keeps only the last 20 turns of history.\" with PLAYGROUND_HISTORY_MAX = 20.",
+     "apps/ally-admin-dashboard/src/pages/AllyConsole/playgroundScenario.ts:45 \u2014 historyFor(...) returns history.slice(-PLAYGROUND_HISTORY_MAX), showing the intended trimming pattern in a similar preview feature."
+    ],
+    "severity": "medium",
+    "hypothesis": "The Preview tab constructs `history` by including all prior turns and sends it with each Ask. The backend enforces a maximum of 20 history elements; after about 10 user-assistant exchanges, `history` exceeds 20 and the server returns 'history must contain no more than 20 elements'. The UI thread still renders fine, but new messages fail due to the oversized history payload.",
+    "suspected_files": [
+     "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx",
+     "apps/ally-admin-dashboard/src/api/chatbots.ts",
+     "apps/ally-admin-dashboard/src/types/chatbots.ts",
+     "apps/ally-admin-dashboard/src/pages/AllyConsole/playgroundScenario.ts"
+    ]
+   }
+  },
+  {
+   "kind": "run_stats",
+   "id": "rs-d3993d58c8",
+   "app": "global",
+   "text": "commit_sweep/sweep",
+   "files": [],
+   "signature": "commit_sweep/sweep",
+   "source_run": "",
+   "created_at": "2026-11-14T18:50:48+00:00",
+   "last_used_at": null,
+   "key": "commit_sweep/sweep",
+   "diagnoses": 1,
+   "diagnosis_correct": 0,
+   "not_a_bug": 1,
+   "fixes": 0,
+   "fix_worked": 0,
+   "fix_needed_edits": 0
+  },
+  {
+   "kind": "wrong_theories",
+   "id": "wt-2e0ca06287",
+   "app": "ally-be",
+   "text": "Prompt translation fails for some languages with a token-mismatch error: the translated text is rejected because required tokens such as {name} and [laughs] are reported missing, even though the translator kept them in the output. Users of those languages then see the English prompt text instead of their selected language. | wrong theory: Prompt translation validator rejects preserved tokens in some languages due to ASCII-only regex (misses tokens with invisible Unicode marks) | why: Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B), e.g. {\u200bname\u200b}; fullwidth brackets are not involved.",
+   "files": [
+    "ally-be/src/prompt/util/translation-token-guard.util.ts",
+    "ally-be/src/prompt/service/prompt-translation.service.ts",
+    "ally-be/src/prompts/agent_template_translation.txt"
+   ],
+   "signature": "",
+   "source_run": "run-20261114-174534-a9d4fc",
+   "created_at": "2026-11-14T18:50:49+00:00",
+   "last_used_at": "2026-11-14T18:52:12+00:00",
+   "title": "Prompt translation validator rejects preserved tokens in some languages due to ASCII-only regex (misses tokens with invisible Unicode marks)",
+   "theory": "Prompt translation validator rejects preserved tokens in some languages due to ASCII-only regex (misses tokens with invisible Unicode marks): Some target-language outputs (notably RTL locales) include invisible Unicode directionality/formatting marks inside preserved tokens, e.g. {\u200ename\u200e} or [l\u200eaughs]. The token guard\u2019s regexes only accept ASCII letters/digits/underscore for placeholders and a\u2013z/digits/[_-] for audio tags, and they do not (root cause claimed: translation-token-guard.util.ts:18-20 \u2014 The placeholder/audio-tag extractors use ASCII-only character classes and don\u2019t strip or tolerate zero-width Unicode formatting/directionality marks inside toke)",
+   "reason": "Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B), e.g. {\u200bname\u200b}; fullwidth brackets are not involved."
+  },
+  {
+   "kind": "conventions",
+   "id": "cv-e728a0785a",
+   "app": "ally-be",
+   "text": "Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B), e.g. {\u200bname\u200b}; fullwidth brackets are not involved.",
+   "files": [],
+   "signature": "",
+   "source_run": "run-20261114-174534-a9d4fc",
+   "created_at": "2026-11-14T18:50:49+00:00",
+   "last_used_at": null,
+   "status": "pending",
+   "count": 1,
+   "sources": [
+    "run-20261114-174534-a9d4fc"
+   ]
+  },
+  {
+   "kind": "fragile_areas",
+   "id": "fr-c2841ffd0f",
+   "app": "ally-be",
+   "text": "ally-be/src/prompt/util/translation-token-guard.util.ts: fix wrong",
+   "files": [
+    "ally-be/src/prompt/util/translation-token-guard.util.ts"
+   ],
+   "signature": "",
+   "source_run": "run-20261114-174534-a9d4fc",
+   "created_at": "2026-11-14T18:50:49+00:00",
+   "last_used_at": null,
+   "count": 1,
+   "reasons": [
+    "Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B), e.g. {\u200bname\u200b}; fullwidth brackets are not involved."
+   ]
+  },
+  {
+   "kind": "run_stats",
+   "id": "rs-d658e87185",
+   "app": "global",
+   "text": "issue/issue",
+   "files": [],
+   "signature": "issue/issue",
+   "source_run": "",
+   "created_at": "2026-11-14T18:50:50+00:00",
+   "last_used_at": null,
+   "key": "issue/issue",
+   "diagnoses": 3,
+   "diagnosis_correct": 1,
+   "not_a_bug": 0,
+   "fixes": 2,
+   "fix_worked": 0,
+   "fix_needed_edits": 1
+  },
+  {
+   "kind": "wrong_theories",
+   "id": "wt-c893a95475",
+   "app": "ally-web",
+   "text": "helpline-v1.50.3 shows 'Sorry \u2014 this page stopped working' on every page right after load. The browser console says: useLocation() may be used only in the context of a <Router> component. The admin dashboard is unaffected. | wrong theory: Helpline app crashes on load: PageviewTracker calls useLocation before <Router> wraps it | why: Wrong place: useLocation() is called by the helpline app's PageviewTracker, which is mounted outside the Router; the fix belongs there, not in ui-shared.",
+   "files": [
+    "ally-web/apps/ally-helpline-dashboard/src/routes/RouteLayout.tsx",
+    "ally-web/libs/ui-shared/src/lib/analytics/PageviewTracker.tsx",
+    "ally-web/apps/ally-helpline-dashboard/src/App.tsx",
+    "ally-web/apps/ally-helpline-dashboard/src/main.tsx"
+   ],
+   "signature": "",
+   "source_run": "run-20261114-180045-514b1b",
+   "created_at": "2026-11-14T18:50:51+00:00",
+   "last_used_at": "2026-11-14T19:04:46+00:00",
+   "title": "Helpline app crashes on load: PageviewTracker calls useLocation before <Router> wraps it",
+   "theory": "Helpline app crashes on load: PageviewTracker calls useLocation before <Router> wraps it: The helpline routes mount a PageviewTracker that uses the React Router useLocation hook. If PageviewTracker renders anywhere not wrapped by a Router, React throws \"useLocation() may be used only in the context of a <Router>\" and the root ErrorBoundary shows the app-level crash message. A refactor li (root cause claimed: Mounting PageviewTracker at RouteLayout.tsx:37-41 as a direct child that runs useLocation during initial render causes a crash when the component renders before Router context is available, triggering)",
+   "reason": "Wrong place: useLocation() is called by the helpline app's PageviewTracker, which is mounted outside the Router; the fix belongs there, not in ui-shared."
+  },
+  {
+   "kind": "fragile_areas",
+   "id": "fr-fe0a44e1df",
+   "app": "ally-web",
+   "text": "ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx: fix needed edits",
+   "files": [
+    "ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx"
+   ],
+   "signature": "",
+   "source_run": "run-20261114-181042-f3d8c3",
+   "created_at": "2026-11-14T18:50:52+00:00",
+   "last_used_at": null,
+   "count": 1,
+   "reasons": [
+    "Send only the most recent 10 messages, the same window ally-be keeps, in a named constant; not the API's maximum of 20."
+   ]
+  },
+  {
+   "kind": "conventions",
+   "id": "cv-c31111ad1c",
+   "app": "ally-web",
+   "text": "Send only the most recent 10 messages, the same window ally-be keeps, in a named constant; not the API's maximum of 20.",
+   "files": [],
+   "signature": "",
+   "source_run": "run-20261114-181042-f3d8c3",
+   "created_at": "2026-11-14T18:50:53+00:00",
+   "last_used_at": null,
+   "status": "approved",
+   "count": 1,
+   "sources": [
+    "run-20261114-181042-f3d8c3"
+   ]
+  },
+  {
+   "kind": "bugs",
+   "id": "bug-88c2b0aba0",
+   "app": "ally-be",
+   "text": "Prompt translation token guard rejects preserved tokens with zero\u2011width spaces, causing false token-mismatch and English fallback: Some target-language translations preserve tokens like {name} and [laughs] but wrap them with zero\u2011width spaces (e.g., U+200B) or insert them inside the token text (e.g., {\u200bname\u200b}, [l\u200baughs]). The token guard\u2019s extractors only accept ASCII letters/digits/underscore for placeholders and lowercase a\u2013z/digits/[_-] for audio tags, and they do not tolerate zero\u2011width Unicode marks inside the token. As ",
+   "files": [
+    "ally-be/src/prompt/util/translation-token-guard.util.ts",
+    "ally-be/src/prompt/service/prompt-translation.service.ts"
+   ],
+   "signature": "20d66c93a5eadd99",
+   "source_run": "run-20261114-185206-b6c81b",
+   "created_at": "2026-11-14T19:04:20+00:00",
+   "last_used_at": null,
+   "title": "Prompt translation token guard rejects preserved tokens with zero\u2011width spaces, causing false token-mismatch and English fallback",
+   "root_cause": "ASCII-only regexes in the token guard do not handle zero\u2011width Unicode characters inside tokens: PLACEHOLDER_RE and AUDIO_TAG_RE at ally-be/src/prompt/util/translation-token-guard.util.ts:18-20 fail to match tokens like {\u200bname\u200b} or [l\u200baughs], causing false negatives in validation.",
+   "fix_summary": "The guard missed preserved tokens when translators inserted zero\u2011width characters inside them. I now strip common zero\u2011width Unicode chars before applying the existing regexes in extractPlaceholders and extractAudioTags, so tokens like {\u200bname\u200b} and [l\u200baughs] are recognized without changing other behavior.",
+   "status": "suggested_fix",
+   "diagnosis": null,
+   "fix_verdict": null,
+   "verdict_reason": "",
+   "finding": {
+    "app": "ally-be",
+    "title": "Prompt translation token guard rejects preserved tokens with zero\u2011width spaces, causing false token-mismatch and English fallback",
+    "category": "logic",
+    "evidence": [
+     "ally-be/src/prompt/util/translation-token-guard.util.ts:18 \u2014 PLACEHOLDER_RE only matches ASCII letters/digits/underscore inside braces: const PLACEHOLDER_RE = /\\{\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\}/g;",
+     "ally-be/src/prompt/util/translation-token-guard.util.ts:19 \u2014 AUDIO_TAG_RE only matches ASCII lowercase letters/digits/_/- inside brackets: const AUDIO_TAG_RE = /\\[\\s*([a-z][a-z0-9_-]*)\\s*\\]/gi;",
+     "ally-be/src/prompt/util/translation-token-guard.util.ts:39-41 \u2014 extractPlaceholders uses PLACEHOLDER_RE; any placeholder not matching that strict ASCII pattern (e.g. with zero-width spaces inside) is omitted.",
+     "ally-be/src/prompt/util/translation-token-guard.util.ts:48-50 \u2014 extractAudioTags uses AUDIO_TAG_RE; tags with zero-width spaces inside the name are omitted.",
+     "ally-be/src/prompt/util/translation-token-guard.util.ts:83-102 \u2014 validateTranslationTokens compares extracted tokens from source vs output; missing/added tokens make ok=false, triggering a token-mismatch error.",
+     "ally-be/src/prompt/service/prompt-translation.service.ts:492-501 \u2014 After translation, guard = validateTranslationTokens(body, output); only when guard.ok is true is the translation stored; otherwise lastError is set to a token mismatch summary.",
+     "ally-be/src/prompt/service/prompt-translation.service.ts:529-540 \u2014 After exhausting attempts, the row is marked FAILED and logs: '[TRANSLATION_FAILED] ... That language keeps serving English until it is retried.'",
+     "ally-be/src/prompt/service/prompt-translation.service.ts:276-284 \u2014 At runtime, a translation is served only if status is READY and hashes match; otherwise English remains (fresh && translatedPrompt check)."
+    ],
+    "severity": "medium",
+    "hypothesis": "Some target-language translations preserve tokens like {name} and [laughs] but wrap them with zero\u2011width spaces (e.g., U+200B) or insert them inside the token text (e.g., {\u200bname\u200b}, [l\u200baughs]). The token guard\u2019s extractors only accept ASCII letters/digits/underscore for placeholders and lowercase a\u2013z/digits/[_-] for audio tags, and they do not tolerate zero\u2011width Unicode marks inside the token. As a result, the preserved tokens are not recognized, validateTranslationTokens reports them as missing/added, the translation is marked FAILED, and runtime falls back to English for those languages.",
+    "suspected_files": [
+     "ally-be/src/prompt/util/translation-token-guard.util.ts",
+     "ally-be/src/prompt/service/prompt-translation.service.ts"
+    ]
+   }
+  },
+  {
+   "kind": "bugs",
+   "id": "bug-77442f3be1",
+   "app": "ally-web",
+   "text": "WhatsApp bot Preview sends unbounded history to test endpoint; server rejects when >20 elements: The Preview tab constructs the `history` payload for each new test message from the entire `turns` array without limiting its length. The backend enforces a maximum of 20 elements for the `history` field; once the conversation exceeds that, subsequent test calls are rejected with 'history must contain no more than 20 elements', even though the on-screen thread still renders. Resetting the thread (",
+   "files": [
+    "ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx"
+   ],
+   "signature": "3925bffc67bce335",
+   "source_run": "run-20261114-190712-e018bf",
+   "created_at": "2026-11-14T19:15:04+00:00",
+   "last_used_at": null,
+   "title": "WhatsApp bot Preview sends unbounded history to test endpoint; server rejects when >20 elements",
+   "root_cause": "ChatbotTestTab.tsx:61 builds `history` from all previous `turns` without trimming to the server\u2019s 20-element limit before calling the test mutation.",
+   "fix_summary": "",
+   "status": "escalated",
+   "diagnosis": null,
+   "fix_verdict": null,
+   "verdict_reason": "",
+   "finding": {
+    "app": "ally-web",
+    "title": "WhatsApp bot Preview sends unbounded history to test endpoint; server rejects when >20 elements",
+    "category": "contract",
+    "evidence": [
+     "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx:41 \u2014 const [turns, setTurns] = useState<Turn[]>([]); (the test chat\u2019s accumulated turns)",
+     "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx:58-63 \u2014 send(): builds `history` from all `turns` and appends the new user turn; no trimming is applied",
+     "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx:61 \u2014 const history = turns.map(turn => ({ role: turn.role, content: turn.content })); (maps every prior turn, unbounded)",
+     "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx:65-72 \u2014 invokes useTestChatbotMutation with { message, history, draft, checkAccess, conversationId } (sends untrimmed history to the server)",
+     "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx:75 \u2014 setTurns(current => [...current, { role: \"assistant\", content: result.reply, result }]); (turns keeps growing, so subsequent sends include ever-longer history)"
+    ],
+    "severity": "medium",
+    "hypothesis": "The Preview tab constructs the `history` payload for each new test message from the entire `turns` array without limiting its length. The backend enforces a maximum of 20 elements for the `history` field; once the conversation exceeds that, subsequent test calls are rejected with 'history must contain no more than 20 elements', even though the on-screen thread still renders. Resetting the thread (New thread) avoids the error because it clears `turns`.",
+    "suspected_files": [
+     "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx"
+    ]
+   }
+  }
+ ]
+}

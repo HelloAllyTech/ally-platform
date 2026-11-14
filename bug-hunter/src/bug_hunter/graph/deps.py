@@ -80,6 +80,18 @@ class GraphDeps:
             return ""
         return self.config.app(self.app).path
 
+    def read_at_base(self, repo_rel: str) -> str | None:
+        """A repo-relative file at the run's base commit, never the fix's edits
+        (``learn`` fingerprints what a later run will see before any fix)."""
+        if self.git is None:
+            return self.read_at_ref(repo_rel)
+        try:
+            return self.git._git(
+                ["show", f"{self.ref or 'HEAD'}:{repo_rel}"], cwd=self.worktree
+            ).stdout
+        except Exception:  # noqa: BLE001 - absent at the base commit
+            return None
+
     def read_at_ref(self, repo_rel: str) -> str | None:
         """A repo-relative file as this run's worktree has it (fingerprints)."""
         path = self.worktree / repo_rel

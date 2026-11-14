@@ -112,7 +112,7 @@ What it shows:
    Fingerprints were taken at the case commit, holdout was never involved, and nothing
    touched live memory.
 
-### First follow-up: built 2026-11-14 (offline), re-check pending
+### First follow-up: built 2026-11-14, re-checked (run 43622436211)
 
 The user's rule for a matching past bug record (enforced in triage code, one test per
 row in `tests/test_memory_rows.py`):
@@ -133,6 +133,41 @@ Recall: similarity only ranks. A record is recalled only with a matching signatu
 shared file, or a word overlap of at least `memory.min_word_overlap` (0.1; in the
 2026-11-14 check, related pairs scored 0.19–0.64 and unrelated ones at most 0.05).
 Capped at 5 records per query. Bug records now store the finding and the verdict reason.
+
+### Re-check results (run 43622436211, 2026-11-14, $3.17, 94 min)
+
+Report: `bug-hunter/evals/results/20261114-174523-memory-check.md`.
+
+| Case | Expected row | Row applied | Pass 2 recalled | Pass 1 → pass 2 (oracle) |
+|---|---|---|---|---|
+| ally-ai-6e81b510 (sweep) | none: pass 1 had no finding | none | – | no bug → no bug (the false-alarm close is still unexercised by a paid run) |
+| ally-be-89d8e055 | 5 not shown | 5: the pass 1 bug record was not shown | wt-2e0c… (the wrong theory) | suggested fix, "invisible marks / ASCII regex" (fail) → suggested fix, **zero-width spaces** stripped before matching (fail) |
+| ally-web-eebbfd01 | 5 not shown | 5 | wt-c893… | escalated, could not reproduce (finding: PageviewTracker calls useLocation outside the Router) → **closed as no bug** |
+| ally-web-9299e9aa | 3 reuse | **2 possible regression** | bug-acff… (triage and investigate) | suggested fix, 20 (fail) → escalated: the repro test could not be run 3 times |
+
+What it shows:
+
+- **Rows 5 and the evidence rule work.** Bug records judged wrong were hidden, each
+  case recalled only its own wrong theory, and no unrelated records appeared (pass 1
+  had cross-recall last time).
+- **89d8e055: the wrong theory changed the diagnosis to the real cause.** The pass 2
+  patch strips zero-width characters before matching. It still fails the oracle,
+  because the oracle also tests a new exported `normaliseTranslationTokens` (the real
+  fix's shape). The case should be `oracle_shape: true`, with human review of this
+  patch.
+- **eebbfd01: a wrong verdict poisoned memory.** Pass 1's finding was the right one this
+  time (PageviewTracker outside the Router). The simulated verdict, written for an
+  earlier run's ui-shared theory, called it wrong, and pass 2 then concluded "no bug".
+  So: a verdict must be judged against the run it is about (the mechanics check's
+  static verdicts cannot be), and one wrong verdict can suppress a correct diagnosis.
+  The dashboard in chunk 09 should show the run's finding next to the verdict form.
+- **9299e9aa: a bug in `learn` (fixed).** It fingerprinted the worktree after the fix had
+  been applied, so pass 2, on the same commit, saw "changed lines" and took row 2
+  instead of row 3. `learn` now fingerprints the base commit (`deps.read_at_base`), with
+  a test that failed before the fix. Row 2 then sent it to investigate, and the repro
+  test could not be run in the sandbox three times (an infra flake, unrelated to
+  memory).
+- Rows 1, 2 (genuine) and 4 have offline tests only.
 
 ### The proposal it replaced
 
