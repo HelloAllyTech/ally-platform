@@ -34,6 +34,22 @@ class AgentGateway(BaseModel):
     #: a validation error or a log line never shows it.
     token: SecretStr
     tools: List[str] = Field(default_factory=list, max_length=20)
+    #: The generated list tools (chunk 6): each becomes a gateway tool at run time.
+    definitions: List["ListToolDefinition"] = Field(default_factory=list, max_length=12)
+    #: List tools the bot has on that didn't fit under the cap; named in the trace.
+    omitted: List[str] = Field(default_factory=list, max_length=200)
+
+
+class ListToolDefinition(BaseModel):
+    """One generated list tool (chunk 6), as ally-be builds it from a list."""
+
+    name: str = Field(..., pattern=r"^(find|create|update)_[a-z0-9_]{1,40}$")
+    description: str = Field("", max_length=2000)
+    input_schema: Dict[str, Any] = Field(default_factory=dict)
+    kind: Literal["find", "create", "update"]
+
+
+AgentGateway.model_rebuild()
 
 
 class AgentRunRequest(KnowledgeAnswerRequest):
@@ -118,6 +134,13 @@ class AgentRunRequest(KnowledgeAnswerRequest):
         }
         if self.gateway:
             bot["gateway_tools"] = list(self.gateway.tools)
+            # Only when there are some, so a run without list tools is today's.
+            if self.gateway.definitions:
+                bot["gateway_definitions"] = [
+                    d.model_dump(mode="json") for d in self.gateway.definitions
+                ]
+            if self.gateway.omitted:
+                bot["gateway_omitted"] = list(self.gateway.omitted)
         return bot
 
     @field_validator("knowledge_topics")

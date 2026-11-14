@@ -157,8 +157,10 @@ def resolve_citations(
             continue
         seen.add(index)
         passage = passages[index - 1]
+        record = {"record_id": passage["record_id"]} if passage.get("record_id") else {}
         resolved.append(
             {
+                **record,
                 "passage_number": index,
                 "chunk_id": passage.get("chunk_id"),
                 "document_id": passage.get("document_id"),

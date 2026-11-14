@@ -47,6 +47,9 @@ class BotConfig(TypedDict, total=False):
     decline_text: Optional[str]
     # --- tool gateway (chunk 3b): the names ally-be offers, never its URL or token
     gateway_tools: List[str]
+    # --- list tools (chunk 6): their definitions, and the names left out by the cap
+    gateway_definitions: List[Dict[str, Any]]
+    gateway_omitted: List[str]
 
 
 class RunInput(TypedDict, total=False):

@@ -147,7 +147,10 @@ def format_purpose(
 
 
 def format_persona(
-    persona: Optional[Dict[str, Any]], prompts: Optional[Dict[str, Any]] = None
+    persona: Optional[Dict[str, Any]],
+    prompts: Optional[Dict[str, Any]] = None,
+    *,
+    lists: str = "",
 ) -> str:
     """
     Render a chatbot's persona as a block that goes AHEAD of the answer template.
@@ -160,9 +163,13 @@ def format_persona(
 
     Empty (no persona) renders as nothing, so a bot without one runs the template
     exactly as before.
+
+    `lists` is the agent's lists section (chunk 6), placed right after the purpose;
+    empty unless the run has list tools.
     """
-    if not persona:
+    if not persona and not lists:
         return ""
+    persona = persona or {}
     name = (persona.get("display_name") or "").strip()
     tone = (persona.get("tone") or "").strip()
     instructions = (persona.get("system_prompt") or "").strip()[
@@ -170,7 +177,7 @@ def format_persona(
     ]
     rules = (persona.get("safety_rules") or "").strip()
     purpose = format_purpose(persona, prompts)
-    if not (name or tone or instructions or rules or purpose):
+    if not (name or tone or instructions or rules or purpose or lists):
         return ""
 
     lines = ["# Who you are"]
@@ -192,6 +199,10 @@ def format_persona(
         # After the owner's instructions and before the safety rules: a purpose
         # shapes how the assistant uses what it knows, and safety still wins.
         lines.append(purpose)
+    if lists:
+        # How to use the business's lists (chunk 6): after the purpose, whose
+        # "never name a time" rule it replaces for an assistant that can book.
+        lines.append(lists)
     if rules:
         # Built by ally-be from the bot's safety pack, never from an editor's text; it
         # comes after the instructions so nothing in them can talk it away.

@@ -111,7 +111,9 @@ def traced(
             started = time.monotonic()
             update = await node(state)
             step = trace_step(name, started, f"{name}: {summary(state, update)}")
-            return {**update, "trace": [step]}
+            # A node may add steps of its own first (the agent's list of tools
+            # left out, chunk 6).
+            return {**update, "trace": [*(update.get("trace") or []), step]}
 
         return wrapper
 

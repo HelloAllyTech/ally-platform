@@ -21,6 +21,8 @@ from app.core.knowledge_agent.schemas import is_general
 from app.prompts.resolver import load_and_format
 
 AGENT_PROMPT_PATH = "agent/system"
+#: How to use the business's lists (chunk 6): only for a run with list tools.
+LISTS_PROMPT_PATH = "agent/lists"
 #: Characters of conversation the agent reads (v1 keeps 1,500 over six
 #: messages); ten messages of a WhatsApp chat fit.
 AGENT_HISTORY_CHARS = 3000
@@ -68,6 +70,9 @@ def format_searches(records: Sequence[Dict[str, Any]]) -> str:
         return "(none yet)"
     lines: List[str] = []
     for record in records:
+        if record.get("list_kind"):
+            lines.append(_format_list_call(record))
+            continue
         if record.get("kind") == "gateway":
             done = (
                 "done"
@@ -86,14 +91,46 @@ def format_searches(records: Sequence[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _numbers(added: Sequence[int]) -> str:
+    if not added:
+        return ""
+    if len(added) == 1:
+        return f"passage {added[0]}"
+    return f"passages {added[0]}–{added[-1]}"
+
+
+def _format_list_call(record: Dict[str, Any]) -> str:
+    """What a list tool did (chunk 6): what a find found, a write done, or a
+    refusal's reason and its alternatives. A failure is shown as not done."""
+    tool = f"- `{record.get('tool')}`"
+    added = record.get("added") or []
+    if not record.get("ok"):
+        message = record.get("message")
+        if message:
+            line = f"{tool}: refused ({message}), not done"
+            return f"{line}; alternatives → {_numbers(added)}" if added else line
+        return f"{tool}: failed ({record.get('error') or 'error'}), not done"
+    if record.get("list_kind") != "find":
+        return f"{tool}: done → {_numbers(added)}" if added else f"{tool}: done"
+    aggregate = record.get("aggregate")
+    if aggregate:
+        kind = str(aggregate.get("kind") or "")
+        what = "count" if kind == "count" else kind.replace("sum:", "total of ")
+        return f"{tool}: {what} = {aggregate.get('value')}"
+    total = record.get("total")
+    found = f"{total} found" if isinstance(total, int) else f"{len(added)} found"
+    return f"{tool}: {found} → {_numbers(added)}" if added else f"{tool}: none found"
+
+
 def format_tools(tools: Sequence[Tool]) -> str:
     """Each tool's name, what it does and its input fields: the step schema's fields."""
     if not tools:
         return "(no tools left: reply now with what you have)"
     blocks: List[str] = []
     for tool in tools:
+        # A list tool's fields go by their alias, the list's own keys (chunk 6).
         fields = ", ".join(
-            f"`{name}`: {info.description or name}"
+            f"`{info.alias or name}`: {info.description or info.alias or name}"
             for name, info in tool.input_model.model_fields.items()
         )
         blocks.append(f"- `{tool.name}`: {tool.description} Input: {fields}.")
@@ -115,6 +152,7 @@ def build_agent_prompt(
     max_chars: int = 1400,
     persona: Optional[Dict[str, Any]] = None,
     prompts: Optional[Dict[str, Any]] = None,
+    lists: bool = False,
 ) -> str:
     """The agent step's prompt. Empty when the template is missing (the caller
     refuses to run unguided)."""
@@ -141,4 +179,8 @@ def build_agent_prompt(
         return body
     # The persona goes first, fenced and ranked below the rules that follow, as in
     # v1's answer prompt.
-    return format_persona(persona, prompts) + body
+    # With list tools (chunk 6), the lists section follows the purpose.
+    section = (
+        load_and_format(LISTS_PROMPT_PATH, prompts=prompts).strip() if lists else ""
+    )
+    return format_persona(persona, prompts, lists=section) + body

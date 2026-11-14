@@ -95,7 +95,10 @@ def offers_booking(sentence: str) -> bool:
 
 def _trim_booking_offers(verdict: Verdict, ctx: CheckContext) -> None:
     """The assistant can't book, so it never offers to (chunk 20a-2). The sentence
-    is trimmed, not sent back; if nothing would be left, the reply stays."""
+    is trimmed, not sent back; if nothing would be left, the reply stays. An
+    assistant with a create tool can book (chunk 6): nothing is trimmed."""
+    if ctx.can_book:
+        return
     if offers_booking(verdict.answer):
         verdict.answer = (
             without_sentences(verdict.answer, lambda s: not offers_booking(s))
@@ -137,13 +140,29 @@ def _send_back_slot_offers(verdict: Verdict, ctx: CheckContext) -> None:
     """A Bring in customers assistant can't see or hold appointments, so it never
     presents a time as free, as a slot or as booked (chunk 20a-2). Sent back once to
     be rewritten; the sentence is taken out meanwhile, so a reply with no time left
-    for a rewrite goes out without it (and says the team will confirm)."""
+    for a rewrite goes out without it (and says the team will confirm). An
+    assistant with a create tool can (chunk 6): `_send_back_unfound_slots` instead."""
+    if ctx.can_book:
+        return
     if ctx.purpose != "enquiries" or not offers_slot(verdict.answer):
         return
     kept = without_sentences(verdict.answer, lambda s: not offers_slot(s))
     verdict.answer = f"{kept} {TEAM_WILL_CONFIRM}".strip()
     if verdict.rejection is None:
         verdict.rejection, verdict.keeps_text = Rejection.OFFERS_SLOT, True
+
+
+def _send_back_unfound_slots(verdict: Verdict, ctx: CheckContext) -> None:
+    """An assistant that can book (chunk 6) may name a time as free or booked only
+    from its lists: the reply must cite a record a list tool returned. Otherwise
+    the sentence is taken out and the draft sent back once, to look it up first."""
+    if not ctx.can_book or not offers_slot(verdict.answer):
+        return
+    if any(citation.get("record_id") for citation in verdict.citations):
+        return
+    verdict.answer = without_sentences(verdict.answer, lambda s: not offers_slot(s))
+    if verdict.rejection is None:
+        verdict.rejection, verdict.keeps_text = Rejection.UNFOUND_SLOT, True
 
 
 def _trim_repeated_crisis_wording(verdict: Verdict, ctx: CheckContext) -> None:
@@ -197,6 +216,7 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _trim_repeated_topic_list,
     _trim_booking_offers,
     _send_back_slot_offers,
+    _send_back_unfound_slots,
     _cut_source_phrases,
     _flag_source_talk,
     _decline_if_nothing_left,

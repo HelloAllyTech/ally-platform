@@ -655,6 +655,21 @@ class AgentPurposeEnquiriesInputs(PromptInputs):
     )
 
 
+class AgentListsInputs(PromptInputs):
+    """`agent/lists.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_lists",
+        name="Chatbot Agent: Lists",
+        description=(
+            "How the assistant uses the business's lists through its find_, create_ "
+            "and update_ tools: look before claiming, book only once confirmed, cite "
+            "what the tools return (chunk 6). Only for a run with list tools; placed "
+            "after the purpose section."
+        ),
+    )
+
+
 class AgentPurposeTrainingInputs(PromptInputs):
     """`agent/purpose_training.txt`."""
 

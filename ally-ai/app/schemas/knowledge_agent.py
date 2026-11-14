@@ -8,7 +8,7 @@ owns the retrieval and the wording.
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, model_serializer
 
 from app.core.knowledge_agent.schemas import AnswerIntent, AnswerMode, DeclineReason
 from app.schemas.knowledge_chunk import AudienceSelector
@@ -189,6 +189,20 @@ class Citation(BaseModel):
     section_path: str
     source_url: str
     similarity: float
+    #: A list record's id (chunk 6): the passage was a record, not a document
+    #: chunk. `document_title` is the list, `section_path` the record's title.
+    record_id: Optional[str] = None
+
+    @model_serializer(mode="wrap")
+    def _record_id_only_when_set(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> Dict[str, Any]:
+        """`record_id` is sent only for a record, so a document citation is
+        exactly what it was before chunk 6."""
+        data = handler(self)
+        if data.get("record_id") is None:
+            data.pop("record_id", None)
+        return data
 
 
 class RetrievalMeta(BaseModel):

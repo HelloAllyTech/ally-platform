@@ -48,6 +48,7 @@ def check_reply(
     decline_text: Optional[str] = None,
     avoid_topics: Sequence[str] = (),
     purpose: Optional[str] = None,
+    can_book: bool = False,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -74,6 +75,7 @@ def check_reply(
         decline_text=(decline_text or "").strip(),
         avoid_topics=tuple(avoid_topics),
         purpose=purpose,
+        can_book=can_book,
     )
     verdict = _read_draft(step, ctx)
     _ground(verdict, step, ctx)

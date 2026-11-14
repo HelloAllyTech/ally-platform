@@ -21,7 +21,7 @@ from app.core.agent_runtime.budget import (
 from app.core.agent_runtime.schemas import REPLY_ACTION
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import gateway_tools, search_tools
-from app.core.agent_runtime.trace import Node, StatusCode, traced
+from app.core.agent_runtime.trace import Node, StatusCode, trace_step, traced
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
@@ -55,21 +55,33 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
                 "revisions": 0,
                 "started_at": time.time(),
             }
+            omitted = bot.get("gateway_omitted") or []
+            if omitted:
+                # List tools over the cap of 12 (chunk 6), named once per run.
+                start["trace"] = [
+                    trace_step(
+                        "tools",
+                        time.monotonic(),
+                        "list tools left out (over 12): " + ", ".join(omitted),
+                    )
+                ]
         budget = search_budget(state)
         # Past the caps the schema itself offers only `reply`. Searches keep their
         # own limit; gateway tools (chunk 3b) are offered while a tool step of any
         # kind fits, and only when ally-be's request named them.
         offered_searches = search_tools(bot) if budget > 0 else []
-        # Each gateway tool at most once a run: one that failed is shown as not
-        # done, and calling it again would only spend the run's time (each call
-        # may wait 5 s) and run it past its cap.
-        called = {
+        # A gateway tool that failed isn't offered again this run: it's shown as
+        # not done, and calling it again would only spend the run's time (each
+        # call may wait 5 s) and run it past its cap. One that succeeded may run
+        # again within the step cap (chunk 6): find can look at Thursday, then
+        # Friday. `hand_over` ends the run when it succeeds.
+        failed = {
             call.get("tool")
             for call in state.get("tool_calls") or []
-            if not is_search(call)
+            if not is_search(call) and not call.get("ok")
         }
         offered_gateway = (
-            [tool for tool in gateway_tools(bot) if tool.name not in called]
+            [tool for tool in gateway_tools(bot) if tool.name not in failed]
             if steps_left(state)
             else []
         )

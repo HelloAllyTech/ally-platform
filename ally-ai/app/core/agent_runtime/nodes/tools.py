@@ -66,7 +66,9 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             )
             records.append(json_safe(result.record))
             summary = result.summary
-            added = []
+            # A list tool's records (chunk 6) join the run's passages, numbered
+            # after them, citable; they are not searches.
+            added = json_safe(result.passages)
             if tool.ends_run and result.record.get("ok"):
                 update = {
                     "result": json_safe(_handover_result(service, state, step, tool))

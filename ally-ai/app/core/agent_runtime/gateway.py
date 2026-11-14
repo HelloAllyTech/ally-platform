@@ -76,7 +76,14 @@ class AgentGatewayClient:
         if body["ok"]:
             result = body.get("result")
             return {"ok": True, "result": result if isinstance(result, dict) else {}}
-        return {"ok": False, "error": str(body.get("error") or "failed")[:64]}
+        failed: Dict[str, Any] = {
+            "ok": False,
+            "error": str(body.get("error") or "failed")[:64],
+        }
+        # A list refusal (chunk 6) carries its message and alternatives.
+        if isinstance(body.get("result"), dict):
+            failed["result"] = body["result"]
+        return failed
 
     async def aclose(self) -> None:
         await self._client.aclose()
