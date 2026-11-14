@@ -154,6 +154,10 @@ def build_agent_prompt(
     prompts: Optional[Dict[str, Any]] = None,
     lists: bool = False,
     today: str = "",
+    memory: str = "",
+    history_lead: str = "",
+    can_book: bool = False,
+    channel: Optional[str] = None,
 ) -> str:
     """The agent step's prompt. Empty when the template is missing (the caller
     refuses to run unguided)."""
@@ -162,10 +166,13 @@ def build_agent_prompt(
         prompts=prompts,
         message=message.strip(),
         passages=format_passages(passages),
-        history=format_history(
-            history,
-            max_turns=settings.AGENT_RUNTIME.MAX_HISTORY_MESSAGES,
-            max_chars=AGENT_HISTORY_CHARS,
+        history=_with_lead(
+            history_lead,
+            format_history(
+                history,
+                max_turns=settings.AGENT_RUNTIME.MAX_HISTORY_MESSAGES,
+                max_chars=AGENT_HISTORY_CHARS,
+            ),
         ),
         feedback=format_feedback(feedback),
         answer_scope=format_answer_scope(answer_mode),
@@ -186,4 +193,22 @@ def build_agent_prompt(
         if lists
         else ""
     )
-    return format_persona(persona, prompts, lists=section) + body
+    # Memory (chunk 8a) follows the lists; Bring in customers' booking variant is
+    # chosen when the run can book.
+    return (
+        format_persona(
+            persona,
+            prompts,
+            lists=section,
+            memory=memory,
+            can_book=can_book,
+            channel=channel,
+        )
+        + body
+    )
+
+
+def _with_lead(lead: str, history: str) -> str:
+    """The person's name and this chat's summary ahead of the last messages (chunk
+    8a); the history exactly as today when there's neither."""
+    return f"{lead}\n{history}" if lead else history

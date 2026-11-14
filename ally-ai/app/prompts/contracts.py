@@ -673,6 +673,85 @@ class AgentListsInputs(PromptInputs):
     today: str
 
 
+class AgentPurposeEnquiriesCanBookInputs(PromptInputs):
+    """`agent/purpose_enquiries_can_book.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_enquiries_can_book",
+        name="Chatbot Agent: Purpose, Bring in Customers (can book)",
+        description=(
+            'The "Bring in customers" purpose for an assistant that can book: it books '
+            "under the lists rules, asks for a name once and only when it isn't known, "
+            "and still passes on what the lists can't do (chunk 8a). Chosen in code "
+            "when the run offers a create_ tool; otherwise the plain section is used."
+        ),
+    )
+
+    #: Where the chat is: "WhatsApp" or "the website".
+    channel: str
+
+
+class AgentMemoryInputs(PromptInputs):
+    """`agent/memory.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_memory",
+        name="Chatbot Agent: Memory",
+        description=(
+            "What the assistant knows about the person from earlier chats, and how it "
+            "uses and keeps those lines with `remember` (chunk 8a). Only when the "
+            "bot's memory is on; placed after the lists section and before the safety "
+            "rules."
+        ),
+    )
+
+    #: The person's memory lines, rendered by ally-be ("m1 (12 Nov): ...").
+    lines: str
+    #: The bot's never-store list, one per line.
+    never_store: str
+
+
+class MemoryCheckInputs(PromptInputs):
+    """`memory/check.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_memory_check",
+        name="Chatbot Memory: Health Check",
+        description=(
+            "On a health, pharmacy or mental-health assistant, decides which memory "
+            "lines are practical and non-clinical enough to keep (chunk 8a). ally-be "
+            "drops a line when this fails or times out."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    lines: str
+    never_store: str = ""
+
+
+class ConversationSummaryInputs(PromptInputs):
+    """`conversation/summary.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_conversation_summary",
+        name="Chatbot Conversation: Rolling Summary",
+        description=(
+            "Folds the messages leaving the assistant's 10-message window into the "
+            "chat's running summary, so a long chat keeps its start (chunk 8a). Runs "
+            "after the reply, never while someone waits."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    summary: str
+    messages: str
+    max_chars: int = 800
+    #: "yes" on a health, pharmacy or mental-health assistant, else "no".
+    health_service: str = "no"
+
+
 class AgentPurposeTrainingInputs(PromptInputs):
     """`agent/purpose_training.txt`."""
 

@@ -76,6 +76,7 @@ def build_response(state: AgentState, run_id: str) -> AgentRunResponse:
         **{**result, "retrieval": retrieval},
         run_id=run_id,
         trace=state.get("trace") or [],
+        memory_writes=state.get("memory_writes") or [],
     )
 
 

@@ -79,7 +79,13 @@ V1_PATH = "/api/v1/knowledge-agent/answer"
 V2_PATH = "/api/v1/agent/run"
 STREAM_PATH = "/api/v1/agent/run/stream"
 TIMEOUT_SECONDS = 90.0
-AGENT_ONLY_FIELDS = ("knowledge_topics", "decline_text")
+AGENT_ONLY_FIELDS = (
+    "knowledge_topics",
+    "decline_text",
+    "memory",
+    "summary",
+    "person_name",
+)
 LATENCY_BUDGET = 0.25
 OVERLAP_TARGET = 80.0
 

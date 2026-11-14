@@ -51,6 +51,10 @@ class BotConfig(TypedDict, total=False):
     gateway_definitions: List[Dict[str, Any]]
     gateway_omitted: List[str]
     gateway_today: str
+    # --- memory (chunk 8a): each only when present
+    memory: Dict[str, Any]  # {lines, never_store}
+    summary: str
+    person_name: str
 
 
 class RunInput(TypedDict, total=False):
@@ -90,6 +94,8 @@ class RunWorking(TypedDict, total=False):
     # The first draft as it would have gone out, when it was sent back for something
     # that still let it go out (agent_check.py).
     fallback_result: Optional[Dict[str, Any]]
+    # What the run asked to remember (chunk 8a): returned, never stored here.
+    memory_writes: List[Dict[str, Any]]
 
     # --- output: the `/knowledge-agent/answer` response, field for field
     result: Optional[Dict[str, Any]]

@@ -7,7 +7,7 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, Literal, Tuple, Union
 
-from app.core.agent_runtime import conversation
+from app.core.agent_runtime import conversation, memory
 from app.core.agent_runtime.budget import (
     MAX_TOOL_STEPS,
     MUST_SEARCH_AFTER,
@@ -122,8 +122,20 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             if _time_left(started_at) < REWRITE_RESERVE_SECONDS:
                 raise
             step, meta = await step_once(False)
+        # What the step asked to remember (chunk 8a): collected, returned with the
+        # result, never stored here. The trace gets counts, never the text.
+        writes = memory.collect(
+            state.get("memory_writes") or [], step, memory.remember_mode(bot)
+        )
+        added = writes[len(state.get("memory_writes") or []) :]
+        if added:
+            start["trace"] = [
+                *(start.get("trace") or []),
+                trace_step("remember", time.monotonic(), memory.trace_summary(added)),
+            ]
         return {
             **start,
+            "memory_writes": writes,
             "agent_step": json_safe(step),
             "agent_meta": json_safe(meta),
             "agent_calls": (state.get("agent_calls") or 0) + 1,

@@ -122,13 +122,34 @@ _FENCE = '"""'
 PURPOSES = ("answer", "enquiries", "training", "guide")
 
 
+def channel_words(channel: Optional[str]) -> str:
+    """Where the chat is, as the can-book section says it (chunk 8a)."""
+    return (
+        "WhatsApp" if (channel or "").strip().lower() == "whatsapp" else "the website"
+    )
+
+
 def format_purpose(
-    persona: Dict[str, Any], prompts: Optional[Dict[str, Any]] = None
+    persona: Dict[str, Any],
+    prompts: Optional[Dict[str, Any]] = None,
+    *,
+    can_book: bool = False,
+    channel: Optional[str] = None,
 ) -> str:
     """What the assistant is for: the purpose's seed section, or for "Something else"
     the owner's own description, fenced like their instructions. Empty when the bot
-    has no purpose, so bots made before purposes run exactly as before."""
+    has no purpose, so bots made before purposes run exactly as before.
+
+    `can_book` (the run offers a create tool) picks Bring in customers' booking
+    variant (chunk 8a), whose rules sit with the lists section's instead of against
+    them."""
     purpose = (persona.get("purpose") or "").strip()
+    if purpose == "enquiries" and can_book:
+        return load_and_format(
+            "agent/purpose_enquiries_can_book",
+            prompts=prompts,
+            channel=channel_words(channel),
+        ).strip()
     if purpose in PURPOSES:
         return load_and_format(f"agent/purpose_{purpose}", prompts=prompts).strip()
     note = (persona.get("purpose_note") or "").strip()[:600]
@@ -151,6 +172,9 @@ def format_persona(
     prompts: Optional[Dict[str, Any]] = None,
     *,
     lists: str = "",
+    memory: str = "",
+    can_book: bool = False,
+    channel: Optional[str] = None,
 ) -> str:
     """
     Render a chatbot's persona as a block that goes AHEAD of the answer template.
@@ -165,9 +189,10 @@ def format_persona(
     exactly as before.
 
     `lists` is the agent's lists section (chunk 6), placed right after the purpose;
-    empty unless the run has list tools.
+    empty unless the run has list tools. `memory` is what the assistant knows about
+    the person (chunk 8a), right after the lists; empty with memory off.
     """
-    if not persona and not lists:
+    if not persona and not lists and not memory:
         return ""
     persona = persona or {}
     name = (persona.get("display_name") or "").strip()
@@ -176,8 +201,8 @@ def format_persona(
         :MAX_PERSONA_PROMPT_CHARS
     ]
     rules = (persona.get("safety_rules") or "").strip()
-    purpose = format_purpose(persona, prompts)
-    if not (name or tone or instructions or rules or purpose or lists):
+    purpose = format_purpose(persona, prompts, can_book=can_book, channel=channel)
+    if not (name or tone or instructions or rules or purpose or lists or memory):
         return ""
 
     lines = ["# Who you are"]
@@ -203,6 +228,10 @@ def format_persona(
         # How to use the business's lists (chunk 6): after the purpose, whose
         # "never name a time" rule it replaces for an assistant that can book.
         lines.append(lists)
+    if memory:
+        # What the assistant knows about the person (chunk 8a): before the safety
+        # rules, which it never overrides.
+        lines.append(memory)
     if rules:
         # Built by ally-be from the bot's safety pack, never from an editor's text; it
         # comes after the instructions so nothing in them can talk it away.

@@ -82,6 +82,10 @@ class LLMTask(str, Enum):
     # iteration, on the bot's answer model. It reads the turn and writes its own
     # search queries, so these bots make no translate call.
     WHATSAPP_AGENT_STEP = "whatsapp_agent_step"
+    # Memory, light (chunk 8a): after the reply, never while someone waits. The
+    # check runs only for health packs; the summary once a chat passes 10 messages.
+    CHATBOT_MEMORY_CHECK = "chatbot_memory_check"
+    CHATBOT_CONVERSATION_SUMMARY = "chatbot_conversation_summary"
     # Text helpline copilot. Two labels because they differ in volume and shape: the
     # risk classifier runs on every talker message with a tiny output, the turn call
     # runs once per (debounced) talker turn and writes the suggestions. Must have the
