@@ -344,6 +344,7 @@ export const Scenario: FC = () => {
                   isStarting={isStartingSimulation}
                   title={scenario?.title || ""}
                   longDescription={scenario?.description || ""}
+                  descriptionAudioUrl={scenario?.descriptionAudioUrl}
                   maxTimeValue={scenario?.maxTimeValue}
                   onStart={onStartSimulationClick}
                   noCredits={buttonDisable}

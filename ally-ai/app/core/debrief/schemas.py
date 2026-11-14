@@ -1,8 +1,8 @@
-"""Shapes the debrief agent's AI steps exchange with ally-be's recipe runner.
+"""Shapes the debrief agent's AI steps exchange inside the Debrief graph.
 
-ally-be owns the run and stores every one of these in the run's workspace; the
-steps here are stateless. Field names are the wire names ally-be reads, so a
-rename here is a contract change on both sides.
+The graph keeps them in its state and step records and ally-be stores the
+result on the run; the steps here are stateless. Field names are the wire
+names ally-be reads, so a rename here is a contract change on both sides.
 """
 
 from __future__ import annotations
@@ -10,11 +10,9 @@ from __future__ import annotations
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+from pydantic.json_schema import SkipJsonSchema
 
-from app.core.debrief_quality.schemas import (
-    DimensionScore,
-    HardFailFinding,
-)
+from app.core.debrief_quality.schemas import DimensionScore, HardFailFinding
 from app.core.debrief_quality.schemas import RiskCue as JudgeRiskCue
 
 # --- Analyst: the evidence map ---------------------------------------------
@@ -43,6 +41,25 @@ class BehaviourEvidence(BaseModel):
         default=None, description="Exact words from that turn, as written."
     )
     note: str = Field(description="One sentence: what happened and why it mattered.")
+    coverage_category: Optional[
+        Literal["Listening Engagement", "Emotional Attunement", "Supportive Engagement"]
+    ] = Field(
+        default=None,
+        description=(
+            "Which of the three skill-coverage areas this behaviour belongs to: "
+            "Listening Engagement (listening and engaging with what the client "
+            "said), Emotional Attunement (recognising and responding to the "
+            "client's emotions) or Supportive Engagement (offering support and a "
+            "safe, non-judgmental space). Null if none fits."
+        ),
+    )
+    detector_agreement: Optional[Literal["agrees", "disagrees"]] = Field(
+        default=None,
+        description=(
+            "Only when LIVE DETECTIONS lists this skill: whether your reading "
+            "agrees with what the live detector recorded. Null otherwise."
+        ),
+    )
 
 
 class PivotalMoment(BaseModel):
@@ -63,6 +80,13 @@ class AiFault(BaseModel):
     )
 
 
+class EmotionLevel(BaseModel):
+    turn_index: int = Field(description="A CLIENT turn.")
+    level: int = Field(
+        ge=-5, le=5, description="-5 very distressed to +5 very positive."
+    )
+
+
 class EvidenceMap(BaseModel):
     behaviours: List[BehaviourEvidence] = Field(default_factory=list)
     pivotal_moments: List[PivotalMoment] = Field(default_factory=list)
@@ -70,6 +94,23 @@ class EvidenceMap(BaseModel):
     ai_faults: List[AiFault] = Field(default_factory=list)
     detected_language: str = Field(
         default="", description="ISO 639-1 code of the counsellor's main language."
+    )
+    # What today's debrief wrote and the new one now must (v9 FR-4): ally-be
+    # maps each turn to its message for the session's emotional movement.
+    emotional_movement: List[EmotionLevel] = Field(
+        default_factory=list,
+        description=(
+            "One entry per CLIENT turn: how the client feels at that turn, "
+            "-5 (very distressed) to +5 (very positive)."
+        ),
+    )
+    case_memory_update: Optional[str] = Field(
+        default=None,
+        description=(
+            "Only when CASE MEMORY is given: what the client now carries into "
+            "the next session of the case, integrating the earlier memory with "
+            "this session, about the client and the case only. Null otherwise."
+        ),
     )
 
 
@@ -90,7 +131,110 @@ class ProgressItem(BaseModel):
 
 
 class ProgressReading(BaseModel):
+    """The Writer's `progress` input. Since the progress agent (2026-11-13) it
+    is derived in code from the vetoed `ProgressReport`, so the Writer's
+    prompt is unchanged (`debrief_graph/progress.py`)."""
+
     items: List[ProgressItem] = Field(default_factory=list)
+
+
+# --- Progress agent (PROGRESS_CONTRACT.md §2) -----------------------------------
+
+ProgressTrend = Literal[
+    "more_consistent", "about_the_same", "worth_another_look", "too_early"
+]
+
+
+class ProgressEvidenceRef(BaseModel):
+    run_id: str = Field(
+        description=(
+            'The run_id of a past session in the profile, or "this" for this '
+            "session's evidence map."
+        )
+    )
+    turn_index: Optional[int] = Field(
+        default=None, description="The counsellor turn of that observation, if any."
+    )
+
+
+class ProgressSkill(BaseModel):
+    skill: str = Field(
+        description="A foundational skill key from SKILL KEYS (never 'other')."
+    )
+    trend: ProgressTrend
+    why: str = Field(
+        description=(
+            "For the Ally team: one or two sentences on what in the observations "
+            "supports the trend."
+        )
+    )
+    evidence: List[ProgressEvidenceRef] = Field(
+        default_factory=list,
+        description="The Analyst observations the trend rests on, oldest first.",
+    )
+    fhs: Literal["agrees", "disagrees", "absent"] = Field(
+        description=(
+            "Whether the Foundational Skills levels for this skill agree with the "
+            "trend; absent when there are none."
+        )
+    )
+    learner_line: str = Field(
+        description=(
+            "One warm, specific sentence to the learner in the SESSION LANGUAGE. "
+            "No scores, levels or numbers. Empty for too_early."
+        )
+    )
+
+
+class ProgressFollowup(BaseModel):
+    point: str = Field(description="A past debrief point, copied verbatim.")
+    status: Literal["done", "partly", "not_yet"]
+    evidence: List[ProgressEvidenceRef] = Field(default_factory=list)
+
+
+class ProgressFocus(BaseModel):
+    skill: str = Field(description="A foundational skill key from SKILL KEYS.")
+    why: str = Field(description="For the Ally team: why this is the focus now.")
+    learner_line: str = Field(
+        description=(
+            "One warm sentence to the learner in the SESSION LANGUAGE on what to "
+            "focus on next. No scores, levels or numbers."
+        )
+    )
+    practise_next: bool = Field(
+        description="True when a Practise next roleplay on this skill would help."
+    )
+
+
+class ProgressReport(BaseModel):
+    skills: List[ProgressSkill] = Field(
+        default_factory=list, description="At most 3 skills."
+    )
+    followups: List[ProgressFollowup] = Field(default_factory=list)
+    focus: Optional[ProgressFocus] = None
+    shown_as: Literal["line", "card"] = Field(
+        default="line", description='"card" only when CARD DUE is yes.'
+    )
+
+
+class ProgressCardSkill(BaseModel):
+    skill: str
+    trend: ProgressTrend
+    line: str
+
+
+class ProgressCardFocus(BaseModel):
+    skill: str
+    line: str
+
+
+class ProgressCard(BaseModel):
+    """`cards.progress_card`: attached in code at finish, never written by the
+    Writer or the Reviser."""
+
+    sessions: int
+    skills: List[ProgressCardSkill] = Field(default_factory=list)
+    focus: Optional[ProgressCardFocus] = None
 
 
 # --- Writer / Reviser: the cards ----------------------------------------------
@@ -167,6 +311,12 @@ class DebriefCards(BaseModel):
     skill_words: List[SkillWordItem] = Field(default_factory=list)
     reflective_question: str = ""
     progress_note: Optional[str] = None
+    # Attached in code after the Writer/Reviser loop (debrief_graph/progress.py),
+    # never asked of a model: hidden from the JSON schema the Writer and the
+    # Reviser answer in, and never dumped from their answers.
+    progress_card: SkipJsonSchema[Optional[ProgressCard]] = Field(
+        default=None, exclude=True
+    )
 
 
 # --- Evaluator ------------------------------------------------------------------
@@ -188,3 +338,119 @@ class EvaluationOutput(BaseModel):
     dimensions: List[DimensionScore]
     hard_fails: List[HardFailFinding] = Field(default_factory=list)
     fixes: List[FixNote] = Field(default_factory=list)
+
+
+# --- Reasoning out loud --------------------------------------------------------
+#
+# Each step also says, in a few sentences, why it decided as it did, for the
+# Debrief Console's run view (v9 FR-7 "the agent's per-turn rationale", FR-38).
+# The field comes last in each schema so it explains the answer rather than
+# steering it. The response models in the endpoints keep their parent types, so
+# pydantic serialises only the parent's fields there and the rationale travels
+# in its own `reasoning` field: it never reaches the cards, the evidence map or
+# anything a learner reads.
+
+REASONING_DESCRIPTION = (
+    "For the Ally team, never shown to the learner: two to four plain sentences "
+    "on what you weighed and why you decided as you did. Refer to moments by "
+    "turn number rather than copying long quotes."
+)
+
+
+class EvidenceMapReasoned(EvidenceMap):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class ProgressReadingReasoned(ProgressReading):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class ProgressReportReasoned(ProgressReport):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class DebriefCardsReasoned(DebriefCards):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class EvaluationOutputReasoned(EvaluationOutput):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+# --- The orchestrator: the findings contract and the plan (spec A3, A5) --------
+
+FindingKind = Literal[
+    "missed", "done_well", "risk", "context", "progress", "comparison"
+]
+
+
+class Finding(BaseModel):
+    """One thing an analysis agent found. Every agent answers in this shape, so
+    the Writer never changes when an agent is added."""
+
+    kind: FindingKind
+    point: str = Field(
+        description=(
+            "One or two sentences in plain words: what was found and why it matters."
+        )
+    )
+    turn_index: Optional[int] = Field(
+        default=None, description="The transcript turn it is about, or null."
+    )
+    quote: Optional[str] = Field(
+        default=None,
+        description=(
+            "Exact words from that turn, copied as written (same script), or null. "
+            "Never invent, translate or tidy a quote."
+        ),
+    )
+    importance: int = Field(
+        ge=1, le=3, description="1 = matters most in this session, 3 = least."
+    )
+    confidence: Confidence
+    source: Optional[str] = Field(
+        default=None,
+        description=(
+            "Where it comes from beyond the transcript: protocol:<code>, "
+            "history:<date or session>, aggregate:<query>, guidance:<code>; or null."
+        ),
+    )
+
+
+class AgentFindings(BaseModel):
+    findings: List[Finding] = Field(default_factory=list)
+
+
+class AgentFindingsReasoned(AgentFindings):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class PlannedAction(BaseModel):
+    agent: str = Field(description="The id of an agent from AVAILABLE AGENTS.")
+    why: str = Field(description="One sentence: what in the profile calls for it.")
+    focus_turns: List[int] = Field(
+        default_factory=list,
+        description=(
+            "Turns worth its closer look (e.g. a risk cue's turn); may be empty."
+        ),
+    )
+
+
+class ConsideredAgent(BaseModel):
+    agent: str
+    why_not: str = Field(description="One sentence: why it is not worth running here.")
+
+
+class PlannerOutput(BaseModel):
+    actions: List[PlannedAction] = Field(default_factory=list)
+    considered: List[ConsideredAgent] = Field(default_factory=list)
+
+
+class PlannerOutputReasoned(PlannerOutput):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+def reasoning_of(output: object) -> str:
+    """The step's rationale, or '' for an output without one."""
+    value = getattr(output, "reasoning", "")
+    return value.strip()[:2000] if isinstance(value, str) else ""

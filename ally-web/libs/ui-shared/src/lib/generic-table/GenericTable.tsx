@@ -50,14 +50,33 @@ export const GenericTable = forwardRef(
     const [sort, setSort] = useState<TableSort>(initialSort || { key: "", value: null });
     const [filter, setFilter] = useState<TableFilter>(initialFilter || []);
 
-    // State for filter popover UI
+    // State for the "+ Filter" column-name list popover (which column to add
+    // a filter for) — separate from the filter popover below.
     const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
-    const [optionAnchorEl, setOptionAnchorEl] = useState<null | HTMLElement>(null);
+
+    // Single source of truth for "which column's filter popover is open and
+    // what's in it", shared by both ways a filter popover can be opened:
+    // clicking a column header (TableHeader renders its own instance inside
+    // that header's <th>, for correct anchoring) and clicking the "+ Filter"
+    // chip or an already-applied filter chip (GenericTable renders its own
+    // instance at the table level). Previously each of those two entry
+    // points kept an entirely independent copy of this state with its own
+    // handler functions — bugs (e.g. TEXT blanking out on reopen) had to be
+    // found and fixed twice because the two copies could silently diverge.
+    // `filterSource` decides which of the two JSX render sites actually
+    // shows the popover's content, since both would otherwise become `open`
+    // together whenever a column is selected.
     const [selectedColumn, setSelectedColumn] = useState<
       null | (Column<T> & { filterOptions: { label: string; value: string }[] })
     >(null);
+    const [filterSource, setFilterSource] = useState<"header" | "chip" | null>(null);
     const [searchText, setSearchText] = useState("");
     const [multiSelectValues, setMultiSelectValues] = useState<string[]>([]);
+    // TEXT filter type's own draft/committed value — kept separate from
+    // `searchText` (which only ever filters a MULTISELECT/SINGLESELECT
+    // option list now), so applying a TEXT filter can never be confused
+    // with, or accidentally cleared by, option-list search state.
+    const [textDraft, setTextDraft] = useState("");
 
     // Expose the scrollable div to the parent via the forwarded ref
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -78,7 +97,7 @@ export const GenericTable = forwardRef(
     );
 
     /**
-     * Opens the filter popover for column selection.
+     * Opens the "+ Filter" column-name list popover.
      * @param {React.MouseEvent<HTMLElement>} event
      */
     const handleOpenFilterPopover = (event: React.MouseEvent<HTMLElement>) => {
@@ -88,18 +107,26 @@ export const GenericTable = forwardRef(
       event.stopPropagation();
       setFilterAnchorEl(event.currentTarget);
       setSelectedColumn(null);
-      setOptionAnchorEl(null);
+      setFilterSource(null);
       setSearchText("");
     };
 
     /**
-     * Selects a column and opens the option popover.
+     * Opens the filter popover for a column, seeding its draft state from
+     * whatever filter is already applied so reopening shows what's active
+     * instead of a blank slate. The single function both entry points call:
+     * `source` is "chip" for the "+ Filter" list / an already-applied
+     * filter's chip (called directly below), and "header" for a column
+     * header's Filter menu item (called via the `onOpenFilter` prop passed
+     * to TableHeader).
      * @param {Column<T> | undefined} col
      * @param {React.MouseEvent<HTMLElement>} event
+     * @param {"header" | "chip"} source
      */
-    const handleSelectColumn = (
+    const openFilterForColumn = (
       col: Column<T> | undefined,
       event: React.MouseEvent<HTMLElement>,
+      source: "header" | "chip",
     ) => {
       if (!col || !col.filterable) return;
       // See handleOpenFilterPopover; also close the column list or its
@@ -107,16 +134,33 @@ export const GenericTable = forwardRef(
       event.stopPropagation();
       setFilterAnchorEl(null);
       setSelectedColumn(col as Column<T> & { filterOptions: { label: string; value: string }[] });
-      setOptionAnchorEl(event.currentTarget);
-      setSearchText("");
-      // Prefill array-valued filters (multiselect + number range) from state
-      if (col.filterType === "multiselect" || col.filterType === "number") {
-        const existing = filter.find(f => f.key === col.key);
-        setMultiSelectValues(Array.isArray(existing?.value) ? existing?.value : []);
-      } else {
+      setFilterSource(source);
+      const existing = filter.find(f => f.key === col.key);
+      if (col.filterType === "text") {
+        // TEXT has its own dedicated draft, not the option-list search box,
+        // so reopening it restores what's already applied instead of a
+        // blank box whose Apply click would otherwise silently clear it.
+        setTextDraft(typeof existing?.value === "string" ? existing.value : "");
         setMultiSelectValues([]);
+        setSearchText("");
+      } else {
+        // MULTISELECT's staging array, NUMBER's initial [min, max], and
+        // DATE's initial [isoStart, isoEnd] all seed from the same
+        // already-applied array value.
+        setMultiSelectValues(Array.isArray(existing?.value) ? existing.value : []);
+        setSearchText("");
+        setTextDraft("");
       }
     };
+
+    /**
+     * Selects a column from the "+ Filter" list, or an already-applied
+     * filter's chip, and opens its filter popover.
+     * @param {Column<T> | undefined} col
+     * @param {React.MouseEvent<HTMLElement>} event
+     */
+    const handleSelectColumn = (col: Column<T> | undefined, event: React.MouseEvent<HTMLElement>) =>
+      openFilterForColumn(col, event, "chip");
 
     /**
      * Closes all filter and option popovers.
@@ -124,13 +168,14 @@ export const GenericTable = forwardRef(
     const handleCloseFilterPopover = () => {
       setFilterAnchorEl(null);
       setSelectedColumn(null);
-      setOptionAnchorEl(null);
+      setFilterSource(null);
       setSearchText("");
       setMultiSelectValues([]);
+      setTextDraft("");
     };
 
     /**
-     * Selects a filter option (single select).
+     * Selects a filter option (single select or TEXT's Apply button).
      * @param {string} colKey
      * @param {string} value
      */
@@ -227,7 +272,11 @@ export const GenericTable = forwardRef(
         >
           <span aria-hidden className="block h-0 w-0" />
           <PopoverContent className="border border-[#e3dbce] mt-[2px]">
-            <div>
+            {/* A table with many filterable columns (custom fields included)
+                had no scroll container here at all, unlike the option lists
+                below — the list just grew past the viewport, so scrolling it
+                scrolled the whole page behind it instead of just the list. */}
+            <div className="max-h-[300px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
               {filterableColumns.map(col => (
                 <div
                   key={col.key as string}
@@ -240,10 +289,12 @@ export const GenericTable = forwardRef(
             </div>
           </PopoverContent>
         </Popover>
-        {/* Use shared FilterPopover for filter options */}
+        {/* Shared FilterPopover for the "+ Filter"/chip entry point — only
+            shown when that's where the open column was selected from, so
+            this and TableHeader's own instance (for the header entry point)
+            never both render content for the same column at once. */}
         <FilterPopover
-          anchorEl={optionAnchorEl}
-          open={Boolean(optionAnchorEl) && !!selectedColumn}
+          open={Boolean(selectedColumn) && filterSource === "chip"}
           onClose={handleCloseFilterPopover}
           column={selectedColumn}
           searchText={searchText}
@@ -262,6 +313,8 @@ export const GenericTable = forwardRef(
           }
           onDateSelect={handleDateSelect}
           onNumberSelect={handleNumberSelect}
+          textValue={textDraft}
+          onTextChange={setTextDraft}
         />
       </>
     );
@@ -290,7 +343,20 @@ export const GenericTable = forwardRef(
             columns={columns}
             filter={filter}
             onSort={handleSort}
-            onFilterChange={handleFilterChange}
+            selectedColumn={selectedColumn}
+            filterSource={filterSource}
+            searchText={searchText}
+            onSearchTextChange={setSearchText}
+            selectedValues={multiSelectValues}
+            textValue={textDraft}
+            onTextChange={setTextDraft}
+            onOpenFilter={(col, event) => openFilterForColumn(col, event, "header")}
+            onCloseFilter={handleCloseFilterPopover}
+            onToggleOption={handleToggleMultiSelectOption}
+            onSaveMultiSelect={handleSaveMultiSelect}
+            onSelectFilterOption={handleSelectFilterOption}
+            onDateSelect={handleDateSelect}
+            onNumberSelect={handleNumberSelect}
           />
           {
             <TableBody

@@ -9,7 +9,7 @@ last_reconciled: 2026-11-09
 
 > [!WARNING]
 > **Deprecated — 2026-08-07, now superseded by the Context Library.** Product and design guidance
-> is now retrieved from Ally's Context Library (which replaced the Stacks MCP on 2026-11-09); see
+> is now retrieved from Ally's Context Library; see
 > [Working with the Context Library](../contributing/planning-with-context-library.md). Kept for history — do
 > not add to it, and treat anything conflicting with current Context Library guidance as superseded.
 

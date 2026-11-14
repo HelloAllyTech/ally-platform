@@ -1,10 +1,21 @@
 import {
   DEBRIEF_MODELS,
+  DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
+  DEBRIEF_PROMPT_CODES,
   DEBRIEF_SEED_BUNDLE,
+  debriefChallengerBundle,
 } from '../constants/debrief-release.constants';
+import {
+  DEBRIEF_ORCHESTRATOR_TOOLS,
+  DEBRIEF_GATEWAY_TOOLS,
+} from '../service/debrief-run-token.service';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
+import {
+  DebriefGraphError,
+  DebriefGraphResponse,
+} from '../service/debrief-graph.client';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
-import { DebriefCards } from '../util/debrief-cards.util';
+import { defaultOwnerSettings } from '../constants/debrief-owner-settings.constants';
 
 const transcript = [
   { turn_index: 1, role: 'counselor', text: 'What brings you here today?' },
@@ -20,77 +31,66 @@ const transcript = [
   },
 ];
 
-const cards = (over: Partial<DebriefCards> = {}): DebriefCards => ({
-  opening: 'You stayed with a client who was struggling.',
-  important_moment: {
-    turn_index: 2,
-    quote: "I don't see the point of anything anymore.",
-    handled_well: true,
-    lead: 'You noticed an important moment.',
-    body: 'You asked the client to say more.',
+const graphAnswer = (
+  over: Partial<DebriefGraphResponse> = {},
+): DebriefGraphResponse => ({
+  status: 'published',
+  skip_reason: null,
+  recipe_key: 'standard',
+  cards: { opening: 'You stayed with a client who was struggling.' },
+  steps: [
+    {
+      step: 'safety_reader',
+      label: 'Reading the session…',
+      status: 'done',
+      startedAt: '2026-11-10T00:00:00.000Z',
+      ms: 1200,
+      model: 'gemini-2.5-flash',
+      estimatedUsd: 0.001,
+    },
+  ],
+  workspace: {
+    safety: { risk_cues: [], learner_distress: [] },
+    decision: { status: 'published', round: 0, why: 'Published round 0.' },
+    revisionRounds: 0,
   },
-  what_worked: [
-    {
-      skill: 'open questions',
-      turn_index: 1,
-      quote: 'What brings you here today?',
-      lead: 'Your opening let the client lead.',
-      body: 'It invited them to start anywhere.',
-    },
-  ],
-  work_on_this: [
-    {
-      skill: 'exploring risk',
-      turn_index: 3,
-      quote: 'Can you tell me more?',
-      lead: 'Ask about safety directly.',
-      why: 'It is how you learn whether someone is at risk.',
-      try_saying: 'Have you had thoughts of ending your life?',
-    },
-  ],
-  practise_next: null,
-  skill_words: [],
-  reflective_question: 'What made it hard to ask directly?',
-  progress_note: null,
+  estimated_cost_usd: 0.07123,
+  fallback_rung: 1,
+  has_risk_cue: true,
+  learner_distress: false,
+  revision_rounds: 1,
+  evaluator_overall: 9.2,
+  evaluator_hard_fails: [],
+  check_failures: [
+    { code: 'total_too_long', section: 'whole debrief', detail: '231 words' },
+  ] as any,
+  resumed: false,
   ...over,
 });
 
-const evaluation = (score: number, hardFails: string[] = []) => ({
-  model: 'gemini-2.5-flash',
-  evaluation: {
-    dimensions: [
-      'evidence_specificity',
-      'accuracy',
-      'actionability',
-      'prioritisation',
-      'personalisation_progress',
-      'practice_alignment',
-      'tone',
-      'clarity',
-    ].map((dimension) => ({ dimension, score })),
-    hard_fails: hardFails.map((code) => ({ code, evidence: 'x' })),
-    fixes:
-      score < 8
-        ? [{ section: 'work_on_this[0]', note: 'be more specific' }]
-        : [],
-  },
-});
-
-function build(opts: {
-  learnerTurns?: number;
-  steps: Record<string, Array<unknown | Error>>;
-  existing?: boolean;
-  practice?: Array<{ id: number; title: string; skills: string[] }>;
-  assessment?: boolean;
-  inCase?: boolean;
-  bundle?: unknown;
-  /** What the guidance search finds. */
-  guidance?: unknown[];
-}) {
+function build(
+  opts: {
+    learnerTurns?: number;
+    existing?: boolean;
+    noSession?: boolean;
+    transcript?: unknown[];
+    languageRecorded?: boolean;
+    inCase?: boolean;
+    monthToDate?: { sessions: number; spentUsd: number };
+    providerAllowlist?: string[];
+    graph?: DebriefGraphResponse | Error;
+    live?: unknown[] | Error;
+    cohort?: unknown;
+    bundle?: unknown;
+    owner?: Record<string, unknown>;
+    progressProfile?: unknown;
+    progressInsert?: Error;
+  } = {},
+) {
   const saved: any[] = [];
-  const calls: string[] = [];
   const runs = {
     query: jest.fn(async () => []),
+    update: jest.fn(async () => undefined),
     create: (x: any) => ({ ...x }),
     save: jest.fn(async (x: any) => {
       saved.push({ ...x });
@@ -99,6 +99,7 @@ function build(opts: {
     findOne: jest.fn(async () => ({ id: 'existing', status: 'published' })),
     findOneOrFail: jest.fn(async () => ({
       id: 'run-1',
+      scenarioSessionId: 's1',
       fallbackRung: 0,
       workspace: {},
     })),
@@ -119,360 +120,625 @@ function build(opts: {
     }),
   };
   const context = {
-    loadSession: async () => ({
-      id: 's1',
-      tenantId: 't1',
-      counselorId: 7,
-      status: 'ENDED',
-      language: 'en',
-      learnerLevel: 'professional',
-      learnerTurns: opts.learnerTurns ?? 8,
-      scenario: { title: 'x', description: 'y' },
-      expectedBehaviours: [],
-      assessment: opts.assessment ?? false,
-      inCase: opts.inCase ?? false,
-    }),
-    caseMemory: async () => 'Meena told you about her exams last time.',
-    transcript: async () => transcript,
-    pastWorkOnThis: async () => [],
-    promptText: async () => null,
-    monthToDate: async () => ({ sessions: 10, spentUsd: 0 }),
-  };
-  const queues = Object.fromEntries(
-    Object.entries(opts.steps).map(([k, v]) => [k, [...v]]),
-  );
-  const ai = {
-    step: jest.fn(async (path: string) => {
-      calls.push(path);
-      const next = queues[path]?.shift();
-      if (next === undefined)
-        throw Object.assign(new Error(`no fake for ${path}`), { status: 500 });
-      if (next instanceof Error) throw next;
-      return next;
-    }),
-  };
-  const guidance = {
-    search: jest.fn(
-      async (): Promise<any> => ({
-        results: opts.guidance ?? [],
-        noConfidentMatch: !(opts.guidance ?? []).length,
-      }),
+    loadSession: jest.fn(async () =>
+      opts.noSession
+        ? null
+        : {
+            id: 's1',
+            tenantId: 't1',
+            counselorId: 7,
+            status: 'ENDED',
+            language: 'en',
+            learnerLevel: 'professional',
+            learnerTurns: opts.learnerTurns ?? 8,
+            scenarioId: 41,
+            scenario: { title: 'x', description: 'y' },
+            expectedBehaviours: ['open questions'],
+            assessment: false,
+            inCase: opts.inCase ?? false,
+            languageRecorded: opts.languageRecorded ?? true,
+          },
     ),
+    caseMemory: jest.fn(async () => 'Meena told you about her exams.'),
+    transcript: jest.fn(async () => opts.transcript ?? transcript),
+    pastWorkOnThis: jest.fn(async () => [
+      { date: '2026-11-01', skill: 'reflections', point: 'Reflect feelings.' },
+    ]),
+    promptText: jest.fn(
+      async (code: string, version: number | null) =>
+        `live ${code}@${version ?? 'current'}`,
+    ),
+    currentPromptVersions: jest.fn(async (codes: string[]) =>
+      Object.fromEntries(codes.map((c) => [c, 2])),
+    ),
+    providerAllowlist: jest.fn(
+      async () => opts.providerAllowlist ?? ['gemini', 'openai', 'anthropic'],
+    ),
+    monthToDate: jest.fn(
+      async () => opts.monthToDate ?? { sessions: 10, spentUsd: 0 },
+    ),
+    liveDetections: jest.fn(async () => {
+      if (opts.live instanceof Error) throw opts.live;
+      return opts.live ?? [];
+    }),
+    cohortStats: jest.fn(async () => opts.cohort ?? null),
+    progressProfile: jest.fn(async () => {
+      if (opts.progressProfile instanceof Error) throw opts.progressProfile;
+      return opts.progressProfile ?? null;
+    }),
+    availability: jest.fn(async () => ({
+      org_protocols: 2,
+      past_debriefs: 4,
+      cohort: true,
+      course: false,
+    })),
   };
+  const graph = {
+    run: jest.fn(async () => {
+      const g = opts.graph ?? graphAnswer();
+      if (g instanceof Error) throw g;
+      return g;
+    }),
+  };
+  const tokens = { sign: jest.fn(() => 'signed-run-token') };
+  const config = { publicApiBaseUrl: 'https://be.example/' };
   const releases = {
     getGa: async () => ({
       id: 'rel',
-      version: 1,
+      version: 3,
       bundle: opts.bundle ?? DEBRIEF_SEED_BUNDLE,
+    }),
+  };
+  const practice = {
+    optionsFor: jest.fn(async () => [
+      { id: 41, title: 'Exam stress', skills: ['reflections'] },
+    ]),
+  };
+  const agentLogs = { record: jest.fn(async () => 0) };
+  const ownerSettings = {
+    get: jest.fn(async () => ({
+      ...defaultOwnerSettings(),
+      ...(opts.owner ?? {}),
+    })),
+  };
+  const progressResults = {
+    insert: jest.fn(async () => {
+      if (opts.progressInsert) throw opts.progressInsert;
+      return {};
     }),
   };
   const svc = new DebriefRunnerService(
     runs as any,
     context as any,
-    ai as any,
+    graph as any,
+    tokens as any,
+    config as any,
     releases as any,
-    { optionsFor: async () => opts.practice ?? [] } as any,
-    guidance as any,
+    practice as any,
     {
       // Every model the seed names is in the catalog, as it is in prod.
       getModels: async () =>
         Object.values(DEBRIEF_MODELS).map((model) => ({ model })),
     } as any,
+    agentLogs as any,
+    ownerSettings as any,
+    progressResults as any,
   );
-  return { svc, saved, calls, ai, guidance, runs };
+  const request = () => (graph.run.mock.calls as any[][])[0]?.[0];
+  return {
+    svc,
+    saved,
+    runs,
+    context,
+    graph,
+    tokens,
+    practice,
+    request,
+    agentLogs,
+    progressResults,
+  };
 }
-
-const safetyWithCue = {
-  model: 'gemini-2.5-flash',
-  risk_cues: [
-    {
-      turn_index: 2,
-      quote: "I don't see the point",
-      category: 'hopelessness',
-      learner_response: 'explored',
-    },
-  ],
-  learner_distress: [],
-};
-const analyst = {
-  model: 'gemini-2.5-pro',
-  evidence: { pivotal_moments: [], behaviours: [] },
-};
 
 describe('DebriefRunnerService', () => {
   it('runs the seed when the live release names a model switched off in the catalog', async () => {
+    const { svc } = build();
     const custom = JSON.parse(JSON.stringify(DEBRIEF_SEED_BUNDLE));
     custom.recipes.standard.steps.find(
       (s: { step: string }) => s.step === 'writer',
     ).model = 'gpt-4.1';
-    const { svc } = build({ steps: {}, bundle: custom });
-    const { release, bundle } = await svc.resolveRelease();
+    const { release, bundle } = await svc.resolveRelease({
+      id: 'r',
+      version: 9,
+      bundle: custom,
+    } as any);
     expect(release).toBeNull();
     expect(bundle).toBe(DEBRIEF_SEED_BUNDLE);
   });
 
-  it('tells the learner what it is doing as each step starts (FR-27)', async () => {
-    const { svc, runs } = build({
-      steps: {
-        'safety-reader': [safetyWithCue],
-        analyst: [analyst],
-        writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
-        evaluator: [evaluation(9)],
-      },
-    });
-    await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    const announced = runs.query.mock.calls.map((c: any[]) =>
-      JSON.parse(c[1][1]),
-    );
-    expect(announced.map((p: any) => p.step)).toEqual(
-      expect.arrayContaining(['safety_reader', 'guidance_lookup', 'writer']),
-    );
-    // After the Safety reader found a cue, the panel knows it.
-    expect((runs.query.mock.calls.slice(-1)[0] as any[])[1][2]).toBe(true);
-  });
-
-  it('publishes a draft that passes the checks and the bar, without revising', async () => {
-    const { svc, calls } = build({
-      steps: {
-        'safety-reader': [safetyWithCue],
-        analyst: [analyst],
-        writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
-        evaluator: [evaluation(9)],
-      },
-    });
-    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
-    expect(run.hasRiskCue).toBe(true);
-    expect(run.recipeKey).toBe('standard');
-    expect(calls).not.toContain('reviser');
-    expect(run.steps.map((s) => s.step)).toEqual(
-      expect.arrayContaining([
-        'safety_reader',
-        'analyst',
-        'guidance_lookup',
-        'writer',
-        'checks',
-        'evaluator',
-      ]),
-    );
-    expect(Number(run.estimatedCostUsd)).toBeGreaterThan(0);
-  });
-
-  it("offers the learner's own roleplays and keeps only links to them", async () => {
-    const base = cards();
-    const { svc, ai } = build({
-      practice: [{ id: 41, title: 'Exam stress', skills: ['Exploring risk'] }],
-      steps: {
-        'safety-reader': [safetyWithCue],
-        analyst: [analyst],
-        writer: [
+  describe('prepare', () => {
+    it('builds the graph request: run, release, bundle with overrides, session, transcript and context', async () => {
+      const { svc, request, tokens } = build({
+        live: [{ behaviour: 'open questions', detected: true, times: 2 }],
+        cohort: { trainees: 'five or more', skills: [] },
+      });
+      await svc.run('s1', {
+        mode: DebriefRunMode.SHADOW,
+        settingOverrides: { passScore: 7 },
+      });
+      const req = request();
+      expect(req).toMatchObject({
+        run_id: 'run-1',
+        scenario_session_id: 's1',
+        mode: 'shadow',
+        resume: false,
+        release: { id: 'rel', version: 3 },
+        run_token: 'signed-run-token',
+        gateway_url: 'https://be.example/api/v1/internal/debrief',
+        transcript,
+      });
+      expect(tokens.sign).toHaveBeenCalledWith(
+        'run-1',
+        's1',
+        DEBRIEF_GATEWAY_TOOLS,
+      );
+      expect(req.bundle.settings.passScore).toBe(7);
+      expect(req.bundle.settings.deadlineMs).toBe(
+        DEBRIEF_SEED_BUNDLE.settings.deadlineMs,
+      );
+      expect(req.session).toMatchObject({
+        tenant_id: 't1',
+        counselor_id: 7,
+        language: 'en',
+        language_source: 'recorded',
+        learner_turns: 8,
+        scenario_id: 41,
+        expected_behaviours: ['open questions'],
+        assessment: false,
+        in_case: false,
+      });
+      expect(req.context).toEqual({
+        live_detections: [
+          { behaviour: 'open questions', detected: true, times: 2 },
+        ],
+        past_work_on_this: [
           {
-            model: 'gemini-3-flash-preview',
-            cards: cards({
-              work_on_this: [{ ...base.work_on_this[0], scenario_id: 41 }],
-              practise_next: {
-                skill: 'exploring risk',
-                reason: 'x',
-                scenario_id: 99,
-              },
-            }),
+            date: '2026-11-01',
+            skill: 'reflections',
+            point: 'Reflect feelings.',
           },
         ],
-        evaluator: [evaluation(9)],
-      },
-    });
-    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    const writerCall = ai.step.mock.calls.find(
-      (c: unknown[]) => c[0] === 'writer',
-    ) as unknown[];
-    expect((writerCall[1] as any).practice_options).toEqual([
-      { id: 41, title: 'Exam stress', skills: ['Exploring risk'] },
-    ]);
-    expect(run.cards?.work_on_this[0].scenario_id).toBe(41);
-    // 99 was never offered to this learner, so it is dropped.
-    expect(run.cards?.practise_next?.scenario_id).toBeNull();
-  });
-
-  describe('Case and Assessment recipes', () => {
-    const steps = () => ({
-      'safety-reader': [safetyWithCue],
-      analyst: [analyst],
-      writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
-      evaluator: [evaluation(9)],
-    });
-    const writerInput = (ai: any) =>
-      (
-        ai.step.mock.calls.find((c: unknown[]) => c[0] === 'writer') as any[]
-      )[1];
-
-    it('runs Assessment for a graded course roleplay, and tells the Writer', async () => {
-      const { svc, ai } = build({ assessment: true, steps: steps() });
-      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-      expect(run.recipeKey).toBe('assessment');
-      expect(writerInput(ai).assessment).toBe(true);
+        cohort: { trainees: 'five or more', skills: [] },
+        case_memory: null,
+        practice_options: [
+          { id: 41, title: 'Exam stress', skills: ['reflections'] },
+        ],
+        progress_profile: null,
+      });
     });
 
-    it('runs Case for a case session, with the case memory', async () => {
-      const { svc, ai } = build({ inCase: true, steps: steps() });
-      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-      expect(run.recipeKey).toBe('case');
-      expect(writerInput(ai).case_memory).toBe(
-        'Meena told you about her exams last time.',
+    it('resolves every prompt the bundle names, with the run’s overrides applied', async () => {
+      const { svc, request } = build();
+      await svc.run('s1', {
+        mode: DebriefRunMode.REPLAY,
+        promptOverrides: { [DEBRIEF_PROMPT_CODES.writer]: 'challenger text' },
+      });
+      const prompts = request().prompts;
+      for (const code of Object.keys(DEBRIEF_SEED_BUNDLE.prompts)) {
+        expect(prompts).toHaveProperty(code);
+      }
+      expect(prompts[DEBRIEF_PROMPT_CODES.writer]).toBe('challenger text');
+      expect(prompts[DEBRIEF_PROMPT_CODES.safetyReader]).toBe(
+        `live ${DEBRIEF_PROMPT_CODES.safetyReader}@current`,
       );
     });
 
-    it('runs Standard under a release made before Case existed', async () => {
-      const older = { ...DEBRIEF_SEED_BUNDLE.recipes };
-      delete older.case;
-      delete older.assessment;
-      const { svc } = build({
-        inCase: true,
-        bundle: { ...DEBRIEF_SEED_BUNDLE, recipes: older },
-        steps: steps(),
+    it('prices every model the bundle names, per million tokens', async () => {
+      const { svc, request } = build();
+      await svc.run('s1', { mode: DebriefRunMode.REPLAY });
+      const prices = request().prices;
+      const named = new Set(
+        Object.values(DEBRIEF_SEED_BUNDLE.recipes).flatMap((r) =>
+          r!.steps.flatMap((s) => [s.model, s.backupModel]).filter(Boolean),
+        ),
+      );
+      for (const model of named) {
+        expect(prices[model as string]).toEqual({
+          input_per_m: expect.any(Number),
+          output_per_m: expect.any(Number),
+        });
+      }
+    });
+
+    it('uses the release ceiling for a replay and the pool’s for production', async () => {
+      const replay = build();
+      await replay.svc.run('s1', { mode: DebriefRunMode.REPLAY });
+      expect(replay.request().ceiling_usd).toBe(
+        DEBRIEF_SEED_BUNDLE.settings.runCeilingUsd,
+      );
+      expect(replay.context.monthToDate).not.toHaveBeenCalled();
+
+      const shadow = build({ monthToDate: { sessions: 1000, spentUsd: 49 } });
+      const run = await shadow.svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      const ceiling = shadow.request().ceiling_usd;
+      expect(ceiling).toBeLessThanOrEqual(1);
+      expect(ceiling).toBeGreaterThan(0);
+      expect(run.ceilingUsd).toBe(ceiling.toFixed(4));
+    });
+
+    it('holds the run for a person when no allowed provider can run a step (plan §8.9)', async () => {
+      const { svc, graph } = build({ providerAllowlist: ['openai'] });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.status).toBe(DebriefRunStatus.NEEDS_PERSON);
+      expect(run.skipReason).toBe('provider_not_allowed');
+      expect(run.workspace?.providerAllowlist?.allowed).toEqual(['openai']);
+      expect(graph.run).not.toHaveBeenCalled();
+    });
+
+    it('holds the run for a person at the monthly cap, without calling the graph', async () => {
+      const { svc, graph } = build({
+        monthToDate: {
+          sessions: 10,
+          spentUsd: DEBRIEF_SEED_BUNDLE.settings.monthlyCapUsd,
+        },
       });
       const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.status).toBe(DebriefRunStatus.NEEDS_PERSON);
+      expect(run.skipReason).toBe('monthly_cap');
+      expect(run.fallbackRung).toBe(6);
       expect(run.recipeKey).toBe('standard');
+      expect(run.workspace.decision.why).toMatch(/budget is spent/);
+      expect(graph.run).not.toHaveBeenCalled();
     });
 
-    it('keeps a short session short, case or not', async () => {
-      const { svc } = build({ inCase: true, learnerTurns: 3, steps: steps() });
+    it.each([
+      ['no_session', { noSession: true }, DebriefRunStatus.SKIPPED],
+      ['too_short', { learnerTurns: 0 }, DebriefRunStatus.SKIPPED],
+      ['no_transcript', { transcript: [] }, DebriefRunStatus.SKIPPED],
+    ])('ends a %s run in ally-be', async (reason, o, status) => {
+      const { svc, graph } = build(o as any);
       const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-      expect(run.recipeKey).toBe('short');
+      expect(run.status).toBe(status);
+      expect(run.skipReason).toBe(reason);
+      expect(run.workspace.decision).toMatchObject({ status, round: null });
+      expect(graph.run).not.toHaveBeenCalled();
+    });
+
+    it('returns the existing run when the session already has one', async () => {
+      const { svc, graph } = build({ existing: true });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.id).toBe('existing');
+      expect(graph.run).not.toHaveBeenCalled();
+    });
+
+    it('leaves an unrecorded language to the graph, and keeps what it read', async () => {
+      const { svc, request } = build({
+        languageRecorded: false,
+        graph: {
+          ...graphAnswer(),
+          language: 'ta',
+          workspace: {
+            ...graphAnswer().workspace,
+            languageSource: 'detected',
+          },
+        },
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      // ally-be sends what it knows: the default, flagged as not recorded.
+      expect(request().session).toMatchObject({
+        language: 'en',
+        language_source: null,
+        language_recorded: false,
+      });
+      // The graph's answer fills the run record as detection here did.
+      expect(run.language).toBe('ta');
+      expect(run.workspace?.languageSource).toBe('detected');
+    });
+
+    it('reads the case memory for a case session, and debriefs on when an optional read fails', async () => {
+      const { svc, request } = build({
+        inCase: true,
+        live: new Error('db down'),
+      });
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(request().context.case_memory).toBe(
+        'Meena told you about her exams.',
+      );
+      expect(request().context.live_detections).toEqual([]);
     });
   });
 
-  it('looks guidance up in Debrief Guidance, as the organisation may read it', async () => {
-    const { svc, guidance, ai } = build({
-      guidance: [
-        {
-          chunk: {
-            id: 'c1',
-            code: 'DG-0003',
-            statement: 'Ask about safety directly',
-            body: 'Ask directly and calmly; asking does not plant the idea.',
-            citation: { title: 'Practice guideline: risk' },
-            attributes: {},
-          },
-          band: 'good',
-        },
-      ],
-      steps: {
-        'safety-reader': [safetyWithCue],
-        analyst: [
+  describe('apply', () => {
+    it('writes every field of the graph’s answer onto the run', async () => {
+      const { svc, saved } = build();
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run).toMatchObject({
+        status: DebriefRunStatus.PUBLISHED,
+        skipReason: null,
+        recipeKey: 'standard',
+        cards: { opening: 'You stayed with a client who was struggling.' },
+        estimatedCostUsd: '0.0712',
+        fallbackRung: 1,
+        hasRiskCue: true,
+        learnerDistress: false,
+        revisionRounds: 1,
+        evaluatorOverall: '9.20',
+        evaluatorHardFails: [],
+        checkFailures: [
           {
-            ...analyst,
-            evidence: {
-              ...(analyst as any).evidence,
-              pivotal_moments: [{ summary: 'client hints at self-harm' }],
-            },
+            code: 'total_too_long',
+            section: 'whole debrief',
+            detail: '231 words',
           },
         ],
-        writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
-        evaluator: [evaluation(9)],
+        tenantId: 't1',
+        language: 'en',
+        learnerTurns: 8,
+      });
+      expect(run.steps).toHaveLength(1);
+      expect(run.finishedAt).toBeInstanceOf(Date);
+      // The graph's workspace is merged over what ally-be wrote.
+      expect(run.workspace).toMatchObject({
+        languageSource: 'recorded',
+        safety: { risk_cues: [], learner_distress: [] },
+        decision: { status: 'published' },
+      });
+      expect(saved).toHaveLength(1);
+    });
+
+    it('stores the graph’s agent logs with each prompt’s version (an override keeps its text)', async () => {
+      const logs = [
+        { seq: 1, kind: 'code', step: 'plan', input: {}, output: {} },
+      ];
+      const { svc, agentLogs } = build({
+        graph: { ...graphAnswer(), logs } as any,
+      });
+      const run = await svc.run('s1', {
+        mode: DebriefRunMode.REPLAY,
+        promptOverrides: { [DEBRIEF_PROMPT_CODES.writer]: 'challenger text' },
+      });
+      expect(agentLogs.record).toHaveBeenCalledTimes(1);
+      const [stored, entries, versions] = (
+        agentLogs.record.mock.calls as any[][]
+      )[0];
+      expect(stored).toBe(run);
+      expect(entries).toEqual(logs);
+      expect(versions[DEBRIEF_PROMPT_CODES.writer]).toEqual({
+        text: 'challenger text',
+      });
+      expect(versions[DEBRIEF_PROMPT_CODES.safetyReader]).toBe(2);
+    });
+
+    it('keeps a needs-person decision and its reason', async () => {
+      const { svc } = build({
+        graph: graphAnswer({
+          status: 'needs_person',
+          skip_reason: 'safety_reader_failed',
+          cards: null,
+          fallback_rung: 6,
+          evaluator_overall: null,
+          check_failures: [],
+        }),
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.status).toBe(DebriefRunStatus.NEEDS_PERSON);
+      expect(run.skipReason).toBe('safety_reader_failed');
+      expect(run.fallbackRung).toBe(6);
+      expect(run.evaluatorOverall).toBeNull();
+      expect(run.cards).toBeNull();
+    });
+
+    it('marks the run failed on an unexpected error', async () => {
+      const { svc } = build({
+        graph: new Error('debrief graph: something odd'),
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.status).toBe(DebriefRunStatus.FAILED);
+      expect(run.error).toBe('debrief graph: something odd');
+      expect(run.fallbackRung).toBe(6);
+      expect(run.workspace.decision.why).toMatch(/unexpected error/);
+    });
+
+    it('leaves a production run running for the sweeper when ally-ai does not answer (v9 FR-3)', async () => {
+      for (const status of [null, 502]) {
+        const { svc } = build({
+          graph: new DebriefGraphError(
+            status,
+            'debrief graph network: socket hang up',
+          ),
+        });
+        const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+        // Not finished: the claim's `running` stays for the sweeper.
+        expect(run.status).not.toBe(DebriefRunStatus.FAILED);
+        expect(run.workspace.graphUnreachable.error).toMatch(/socket hang up/);
+        expect(run.finishedAt).toBeFalsy();
+      }
+    });
+
+    it('ends a replay as failed when ally-ai does not answer (replays are not swept)', async () => {
+      const { svc } = build({
+        graph: new DebriefGraphError(
+          null,
+          'debrief graph network: socket hang up',
+        ),
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.REPLAY });
+      expect(run.status).toBe(DebriefRunStatus.FAILED);
+    });
+
+    it('marks the run failed when the graph answers without a decision', async () => {
+      const { svc } = build({ graph: { status: 'running' } as any });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.status).toBe(DebriefRunStatus.FAILED);
+      expect(run.error).toMatch(/no decision/);
+    });
+  });
+
+  describe('learner progress', () => {
+    const profile = { session_number: 5, card_due: true, sessions: [] };
+
+    it('sends the progress profile with the owner settings, and asks for the progress prompt', async () => {
+      const { svc, request, context } = build({
+        progressProfile: profile,
+        owner: { progressWindow: 8, progressCardEvery: 3 },
+      });
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(request().context.progress_profile).toEqual(profile);
+      expect(context.progressProfile).toHaveBeenCalledWith(7, 't1', 's1', {
+        window: 8,
+        cardEvery: 3,
+        useFhs: true,
+        showWorseToLearners: false,
+      });
+      expect(request().prompts).toHaveProperty(DEBRIEF_PROMPT_CODES.progress);
+    });
+
+    it('sends no profile when progress is switched off', async () => {
+      const { svc, request, context } = build({
+        progressProfile: profile,
+        owner: { progressOn: false },
+      });
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(context.progressProfile).not.toHaveBeenCalled();
+      expect(request().context.progress_profile).toBeNull();
+    });
+
+    it('an unreadable profile never blocks the debrief', async () => {
+      const { svc, request } = build({ progressProfile: new Error('boom') });
+      const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(request().context.progress_profile).toBeNull();
+      expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
+    });
+
+    const progress = {
+      report: {
+        skills: [
+          {
+            skill: 'empathy',
+            trend: 'too_early' as const,
+            why: 'Two sessions.',
+            evidence: [{ run_id: 'this', turn_index: 3 }],
+            fhs: 'absent' as const,
+            learner_line: '',
+          },
+        ],
+        followups: [{ point: 'Reflect feelings.', status: 'partly' }],
+        focus: { skill: 'empathy', why: 'x', learner_line: 'y' },
+        shown_as: 'card' as const,
       },
+      vetoes: [{ skill: 'empathy', veto: 'too_few_sessions', detail: '2 < 3' }],
+      shown_as: 'card' as const,
+      model: 'gemini-2.5-flash',
+      window_session_ids: [
+        '11111111-1111-1111-1111-111111111111',
+        'not-a-uuid',
+      ],
+      analyst_versions: [2, 3],
+    };
+
+    it('stores the progress reading when the graph sends one', async () => {
+      const { svc, progressResults } = build({
+        graph: graphAnswer({ progress }),
+      });
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(progressResults.insert).toHaveBeenCalledWith({
+        tenantId: 't1',
+        counselorId: 7,
+        runId: 'run-1',
+        scenarioSessionId: 's1',
+        windowSessionIds: ['11111111-1111-1111-1111-111111111111'],
+        skills: progress.report.skills,
+        followups: progress.report.followups,
+        focus: progress.report.focus,
+        vetoes: progress.vetoes,
+        shownAs: 'card',
+        analystVersions: [2, 3],
+        model: 'gemini-2.5-flash',
+      });
+    });
+
+    it('stores nothing when the progress agent did not run', async () => {
+      const { svc, progressResults } = build();
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(progressResults.insert).not.toHaveBeenCalled();
+    });
+
+    it('a failed write never fails the run', async () => {
+      const { svc, progressResults, agentLogs } = build({
+        graph: graphAnswer({ progress }),
+        progressInsert: new Error('no table'),
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(progressResults.insert).toHaveBeenCalled();
+      expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
+      expect(agentLogs.record).toHaveBeenCalled();
+    });
+  });
+
+  describe('resume (v9 FR-3)', () => {
+    it('calls the graph with resume: true and the same run id', async () => {
+      const { svc, request } = build();
+      const stuck = {
+        id: 'run-9',
+        scenarioSessionId: 's1',
+        mode: DebriefRunMode.SHADOW,
+        status: DebriefRunStatus.RUNNING,
+        fallbackRung: 0,
+        workspace: { resumes: 1 },
+      } as any;
+      const done = await svc.resume(stuck);
+      expect(request()).toMatchObject({ run_id: 'run-9', resume: true });
+      expect(done.status).toBe(DebriefRunStatus.PUBLISHED);
+      expect(done.workspace.resumes).toBe(1);
+    });
+  });
+});
+
+describe('DebriefRunnerService with the orchestrator (spec A11)', () => {
+  it('a release without the orchestrator runs as before: base tools, no availability, no orchestrator prompts', async () => {
+    const { svc, request, tokens, context } = build();
+    await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    expect(tokens.sign).toHaveBeenCalledWith(
+      'run-1',
+      's1',
+      DEBRIEF_GATEWAY_TOOLS,
+    );
+    expect(context.availability).not.toHaveBeenCalled();
+    expect(request().context).not.toHaveProperty('availability');
+    for (const code of DEBRIEF_ORCHESTRATOR_PROMPT_CODES) {
+      expect(request().prompts).not.toHaveProperty(code);
+    }
+    expect(request().bundle.orchestrator).toBeUndefined();
+  });
+
+  it('a challenger release sends the orchestrator, its tools, prompts, prices and the availability facts', async () => {
+    const { svc, request, tokens } = build({
+      bundle: debriefChallengerBundle(DEBRIEF_SEED_BUNDLE),
     });
     await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    expect(guidance.search).toHaveBeenCalledWith(
-      expect.objectContaining({
-        useCase: 'debrief',
-        collections: ['debrief_guidance'],
-        queries: ['client hints at self-harm'],
-        // 't1' is not an organisation id, so only global guidelines.
-        audience: { tenantId: null },
-        sessionId: 's1',
-      }),
-    );
-    // The Writer reads the guideline as it read a passage: cited by its document, word for word.
-    const writer = (ai.step.mock.calls as any[]).find(
-      ([path]) => path === 'writer',
-    );
-    expect(writer[1].passages).toEqual([
-      {
-        title: 'Practice guideline: risk',
-        text: 'Ask directly and calmly; asking does not plant the idea.',
-      },
+    const req = request();
+    expect(req.bundle.orchestrator.enabled).toBe(true);
+    expect(tokens.sign).toHaveBeenCalledWith('run-1', 's1', [
+      ...DEBRIEF_GATEWAY_TOOLS,
+      ...DEBRIEF_ORCHESTRATOR_TOOLS,
     ]);
-  });
-
-  it('reads the language from the transcript when the session recorded none, and keeps that on the run', async () => {
-    const { svc } = build({
-      steps: {
-        'safety-reader': [safetyWithCue],
-        analyst: [analyst],
-        writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
-        evaluator: [evaluation(9)],
-      },
+    expect(req.context.availability).toEqual({
+      org_protocols: 2,
+      past_debriefs: 4,
+      cohort: true,
+      course: false,
     });
-    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    expect(run.workspace?.languageSource).toMatch(/^detected/);
-    expect(run.workspace?.safety).toBeDefined();
-  });
-
-  it('revises a draft below the bar and keeps the better one', async () => {
-    const { svc, calls } = build({
-      steps: {
-        'safety-reader': [safetyWithCue],
-        analyst: [analyst],
-        writer: [{ cards: cards() }],
-        evaluator: [evaluation(6), evaluation(8.5)],
-        reviser: [{ cards: cards({ opening: 'A revised opening.' }) }],
-      },
-    });
-    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    expect(calls.filter((c) => c === 'reviser')).toHaveLength(1);
-    expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
-    expect(run.revisionRounds).toBe(1);
-    expect((run.cards as any).opening).toBe('A revised opening.');
-    expect(run.workspace.evaluations.map((e: any) => e.overall)).toEqual([
-      6, 8.5,
-    ]);
-  });
-
-  it('never publishes without a safety reading, even after a retry', async () => {
-    const { svc, calls } = build({
-      steps: {
-        'safety-reader': [new Error('502'), new Error('502')],
-        analyst: [analyst],
-      },
-    });
-    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    expect(run.status).toBe(DebriefRunStatus.NEEDS_PERSON);
-    expect(run.skipReason).toBe('safety_reader_failed');
-    expect(calls.filter((c) => c === 'safety-reader')).toHaveLength(2);
-    expect(calls).not.toContain('writer');
-  });
-
-  it('a draft that drops the risk cue goes to a person, never to the learner', async () => {
-    const noMoment = cards({ important_moment: null });
-    const { svc } = build({
-      learnerTurns: 3, // Short recipe: no revisions
-      steps: {
-        'safety-reader': [safetyWithCue],
-        analyst: [analyst],
-        writer: [{ cards: noMoment }],
-        evaluator: [evaluation(9, ['missed_risk_cue'])],
-      },
-    });
-    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    expect(run.recipeKey).toBe('short');
-    expect(run.status).toBe(DebriefRunStatus.NEEDS_PERSON);
-    expect(run.checkFailures.map((f) => f.code)).toContain(
-      'risk_cue_uncovered',
-    );
-  });
-
-  it('skips a session with no learner turns', async () => {
-    const { svc, calls } = build({ learnerTurns: 0, steps: {} });
-    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    expect(run.status).toBe(DebriefRunStatus.SKIPPED);
-    expect(run.skipReason).toBe('too_short');
-    expect(calls).toEqual([]);
-  });
-
-  it('returns the existing run when the session already has one', async () => {
-    const { svc, calls } = build({ existing: true, steps: {} });
-    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    expect(run.id).toBe('existing');
-    expect(calls).toEqual([]);
+    for (const code of DEBRIEF_ORCHESTRATOR_PROMPT_CODES) {
+      expect(req.prompts).toHaveProperty(code);
+    }
+    for (const model of [
+      DEBRIEF_MODELS.planner,
+      DEBRIEF_MODELS.registryAgent,
+      DEBRIEF_MODELS.registryAgentBackup,
+    ]) {
+      expect(req.prices[model]).toEqual({
+        input_per_m: expect.any(Number),
+        output_per_m: expect.any(Number),
+      });
+    }
   });
 });

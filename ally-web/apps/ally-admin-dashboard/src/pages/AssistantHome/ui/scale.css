@@ -1,0 +1,375 @@
+/*
+ * AI Chatbots' one scale (chunk 20d-2), on the v2 tokens and scoped to its screens (the home, the
+ * inbox, the list page), so onboarding, the bot page and the rest of the dashboard are untouched.
+ *
+ *   Space   4 · 8 · 12 · 16 · 24 · 32 · 48 (DESIGN.md §2)
+ *   Height  44 default · 36 small (desktop only; 44 on touch) · 50 only on onboarding and visitor
+ *           pages
+ *   Radius  12 inputs and buttons · 16 cards · 999 chips and badges
+ */
+
+:where(.ally-home, .ally-inbox, .ally-list-page) {
+  --ally-space-1: 4px;
+  --ally-space-2: 8px;
+  --ally-space-3: 12px;
+  --ally-space-4: 16px;
+  --ally-space-5: 24px;
+  --ally-space-6: 32px;
+  --ally-h: 44px;
+  --ally-h-sm: 36px;
+}
+
+/* One height: the primary is the same height as every other button here. */
+:where(.ally-home, .ally-inbox, .ally-list-page) .ally-btn,
+:where(.ally-home, .ally-inbox, .ally-list-page) .ally-btn--primary {
+  min-height: var(--ally-h);
+  padding: 0 16px;
+}
+:where(.ally-home, .ally-inbox, .ally-list-page) .ally-btn--sm {
+  min-height: var(--ally-h-sm);
+  padding: 0 12px;
+  font-size: 14px;
+}
+@media (pointer: coarse) {
+  :where(.ally-home, .ally-inbox, .ally-list-page) .ally-btn--sm {
+    min-height: var(--ally-h);
+  }
+}
+:where(.ally-home, .ally-inbox, .ally-list-page) .ally-btn--danger {
+  color: var(--ally-danger);
+  border-color: color-mix(in srgb, var(--ally-danger) 40%, var(--ally-line-strong));
+}
+
+/* Inputs: the UI font, never the dashboard's serif (digits included). */
+:where(.ally-home, .ally-inbox, .ally-list-page) :is(.ally-input, input, select, textarea) {
+  font-family: var(--ally-font-ui);
+}
+:where(.ally-home, .ally-inbox, .ally-list-page) .ally-input--compact {
+  width: auto;
+  min-height: var(--ally-h);
+  padding-right: 32px;
+}
+
+/* ── Lists ── */
+.ally-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ally-line);
+}
+.ally-list__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ally-space-3);
+  min-height: 52px;
+  padding: var(--ally-space-2) 0;
+  border-bottom: 1px solid var(--ally-line);
+}
+.ally-list__main {
+  /* Below about 200px of room the actions go under the words, never squeeze them. */
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ally-list__title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ally-space-2);
+  font: 500 15px/1.4 var(--ally-font-ui);
+  color: var(--ally-ink);
+  overflow-wrap: anywhere;
+}
+.ally-list__meta {
+  font: 400 13px/1.4 var(--ally-font-ui);
+  color: var(--ally-faint);
+  overflow-wrap: anywhere;
+}
+.ally-list__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ally-space-2);
+}
+.ally-list__row--skeleton {
+  min-height: 52px;
+}
+.ally-skeleton {
+  display: block;
+  width: 60%;
+  height: 14px;
+  border-radius: 6px;
+  background: var(--ally-sunken);
+}
+.ally-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ally-h-sm, 36px);
+  height: var(--ally-h-sm, 36px);
+  border: 1px solid transparent;
+  border-radius: var(--ally-radius-sm);
+  background: transparent;
+  color: var(--ally-muted);
+  cursor: pointer;
+}
+.ally-icon-btn:hover:not(:disabled) {
+  background: var(--ally-sunken);
+  color: var(--ally-ink);
+}
+.ally-icon-btn:focus-visible {
+  outline: none;
+  border-color: var(--ally-accent);
+  box-shadow: 0 0 0 4px var(--ally-accent-soft);
+}
+.ally-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (pointer: coarse) {
+  .ally-icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+.ally-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ally-space-2);
+  align-items: center;
+}
+.ally-add-row > .ally-input:first-of-type {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.ally-inline-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ally-space-2);
+  max-width: 420px;
+}
+.ally-home__list-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ally-space-3);
+}
+.ally-home__subhead {
+  margin: var(--ally-space-2) 0 0;
+  font: 600 15px/1.3 var(--ally-font-ui);
+}
+.ally-note {
+  margin: 0;
+  padding: var(--ally-space-3) var(--ally-space-4);
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+  font: 400 14px/1.45 var(--ally-font-ui);
+  color: var(--ally-ink-2);
+}
+.ally-note--warn {
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+}
+.ally-home__radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ally-space-2);
+}
+.ally-home__radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ally-space-2);
+  min-height: var(--ally-h);
+  padding: 0 14px;
+  border: 1px solid var(--ally-line-strong);
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface);
+  font: 400 15px/1.3 var(--ally-font-ui);
+  cursor: pointer;
+}
+.ally-home__radio.is-on {
+  border-color: var(--ally-accent);
+  background: var(--ally-accent-soft);
+}
+.ally-home__reply-text {
+  margin: 4px 0 0;
+  color: var(--ally-ink-2);
+}
+.ally-home__reply-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ally-space-3);
+  padding: var(--ally-space-4);
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+}
+
+/* ── Badges ── */
+:where(.ally-home, .ally-inbox, .ally-list-page) .ally-badge--good {
+  background: var(--ally-good-bg);
+  color: var(--ally-good);
+}
+:where(.ally-home, .ally-inbox, .ally-list-page) .ally-badge--warn {
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+}
+:where(.ally-home, .ally-inbox, .ally-list-page) .ally-badge--muted {
+  background: var(--ally-sunken);
+  color: var(--ally-muted);
+}
+
+/* ── Sheets: a panel over the page with a scrim ── */
+.ally-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: flex-end;
+}
+.ally-sheet__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(23, 23, 28, 0.32);
+}
+.ally-sheet__panel {
+  position: relative;
+  width: min(440px, 100vw);
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--ally-space-5);
+  background: var(--ally-bg);
+  box-shadow: 0 30px 60px rgba(23, 23, 28, 0.18);
+  outline: none;
+}
+.ally-sheet--bottom {
+  align-items: flex-end;
+}
+.ally-sheet--bottom .ally-sheet__panel {
+  width: 100vw;
+  height: auto;
+  max-height: 92vh;
+  border-radius: 20px 20px 0 0;
+}
+.ally-sheet--center {
+  align-items: center;
+  justify-content: center;
+  padding: var(--ally-space-4);
+}
+.ally-sheet--center .ally-sheet__panel {
+  width: min(420px, 100%);
+  height: auto;
+  border-radius: var(--ally-radius-lg);
+  background: var(--ally-surface);
+}
+.ally-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ally-space-3);
+  margin-bottom: var(--ally-space-4);
+}
+.ally-sheet__head .ally-heading {
+  margin: 0;
+}
+@media (max-width: 959px) {
+  .ally-sheet__panel {
+    width: 100vw;
+    padding: var(--ally-space-4);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ally-sheet__panel {
+    animation: ally-sheet-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes ally-sheet-in {
+    from {
+      transform: translateX(24px);
+      opacity: 0;
+    }
+  }
+  .ally-sheet--center .ally-sheet__panel {
+    animation: ally-sheet-pop 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes ally-sheet-pop {
+    from {
+      transform: scale(0.97);
+      opacity: 0;
+    }
+  }
+}
+
+/* The `···` menu (ui/Menu.tsx): the assistant header, and each card on the assistants list. */
+.ally-more {
+  position: relative;
+}
+.ally-more__button {
+  width: 44px;
+  padding: 0;
+}
+.ally-more__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 200px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  box-shadow: 0 12px 30px rgba(23, 23, 28, 0.12);
+}
+.ally-more__menu :is(a, button) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--ally-radius-sm);
+  background: none;
+  color: var(--ally-ink);
+  font: 400 15px/1.3 var(--ally-font-ui);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ally-more__menu :is(a, button):is(:hover, :focus-visible) {
+  background: var(--ally-sunken);
+  outline: none;
+}
+/* A destructive entry, such as Remove assistant. */
+.ally-more__menu button.ally-more__danger {
+  color: var(--ally-danger);
+}
+
+/* Remove assistant (ui/RemoveDialog.tsx). */
+.ally-remove {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ally-space-3);
+}
+.ally-remove .ally-heading {
+  margin: 0;
+}
+.ally-remove .ally-small {
+  margin: 0;
+  color: var(--ally-muted);
+}
+.ally-remove .ally-remove__error {
+  color: var(--ally-danger);
+}
+.ally-remove__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ally-space-2);
+  margin-top: var(--ally-space-2);
+}
+.ally-btn--primary.ally-remove__confirm {
+  min-height: 44px;
+  background: var(--ally-danger);
+}

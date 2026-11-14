@@ -1,0 +1,255 @@
+{
+  "version": 1,
+  "about": "Synthetic planner cases for the orchestrated Debrief (no production data). Each case is a session whose right planner choice is known by construction: the profile and the Analyst's evidence summary carry exactly the signal an agent's use_when names. Used today by ally-ai tests/core/debrief_graph/test_orchestrator_fixtures.py (planner wiring with a fake model) and ally-be src/debrief/test/debrief-orchestrator-metrics.spec.ts (metric rollups); an offline planner eval can load the same file later. `expected.choose` = agents a good plan includes; `expected.never` = agents it must not include (many are simply not offered); `expected.offered` / `expected.notOffered` = what code must and must not show the planner; `expectedFindings` = what protocol_check should find (quotes are exact transcript words, checked by the quote verifier).",
+  "organisation": {
+    "id": "fixture-org-sunrise",
+    "name": "Sunrise Listening Line (synthetic)",
+    "protocols": [
+      {
+        "code": "SYN-P1",
+        "title": "Refer when low mood lasts two weeks",
+        "text": "If a caller describes low mood on most days for two weeks or longer, suggest they see a GP or a counsellor, and offer the referral list before the call ends."
+      },
+      {
+        "code": "SYN-P2",
+        "title": "Give the helpline on any self-harm mention",
+        "text": "Whenever a caller mentions self-harm, give the 24-hour crisis helpline number and ask whether they can keep themselves safe tonight."
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "protocol_self_harm",
+      "about": "The organisation has two protocols and the client mentions self-harm; the trainee moves on to coping tips without the helpline.",
+      "session": { "language": "en", "learner_turns": 4 },
+      "inputs": {
+        "availability": { "org_protocols": 2, "past_debriefs": 0 },
+        "past_work_on_this": []
+      },
+      "transcript": [
+        { "turn_index": 1, "role": "counselor", "text": "Hi, thanks for calling. What's on your mind tonight?" },
+        { "turn_index": 2, "role": "client", "text": "Work has been awful and I can't sleep." },
+        { "turn_index": 3, "role": "counselor", "text": "That sounds exhausting. How long has it been like this?" },
+        { "turn_index": 4, "role": "client", "text": "A while. Last night I thought about cutting myself again." },
+        { "turn_index": 5, "role": "counselor", "text": "Have you tried a warm bath before bed? Some people find that helps." },
+        { "turn_index": 6, "role": "client", "text": "I guess I could try that." },
+        { "turn_index": 7, "role": "counselor", "text": "Great, let's talk about a sleep routine." }
+      ],
+      "safety": {
+        "risk_cues": [
+          { "turn_index": 4, "category": "self_harm", "learner_response": "missed", "evidence": "Client mentions thoughts of cutting." }
+        ],
+        "learner_distress": []
+      },
+      "evidence": {
+        "behaviours": [
+          { "skill": "open questions", "opportunity": true, "observation": "observed", "confidence": "high", "importance": 2, "turn_index": 1, "quote": "What's on your mind tonight?", "note": "Opened warmly." },
+          { "skill": "exploring risk", "opportunity": true, "observation": "missed", "confidence": "high", "importance": 3, "turn_index": 5, "quote": "Have you tried a warm bath before bed?", "note": "Moved to tips after a self-harm disclosure." }
+        ],
+        "pivotal_moments": [
+          { "turn_index": 4, "summary": "Client discloses recent thoughts of self-harm and the trainee moves straight to sleep tips", "why_it_matters": "A risk disclosure needs safety questions first." }
+        ],
+        "ai_faults": []
+      },
+      "expected": {
+        "offered": ["protocol_check"],
+        "notOffered": ["history_deep", "analyst"],
+        "choose": ["protocol_check"],
+        "never": ["history_deep", "language_specialist"]
+      },
+      "expectedFindings": {
+        "protocol_check": [
+          { "kind": "missed", "turnIndex": 5, "quote": "Have you tried a warm bath before bed?", "source": "protocol:SYN-P2", "point": "The organisation's protocol says to give the crisis helpline when self-harm is mentioned; the trainee moved on to sleep tips instead." }
+        ]
+      }
+    },
+    {
+      "id": "protocol_low_mood_two_weeks",
+      "about": "No risk cue, but the client describes a month of low mood and the trainee never suggests a referral: the low-mood protocol applies.",
+      "session": { "language": "en", "learner_turns": 4 },
+      "inputs": {
+        "availability": { "org_protocols": 2, "past_debriefs": 1 },
+        "past_work_on_this": []
+      },
+      "transcript": [
+        { "turn_index": 1, "role": "counselor", "text": "Hello, how are you doing today?" },
+        { "turn_index": 2, "role": "client", "text": "Honestly I've felt low pretty much every day for about a month." },
+        { "turn_index": 3, "role": "counselor", "text": "A month is a long time to feel that way." },
+        { "turn_index": 4, "role": "client", "text": "Yeah. I just drag myself through the day." },
+        { "turn_index": 5, "role": "counselor", "text": "What keeps you going on the hard days?" },
+        { "turn_index": 6, "role": "client", "text": "My dog, mostly." },
+        { "turn_index": 7, "role": "counselor", "text": "It sounds like your dog matters a lot. Thanks for sharing today." }
+      ],
+      "safety": { "risk_cues": [], "learner_distress": [] },
+      "evidence": {
+        "behaviours": [
+          { "skill": "reflecting feelings", "opportunity": true, "observation": "observed", "confidence": "high", "importance": 2, "turn_index": 3, "quote": "A month is a long time to feel that way.", "note": "Reflected the duration." },
+          { "skill": "referral", "opportunity": true, "observation": "missed", "confidence": "high", "importance": 3, "note": "Closed the call without suggesting further support." }
+        ],
+        "pivotal_moments": [
+          { "turn_index": 2, "summary": "Client describes low mood on most days for about a month", "why_it_matters": "Long-lasting low mood calls for a referral." },
+          { "turn_index": 7, "summary": "Trainee closes the call without suggesting any further support", "why_it_matters": "The chance to refer passes." }
+        ],
+        "ai_faults": []
+      },
+      "expected": {
+        "offered": ["protocol_check"],
+        "notOffered": ["history_deep", "analyst"],
+        "choose": ["protocol_check"],
+        "never": ["history_deep", "language_specialist"]
+      },
+      "expectedFindings": {
+        "protocol_check": [
+          { "kind": "missed", "turnIndex": 7, "quote": "Thanks for sharing today.", "source": "protocol:SYN-P1", "point": "The organisation asks for a referral when low mood lasts two weeks or more; the call closed without one." },
+          { "kind": "done_well", "turnIndex": 3, "quote": "A month is a long time to feel that way.", "source": "protocol:SYN-P1", "point": "The trainee picked up how long the low mood had lasted, which is what the protocol turns on." }
+        ]
+      }
+    },
+    {
+      "id": "history_repeated_miss",
+      "about": "Four past debriefs, three of which asked the learner to work on reflecting feelings, and this session missed it again.",
+      "session": { "language": "en", "learner_turns": 4 },
+      "inputs": {
+        "availability": { "org_protocols": 0, "past_debriefs": 4 },
+        "past_work_on_this": [
+          { "date": "2026-10-02", "skill": "reflecting feelings", "point": "Name the feeling you hear before asking the next question." },
+          { "date": "2026-10-09", "skill": "reflecting feelings", "point": "Reflect the feeling, not only the facts." },
+          { "date": "2026-10-16", "skill": "reflecting feelings", "point": "Slow down and say back what the client feels." },
+          { "date": "2026-10-23", "skill": "pacing", "point": "Leave space after a hard disclosure." }
+        ]
+      },
+      "transcript": [
+        { "turn_index": 1, "role": "counselor", "text": "What would you like to talk about?" },
+        { "turn_index": 2, "role": "client", "text": "My sister stopped speaking to me and it really hurts." },
+        { "turn_index": 3, "role": "counselor", "text": "When did she stop speaking to you?" },
+        { "turn_index": 4, "role": "client", "text": "Three weeks ago, after an argument about our mum." },
+        { "turn_index": 5, "role": "counselor", "text": "What was the argument about?" },
+        { "turn_index": 6, "role": "client", "text": "Who should look after her." },
+        { "turn_index": 7, "role": "counselor", "text": "Have you tried calling her?" }
+      ],
+      "safety": { "risk_cues": [], "learner_distress": [] },
+      "evidence": {
+        "behaviours": [
+          { "skill": "open questions", "opportunity": true, "observation": "partial", "confidence": "medium", "importance": 2, "turn_index": 1, "quote": "What would you like to talk about?", "note": "Opened openly, then switched to fact questions." },
+          { "skill": "reflecting feelings", "opportunity": true, "observation": "missed", "confidence": "high", "importance": 3, "note": "The client named hurt twice; it was never reflected." }
+        ],
+        "pivotal_moments": [
+          { "turn_index": 2, "summary": "Client says a family rift really hurts and the trainee asks for dates instead of the feeling", "why_it_matters": "The feeling was the door into the conversation." }
+        ],
+        "ai_faults": []
+      },
+      "expected": {
+        "offered": ["history_deep", "progress_reader"],
+        "notOffered": ["protocol_check", "analyst"],
+        "choose": ["history_deep"],
+        "never": ["protocol_check", "language_specialist"]
+      }
+    },
+    {
+      "id": "language_hinglish_romanised",
+      "about": "A Hindi session in which the learner writes romanised Hindi mixed with English (Latin script): the quotes are not in the debrief language's script.",
+      "session": { "language": "hi", "learner_turns": 4 },
+      "inputs": {
+        "availability": { "org_protocols": 0, "past_debriefs": 0 },
+        "past_work_on_this": []
+      },
+      "transcript": [
+        { "turn_index": 1, "role": "counselor", "text": "Namaste, aaj aap kaisa feel kar rahe ho?" },
+        { "turn_index": 2, "role": "client", "text": "Bas thoda pareshan hoon, exams aa rahe hain." },
+        { "turn_index": 3, "role": "counselor", "text": "Exams ka pressure bahut heavy lagta hai, haan?" },
+        { "turn_index": 4, "role": "client", "text": "Haan, raat ko neend nahi aati." },
+        { "turn_index": 5, "role": "counselor", "text": "Neend na aana, that must be really tiring. Take your time." },
+        { "turn_index": 6, "role": "client", "text": "Thank you, accha laga baat karke." },
+        { "turn_index": 7, "role": "counselor", "text": "Kabhi bhi baat karni ho toh call karna." }
+      ],
+      "safety": { "risk_cues": [], "learner_distress": [] },
+      "evidence": {
+        "behaviours": [
+          { "skill": "reflecting feelings", "opportunity": true, "observation": "observed", "confidence": "high", "importance": 3, "turn_index": 3, "quote": "Exams ka pressure bahut heavy lagta hai, haan?", "note": "Reflected the pressure in the client's own mix." },
+          { "skill": "exploring sleep", "opportunity": true, "observation": "partial", "confidence": "medium", "importance": 2, "turn_index": 5, "quote": "Neend na aana, that must be really tiring.", "note": "Acknowledged, did not explore." }
+        ],
+        "pivotal_moments": [
+          { "turn_index": 4, "summary": "Client mentions sleeplessness before exams and the trainee acknowledges it in mixed Hindi and English", "why_it_matters": "The warmth rests on the language mix." }
+        ],
+        "ai_faults": [
+          { "turn_index": 6, "note": "The AI client wrapped up abruptly with \"accha laga\" before the trainee could explore." }
+        ]
+      },
+      "expected": {
+        "offered": ["language_specialist"],
+        "notOffered": ["protocol_check", "history_deep", "analyst"],
+        "choose": ["language_specialist"],
+        "never": ["protocol_check", "history_deep"]
+      }
+    },
+    {
+      "id": "language_code_mixed_devanagari",
+      "about": "An English session in which the learner writes Hindi in Devanagari alongside English: code-mixed, and a script other than the debrief language's.",
+      "session": { "language": "en", "learner_turns": 4 },
+      "inputs": {
+        "availability": { "org_protocols": 0, "past_debriefs": 0 },
+        "past_work_on_this": []
+      },
+      "transcript": [
+        { "turn_index": 1, "role": "counselor", "text": "Hello, आप कैसे हैं? What brings you here?" },
+        { "turn_index": 2, "role": "client", "text": "I've been feeling lonely since I moved cities." },
+        { "turn_index": 3, "role": "counselor", "text": "नए शहर में अकेलापन, that sounds hard." },
+        { "turn_index": 4, "role": "client", "text": "It is. I don't know anyone." },
+        { "turn_index": 5, "role": "counselor", "text": "What has helped you meet people before?" },
+        { "turn_index": 6, "role": "client", "text": "Maybe joining a club." },
+        { "turn_index": 7, "role": "counselor", "text": "अच्छा idea है. Let's think about which one." }
+      ],
+      "safety": { "risk_cues": [], "learner_distress": [] },
+      "evidence": {
+        "behaviours": [
+          { "skill": "reflecting feelings", "opportunity": true, "observation": "observed", "confidence": "high", "importance": 2, "turn_index": 3, "quote": "नए शहर में अकेलापन, that sounds hard.", "note": "Reflected the loneliness." },
+          { "skill": "open questions", "opportunity": true, "observation": "observed", "confidence": "high", "importance": 2, "turn_index": 5, "quote": "What has helped you meet people before?", "note": "Invited the client's own ideas." }
+        ],
+        "pivotal_moments": [
+          { "turn_index": 3, "summary": "Trainee reflects the client's loneliness, switching between Hindi and English", "why_it_matters": "The switch may carry warmth the debrief should keep." }
+        ],
+        "ai_faults": []
+      },
+      "expected": {
+        "offered": ["language_specialist"],
+        "notOffered": ["protocol_check", "history_deep", "analyst"],
+        "choose": ["language_specialist"],
+        "never": ["protocol_check", "history_deep"]
+      }
+    },
+    {
+      "id": "plain_english_first_session",
+      "about": "No organisation protocols, a first session, English throughout: none of protocol_check, history_deep or language_specialist is worth running (none is even offered).",
+      "session": { "language": "en", "learner_turns": 4, "counselor_id": 7 },
+      "inputs": {
+        "availability": { "org_protocols": 0, "past_debriefs": 0 },
+        "past_work_on_this": []
+      },
+      "transcript": [
+        { "turn_index": 1, "role": "counselor", "text": "Hi, I'm here to listen. What's been happening?" },
+        { "turn_index": 2, "role": "client", "text": "I failed my driving test again." },
+        { "turn_index": 3, "role": "counselor", "text": "That's disappointing. How are you feeling about it?" },
+        { "turn_index": 4, "role": "client", "text": "Embarrassed, mostly." },
+        { "turn_index": 5, "role": "counselor", "text": "Embarrassed. Tell me more about that." },
+        { "turn_index": 6, "role": "client", "text": "Everyone else passed first time." },
+        { "turn_index": 7, "role": "counselor", "text": "It can feel like everyone else finds it easy." }
+      ],
+      "safety": { "risk_cues": [], "learner_distress": [] },
+      "evidence": {
+        "behaviours": [
+          { "skill": "reflecting feelings", "opportunity": true, "observation": "observed", "confidence": "high", "importance": 3, "turn_index": 5, "quote": "Embarrassed. Tell me more about that.", "note": "Named the feeling and invited more." }
+        ],
+        "pivotal_moments": [
+          { "turn_index": 4, "summary": "Client names embarrassment and the trainee reflects it back", "why_it_matters": "A clean example of reflecting a feeling." }
+        ],
+        "ai_faults": []
+      },
+      "expected": {
+        "offered": [],
+        "notOffered": ["protocol_check", "history_deep", "language_specialist", "analyst"],
+        "choose": [],
+        "never": ["protocol_check", "history_deep", "language_specialist"]
+      }
+    }
+  ]
+}

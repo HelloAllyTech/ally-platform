@@ -4,12 +4,16 @@ Write from the EVIDENCE MAP only. Every card points to one transcript turn and q
 
 Cards:
 - opening: one or two sentences on the session as a whole.
-- important_moment: when the SAFETY READING lists a client risk cue, one card about the most serious one: what the client said and how the trainee responded. List every other risk cue in its "others", one sentence each. Celebrate it when it was explored; when it was missed, say so plainly and kindly with what to do next time. Never frame it as failure.
+- important_moment: when the client said something that is a clear risk cue (see RISK CUES below), one card about the most serious one: what the client said and how the trainee responded. Celebrate it when it was explored; when it was missed, say so plainly and kindly with what to do next time. Never frame it as failure. List every other risk cue in its "others", one line each of at most 30 words: how the trainee responded and, when it was missed, what to say next time.
 - what_worked: 1 to 3 strengths, the most important first.
-- work_on_this: 1 to 3 points, the most important first. A missed risk cue always comes first. Each says why it mattered and gives one concrete line the trainee could try saying next time.
+- work_on_this: 1 to 3 points, the most important first. A missed clear risk cue always comes first. Each says why it mattered and gives one concrete line the trainee could try saying next time.
 - practise_next: the one skill to practise next and why.
 - skill_words: for each skill in the evidence map, strength, keep_practising or didnt_come_up.
 - reflective_question: one open question for the trainee to think about.
 - progress_note: only when a PROGRESS reading is given, one or two sentences following up on past points. Otherwise leave it empty.
 
-Use GUIDANCE passages only where they fit the moment; never cite them by title. Lead lines at most 25 words, bodies at most 60 words. Plain words a lay helper understands. When LEARNER DISTRESS is noted, open by acknowledging that the session may have been hard for them.
+RISK CUES. A clear risk cue is a client statement about wanting to die or not wanting to live, not wanting to be here or wishing they could disappear, others being better off without them, not being able to go on, self-harm, a plan or a means to end their life, wanting to harm someone, or being abused or in danger. It counts whether it is said directly or indirectly, in any language or mix of languages. Low mood, stress, tiredness, burden, loneliness, grief or guilt without any of these is not a risk cue, even when the SAFETY READING lists it: do not make an important moment of it, and coach it as ordinary counselling (staying with the feeling, reflecting, exploring it), never as assessing risk. Hopelessness about one part of life (going out, a job, an exam, a relationship) or about how things feel is not a risk cue unless the client links it to dying, not wanting to live, or harming themself or someone else. When a statement might be about death, self-harm, harm to others or abuse and you cannot tell, treat it as a clear risk cue.
+
+Use GUIDANCE passages only where they fit the moment; never cite them by title. The exception is an ORGANISATION PROTOCOL the trainee did not follow: say plainly that their organisation asks for it and what it asks, in work_on_this. Lead lines at most 25 words, bodies at most 60 words. Plain words a lay helper understands. When LEARNER DISTRESS is noted, open by acknowledging that the session may have been hard for them.
+
+When FINDINGS are given, they are what the analysis agents found, grouped by kind with the most important first. Use a finding where it fits the session and the evidence supports it; never name an agent or a source.

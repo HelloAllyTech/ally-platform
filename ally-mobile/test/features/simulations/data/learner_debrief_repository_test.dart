@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -119,6 +120,9 @@ void main() {
       expect(of({'state': 'working', 'steps': ['a', 'b']}).steps, ['a', 'b']);
       expect(of({'state': 'working'}).isShowable, isTrue);
       expect(of({'state': 'on_its_way'}).state, LearnerDebriefState.onItsWay);
+      expect(of({'state': 'taking_longer'}).state, LearnerDebriefState.takingLonger);
+      expect(of({'state': 'not_available'}).isShowable, isFalse);
+      expect(of({'state': 'not_available', 'stopped': true}).isShowable, isTrue);
       expect(of({'state': 'too_short'}).state, LearnerDebriefState.tooShort);
       expect(of({'state': 'not_available'}).isShowable, isFalse);
       expect(of({'state': 'something_new'}).isShowable, isFalse);
@@ -272,11 +276,29 @@ void main() {
       verify(() => dio.get<Map<String, dynamic>>('/debriefs/sessions/s-1/audio/work_on_this%5B0%5D')).called(1);
 
       when(() => dio.post<void>(any())).thenAnswer((_) async => _response<void>(null));
+      when(() => dio.post<void>(any(), data: any(named: 'data'))).thenAnswer((_) async => _response<void>(null));
       await repository.markRead('s-1');
       verify(() => dio.post<void>('/debriefs/sessions/s-1/read')).called(1);
       await repository.markOpened('s-1');
-      verify(() => dio.post<void>('/debriefs/sessions/s-1/opened')).called(1);
+      // Flutter tests run as Android unless told otherwise.
+      verify(() => dio.post<void>('/debriefs/sessions/s-1/opened', data: {'platform': 'android'})).called(1);
       expect(LearnerDebriefRepository.replyStreamPath('s-1'), '/debriefs/sessions/s-1/reply/stream');
+    });
+
+    test('POST a learner event with the platform', () async {
+      when(() => dio.post<void>(any(), data: any(named: 'data'))).thenAnswer((_) async => _response<void>(null));
+      await repository.recordEvent('s-1', DebriefLearnerEvent.practiseNextClick);
+      verify(
+        () => dio.post<void>('/debriefs/sessions/s-1/events', data: {'kind': 'practise_next_click', 'platform': 'android'}),
+      ).called(1);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await repository.recordEvent('s-1', DebriefLearnerEvent.leftBeforeReady);
+      verify(
+        () => dio.post<void>('/debriefs/sessions/s-1/events', data: {'kind': 'left_before_ready', 'platform': 'ios'}),
+      ).called(1);
+      debugDefaultTargetPlatformOverride = null;
     });
 
     test('DELETE a flag to undo it', () async {

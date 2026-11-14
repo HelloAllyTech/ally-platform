@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from "react";
 
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
 
 import { Permissions, ROUTES, FeatureToggleKey, OrgToggle } from "@constants";
 import {
@@ -52,6 +52,10 @@ import {
   AgentTestCases,
   Competencies,
   DebriefConsole,
+  DebriefSessionPage,
+  AgentLogsPage,
+  PmAgentPage,
+  DebriefSettingsPage,
   RoleplaySessionLogs,
   RoleplaySessionLogDetail,
   Terms,
@@ -60,12 +64,42 @@ import {
   EvaluateRecords,
   EvaluateRecordDetail,
   WhatsAppBot,
-  ChatbotPage,
 } from "@pages";
+
+// By path, not through `@pages`: onboarding (chunk 20a) needs nothing the barrel provides.
 
 import { DefaultRedirect } from "./DefaultRedirect";
 import { PrivateLayout } from "./PrivateLayout";
 import { PublicRoute } from "./PublicRoute";
+import { AssistantHome } from "../pages/AssistantHome";
+import { OnboardingSession, OnboardingStart } from "../pages/Onboarding";
+
+/**
+ * The Debrief console opens with the Analytics toggle or the clinical
+ * advisor's own toggle, as ally-be's DebriefRead allows (CONSOLE_API "Roles").
+ */
+const DEBRIEF_CONSOLE_FEATURES = [
+  FeatureToggleKey.ANALYTICS,
+  FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
+];
+
+/** `/inbox` (an owner's email from before the inbox moved): AI Chatbots → Inbox, same chat. */
+const InboxRedirect: React.FC = () => {
+  const [params] = useSearchParams();
+  const next = new URLSearchParams(params);
+  next.set("tab", "inbox");
+  return <Navigate to={`${ROUTES.WHATSAPP_BOT}?${next.toString()}`} replace />;
+};
+
+/**
+ * One assistant: the assistant home (chunk 20d), edge to edge. The classic tabbed page went in CL1;
+ * an old `?view=classic` link opens the home, and its `tab=` still lands on the right section.
+ */
+const ChatbotDetailRoute: React.FC = () => (
+  <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
+    <AssistantHome />
+  </PrivateLayout>
+);
 
 // Lazy-loaded so IBM Carbon + Carbon Charts (+ d3) and the scoped Carbon
 // stylesheet ship as their own chunk, loaded only when the Analytics tab opens.
@@ -87,9 +121,18 @@ const DesignSystem = lazy(() =>
   import("../pages/DesignSystem/DesignSystem").then(module => ({ default: module.DesignSystem })),
 );
 
+// Agents v2 component gallery (chunk 20d): development builds only, so it never ships.
+const DevV2Components = import.meta.env.DEV ? lazy(() => import("../pages/DevV2Components")) : null;
+// Onboarding's screens from fixtures, for review and the Playwright tests (chunk 20d).
+const DevOnboarding = import.meta.env.DEV ? lazy(() => import("../pages/DevOnboarding")) : null;
+const DevInbox = import.meta.env.DEV ? lazy(() => import("../pages/DevInbox")) : null;
+const DevAssistantHome = import.meta.env.DEV
+  ? lazy(() => import("../pages/DevAssistantHome"))
+  : null;
+
 export const RouteLayout: React.FC = () => {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <Routes>
         {/* Public Routes */}
         <Route
@@ -123,6 +166,47 @@ export const RouteLayout: React.FC = () => {
             </Suspense>
           }
         />
+
+        {DevOnboarding && (
+          <Route
+            path="/dev/onboarding"
+            element={
+              <Suspense fallback={null}>
+                <DevOnboarding />
+              </Suspense>
+            }
+          />
+        )}
+        {DevInbox && (
+          <Route
+            path="/dev/inbox"
+            element={
+              <Suspense fallback={null}>
+                <DevInbox />
+              </Suspense>
+            }
+          />
+        )}
+        {DevAssistantHome && (
+          <Route
+            path="/dev/assistant-home/*"
+            element={
+              <Suspense fallback={null}>
+                <DevAssistantHome />
+              </Suspense>
+            }
+          />
+        )}
+        {DevV2Components && (
+          <Route
+            path="/dev/v2-components"
+            element={
+              <Suspense fallback={null}>
+                <DevV2Components />
+              </Suspense>
+            }
+          />
+        )}
 
         {/* Evaluator micro-app — its own email+password session (NOT admin
             auth); the pages gate themselves on the evaluator token. */}
@@ -645,22 +729,42 @@ export const RouteLayout: React.FC = () => {
             </PrivateLayout>
           }
         />
+        <Route path={ROUTES.INBOX} element={<InboxRedirect />} />
         <Route
           path={ROUTES.WHATSAPP_BOT}
           element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT}>
+            // Full bleed, as the assistant home: the page draws its own background to the edges.
+            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
               <WhatsAppBot />
             </PrivateLayout>
           }
         />
+        {/* Onboarding (chunk 20a), before `:botId` so `new` is never read as a bot id. */}
         <Route
-          path={ROUTES.CHATBOT_DETAIL}
+          path={ROUTES.CHATBOT_NEW}
           element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT}>
-              <ChatbotPage />
+            <PrivateLayout
+              requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
+              requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
+              fullBleed
+            >
+              <OnboardingStart />
             </PrivateLayout>
           }
         />
+        <Route
+          path={ROUTES.CHATBOT_NEW_SESSION(":draftId")}
+          element={
+            <PrivateLayout
+              requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
+              requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
+              fullBleed
+            >
+              <OnboardingSession />
+            </PrivateLayout>
+          }
+        />
+        <Route path={ROUTES.CHATBOT_DETAIL} element={<ChatbotDetailRoute />} />
         <Route
           path={ROUTES.WHATSAPP_BOT_LEGACY}
           element={<Navigate to={ROUTES.WHATSAPP_BOT} replace />}
@@ -668,8 +772,40 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.DEBRIEFS}
           element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.ANALYTICS}>
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
               <DebriefConsole />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.DEBRIEF_SESSION(":runId")}
+          element={
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+              <DebriefSessionPage />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.DEBRIEF_SESSION_LOGS(":runId")}
+          element={
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+              <AgentLogsPage />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.DEBRIEFS_PM_AGENT}
+          element={
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+              <PmAgentPage />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.DEBRIEFS_SETTINGS}
+          element={
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+              <DebriefSettingsPage />
             </PrivateLayout>
           }
         />

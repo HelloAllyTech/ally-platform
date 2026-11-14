@@ -1099,6 +1099,7 @@ export class BuilderPullRequestService {
           repo: targets[0].repo,
           workflow: targets[0].workflow,
           since: pullRequest.mergedAt,
+          apps: targets[0].inputs?.apps,
         });
         if (!run) continue;
 

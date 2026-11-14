@@ -65,6 +65,16 @@ export interface DebriefCards {
   }>;
   reflective_question: string;
   progress_note?: string | null;
+  /**
+   * "Your last n sessions" (learner progress), only on a debrief where the
+   * card was due and the progress agent had something to tell the learner.
+   * Passed through to the learner as written: every reader spreads the cards.
+   */
+  progress_card?: {
+    sessions: number;
+    skills: Array<{ skill: string; trend: string; line: string }>;
+    focus: { skill: string; line: string } | null;
+  } | null;
 }
 
 export interface SafetyReading {
@@ -73,6 +83,13 @@ export interface SafetyReading {
     quote: string;
     category: string;
     learner_response: string;
+    /**
+     * How sure the cue is, set by ally-ai from the reader's own answer
+     * (`cue_strength.py`): `possible` is a hopelessness cue with no word of
+     * death, self-harm or a means, which the Writer may judge not a risk cue.
+     * Absent means clear.
+     */
+    strength?: 'clear' | 'possible';
   }>;
   learner_distress: Array<{ turn_index: number; quote: string }>;
 }
@@ -403,10 +420,19 @@ export function runDebriefChecks(input: {
     }
   }
 
-  // Every client risk cue is covered: the most serious one by the important
-  // moment, each other one by a line in its `others`. A cue left out is the
-  // worst failure a debrief can have, so a single uncovered turn fails.
-  const cueTurns = [...new Set(safety.risk_cues.map((c) => c.turn_index))];
+  // Every clear client risk cue is covered: the most serious one by the
+  // important moment, each other one by a line in its `others`. A cue left out
+  // is the worst failure a debrief can have, so a single uncovered turn fails.
+  // A `possible` cue is the Writer's call (low mood or grief is coached as
+  // ordinary counselling), so leaving it out is not a failure; a cue without a
+  // strength counts as clear.
+  const cueTurns = [
+    ...new Set(
+      safety.risk_cues
+        .filter((c) => c.strength !== 'possible')
+        .map((c) => c.turn_index),
+    ),
+  ];
   if (cueTurns.length > 0) {
     if (!cards.important_moment) {
       fail(
@@ -640,6 +666,18 @@ export function keepOfferedPractice(
         }
       : cards.practise_next,
   };
+}
+
+/**
+ * Plan §8.2: a short session's debrief is the opening and one card. Writers
+ * still sometimes add "Practise this next" and the skill words; the learner
+ * (and the supervisor reading their debrief) never sees them on a short one.
+ */
+export function cardsForReader<
+  T extends Record<string, any> | null | undefined,
+>(cards: T, recipeKey?: string | null): T {
+  if (!cards || recipeKey !== 'short') return cards;
+  return { ...cards, practise_next: null, skill_words: [] } as T;
 }
 
 /**

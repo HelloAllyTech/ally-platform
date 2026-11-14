@@ -27,6 +27,7 @@ import {
   ListPartsCommand,
   CopyObjectCommand,
   CopyObjectCommandOutput,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { AppConfigService } from '../../config/config.service';
@@ -307,6 +308,36 @@ export class S3Service {
         `Failed to delete object ${key} from bucket ${bucket}: ${error.message}`,
       );
     }
+  }
+
+  /**
+   * Every key under a prefix — or, with a delimiter, the "folders" one level
+   * down (`prefixes`). Follows continuation tokens to the end.
+   */
+  async listObjects(params: {
+    bucket: string;
+    prefix: string;
+    delimiter?: string;
+  }): Promise<{ keys: string[]; prefixes: string[] }> {
+    const keys: string[] = [];
+    const prefixes: string[] = [];
+    let token: string | undefined;
+    do {
+      const page = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: params.bucket,
+          Prefix: params.prefix,
+          Delimiter: params.delimiter,
+          ContinuationToken: token,
+        }),
+      );
+      for (const o of page.Contents ?? []) if (o.Key) keys.push(o.Key);
+      for (const p of page.CommonPrefixes ?? []) {
+        if (p.Prefix) prefixes.push(p.Prefix);
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return { keys, prefixes };
   }
 
   /** Server-side copy an object within the same bucket. */

@@ -35,6 +35,7 @@ export const uiSharedFakes = {
       onClick={onClick}
       disabled={disabled}
       aria-expanded={rest["aria-expanded"]}
+      data-kind={rest.kind}
     >
       {children}
     </button>
@@ -146,6 +147,50 @@ export const uiSharedFakes = {
     </div>
   ),
   SelectItem: ({ value, text }: any) => <option value={value}>{text}</option>,
+  // A Carbon Dropdown as a native select: each option's value is its label, so a test picks an
+  // item by the words a person sees.
+  CarbonDropdown: ({
+    id,
+    titleText,
+    items,
+    selectedItem,
+    itemToString,
+    onChange,
+    disabled,
+    ...rest
+  }: any) => {
+    const text = (item: any) => (itemToString ? itemToString(item) : String(item ?? ""));
+    return (
+      <div data-testid={rest["data-testid"]}>
+        <label htmlFor={id}>{titleText}</label>
+        <select
+          id={id}
+          value={selectedItem ? text(selectedItem) : ""}
+          disabled={disabled}
+          onChange={event =>
+            onChange?.({ selectedItem: items.find((i: any) => text(i) === event.target.value) })
+          }
+        >
+          {items.map((item: any, i: number) => (
+            <option key={i} value={text(item)} disabled={Boolean(item?.disabled)}>
+              {text(item)}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  },
+  NumberInput: ({ id, value, min, max, disabled, onChange }: any) => (
+    <input
+      id={id}
+      type="number"
+      value={value}
+      min={min}
+      max={max}
+      disabled={disabled}
+      onChange={event => onChange?.(event, { value: event.target.value, direction: "" })}
+    />
+  ),
   ContentSwitcher: ({ children, selectedIndex, onChange, ...rest }: any) => (
     <div role="group" aria-label={rest["aria-label"]}>
       {React.Children.map(children, (child: any, index: number) =>
@@ -177,6 +222,14 @@ export const uiSharedFakes = {
   TableHeader: passthrough("th"),
   TableCell: passthrough("td"),
   Tooltip: ({ children, label }: any) => <span data-tooltip={label}>{children}</span>,
+  DismissibleTag: ({ text, title, onClose, ...rest }: any) => (
+    <span data-testid={rest["data-testid"]}>
+      {text}
+      <button type="button" aria-label={title} onClick={onClose}>
+        ×
+      </button>
+    </span>
+  ),
   SidePanel: ({ open, title, onClose, closeLabel, children }: any) =>
     open ? (
       <aside role="dialog" aria-label="Side panel">
@@ -201,4 +254,36 @@ export const uiSharedFakes = {
     </nav>
   ),
   InlineLoading: ({ description }: any) => <span>{description}</span>,
+  /** Opens on its trigger and closes once an item is chosen; no floating or focus handling. */
+  OverflowMenu: function OverflowMenu({
+    children,
+    iconDescription,
+    renderIcon: Icon,
+    ...rest
+  }: any) {
+    const [open, setOpen] = React.useState(false);
+    return (
+      <div data-testid={rest["data-testid"]}>
+        <button
+          type="button"
+          aria-label={iconDescription}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => setOpen(o => !o)}
+        >
+          {Icon ? <Icon /> : null}
+        </button>
+        {open && (
+          <div role="menu" onClick={() => setOpen(false)}>
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  },
+  OverflowMenuItem: ({ itemText, onClick, disabled }: any) => (
+    <button type="button" role="menuitem" onClick={onClick} disabled={disabled}>
+      {itemText}
+    </button>
+  ),
 };

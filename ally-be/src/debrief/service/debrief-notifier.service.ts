@@ -13,6 +13,20 @@ const DEBRIEF_CLINICAL_SIGN_OFF_KEY =
 export const DEBRIEF_READY_NOTIFICATION = 'DEBRIEF_READY';
 export const DEBRIEF_REVIEWED_NOTIFICATION = 'DEBRIEF_REVIEWED';
 export const DEBRIEF_ESCALATED_NOTIFICATION = 'DEBRIEF_ESCALATED';
+/** FR-54 / spec C3: promotions, reverts, filings and route-D proposals, to the owner. */
+export const DEBRIEF_OWNER_NOTIFICATION = 'DEBRIEF_OWNER_ALERT';
+/** Approvals in their last 3 days and urgent flags past the review deadline, to the Ally team. */
+export const DEBRIEF_TEAM_NOTIFICATION = 'DEBRIEF_TEAM_ALERT';
+/** The owner permission (migration 1981900730000). */
+const OWNER_PERMISSION = 'manage:admin:debrief-settings';
+
+export interface DebriefStaffAlert {
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  /** The person who did it is not told twice. */
+  excludeUserId?: number | null;
+}
 
 export interface DebriefEscalation {
   what: 'flag' | 'run';
@@ -139,6 +153,80 @@ export class DebriefNotifier {
       this.logger.warn(
         `[debrief] escalation notification for session ${e.scenarioSessionId} failed: ${(err as Error).message}`,
       );
+    }
+  }
+
+  /**
+   * FR-54 (spec C3): every promotion, revert (a canary's auto-revert too),
+   * Builder or Bug Hunter filing and route-D proposal tells the owner — the
+   * holders of `manage:admin:debrief-settings` — with an in-app notification
+   * that opens the console. Staff-facing, so English. Never throws.
+   */
+  async owner(alert: DebriefStaffAlert): Promise<number> {
+    return this.staff(
+      `SELECT DISTINCT u.id, u.tenant_id
+         FROM users u
+         JOIN user_groups ug ON ug."userId" = u.id
+         JOIN group_permissions gp ON gp."groupId" = ug."groupId"
+         JOIN permissions p ON p.id = gp."permissionId"
+        WHERE p.name = $1`,
+      [OWNER_PERMISSION],
+      DEBRIEF_OWNER_NOTIFICATION,
+      alert,
+    );
+  }
+
+  /**
+   * The Ally team — everyone with the Debrief console (the Analytics toggle)
+   * and platform access: approvals entering their last 3 days, urgent flags
+   * past the review deadline. Never throws.
+   */
+  async team(alert: DebriefStaffAlert): Promise<number> {
+    return this.staff(
+      `SELECT DISTINCT u.id, u.tenant_id
+         FROM admin_feature_toggles t
+         JOIN users u ON u.id = t."userId"
+         JOIN user_groups ug ON ug."userId" = u.id
+         JOIN group_permissions gp ON gp."groupId" = ug."groupId"
+         JOIN permissions p ON p.id = gp."permissionId"
+        WHERE t."featureKey" = $1 AND t.enabled = true
+          AND p.name = 'system:access'`,
+      [FeatureToggleKey.ANALYTICS],
+      DEBRIEF_TEAM_NOTIFICATION,
+      alert,
+    );
+  }
+
+  private async staff(
+    sql: string,
+    params: unknown[],
+    type: string,
+    alert: DebriefStaffAlert,
+  ): Promise<number> {
+    try {
+      const people: Array<{ id: number; tenant_id: string | null }> =
+        await this.dataSource.query(sql, params);
+      let sent = 0;
+      for (const p of people) {
+        if (alert.excludeUserId && Number(p.id) === alert.excludeUserId) {
+          continue;
+        }
+        await this.inApp.create({
+          userId: Number(p.id),
+          tenantId: p.tenant_id as string,
+          type,
+          title: alert.title.slice(0, 200),
+          body: alert.body.slice(0, 1000),
+          data: { screen: 'DebriefConsole', ...(alert.data ?? {}) },
+        });
+        sent++;
+      }
+      return sent;
+    } catch (err) {
+      this.logger.warn(
+        `[debrief] ${type} notification failed: ${(err as Error).message}`,
+      );
+      return 0;
     }
   }
 

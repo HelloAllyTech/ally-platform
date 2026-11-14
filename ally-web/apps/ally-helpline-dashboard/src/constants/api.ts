@@ -234,6 +234,7 @@ export const ApiEndpoints = {
     // The Debrief agent's debrief for one of the caller's own sessions.
     GET_LEARNER_DEBRIEF: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}`,
     HELPFUL: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/helpful`,
+    PULSE: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/pulse`,
     FLAGS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/flags`,
     FLAG: (sessionId: string, flagId: string) =>
       `/v1/debriefs/sessions/${sessionId}/flags/${flagId}`,
@@ -242,6 +243,8 @@ export const ApiEndpoints = {
     // The learner read the debrief to the end (XP, once).
     READ: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/read`,
     OPENED: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/opened`,
+    // What the learner did that only the app sees (v9 §3.3 experience metrics).
+    EVENTS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/events`,
     // Read-aloud: a short-lived link to one card's audio.
     AUDIO: (sessionId: string, section: string) =>
       `/v1/debriefs/sessions/${sessionId}/audio/${encodeURIComponent(section)}`,

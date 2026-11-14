@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -13,7 +14,10 @@ LearnerDebriefView _view(String state) => LearnerDebriefView.fromJson({'state': 
 void main() {
   late MockLearnerDebriefRepository repo;
 
-  setUpAll(() => registerFallbackValue(DebriefFlagReason.didntSay));
+  setUpAll(() {
+    registerFallbackValue(DebriefFlagReason.didntSay);
+    registerFallbackValue(DebriefLearnerEvent.waited);
+  });
   setUp(() => repo = MockLearnerDebriefRepository());
 
   LearnerDebriefController make() => LearnerDebriefController(repository: repo, sessionId: 's-1');
@@ -26,11 +30,61 @@ void main() {
     c.dispose();
   });
 
-  test('a failed first request keeps today\'s debrief', () async {
-    when(() => repo.getDebrief('s-1')).thenThrow(Exception('500'));
+  DioException dioError({int? status, DioExceptionType type = DioExceptionType.badResponse}) => DioException(
+    requestOptions: RequestOptions(path: '/x'),
+    type: type,
+    response: status == null ? null : Response(requestOptions: RequestOptions(path: '/x'), statusCode: status),
+  );
+
+  test('a refused first request (403) keeps today\'s debrief', () async {
+    when(() => repo.getDebrief('s-1')).thenThrow(dioError(status: 403));
     final c = make();
     await c.load();
     expect(c.view, isNull);
+    c.dispose();
+  });
+
+  test('a 5xx first request is failed; no connection is offline; retry loads it', () async {
+    final answers = <Object>[
+      dioError(status: 502),
+      dioError(type: DioExceptionType.connectionError),
+      LearnerDebriefView.fromJson(readyDebriefJson()),
+    ];
+    var calls = 0;
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async {
+      final next = answers[calls++];
+      if (next is DioException) throw next;
+      return next as LearnerDebriefView;
+    });
+    final c = make();
+    await c.load();
+    expect(c.view?.state, LearnerDebriefState.failed);
+    await c.retry();
+    expect(c.view?.state, LearnerDebriefState.offline);
+    await c.retry();
+    expect(c.view?.state, LearnerDebriefState.ready);
+    expect(c.retrying, isFalse);
+    c.dispose();
+  });
+
+  test('a supervisor\'s failed view keeps the note', () async {
+    when(() => repo.getSupervisorDebrief('s-1')).thenThrow(dioError(status: 500));
+    final c = LearnerDebriefController(repository: repo, sessionId: 's-1', supervisor: true);
+    await c.load();
+    expect(c.view, isNull);
+    c.dispose();
+  });
+
+  test('the pulse answer shows once the server accepts it', () async {
+    when(() => repo.getDebrief('s-1')).thenAnswer(
+      (_) async => LearnerDebriefView.fromJson({...readyDebriefJson(), 'pulse': {'knew_next': null, 'fair': null}}),
+    );
+    when(() => repo.answerPulse('s-1', DebriefPulseQuestion.knewNext, answer: true)).thenAnswer((_) async {});
+    final c = make();
+    await c.load();
+    await c.answerPulse(DebriefPulseQuestion.knewNext, true);
+    expect(c.view?.pulse?.knewNext, isTrue);
+    expect(c.view?.pulse?.fair, isNull);
     c.dispose();
   });
 
@@ -141,6 +195,27 @@ void main() {
     c.dispose();
   });
 
+  test('recordEvent: once per kind, never awaited, and a failure is silent', () async {
+    when(() => repo.recordEvent('s-1', any())).thenThrow(Exception('404'));
+    final c = make();
+    c.recordEvent(DebriefLearnerEvent.waited);
+    c.recordEvent(DebriefLearnerEvent.waited);
+    c.recordEvent(DebriefLearnerEvent.leftBeforeReady);
+    await Future<void>.delayed(Duration.zero);
+    verify(() => repo.recordEvent('s-1', DebriefLearnerEvent.waited)).called(1);
+    verify(() => repo.recordEvent('s-1', DebriefLearnerEvent.leftBeforeReady)).called(1);
+    c.dispose();
+  });
+
+  test('recordEvent: an asynchronous failure is swallowed too', () async {
+    when(() => repo.recordEvent('s-1', any())).thenAnswer((_) => Future<void>.error(Exception('400')));
+    final c = make();
+    c.recordEvent(DebriefLearnerEvent.readThrough);
+    await Future<void>.delayed(Duration.zero);
+    verify(() => repo.recordEvent('s-1', DebriefLearnerEvent.readThrough)).called(1);
+    c.dispose();
+  });
+
   test('supervisor: reads the supervisor view only, and never marks read or opened', () async {
     when(() => repo.getSupervisorDebrief('s-1')).thenAnswer(
       (_) async => LearnerDebriefView.fromSupervisorJson({'state': 'ready', 'cards': readyDebriefJson()['cards']}),
@@ -150,7 +225,9 @@ void main() {
     expect(c.view?.supervisor, isNotNull);
     await c.markRead();
     await c.markOpened();
+    c.recordEvent(DebriefLearnerEvent.waited);
     verifyNever(() => repo.getDebrief(any()));
+    verifyNever(() => repo.recordEvent(any(), any()));
     verifyNever(() => repo.markRead(any()));
     verifyNever(() => repo.markOpened(any()));
     c.dispose();

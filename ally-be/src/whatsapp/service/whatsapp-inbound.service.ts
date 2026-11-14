@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IsNull, Repository } from 'typeorm';
@@ -43,9 +43,12 @@ import type {
 } from 'src/chatbot/engine/chatbot-engine.types';
 import { ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
+import { HandoverService } from 'src/chatbot/handover/handover.service';
+import { ConversationService } from 'src/chatbot/service/conversation.service';
 import { ConnectorService } from 'src/chatbot/service/connector.service';
 import { withFirstMessageParts } from 'src/chatbot/engine/first-reply';
 import { MAX_HISTORY_MESSAGES } from 'src/chatbot/engine/knowledge-request';
+import { WaSharedStoreWriter } from '../shared-store/wa-shared-store.writer';
 
 /**
  * Opt-out / opt-in words, recognised in code regardless of what templates exist.
@@ -149,6 +152,17 @@ export class WhatsAppInboundService {
     @InjectRepository(Chatbot)
     private readonly chatbotRepository: Repository<Chatbot>,
     private readonly eventEmitter: EventEmitter2,
+    /**
+     * The shared conversation store's dual-write (chunk 12). Optional so a module built without it
+     * — every spec that predates it — behaves exactly as before.
+     */
+    @Optional() private readonly sharedStore?: WaSharedStoreWriter,
+    /**
+     * The inbox (chunk 11a): who holds a chat, and what happens after each decision. Optional for
+     * the same reason: without them no chat is held and nothing changes.
+     */
+    @Optional() private readonly handover?: HandoverService,
+    @Optional() private readonly conversations?: ConversationService,
   ) {}
 
   async handle(inbound: InboundWhatsAppMessage): Promise<void> {
@@ -218,6 +232,9 @@ export class WhatsAppInboundService {
           status: WaMessageStatus.PROCESSING,
         },
       );
+      // Copied to the shared store in the background. Awaited only when history is read from
+      // there, and then for a capped time (see recentHistory).
+      const sharedCopy = this.sharedStore?.mirrorInbound(settings, inboundId);
 
       if (contact.blockedAt) {
         // Silently. Telling an abuser precisely when they were blocked mostly teaches them to
@@ -263,18 +280,24 @@ export class WhatsAppInboundService {
       );
       if (consentHandled) return;
 
-      // Every path from here replies — a keyword reply at once, the others after a model call.
-      // Placed HERE and no earlier because Meta's guidance is to show typing only when a reply is
-      // coming: the silent exits above (opted out, blocked, rate-limited) must not leave a bubble
-      // that never resolves. Not awaited, so it never delays the reply.
-      void this.showTyping(
-        inbound.providerMessageId,
-        inbound.text,
-        contact.locale,
-        chatbot.id,
-        settings,
-        number.creds,
-      );
+      // Every path from here replies — a keyword reply at once, the others after a model call —
+      // unless a team member has the chat (chunk 11a), when only a crisis reply goes out, so no
+      // typing dots. Placed HERE and no earlier because Meta's guidance is to show typing only when
+      // a reply is coming: the silent exits above (opted out, blocked, rate-limited) must not leave
+      // a bubble that never resolves. Not awaited, so it never delays the reply.
+      const heldByPerson =
+        ((await this.conversations
+          ?.holderOf(conversation.id)
+          .catch(() => null)) ?? null) !== null;
+      if (!heldByPerson)
+        void this.showTyping(
+          inbound.providerMessageId,
+          inbound.text,
+          contact.locale,
+          chatbot.id,
+          settings,
+          number.creds,
+        );
 
       // ── 6. Identity ──────────────────────────────────────────────────────
       // Who is asking, for the bot's "who can chat" list and per-organisation knowledge.
@@ -293,12 +316,16 @@ export class WhatsAppInboundService {
         });
 
       // ── 7. The bot decides ───────────────────────────────────────────────
-      const decision = await this.engine.respond({
+      let decision = await this.engine.respond({
         chatbot,
         settings,
         text: inbound.text,
         language: contact.locale,
-        history: await this.recentHistory(conversation.id),
+        history: await this.recentHistory(
+          conversation.id,
+          settings,
+          sharedCopy,
+        ),
         isFirstMessage: contact.messageCount === 1,
         sender: {
           externalId: contact.phoneE164,
@@ -315,6 +342,26 @@ export class WhatsAppInboundService {
         conversationId: conversation.id,
         providerMessageId: inbound.providerMessageId,
       });
+
+      // A team member has this chat (chunk 11a): the engine didn't answer, so nothing is sent.
+      // The message is kept for the team, and the inbox is told.
+      if (decision.held) {
+        await this.messageRepository.update(
+          { id: inboundId },
+          { status: WaMessageStatus.RECEIVED, handledBy: WaHandledBy.HELD },
+        );
+        void this.sharedStore?.sync([inboundId], inboundId);
+        await this.handover?.afterDecision(chatbot, conversation.id, decision);
+        return;
+      }
+      // Safety, Needs a person, and a second "I don't know" becoming the hand-over message.
+      if (this.handover) {
+        decision = await this.handover.afterDecision(
+          chatbot,
+          conversation.id,
+          decision,
+        );
+      }
 
       // ── 8. Send and record ───────────────────────────────────────────────
       // A person's first hello also gets the first-message notice after the welcome message.
@@ -378,6 +425,7 @@ export class WhatsAppInboundService {
         { id: inboundId },
         { status: WaMessageStatus.FAILED, errorMessage: message },
       );
+      void this.sharedStore?.sync([inboundId], inboundId);
     }
   }
 
@@ -600,7 +648,15 @@ export class WhatsAppInboundService {
 
   private async recentHistory(
     conversationId: string,
+    settings?: WhatsAppBotSettings,
+    sharedCopy?: Promise<boolean>,
   ): Promise<{ role: string; content: string }[]> {
+    // `readHistoryFrom: shared` (chunk 12): the same history from the shared store, once this
+    // message's copy has landed; otherwise, or on any failure, from wa_messages as always.
+    if (settings && sharedCopy && this.sharedStore?.readsShared(settings)) {
+      const shared = await this.sharedStore.history(conversationId, sharedCopy);
+      if (shared) return shared;
+    }
     const rows = await this.messageRepository.find({
       where: { conversationId },
       order: { createdAt: 'DESC' },
@@ -865,6 +921,9 @@ export class WhatsAppInboundService {
         },
       );
     }
+
+    // After the send, in the background: both rows' final state to the shared store.
+    void this.sharedStore?.sync([inReplyToId, outbound.id], inReplyToId);
   }
 
   private async discard(messageId: string, reason: string): Promise<void> {
@@ -873,6 +932,7 @@ export class WhatsAppInboundService {
       { id: messageId },
       { status: WaMessageStatus.DISCARDED, errorMessage: reason },
     );
+    void this.sharedStore?.sync([messageId], messageId);
   }
 
   private async recordUnanswered(

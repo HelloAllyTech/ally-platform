@@ -357,6 +357,18 @@ export const deriveNavigationItems = ({
             );
           // Viewing and voting reach a wider group than the manage surface
           // (PRODUCT_ROADMAP_MANAGE); this key switches the tab itself.
+          // The Debriefs console: the Analytics toggle or the clinical advisor's toggle (the
+          // routes' DEBRIEF_CONSOLE_FEATURES), and one of the console's permissions — the Ally
+          // team (system:access), the clinical advisor (review:admin:debriefs, held without any
+          // platform group) or the owner. Not in buildSidebarItemFeatureKeyMap (one key, no grant).
+          case SIDEBAR_ITEMS.DEBRIEFS:
+            return (
+              (hasFeature(features, FeatureToggleKey.ANALYTICS) ||
+                hasFeature(features, FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF)) &&
+              (permissions!.includes(Permissions.SYSTEM_ACCESS) ||
+                permissions!.includes(Permissions.REVIEW_DEBRIEFS) ||
+                permissions!.includes(Permissions.MANAGE_DEBRIEF_SETTINGS))
+            );
           case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
             return (
               permissions!.includes(Permissions.VIEW_PRODUCT_ROADMAP) &&

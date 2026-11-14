@@ -32,7 +32,6 @@ vi.mock("@hooks", async importOriginal => ({
   useAnalytics: () => ({ track: vi.fn() }),
 }));
 
-
 // Mock react-router-dom
 const mockNavigate = vi.fn();
 const mockUseParams = vi.fn(() => ({ sessionId: "123" }));
@@ -1349,6 +1348,79 @@ describe("PostSimulationSummary Component", () => {
       );
 
       expect(container1.innerHTML).toBe(container2.innerHTML);
+    });
+  });
+
+  /**
+   * TEST GROUP: Desktop layout (PRD §6.3)
+   * At ≥ 1024 px the transcript sits beside the debrief cards; below, tabs.
+   */
+  describe("Transcript beside the cards at ≥ 1024 px", () => {
+    const original = window.matchMedia;
+    const mockWidth = (px: number) => {
+      window.matchMedia = vi.fn((query: string) => {
+        const min = /min-width:\s*(\d+)px/.exec(query);
+        return {
+          matches: min ? px >= Number(min[1]) : false,
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        } as unknown as MediaQueryList;
+      }) as unknown as typeof window.matchMedia;
+    };
+    afterEach(() => {
+      window.matchMedia = original;
+    });
+
+    it("shows the debrief and the transcript side by side, with no tabs", () => {
+      mockWidth(1280);
+      render(
+        <TestWrapper>
+          <PostSimulationSummary />
+        </TestWrapper>,
+      );
+
+      expect(screen.queryByTestId("tabs")).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("post-sim-debrief-column")).getByTestId("debrief-tab"),
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("post-sim-transcript-column")).getByTestId(
+          "simulation-transcript-tab",
+        ),
+      ).toBeInTheDocument();
+      // The cards column is at most 68 characters wide.
+      expect(screen.getByTestId("post-sim-beside").className).toContain("minmax(0,68ch)");
+    });
+
+    it("See this moment scrolls the transcript beside it and keeps the debrief on screen", () => {
+      mockWidth(1024);
+      render(
+        <TestWrapper>
+          <PostSimulationSummary />
+        </TestWrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId("debrief-open-moment-2"));
+
+      expect(screen.getByTestId("debrief-tab")).toBeInTheDocument();
+      expect(screen.getByTestId("simulation-transcript-tab")).toHaveAttribute(
+        "data-focus-message-id",
+        "msg-2",
+      );
+    });
+
+    it("keeps the tabs below 1024 px", () => {
+      mockWidth(1023);
+      render(
+        <TestWrapper>
+          <PostSimulationSummary />
+        </TestWrapper>,
+      );
+
+      expect(screen.getByTestId("tabs")).toBeInTheDocument();
+      expect(screen.queryByTestId("post-sim-beside")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("simulation-transcript-tab")).not.toBeInTheDocument();
     });
   });
 });

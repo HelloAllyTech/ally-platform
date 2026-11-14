@@ -1,12 +1,25 @@
-import { FC, ReactNode, useRef, useState } from "react";
+import {
+  FC,
+  ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
+import i18next, { type i18n } from "i18next";
 import {
   Bookmark,
+  Check,
   ChevronDown,
   CircleDashed,
   HeartHandshake,
   HelpCircle,
   Loader2,
+  RefreshCw,
   MessageSquareQuote,
   Phone,
   Sprout,
@@ -15,7 +28,7 @@ import {
   ThumbsUp,
   TrendingUp,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { I18nextProvider, useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import {
@@ -26,7 +39,9 @@ import {
   SupervisorDebriefFlag,
 } from "@types";
 
-import { CardFlag, DebriefHelpful } from "./DebriefCardFeedback";
+import { CardFlag, DebriefHelpful, DebriefPulseCard } from "./DebriefCardFeedback";
+import { DebriefExplainer } from "./DebriefExplainer";
+import { DebriefProgressCard, parseProgressCard } from "./DebriefProgressCard";
 import {
   ListenAllBar,
   ListenButton,
@@ -35,7 +50,13 @@ import {
   useIsBeingRead,
 } from "./ReadAloudControls";
 import { useDebriefReadAloud } from "./useDebriefReadAloud";
-import { useMarkOpened, useReadToTheEnd } from "./useReadToTheEnd";
+import {
+  useDebriefEvent,
+  useMarkOpened,
+  useReadToTheEnd,
+  useSeenOnce,
+  useWaitingEvents,
+} from "./useReadToTheEnd";
 
 /** 'hi-IN' → 'hi'; anything unusable → undefined (inherit the page's lang). */
 export const toLangAttribute = (language?: string | null): string | undefined => {
@@ -51,11 +72,29 @@ const SKILL_WORD_ICON: Record<DebriefSkillWord, ReactNode> = {
   ),
 };
 
-const Quote: FC<{ text: string }> = ({ text }) => (
-  <blockquote className="border-l-2 border-primary-200 pl-3 font-primary text-sm italic text-typography-700">
-    “{text}”
-  </blockquote>
-);
+/** PRD §6.3: each quote opens the transcript at the turn it came from. */
+const SeeMomentContext = createContext<((quote: string) => void) | null>(null);
+
+const Quote: FC<{ text: string }> = ({ text }) => {
+  const { t } = useTranslation();
+  const seeMoment = useContext(SeeMomentContext);
+  return (
+    <div className="flex flex-col gap-1">
+      <blockquote className="border-l-2 border-primary-200 pl-3 font-primary text-sm italic text-typography-700">
+        “{text}”
+      </blockquote>
+      {seeMoment && (
+        <button
+          type="button"
+          onClick={() => seeMoment(text)}
+          className="inline-flex min-h-[44px] items-center self-start rounded-md px-2 font-primary text-xs font-semibold text-primary-700 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+        >
+          {t("postSim.debrief.momentLabel")}
+        </button>
+      )}
+    </div>
+  );
+};
 
 /** One card in the debrief: a list item with a heading. */
 const Card: FC<{
@@ -106,14 +145,16 @@ const scenarioPath = (id: number) => `/scenario/${id}`;
  * its language choice and trigger warnings come first. Rendered only for a
  * roleplay the server says the learner can still open.
  */
-const PractiseLink: FC<{ scenario: { id: number; title: string }; primary?: boolean }> = ({
-  scenario,
-  primary,
-}) => {
+const PractiseLink: FC<{
+  scenario: { id: number; title: string };
+  primary?: boolean;
+  onClick?: () => void;
+}> = ({ scenario, primary, onClick }) => {
   const { t } = useTranslation();
   return (
     <Link
       to={scenarioPath(scenario.id)}
+      onClick={onClick}
       data-testid={primary ? "debrief-practise-next" : "debrief-practise-this"}
       aria-label={t("postSim.debriefCards.practise.label", { title: scenario.title })}
       className={
@@ -200,6 +241,8 @@ export const readableSections = (view: LearnerDebriefView): string[] => {
     ...cards.work_on_this.map((_, i) => `work_on_this[${i}]`),
     cards.practise_next ? "practise_next" : null,
     cards.reflective_question ? "reflective_question" : null,
+    // Last, as it sits below the debrief.
+    parseProgressCard(cards.progress_card) ? "progress_card" : null,
   ].filter((x): x is string => !!x && !removed.has(x));
 };
 
@@ -215,6 +258,11 @@ const ReadyCards: FC<{
   const readEndRef = useRef<HTMLDivElement>(null);
   useReadToTheEnd(sessionId, readEndRef, !supervisor);
   useMarkOpened(sessionId, !supervisor);
+  // v9 §3.3 read-through: the end of the FIRST Work-on-this card.
+  const report = useDebriefEvent(sessionId, !supervisor);
+  const firstEndRef = useRef<HTMLDivElement>(null);
+  const onFirstEnd = useCallback(() => report("read_through"), [report]);
+  useSeenOnce(firstEndRef, onFirstEnd, !supervisor);
   const corrections = view.corrections ?? [];
   // Sections keep their stored index, the one a flag and a correction name.
   const removed = new Set(corrections.filter(c => c.outcome === "removed").map(c => c.section));
@@ -246,6 +294,11 @@ const ReadyCards: FC<{
     .map((item, index) => ({ item, index }))
     .filter(({ index }) => !removed.has(`work_on_this[${index}]`));
   const practise = removed.has("practise_next") ? null : cards.practise_next;
+  const progressCard = removed.has("progress_card") ? null : parseProgressCard(cards.progress_card);
+
+  const momentTitle = moment?.handled_well
+    ? t("postSim.debriefCards.importantMoment.titleHandledWell")
+    : t("postSim.debriefCards.importantMoment.title");
 
   return (
     <div className="flex flex-col gap-4">
@@ -255,7 +308,8 @@ const ReadyCards: FC<{
             testId="debrief-card-important-moment"
             readSection="important_moment"
             tone="attention"
-            title={t("postSim.debriefCards.importantMoment.title")}
+            // PRD §6.2, case 3: a risk cue the learner handled well is named as theirs.
+            title={momentTitle}
             icon={<Bookmark aria-hidden="true" className="h-5 w-5 text-warning-700" />}
           >
             <Lead>{moment.lead}</Lead>
@@ -276,7 +330,7 @@ const ReadyCards: FC<{
             )}
             <Body>{t("postSim.debriefCards.importantMoment.support")}</Body>
             {!!view.supportLines?.length && <SupportLines lines={view.supportLines} />}
-            {flagControl("important_moment", t("postSim.debriefCards.importantMoment.title"))}
+            {flagControl("important_moment", momentTitle)}
           </Card>
         </ul>
       )}
@@ -315,7 +369,7 @@ const ReadyCards: FC<{
             icon={<Target aria-hidden="true" className="h-5 w-5 text-warning-700" />}
           >
             <ul className="flex flex-col gap-4">
-              {growth.map(({ item, index }) => (
+              {growth.map(({ item, index }, shown) => (
                 <ReadableItem
                   key={`${item.turn_index}-${index}`}
                   section={`work_on_this[${index}]`}
@@ -342,6 +396,13 @@ const ReadyCards: FC<{
                     <PractiseLink scenario={practiceFor(item.scenario_id)!} />
                   )}
                   {flagControl(`work_on_this[${index}]`, item.lead)}
+                  {shown === 0 && (
+                    <div
+                      ref={firstEndRef}
+                      data-testid="debrief-first-work-end"
+                      aria-hidden="true"
+                    />
+                  )}
                 </ReadableItem>
               ))}
             </ul>
@@ -359,7 +420,11 @@ const ReadyCards: FC<{
             <Lead>{practise.skill}</Lead>
             <Body>{practise.reason}</Body>
             {practiceFor(practise.scenario_id) && (
-              <PractiseLink scenario={practiceFor(practise.scenario_id)!} primary />
+              <PractiseLink
+                scenario={practiceFor(practise.scenario_id)!}
+                primary
+                onClick={() => report("practise_next_click")}
+              />
             )}
             {flagControl("practise_next", t("postSim.debriefCards.practiseNext"))}
           </Card>
@@ -398,19 +463,43 @@ const ReadyCards: FC<{
           </Card>
         )}
 
-        <Card
-          testId="debrief-card-reflective-question"
-          readSection="reflective_question"
-          title={t("postSim.debriefCards.reflectiveQuestion")}
-          icon={<HelpCircle aria-hidden="true" className="h-5 w-5 text-primary-600" />}
-        >
-          <Body>{cards.reflective_question}</Body>
-          <ListenButton
-            section="reflective_question"
-            cardLabel={t("postSim.debriefCards.reflectiveQuestion")}
-          />
-          {replyThread}
-        </Card>
+        {!moment && view.riskCue && !view.distress && !!view.supportLines?.length && (
+          <Card
+            testId="debrief-card-support"
+            title={t("postSim.debriefCards.support.title")}
+            icon={<HeartHandshake aria-hidden="true" className="h-5 w-5 text-primary-600" />}
+          >
+            <Body>{t("postSim.debriefCards.support.lead")}</Body>
+            <SupportLines lines={view.supportLines} />
+          </Card>
+        )}
+
+        {cards.reflective_question?.trim() ? (
+          <Card
+            testId="debrief-card-reflective-question"
+            readSection="reflective_question"
+            title={t("postSim.debriefCards.reflectiveQuestion")}
+            icon={<HelpCircle aria-hidden="true" className="h-5 w-5 text-primary-600" />}
+          >
+            <Body>{cards.reflective_question}</Body>
+            <ListenButton
+              section="reflective_question"
+              cardLabel={t("postSim.debriefCards.reflectiveQuestion")}
+            />
+            {replyThread}
+          </Card>
+        ) : (
+          // A short debrief may come without a question (its rule checks don't require one):
+          // no empty "One question to think about" card, but Ask Ally stays.
+          replyThread && (
+            <li
+              data-testid="debrief-ask-ally-no-question"
+              className="flex flex-col gap-3 rounded-lg border border-primary-100 bg-white p-4"
+            >
+              {replyThread}
+            </li>
+          )
+        )}
       </ul>
       {removed.size > 0 && (
         <p data-testid="debrief-removed-note" className="font-primary text-xs text-typography-700">
@@ -429,7 +518,20 @@ const ReadyCards: FC<{
               : t("postSim.debriefCards.supervisor.helpfulNone")}
         </p>
       ) : (
-        <DebriefHelpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
+        <>
+          <DebriefHelpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
+          {view.pulse && <DebriefPulseCard sessionId={sessionId} pulse={view.pulse} />}
+        </>
+      )}
+      {/* Progress contract §4: below the debrief, only when the card is due. */}
+      {progressCard && (
+        <DebriefProgressCard
+          card={progressCard}
+          controls={flagControl(
+            "progress_card",
+            t("postSim.debriefCards.progressCard.title", { n: progressCard.sessions }),
+          )}
+        />
       )}
     </div>
   );
@@ -498,26 +600,84 @@ interface DebriefCardsProps {
   supervisor?: SupervisorView;
   /** Ask Ally's thread and composer, under the reflective question. */
   replyThread?: ReactNode;
+  /** "See this moment" on a quote: open the transcript at that turn. */
+  onSeeQuote?: (quote: string) => void;
+  /** "Try again" on a debrief that didn't load. */
+  onRetry?: () => void;
+  /** True while that retry is in flight. */
+  retrying?: boolean;
 }
 
 /**
  * The Debrief agent's debrief, as structured cards. Only mounted when the
- * learner's organisation is switched on — `not_available` never reaches here
- * (see `useLearnerDebrief`).
+ * learner's organisation is switched on — `not_available` reaches here only
+ * after an emergency stop (see `useLearnerDebrief`).
  *
  * No score, no percentage and no red anywhere: amber marks what needs
  * attention, and every status carries text plus an icon, never colour alone.
  */
-export const DebriefCards: FC<DebriefCardsProps> = ({
+/** Scripts that need more line height than Latin to stay legible (NFR-6: ≥ 1.6). */
+const INDIC_LANGUAGES = new Set(["hi", "mr", "ta", "kn", "bn", "ml", "te", "gu", "pa", "or"]);
+export const isIndicLanguage = (language?: string | null): boolean =>
+  INDIC_LANGUAGES.has(toLangAttribute(language) ?? "");
+
+/**
+ * A separate i18next instance over the app's translations, fixed to the
+ * debrief's language. Not `cloneInstance`: a clone shares the language
+ * detector, and switching it would save the debrief's language as the app's.
+ */
+const debriefLanguageInstance = (app: i18n, lng: string): i18n => {
+  const instance = i18next.createInstance();
+  void instance.init({
+    lng,
+    fallbackLng: "en",
+    resources: app.store.data,
+    returnEmptyString: false,
+    interpolation: { escapeValue: false },
+    initImmediate: false,
+  });
+  return instance;
+};
+
+/**
+ * PRD §9: everything in the debrief follows the session's language, labels
+ * included, whatever language the app is in. Languages without reviewed UI
+ * copy fall back to English labels (i18next's fallback).
+ */
+export const DebriefCards: FC<DebriefCardsProps> = props => {
+  const { i18n } = useTranslation();
+  const lng = toLangAttribute(props.view.language);
+  const debriefI18n = useMemo(
+    () =>
+      lng && i18n?.store && lng !== toLangAttribute(i18n.language)
+        ? debriefLanguageInstance(i18n, lng)
+        : null,
+    [i18n, lng],
+  );
+  if (!debriefI18n) return <DebriefCardsInLanguage {...props} />;
+  return (
+    <I18nextProvider i18n={debriefI18n}>
+      <DebriefCardsInLanguage {...props} />
+    </I18nextProvider>
+  );
+};
+
+const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
   view,
   sessionId,
   replyThread,
   supervisor,
+  onSeeQuote,
+  onRetry,
+  retrying = false,
 }) => {
   const { t } = useTranslation();
   const readAloud = useDebriefReadAloud(sessionId);
   // Read-aloud is the learner's: its audio links are theirs alone.
   const ready = view.state === "ready" && !!view.cards && !supervisor;
+  // v9 §3.3 "abandoned before ready": waited on the working screen, left early.
+  const reportWaiting = useDebriefEvent(sessionId, !supervisor);
+  useWaitingEvents(view.state === "working", reportWaiting, !supervisor);
   const latestStep = view.steps?.length ? view.steps[view.steps.length - 1] : undefined;
   const progressLine = (): string => {
     const p = view.progress;
@@ -530,6 +690,32 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
     }
     return t(`postSim.debriefCards.working.steps.${p.key}`);
   };
+
+  // FR-27: the steps already done stay on the panel as quiet ticks, in the
+  // order the run took them; the current one keeps the spinner.
+  const currentLine = view.state === "working" ? progressLine() : null;
+  const [doneLines, setDoneLines] = useState<string[]>([]);
+  const lastLine = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentLine) return;
+    const previous = lastLine.current;
+    if (previous && previous !== currentLine) {
+      setDoneLines(d => (d.includes(previous) ? d : [...d, previous]));
+    }
+    lastLine.current = currentLine;
+  }, [currentLine]);
+
+  // Plan §7.8: when a debrief the learner waited for is ready, focus moves to
+  // the heading (never on a page that opened on a ready debrief).
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const wasWorking = useRef(false);
+  useEffect(() => {
+    if (view.state === "working") wasWorking.current = true;
+    else if (wasWorking.current && view.state === "ready" && view.cards) {
+      wasWorking.current = false;
+      headingRef.current?.focus();
+    }
+  }, [view.state, view.cards]);
 
   let content: ReactNode = null;
   if (view.state === "working") {
@@ -548,14 +734,93 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
           <p className="font-primary text-sm font-semibold text-typography-900">
             {t("postSim.debriefCards.working.title")}
           </p>
-          <p className="font-primary text-sm text-typography-700">{progressLine()}</p>
+          <ul className="flex flex-col gap-1" data-testid="debrief-working-steps">
+            {doneLines
+              .filter(line => line !== currentLine)
+              .map(line => (
+                <li
+                  key={line}
+                  className="flex items-center gap-1.5 font-primary text-sm text-typography-600"
+                >
+                  <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-primary-600" />
+                  {line.replace(/…$/, "")}
+                </li>
+              ))}
+            <li className="font-primary text-sm text-typography-700" aria-current="step">
+              {currentLine}
+            </li>
+          </ul>
         </div>
+      </div>
+    );
+  } else if (view.state === "taking_longer") {
+    // Plan §7.5 / §10.3: a person is finishing it (no risk cue). Calm, not a
+    // failure; the learner can check again rather than wait on a poll.
+    content = (
+      <div data-testid="debrief-taking-longer" className="flex flex-col gap-3">
+        <div role="status" aria-live="polite">
+          <Body>{t("postSim.debriefCards.takingLonger.body")}</Body>
+        </div>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="inline-flex min-h-[44px] items-center gap-2 self-start rounded-full border border-primary-200 bg-primary-50 px-4 font-primary text-sm font-semibold text-primary-600 transition-colors hover:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={`h-4 w-4 ${retrying ? "animate-spin motion-reduce:animate-none" : ""}`}
+            />
+            {retrying
+              ? t("postSim.debriefCards.takingLonger.checking")
+              : t("postSim.debriefCards.takingLonger.checkAgain")}
+          </button>
+        )}
       </div>
     );
   } else if (view.state === "on_its_way") {
     content = <Body>{t("postSim.debriefCards.onItsWay")}</Body>;
+  } else if (view.state === "not_available") {
+    // FR-46: the organisation's debriefs were stopped (only sent with `stopped`).
+    content = (
+      <div data-testid="debrief-not-available">
+        <Body>{t("postSim.debriefCards.notAvailable")}</Body>
+      </div>
+    );
   } else if (view.state === "too_short") {
     content = <Body>{t("postSim.debriefCards.tooShort")}</Body>;
+  } else if (view.state === "failed") {
+    // PRD §6.12 "failed": the request itself failed. Amber, never red; the
+    // debrief is safe, so say so and offer one way forward.
+    content = (
+      <div
+        role="alert"
+        data-testid="debrief-failed"
+        className="flex flex-col gap-3 rounded-lg border-2 border-warning-300 bg-warning-50 p-4"
+      >
+        <h3 className="font-primary text-base font-semibold text-typography-900">
+          {t("postSim.debriefCards.failed.title")}
+        </h3>
+        <Body>{t("postSim.debriefCards.failed.body")}</Body>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="inline-flex min-h-[44px] items-center gap-2 self-start rounded-md bg-primary-600 px-4 font-primary text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={`h-4 w-4 ${retrying ? "animate-spin motion-reduce:animate-none" : ""}`}
+            />
+            {retrying
+              ? t("postSim.debriefCards.failed.retrying")
+              : t("postSim.debriefCards.failed.retry")}
+          </button>
+        )}
+      </div>
+    );
   } else if (view.state === "ready" && view.cards) {
     const cards = (
       <ReadyCards
@@ -570,32 +835,41 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
   }
 
   return (
-    <ReadAloudContext.Provider value={ready ? readAloud : null}>
-      <div className="flex w-full flex-col rounded-lg bg-gradient-to-br from-primary-500 to-primary-100 p-1">
-        <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
-          <h2 className="font-primary text-lg font-semibold text-white">
-            {t("postSim.debriefCards.header")}
-          </h2>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {ready && <ListenAllBar sections={readableSections(view)} />}
-            <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-primary text-xs font-medium text-typography-800">
-              {t("postSim.debriefCards.aiLabel")}
-            </span>
+    <SeeMomentContext.Provider value={onSeeQuote ?? null}>
+      <ReadAloudContext.Provider value={ready ? readAloud : null}>
+        <div className="flex w-full flex-col rounded-lg bg-gradient-to-br from-primary-500 to-primary-100 p-1">
+          <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              className="font-primary text-lg font-semibold text-white focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            >
+              {t("postSim.debriefCards.header")}
+            </h2>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {ready && <ListenAllBar sections={readableSections(view)} />}
+              <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-primary text-xs font-medium text-typography-800">
+                {t("postSim.debriefCards.aiLabel")}
+              </span>
+              <DebriefExplainer />
+            </div>
+          </div>
+          <div
+            lang={toLangAttribute(view.language)}
+            data-testid="debrief-cards"
+            className={`flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6 ${
+              isIndicLanguage(view.language) ? "[&_*]:!leading-[1.7]" : ""
+            }`}
+          >
+            <ReadAloudStatusLine />
+            {/* FR-27: screen readers hear when the debrief is ready. */}
+            <p className="sr-only" role="status" aria-live="polite">
+              {view.state === "ready" && view.cards ? t("postSim.debriefCards.ready.announce") : ""}
+            </p>
+            {content}
           </div>
         </div>
-        <div
-          lang={toLangAttribute(view.language)}
-          data-testid="debrief-cards"
-          className="flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6"
-        >
-          <ReadAloudStatusLine />
-          {/* FR-27: screen readers hear when the debrief is ready. */}
-          <p className="sr-only" role="status" aria-live="polite">
-            {view.state === "ready" && view.cards ? t("postSim.debriefCards.ready.announce") : ""}
-          </p>
-          {content}
-        </div>
-      </div>
-    </ReadAloudContext.Provider>
+      </ReadAloudContext.Provider>
+    </SeeMomentContext.Provider>
   );
 };

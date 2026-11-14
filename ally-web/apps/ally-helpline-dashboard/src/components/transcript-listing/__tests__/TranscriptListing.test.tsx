@@ -7,7 +7,7 @@
 import { render, screen, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import TranscriptListing from "../TranscriptListing";
+import TranscriptListing, { scrollIntoViewWithin } from "../TranscriptListing";
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
   InfiniteScroll: ({ children }: any) => <div data-testid="infinite-scroll">{children}</div>,
@@ -159,5 +159,55 @@ describe("TranscriptListing moment focus", () => {
 
     expect(scrollIntoView).toHaveBeenCalledTimes(2);
     expect(rowFor("The moment in question")?.className).toContain("ring-2");
+  });
+});
+
+describe("scrollIntoViewWithin (LW-07: the page stays put)", () => {
+  const rect = (top: number, height: number) =>
+    ({
+      top,
+      bottom: top + height,
+      height,
+      left: 0,
+      right: 0,
+      width: 0,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    }) as DOMRect;
+
+  it("scrolls only the column that scrolls on its own, never the page", () => {
+    const column = document.createElement("div");
+    column.style.overflowY = "auto";
+    const row = document.createElement("div");
+    column.appendChild(row);
+    document.body.appendChild(column);
+    Object.defineProperty(column, "scrollHeight", { value: 2000 });
+    Object.defineProperty(column, "clientHeight", { value: 400 });
+    column.scrollTop = 100;
+    column.getBoundingClientRect = () => rect(50, 400);
+    row.getBoundingClientRect = () => rect(950, 40);
+    column.scrollTo = vi.fn() as any;
+    row.scrollIntoView = vi.fn();
+
+    scrollIntoViewWithin(row, "center");
+
+    // 950 - 50 + 100 = 1000 from the column's top; centred: 1000 - (400 - 40) / 2.
+    expect(column.scrollTo).toHaveBeenCalledWith({ top: 820, behavior: "smooth" });
+    expect(row.scrollIntoView).not.toHaveBeenCalled();
+    column.remove();
+  });
+
+  it("with no scrolling column (the transcript tab), scrolls the page as before", () => {
+    const wrapper = document.createElement("div");
+    const row = document.createElement("div");
+    wrapper.appendChild(row);
+    document.body.appendChild(wrapper);
+    row.scrollIntoView = vi.fn();
+
+    scrollIntoViewWithin(row, "center");
+
+    expect(row.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    wrapper.remove();
   });
 });

@@ -10,6 +10,7 @@ from app.core.agent_runtime.graph import close_agent_runtime, open_agent_runtime
 from app.core.ally_core.client import AllyCoreClient
 from app.core.config import settings
 from app.core.constants import APISettings
+from app.core.pm_agent.store import close_pm_agent_store, open_pm_agent_store
 from app.core.vector_db.weaviate_client import WeaviateClient
 from app.middleware import get_middlewares
 from app.utils.logger import get_trace_id, logger, logging_config
@@ -29,13 +30,18 @@ async def lifespan(_: FastAPI):
     initialize_openai_clients()
     logger.info("OpenAI clients initialized")
 
-    # Agents v2 runtime: only opened when switched on, so a deploy with it off
-    # touches no new database. Never raises: if its database is unreachable the
-    # runtime stays off and everything else starts.
-    if settings.AGENT_RUNTIME.ENABLED:
+    # The checkpoint database: opened when the Agents v2 runtime is switched on,
+    # and whenever one is configured, because the Debrief graph checkpoints
+    # every run there too (durable resume, v9 FR-3) whatever the chatbots' flag
+    # says. Never raises: if it is unreachable the runtimes fall back as before
+    # and everything else starts.
+    if settings.AGENT_RUNTIME.ENABLED or settings.AGENT_RUNTIME.CHECKPOINT_DB_URL:
         await open_agent_runtime()
+    # The PM agent's memory, on the checkpoint database's pool (in memory without one).
+    await open_pm_agent_store()
 
     yield
+    await close_pm_agent_store()
     await close_agent_runtime()
     await WeaviateClient.close(WeaviateClient.get_client())
     await AllyCoreClient.close(AllyCoreClient.get_client())

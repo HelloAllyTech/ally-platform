@@ -29,6 +29,7 @@ vi.mock("@api", () => ({
   useGetSupervisorDebriefQuery: (...args: unknown[]) => mockSupervisorQuery(...args),
   useLazyGetDebriefCardAudioQuery: () => [vi.fn()],
   useMarkDebriefOpenedMutation: () => [vi.fn()],
+  useReportDebriefEventMutation: () => [vi.fn(() => ({ unwrap: () => Promise.resolve() }))],
   useMarkDebriefReadMutation: () => [vi.fn()],
   useGetChatHistoryQuery: (...args: unknown[]) => mockChatHistoryQuery(...args),
   // The learner's org isn't on the new Debrief agent here, so today's view stays.

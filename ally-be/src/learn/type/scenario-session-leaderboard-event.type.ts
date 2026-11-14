@@ -16,6 +16,22 @@ export interface ScenarioSessionLeaderboardEndedEventParams {
   scenarioSessionId: string;
 }
 
+/**
+ * A roleplay finished: emitted once per session by whichever path wins the
+ * IN_PROGRESS -> COMPLETED compare-and-set, whatever its recorded duration.
+ * The Debrief agent starts the learner's debrief from it (PRD NFR-1: visible
+ * within 75 s p50 of session end). Kept apart from SCENARIO_SESSION_ENDED,
+ * which is about practice minutes and is skipped when none were recorded.
+ */
+export enum ScenarioSessionCompletionEvent {
+  SCENARIO_SESSION_COMPLETED = 'SCENARIO_SESSION_COMPLETED',
+}
+
+export interface ScenarioSessionCompletedEventParams {
+  scenarioSessionId: string;
+  tenantId: string | null;
+}
+
 export enum LeaderboardActionEvent {
   MINUTES_PLAYED_UPDATED = 'MINUTES_PLAYED_UPDATED',
 }

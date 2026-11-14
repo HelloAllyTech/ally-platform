@@ -17,7 +17,9 @@ const handleLogout = () => {
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN);
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED);
 
-  window.location.href = ROUTES.LOGIN;
+  // Raw window.location bypasses the router basename - prefix the Vite base
+  // (the app lives under /admin in production, / everywhere else).
+  window.location.href = import.meta.env.BASE_URL.replace(/\/$/, "") + ROUTES.LOGIN;
 };
 
 const baseQuery = fetchBaseQuery({
@@ -30,6 +32,12 @@ const baseQuery = fetchBaseQuery({
     return headers;
   },
 });
+
+/**
+ * Reads whose 403 is expected for some roles and handled by the caller: no toast. A function, not
+ * a constant: read at module load it breaks every suite that mocks `@constants` wholesale.
+ */
+export const silentForbiddenReads = (): string[] => [ApiEndpoints.AUTH.GET_USER_PREFERENCES];
 
 /**
  * This function wraps the base query to handle authentication token refresh.
@@ -105,7 +113,13 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
       // AiLabErrorState / the AI Lab tabs). One consistent toast here means
       // every endpoint gets a permission message even when the calling
       // component only checks `isError`.
-      toast.error(en.error.forbidden);
+      // Except a read every signed-in admin makes at start whose 403 is expected and handled:
+      // the saved sidebar order (only holders of the preference grant have one; a clinical
+      // advisor does not), which otherwise greeted them with this toast on every load.
+      const url = typeof args === "string" ? args : args.url;
+      if (!silentForbiddenReads().some(path => url.split("?")[0].endsWith(path))) {
+        toast.error(en.error.forbidden);
+      }
     }
 
     return result;
@@ -121,7 +135,14 @@ export const baseAPI = createApi({
   reducerPath: "baseAPI",
   baseQuery: baseQueryWithReauth,
   tagTypes: [
+    TAG_TYPES.NOTIFICATIONS,
+    TAG_TYPES.PRODUCT_PLANS,
     TAG_TYPES.USERS,
+    TAG_TYPES.BOT_DRAFT,
+    TAG_TYPES.CHECKUP,
+    TAG_TYPES.SOURCES,
+    TAG_TYPES.SCORECARD,
+    TAG_TYPES.INBOX,
     TAG_TYPES.TENANTS,
     TAG_TYPES.SESSION_EVENTS,
     TAG_TYPES.SESSION_EVENT_TAGS,
@@ -255,12 +276,13 @@ export const baseAPI = createApi({
     TAG_TYPES.FEATURE_TOGGLE_REGISTRY,
     TAG_TYPES.USER_FEATURE_TOGGLES,
     TAG_TYPES.PLATFORM_ADMINS,
+    TAG_TYPES.CLINICAL_ADVISORS,
     TAG_TYPES.MOBILE_RELEASE_RUNS,
     TAG_TYPES.MIN_APP_VERSION,
     TAG_TYPES.HELPLINE_ADMIN_SETTINGS,
     TAG_TYPES.SKILL_EXPERIMENTS,
-    TAG_TYPES.DEBRIEF_CALIBRATION,
     TAG_TYPES.DEBRIEF_CONSOLE,
+    TAG_TYPES.DEBRIEF_EXPERT_REVIEW,
     TAG_TYPES.PUBLIC_ROADMAP,
     TAG_TYPES.CONTEXT_LIBRARY_COLLECTIONS,
     TAG_TYPES.CONTEXT_LIBRARY_QUEUE,

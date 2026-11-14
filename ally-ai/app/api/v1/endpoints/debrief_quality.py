@@ -8,7 +8,8 @@ The response echoes the model and rubric version actually used, so the caller
 stamps the stored rows with what ran rather than hard-coding our config.
 """
 
-from typing import List, Optional
+import time
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -16,6 +17,7 @@ from pydantic import BaseModel, Field
 from app.core.config import settings
 from app.core.debrief_quality.judge import judge_debrief
 from app.core.debrief_quality.schemas import DimensionScore, HardFailFinding
+from app.core.llm.capture import capture_calls
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -37,6 +39,9 @@ class DebriefQualityRequest(BaseModel):
     # debrief that refers to them is not marked as an unsupported claim.
     history: Optional[str] = None
     rubric: Optional[str] = None
+    # The judge's instructions from the Skills Store
+    # (`debrief_quality_judge_system`); the code's text when absent.
+    judge_instructions: Optional[str] = None
     # Attribution only: carried onto the call's llm_usage row.
     scenario_session_id: Optional[str] = None
 
@@ -48,6 +53,31 @@ class DebriefQualityResponse(BaseModel):
     # failed attempt rather than a zero.
     dimensions: List[DimensionScore]
     hard_fails: List[HardFailFinding]
+    # The call as the debrief's Agent logs keep it: the exact message (the
+    # judge's instructions replaced by `{{system_prompt}}` when they were sent),
+    # the full reply, tokens and time. None when no model was called.
+    log: Optional[Dict[str, Any]] = None
+
+
+def _log(calls: List[Dict[str, Any]], instructions: Optional[str], ms: int):
+    if not calls:
+        return None
+    c = calls[-1]
+    prompt = c.get("prompt") or ""
+    inlined = bool(instructions) and instructions in prompt
+    if inlined:
+        prompt = prompt.replace(instructions, "{{system_prompt}}", 1)
+    return {
+        "input": prompt,
+        "prompt_inlined": inlined,
+        "output": c.get("reply"),
+        "model": c.get("model"),
+        "fell_back_from": c.get("fell_back_from"),
+        "tokens_in": c.get("tokens_in") or None,
+        "tokens_out": c.get("tokens_out") or None,
+        "ms": ms,
+        "error": c.get("error"),
+    }
 
 
 @router.post("/judge", response_model=DebriefQualityResponse)
@@ -62,17 +92,22 @@ async def judge(req: DebriefQualityRequest) -> DebriefQualityResponse:
             status_code=status.HTTP_400_BAD_REQUEST, detail="empty debrief"
         )
 
+    t0 = time.monotonic()
+    calls: List[Dict[str, Any]] = []
     try:
-        output, judge_model = await judge_debrief(
-            req.transcript,  # type: ignore[arg-type]
-            req.debrief,
-            req.language,
-            learner_level=req.learner_level,
-            guidance=req.guidance,
-            history=req.history,
-            rubric=req.rubric,
-            scenario_session_id=req.scenario_session_id,
-        )
+        with capture_calls() as captured:
+            calls = captured
+            output, judge_model = await judge_debrief(
+                req.transcript,  # type: ignore[arg-type]
+                req.debrief,
+                req.language,
+                learner_level=req.learner_level,
+                guidance=req.guidance,
+                history=req.history,
+                rubric=req.rubric,
+                instructions=req.judge_instructions,
+                scenario_session_id=req.scenario_session_id,
+            )
     except Exception as exc:  # noqa: BLE001 - surface as 500, keep caller decoupled
         logger.exception("[debrief-quality] judge failed")
         raise HTTPException(
@@ -85,4 +120,5 @@ async def judge(req: DebriefQualityRequest) -> DebriefQualityResponse:
         judge_prompt_version=settings.DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION,
         dimensions=output.dimensions if output else [],
         hard_fails=output.hard_fails if output else [],
+        log=_log(calls, req.judge_instructions, round((time.monotonic() - t0) * 1000)),
     )

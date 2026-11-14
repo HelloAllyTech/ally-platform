@@ -194,6 +194,29 @@ describe('ContextLibraryOrgController', () => {
     expect(own.chunkService.setStatus).toHaveBeenCalled();
   });
 
+  it('shows an entry Ally targeted at this organisation, read-only', async () => {
+    const targeted = chunk({
+      isGlobal: false,
+      ownerTenantId: null,
+      tenantIds: [MINE, THEIRS],
+    });
+    const { controller, chunkService } = build({ found: targeted });
+    await expect(controller.getChunk(user, 'AG-0001', MINE)).resolves.toEqual(
+      expect.objectContaining({ code: 'AG-0001' }),
+    );
+    await expect(
+      controller.chunkAction(user, 'AG-0001', 'archive', MINE),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(chunkService.setStatus).not.toHaveBeenCalled();
+
+    const elsewhere = build({
+      found: chunk({ ownerTenantId: null, tenantIds: [THEIRS] }),
+    });
+    await expect(
+      elsewhere.controller.getChunk(user, 'AG-0001', MINE),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('searches as its learners would be served: global plus its own, guide library only', async () => {
     const { controller, retrieval } = build();
     await controller.search(user, MINE, { query: 'who to call' } as any);

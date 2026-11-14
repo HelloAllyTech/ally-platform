@@ -103,6 +103,7 @@ vi.mock("@api", () => ({
   },
   useGetBuilderDecisionsQuery: () => ({ data: { decisions: [], count: 0 } }),
   useCreateBuilderSessionMutation: () => [vi.fn(), { isLoading: false }],
+  useGetBuilderSettingsQuery: () => ({ data: undefined }),
   useArchiveBuilderSessionMutation: () => [
     (id: string) => {
       archiveSpy(id);
@@ -155,6 +156,19 @@ describe("Builder mission control — archive", () => {
     archiveShouldFail = false;
     sessions = [];
     archivedPage = { sessions: [], totalCount: 0 };
+  });
+
+  describe("a session requested for the PM agent (R2-20)", () => {
+    it("shows like any other, with a small marker", () => {
+      sessions = [
+        session({ id: "s1", title: "From the PM agent", requestedBy: "debrief_pm_agent" }),
+        session({ id: "s2", title: "Started by hand" }),
+      ];
+      render(<Builder />, { wrapper: MemoryRouter });
+      expect(screen.getByText("From the PM agent")).toBeInTheDocument();
+      expect(screen.getAllByTestId("builder-session-requested-for")).toHaveLength(1);
+      expect(screen.getByText("Requested for the PM agent")).toBeInTheDocument();
+    });
   });
 
   describe("R1 — archive action on terminal cards", () => {

@@ -530,7 +530,14 @@ const CreateNoteDrawer: FC<CreateNoteDrawerProps> = ({ open, onClose }) => {
           : spoken;
         try {
           const chatId = await ensureNote();
-          await saveNoteTranscript({ chatId, transcript: transcriptRef.current }).unwrap();
+          await saveNoteTranscript({
+            chatId,
+            transcript: transcriptRef.current,
+            // This session's own recorded length (reset to 0 only once
+            // resetRecorder() runs below) — the backend accumulates it onto
+            // the note's stored call duration.
+            durationSeconds: Math.round(recorder.durationMs / 1000),
+          }).unwrap();
         } catch {
           // Non-fatal: the note and any extracted values still saved.
         }
@@ -574,7 +581,11 @@ const CreateNoteDrawer: FC<CreateNoteDrawerProps> = ({ open, onClose }) => {
           : partialTranscript;
         try {
           const chatId = await ensureNote();
-          await saveNoteTranscript({ chatId, transcript: transcriptRef.current }).unwrap();
+          await saveNoteTranscript({
+            chatId,
+            transcript: transcriptRef.current,
+            durationSeconds: Math.round(recorder.durationMs / 1000),
+          }).unwrap();
         } catch {
           // Best-effort: even if this save fails, don't turn a partial
           // success into a hard failure — the counsellor is already told the

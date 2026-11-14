@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -19,20 +20,35 @@ import { settledEndedSessionPredicate } from '../../analytics/util/session-eligi
 import { runWithConcurrency } from '../../analytics/util/judge-concurrency.util';
 import {
   DEBRIEF_AGENT_KEY,
+  DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_SEED_BUNDLE,
+  DebriefProvider,
   DebriefStep,
 } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
+import {
+  PROVIDER_ALLOWED_KEY,
+  allowlistFromValues,
+} from '../util/debrief-provider-allowlist.util';
 import { GuideSupportLine } from '../../guide/entity/guide-org-profile.entity';
 import { resolveSupportLines } from '../../guide/safety/fixed-responses';
 import {
-  ScenarioSessionLeaderboardEndedEventParams,
-  ScenarioSessionLeaderboardEvent,
+  ScenarioSessionCompletedEventParams,
+  ScenarioSessionCompletionEvent,
 } from '../../learn/type/scenario-session-leaderboard-event.type';
-import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
+import {
+  DebriefRunArm,
+  DebriefRunMode,
+  DebriefRunStatus,
+} from '../enum/debrief-run.enum';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefNotifier } from './debrief-notifier.service';
+import { DebriefPublishService } from './debrief-publish.service';
+import { DebriefTrialsService } from './debrief-trials.service';
+import { DebriefReleasesService } from './debrief-releases.service';
 import { DebriefPracticeService } from './debrief-practice.service';
+import { hasLegacyFeedback } from '../util/debrief-live.util';
+import { cardsForReader } from '../util/debrief-cards.util';
 import {
   DebriefProgress,
   DebriefRunnerService,
@@ -51,6 +67,12 @@ export const LIVE_START_DELAY_MS = 45_000;
 const DRAIN_WINDOW_HOURS = 48;
 /** Well past the longest deadline (risk cue: 3 min) plus a slow drain. */
 const STUCK_AFTER_MINUTES = 10;
+/**
+ * v9 FR-3: a run still "running" this long is past every deadline (150 s,
+ * 180 s with a risk cue), so its worker is gone: resume it, once.
+ */
+const RESUME_AFTER_MINUTES = 5;
+const MAX_RESUMES = 1;
 
 /** The tenant switch: the only per-org setting the Debrief agent has in v1. */
 export const DEBRIEF_POLICY: PolicySchema = {
@@ -59,6 +81,19 @@ export const DEBRIEF_POLICY: PolicySchema = {
     default: false,
     description:
       "Learners in this organisation read the Debrief agent's debrief instead of today's.",
+    overridableBy: ['org'],
+    group: 'Launch',
+  },
+  // FR-46: when the organisation was last switched off (epoch ms). After
+  // launch, off is an emergency stop: its learners read "not available" for
+  // sessions without a debrief already written, never today's debrief.
+  stoppedAt: {
+    type: 'int',
+    default: null,
+    nullable: true,
+    min: 0,
+    description:
+      'When this organisation was switched off (an emergency stop). Learners see "not available" for sessions without a debrief already written.',
     overridableBy: ['org'],
     group: 'Launch',
   },
@@ -71,13 +106,33 @@ export const DEBRIEF_POLICY: PolicySchema = {
     overridableBy: ['org'],
     group: 'Launch',
   },
+  // Plan §8.9 / v9 FR-57 (Q12): an organisation whose contract restricts
+  // providers. Not set = allowed; see debrief-provider-allowlist.util.ts.
+  ...Object.fromEntries(
+    DEBRIEF_APPROVED_PROVIDERS.map((p) => [
+      PROVIDER_ALLOWED_KEY(p),
+      {
+        type: 'boolean',
+        default: true,
+        description: `This organisation's debriefs may use ${p} models. Off keeps its learners' sessions (live debriefs, side-by-side trials, Ask Ally) away from ${p}.`,
+        overridableBy: ['org'],
+        group: 'Providers',
+      },
+    ]),
+  ),
 };
 
 export type DebriefRegion = 'india' | 'outside_india';
 
 /** What a learner can read: cards only once published, nothing about the run. */
 export interface LearnerDebriefView {
-  state: 'ready' | 'working' | 'on_its_way' | 'too_short' | 'not_available';
+  state:
+    | 'ready'
+    | 'working'
+    | 'taking_longer'
+    | 'on_its_way'
+    | 'too_short'
+    | 'not_available';
   runId?: string;
   cards?: Record<string, any> | null;
   language?: string | null;
@@ -86,10 +141,20 @@ export interface LearnerDebriefView {
   progress?: LearnerProgress | null;
   /** The learner stepped out of the role in distress: support comes first. */
   distress?: boolean;
+  /**
+   * The safety reading found a risk cue. The support lines show whenever it
+   * did, with or without an important-moment card.
+   */
+  riskCue?: boolean;
   /** The organisation's support lines (the Guide's), crisis lines first. */
   supportLines?: GuideSupportLine[];
   /** Roleplays the cards link to that the learner can still open. */
   practice?: Array<{ id: number; title: string }>;
+  /**
+   * `not_available` only: the organisation's debriefs were stopped (FR-46),
+   * so the tab says "not available" instead of showing today's debrief.
+   */
+  stopped?: boolean;
 }
 
 /** The roleplays a debrief's cards link to, once each. */
@@ -105,7 +170,9 @@ function practiceIds(cards?: Record<string, any> | null): number[] {
 
 /**
  * Owns when the Debrief agent runs: the 5-minute drain over ended sessions
- * (shadow everywhere, live for switched-on tenants), the release seed, the
+ * of switched-on tenants (live; while the agent is in development no other
+ * organisation's sessions are debriefed automatically — a shadow run is
+ * only ever asked for from the Console), the release seed, the
  * tenant switch, and the nightly reconciliation of estimated against actual
  * cost from `llm_usage`.
  */
@@ -161,6 +228,12 @@ export class DebriefAgentService implements OnModuleInit {
     private readonly config: AppConfigService,
     private readonly practice: DebriefPracticeService,
     private readonly notifier: DebriefNotifier,
+    /** v9 FR-20: a readable live debrief is written where today's was. */
+    @Optional() private readonly publisher?: DebriefPublishService,
+    /** The PM agent's paired trials and canary (v9 FR-52). */
+    @Optional() private readonly trials?: DebriefTrialsService,
+    /** Code releases on deploy: live unless they would undo a promoted change. */
+    @Optional() private readonly releaseHistory?: DebriefReleasesService,
   ) {}
 
   /**
@@ -178,38 +251,101 @@ export class DebriefAgentService implements OnModuleInit {
         run.status,
       )
     ) {
+      await this.publisher?.applyToSession(run);
       await this.notifier.ready(run);
     }
   }
 
   onModuleInit(): void {
-    scheduledTaskRegistry.register('5min', 'debrief-agent-drain', () =>
+    // Debrief › Settings › Schedules: when these run is data (debrief_schedules).
+    scheduledTaskRegistry.registerConfigurable('debrief-agent-drain', () =>
       this.drain(),
     );
-    scheduledTaskRegistry.register('daily', 'debrief-cost-reconcile', () =>
-      this.reconcileCosts(),
+    scheduledTaskRegistry.registerConfigurable(
+      'debrief-cost-reconcile',
+      async () => {
+        await this.reconcileCosts();
+      },
     );
-    scheduledTaskRegistry.register('5min', 'debrief-stuck-sweep', async () => {
-      await this.sweepStuckRuns();
+    scheduledTaskRegistry.registerConfigurable(
+      'debrief-stuck-sweep',
+      async () => {
+        const resumed = await this.resumeStuckRuns();
+        const handed = await this.sweepStuckRuns();
+        return resumed + handed === 0
+          ? 'none stuck'
+          : `${resumed} resumed, ${handed} handed to a person`;
+      },
+    );
+    scheduledTaskRegistry.registerConfigurable('debrief-judge', async () => {
+      const n = await this.judge.drain(5);
+      return `${n} judged`;
     });
   }
 
-  /** Seed version 1 from code; a deploy never undoes a deliberate rollback. */
+  /**
+   * The release in force. The first boot seeds version 1 from code; after
+   * that a deploy makes a release only when it changes release contents
+   * (default models, settings, recipes): live at once, unless it would undo a
+   * promoted change (DebriefReleasesService.fromCodeDefaults). Default prompt
+   * texts reach learners through the Skills Store, as a publish does.
+   */
   async ensureRelease(): Promise<void> {
-    await this.releases.syncSeed(
-      DEBRIEF_AGENT_KEY,
-      DEBRIEF_SEED_BUNDLE as unknown as Record<string, unknown>,
-    );
+    if (!(await this.releases.getGa(DEBRIEF_AGENT_KEY))) {
+      await this.releases.syncSeed(
+        DEBRIEF_AGENT_KEY,
+        DEBRIEF_SEED_BUNDLE as unknown as Record<string, unknown>,
+      );
+    } else {
+      try {
+        await this.releaseHistory?.fromCodeDefaults();
+      } catch (e) {
+        this.logger.warn(
+          `[debrief] could not check the code defaults: ${(e as Error).message}`,
+        );
+      }
+    }
+    // Plan §8.8: every release records the exact prompt versions it runs.
+    try {
+      await this.runner.pinAll();
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] could not record release prompt versions: ${(e as Error).message}`,
+      );
+    }
   }
 
   async isLive(tenantId: string | null): Promise<boolean> {
-    if (!tenantId) return false;
+    return (await this.orgSwitch(tenantId)).live;
+  }
+
+  /** The tenant switch, and when it was last used as an emergency stop (FR-46). */
+  async orgSwitch(
+    tenantId: string | null,
+  ): Promise<{ live: boolean; stoppedAt: number | null }> {
+    if (!tenantId) return { live: false, stoppedAt: null };
     const row = await this.overrides.get(
       DEBRIEF_AGENT_KEY,
       AgentConfigLayer.ORG,
       tenantId,
     );
-    return row?.values?.live === true;
+    const live = row?.values?.live === true;
+    const stoppedAt = row?.values?.stoppedAt;
+    return {
+      live,
+      stoppedAt: !live && typeof stoppedAt === 'number' ? stoppedAt : null,
+    };
+  }
+
+  /** Organisations switched off after being on: an emergency stop (FR-46). */
+  async stoppedTenants(): Promise<string[]> {
+    const rows = await this.dataSource.query(
+      `SELECT "scopeId" FROM agent_config_overrides
+        WHERE "agentKey" = $1 AND layer = 'org' AND "values" ? 'stoppedAt'
+          AND COALESCE(("values"->>'live')::boolean, false) = false`,
+      [DEBRIEF_AGENT_KEY],
+    );
+    return rows.map((r: { scopeId: string }) => r.scopeId);
   }
 
   async setLive(
@@ -223,7 +359,11 @@ export class DebriefAgentService implements OnModuleInit {
       layer: AgentConfigLayer.ORG,
       scopeId: tenantId,
       schema: DEBRIEF_POLICY,
-      change: live ? { set: { live: true } } : { clear: ['live'] },
+      // Off is the emergency stop (FR-46): remember when, so learners read
+      // "not available" rather than today's debrief.
+      change: live
+        ? { set: { live: true }, clear: ['stoppedAt'] }
+        : { set: { stoppedAt: Date.now() }, clear: ['live'] },
       actorUserId: userId,
     });
   }
@@ -263,6 +403,62 @@ export class DebriefAgentService implements OnModuleInit {
     });
   }
 
+  /** Plan §8.9 (FR-57): each organisation's provider allowlist, for those that set one. */
+  async providerAllowlists(): Promise<Map<string, DebriefProvider[]>> {
+    const rows: Array<{ scopeId: string; values: Record<string, unknown> }> =
+      await this.dataSource.query(
+        `SELECT "scopeId", "values" FROM agent_config_overrides
+          WHERE "agentKey" = $1 AND layer = 'org'`,
+        [DEBRIEF_AGENT_KEY],
+      );
+    return new Map(
+      rows.map((r) => [r.scopeId, allowlistFromValues(r.values)] as const),
+    );
+  }
+
+  /**
+   * The owner sets which approved providers an organisation's debriefs may
+   * use. At least one: an empty list would stop every debrief, which is what
+   * switching the organisation off is for.
+   */
+  async setProviderAllowlist(
+    tenantId: string,
+    providers: string[],
+    userId: number,
+  ): Promise<DebriefProvider[]> {
+    const allowed = DEBRIEF_APPROVED_PROVIDERS.filter((p) =>
+      providers.includes(p),
+    );
+    const unknown = providers.filter(
+      (p) => !(DEBRIEF_APPROVED_PROVIDERS as readonly string[]).includes(p),
+    );
+    if (unknown.length) {
+      throw new BadRequestException(
+        `Not an approved provider: ${unknown.join(', ')}`,
+      );
+    }
+    if (!allowed.length) {
+      throw new BadRequestException(
+        "Allow at least one provider. To stop this organisation's debriefs, switch it off instead.",
+      );
+    }
+    const set: Record<string, boolean> = {};
+    const clear: string[] = [];
+    for (const p of DEBRIEF_APPROVED_PROVIDERS) {
+      if (allowed.includes(p)) clear.push(PROVIDER_ALLOWED_KEY(p));
+      else set[PROVIDER_ALLOWED_KEY(p)] = false;
+    }
+    await this.overrides.save({
+      agentKey: DEBRIEF_AGENT_KEY,
+      layer: AgentConfigLayer.ORG,
+      scopeId: tenantId,
+      schema: DEBRIEF_POLICY,
+      change: { set, clear },
+      actorUserId: userId,
+    });
+    return allowed;
+  }
+
   /** Whether the organisation set support lines of its own in its Guide profile. */
   async hasOwnSupportLines(tenantId: string): Promise<boolean> {
     const [row] = await this.dataSource.query(
@@ -298,14 +494,17 @@ export class DebriefAgentService implements OnModuleInit {
     return rows.map((r: { scopeId: string }) => r.scopeId);
   }
 
-  /** Ended sessions with messages and no production run yet. */
+  /** Ended sessions of the given tenants with messages and no production run yet. */
   async pendingSessions(
     limit: number,
+    tenantIds: string[],
   ): Promise<Array<{ id: string; tenant_id: string | null }>> {
+    if (tenantIds.length === 0) return [];
     return this.dataSource.query(
       `SELECT s.id, s.tenant_id
          FROM scenario_sessions s
         WHERE ${settledEndedSessionPredicate('s')}
+          AND s.tenant_id::text = ANY($3::text[])
           AND s."createdAt" >= now() - make_interval(hours => $1)
           AND s."roomId" NOT LIKE 'preview-%'
           AND s."roomId" NOT LIKE 'seed-room-%'
@@ -315,26 +514,30 @@ export class DebriefAgentService implements OnModuleInit {
                            WHERE r."scenarioSessionId" = s.id AND r.mode IN ('shadow','live'))
         ORDER BY s."endedAt" DESC NULLS LAST
         LIMIT $2`,
-      [DRAIN_WINDOW_HOURS, limit],
+      [DRAIN_WINDOW_HOURS, limit, tenantIds],
     );
   }
 
-  async drain(): Promise<void> {
-    if (this.config.debriefAgentMode === 'off') return;
+  /** Start debriefs waiting in switched-on organisations; says what it did, for the run log. */
+  async drain(): Promise<string> {
+    if (this.config.debriefAgentMode === 'off') return 'Debrief agent is off';
     await this.ensureRelease();
-    const pending = await this.pendingSessions(DRAIN_BATCH);
+    // Only switched-on organisations: no automatic shadow runs elsewhere.
+    const pending = await this.pendingSessions(
+      DRAIN_BATCH,
+      await this.liveTenants(),
+    );
     if (pending.length === 0) {
-      await this.judge.drain(5);
-      return;
+      const judged = await this.judge.drain(5);
+      return judged ? `0 started · ${judged} judged` : '0 started';
     }
-    const live = new Set(await this.liveTenants());
     let done = 0;
     await runWithConcurrency(pending, DRAIN_CONCURRENCY, async (s) => {
-      const mode =
-        s.tenant_id && live.has(s.tenant_id)
-          ? DebriefRunMode.LIVE
-          : DebriefRunMode.SHADOW;
-      const run = await this.runner.run(s.id, { mode });
+      const mode = DebriefRunMode.LIVE;
+      const run = await this.runner.run(s.id, {
+        mode,
+        ...(await this.canaryOptions(s.id, mode)),
+      });
       await this.announceReady(run);
       // The independent judge scores every debrief, published or not, blind.
       if (run.cards) {
@@ -345,6 +548,7 @@ export class DebriefAgentService implements OnModuleInit {
               `[debrief] judging run ${run.id} failed: ${(e as Error).message}`,
             ),
           );
+        void this.trials?.onPublished(run);
       }
       done++;
       this.logger.info(
@@ -352,6 +556,7 @@ export class DebriefAgentService implements OnModuleInit {
       );
     });
     this.logger.info(`[debrief] drain finished ${done}/${pending.length}`);
+    return `${done} started`;
   }
 
   /**
@@ -360,11 +565,11 @@ export class DebriefAgentService implements OnModuleInit {
    * drain (which waits for sessions to settle). Shadow runs keep to the drain:
    * nobody is waiting for them.
    */
-  @OnEvent(ScenarioSessionLeaderboardEvent.SCENARIO_SESSION_ENDED, {
+  @OnEvent(ScenarioSessionCompletionEvent.SCENARIO_SESSION_COMPLETED, {
     async: true,
   })
   async onSessionEnded(
-    event: ScenarioSessionLeaderboardEndedEventParams,
+    event: ScenarioSessionCompletedEventParams,
   ): Promise<void> {
     if (this.config.debriefAgentMode === 'off') return;
     if (
@@ -383,6 +588,7 @@ export class DebriefAgentService implements OnModuleInit {
       await this.ensureRelease();
       const run = await this.runner.run(sessionId, {
         mode: DebriefRunMode.LIVE,
+        ...(await this.canaryOptions(sessionId, DebriefRunMode.LIVE)),
       });
       await this.announceReady(run);
       this.logger.info(
@@ -396,6 +602,7 @@ export class DebriefAgentService implements OnModuleInit {
               `[debrief] judging run ${run.id} failed: ${(e as Error).message}`,
             ),
           );
+        void this.trials?.onPublished(run);
       }
     } catch (e) {
       this.logger.error(
@@ -408,9 +615,75 @@ export class DebriefAgentService implements OnModuleInit {
    * The sweeper (v9 FR-3): a run still "running" well past every deadline
    * lost its worker — a deploy or a crash. A live one goes to a person to
    * finish (the learner sees "on its way", never an endless progress panel);
-   * a shadow or replay one is marked failed. Resuming mid-run is not built:
-   * the paid steps' results are not checkpointed yet.
+   * a shadow or replay one is marked failed. Runs are resumed once first
+   * (resumeStuckRuns); this catches the ones that died again, and replays.
    */
+  /**
+   * v9 FR-52 rung 4: a live debrief in a switched-on organisation runs on the
+   * canary release when one is running and the session falls in its share,
+   * marked as the canary's challenger arm. Never for shadow runs: the canary
+   * is about what learners read. A failed read means no canary.
+   */
+  private async canaryOptions(
+    sessionId: string,
+    mode: DebriefRunMode,
+  ): Promise<Record<string, unknown>> {
+    if (mode !== DebriefRunMode.LIVE || !this.trials) return {};
+    const canary = await this.trials.canaryFor(sessionId).catch(() => null);
+    return canary
+      ? {
+          release: canary.release,
+          experimentId: canary.ideaId,
+          arm: DebriefRunArm.CHALLENGER,
+        }
+      : {};
+  }
+
+  /**
+   * v9 FR-3 durable runs: a production run whose worker died mid-run (a
+   * deploy, a crash) is resumed once from its checkpoint — the paid steps that
+   * finished are replayed, not paid again — with a fresh deadline. Each is
+   * claimed by bumping its resume count in one statement, so two replicas
+   * never resume the same run. One that dies again goes to the sweeper below.
+   */
+  async resumeStuckRuns(): Promise<number> {
+    const res = await this.dataSource.query(
+      `UPDATE debrief_runs
+          SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{resumes}',
+                to_jsonb(COALESCE((workspace->>'resumes')::int, 0) + 1)),
+              "startedAt" = now(),
+              "updatedAt" = now()
+        WHERE status = $1
+          AND mode IN ('shadow','live')
+          AND COALESCE((workspace->>'resumes')::int, 0) < $2
+          AND COALESCE("startedAt", "createdAt") < now() - interval '${RESUME_AFTER_MINUTES} minutes'
+        RETURNING id`,
+      [DebriefRunStatus.RUNNING, MAX_RESUMES],
+    );
+    const rows: Array<{ id: string }> = Array.isArray(res?.[0])
+      ? res[0]
+      : (res ?? []);
+    for (const { id } of rows) {
+      const run = await this.runs.findOne({ where: { id } });
+      if (!run) continue;
+      try {
+        const done = await this.runner.resume(run);
+        this.logger.warn(
+          `[debrief] resumed stuck ${done.mode} run ${done.id} session=${done.scenarioSessionId} status=${done.status}`,
+        );
+        await this.announceReady(done);
+        if (done.cards) {
+          await this.judge.judge(done).catch(() => undefined);
+        }
+      } catch (e) {
+        this.logger.error(
+          `[debrief] resuming run ${id} failed: ${(e as Error).message}`,
+        );
+      }
+    }
+    return rows.length;
+  }
+
   async sweepStuckRuns(): Promise<number> {
     const res = await this.dataSource.query(
       `UPDATE debrief_runs
@@ -441,7 +714,9 @@ export class DebriefAgentService implements OnModuleInit {
   ): Promise<LearnerDebriefView> {
     const rows = await this.dataSource.query(
       `SELECT s."counselorId" AS counselor_id, s.tenant_id, s.status,
-              COALESCE(s."endedAt", s."updatedAt") AS ended_at
+              COALESCE(s."endedAt", s."updatedAt") AS ended_at,
+              (SELECT d.summary->'feedback' FROM scenario_session_details d
+                WHERE d."scenarioSessionId" = s.id LIMIT 1) AS feedback
          FROM scenario_sessions s WHERE s.id = $1`,
       [sessionId],
     );
@@ -449,11 +724,36 @@ export class DebriefAgentService implements OnModuleInit {
     if (!s || Number(s.counselor_id) !== Number(userId)) {
       throw new ForbiddenException('Not your session');
     }
-    if (!(await this.isLive(s.tenant_id))) return { state: 'not_available' };
     const runs = await this.runs.find({
       where: { scenarioSessionId: sessionId },
     });
     const run = runs.find((r) => r.mode === DebriefRunMode.LIVE);
+    // FR-46: an emergency stop stops new debriefs; ones already written stay
+    // as they are ("Debriefs already written stay as they are").
+    const written =
+      !!run?.cards &&
+      [DebriefRunStatus.PUBLISHED, DebriefRunStatus.BELOW_BAR].includes(
+        run.status,
+      );
+    if (!written) {
+      const org = await this.orgSwitch(s.tenant_id);
+      if (!org.live) {
+        // FR-46: after an emergency stop the tab says "not available" —
+        // except a debrief already written: today's note for a session that
+        // ended before the stop stays as it was.
+        if (
+          org.stoppedAt !== null &&
+          !(
+            s.ended_at &&
+            new Date(s.ended_at).getTime() < org.stoppedAt &&
+            hasLegacyFeedback(s.feedback)
+          )
+        ) {
+          return { state: 'not_available', stopped: true };
+        }
+        return { state: 'not_available' };
+      }
+    }
     if (!run || run.status === DebriefRunStatus.QUEUED) {
       // Only a session the drain will still pick up is "on its way": one
       // debriefed in shadow before the switch, or older than the drain's
@@ -477,26 +777,35 @@ export class DebriefAgentService implements OnModuleInit {
           ),
         };
       case DebriefRunStatus.PUBLISHED:
-      case DebriefRunStatus.BELOW_BAR:
+      case DebriefRunStatus.BELOW_BAR: {
+        const cards = cardsForReader(run.cards, run.recipeKey);
         return {
           state: 'ready',
           runId: run.id,
-          cards: run.cards,
+          cards,
           language: run.language,
           distress: run.learnerDistress === true,
+          // The safety reading found something. The apps show the support
+          // lines on their own when the Writer judged it ordinary low mood or
+          // grief and wrote no important moment.
+          riskCue: run.hasRiskCue === true,
           supportLines: await this.supportLines(s.tenant_id, run.language),
           practice: await this.practice.available(
             userId,
             s.tenant_id,
-            practiceIds(run.cards),
+            practiceIds(cards),
           ),
         };
+      }
       case DebriefRunStatus.SKIPPED:
         return {
           state: run.skipReason === 'too_short' ? 'too_short' : 'not_available',
         };
       default:
-        return { state: 'on_its_way' };
+        // Plan §10.3 rung 6: a person finishes it. With a risk cue the
+        // learner reads "on its way" (urgent in the queue); otherwise
+        // "taking longer" with Check again (plan §7.5).
+        return { state: run.hasRiskCue ? 'on_its_way' : 'taking_longer' };
     }
   }
 

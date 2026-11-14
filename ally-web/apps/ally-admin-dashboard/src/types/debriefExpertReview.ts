@@ -1,0 +1,127 @@
+import { DebriefCardsData } from "./debriefConsole";
+
+export type ExpertVerdict = "good" | "needs_work";
+
+export type ExpertCommentAnchor = "transcript" | "card" | "debrief";
+
+export type ExpertCommentTag =
+  | "missed_moment"
+  | "wrong_or_unsupported"
+  | "tone"
+  | "advice_doesnt_fit"
+  | "protocol"
+  | "language"
+  | "too_long_or_unclear"
+  /** Names no specific moment: pre-fills Evidence = No. */
+  | "too_vague"
+  | "good_keep_this";
+
+export interface ExpertTranscriptTurn {
+  turnIndex: number;
+  speaker: "client" | "learner";
+  text: string;
+  gap: boolean;
+  riskCue: { category: string; learnerResponse: string } | null;
+}
+
+export interface ExpertComment {
+  id: string;
+  runId: string;
+  parentId: string | null;
+  anchorKind: ExpertCommentAnchor;
+  turnIndex: number | null;
+  section: string | null;
+  spanStart: number | null;
+  spanEnd: number | null;
+  quotedText: string | null;
+  body: string;
+  tag: ExpertCommentTag | null;
+  status: "open" | "resolved";
+  reviewer: { id: number; name: string | null };
+  mine: boolean;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+  /** The PM agent idea this comment fed (agent_lessons status). */
+  idea: { id: string; title: string | null; status: string | null } | null;
+  repeatOf: { id: string; runId: string | null; body: string | null } | null;
+}
+
+export interface ExpertReviewDetail {
+  run: {
+    id: string;
+    sessionId: string;
+    status: string;
+    mode: "live" | "shadow";
+    language: string | null;
+    sessionType: string | null;
+    tenantName: string | null;
+    createdAt: string;
+    hasRiskCue: boolean;
+    learnerDistress: boolean;
+    releaseVersion: number | null;
+  };
+  transcript: ExpertTranscriptTurn[];
+  cards: DebriefCardsData;
+  corrections: Array<{ section: string | null; outcome: string; note: string | null }>;
+  flags: Array<{
+    id: string;
+    section: string | null;
+    reason: string | null;
+    note: string | null;
+    status: string;
+    resolutionNote: string | null;
+    createdAt: string;
+  }>;
+  comments: ExpertComment[];
+  myReview: { verdict: ExpertVerdict; hardFails: string[]; updatedAt: string } | null;
+  otherReviews: {
+    count: number;
+    verdicts: Array<{ verdict: ExpertVerdict; hardFails: string[] }> | null;
+  };
+  judge: { overall: number | null; hardFails: string[] } | null;
+  evaluator: { overall: number | null; hardFails: string[] } | null;
+  hardFailCodes: string[];
+  /** The κ gate's yes/no questions under the verdict, pre-filled (older servers: absent). */
+  agreement?: AgreementQuestion[];
+}
+
+/** One κ-gate measure; the judge's codes. */
+export type AgreementMeasure = "accuracy" | "evidence_specificity" | "missed_risk_cue";
+
+/** Where a pre-filled "No" came from. */
+export type AgreementPrefillSource =
+  | {
+      kind: "comment";
+      commentId: string;
+      anchorKind: string;
+      turnIndex: number | null;
+      section: string | null;
+    }
+  | { kind: "hard_fail"; code: string };
+
+export interface AgreementQuestion {
+  measure: AgreementMeasure;
+  /** What the panel starts with: the saved answer, else the pre-fill. */
+  answer: boolean;
+  prefilled: boolean;
+  source: AgreementPrefillSource | null;
+  /** The saved answer; null before the reviewer confirmed one. */
+  saved: boolean | null;
+}
+
+/** A selection waiting to become a comment. */
+export interface ExpertCommentDraftAnchor {
+  anchorKind: ExpertCommentAnchor;
+  turnIndex?: number;
+  section?: string;
+  spanStart?: number;
+  spanEnd?: number;
+  quotedText?: string;
+}
+
+export interface NewExpertComment extends ExpertCommentDraftAnchor {
+  body: string;
+  tag?: ExpertCommentTag | null;
+  parentId?: string;
+}

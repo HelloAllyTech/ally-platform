@@ -1,3 +1,4 @@
+import type { BuilderQuestionEvent } from './builder-sse.type';
 /**
  * The decision feed: every point, across every Builder session, where the
  * agent has stopped and is waiting for a person to choose.
@@ -181,3 +182,34 @@ export const parseDecisionId = (
     ref: rest.length ? rest.join(':') : null,
   };
 };
+
+/**
+ * How an interview question is answered on a decision card: its options, one
+ * or several, and whether words are taken too. Shared by the feed and by any
+ * other surface that answers Builder's question (the PM agent's idea card), so
+ * both offer the same choices.
+ */
+export function questionChoices(
+  question: BuilderQuestionEvent,
+): Pick<
+  BuilderDecision,
+  | 'selection'
+  | 'options'
+  | 'allowCustom'
+  | 'allowNone'
+  | 'minSelections'
+  | 'customPlaceholder'
+> {
+  const isSelect = question.kind !== 'freeText';
+  return {
+    selection:
+      question.kind === 'multiSelect' || question.kind === 'dropdown'
+        ? 'multi'
+        : 'single',
+    options: isSelect ? (question.options ?? []) : [],
+    allowCustom: isSelect ? question.allowCustom !== false : true,
+    allowNone: Boolean(question.allowNone),
+    minSelections: question.minSelections ?? null,
+    customPlaceholder: 'Your own answer…',
+  };
+}

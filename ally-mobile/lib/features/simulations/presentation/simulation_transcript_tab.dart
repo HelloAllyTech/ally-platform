@@ -16,7 +16,10 @@ import 'widgets/feedback/feedback_widgets.dart';
 
 /// A "See this moment" jump from the debrief (RN `TranscriptFocusRequest`):
 /// [requestId] makes a repeat tap on the same chip a new request.
-typedef TranscriptFocusRequest = ({String messageId, int requestId});
+///
+/// A card's quote ([quote], exact words from one turn) finds that turn by its
+/// words; otherwise [messageId] names it.
+typedef TranscriptFocusRequest = ({String messageId, String? quote, int requestId});
 
 /// Port of RN `TranscriptTab` → `SimulationTranscript` +
 /// `SimulationTranscriptItem`: a "Transcript" card with the accuracy
@@ -253,11 +256,15 @@ class _SimulationTranscriptTabState extends ConsumerState<SimulationTranscriptTa
   void _chaseFocus() {
     final focus = widget.focusMessage;
     if (!mounted || focus == null || _handledFocusRequest == focus.requestId) return;
-    final index = _messages.indexWhere((m) => '${m.id}' == focus.messageId);
+    String squash(String text) => text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final quote = squash(focus.quote ?? '');
+    final index = quote.isNotEmpty
+        ? _messages.indexWhere((m) => squash(m.content).contains(quote))
+        : _messages.indexWhere((m) => '${m.id}' == focus.messageId);
     if (index != -1) {
       _handledFocusRequest = focus.requestId;
       _focusTimer?.cancel();
-      setState(() => _focusedMessageId = focus.messageId);
+      setState(() => _focusedMessageId = '${_messages[index].id}');
       _focusTimer = Timer(_focusHighlight, () {
         if (mounted) setState(() => _focusedMessageId = null);
       });

@@ -134,14 +134,21 @@ export enum LlmTask {
   DEBRIEF_WRITER = 'debrief_writer',
   DEBRIEF_EVALUATOR = 'debrief_evaluator',
   DEBRIEF_REVISER = 'debrief_reviser',
+  // The orchestrated debrief (spec A5, A9): the planner and its prompt-only agents.
+  DEBRIEF_PLANNER = 'debrief_planner',
+  DEBRIEF_PROTOCOL_CHECK = 'debrief_protocol_check',
+  DEBRIEF_HISTORY_DEEP = 'debrief_history_deep',
+  DEBRIEF_LANGUAGE_SPECIALIST = 'debrief_language_specialist',
   // Ask Ally: the Debrief agent answering the learner's replies, streamed.
   DEBRIEF_REPLY = 'debrief_reply',
   // Read-aloud of a debrief card (Sarvam TTS), cached per card text.
   DEBRIEF_READ_ALOUD = 'debrief_read_aloud',
+  // Narration of a role-play's description (Sarvam TTS), made when it is published or edited.
+  SCENARIO_DESCRIPTION_NARRATION = 'scenario_description_narration',
   // Whether an answer to the reflective question is on topic, for XP.
   DEBRIEF_REFLECTION_CHECK = 'debrief_reflection_check',
-  // The debrief Improver's daily analysis; learning budget, never production.
-  DEBRIEF_IMPROVER = 'debrief_improver',
+  // The debrief PM agent's daily analysis; learning budget, never production.
+  DEBRIEF_PM_AGENT = 'debrief_improver',
   // Thinking-filler judge in ally-ai: scores whether a filler sounded like the
   // character and fitted the turn. Its own label rather than folded into
   // LANGUAGE_JUDGE because it runs on a different cadence over a different
@@ -200,6 +207,24 @@ export enum LlmTask {
   // per loop iteration on the bot's answer model. Chatbot spend, not a learner practising, so
   // absent from TASK_AREA like the helpline's.
   WHATSAPP_AGENT_STEP = 'whatsapp_agent_step',
+  // Onboarding builder (chunk 20a), made by ally-ai's /builder/*: one label per
+  // sub-task, so the cost of setting up an assistant shows step by step.
+  // Extraction runs once per batch of crawled pages and dominates. Customer
+  // setup spend, not a learner practising, so absent from TASK_AREA.
+  ONBOARDING_BUILDER_STEP = 'onboarding_builder_step',
+  ONBOARDING_EXTRACT_FACTS = 'onboarding_extract_facts',
+  ONBOARDING_CLASSIFY = 'onboarding_classify',
+  ONBOARDING_GAPS = 'onboarding_gaps',
+  // Purposes (chunk 20a-2): tailors the five purpose cards and recommends one.
+  ONBOARDING_PURPOSES = 'onboarding_purposes',
+  ONBOARDING_DRAFT = 'onboarding_draft',
+  // Change by chat on the assistant home (chunk 20a-2): one call per request.
+  ONBOARDING_CHANGE = 'onboarding_change',
+  // The checkup (chunk 20a-2), made by ally-ai's /checkup/grade: one judge call per graded
+  // question that needs a reading for meaning. Customer spend, absent from TASK_AREA.
+  CHECKUP_JUDGE = 'checkup_judge',
+  // Writes an assistant's checkup questions from its learned details (chunk 20a-2).
+  CHECKUP_QUESTIONS = 'checkup_questions',
   // Feedback → skill mapping (src/foundational-skills): one call per completed
   // session whose debrief names areas of growth, filing each under one
   // foundational helping skill (or none) for the Helping skills "named

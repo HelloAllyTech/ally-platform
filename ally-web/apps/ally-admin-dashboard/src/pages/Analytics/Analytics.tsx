@@ -43,6 +43,7 @@ import { SuggestionsTab } from "./tabs/suggestions/SuggestionsTab";
 import { WeakPerformingMetricsTab } from "./tabs/WeakPerformingMetricsTab";
 import { TokenConsumption } from "./TokenConsumption";
 import { ConversationDrift } from "../ConversationDrift/ConversationDrift";
+import { DebriefAnalytics } from "../Debriefs/metrics/DebriefAnalytics";
 
 const RANGE_ITEMS: { id: AnalyticsRange; label: string }[] = [
   { id: "30d", label: "Last 30 days" },
@@ -87,6 +88,8 @@ interface TabDef {
 
 /** Query-string key that selects an Analytics tab by its `TabDef.id`. */
 export const ANALYTICS_TAB_PARAM = "tab";
+/** The Debriefs tab's id, exported so the Debrief Console can send its old Metrics links here. */
+export const ANALYTICS_DEBRIEFS_TAB_ID = "debriefs";
 /** The Bug Agent tab's id, exported so the Bug Hunter page can link to it. */
 export const ANALYTICS_BUG_AGENT_TAB_ID = "bug-agent-performance";
 
@@ -152,6 +155,19 @@ const TABS: TabDef[] = [
     uses: { language: false, range: true },
     orgScoped: true,
     render: f => <AllyGuideTab {...f} />,
+  },
+  {
+    // The Debrief agent's metrics: the PRD's success metrics, the pass rate (the same definition the
+    // evals use) with its breakdowns, and each agent in the debrief family. Moved here from the
+    // Debrief Console on 2026-11-11 so every agent's analytics sit together; the Console keeps the
+    // operator work. It reads the page's time range, and adds its six filters (organisation,
+    // language, learner level, debrief type, release, judge version) to the page's filter row. The
+    // page's language picker is off: debrief language is the session's own code, not a scenario
+    // language.
+    id: ANALYTICS_DEBRIEFS_TAB_ID,
+    label: "Debriefs",
+    uses: { language: false, range: true },
+    render: f => <DebriefAnalytics range={f.query.range} />,
   },
   {
     id: "latency",

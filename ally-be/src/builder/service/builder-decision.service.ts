@@ -13,7 +13,10 @@ import { RedisService } from 'src/redis/service/redis.service';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderMessage } from '../entity/builder-message.entity';
 import { BuilderPullRequest } from '../entity/builder-pull-request.entity';
-import { BuilderSessionRepository } from '../repository/builder-session.repository';
+import {
+  BuilderSessionRepository,
+  SHARED_SESSIONS_ONLY,
+} from '../repository/builder-session.repository';
 import { BuilderMessageRepository } from '../repository/builder-message.repository';
 import { BuilderPullRequestRepository } from '../repository/builder-build.repository';
 import { BuilderPrdService } from './builder-prd.service';
@@ -29,6 +32,7 @@ import {
 import {
   BUILDER_DECISION_CATEGORY,
   BuilderDecision,
+  questionChoices,
   BuilderDecisionAnswerResult,
   BuilderDecisionKind,
   buildDecisionId,
@@ -149,7 +153,9 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
    */
   async listPending(): Promise<BuilderDecision[]> {
     const sessions = await this.sessionRepository.find({
-      where: { archivedAt: IsNull() },
+      // A private (unfiled) plan's questions are its author's, answered in the
+      // plan itself — never in the shared decision inbox.
+      where: { ...SHARED_SESSIONS_ONLY, archivedAt: IsNull() },
       order: { updatedAt: 'ASC' },
     });
     if (!sessions.length) return [];
@@ -207,7 +213,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
     const parsed = parseDecisionId(decisionId);
     if (!parsed) return null;
     const session = await this.sessionRepository.findOne({
-      where: { id: parsed.sessionId },
+      where: { id: parsed.sessionId, ...SHARED_SESSIONS_ONLY },
     });
     if (!session) return null;
     const [names, pullRequests] = await Promise.all([
@@ -275,8 +281,14 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
     const history = await this.historyService.recordDecision(
       decision,
       { selectedOptionIds: picked, customText: words || null, none: dto.none },
-      // A rule decides on nobody's behalf at the moment it runs.
-      { ...context, actorUserId: context.surface === 'rule' ? null : userId },
+      // A rule, or a requesting agent, decides on nobody's behalf.
+      {
+        ...context,
+        actorUserId:
+          context.surface === 'rule' || context.surface === 'requester'
+            ? null
+            : userId,
+      },
     );
     const historyId = history?.id ?? null;
 
@@ -753,7 +765,6 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
       for (const pending of interview) {
         if (pending.kind === 'question' && pending.question) {
           const question = pending.question;
-          const isSelect = question.kind !== 'freeText';
           decisions.push(
             make('question', question.id, {
               prompt: question.prompt,
@@ -764,15 +775,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
                 ...prdContext,
               ],
               blocked: 'Scoping is paused until this is answered.',
-              selection:
-                question.kind === 'multiSelect' || question.kind === 'dropdown'
-                  ? 'multi'
-                  : 'single',
-              options: isSelect ? (question.options ?? []) : [],
-              allowCustom: isSelect ? question.allowCustom !== false : true,
-              allowNone: Boolean(question.allowNone),
-              minSelections: question.minSelections ?? null,
-              customPlaceholder: 'Your own answer…',
+              ...questionChoices(question),
               waitingSince: pending.since.toISOString(),
             }),
           );
@@ -1070,6 +1073,25 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * What a session's interview is waiting on, for a requester deciding whether it can
+   * answer (plan §11.5): the pending question, or that a situation brief waits for a
+   * person to confirm. Empty when the interview is not waiting on anything.
+   */
+  async pendingInterview(sessionId: string): Promise<{
+    questions: BuilderQuestionEvent[];
+    brief: boolean;
+  }> {
+    const session = await this.sessionService.getSession(sessionId);
+    const pending = await this.interviewDecisions(session, null);
+    return {
+      questions: pending
+        .filter((entry) => entry.kind === 'question' && entry.question)
+        .map((entry) => entry.question as BuilderQuestionEvent),
+      brief: pending.some((entry) => entry.kind === 'brief'),
+    };
+  }
+
+  /**
    * What the interview is waiting on: the last assistant row's unanswered
    * questions, or its unconfirmed situation brief. Only the last row counts —
    * a question from an earlier turn that the admin talked past has been
@@ -1252,6 +1274,8 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
             }`,
           );
         }
+        // After the lock: a requester answering starts the next turn.
+        void this.sessionService.turnEnded(sessionId);
       }
     };
     // Deliberately not awaited: the answer is recorded by the orchestrator's

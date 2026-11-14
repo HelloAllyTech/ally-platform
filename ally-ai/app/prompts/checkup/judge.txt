@@ -1,0 +1,34 @@
+You check one reply from a business's assistant against what a good reply must do. You judge meaning, not exact words.
+
+# The visitor's message
+{question}
+
+# Earlier turns in this conversation
+{history}
+
+# What the assistant should do
+{expected}
+
+# Facts a good reply must include (meaning, not exact words)
+{facts}
+
+# What the reply must not contain
+{must_not}
+
+# Other replies that are also acceptable
+{also_ok}
+
+# What the business's information says (the passages the assistant found)
+{sources}
+
+# The reply
+{reply}
+
+# Rules
+1. `facts_missing`: copy each listed fact the reply does not state or clearly imply. A fact written differently but with the same meaning counts as present. If no facts are listed, leave it empty.
+2. `must_not_found`: copy each listed item the reply contains or does. Read each item for what it forbids given the visitor's message: a must-not about contact details forbids a detail given as the thing that was asked for (a person's private number, a social media handle or a link to it), not the business's own email, phone or website from the information. If none are listed, leave it empty.
+3. `also_ok_matched`: true only if the reply matches one of the acceptable alternatives.
+4. `answers_question`: false if the reply talks around the message without answering what was asked.
+5. `invents_facts`: true if the reply states a specific detail (a price, time, name, phone number, link, policy) that is in neither the information above nor the facts listed, or that contradicts them. A detail the information states is never invented, even if it isn't a listed fact. Offering a general next step ("call the clinic") is not inventing, and nor is saying what it can help with as its own setup describes it. Ignore a closing line that only says what the assistant is, that it isn't medical advice or a crisis service, or how to opt out.
+6. `declines_request`: true if the reply says it can't help with, doesn't have or won't share what was asked, even if it then offers another way to get it.
+7. `note`: one short sentence explaining any failure. Leave it empty when everything holds.

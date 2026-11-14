@@ -1,0 +1,107 @@
+/** The bot page's own words, in English. `hi.ts` has the same shape (checked by the type below). */
+export const en = {
+  lang: "en",
+  start: "Start",
+  poweredBy: "Powered by Ally",
+  loading: "Loading…",
+  cover: {
+    privateNote: "Only invited people can use this chat.",
+    organisationNote: "For members of the organisation. You'll confirm your work email first.",
+    coverAlt: "{business} cover image",
+  },
+  access: {
+    emailTitle: "Confirm your email",
+    emailHelp: "We'll send a 6-digit code to this address.",
+    emailLabel: "Email address",
+    emailPlaceholder: "you@example.com",
+    sendCode: "Send code",
+    codeTitle: "Enter your code",
+    codeHelp: "If {email} can use this chat, a code is on its way. It works for 10 minutes.",
+    codeLabel: "6-digit code",
+    verify: "Continue",
+    resend: "Send a new code",
+    resendIn: "Send a new code in {seconds}s",
+    changeEmail: "Use a different email",
+    invalidEmail: "Enter a valid email address.",
+  },
+  prechat: {
+    progress: "Question {n} of {total}",
+    next: "Next",
+    back: "Back",
+    finish: "Start chatting",
+    optional: "Optional",
+    required: "Please answer this question.",
+    choose: "Choose one",
+    agree: "I agree",
+  },
+  chat: {
+    inputLabel: "Your message",
+    placeholder: "Type your question…",
+    send: "Send",
+    newChat: "New chat",
+    suggested: "You can ask",
+    sources: "Sources",
+    you: "You",
+    signedInAs: "Signed in as {email}",
+    tooLong: "{count} of {max} characters",
+    headerIdle: "Answers from {name}'s own information",
+    typing: "Typing…",
+    /** A person stepping in (copy §23, chunk 11a). */
+    talkToPerson: "Talk to a person",
+    joined: "{sender} has joined the chat.",
+    backToAssistant: "You're chatting with the assistant again.",
+    /** "Was this helpful?" under an answer (copy §21, chunk Q2a). */
+    feedback: {
+      question: "Was this helpful?",
+      up: "Helpful",
+      down: "Not helpful",
+      whatWrong: "What was wrong?",
+      reasons: {
+        wrong_info: "Wrong information",
+        not_answered: "Didn't answer my question",
+        other: "Something else",
+      },
+      notePlaceholder: "Tell us more (optional)",
+      send: "Send",
+      skip: "Skip",
+      thanks: "Thanks, this helps the team improve it.",
+    },
+    status: {
+      thinking: "Thinking…",
+      searching: "Looking it up…",
+      found: "Reading what I found…",
+      checking: "Checking the answer…",
+      rewriting: "Improving the answer…",
+      writing: "Writing the reply…",
+    },
+  },
+  /** The website widget (copy §22, chunk 13). */
+  embed: {
+    close: "Close",
+  },
+  errors: {
+    BOT_PAGE_NOT_FOUND: "This chat link isn't available. It may have been turned off.",
+    BOT_PAGE_BOT_CHECK_FAILED: "We couldn't confirm you're a person. Please try again.",
+    BOT_PAGE_START_AGAIN: "Your session has ended. Please start again.",
+    BOT_PAGE_NOT_ALLOWED: "This email can't use this chat. Ask the person who shared the link.",
+    BOT_PAGE_CODE_WRONG: "That code isn't right. Please check it and try again.",
+    BOT_PAGE_CODE_EXPIRED: "That code has expired. Ask for a new one.",
+    BOT_PAGE_CODE_TOO_MANY: "Too many tries. Ask for a new code.",
+    BOT_PAGE_EMAIL_UNAVAILABLE:
+      "We couldn't send the email just now. Please try again in a minute.",
+    BOT_PAGE_THROTTLED: "You're sending messages quickly. Please wait {minutes} min and try again.",
+    BOT_PAGE_BUSY_UNAVAILABLE: "We're busy right now. Please try again later.",
+    BOT_PAGE_MESSAGE_TOO_LONG: "Please keep your message under {max} characters.",
+    BOT_PAGE_INTAKE_REQUIRED: "Please answer the questions first.",
+    BOT_PAGE_INTAKE_INVALID: "Please check your answer.",
+    BOT_PAGE_HOST_NOT_ALLOWED: "This chat isn't available on this website.",
+    NETWORK: "You seem to be offline. Check your connection and try again.",
+    INTERNAL: "Something went wrong. Please try again.",
+    tryAgain: "Try again",
+    startAgain: "Start again",
+  },
+};
+
+/** Same keys, any words: what `hi.ts` must provide. */
+type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };
+export type BotPageCopy = Shape<typeof en>;

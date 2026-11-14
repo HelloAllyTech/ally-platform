@@ -35,6 +35,8 @@ export interface Scenario {
   title?: string;
   scenario?: string;
   description?: string;
+  /** Narration of the description; absent until generated. */
+  descriptionAudioUrl?: string | null;
   /** Text reminders shown to the learner during the roleplay. */
   reminders?: string[];
   /** Whether reminders are shown to the learner during the roleplay — reminders should only render when this is true. */
@@ -409,7 +411,9 @@ export interface SimulationTranscriptMessage {
  * tapping the same chip twice scrolls to the moment twice.
  */
 export interface TranscriptFocusRequest {
-  messageId: string;
+  messageId?: string;
+  /** A debrief card's quote: the transcript turn it was taken from, found by its exact words. */
+  quote?: string;
   requestId: number;
 }
 

@@ -9,6 +9,7 @@ import { AutoExpandableTextarea } from "@ally-ui-mono/ui-shared";
 import {
   useArchiveBuilderSessionMutation,
   useCreateBuilderSessionMutation,
+  useGetBuilderSettingsQuery,
   useGetArchivedBuilderSessionsQuery,
   useGetBuilderDecisionsQuery,
   useGetBuilderSessionsQuery,
@@ -99,6 +100,14 @@ const SessionCard: React.FC<{
           {session.createdByName && (
             <p className="mt-0.5 truncate text-xs text-typography-500">
               {strings.startedBy(session.createdByName)}
+            </p>
+          )}
+          {session.requestedBy && strings.requestedFor[session.requestedBy] && (
+            <p
+              className="mt-0.5 truncate text-xs text-typography-500"
+              data-testid="builder-session-requested-for"
+            >
+              {strings.requestedFor[session.requestedBy]}
             </p>
           )}
         </div>
@@ -201,6 +210,9 @@ export const Builder: React.FC = () => {
     { skip: !showArchived },
   );
   const [createSession, { isLoading: isCreating }] = useCreateBuilderSessionMutation();
+  // Retired once plans start on the roadmap: new work is filed as an idea there.
+  const { data: builderSettings } = useGetBuilderSettingsQuery();
+  const startsOnRoadmap = builderSettings?.builderDirectInterviewEnabled === false;
   // The decision feed's count rides the same poll cadence as the list: a
   // decision that arrived while this page was open should show here too.
   const { data: decisionFeed } = useGetBuilderDecisionsQuery(undefined, {
@@ -392,31 +404,45 @@ export const Builder: React.FC = () => {
             <BuilderNotificationBell />
           </div>
         </div>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <AutoExpandableTextarea
-            id="builder-hero"
-            value={heroValue}
-            onChange={setHeroValue}
-            placeholder={strings.heroPlaceholder}
-            maxLines={4}
-            disabled={isCreating}
-            onKeyDown={(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void start();
-              }
-            }}
-          />
-          <Button
-            kind="primary"
-            size="md"
-            className="max-sm:!w-full max-sm:!max-w-none"
-            disabled={!heroValue.trim() || isCreating}
-            onClick={() => void start()}
-          >
-            {strings.heroSubmit}
-          </Button>
-        </div>
+        {startsOnRoadmap ? (
+          <p className="mt-3 text-sm">
+            New builds now start on the Product Roadmap: file an idea there, and once it has a PRD
+            its plan comes here to build.{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => navigate(`${ROUTES.PRODUCT_ROADMAP}?tab=my-ideas`)}
+            >
+              Go to My ideas
+            </button>
+          </p>
+        ) : (
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+            <AutoExpandableTextarea
+              id="builder-hero"
+              value={heroValue}
+              onChange={setHeroValue}
+              placeholder={strings.heroPlaceholder}
+              maxLines={4}
+              disabled={isCreating}
+              onKeyDown={(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void start();
+                }
+              }}
+            />
+            <Button
+              kind="primary"
+              size="md"
+              className="max-sm:!w-full max-sm:!max-w-none"
+              disabled={!heroValue.trim() || isCreating}
+              onClick={() => void start()}
+            >
+              {strings.heroSubmit}
+            </Button>
+          </div>
+        )}
       </header>
 
       <div className="mb-4 flex flex-col gap-4">

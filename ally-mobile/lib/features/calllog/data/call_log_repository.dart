@@ -123,6 +123,7 @@ class SimulationLogItem {
     required this.scenarioTitle,
     required this.score,
     this.sessionName,
+    this.counselorId,
   });
 
   factory SimulationLogItem.fromJson(Map<String, dynamic> json) {
@@ -144,6 +145,7 @@ class SimulationLogItem {
       scenarioTitle: scenario?['title'] as String? ?? json['scenarioTitle'] as String?,
       score: (json['score'] as num?)?.toDouble(),
       sessionName: (json['metadata'] as Map<String, dynamic>?)?['sessionName'] as String?,
+      counselorId: (json['counselorId'] as num?)?.toInt(),
     );
   }
 
@@ -157,6 +159,9 @@ class SimulationLogItem {
   /// `metadata.sessionName` — the only `logTitle` source a scenario session
   /// can have (it has no `details`).
   final String? sessionName;
+
+  /// Who did the session: the viewer's own reads the learner debrief view.
+  final int? counselorId;
 
   /// RN `CallLogItem.tsx`'s `logTitle` for a role-play row.
   String get logTitle => (sessionName?.isNotEmpty ?? false) ? sessionName! : 'ID-$id';
@@ -761,6 +766,12 @@ class CallLogRepository {
     final response = await _dio.post<Map<String, dynamic>>(
       '/chats/note/generate-from-audio',
       data: formData,
+      // This endpoint transcribes (possibly several chunks, for a long
+      // dictation) and then runs field extraction — multiple sequential
+      // LLM calls behind one response, heavier than the shared client's
+      // default 90s budget comfortably covers. A long dictation timing out
+      // here looked exactly like "no summary generated".
+      options: Options(receiveTimeout: const Duration(minutes: 5)),
     );
     final data = response.data ?? {};
     final values = (data['values'] as List<dynamic>? ?? [])
@@ -772,8 +783,24 @@ class CallLogRepository {
   /// Mirrors RN's `scribeNoteApi.ts` `saveNoteTranscript` mutation: replaces
   /// the manual note's stored dictation transcript (callers re-send the full
   /// accumulated text, not a delta) so it shows in the note's Transcript view.
-  Future<void> saveNoteTranscript({required int chatId, required String transcript}) async {
-    await _dio.put<void>('/chats/$chatId/transcript', data: {'transcript': transcript});
+  ///
+  /// [durationSeconds] is the length of the dictation just recorded (not
+  /// the note's accumulated total) — a manual note's startedAt/endedAt are
+  /// both set to the instant it was created and never touched again, so
+  /// without this the backend's call-duration math always computes zero no
+  /// matter how long the counsellor actually dictated.
+  Future<void> saveNoteTranscript({
+    required int chatId,
+    required String transcript,
+    int? durationSeconds,
+  }) async {
+    await _dio.put<void>(
+      '/chats/$chatId/transcript',
+      data: {
+        'transcript': transcript,
+        if (durationSeconds != null && durationSeconds > 0) 'durationSeconds': durationSeconds,
+      },
+    );
   }
 
   /// RN `useCallTranscriptDetails` page size.

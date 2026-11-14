@@ -6,6 +6,12 @@ const navigateMock = vi.fn();
 const logoutMock = vi.fn();
 const trackMock = vi.fn();
 
+// Lets a test sign in someone who can open no page at all.
+const navState: { empty: boolean; permissions: string[] } = vi.hoisted(() => ({
+  empty: false,
+  permissions: ["system:access"],
+}));
+
 let mockUser = {
   name: "Alice",
   email: "alice@example.com",
@@ -76,25 +82,44 @@ vi.mock("@hooks", () => ({
     user: mockUser,
     logout: logoutMock,
     features: mockUser.features,
-    filteredNavigationItems: [
-      { id: "SIMULATION_STUDIO", label: "Simulation Studio", path: "/simulation-studio" },
-      { id: "EVENT_MANAGEMENT", label: "Events", path: "/events" },
-      { id: "SCENARIO_LANGUAGES", label: "Scenario Languages", path: "/manage-scenario-languages" },
-      { id: "SCENARIO_VOICES", label: "Scenario Voices", path: "/manage-scenario-voices" },
-      { id: "PROMPTS", label: "Prompts", path: "/manage-prompts" },
-      { id: "TRANSLATIONS", label: "Translations", path: "/manage-translations" },
-      { id: "USERS", label: "Users", path: "/users" },
-      {
-        id: "SETTINGS",
-        label: "Settings",
-        path: "/settings",
-      },
-    ],
+    permissions: navState.permissions,
+    filteredNavigationItems: navState.empty
+      ? []
+      : [
+          { id: "SIMULATION_STUDIO", label: "Simulation Studio", path: "/simulation-studio" },
+          { id: "EVENT_MANAGEMENT", label: "Events", path: "/events" },
+          {
+            id: "SCENARIO_LANGUAGES",
+            label: "Scenario Languages",
+            path: "/manage-scenario-languages",
+          },
+          { id: "SCENARIO_VOICES", label: "Scenario Voices", path: "/manage-scenario-voices" },
+          { id: "PROMPTS", label: "Prompts", path: "/manage-prompts" },
+          { id: "TRANSLATIONS", label: "Translations", path: "/manage-translations" },
+          { id: "USERS", label: "Users", path: "/users" },
+          {
+            id: "SETTINGS",
+            label: "Settings",
+            path: "/settings",
+          },
+        ],
   }),
 }));
 
 vi.mock("@components", () => ({
   UserModal: () => null,
+}));
+
+// The quick actions have their own suites (speech, drafts API, colour mode); here we only need to
+// know the primary nav carries them.
+vi.mock("@components/notification-bell/NotificationBell", () => ({
+  NotificationBell: () => <button data-testid="notification-bell" />,
+}));
+vi.mock("@components/idea-capture/IdeaCapture", () => ({
+  IdeaCaptureLauncher: () => <button data-testid="idea-capture-button" />,
+}));
+vi.mock("@components/color-mode-toggle/ColorModeToggle", () => ({
+  ColorModeToggle: () => <button data-testid="color-mode-toggle" />,
 }));
 
 vi.mock("@constants", () => ({
@@ -130,6 +155,7 @@ vi.mock("@constants", () => ({
     common: {
       searchMenu: "Search menu...",
       noMenuResults: "No matching tabs",
+      noMenuAccess: "Your account can't open any page here yet.",
       clearSearch: "Clear search",
     },
     auth: {
@@ -170,6 +196,7 @@ const renderWithProvider = (component: React.ReactElement) => {
 
 describe("Sidebar", () => {
   beforeEach(() => {
+    navState.empty = false;
     navigateMock.mockReset();
     logoutMock.mockReset();
     // Mock window.innerWidth to be large enough to keep sidebar expanded
@@ -178,6 +205,19 @@ describe("Sidebar", () => {
       configurable: true,
       value: 1400,
     });
+  });
+
+  it("says so when a signed-in user can open no page, instead of an empty sidebar", () => {
+    navState.empty = true;
+    renderWithProvider(<Sidebar />);
+    expect(screen.getByTestId("sidebar-no-access")).toHaveTextContent(
+      "Your account can't open any page here yet.",
+    );
+  });
+
+  it("shows no such note while there are pages to open", () => {
+    renderWithProvider(<Sidebar />);
+    expect(screen.queryByTestId("sidebar-no-access")).toBeNull();
   });
 
   it("renders navigation items by title when collapsed", () => {
@@ -205,6 +245,20 @@ describe("Sidebar", () => {
     // After collapse, text should be hidden and only title remains
     expect(screen.queryByText("Simulation Studio")).not.toBeInTheDocument();
     expect(screen.getByTitle("Simulation Studio")).toBeInTheDocument();
+  });
+
+  it("carries the idea mic and light/dark switch in the primary nav, expanded or collapsed", () => {
+    renderWithProvider(<Sidebar />);
+    const sidebar = screen.getByTestId("admin-sidebar");
+    const actions = screen.getByTestId("sidebar-quick-actions");
+    expect(sidebar).toContainElement(actions);
+    expect(actions).toContainElement(screen.getByTestId("idea-capture-button"));
+    expect(actions).toContainElement(screen.getByTestId("color-mode-toggle"));
+    expect(actions).toHaveClass("flex-row");
+
+    fireEvent.click(screen.getByTitle("Collapse sidebar"));
+    expect(screen.getByTestId("sidebar-quick-actions")).toHaveClass("flex-col");
+    expect(screen.getByTestId("color-mode-toggle")).toBeInTheDocument();
   });
 
   it("opens user menu and logs out when expanded", () => {

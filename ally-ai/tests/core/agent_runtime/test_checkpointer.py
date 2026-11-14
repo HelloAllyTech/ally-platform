@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
 
@@ -232,7 +233,40 @@ class TestTheCachedGraph:
         await open_agent_runtime()
         opened = get_agent_graph(service)
         assert opened is not before
-        assert opened.checkpointer is checkpointer_module._saver
+        # Without Postgres the chatbot graph keeps no checkpoints: the in-memory
+        # saver (still opened for Debrief and the PM agent) would only grow.
+        assert opened.checkpointer is None
         await close_agent_runtime()
         assert get_agent_graph(service) is not opened
         get_agent_graph.cache_clear()
+
+    async def test_the_graph_uses_postgres_when_it_is_open(self, service, monkeypatch):
+        postgres = MagicMock(spec=BaseCheckpointSaver)
+        monkeypatch.setattr(checkpointer_module, "_saver", postgres)
+        get_agent_graph.cache_clear()
+        assert get_agent_graph(service).checkpointer is postgres
+        get_agent_graph.cache_clear()
+
+
+class TestWithoutCheckpoints:
+    async def test_runs_answer_the_same_with_no_checkpointer(
+        self, service, chunk_service
+    ):
+        """Every input comes with the request, so a run needs no stored state."""
+        first, second = await _two_runs(
+            build_graph(service, None), chunk_service, "conv-1"
+        )
+        assert first["result"]["citations"][0]["chunk_id"] == CHUNK_A
+        assert second["result"]["turn_type"] == "smalltalk"
+        assert len(second["trace"]) == 2
+
+    async def test_durable_checkpointer_is_postgres_only(self, monkeypatch):
+        monkeypatch.setattr(checkpointer_module, "_saver", None)
+        assert checkpointer_module.durable_checkpointer() is None
+        monkeypatch.setattr(
+            checkpointer_module, "_saver", checkpointer_module.InMemorySaver()
+        )
+        assert checkpointer_module.durable_checkpointer() is None
+        postgres = MagicMock(spec=BaseCheckpointSaver)
+        monkeypatch.setattr(checkpointer_module, "_saver", postgres)
+        assert checkpointer_module.durable_checkpointer() is postgres

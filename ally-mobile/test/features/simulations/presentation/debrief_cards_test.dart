@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,9 @@ import 'package:url_launcher_platform_interface/url_launcher_platform_interface.
 
 import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/learner_debrief_repository.dart';
+import 'package:ally_mobile_flutter/features/simulations/data/simulation_transcript_repository.dart';
+import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/feedback/debrief_cards.dart'
+    show readableSections;
 import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/feedback/debrief_read_aloud.dart';
 
 import '../data/learner_debrief_repository_test.dart' show readyDebriefJson;
@@ -72,6 +76,24 @@ class _FakeDebriefAudioPlayer implements DebriefAudioPlayer {
   Future<void> dispose() async {}
 }
 
+/// A ready debrief with "Your last {n} sessions" (progress contract §2).
+Map<String, dynamic> _withProgressCard() {
+  final json = readyDebriefJson();
+  return {
+    ...json,
+    'cards': {
+      ...json['cards'] as Map<String, dynamic>,
+      'progress_card': {
+        'sessions': 5,
+        'skills': [
+          {'skill': 'empathy', 'trend': 'more_consistent', 'line': 'You named the feeling more often.'},
+        ],
+        'focus': {'skill': 'harm', 'line': 'Ask about safety directly.'},
+      },
+    },
+  };
+}
+
 const _supportLine = {'name': 'Tele-MANAS', 'phone': '+91 14416', 'hours': 'Open 24 hours', 'isCrisis': true};
 
 void main() {
@@ -98,6 +120,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Design A5: scroll "One question to think about" into view, which docks
+  /// the composer.
+  Future<void> showQuestion(WidgetTester tester) async {
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('debrief-card-reflective-question')),
+      200,
+      scrollable: find.descendant(of: find.byKey(const Key('debrief-cards')), matching: find.byType(Scrollable)),
+    );
+    await tester.pumpAndSettle();
+  }
+
   group('today\'s debrief stays unchanged', () {
     testWidgets('when the organisation isn\'t switched on (not_available)', (tester) async {
       await h.pump(tester);
@@ -106,8 +139,8 @@ void main() {
       verify(() => h.learnerDebrief.getDebrief('session-1')).called(1);
     });
 
-    testWidgets('when the request fails', (tester) async {
-      when(() => h.learnerDebrief.getDebrief(any())).thenThrow(Exception('500'));
+    testWidgets('when the server refuses (403)', (tester) async {
+      when(() => h.learnerDebrief.getDebrief(any())).thenThrow(_dioError(403));
       await h.pump(tester);
       expect(find.text('from Ally'), findsOneWidget);
       expect(find.byKey(const Key('debrief-cards')), findsNothing);
@@ -142,7 +175,9 @@ void main() {
     expect(find.text('Your debrief'), findsOneWidget);
     expect(find.text('Written by Ally (AI)'), findsOneWidget);
     expect(find.byKey(const Key('debrief-card-important-moment')), findsOneWidget);
-    expect(find.text('An important moment'), findsOneWidget);
+    // The fixture's learner asked directly and stayed (handled_well).
+    expect(find.text('You noticed an important moment'), findsOneWidget);
+    expect(find.text('An important moment'), findsNothing);
     expect(
       find.text(
         'Moments like this are hard. If this session brought something up for you, you can talk to:',
@@ -179,6 +214,25 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Answer here, or ask Ally anything about this session…'), findsOneWidget);
+  });
+
+  testWidgets('a debrief without a question shows no empty question card; Ask Ally stays', (tester) async {
+    final json = readyDebriefJson();
+    stubDebrief({
+      ...json,
+      'cards': {...(json['cards'] as Map<String, dynamic>), 'reflective_question': ''},
+    });
+    await h.pump(tester);
+
+    expect(find.byKey(const Key('debrief-card-reflective-question')), findsNothing);
+    expect(find.text('One question to think about'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('debrief-ask-ally-no-question')),
+        matching: find.byKey(const Key('ask-ally')),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a removed point is hidden by its stored index; a kept one says why', (tester) async {
@@ -290,6 +344,44 @@ void main() {
     expect(find.byKey(const Key('debrief-flag-open')), findsNWidgets(5));
   });
 
+  testWidgets('the progress card has its own "This isn\'t right", flagged as progress_card', (tester) async {
+    stubDebrief(_withProgressCard());
+    final until = DateTime.now().add(const Duration(minutes: 10));
+    when(
+      () => h.learnerDebrief.flagCard(
+        'session-1',
+        section: any(named: 'section'),
+        reason: any(named: 'reason'),
+        note: any(named: 'note'),
+      ),
+    ).thenAnswer((_) async => (id: 'f1', undoUntil: until));
+    await h.pump(tester);
+
+    final progressFlag = find.byKey(const ValueKey('debrief-flag-progress_card'));
+    await tapVisible(tester, find.descendant(of: progressFlag, matching: find.byKey(const Key('debrief-flag-open'))));
+    await tapVisible(tester, find.byKey(const ValueKey('debrief-flag-reason-didnt_say')));
+    await tapVisible(tester, find.byKey(const Key('debrief-flag-send')));
+    verify(
+      () => h.learnerDebrief.flagCard(
+        'session-1',
+        section: 'progress_card',
+        reason: DebriefFlagReason.didntSay,
+        note: any(named: 'note'),
+      ),
+    ).called(1);
+  });
+
+  testWidgets('a progress card the Ally team removed is not shown', (tester) async {
+    stubDebrief({
+      ..._withProgressCard(),
+      'corrections': [
+        {'section': 'progress_card', 'outcome': 'removed', 'note': null, 'at': '2026-11-13T10:00:00Z'},
+      ],
+    });
+    await h.pump(tester);
+    expect(find.byKey(const Key('debrief-card-progress')), findsNothing);
+  });
+
   testWidgets('a flag past its undo window reads "Sent to the Ally team", no Undo', (tester) async {
     stubDebrief({
       ...readyDebriefJson(),
@@ -350,6 +442,64 @@ void main() {
     expect(toggled('debrief-helpful-no'), isFalse);
   });
 
+  group('a debrief that didn\'t load (PRD §6.12)', () {
+    testWidgets('a 5xx shows "didn\'t load" with Try again, not the old note; Try again loads it', (tester) async {
+      var calls = 0;
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer((_) async {
+        if (calls++ == 0) throw _dioError(500);
+        return LearnerDebriefView.fromJson(readyDebriefJson());
+      });
+      await h.pump(tester);
+      expect(find.byKey(const Key('debrief-failed')), findsOneWidget);
+      expect(find.text("Your debrief didn't load"), findsOneWidget);
+      expect(find.text('from Ally'), findsNothing);
+      expect(tester.getSize(find.byKey(const Key('debrief-retry'))).height, greaterThanOrEqualTo(44));
+
+      await tapVisible(tester, find.byKey(const Key('debrief-retry')));
+      expect(find.byKey(const Key('debrief-failed')), findsNothing);
+      expect(find.text('What worked'), findsOneWidget);
+    });
+
+    testWidgets('no connection shows "You\'re offline" with Try again', (tester) async {
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenThrow(
+        DioException(requestOptions: RequestOptions(path: '/x'), type: DioExceptionType.connectionError),
+      );
+      await h.pump(tester);
+      expect(find.byKey(const Key('debrief-offline')), findsOneWidget);
+      expect(find.text("You're offline"), findsOneWidget);
+      expect(find.byKey(const Key('debrief-retry')), findsOneWidget);
+    });
+  });
+
+  testWidgets('"How Ally writes your debrief" opens the explainer sheet', (tester) async {
+    stubDebrief(readyDebriefJson());
+    await h.pump(tester);
+    await tapVisible(tester, find.byKey(const Key('debrief-explainer-link')));
+    expect(find.byKey(const Key('debrief-explainer')), findsOneWidget);
+    expect(find.textContaining('reviews and improves its own draft'), findsOneWidget);
+    expect(find.textContaining('Your supervisor can read your debriefs'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('debrief-explainer-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('debrief-explainer')), findsNothing);
+  });
+
+  testWidgets('the pulse shows only when picked, and sends an answer', (tester) async {
+    stubDebrief({...readyDebriefJson(), 'pulse': {'knew_next': null, 'fair': null}});
+    when(
+      () => h.learnerDebrief.answerPulse('session-1', DebriefPulseQuestion.fair, answer: false),
+    ).thenAnswer((_) async {});
+    await h.pump(tester);
+    expect(find.text('Did you know what to practise next?'), findsOneWidget);
+    await tapVisible(tester, find.byKey(const Key('debrief-pulse-fair-no')));
+    verify(() => h.learnerDebrief.answerPulse('session-1', DebriefPulseQuestion.fair, answer: false)).called(1);
+  });
+
+  testWidgets('no pulse on a debrief that wasn\'t picked', (tester) async {
+    stubDebrief(readyDebriefJson());
+    await h.pump(tester);
+    expect(find.byKey(const Key('debrief-pulse')), findsNothing);
+  });
+
   testWidgets('touch targets are at least 44pt', (tester) async {
     stubDebrief(readyDebriefJson());
     await h.pump(tester);
@@ -389,6 +539,27 @@ void main() {
       expect(find.text('What worked'), findsOneWidget);
       // The important moment ends with the same support lines.
       expect(find.byKey(const Key('debrief-support-lines')), findsNWidgets(2));
+    });
+
+    testWidgets('a risk cue with no important moment still shows the support lines', (tester) async {
+      final json = readyDebriefJson();
+      final cards = {...json['cards'] as Map<String, dynamic>}..remove('important_moment');
+      stubDebrief({...json, 'cards': cards, 'riskCue': true, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('debrief-card-important-moment')), findsNothing);
+      expect(find.byKey(const Key('debrief-card-support')), findsOneWidget);
+      expect(find.text('If this session brought something up for you, you can talk to:'), findsOneWidget);
+      expect(find.text('Tele-MANAS · +91 14416'), findsOneWidget);
+    });
+
+    testWidgets('no risk cue: no support card of its own', (tester) async {
+      final json = readyDebriefJson();
+      final cards = {...json['cards'] as Map<String, dynamic>}..remove('important_moment');
+      stubDebrief({...json, 'cards': cards, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('debrief-card-support')), findsNothing);
     });
 
     testWidgets('a support line is a tel: link', (tester) async {
@@ -469,25 +640,176 @@ void main() {
     await h.pump(tester);
     verify(() => h.chatApi.getHistory('session-1')).called(1);
 
-    await tester.ensureVisible(find.byKey(const Key('ask-ai-input')));
+    await showQuestion(tester);
     await tester.enterText(find.byKey(const Key('ask-ai-input')), 'Why?');
     await tester.pump();
-    await tapVisible(tester, find.byKey(const Key('ask-ai-send')));
+    await tester.tap(find.byKey(const Key('ask-ai-send')));
+    await tester.pumpAndSettle();
 
     expect(find.text('Why?'), findsOneWidget);
     expect(find.textContaining('opened her up', findRichText: true), findsOneWidget);
     verifyNever(() => h.chatApi.streamChat(any(), any(), cancelToken: any(named: 'cancelToken')));
   });
 
-  testWidgets('Ask Ally tells the learner their supervisor can read it, under the input', (tester) async {
+  testWidgets('Ask Ally tells the learner their supervisor can read it, under the question', (tester) async {
     stubDebrief(readyDebriefJson());
     await h.pump(tester);
     final note = find.text('Your supervisor can read this conversation.');
     expect(find.descendant(of: find.byKey(const Key('ask-ally')), matching: note), findsOneWidget);
     expect(
-      tester.getTopLeft(note).dy,
-      greaterThan(tester.getTopLeft(find.byKey(const Key('ask-ai-input'))).dy),
+      find.descendant(of: find.byKey(const Key('debrief-card-reflective-question')), matching: note),
+      findsOneWidget,
     );
+  });
+
+  group('the screen header folds away (Mobile round 2)', () {
+    double titleTop(WidgetTester tester) => tester.getTopLeft(find.byKey(const Key('simulation-feedback-title'))).dy;
+
+    testWidgets('scrolling the debrief folds the title and stars; the tabs stay; scrolling back opens them', (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester);
+      final tabs = find.text('Transcript');
+      final tabsTop = tester.getTopLeft(tabs).dy;
+      expect(titleTop(tester), lessThan(tabsTop));
+
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -600));
+      await tester.pumpAndSettle();
+      // The title has folded away: the tab bar moved up to the top and is still there.
+      expect(find.byKey(const Key('simulation-feedback-header')), findsOneWidget);
+      final align = tester.widget<Align>(
+        find.descendant(of: find.byKey(const Key('simulation-feedback-header')), matching: find.byType(Align)).first,
+      );
+      expect(align.heightFactor, 0);
+      expect(tester.getTopLeft(tabs).dy, lessThan(tabsTop - 40));
+      expect(tabs.hitTestable(), findsOneWidget);
+
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, 3000));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('simulation-feedback-header')), findsNothing);
+      expect(tester.getTopLeft(tabs).dy, tabsTop);
+    });
+
+    testWidgets('the Transcript tab still opens and lists the session', (tester) async {
+      stubDebrief(readyDebriefJson());
+      when(
+        () => h.transcript.getMessages(scenarioSessionId: 'session-1', offset: 0, languageCode: any(named: 'languageCode')),
+      ).thenAnswer(
+        (_) async => (
+          messages: [
+            SimulationTranscriptMessage.fromJson({'id': 41, 'senderId': -1, 'content': 'Hello there', 'startSeconds': 3}),
+          ],
+          count: 1,
+        ),
+      );
+      await h.pump(tester);
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -600));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Transcript'));
+      await tester.pumpAndSettle();
+      expect(find.text('Hello there'), findsOneWidget);
+      // Switching tabs brings the title and its back arrow back.
+      expect(find.byKey(const Key('simulation-feedback-header')), findsNothing);
+      expect(find.byKey(const Key('simulation-feedback-back')).hitTestable(), findsOneWidget);
+    });
+  });
+
+  group('Ask Ally composer (design A5)', () {
+    bool docked(WidgetTester tester) => !tester
+        .widget<IgnorePointer>(
+          find.ancestor(of: find.byKey(const Key('ask-ally-composer')), matching: find.byType(IgnorePointer)).first,
+        )
+        .ignoring;
+
+    testWidgets('hidden while reading the cards, docked once the question is in view, hidden again above',
+        (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester);
+      expect(find.byKey(const Key('ask-ally-composer')), findsOneWidget);
+      expect(docked(tester), isFalse);
+      // No per-card ask icon and no floating button: one composer.
+      expect(find.byKey(const Key('ask-ai-input')), findsOneWidget);
+      // The composer is not inside any card.
+      expect(
+        find.descendant(of: find.byKey(const Key('debrief-card-reflective-question')), matching: find.byKey(const Key('ask-ai-input'))),
+        findsNothing,
+      );
+
+      await showQuestion(tester);
+      expect(docked(tester), isTrue);
+      // Docked at the bottom of the debrief, below the question's heading.
+      expect(
+        tester.getTopLeft(find.byKey(const Key('ask-ally-composer'))).dy,
+        greaterThan(tester.getTopLeft(find.text('One question to think about')).dy),
+      );
+
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, 3000));
+      await tester.pumpAndSettle();
+      expect(docked(tester), isFalse);
+    });
+
+    testWidgets('the header scrolls away with the cards', (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester);
+      expect(
+        find.descendant(of: find.byKey(const Key('debrief-cards')), matching: find.byKey(const Key('debrief-header'))),
+        findsOneWidget,
+      );
+      final top = tester.getTopLeft(find.text('Your debrief')).dy;
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -150));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.text('Your debrief')).dy, lessThan(top));
+      // ⓘ beside "Written by Ally (AI)", not its own line.
+      expect(
+        (tester.getCenter(find.byKey(const Key('debrief-explainer-link'))).dy -
+                tester.getCenter(find.text('Written by Ally (AI)')).dy)
+            .abs(),
+        lessThan(4),
+      );
+    });
+
+    testWidgets('distress first: no composer until the learner opens the debrief', (tester) async {
+      stubDebrief({...readyDebriefJson(), 'distress': true, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -3000));
+      await tester.pumpAndSettle();
+      expect(docked(tester), isFalse);
+
+      await tapVisible(tester, find.byKey(const Key('debrief-when-ready')));
+      await showQuestion(tester);
+      expect(docked(tester), isTrue);
+    });
+  });
+
+  testWidgets('every quote has See this moment, which opens the transcript at those words', (tester) async {
+    stubDebrief(readyDebriefJson());
+    when(
+      () => h.transcript.getMessages(scenarioSessionId: 'session-1', offset: 0, languageCode: any(named: 'languageCode')),
+    ).thenAnswer(
+      (_) async => (
+        messages: [
+          SimulationTranscriptMessage.fromJson({'id': 41, 'senderId': -1, 'content': 'Hello', 'startSeconds': 3}),
+          SimulationTranscriptMessage.fromJson(
+            {'id': 42, 'senderId': -1, 'content': 'Honestly, I sometimes think it would be  easier not to be here.', 'startSeconds': 65},
+          ),
+        ],
+        count: 2,
+      ),
+    );
+    await h.pump(tester);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('debrief-card-important-moment')),
+        matching: find.byKey(const Key('debrief-see-moment')),
+      ),
+      findsNWidgets(2),
+    );
+    await tapVisible(tester, find.byKey(const Key('debrief-see-moment')).first);
+
+    // The Transcript tab, that turn outlined (found by its words, spacing aside).
+    final row = find.textContaining('easier not to be here');
+    expect(row, findsOneWidget);
+    final focused = tester.widget<Container>(find.ancestor(of: row, matching: find.byType(Container)).first);
+    expect((focused.decoration! as BoxDecoration).border!.top.width, 2);
   });
 
   void stubSupervisor(Map<String, dynamic> json) {
@@ -508,6 +830,19 @@ void main() {
       'thread': thread ?? <Object>[],
     };
   }
+
+  testWidgets('the learner\'s own session from Session Logs is the full learner view, Ask Ally included', (tester) async {
+    stubDebrief(readyDebriefJson());
+    await h.pump(tester, fromLogs: true, ownSession: true);
+
+    verify(() => h.learnerDebrief.getDebrief('session-1')).called(1);
+    verifyNever(() => h.learnerDebrief.getSupervisorDebrief(any()));
+    verify(() => h.chatApi.getHistory('session-1')).called(1);
+    expect(find.byKey(const Key('debrief-flag-open')), findsWidgets);
+    expect(find.byKey(const Key('ask-ally')), findsOneWidget);
+    await showQuestion(tester);
+    expect(find.byKey(const Key('ask-ai-input')), findsOneWidget);
+  });
 
   group('supervisor view from Roleplay Logs (v9 FR-26)', () {
     testWidgets('the same cards, read-only: no controls and no learner-only calls', (tester) async {
@@ -679,6 +1014,28 @@ void main() {
       // Done: back to "Listen all", nothing highlighted.
       expect(find.byKey(const Key('debrief-listen-all-play')), findsOneWidget);
       expect(find.byKey(const Key('debrief-reading')), findsNothing);
+    });
+
+    testWidgets('the progress card reads last in Listen all and has its own Listen', (tester) async {
+      final player = _FakeDebriefAudioPlayer();
+      final json = _withProgressCard();
+      expect(readableSections(LearnerDebriefView.fromJson(json)).last, 'progress_card');
+      expect(readableSections(LearnerDebriefView.fromJson(readyDebriefJson())), isNot(contains('progress_card')));
+      stubDebrief(json);
+      when(() => h.learnerDebrief.getCardAudioUrl('session-1', any()))
+          .thenAnswer((invocation) async => 'https://audio/${invocation.positionalArguments[1]}');
+      await h.pump(tester, overrides: [debriefAudioPlayerFactoryProvider.overrideWithValue(() => player)]);
+
+      await tapVisible(tester, find.byKey(const ValueKey('debrief-listen-progress_card')));
+      verify(() => h.learnerDebrief.getCardAudioUrl('session-1', 'progress_card')).called(1);
+      expect(player.played, ['https://audio/progress_card']);
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('debrief-card-progress')),
+          matching: find.byKey(const Key('debrief-reading')),
+        ),
+        findsOneWidget,
+      );
     });
   });
 
@@ -868,11 +1225,34 @@ void main() {
       await h.pump(tester);
       expect(
         find.text(
-          'Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day.',
+          "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day. We'll let you know.",
         ),
         findsOneWidget,
       );
       expect(find.text('from Ally'), findsNothing);
+    });
+
+    testWidgets('taking_longer shows Check again, which asks now (plan §7.5)', (tester) async {
+      var calls = 0;
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer(
+        (_) async => LearnerDebriefView.fromJson(calls++ == 0 ? {'state': 'taking_longer'} : readyDebriefJson()),
+      );
+      await h.pump(tester);
+      expect(find.byKey(const Key('debrief-taking-longer')), findsOneWidget);
+      expect(find.text("This is taking longer than usual. I'll let you know when it's ready."), findsOneWidget);
+      expect(tester.getSize(find.byKey(const Key('debrief-check-again'))).height, greaterThanOrEqualTo(44));
+
+      await tapVisible(tester, find.byKey(const Key('debrief-check-again')));
+      expect(calls, 2);
+      expect(find.byKey(const Key('debrief-taking-longer')), findsNothing);
+      expect(find.text('What worked'), findsOneWidget);
+    });
+
+    testWidgets('not_available after an emergency stop says so, not today\'s debrief (FR-46)', (tester) async {
+      stubDebrief({'state': 'not_available', 'stopped': true});
+      await h.pump(tester);
+      expect(find.byKey(const Key('debrief-not-available')), findsOneWidget);
+      expect(find.text("A debrief isn't available for this session."), findsOneWidget);
     });
 
     testWidgets('too_short', (tester) async {
@@ -886,4 +1266,207 @@ void main() {
       );
     });
   });
+
+  group('learner events (experience metrics)', () {
+    void stubPractiseNext() {
+      final json = readyDebriefJson();
+      final cards = json['cards'] as Map<String, dynamic>;
+      stubDebrief({
+        ...json,
+        'cards': {
+          ...cards,
+          'practise_next': {...cards['practise_next'] as Map<String, dynamic>, 'scenario_id': 42},
+        },
+        'practice': [
+          {'id': 42, 'title': 'Supporting a grieving parent'},
+        ],
+      });
+    }
+
+    void reduceMotion(WidgetTester tester) {
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    }
+
+    testWidgets('"Practise this next" sends practise_next_click once, however often it is tapped', (tester) async {
+      stubPractiseNext();
+      final router = await h.pump(tester);
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.practiseNextClick));
+
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      expect(find.text('SIMULATION_DETAILS:42'), findsOneWidget);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.practiseNextClick)).called(1);
+
+      router.pop();
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.practiseNextClick));
+    });
+
+    testWidgets('"Practise this" on a Work-on-this point is not practise_next_click', (tester) async {
+      final json = readyDebriefJson();
+      final cards = json['cards'] as Map<String, dynamic>;
+      stubDebrief({
+        ...json,
+        'cards': {
+          ...cards,
+          'work_on_this': [
+            {...(cards['work_on_this'] as List).first as Map<String, dynamic>, 'scenario_id': 7},
+          ],
+        },
+        'practice': [
+          {'id': 7, 'title': 'Open questions'},
+        ],
+      });
+      await h.pump(tester);
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-this')));
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.practiseNextClick));
+    });
+
+    testWidgets('working shows send waited once; leaving before ready sends left_before_ready', (tester) async {
+      reduceMotion(tester);
+      stubDebrief({'state': 'working'});
+      final router = await h.pump(tester);
+      expect(find.byKey(const Key('debrief-working')), findsOneWidget);
+      // Polls rebuild the working state; waited still goes once.
+      await tester.pump(const Duration(seconds: 7));
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.waited)).called(1);
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+
+      router.go('/home');
+      await tester.pumpAndSettle();
+      expect(find.text('HOME'), findsOneWidget);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.leftBeforeReady)).called(1);
+    });
+
+    testWidgets('the app going to the background while working sends left_before_ready once', (tester) async {
+      reduceMotion(tester);
+      stubDebrief({'state': 'working'});
+      final router = await h.pump(tester);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.leftBeforeReady)).called(1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      router.go('/home');
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+    });
+
+    testWidgets('leaving once the debrief is ready is not left_before_ready', (tester) async {
+      reduceMotion(tester);
+      var calls = 0;
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer(
+        (_) async => LearnerDebriefView.fromJson(calls++ == 0 ? {'state': 'working'} : readyDebriefJson()),
+      );
+      final router = await h.pump(tester);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text('What worked'), findsOneWidget);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.waited)).called(1);
+
+      router.go('/home');
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+    });
+
+    testWidgets('a ready debrief never sends waited or left_before_ready', (tester) async {
+      stubDebrief(readyDebriefJson());
+      final router = await h.pump(tester);
+      router.go('/home');
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.waited));
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+    });
+
+    testWidgets('read_through once the end of the FIRST Work-on-this point is on screen', (tester) async {
+      final json = readyDebriefJson();
+      final cards = json['cards'] as Map<String, dynamic>;
+      final first = (cards['work_on_this'] as List).first as Map<String, dynamic>;
+      stubDebrief({
+        ...json,
+        'cards': {
+          ...cards,
+          'work_on_this': [
+            first,
+            // Long, so its end (the read-XP marker) stays below the screen.
+            {...first, 'lead': 'A second point.', 'why': 'Why it matters. ' * 120, 'try_saying': 'Something else to try.'},
+          ],
+        },
+      });
+      await h.pump(tester);
+      await tester.pump(const Duration(seconds: 2));
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.readThrough));
+
+      // The first point's last line in view; no minimum time, unlike read XP.
+      await tester.ensureVisible(find.byKey(const Key('debrief-flag-work_on_this[0]')));
+      await tester.pumpAndSettle();
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.readThrough)).called(1);
+      verifyNever(() => h.learnerDebrief.markRead(any()));
+
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, 400));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('debrief-flag-work_on_this[0]')));
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.readThrough));
+    });
+
+    testWidgets('failing event calls never throw or show anything', (tester) async {
+      reduceMotion(tester);
+      when(() => h.learnerDebrief.recordEvent(any(), any())).thenThrow(Exception('404'));
+      var calls = 0;
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer((_) async {
+        final json = readyDebriefJson();
+        final cards = json['cards'] as Map<String, dynamic>;
+        return LearnerDebriefView.fromJson(
+          calls++ == 0
+              ? {'state': 'working'}
+              : {
+                  ...json,
+                  'cards': {
+                    ...cards,
+                    'practise_next': {...cards['practise_next'] as Map<String, dynamic>, 'scenario_id': 42},
+                  },
+                  'practice': [
+                    {'id': 42, 'title': 'Supporting a grieving parent'},
+                  ],
+                },
+        );
+      });
+      await h.pump(tester);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('What worked'), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(const Key('debrief-flag-work_on_this[0]')));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      expect(tester.takeException(), isNull);
+      expect(find.text('SIMULATION_DETAILS:42'), findsOneWidget);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.waited)).called(1);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.readThrough)).called(1);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.practiseNextClick)).called(1);
+    });
+
+    testWidgets('from Logs (supervisor) nothing is sent', (tester) async {
+      stubSupervisor(supervisorJson());
+      final router = await h.pump(tester, fromLogs: true);
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+      router.go('/home');
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), any()));
+    });
+  });
 }
+
+DioException _dioError(int status) => DioException(
+  requestOptions: RequestOptions(path: '/debriefs/sessions/session-1'),
+  type: DioExceptionType.badResponse,
+  response: Response(requestOptions: RequestOptions(path: '/debriefs/sessions/session-1'), statusCode: status),
+);

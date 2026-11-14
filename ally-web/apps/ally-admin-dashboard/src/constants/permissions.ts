@@ -52,11 +52,19 @@ export enum Permissions {
   // nothing to show without the chat), but both grants exist so the backend can tier them later.
   VIEW_COURSE_COPILOT = "view:admin:course-copilot",
   EDIT_COURSE_COPILOT = "edit:admin:course-copilot",
+  // AI Chatbots: onboarding (/chatbots/new) needs the edit grant, as ally-be checks it.
+  EDIT_WHATSAPP_BOT = "edit:whatsapp-bot",
   // Ally guide (Ally Console + org Ally tab). Transcripts need their own
   // permission AND the per-person ally_guide_transcripts toggle.
   VIEW_ALLY_GUIDE = "view:admin:ally-guide",
   EDIT_ALLY_GUIDE = "edit:admin:ally-guide",
   REVIEW_ALLY_GUIDE_TRANSCRIPTS = "review:admin:ally-guide-transcripts",
+  // Debrief expert review: the Debrief Console's Expert review tab (with the Analytics toggle).
+  REVIEW_DEBRIEFS = "review:admin:debriefs",
+  // Debriefs console roles (CONSOLE_API.md "Roles"): the platform tier is the Ally team, and the
+  // owner holds the debrief settings. Read through pages/Debriefs/debriefAccess.ts only.
+  SYSTEM_ACCESS = "system:access",
+  MANAGE_DEBRIEF_SETTINGS = "manage:admin:debrief-settings",
   // Per-user preferences (e.g. the saved admin sidebar order). Held by every
   // platform-tier group — PLATFORM_ADMIN inherited both from SUPER_DUPER_ADMIN
   // in the role-collapse migration — but NOT by a plain tenant ADMIN or a

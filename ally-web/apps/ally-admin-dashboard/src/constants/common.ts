@@ -187,8 +187,8 @@ export const ApiEndpoints = {
     LIST: "/v1/learn/admin/tracks",
     BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
-    // Raise a live quiz's attempt limit; the structure PUT is locked once learners enrol.
-    QUIZ_SETTINGS: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/quiz/settings`,
+    // Raise a live quiz's or annotation's attempt limit; the structure PUT is locked once learners enrol.
+    ATTEMPT_LIMIT: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/attempt-limit`,
     // The trainer's notes for Ally and per-item tension.
     GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
@@ -298,6 +298,16 @@ export const ApiEndpoints = {
     ELIGIBLE: "/v1/platform-admins/eligible",
     ASSIGN: "/v1/platform-admins",
     REMOVE: (userId: number) => `/v1/platform-admins/${userId}`,
+  },
+  // User Management › Debrief access: the Clinical advisor and Debrief owner roles (gated by
+  // admin_user_management, like Ally admins).
+  CLINICAL_ADVISORS: {
+    LIST: "/v1/clinical-advisors",
+    SEARCH: "/v1/clinical-advisors/search",
+    ADD: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    REMOVE: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    // The Debrief owner role, on the same page and gate.
+    OWNER: (userId: number) => `/v1/clinical-advisors/${userId}/owner`,
   },
   SUPER_DUPER_ADMINS: {
     LIST: "/v1/super-duper-admins",
@@ -465,30 +475,77 @@ export const ApiEndpoints = {
   },
   DEBRIEF_CONSOLE: {
     OVERVIEW: "/v1/debriefs/console/overview",
-    RUNS: "/v1/debriefs/console/runs",
-    RUN: (id: string) => `/v1/debriefs/console/runs/${id}`,
+    SETTINGS: "/v1/debriefs/console/settings",
+    METRICS: "/v1/debriefs/console/metrics",
+    SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
+    /** Settings › Schedules (engineering only). */
+    SCHEDULES: "/v1/debriefs/console/schedules",
+    SETTINGS_BASELINE: "/v1/debriefs/console/settings/baseline",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
-    IMPROVER: "/v1/debriefs/console/improver",
-    IMPROVER_ANALYSE: "/v1/debriefs/console/improver/analyse",
+    PM_AGENT: "/v1/debriefs/console/pm-agent",
+    PM_AGENT_ANALYSE: "/v1/debriefs/console/pm-agent/analyse",
+    PM_AGENT_REPORTS: "/v1/debriefs/console/pm-agent/reports",
+    PM_AGENT_REPORT: (kind: string, period: string) =>
+      `/v1/debriefs/console/pm-agent/reports/${kind}/${period}`,
     IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
-      `/v1/debriefs/console/improver/ideas/${id}/${action}`,
-    RELEASES: "/v1/debriefs/console/releases",
+      `/v1/debriefs/console/pm-agent/ideas/${id}/${action}`,
+    /** "Hand to Builder": where the idea stands in Builder, and answering its question. */
+    IDEA_BUILDER: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/builder`,
+    IDEA_BUILDER_ANSWER: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/builder/answer`,
     MODELS: "/v1/debriefs/console/models",
     ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,
     TEST_SETS_BUILD: "/v1/debriefs/console/test-sets/build",
     TENANTS: "/v1/debriefs/console/tenants",
     TENANT_LIVE: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/live`,
     TENANT_REGION: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/region`,
-    REVIEW: "/v1/debriefs/console/review",
+    TENANT_PROVIDERS: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/providers`,
     RUN_ACTION: (id: string, action: "publish" | "todays-debrief" | "reviewed") =>
       `/v1/debriefs/console/runs/${id}/${action}`,
     RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
     ESCALATE: (kind: "flags" | "runs", id: string) => `/v1/debriefs/console/${kind}/${id}/escalate`,
+    ME: "/v1/debriefs/console/me",
+    SESSIONS: "/v1/debriefs/console/sessions",
+    SESSION: (runId: string) => `/v1/debriefs/console/sessions/runs/${runId}`,
+    RUN_LOGS: (runId: string) => `/v1/debriefs/console/runs/${runId}/logs`,
+    ATTENTION: "/v1/debriefs/console/attention",
+    ANALYTICS: "/v1/debriefs/console/analytics",
+    CORRECT_RUN: (runId: string) => `/v1/debriefs/console/runs/${runId}/correct`,
+    COMMENTS: (runId: string) => `/v1/debriefs/console/runs/${runId}/comments`,
+    COMMENT: (id: string) => `/v1/debriefs/console/comments/${id}`,
+    COMMENT_ACTION: (id: string, action: "resolve" | "reopen" | "still-happening") =>
+      `/v1/debriefs/console/comments/${id}/${action}`,
+    IDEA_QUESTIONS: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/questions`,
+    IDEA_START_STEP: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/start-step`,
+    IDEA_APPROVE_PINNED: (id: string) =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/approve-pinned-rule`,
+    IDEA_WITHDRAW_PINNED: (id: string) =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/withdraw-pinned-rule`,
+    IDEA_REJECT_PINNED: (id: string) =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/reject-pinned-rule`,
+    PINNED_RULES: "/v1/debriefs/console/pinned-rules",
+    PINNED_RULE_PROPOSALS: "/v1/debriefs/console/pinned-rules/proposals",
+    AUTONOMY: "/v1/debriefs/console/autonomy",
+    AUTONOMY_MATRIX: "/v1/debriefs/console/autonomy/matrix",
+    AUTONOMY_ORG: (tenantId: string) => `/v1/debriefs/console/autonomy/orgs/${tenantId}`,
+    BUDGETS: "/v1/debriefs/console/budgets",
+    RELEASE_HISTORY: "/v1/debriefs/console/release-history",
+    RELEASE_HISTORY_ITEM: (id: string) => `/v1/debriefs/console/release-history/${id}`,
+    RELEASE_COMPARE: (id: string) => `/v1/debriefs/console/releases/${id}/compare`,
+    PROPOSE: "/v1/debriefs/console/pm-agent/ideas/propose",
+    PROMOTE_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/promote-waiting`,
+    DISMISS_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/dismiss-waiting`,
+    EMERGENCY_STOP: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/emergency-stop`,
   },
-  DEBRIEF_CALIBRATION: {
-    SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",
-    AGREEMENT: "/v1/analytics/debrief-quality/calibration/agreement",
-    ITEM: (sessionId: string) => `/v1/analytics/debrief-quality/calibration/${sessionId}`,
+  // The caller's in-app notification feed (ally-be notification-feed.controller).
+  NOTIFICATIONS: {
+    LIST: "/v1/notifications",
+    UNREAD_COUNT: "/v1/notifications/unread-count",
+    READ: (id: string) => `/v1/notifications/${id}/read`,
+    READ_ALL: "/v1/notifications/read-all",
+  },
+  // Expert review (debrief orchestrator spec Part B): the verdict, from the session's Review panel.
+  DEBRIEF_EXPERT_REVIEW: {
+    VERDICT: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}/verdict`,
   },
   SKILL_EXPERIMENTS: {
     LIST: "/v1/skill-experiments",
@@ -687,10 +744,13 @@ export const ApiEndpoints = {
     QUEUE: "/v1/context-library/queue",
     SOURCES: "/v1/context-library/sources",
     SOURCE_BY_ID: (id: string) => `/v1/context-library/sources/${id}`,
+    SOURCE_AUDIENCE: (id: string) => `/v1/context-library/sources/${id}/audience`,
     SOURCE_ACTION: (id: string, action: "pause" | "resume" | "cancel" | "front" | "retry") =>
       `/v1/context-library/sources/${id}/${action}`,
     CHUNKS: "/v1/context-library/chunks",
     CHUNK_BY_CODE: (code: string) => `/v1/context-library/chunks/${encodeURIComponent(code)}`,
+    CHUNK_AUDIENCE: (code: string) =>
+      `/v1/context-library/chunks/${encodeURIComponent(code)}/audience`,
     CHUNK_ACTION: (code: string, action: "archive" | "restore" | "pin" | "unpin") =>
       `/v1/context-library/chunks/${encodeURIComponent(code)}/${action}`,
     COLLECTION_CHUNKS: (collectionId: string) =>
@@ -827,18 +887,87 @@ export const ApiEndpoints = {
     BY_ID: (id: string) => `/v1/chatbots/${id}`,
     STATUS: (id: string) => `/v1/chatbots/${id}/status`,
     ARCHIVE: (id: string) => `/v1/chatbots/${id}/archive`,
+    ARCHIVED: "/v1/chatbots/archived",
+    RESTORE: (id: string) => `/v1/chatbots/${id}/restore`,
     SETTINGS: (id: string) => `/v1/chatbots/${id}/settings`,
     DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents`,
     DOCUMENT_UPLOAD_URL: (id: string) => `/v1/chatbots/${id}/documents/upload-url`,
     PRIVATE_DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents/private`,
     DOCUMENT_BY_ID: (id: string, documentId: string) =>
       `/v1/chatbots/${id}/documents/${documentId}`,
-    MEMBERS: (id: string) => `/v1/chatbots/${id}/members`,
-    AUDIENCE: (id: string) => `/v1/chatbots/${id}/audience`,
-    AUDIENCE_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/audience/${entryId}`,
     TEST: (id: string) => `/v1/chatbots/${id}/test`,
     TEST_STREAM: (id: string) => `/v1/chatbots/${id}/test/stream`,
+    PAGE: (id: string) => `/v1/chatbots/${id}/page`,
+    PAGE_BRAND: (id: string) => `/v1/chatbots/${id}/page/brand`,
+    TEAM_NAMES: (id: string) => `/v1/chatbots/${id}/team-names`,
+    HOME: (id: string) => `/v1/chatbots/${id}/home`,
+    HOME_LIST: (id: string, list: string) => `/v1/chatbots/${id}/home/lists/${list}`,
+    RULES: (id: string) => `/v1/chatbots/${id}/rules`,
+    FACT_CORRECTION: (id: string, factId: string) =>
+      `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,
+    IMAGES: (id: string) => `/v1/chatbots/${id}/images`,
+    IMAGE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}`,
+    IMAGE_RESTORE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}/restore`,
     CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
+    CHECKUP: (id: string) => `/v1/chatbots/${id}/checkup`,
+    CHANGES: (id: string) => `/v1/chatbots/${id}/changes`,
+    HISTORY: (id: string) => `/v1/chatbots/${id}/history`,
+    HOW_IT_WORKS: (id: string) => `/v1/chatbots/${id}/how-it-works`,
+    HOME_NUMBERS: (id: string, days: 7 | 30) => `/v1/chatbots/${id}/home/numbers?days=${days}`,
+    CHANGES_PROPOSE: (id: string) => `/v1/chatbots/${id}/changes/propose`,
+    CHANGES_APPLY: (id: string) => `/v1/chatbots/${id}/changes/apply`,
+    CHANGE_UNDO: (id: string, eventId: string) => `/v1/chatbots/${id}/changes/${eventId}/undo`,
+    SOURCES: (id: string) => `/v1/chatbots/${id}/sources`,
+    SCORECARD: (id: string) => `/v1/chatbots/${id}/scorecard`,
+    SCORECARD_ANSWER: (id: string, questionId: string) =>
+      `/v1/chatbots/${id}/scorecard/unanswered/${questionId}/answer`,
+    SCORECARD_CORRECT: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/correct`,
+    SCORECARD_FINE: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/fine`,
+    SOURCE_PREVIEW: (id: string) => `/v1/chatbots/${id}/sources/preview`,
+    SOURCE_REMOVE: (id: string) => `/v1/chatbots/${id}/sources/remove`,
+    SOURCE_RESTORE: (id: string, eventId: string) =>
+      `/v1/chatbots/${id}/sources/${eventId}/restore`,
+    CHECKUP_RUNS: (id: string) => `/v1/chatbots/${id}/checkup/runs`,
+    CHECKUP_CASES: (id: string) => `/v1/chatbots/${id}/checkup/cases`,
+    CHECKUP_CASE: (id: string, caseId: string) => `/v1/chatbots/${id}/checkup/cases/${caseId}`,
+    CHECKUP_SUGGESTIONS: (id: string) => `/v1/chatbots/${id}/checkup/suggestions`,
+    CHECKUP_RUN: (id: string, runId: string) => `/v1/chatbots/${id}/checkup/runs/${runId}`,
+    CHECKUP_ANSWER: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/answer`,
+    CHECKUP_NOT_OFFERED: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/not-offered`,
+  },
+  INBOX: {
+    CONVERSATIONS: "/v1/inbox/conversations",
+    COUNTS: "/v1/inbox/counts",
+    EVENTS: "/v1/inbox/events",
+    THREAD: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}`,
+    TAKE_OVER: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/take-over`,
+    HAND_BACK: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/hand-back`,
+    REPLY: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/messages`,
+  },
+  BOT_DRAFTS: {
+    LIST: "/v1/bot-drafts",
+    CURRENT: "/v1/bot-drafts/current",
+    BY_ID: (id: string) => `/v1/bot-drafts/${id}`,
+    EVENTS: (id: string) => `/v1/bot-drafts/${id}/events`,
+    PAGES_FOUND: (id: string) => `/v1/bot-drafts/${id}/pages/found`,
+    PAGES: (id: string) => `/v1/bot-drafts/${id}/pages`,
+    PAGES_UNDO: (id: string, eventId: string) => `/v1/bot-drafts/${id}/pages/${eventId}/undo`,
+    MESSAGES_STREAM: (id: string) => `/v1/bot-drafts/${id}/messages/stream`,
+    UNDO: (id: string) => `/v1/bot-drafts/${id}/undo`,
+    BACK: (id: string) => `/v1/bot-drafts/${id}/back`,
+    DOCUMENTS: (id: string) => `/v1/bot-drafts/${id}/documents`,
+    DESCRIPTION: (id: string) => `/v1/bot-drafts/${id}/description`,
+    PUBLISH: (id: string) => `/v1/bot-drafts/${id}/publish`,
+    ABANDON: (id: string) => `/v1/bot-drafts/${id}/abandon`,
+    CHECKUP: (id: string) => `/v1/bot-drafts/${id}/checkup`,
   },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
@@ -850,7 +979,6 @@ export const ApiEndpoints = {
     DOCUMENT_REINDEX: (id: string) => `/v1/knowledge-base/documents/${id}/reindex`,
     DOCUMENT_ARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/archive`,
     DOCUMENT_UNARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/unarchive`,
-    CHUNK_BY_ID: (chunkId: string) => `/v1/knowledge-base/chunks/${chunkId}`,
     STATS: "/v1/knowledge-base/stats",
     // Bot (ally-be src/whatsapp)
     // Phone → organisation mappings. Surfaced under User Management, but owned by the bot:
@@ -871,17 +999,7 @@ export const ApiEndpoints = {
     NUMBER_CHECK: (id: string) => `/v1/whatsapp/numbers/${id}/check`,
     NUMBER_SUBSCRIBE: (id: string) => `/v1/whatsapp/numbers/${id}/subscribe`,
     NUMBER_BY_ID: (id: string) => `/v1/whatsapp/numbers/${id}`,
-    // Conversations, unanswered queue and usage dashboard
-    CONVERSATIONS: "/v1/whatsapp/conversations",
-    CONVERSATION_BY_ID: (id: string) => `/v1/whatsapp/conversations/${id}`,
-    CONVERSATION_LANGUAGES: "/v1/whatsapp/conversations/languages",
-    CITATION_BY_CHUNK: (chunkId: string) => `/v1/whatsapp/citations/${chunkId}`,
-    CONTACT_REVEAL: (id: string) => `/v1/whatsapp/contacts/${id}/reveal`,
-    CONTACT_BLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/block`,
-    CONTACT_UNBLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/unblock`,
-    UNANSWERED: "/v1/whatsapp/unanswered",
-    UNANSWERED_BY_ID: (id: string) => `/v1/whatsapp/unanswered/${id}`,
-    UNANSWERED_CREATE_DOCUMENT: (id: string) => `/v1/whatsapp/unanswered/${id}/create-document`,
+    // All numbers on the assistant home's Overview
     ANALYTICS_OVERVIEW: "/v1/whatsapp/analytics/overview",
     ANALYTICS_TIMESERIES: "/v1/whatsapp/analytics/timeseries",
     ANALYTICS_LANGUAGES: "/v1/whatsapp/analytics/languages",
@@ -1024,6 +1142,10 @@ export const ROUTES = {
   MANAGE_LLM_MODEL_CATALOG: "/manage-llm-model-catalog",
   AI_TASKS: "/ai-tasks",
   DEBRIEFS: "/debriefs",
+  DEBRIEF_SESSION: (runId: string) => `/debriefs/sessions/${runId}`,
+  DEBRIEF_SESSION_LOGS: (runId: string) => `/debriefs/sessions/${runId}/logs`,
+  DEBRIEFS_PM_AGENT: "/debriefs/pm-agent",
+  DEBRIEFS_SETTINGS: "/debriefs/settings",
   MANAGE_SCENARIO_LANGUAGES: "/manage-scenario-languages",
   MANAGE_LANGUAGE_GLOSSARY: (id: string | number) => `/manage-scenario-languages/${id}/glossary`,
   MANAGE_PROMPTS: "/manage-prompts",
@@ -1054,6 +1176,10 @@ export const ROUTES = {
   /** Bookmarks from before chatbots; redirected to WHATSAPP_BOT. */
   WHATSAPP_BOT_LEGACY: "/whatsapp-bot",
   CHATBOT_DETAIL: "/chatbots/:botId",
+  /** Onboarding (chunk 20a). Static, so it outranks `:botId`. */
+  CHATBOT_NEW: "/chatbots/new",
+  INBOX: "/inbox",
+  CHATBOT_NEW_SESSION: (draftId: string) => `/chatbots/new/${draftId}`,
   TERMS: "/terms",
   PRIVACY: "/privacy",
   // Fully public, no-login gallery of the centralised design-system components.
@@ -1209,6 +1335,11 @@ export const TAG_TYPES = {
   WHATSAPP_BOT_NUMBERS: "whatsAppBotNumbers",
   CHATBOTS: "chatbots",
   CHATBOT_DETAIL: "chatbotDetail",
+  BOT_DRAFT: "botDraft",
+  CHECKUP: "checkup",
+  SOURCES: "sources",
+  SCORECARD: "scorecard",
+  INBOX: "inbox",
   CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so
@@ -1234,9 +1365,11 @@ export const TAG_TYPES = {
   FEATURE_TOGGLE_REGISTRY: "featureToggleRegistry",
   USER_FEATURE_TOGGLES: "userFeatureToggles",
   PLATFORM_ADMINS: "platformAdmins",
+  CLINICAL_ADVISORS: "clinicalAdvisors",
   // Product Roadmap. NOTE: every one of these must ALSO be listed in baseApi.ts's
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
+  PRODUCT_PLANS: "productPlans",
   PRODUCT_ROADMAP_VOTE_BUDGET: "productRoadmapVoteBudget",
   PRODUCT_ROADMAP_BREADTH: "productRoadmapBreadth",
   PRODUCT_ROADMAP_FACETS: "productRoadmapFacets",
@@ -1329,8 +1462,10 @@ export const TAG_TYPES = {
   // Skill experiments (auto-improve on Skills Store). Also registered in
   // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   SKILL_EXPERIMENTS: "skillExperiments",
-  DEBRIEF_CALIBRATION: "debriefCalibration",
   DEBRIEF_CONSOLE: "debriefConsole",
+  // Also registered in baseApi.ts's `tagTypes`.
+  DEBRIEF_EXPERT_REVIEW: "debriefExpertReview",
+  NOTIFICATIONS: "notifications",
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",

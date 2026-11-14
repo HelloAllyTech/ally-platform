@@ -5,7 +5,7 @@
  * A release is an immutable `agent_releases` row (agentKey `debrief`), the same
  * harness the Ally guide uses, so promotion, rollback and the audit trail are
  * shared. The bundle below is version 1, seeded from code; every later version
- * comes from an approved Improver idea or a person, never from editing GA.
+ * comes from an approved PM agent idea or a person, never from editing GA.
  *
  * Prompts live in the Skills Store. `prompts` pins each code to a version
  * number; `null` means "the store's current version", which is what the seed
@@ -49,9 +49,6 @@ export function modelProblem(model: string): string | null {
   if (!computeCostUsd(model, 1, 1).priced) return `${model} has no known price`;
   return null;
 }
-/** Learning-loop calls (Improver, screens) are ledgered apart from production. */
-export const DEBRIEF_LEARNING_AGENT_KEY = 'debrief_learning';
-
 export enum DebriefStep {
   SAFETY_READER = 'safety_reader',
   ANALYST = 'analyst',
@@ -115,11 +112,21 @@ export interface DebriefSettings {
 
 /** Ask Ally in conversation mode (v9 FR-43): part of the release, like every step. */
 export interface DebriefReplyConfig {
-  /** A provider the in-process chat can run. */
+  /** A provider Ask Ally's agent in ally-ai can run. */
   provider: 'gemini' | 'openai' | 'anthropic';
   model: string;
   /** Room for a 120-word reply in an Indic script, which costs far more tokens than English. */
   maxTokens: number;
+  /**
+   * v9 FR-43: dollars one reply may spend across its passes. ally-ai enforces
+   * it and never allows more than $0.05 (`REPLY_BUDGET_USD`, app/core/ask_ally).
+   */
+  budgetUsd?: number;
+  /**
+   * v9 FR-43: model passes per reply, tool passes included, the last never
+   * calling a tool. ally-ai's default and ceiling is 4 (`REPLY_MAX_TURNS`).
+   */
+  maxTurns?: number;
 }
 
 export interface DebriefBundle {
@@ -130,18 +137,82 @@ export interface DebriefBundle {
   settings: DebriefSettings;
   /** Absent in releases made before Ask Ally: the code default then applies. */
   reply?: DebriefReplyConfig;
+  /**
+   * The orchestrator (spec A1–A5, A11). Absent, or `enabled: false`, runs
+   * today's fixed recipes: every release made before it, and the seed, which
+   * never carries it (a changed seed auto-promotes to GA). A challenger
+   * release turns it on; a person promotes it through the ladder.
+   */
+  orchestrator?: DebriefOrchestratorConfig;
 }
+
+/**
+ * The registry agents ally-ai's build defines (one module per agent,
+ * `app/core/debrief_graph/registry/agents/`), at the version it has. A release
+ * may enable an agent only at a version the build has; ally-ai refuses any
+ * other (spec A2: calling an agent outside the release is refused).
+ */
+export const DEBRIEF_REGISTRY_AGENTS = {
+  analyst: { version: 1 },
+  progress_reader: { version: 1 },
+  guidance_lookup: { version: 1 },
+  case_memory: { version: 1 },
+  assessment_anchoring: { version: 1 },
+  protocol_check: { version: 1 },
+  history_deep: { version: 1 },
+  language_specialist: { version: 1 },
+  cohort_comparison: { version: 1 },
+  course_patterns: { version: 1 },
+} as const;
+export type DebriefRegistryAgentId = keyof typeof DEBRIEF_REGISTRY_AGENTS;
+
+/** One registry agent a release enables. No model: the build's default (or the recipe's step). */
+export interface DebriefReleaseAgent {
+  id: DebriefRegistryAgentId;
+  version: number;
+  model?: string | null;
+  backupModel?: string | null;
+}
+
+export interface DebriefOrchestratorConfig {
+  /** The challenger flag: on, the planner chooses the analysis agents. */
+  enabled: boolean;
+  /** Fast class, structured, temperature 0 (spec A5). */
+  plannerModel: string;
+  plannerBackupModel?: string | null;
+  /** D3: one evidence top-up after the first failed evaluation. */
+  topUp: boolean;
+  maxAgentsPerPlan: number;
+  agents: DebriefReleaseAgent[];
+}
+
+/** Planner limits a release may set (spec Part E: owner settings come later). */
+export const DEBRIEF_MAX_AGENTS_PER_PLAN = 10;
 
 export const DEBRIEF_PROMPT_CODES = {
   safetyReader: 'debrief_safety_reader_system',
   analyst: 'debrief_analyst_system',
   progressReader: 'debrief_progress_reader_system',
+  /** The progress agent (learner progress over past sessions); its step key stays `progress_reader`. */
+  progress: 'debrief_progress_system',
   writer: 'debrief_writer_system',
   reviser: 'debrief_reviser_system',
   rubric: 'debrief_quality_rubric',
-  improver: 'debrief_improver_system',
+  pmAgent: 'debrief_improver_system',
   reply: 'debrief_reply_system',
+  planner: 'debrief_planner_system',
+  protocolCheck: 'debrief_protocol_check_system',
+  historyDeep: 'debrief_history_deep_system',
+  languageSpecialist: 'debrief_language_specialist_system',
 } as const;
+
+/** The orchestrator's prompts, sent to ally-ai only when a release turns it on. */
+export const DEBRIEF_ORCHESTRATOR_PROMPT_CODES: readonly string[] = [
+  DEBRIEF_PROMPT_CODES.planner,
+  DEBRIEF_PROMPT_CODES.protocolCheck,
+  DEBRIEF_PROMPT_CODES.historyDeep,
+  DEBRIEF_PROMPT_CODES.languageSpecialist,
+];
 
 /** The on-topic check for reflection XP: a yes or no, cheap and fast. */
 export const DEBRIEF_REFLECTION_CHECK_MODEL = {
@@ -157,23 +228,27 @@ export const DEBRIEF_REPLY_DEFAULT: DebriefReplyConfig = {
 };
 
 /**
- * Prompts the Improver may propose edits to. The rubric and the Safety
- * reader are pinned (named people only), and the Improver's own instructions
- * change only through a person.
+ * Prompts the PM agent may propose edits to. The rubric and the Safety
+ * reader are pinned (named people only), and the PM agent's own instructions
+ * change only through a person. The orchestrator's planner and its
+ * prompt-only registry agents are route A too (spec C3: default plans and
+ * changed manifests), but only while the GA release runs the orchestrator:
+ * otherwise a change to them could not be tested (DebriefPmAgentToolsService).
  */
-export const IMPROVER_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
+export const PM_AGENT_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
   DEBRIEF_PROMPT_CODES.writer,
   DEBRIEF_PROMPT_CODES.reviser,
+  ...DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
 ]);
 
 /**
- * Settings the Improver may propose, each with the range it may move in. The
+ * Settings the PM agent may propose, each with the range it may move in. The
  * budget ceiling and cap are the owner's, and the deadlines are learner
  * promises, so neither is here.
  */
-export const IMPROVER_SETTINGS: Record<string, { min: number; max: number }> = {
+export const PM_AGENT_SETTINGS: Record<string, { min: number; max: number }> = {
   maxRevisionRounds: { min: 0, max: 3 },
   guidancePassagesPerMoment: { min: 0, max: 3 },
   standardMinLearnerTurns: { min: 3, max: 10 },
@@ -182,6 +257,11 @@ export const IMPROVER_SETTINGS: Record<string, { min: number; max: number }> = {
 /** Every step's model. Writer and Evaluator differ from each other and from the pinned judge. */
 export const DEBRIEF_MODELS = {
   safetyReader: 'gemini-2.5-flash',
+  // At temperature 0, 2.5-flash loops on about 1% of sessions until its output limit (65k tokens,
+  // ~4 min), and retrying it repeats the loop; this model read those sessions cleanly 6/6 and
+  // passes the safety-recall gate (18/18 x3, 2026-11-11). Without a backup, both attempts fail
+  // and a person has to finish the debrief.
+  safetyReaderBackup: 'gemini-3-flash-preview',
   analyst: 'gemini-2.5-pro',
   progressReader: 'gemini-2.5-flash',
   writer: 'gemini-3-flash-preview',
@@ -190,8 +270,15 @@ export const DEBRIEF_MODELS = {
   writerBackup: 'gemini-2.5-flash',
   evaluator: 'gemini-2.5-flash',
   reviser: 'gemini-3-flash-preview',
-  improver: 'gemini-2.5-pro',
+  pmAgent: 'gemini-2.5-pro',
+  // The PM agent's backup when its model fails or its breaker is open.
+  pmAgentBackup: 'gemini-2.5-flash',
   judge: 'gemini-2.5-pro',
+  /** The orchestrator's planner: fast, the learner is waiting (spec A5). */
+  planner: 'gemini-2.5-flash',
+  /** The prompt-only registry agents (ally-ai manifests name the same). */
+  registryAgent: 'gemini-2.5-flash',
+  registryAgentBackup: 'gemini-3-flash-preview',
 } as const;
 
 const step = (
@@ -217,6 +304,7 @@ const SEED_RECIPES_BASE = {
           DebriefStep.SAFETY_READER,
           'Reading your session…',
           DEBRIEF_MODELS.safetyReader,
+          DEBRIEF_MODELS.safetyReaderBackup,
         ),
         step(
           DebriefStep.ANALYST,
@@ -251,13 +339,16 @@ const SEED_RECIPES_BASE = {
     },
     [DebriefRecipeKey.SHORT]: {
       key: DebriefRecipeKey.SHORT,
-      maxRevisionRounds: 0,
+      // One round: with none, any blocking check (a score mentioned, a body too long) sent a
+      // short session's debrief to a person instead of being fixed.
+      maxRevisionRounds: 1,
       shortForm: true,
       steps: [
         step(
           DebriefStep.SAFETY_READER,
           'Reading your session…',
           DEBRIEF_MODELS.safetyReader,
+          DEBRIEF_MODELS.safetyReaderBackup,
         ),
         step(
           DebriefStep.ANALYST,
@@ -276,6 +367,12 @@ const SEED_RECIPES_BASE = {
           'Reviewing my draft…',
           DEBRIEF_MODELS.evaluator,
         ),
+        step(
+          DebriefStep.REVISER,
+          'Making it clearer…',
+          DEBRIEF_MODELS.reviser,
+          DEBRIEF_MODELS.writerBackup,
+        ),
       ],
     },
   },
@@ -293,7 +390,10 @@ const SEED_RECIPES_BASE = {
     runCeilingUsd: 0.5,
     runFloorUsd: 0.15,
     poolPerSessionUsd: 0.25,
-    monthlyCapUsd: 500,
+    // Lowered from 500 on 2026-11-10 as a safety net while the Debrief agent
+    // is still in development (~$3 a month today). Raise it to a proper level
+    // once the whole loop is finished.
+    monthlyCapUsd: 50,
     deadlineMs: 150_000,
     riskDeadlineMs: 180_000,
     guidancePassagesPerMoment: 2,
@@ -315,6 +415,138 @@ export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
   },
 };
 
+/**
+ * The orchestrator as a challenger release enables it: every registry agent
+ * at the build's version, today's recipe models for the agents that were
+ * recipe steps, the build's defaults for the rest.
+ */
+export const DEBRIEF_ORCHESTRATOR_DEFAULT: DebriefOrchestratorConfig = {
+  enabled: true,
+  plannerModel: DEBRIEF_MODELS.planner,
+  plannerBackupModel: null,
+  topUp: true,
+  maxAgentsPerPlan: 6,
+  agents: (
+    Object.entries(DEBRIEF_REGISTRY_AGENTS) as Array<
+      [DebriefRegistryAgentId, { version: number }]
+    >
+  ).map(([id, { version }]) => ({ id, version })),
+};
+
+/**
+ * A challenger bundle (spec A11): `base` (normally the live GA bundle) with
+ * the orchestrator on. Made a DRAFT release by the Console action; never the
+ * seed, because a changed seed is promoted to GA at boot.
+ */
+export function debriefChallengerBundle(
+  base: DebriefBundle,
+  orchestrator: Partial<DebriefOrchestratorConfig> = {},
+): DebriefBundle {
+  return {
+    ...base,
+    prompts: {
+      ...base.prompts,
+      ...Object.fromEntries(
+        DEBRIEF_ORCHESTRATOR_PROMPT_CODES.filter(
+          (c) => !(c in (base.prompts ?? {})),
+        ).map((c) => [c, null]),
+      ),
+    },
+    orchestrator: {
+      ...DEBRIEF_ORCHESTRATOR_DEFAULT,
+      ...(base.orchestrator ?? {}),
+      ...orchestrator,
+      enabled: orchestrator.enabled ?? true,
+    },
+  };
+}
+
+/** True when a bundle runs the orchestrator rather than the fixed recipes. */
+export function isOrchestrated(bundle: Partial<DebriefBundle>): boolean {
+  return bundle.orchestrator?.enabled === true;
+}
+
+/** Every model the orchestrator block names (for prices and validation). */
+export function orchestratorModels(bundle: Partial<DebriefBundle>): string[] {
+  const o = bundle.orchestrator;
+  if (!o) return [];
+  return [
+    o.plannerModel,
+    o.plannerBackupModel,
+    ...(o.agents ?? []).flatMap((a) => [a.model, a.backupModel]),
+    // The prompt-only agents' build defaults run when the release names none.
+    ...(o.enabled
+      ? [DEBRIEF_MODELS.registryAgent, DEBRIEF_MODELS.registryAgentBackup]
+      : []),
+  ].filter((m): m is string => typeof m === 'string' && m.length > 0);
+}
+
+/** Every problem with an orchestrator block (none when it may be used). */
+export function orchestratorProblems(
+  o: unknown,
+  catalog?: DebriefModelCatalog,
+): string[] {
+  if (o === undefined || o === null) return [];
+  const c = o as Partial<DebriefOrchestratorConfig>;
+  if (typeof c !== 'object') return ['orchestrator is not an object'];
+  const problems: string[] = [];
+  if (typeof c.enabled !== 'boolean') {
+    problems.push('orchestrator: enabled must be true or false');
+  }
+  if (typeof c.topUp !== 'boolean') {
+    problems.push('orchestrator: topUp must be true or false');
+  }
+  if (
+    !Number.isInteger(c.maxAgentsPerPlan) ||
+    (c.maxAgentsPerPlan as number) < 1 ||
+    (c.maxAgentsPerPlan as number) > DEBRIEF_MAX_AGENTS_PER_PLAN
+  ) {
+    problems.push(
+      `orchestrator: maxAgentsPerPlan must be 1–${DEBRIEF_MAX_AGENTS_PER_PLAN}`,
+    );
+  }
+  if (!c.plannerModel) problems.push('orchestrator: no planner model');
+  if (!Array.isArray(c.agents)) {
+    problems.push('orchestrator: agents must be a list');
+  } else {
+    const seen = new Set<string>();
+    for (const a of c.agents) {
+      const known =
+        DEBRIEF_REGISTRY_AGENTS[a?.id as DebriefRegistryAgentId] ?? null;
+      if (!known) {
+        problems.push(`orchestrator: no registry agent ${String(a?.id)}`);
+        continue;
+      }
+      if (seen.has(a.id))
+        problems.push(`orchestrator: ${a.id} is listed twice`);
+      seen.add(a.id);
+      if (a.version !== known.version) {
+        problems.push(
+          `orchestrator: ${a.id} v${String(a.version)} is not in this build (v${known.version})`,
+        );
+      }
+    }
+  }
+  const models = [
+    c.plannerModel,
+    c.plannerBackupModel,
+    ...(Array.isArray(c.agents) ? c.agents : []).flatMap((a) => [
+      a?.model,
+      a?.backupModel,
+    ]),
+  ].filter((m): m is string => typeof m === 'string' && m.length > 0);
+  for (const m of new Set(models)) {
+    const problem = modelProblem(m);
+    if (problem) problems.push(`orchestrator: ${problem}`);
+    else if (catalog && !catalog.steps.has(m)) {
+      problems.push(
+        `orchestrator: ${m} is not an active model in the LLM catalog for ally-ai`,
+      );
+    }
+  }
+  return problems;
+}
+
 /** Steps no recipe may drop (plan §8.2): safety, writing, the checks and the evaluation. */
 export const MANDATORY_STEPS: readonly DebriefStep[] = [
   DebriefStep.SAFETY_READER,
@@ -326,7 +558,7 @@ export const MANDATORY_STEPS: readonly DebriefStep[] = [
 /**
  * The platform's LLM catalog (Admin → Model Catalog), as the debrief reads it:
  * the active model ids each place a debrief model runs can call. The steps
- * run in ally-ai; Ask Ally and the reflection check run in ally-be.
+ * and Ask Ally run in ally-ai (both read its list).
  */
 export interface DebriefModelCatalog {
   steps: ReadonlySet<string>;
@@ -367,7 +599,7 @@ export function validateDebriefBundle(
     if (problem) problems.push(problem);
     else if (catalog && !catalog.reply.has(b.reply.model)) {
       problems.push(
-        `${b.reply.model} is not an active model in the LLM catalog for ally-be`,
+        `${b.reply.model} is not an active model in the LLM catalog for ally-ai`,
       );
     }
   }
@@ -425,6 +657,7 @@ export function validateDebriefBundle(
       problems.push(`recipe ${key}: maxRevisionRounds must be 0–3`);
     }
   }
+  problems.push(...orchestratorProblems(b.orchestrator, catalog));
   const s = b.settings;
   if (!s) problems.push('settings are missing');
   else {

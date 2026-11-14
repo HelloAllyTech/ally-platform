@@ -101,6 +101,7 @@ class FeedbackHarness {
         .thenAnswer((_) async => const LearnerDebriefView(state: LearnerDebriefState.notAvailable));
     when(() => learnerDebrief.markRead(any())).thenAnswer((_) async {});
     when(() => learnerDebrief.markOpened(any())).thenAnswer((_) async {});
+    when(() => learnerDebrief.recordEvent(any(), any())).thenAnswer((_) async {});
     when(() => simulations.getEventChecklist(any())).thenAnswer((_) async => <EventChecklistItem>[]);
     when(
       () => simulations.addSimulationFeedback(
@@ -140,6 +141,7 @@ class FeedbackHarness {
   Future<GoRouter> pump(
     WidgetTester tester, {
     bool fromLogs = false,
+    bool ownSession = false,
     String? pathId,
     String? caseId,
     List<String> permissions = allPermissions,
@@ -155,6 +157,7 @@ class FeedbackHarness {
           builder: (context, state) => SimulationFeedbackScreen(
             scenarioSessionId: 'session-1',
             fromLogs: fromLogs,
+            ownSession: ownSession,
             pathId: pathId,
             caseId: caseId,
           ),
@@ -205,4 +208,5 @@ class FeedbackHarness {
 
 void registerFeedbackFallbacks() {
   registerFallbackValue(<String>[]);
+  registerFallbackValue(DebriefLearnerEvent.waited);
 }

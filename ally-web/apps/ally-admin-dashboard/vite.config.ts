@@ -1,5 +1,7 @@
 /// <reference types='vitest' />
-import { defineConfig } from "vite";
+import { build, defineConfig, loadEnv, type Plugin } from "vite";
+import { transform } from "esbuild";
+import { readFileSync } from "fs";
 import react from "@vitejs/plugin-react";
 import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { nxCopyAssetsPlugin } from "@nx/vite/plugins/nx-copy-assets.plugin";
@@ -10,8 +12,64 @@ import { testResourceLimits } from "../../vitest.resource-limits";
 // Get absolute paths
 const projectRoot = __dirname;
 
+/**
+ * `/b/<slug>` is the bot page (b.html). The dev server and `vite preview` would otherwise answer it
+ * with the dashboard's index.html. Deployed, the CDN does answer with index.html, and a script at
+ * the top of it hands over to b.html in place.
+ */
+function botPageRoutes(): Plugin {
+  const rewrite = (req: { url?: string }, _res: unknown, next: () => void) => {
+    if (req.url && /^\/b\/[^/?#]+\/?(\?.*)?$/.test(req.url)) req.url = "/b.html";
+    next();
+  };
+  return {
+    name: "bot-page-routes",
+    configureServer: server => void server.middlewares.use(rewrite),
+    configurePreviewServer: server => void server.middlewares.use(rewrite),
+  };
+}
+
+/**
+ * The website widget's loader (chunk 13), `/widget.js`. The dashboard's build also builds it (from
+ * vite.widget.config.ts) so every deploy ships it; the dev server compiles it on request into the
+ * same plain script, since a snippet's `<script>` can't load a module.
+ */
+function widgetBundle(): Plugin {
+  let mode = "production";
+  return {
+    name: "ally-widget",
+    configResolved: config => void (mode = config.mode),
+    async closeBundle() {
+      if (process.env.VITEST) return;
+      await build({ configFile: path.resolve(projectRoot, "vite.widget.config.ts"), mode });
+    },
+    configureServer: server =>
+      void server.middlewares.use(async (req, res, next) => {
+        if (req.url?.split("?")[0] !== "/widget.js") return next();
+        const env = loadEnv(server.config.mode, projectRoot, "VITE_");
+        const { code } = await transform(
+          readFileSync(path.resolve(projectRoot, "src/widget/loader.ts"), "utf8"),
+          {
+            loader: "ts",
+            format: "iife",
+            target: "es2019",
+            define: {
+              "import.meta.env.VITE_API_BASE_URL": JSON.stringify(env.VITE_API_BASE_URL ?? ""),
+            },
+          },
+        );
+        res.setHeader("Content-Type", "text/javascript");
+        res.setHeader("Cache-Control", "no-store");
+        res.end(code);
+      }),
+  };
+}
+
 export default defineConfig(() => ({
   root: __dirname,
+  // Production serves the admin app under app.helloally.ai/admin/ (set via
+  // VITE_BASE_PATH in the release workflow); dev and other builds stay at /.
+  base: process.env.VITE_BASE_PATH || "/",
   cacheDir: "../../node_modules/.vite/apps/ally-admin-dashboard",
   server: {
     port: 8081,
@@ -34,7 +92,14 @@ export default defineConfig(() => ({
     port: 4300,
     host: "localhost",
   },
-  plugins: [react(), nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"]), svgr()],
+  plugins: [
+    react(),
+    nxViteTsPaths(),
+    nxCopyAssetsPlugin(["*.md"]),
+    svgr(),
+    botPageRoutes(),
+    widgetBundle(),
+  ],
   // Carbon v11 ships SCSS that triggers many Dart-Sass deprecation warnings.
   // quietDeps silences node_modules noise; silenceDeprecations keeps the
   // remaining (expected) Carbon warnings from failing the build.
@@ -59,6 +124,12 @@ export default defineConfig(() => ({
       transformMixedEsModules: true,
     },
     rollupOptions: {
+      // Two pages: the dashboard, and the public bot page (/b/<slug>, chunk 12b), which shares no
+      // code with the dashboard's entry so a visitor downloads only the page.
+      input: {
+        main: path.resolve(projectRoot, "index.html"),
+        botPage: path.resolve(projectRoot, "b.html"),
+      },
       output: {
         // Add content hashes to filenames for cache busting
         entryFileNames: "assets/[name]-[hash].js",

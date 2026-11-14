@@ -90,6 +90,7 @@ import { BuilderRule } from './entity/builder-rule.entity';
 import { BuilderSchedulerRegistrationService } from './service/builder-scheduler-registration.service';
 import { BuilderSessionRepository } from './repository/builder-session.repository';
 import { BuilderMessageRepository } from './repository/builder-message.repository';
+import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
 import {
   BuilderPrdDocRepository,
   BuilderPrdVersionRepository,
@@ -128,6 +129,8 @@ import {
  */
 @Module({
   imports: [
+    // Plan sessions price their interview into the plan spend ledger. Entities only: no cycle.
+    ProductPlanningModule,
     TypeOrmModule.forFeature([
       BuilderSession,
       BuilderMessage,
@@ -250,6 +253,10 @@ import {
   ],
   exports: [
     BuilderSessionService,
+    // The roadmap's plan flow (product-roadmap/plan) keeps a plan in a Builder session from its
+    // first message, so it appends to the transcript and reads session rows directly.
+    BuilderSessionRepository,
+    BuilderMessageRepository,
     // The Builder tab's Up next, Start and Put back live with the roadmap
     // (which owns opportunities); they read these to gate, seed and record.
     BuilderNowService,

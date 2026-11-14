@@ -23,7 +23,14 @@ import 'learner_debrief_controller.dart';
 /// No score, no percentage and no red anywhere: amber marks what needs
 /// attention, and every status carries text plus an icon, never colour alone.
 class DebriefCards extends ConsumerStatefulWidget {
-  const DebriefCards({super.key, required this.controller, this.replyThread, this.readOnly = false});
+  const DebriefCards({
+    super.key,
+    required this.controller,
+    this.replyThread,
+    this.composer,
+    this.readOnly = false,
+    this.onSeeQuote,
+  });
 
   final LearnerDebriefController controller;
 
@@ -34,6 +41,16 @@ class DebriefCards extends ConsumerStatefulWidget {
   /// Ask Ally's thread and composer, under the reflective question. Shown
   /// only once the debrief is `ready`; null on the read-only (Logs) view.
   final Widget? replyThread;
+
+  /// Ask Ally's composer (design A5): docked at the bottom of the screen
+  /// while "One question to think about" is in view (or scrolled past) and
+  /// hidden while the learner reads the cards above it. Null when there is
+  /// nothing to ask (read-only, supervisor view, not ready).
+  final Widget? composer;
+
+  /// "See this moment" under each quote: opens the transcript at that turn
+  /// (PRD §6.3, web `onSeeQuote`). Null when there is no transcript to open.
+  final ValueChanged<String>? onSeeQuote;
 
   /// v9 FR-65: the debrief must have been open this long to earn
   /// DEBRIEF_READ XP.
@@ -64,6 +81,37 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
   bool _openLongEnough = false;
   bool _readEndSeen = false;
 
+  // Experience metrics (`read_through`): the end of the FIRST Work-on-this
+  // point on screen while the debrief is open — no minimum time.
+  final _readThroughKey = GlobalKey();
+  bool _readThroughSeen = false;
+
+  // Experience metrics (`waited` / `left_before_ready`): the working state
+  // was shown, so leaving before the debrief is ready is worth recording.
+  bool _waitedShown = false;
+
+  // Design A5: the composer docks once the reflective question is in view.
+  final _questionKey = GlobalKey();
+  bool _composerDocked = false;
+  bool _composerFocused = false;
+
+  void _checkComposer() {
+    if (!mounted || widget.composer == null) return;
+    final question = _questionKey.currentContext?.findRenderObject();
+    final list = _listKey.currentContext?.findRenderObject();
+    var docked = false;
+    if (question is RenderBox && list is RenderBox && question.attached && question.hasSize && list.hasSize) {
+      final top = question.localToGlobal(Offset.zero).dy;
+      final listBottom = list.localToGlobal(Offset.zero).dy + list.size.height;
+      // Docked once the question's heading has come up into the screen;
+      // still docked below it (the thread, Was this helpful?).
+      docked = top < listBottom - 48;
+    }
+    // Typing keeps it: the keyboard shrinks the list under the composer.
+    if (_composerFocused) docked = true;
+    if (docked != _composerDocked) setState(() => _composerDocked = docked);
+  }
+
   /// The state last seen, so the move from writing to ready is announced.
   LearnerDebriefState? _lastState;
 
@@ -77,6 +125,7 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
 
   @override
   void dispose() {
+    _recordLeftBeforeReady();
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_announceWhenReady);
     _openedTimer?.cancel();
@@ -92,7 +141,10 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
     final view = widget.controller.view;
     final previous = _lastState;
     _lastState = view?.state;
-    final wasWaiting = previous == LearnerDebriefState.working || previous == LearnerDebriefState.onItsWay;
+    final wasWaiting =
+        previous == LearnerDebriefState.working ||
+        previous == LearnerDebriefState.onItsWay ||
+        previous == LearnerDebriefState.takingLonger;
     if (!mounted || !wasWaiting || view?.state != LearnerDebriefState.ready || view?.cards == null) return;
     SemanticsService.sendAnnouncement(
       View.of(context),
@@ -123,6 +175,7 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
     if (state == AppLifecycleState.resumed) {
       _armOpened();
     } else {
+      if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) _recordLeftBeforeReady();
       _openedTimer?.cancel();
       _openedTimer = null;
     }
@@ -135,21 +188,40 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
       _openLongEnough = true;
       _maybeMarkRead();
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkReadEnd());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkReadEnd();
+      _checkComposer();
+    });
   }
 
-  /// Whether the read-end marker is inside the list's visible area.
+  /// Whether the read-end markers are inside the list's visible area.
   void _checkReadEnd() {
-    if (!mounted || _readEndSeen) return;
-    final marker = _readEndKey.currentContext?.findRenderObject();
-    final list = _listKey.currentContext?.findRenderObject();
-    if (marker is! RenderBox || list is! RenderBox || !marker.attached || !marker.hasSize || !list.hasSize) return;
-    final top = marker.localToGlobal(Offset.zero).dy;
-    final listTop = list.localToGlobal(Offset.zero).dy;
-    if (top >= listTop && top <= listTop + list.size.height) {
+    if (!mounted) return;
+    if (!_readThroughSeen && _onScreen(_readThroughKey)) {
+      _readThroughSeen = true;
+      widget.controller.recordEvent(DebriefLearnerEvent.readThrough);
+    }
+    if (!_readEndSeen && _onScreen(_readEndKey)) {
       _readEndSeen = true;
       _maybeMarkRead();
     }
+  }
+
+  bool _onScreen(GlobalKey key) {
+    final marker = key.currentContext?.findRenderObject();
+    final list = _listKey.currentContext?.findRenderObject();
+    if (marker is! RenderBox || list is! RenderBox || !marker.attached || !marker.hasSize || !list.hasSize) return false;
+    final top = marker.localToGlobal(Offset.zero).dy;
+    final listTop = list.localToGlobal(Offset.zero).dy;
+    return top >= listTop && top <= listTop + list.size.height;
+  }
+
+  /// `left_before_ready`: the working state was shown and the debrief still
+  /// isn't ready as the learner leaves (screen closed or app backgrounded).
+  void _recordLeftBeforeReady() {
+    if (!_waitedShown || widget.readOnly) return;
+    if (widget.controller.view?.state == LearnerDebriefState.ready) return;
+    widget.controller.recordEvent(DebriefLearnerEvent.leftBeforeReady);
   }
 
   void _maybeMarkRead() {
@@ -170,66 +242,169 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
             progress: view.progress,
             latestStep: view.steps.isEmpty ? null : view.steps.last,
           ),
+          LearnerDebriefState.takingLonger => _TakingLonger(controller: widget.controller),
           LearnerDebriefState.onItsWay => _Body(ref.t('$_k.onItsWay'), key: const Key('debrief-on-its-way')),
+          LearnerDebriefState.notAvailable when view.stopped => _Body(
+            ref.t('$_k.notAvailable'),
+            key: const Key('debrief-not-available'),
+          ),
           LearnerDebriefState.tooShort => _Body(ref.t('$_k.tooShort'), key: const Key('debrief-too-short')),
+          LearnerDebriefState.failed => _LoadProblem(controller: widget.controller, offline: false),
+          LearnerDebriefState.offline => _LoadProblem(controller: widget.controller, offline: true),
           LearnerDebriefState.ready when view.cards != null => _ReadyCards(
             cards: view.cards!,
             view: view,
             controller: widget.controller,
             readAloud: _readAloud,
             readEndKey: _readEndKey,
+            readThroughKey: _readThroughKey,
             replyThread: widget.replyThread,
           ),
           _ => const SizedBox.shrink(),
         };
         if (ready && view.distress) content = _DistressFirst(view: view, child: content);
         if (ready) _afterReadyFrame();
+        if (view.state == LearnerDebriefState.working && !widget.readOnly && view.supervisor == null) {
+          _waitedShown = true;
+          widget.controller.recordEvent(DebriefLearnerEvent.waited);
+        }
         final status = _readAloud.status;
-        return _Frame(
+        final composer = ready ? widget.composer : null;
+        final header = _Header(
           title: ref.t('$_k.header'),
           aiLabel: ref.t('$_k.aiLabel'),
-          controls: ready
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _ListenAllBar(readAloud: _readAloud, sections: readableSections(view)),
-                    // Above the scrolling cards (the web puts it atop the
-                    // cards), so a "Listen" tapped far down still sees why
-                    // it stopped.
-                    if (status == DebriefReadAloudStatus.loading || status == DebriefReadAloudStatus.error)
-                      Semantics(
-                        liveRegion: true,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-                          child: Text(
-                            ref.t(status == DebriefReadAloudStatus.error ? '$_k.listen.error' : '$_k.listen.loading'),
-                            key: const Key('debrief-listen-status'),
-                            style: _smallStyle.copyWith(color: Colors.white, fontSize: 13),
+          controls: ready ? _ListenAllBar(readAloud: _readAloud, sections: readableSections(view)) : null,
+        );
+        // The header scrolls away, so why a "Listen" stopped floats over the
+        // top of the cards wherever the learner is.
+        final listenStatus = ready &&
+                (status == DebriefReadAloudStatus.loading || status == DebriefReadAloudStatus.error)
+            ? Semantics(
+                liveRegion: true,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    ref.t(status == DebriefReadAloudStatus.error ? '$_k.listen.error' : '$_k.listen.loading'),
+                    key: const Key('debrief-listen-status'),
+                    style: _smallStyle.copyWith(color: Colors.white, fontSize: 13),
+                  ),
+                ),
+              )
+            : null;
+        final docked = composer != null && _composerDocked;
+        return _SeeMomentScope(
+          onSeeQuote: widget.onSeeQuote,
+          child: _QuestionKeyScope(
+            questionKey: _questionKey,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _Frame(
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (_) {
+                        // The new offset is laid out on the next frame.
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _checkReadEnd();
+                          _checkComposer();
+                        });
+                        return false;
+                      },
+                      child: KeyedSubtree(
+                        key: _listKey,
+                        // One scroll for everything: the header scrolls away
+                        // with the cards (Mobile round 2), no fixed strip.
+                        child: ListView(
+                          key: const Key('debrief-cards'),
+                          padding: EdgeInsets.only(bottom: composer != null ? 96 : 4),
+                          children: [
+                            header,
+                            Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: content,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (listenStatus != null) Positioned(top: 14, left: 14, right: 14, child: listenStatus),
+                if (composer != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: IgnorePointer(
+                      ignoring: !docked,
+                      child: ExcludeSemantics(
+                        excluding: !docked,
+                        child: AnimatedSlide(
+                          offset: docked ? Offset.zero : const Offset(0, 1.2),
+                          duration: (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+                              ? Duration.zero
+                              : const Duration(milliseconds: 200),
+                          curve: Curves.easeOut,
+                          child: Container(
+                            key: const Key('ask-ally-composer'),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              border: Border(top: BorderSide(color: AppColors.blue100)),
+                              boxShadow: [BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, -4))],
+                            ),
+                            child: Focus(
+                              onFocusChange: (focused) {
+                                _composerFocused = focused;
+                                _checkComposer();
+                              },
+                              child: composer,
+                            ),
                           ),
                         ),
                       ),
-                  ],
-                )
-              : null,
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (_) {
-              // The new offset is laid out on the next frame.
-              WidgetsBinding.instance.addPostFrameCallback((_) => _checkReadEnd());
-              return false;
-            },
-            child: KeyedSubtree(
-              key: _listKey,
-              child: ListView(
-                key: const Key('debrief-cards'),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                children: [content],
-              ),
+                    ),
+                  ),
+              ],
             ),
           ),
         );
       },
     );
   }
+}
+
+/// "See this moment" for every [_Quote] below it.
+class _SeeMomentScope extends InheritedWidget {
+  const _SeeMomentScope({required this.onSeeQuote, required super.child});
+
+  final ValueChanged<String>? onSeeQuote;
+
+  static ValueChanged<String>? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_SeeMomentScope>()?.onSeeQuote;
+
+  @override
+  bool updateShouldNotify(_SeeMomentScope oldWidget) => oldWidget.onSeeQuote != onSeeQuote;
+}
+
+/// The reflective question card's key, so the composer knows when it is in view.
+class _QuestionKeyScope extends InheritedWidget {
+  const _QuestionKeyScope({required this.questionKey, required super.child});
+
+  final GlobalKey questionKey;
+
+  static GlobalKey? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_QuestionKeyScope>()?.questionKey;
+
+  @override
+  bool updateShouldNotify(_QuestionKeyScope oldWidget) => oldWidget.questionKey != questionKey;
 }
 
 /// The cards "Listen all" reads, in the order they appear; removed ones
@@ -245,20 +420,17 @@ List<String> readableSections(LearnerDebriefView view) {
     for (var i = 0; i < cards.workOnThis.length; i++) 'work_on_this[$i]',
     if (cards.practiseNext != null) 'practise_next',
     if (cards.reflectiveQuestion.isNotEmpty) 'reflective_question',
+    // Last, as it sits below the debrief.
+    if (cards.progressCard != null) 'progress_card',
   ].where((s) => !removed.contains(s)).toList();
 }
 
-/// The same gradient frame as today's debrief ([AskAiGradientCard]), with
-/// the "Written by Ally (AI)" label beside the title.
+/// The same gradient frame as today's debrief ([AskAiGradientCard]); the
+/// header and the cards scroll inside it together.
 class _Frame extends StatelessWidget {
-  const _Frame({required this.title, required this.aiLabel, required this.child, this.controls});
+  const _Frame({required this.child});
 
-  final String title;
-  final String aiLabel;
   final Widget child;
-
-  /// "Listen all" and its controls, on a row under the title.
-  final Widget? controls;
 
   @override
   Widget build(BuildContext context) {
@@ -273,58 +445,69 @@ class _Frame extends StatelessWidget {
           colors: [AppColors.primary, AppColors.blue100, AppColors.brandLogo],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Semantics(
-                    header: true,
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        fontFamily: AppFonts.ibmPlexSerifMedium,
-                        fontSize: 14,
-                        height: 20 / 14,
-                        letterSpacing: 0.25,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+      child: child,
+    );
+  }
+}
+
+/// "Your debrief", "Written by Ally (AI)" with the ⓘ for "How Ally writes
+/// your debrief" beside it (PRD §6.3; Mobile round 2: not its own line),
+/// then "Listen all". Scrolls away with the cards.
+class _Header extends StatelessWidget {
+  const _Header({required this.title, required this.aiLabel, this.controls});
+
+  final String title;
+  final String aiLabel;
+
+  /// "Listen all" and its controls, on a row under the title.
+  final Widget? controls;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('debrief-header'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 2, 4, 2),
+          child: Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  header: true,
                   child: Text(
-                    aiLabel,
+                    title,
                     style: const TextStyle(
                       fontFamily: AppFonts.ibmPlexSerifMedium,
-                      fontSize: 11,
-                      color: AppColors.highEmphasis,
+                      fontSize: 14,
+                      height: 20 / 14,
+                      letterSpacing: 0.25,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  aiLabel,
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
+                    fontSize: 11,
+                    color: AppColors.highEmphasis,
+                  ),
+                ),
+              ),
+              const _ExplainerLink(),
+            ],
           ),
-          if (controls != null)
-            Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 4), child: controls),
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.only(left: 4, right: 4, bottom: 4),
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-              child: child,
-            ),
-          ),
-        ],
-      ),
+        ),
+        if (controls != null) Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 4), child: controls),
+      ],
     );
   }
 }
@@ -385,20 +568,34 @@ class _Lead extends StatelessWidget {
   Widget build(BuildContext context) => Text(text, style: _leadStyle);
 }
 
-class _Quote extends StatelessWidget {
+class _Quote extends ConsumerWidget {
   const _Quote(this.text);
 
   final String text;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quote = Container(
       padding: const EdgeInsets.only(left: 12),
       decoration: const BoxDecoration(border: Border(left: BorderSide(color: AppColors.blue100, width: 2))),
       child: Text(
         '“$text”',
         style: _bodyStyle.copyWith(fontStyle: FontStyle.italic, color: AppColors.mediumEmphasis),
       ),
+    );
+    final seeMoment = _SeeMomentScope.of(context);
+    if (seeMoment == null) return quote;
+    // PRD §6.3: each quote opens the transcript at the turn it came from.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        quote,
+        _LinkButton(
+          key: const Key('debrief-see-moment'),
+          label: ref.t('postSim.debrief.momentLabel'),
+          onPressed: () => seeMoment(text),
+        ),
+      ],
     );
   }
 }
@@ -546,6 +743,7 @@ class _ReadyCards extends ConsumerWidget {
     required this.controller,
     required this.readAloud,
     required this.readEndKey,
+    required this.readThroughKey,
     this.replyThread,
   });
 
@@ -556,6 +754,9 @@ class _ReadyCards extends ConsumerWidget {
 
   /// Marks the end of the last Work-on-this card, for DEBRIEF_READ XP.
   final GlobalKey readEndKey;
+
+  /// Marks the end of the first Work-on-this point, for `read_through`.
+  final GlobalKey readThroughKey;
   final Widget? replyThread;
 
   static const _k = 'postSim.debriefCards';
@@ -596,7 +797,11 @@ class _ReadyCards extends ConsumerWidget {
         if (!removed.contains('work_on_this[$i]')) (index: i, item: cards.workOnThis[i]),
     ];
     final practise = removed.contains('practise_next') ? null : cards.practiseNext;
-    final momentTitle = ref.t('$_k.importantMoment.title');
+    // PRD §6.2, case 3 [SAFETY]: no false-alarm framing when the learner
+    // asked directly and stayed (web 3192b5d09).
+    final momentTitle = ref.t(
+      moment?.handledWell ?? false ? '$_k.importantMoment.titleHandledWell' : '$_k.importantMoment.title',
+    );
     final practiseTitle = ref.t('$_k.practiseNext');
 
     final children = <Widget>[
@@ -656,16 +861,19 @@ class _ReadyCards extends ConsumerWidget {
           icon: const Icon(Icons.track_changes, size: 20, color: _amberStrong),
           children: [
             for (final (:index, :item) in growth)
-              _Item(
-                reading: readAloud.isBeingRead('work_on_this[$index]'),
-                children: [
-                  _Lead(item.lead),
-                  _Quote(item.quote),
-                  _Body(item.why),
-                  _TrySaying(label: ref.t('$_k.trySaying'), text: item.trySaying),
-                  if (view.practiceFor(item.scenarioId) case final scenario?) _PractiseLink(scenario: scenario),
-                  flag('work_on_this[$index]', item.lead),
-                ],
+              _withMarker(
+                index == growth.first.index ? readThroughKey : null,
+                _Item(
+                  reading: readAloud.isBeingRead('work_on_this[$index]'),
+                  children: [
+                    _Lead(item.lead),
+                    _Quote(item.quote),
+                    _Body(item.why),
+                    _TrySaying(label: ref.t('$_k.trySaying'), text: item.trySaying),
+                    if (view.practiceFor(item.scenarioId) case final scenario?) _PractiseLink(scenario: scenario),
+                    flag('work_on_this[$index]', item.lead),
+                  ],
+                ),
               ),
             SizedBox(key: readEndKey, height: 0),
           ],
@@ -680,7 +888,11 @@ class _ReadyCards extends ConsumerWidget {
             _Lead(practise.skill),
             _Body(practise.reason),
             if (view.practiceFor(practise.scenarioId) case final scenario?)
-              _PractiseLink(scenario: scenario, primary: true),
+              _PractiseLink(
+                scenario: scenario,
+                primary: true,
+                onOpen: () => controller.recordEvent(DebriefLearnerEvent.practiseNextClick),
+              ),
             flag('practise_next', practiseTitle),
           ],
         ),
@@ -721,7 +933,43 @@ class _ReadyCards extends ConsumerWidget {
           icon: Icon(Icons.trending_up, size: 20, color: AppColors.primary),
           children: [_Body(cards.progressNote!)],
         ),
-      _Card(
+      // The safety reading found something but the Writer judged it ordinary
+      // low mood or grief, so there is no important moment to carry the
+      // support lines: they get a card of their own.
+      if (moment == null && view.riskCue && !view.distress && view.supportLines.isNotEmpty)
+        _Card(
+          key: const Key('debrief-card-support'),
+          title: ref.t('$_k.support.title'),
+          icon: Icon(Icons.volunteer_activism_outlined, size: 20, color: AppColors.primary),
+          children: [
+            _Body(ref.t('$_k.support.lead')),
+            _SupportLines(lines: view.supportLines),
+          ],
+        ),
+      // A short debrief may come without a question (its rule checks don't
+      // require one): no empty "One question to think about" card, but Ask
+      // Ally stays, and the composer still docks where the question would be.
+      if (cards.reflectiveQuestion.trim().isEmpty)
+        if (replyThread != null)
+          KeyedSubtree(
+            key: _QuestionKeyScope.of(context),
+            child: Container(
+              key: const Key('debrief-ask-ally-no-question'),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.blue50),
+              ),
+              child: replyThread,
+            ),
+          )
+        else
+          const SizedBox.shrink()
+      else
+      KeyedSubtree(
+        key: _QuestionKeyScope.of(context),
+        child: _Card(
         key: const Key('debrief-card-reflective-question'),
         reading: readAloud.isBeingRead('reflective_question'),
         title: ref.t('$_k.reflectiveQuestion'),
@@ -740,6 +988,7 @@ class _ReadyCards extends ConsumerWidget {
           ?replyThread,
         ],
       ),
+      ),
       if (removed.isNotEmpty)
         Text(ref.t('$_k.corrections.removed'), key: const Key('debrief-removed-note'), style: _smallStyle),
       if (supervisor != null)
@@ -752,8 +1001,17 @@ class _ReadyCards extends ConsumerWidget {
           key: const Key('debrief-supervisor-helpful'),
           style: _smallStyle,
         )
-      else
+      else ...[
         _Helpful(controller: controller, helpful: view.helpful),
+        if (view.pulse != null) _Pulse(controller: controller, pulse: view.pulse!),
+      ],
+      // Progress contract §4: below the debrief, only when the card is due.
+      if (cards.progressCard case final progressCard? when !removed.contains('progress_card'))
+        DebriefProgressCardView(
+          card: progressCard,
+          reading: readAloud.isBeingRead('progress_card'),
+          controls: flag('progress_card', ref.t('$_k.progressCard.title', {'n': progressCard.sessions})),
+        ),
     ];
 
     return Column(
@@ -763,6 +1021,15 @@ class _ReadyCards extends ConsumerWidget {
       ],
     );
   }
+
+  /// [child] with a zero-height marker under it, so the marker's position
+  /// is the child's end without adding a gap; [child] alone when no [key].
+  static Widget _withMarker(GlobalKey? key, Widget child) => key == null
+      ? child
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [child, SizedBox(key: key, height: 0)],
+        );
 
   static Widget _skillWordIcon(DebriefSkillWord word) => switch (word) {
     DebriefSkillWord.strength => const Icon(Icons.star, size: 16, color: AppColors.success),
@@ -932,16 +1199,22 @@ class _SupportLines extends StatelessWidget {
 /// trigger warnings come first. Only for a roleplay the server says the
 /// learner can still open.
 class _PractiseLink extends ConsumerWidget {
-  const _PractiseLink({required this.scenario, this.primary = false});
+  const _PractiseLink({required this.scenario, this.primary = false, this.onOpen});
 
   final DebriefPracticeScenario scenario;
   final bool primary;
+
+  /// Called before the roleplay opens (the `practise_next_click` event).
+  final VoidCallback? onOpen;
 
   static const _k = 'postSim.debriefCards.practise';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    void open() => context.push('/simulations/${scenario.id}');
+    void open() {
+      onOpen?.call();
+      context.push('/simulations/${scenario.id}');
+    }
     final label = ref.t(primary ? '$_k.next' : '$_k.this');
     final button = primary
         ? FilledButton(
@@ -1511,6 +1784,415 @@ class _Helpful extends ConsumerWidget {
         choice(false, ref.t('$_k.no'), Icons.thumb_down_outlined),
         if (helpful != null) Semantics(liveRegion: true, child: Text(ref.t('$_k.thanks'), style: _smallStyle)),
       ],
+    );
+  }
+}
+
+/// PRD §6.12 "failed" and (phone only) "offline": the first request failed
+/// outright. Amber, never red; the debrief is safe, so say so, and offer
+/// Try again. Offline also retries by itself on reconnecting ([DebriefTab]).
+class _LoadProblem extends ConsumerWidget {
+  const _LoadProblem({required this.controller, required this.offline});
+
+  final LearnerDebriefController controller;
+  final bool offline;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final k = offline ? 'postSim.debriefCards.offline' : 'postSim.debriefCards.failed';
+    final retrying = controller.retrying;
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        key: Key(offline ? 'debrief-offline' : 'debrief-failed'),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _amberFill,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _amberBorder, width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(header: true, child: Text(ref.t('$k.title'), style: _leadStyle.copyWith(fontSize: 16))),
+            const SizedBox(height: 8),
+            Text(ref.t('$k.body'), style: _bodyStyle),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const Key('debrief-retry'),
+              onPressed: retrying ? null : controller.retry,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text(
+                ref.t(retrying ? 'postSim.debriefCards.failed.retrying' : 'postSim.debriefCards.failed.retry'),
+              ),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(44, 44),
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                textStyle: _leadStyle,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Plan §7.5 / §10.3 "taking longer + Check again": a person is finishing
+/// the debrief (no risk cue). Calm, not a failure; Check again asks now
+/// instead of waiting for the next slow poll.
+class _TakingLonger extends ConsumerWidget {
+  const _TakingLonger({required this.controller});
+
+  final LearnerDebriefController controller;
+
+  static const _k = 'postSim.debriefCards.takingLonger';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final checking = controller.retrying;
+    return Column(
+      key: const Key('debrief-taking-longer'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(liveRegion: true, child: Text(ref.t('$_k.body'), style: _bodyStyle)),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          key: const Key('debrief-check-again'),
+          onPressed: checking ? null : controller.retry,
+          icon: const Icon(Icons.refresh, size: 18),
+          label: Text(ref.t(checking ? '$_k.checking' : '$_k.checkAgain')),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(44, 44),
+            foregroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+            textStyle: _leadStyle,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "How Ally writes your debrief" (PRD §6.3, §6.12; plan §7.5): an ⓘ beside
+/// "Written by Ally (AI)" in the header that opens a static sheet — Ally checks and revises its own draft,
+/// quotes are checked, it can still be wrong, and supervisors can read debriefs.
+class _ExplainerLink extends ConsumerWidget {
+  const _ExplainerLink();
+
+  static const _k = 'postSim.debriefCards.explainer';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final label = ref.t('$_k.link');
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: IconButton(
+        key: const Key('debrief-explainer-link'),
+        tooltip: label,
+        onPressed: () => showDebriefExplainer(context),
+        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+        padding: EdgeInsets.zero,
+        icon: const Icon(Icons.info_outline, size: 20, color: Colors.white),
+      ),
+    );
+  }
+}
+
+/// Opens the explainer as a bottom sheet.
+Future<void> showDebriefExplainer(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    builder: (_) => const _ExplainerSheet(),
+  );
+}
+
+class _ExplainerSheet extends ConsumerWidget {
+  const _ExplainerSheet();
+
+  static const _k = 'postSim.debriefCards.explainer';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        key: const Key('debrief-explainer'),
+        padding: const EdgeInsets.fromLTRB(20, 8, 8, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    header: true,
+                    child: Text(ref.t('$_k.title'), style: _leadStyle.copyWith(fontSize: 16)),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('debrief-explainer-close'),
+                  tooltip: ref.t('$_k.close'),
+                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: AppColors.highEmphasis),
+                ),
+              ],
+            ),
+            for (final key in const ['how', 'quotes', 'wrong', 'supervisor']) ...[
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                // Indic scripts need the taller line (plan §7.7: ≥ 1.6).
+                child: Text(ref.t('$_k.$key'), style: _bodyStyle.copyWith(height: 1.6)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The post-launch pulse (PRD §9): on a debrief the server picked, two
+/// yes/no questions under "Was this helpful?"; answering again changes it.
+class _Pulse extends ConsumerWidget {
+  const _Pulse({required this.controller, required this.pulse});
+
+  final LearnerDebriefController controller;
+  final DebriefPulse pulse;
+
+  static const _k = 'postSim.debriefCards.pulse';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    Widget choice(DebriefPulseQuestion question, bool value) {
+      final pressed = pulse.answerTo(question) == value;
+      return Semantics(
+        toggled: pressed,
+        child: OutlinedButton(
+          key: Key('debrief-pulse-${question.wire}-${value ? 'yes' : 'no'}'),
+          onPressed: controller.pulseSending ? null : () => controller.answerPulse(question, value),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(64, 44),
+            foregroundColor: AppColors.highEmphasis,
+            backgroundColor: Colors.white,
+            side: BorderSide(color: pressed ? AppColors.primary : AppColors.blue100, width: pressed ? 2 : 1),
+            textStyle: pressed ? _leadStyle : _bodyStyle,
+          ),
+          child: Text(ref.t(value ? '$_k.yes' : '$_k.no')),
+        ),
+      );
+    }
+
+    final answered = DebriefPulseQuestion.values.every((q) => pulse.answerTo(q) != null);
+    return Container(
+      key: const Key('debrief-pulse'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.blue50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.blue100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(ref.t('$_k.intro'), style: _bodyStyle),
+          for (final question in DebriefPulseQuestion.values) ...[
+            const SizedBox(height: 12),
+            Text(ref.t('$_k.${question.wire}'), style: _leadStyle),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [choice(question, true), choice(question, false)]),
+          ],
+          if (answered) ...[
+            const SizedBox(height: 8),
+            Semantics(liveRegion: true, child: Text(ref.t('$_k.thanks'), style: _smallStyle)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// "Your last {n} sessions" (progress contract §4; web `DebriefProgressCard`):
+/// how the learner's skills have moved over their recent sessions, below the
+/// debrief. Collapsed it shows the one focus (or the first skill's line when
+/// there is no focus); "Show more" opens every skill with its trend word.
+/// Trend words always carry text and an icon, never colour alone.
+class DebriefProgressCardView extends ConsumerStatefulWidget {
+  const DebriefProgressCardView({super.key, required this.card, this.controls, this.reading = false});
+
+  final DebriefProgressCard card;
+
+  /// Listen and "This isn't right" for the learner (the flag, for a
+  /// supervisor), under the card.
+  final Widget? controls;
+
+  /// Read-aloud is reading this card.
+  final bool reading;
+
+  @override
+  ConsumerState<DebriefProgressCardView> createState() => _DebriefProgressCardViewState();
+}
+
+class _DebriefProgressCardViewState extends ConsumerState<DebriefProgressCardView> {
+  static const _k = 'postSim.debriefCards.progressCard';
+  bool _open = false;
+
+  /// The skill's name in the app's language, else the key made readable
+  /// (`open_questions` → "Open questions").
+  String _skillName(String key) {
+    final path = '$_k.skills.$key';
+    final name = RegExp(r'^[A-Za-z][A-Za-z_]*$').hasMatch(key) ? ref.t(path) : path;
+    if (name != path) return name;
+    final words = key.replaceAll(RegExp(r'[_-]+'), ' ').trim().toLowerCase();
+    return words.isEmpty ? key : words[0].toUpperCase() + words.substring(1);
+  }
+
+  static (IconData, Color, Color) _trendStyle(DebriefProgressTrend trend) => switch (trend) {
+    DebriefProgressTrend.moreConsistent => (Icons.trending_up, AppColors.blue50, AppColors.primary),
+    DebriefProgressTrend.aboutTheSame => (Icons.arrow_forward, AppColors.grey100, AppColors.mediumEmphasis),
+    DebriefProgressTrend.worthAnotherLook => (Icons.visibility_outlined, _amberFill, _amberStrong),
+    DebriefProgressTrend.tooEarly => (Icons.more_horiz, _amberFill, _amberStrong),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final card = widget.card;
+    final focus = card.focus;
+    final (heading, line) = focus != null
+        ? ('${ref.t('$_k.focus')}: ${_skillName(focus.skill)}', focus.line)
+        : (null, card.skills.first.line);
+    return _ReadingRing(
+      reading: widget.reading,
+      child: Container(
+      key: const Key('debrief-card-progress'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.blue50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.blue100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            header: true,
+            child: Row(
+              children: [
+                Icon(Icons.trending_up, size: 20, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(ref.t('$_k.title', {'n': card.sessions}), style: _leadStyle.copyWith(fontSize: 16)),
+                ),
+              ],
+            ),
+          ),
+          // With no focus, the first skill's line is the preview; open, it
+          // is in the list below instead.
+          if (heading != null || !_open) ...[
+            const SizedBox(height: 12),
+            Column(
+              key: Key(heading != null ? 'debrief-progress-focus' : 'debrief-progress-preview'),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (heading != null) ...[_Lead(heading), const SizedBox(height: 4)],
+                _Body(line),
+              ],
+            ),
+          ],
+          if (_open)
+            for (final entry in card.skills) ...[
+              const SizedBox(height: 12),
+              _progressSkill(entry),
+            ],
+          if (card.skills.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              // One node: a button that says whether it is expanded.
+              child: MergeSemantics(
+                child: Semantics(
+                expanded: _open,
+                child: TextButton(
+                  key: const Key('debrief-progress-toggle'),
+                  onPressed: () => setState(() => _open = !_open),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: AppColors.primary,
+                    textStyle: _leadStyle,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(ref.t(_open ? '$_k.showLess' : '$_k.showMore')),
+                      const SizedBox(width: 4),
+                      Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18),
+                    ],
+                  ),
+                ),
+                ),
+              ),
+            ),
+          ],
+          if (widget.controls != null) ...[const SizedBox(height: 4), widget.controls!],
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _progressSkill(DebriefProgressSkill entry) {
+    final (icon, fill, ink) = _trendStyle(entry.trend);
+    return Container(
+      key: ValueKey('debrief-progress-skill-${entry.skill}'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.blue100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(_skillName(entry.skill), style: _leadStyle),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(999)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 14, color: ink),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        ref.t('$_k.trends.${entry.trend.wire}'),
+                        style: _smallStyle.copyWith(color: ink),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _Body(entry.line),
+        ],
+      ),
     );
   }
 }

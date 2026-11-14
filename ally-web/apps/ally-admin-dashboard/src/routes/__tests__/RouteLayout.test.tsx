@@ -69,6 +69,10 @@ vi.mock("@pages", () => ({
   TooltipManagement: () => <div>TooltipManagementPage</div>,
   AgentTestCases: () => <div>AgentTestCasesPage</div>,
   DebriefConsole: () => <div>DebriefConsolePage</div>,
+  DebriefSessionPage: () => <div>DebriefSessionPage</div>,
+  AgentLogsPage: () => <div>AgentLogsPage</div>,
+  PmAgentPage: () => <div>PmAgentPage</div>,
+  DebriefSettingsPage: () => <div>DebriefSettingsPage</div>,
   Competencies: () => <div>CompetenciesPage</div>,
   RoleplaySessionLogs: () => <div>RoleplaySessionLogsPage</div>,
   RoleplaySessionLogDetail: () => <div>RoleplaySessionLogDetailPage</div>,
@@ -76,7 +80,6 @@ vi.mock("@pages", () => ({
   Logs: () => <div>LogsPage</div>,
   MobileReleases: () => <div>MobileReleasesPage</div>,
   WhatsAppBot: () => <div>WhatsAppBotPage</div>,
-  ChatbotPage: () => <div>ChatbotPage</div>,
   Terms: () => <div>TermsPage</div>,
   Privacy: () => <div>PrivacyPage</div>,
   AILab: () => <div>AILabPage</div>,
@@ -99,9 +102,26 @@ vi.mock("@pages", () => ({
   CourseCopilotSession: () => <div>CourseCopilotSessionPage</div>,
 }));
 
+// The assistant home (chunk 20d) stands in for its real page, which needs the store.
+vi.mock("../../pages/AssistantHome", () => ({
+  AssistantHome: () => <div>AssistantHomePage</div>,
+}));
 describe("RouteLayout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("opens an assistant on its home, and an old ?view=classic link on the home too", () => {
+    for (const path of [
+      "/chatbots/bot-1",
+      "/chatbots/bot-1?view=classic",
+      "/chatbots/bot-1?view=classic&tab=usage",
+    ]) {
+      window.history.pushState({}, "", path);
+      const { unmount } = render(<RouteLayout />);
+      expect(screen.getByText("AssistantHomePage")).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it("renders Login route", () => {
@@ -202,6 +222,27 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.COURSE_COPILOT_SESSION("abc-123"));
     render(<RouteLayout />);
     expect(screen.getByText("CourseCopilotSessionPage")).toBeInTheDocument();
+  });
+
+  it("renders a run's Agent logs at /debriefs/sessions/:runId/logs, not the session route", () => {
+    window.history.pushState({}, "", ROUTES.DEBRIEF_SESSION_LOGS("r1"));
+    render(<RouteLayout />);
+    expect(screen.getByText("AgentLogsPage")).toBeInTheDocument();
+    expect(screen.queryByText("DebriefSessionPage")).not.toBeInTheDocument();
+  });
+
+  // CONSOLE_API "Roles": the Analytics toggle or the clinical advisor's toggle opens the console,
+  // as ally-be's DebriefRead allows; an advisor has only the second.
+  it("opens the Debrief console with the Analytics or the clinical-advisor toggle", () => {
+    for (const path of [ROUTES.DEBRIEFS, ROUTES.DEBRIEF_SESSION("r1")]) {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", path);
+      render(<RouteLayout />);
+      expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toEqual([
+        FeatureToggleKey.ANALYTICS,
+        FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
+      ]);
+    }
   });
 
   describe("Ally Console route", () => {

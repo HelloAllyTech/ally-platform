@@ -1,0 +1,228 @@
+/*
+ * Agents v2 design tokens (docs/agents-v2/DESIGN.md §2–3). Scoped to two classes so the old
+ * dashboard never sees them: `.ally-v2` (Ally's own screens: onboarding, assistant home, Look and
+ * feel) and `.brand-surface` (visitor screens: the bot page, later the landing page). Nothing is set
+ * on :root. Plain CSS with no Tailwind, so the bot page can use it without compiling the app's
+ * Tailwind.
+ */
+
+.ally-v2,
+.brand-surface {
+  --ally-font-display: "Instrument Serif", Georgia, serif;
+  --ally-font-ui:
+    "Geist", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Devanagari", sans-serif;
+  --ally-font-label: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ally-font-friendly: "Nunito", "Geist", system-ui, sans-serif;
+  --ally-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ally-radius-sm: 12px;
+  --ally-radius-md: 16px;
+  --ally-radius-lg: 20px;
+  --ally-radius-xl: 32px;
+  --ally-shadow-hover: 0 10px 30px rgba(23, 23, 28, 0.08);
+  --ally-shadow-float: 0 12px 30px rgba(0, 0, 0, 0.2);
+  --ally-shadow-phone: 0 30px 60px rgba(23, 23, 28, 0.18);
+}
+
+.ally-v2 {
+  --ally-bg: #f6f5f1;
+  --ally-surface: #ffffff;
+  --ally-surface-2: #fbfaf7;
+  --ally-sunken: #eceae4;
+  --ally-line: #e4e2dc;
+  --ally-line-strong: #dad8d1;
+  --ally-ink: #17171c;
+  --ally-ink-2: #3c3b42;
+  --ally-muted: #5f5e66;
+  --ally-faint: #6b6a72;
+  --ally-accent: #3b3bd9;
+  --ally-accent-soft: rgba(59, 59, 217, 0.08);
+  --ally-on-accent: #ffffff;
+  --ally-good: #1f6b47;
+  --ally-good-bg: #e8f5ee;
+  --ally-warn: #9a3412;
+  --ally-warn-bg: #fdf0e7;
+  --ally-info: #2a2aa8;
+  --ally-info-bg: #ececfd;
+  --ally-danger: #a33a1f;
+  font-family: var(--ally-font-ui);
+  color: var(--ally-ink);
+  background: var(--ally-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Visitor surfaces map the same component variables onto the bot's brand, so `v2/core`
+ * components draw in the owner's colours there. `--brand-accent` and `--brand-on-accent` are set
+ * inline from the bot's (contrast-corrected) colour; the rest follow the theme.
+ */
+.brand-surface {
+  --brand-accent: #3b3bd9;
+  --brand-on-accent: #ffffff;
+  --brand-accent-soft: color-mix(in srgb, var(--brand-accent) 8%, transparent);
+  --brand-bg: #fbfaf7;
+  --brand-surface: #ffffff;
+  --brand-ink: #17171c;
+  --brand-muted: #5f5e66;
+  --brand-line: #e6e3dc;
+  --brand-heading: var(--ally-font-display);
+  --ally-bg: var(--brand-bg);
+  --ally-surface: var(--brand-surface);
+  --ally-surface-2: var(--brand-bg);
+  --ally-sunken: color-mix(in srgb, var(--brand-ink) 6%, var(--brand-surface));
+  --ally-line: var(--brand-line);
+  --ally-line-strong: color-mix(in srgb, var(--brand-ink) 16%, var(--brand-surface));
+  --ally-ink: var(--brand-ink);
+  --ally-ink-2: var(--brand-ink);
+  --ally-muted: var(--brand-muted);
+  --ally-faint: var(--brand-muted);
+  --ally-accent: var(--brand-accent);
+  --ally-accent-soft: var(--brand-accent-soft);
+  --ally-on-accent: var(--brand-on-accent);
+  --ally-danger: #a33a1f;
+  font-family: var(--ally-font-ui);
+  color: var(--brand-ink);
+  background: var(--brand-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.brand-surface[data-heading="modern"] {
+  --brand-heading: var(--ally-font-ui);
+}
+.brand-surface[data-heading="friendly"] {
+  --brand-heading: var(--ally-font-friendly);
+}
+
+.brand-surface[data-theme="dark"] {
+  --brand-bg: #111114;
+  --brand-surface: #1c1c21;
+  --brand-ink: #f4f3ef;
+  --brand-muted: #a3a2aa;
+  --brand-line: #2c2c33;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  .brand-surface[data-theme="auto"] {
+    --brand-bg: #111114;
+    --brand-surface: #1c1c21;
+    --brand-ink: #f4f3ef;
+    --brand-muted: #a3a2aa;
+    --brand-line: #2c2c33;
+    color-scheme: dark;
+  }
+}
+
+/* Hindi text uses Noto Sans Devanagari (Geist has no Devanagari). Its @font-face carries a
+   Devanagari unicode-range, so the browser only downloads it when such text is on screen. */
+.ally-v2 :lang(hi),
+.brand-surface :lang(hi),
+.brand-surface:lang(hi) {
+  font-family: "Noto Sans Devanagari", var(--ally-font-ui);
+}
+
+/* ── Motion (DESIGN.md §3) ─────────────────────────────────────────────── */
+
+@keyframes ally-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ally-slide {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ally-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes ally-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--ally-accent-soft);
+  }
+  50% {
+    transform: scale(1.07);
+    box-shadow: 0 0 18px 4px var(--ally-accent-soft);
+  }
+}
+@keyframes ally-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ally-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ally-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.ally-rise {
+  animation: ally-rise 550ms var(--ally-ease) both;
+  animation-delay: calc(var(--ally-i, 0) * 60ms);
+}
+.ally-slide {
+  animation: ally-slide 450ms var(--ally-ease) both;
+}
+.ally-pop {
+  animation: ally-pop 400ms var(--ally-ease) both;
+}
+.ally-breathe {
+  animation: ally-breathe 3.2s ease-in-out infinite;
+}
+.ally-breathe[data-working="true"] {
+  animation-duration: 1.4s;
+}
+.ally-press {
+  transition: transform 120ms var(--ally-ease);
+}
+.ally-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Reduced motion: every animation becomes an instant opacity change, and loops stop. */
+@media (prefers-reduced-motion: reduce) {
+  .ally-rise,
+  .ally-slide,
+  .ally-pop {
+    animation: ally-fade 1ms linear both;
+    animation-delay: 0ms;
+  }
+  .ally-breathe,
+  .ally-breathe[data-working="true"] {
+    animation: none;
+  }
+  .ally-press:active:not(:disabled) {
+    transform: none;
+  }
+  .ally-v2 *,
+  .brand-surface * {
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

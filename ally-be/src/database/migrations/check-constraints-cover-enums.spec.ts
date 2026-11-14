@@ -4,10 +4,33 @@ import {
   DebriefFeedbackStatus,
   DebriefFlagReason,
   DebriefRunArm,
+  DebriefRunLogKind,
   DebriefRunMode,
   DebriefRunStatus,
 } from '../../debrief/enum/debrief-run.enum';
+import {
+  DebriefCommentAnchor,
+  DebriefCommentStatus,
+  DebriefCommentTag,
+  DebriefReviewVerdict,
+  DebriefAgreementMeasure,
+} from '../../debrief/enum/debrief-review.enum';
 import { join } from 'path';
+import {
+  ConversationChannel,
+  ConversationMessageRole,
+  ConversationStatus,
+} from '../../chatbot/enum/conversation.enum';
+import {
+  BotPageAccess,
+  BotPageAccessKind,
+  BotPageStatus,
+} from '../../chatbot/enum/bot-page.enum';
+import {
+  BotDraftStatus,
+  BotDraftStep,
+  SafetyPackId,
+} from '../../bot-draft/enum/bot-draft.enum';
 import {
   ClBulkUploadStatus,
   ClChunkConfidence,
@@ -40,9 +63,16 @@ import {
   BuilderPrFeedbackStatus,
   BuilderRunMode,
   BuilderRunStatus,
+  BuilderSessionKind,
   BuilderSessionStatus,
+  BuilderSessionVisibility,
   BuilderStage,
 } from '../../builder/enum/builder.enum';
+import {
+  PlanEventKind,
+  PlanNotificationKind,
+  PlanStage,
+} from '../../product-planning/enum/product-planning.enum';
 import {
   CourseCopilotEventType,
   CourseCopilotJobKind,
@@ -258,6 +288,16 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_cl_rollout_steps_status', Object.values(ClRolloutStatus)],
     ['CHK_builder_sessions_status', Object.values(BuilderSessionStatus)],
     ['CHK_builder_sessions_stage', Object.values(BuilderStage)],
+    ['CHK_builder_sessions_kind', Object.values(BuilderSessionKind)],
+    [
+      'CHK_builder_sessions_visibility',
+      Object.values(BuilderSessionVisibility),
+    ],
+    ['CHK_plan_events_kind', Object.values(PlanEventKind)],
+    ['CHK_plan_spend_entries_stage', Object.values(PlanStage)],
+    ['CHK_builder_sessions_plan_stage', Object.values(PlanStage)],
+    ['CHK_roadmap_opportunities_plan_stage', Object.values(PlanStage)],
+    ['CHK_plan_notifications_kind', Object.values(PlanNotificationKind)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],
     ['CHK_builder_build_runs_status', Object.values(BuilderRunStatus)],
     ['CHK_builder_build_runs_mode', Object.values(BuilderRunMode)],
@@ -366,8 +406,20 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_debrief_runs_status', Object.values(DebriefRunStatus)],
     ['CHK_debrief_runs_arm', Object.values(DebriefRunArm)],
     ['CHK_debrief_run_feedback_kind', Object.values(DebriefFeedbackKind)],
+    ['CHK_debrief_run_logs_kind', Object.values(DebriefRunLogKind)],
     ['CHK_debrief_run_feedback_reason', Object.values(DebriefFlagReason)],
     ['CHK_debrief_run_feedback_status', Object.values(DebriefFeedbackStatus)],
+    ['CHK_debrief_reviews_verdict', Object.values(DebriefReviewVerdict)],
+    [
+      'CHK_debrief_review_comments_anchor_kind',
+      Object.values(DebriefCommentAnchor),
+    ],
+    ['CHK_debrief_review_comments_tag', Object.values(DebriefCommentTag)],
+    ['CHK_debrief_review_comments_status', Object.values(DebriefCommentStatus)],
+    [
+      'CHK_debrief_review_answers_measure',
+      Object.values(DebriefAgreementMeasure),
+    ],
     ['CHK_agent_release_audit_action', Object.values(AgentReleaseAuditAction)],
     [
       'CHK_agent_release_audit_actor_kind',
@@ -416,6 +468,24 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_guide_appointments_purpose', Object.values(GuideAppointmentPurpose)],
     ['CHK_guide_crisis_responses_scope', Object.values(GuideCrisisScope)],
     ['CHK_track_enrollments_entry_source', Object.values(TrackEntrySource)],
+    // The shared conversation store (Agents v2, chunk 12).
+    [
+      'CHK_chatbot_contact_identities_channel',
+      Object.values(ConversationChannel),
+    ],
+    ['CHK_chatbot_conversations_channel', Object.values(ConversationChannel)],
+    ['CHK_chatbot_conversations_status', Object.values(ConversationStatus)],
+    ['CHK_chatbot_messages_channel', Object.values(ConversationChannel)],
+    ['CHK_chatbot_messages_role', Object.values(ConversationMessageRole)],
+    // The bot page (Agents v2, chunk 12b).
+    ['CHK_chatbot_pages_status', Object.values(BotPageStatus)],
+    ['CHK_chatbot_pages_access', Object.values(BotPageAccess)],
+    ['CHK_chatbot_page_access_kind', Object.values(BotPageAccessKind)],
+    // Agent-first onboarding (Agents v2, chunk 20a).
+    ['CHK_bot_drafts_status', Object.values(BotDraftStatus)],
+    ['CHK_bot_drafts_step', Object.values(BotDraftStep)],
+    ['CHK_bot_drafts_safety_pack', Object.values(SafetyPackId)],
+    ['CHK_chatbots_safety_pack', Object.values(SafetyPackId)],
   ])('%s accepts every enum value', (constraint, values) => {
     const allowed = allowedValues(constraint as string);
     const missing = (values as string[]).filter((v) => !allowed.includes(v));

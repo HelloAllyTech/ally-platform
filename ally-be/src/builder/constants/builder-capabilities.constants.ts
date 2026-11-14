@@ -362,12 +362,12 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   },
   {
     id: 'debrief-agent',
-    name: 'Debrief agent and its Improver (admin Debriefs)',
+    name: 'Debrief agent and its PM agent (admin Debriefs)',
     whatItIs:
       'Writes the debrief a learner reads after a roleplay by following a recipe of steps ' +
       '(Safety reader, Analyst, Progress reader, Guidance lookup, Writer, rule checks, Evaluator, ' +
       'Reviser) under a budget and deadline, with a fallback ladder; runs in shadow beside ' +
-      "today's debrief and live for organisations switched on. The Improver reads aggregate " +
+      "today's debrief and live for organisations switched on. The PM agent reads aggregate " +
       'signals daily, proposes prompt and setting changes, tries them on test sets built from ' +
       'real sessions, and a person approves each new release. Runs on the agent harness ' +
       '(agentKey debrief).',
@@ -384,6 +384,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'debrief',
       'feedback after roleplay',
       'post-session feedback',
+      'pm agent',
       'improver',
       'risk cue',
       'important moment',
@@ -595,10 +596,16 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     name: 'Product roadmap, votes and the opportunity copilot',
     whatItIs:
       'Roadmap opportunities with votes, the copilot that interviews someone into a filed ' +
-      'opportunity, and the hand-off that opens a Builder session from one.',
+      'opportunity, the hand-off that opens a Builder session from one, and the plan ' +
+      'foundations (who may plan, the plan event log and the plan spend ledger).',
     reuseWhen:
-      'A request concerns filing, prioritising or voting on product work.',
-    modules: ['ally-be:src/product-roadmap', 'ally-be:src/public-roadmap'],
+      'A request concerns filing, prioritising or voting on product work, or planning an ' +
+      'idea through PRD, design and outcome.',
+    modules: [
+      'ally-be:src/product-roadmap',
+      'ally-be:src/public-roadmap',
+      'ally-be:src/product-planning',
+    ],
     adminRoute: '/product-roadmap',
     keywords: [
       'roadmap',
@@ -639,6 +646,29 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'faq bot',
       'messaging',
       'connector',
+    ],
+  },
+  {
+    id: 'assistant-onboarding',
+    name: 'New assistant setup (onboarding)',
+    whatItIs:
+      'A guided setup that reads a business website or documents, shows what it learned with ' +
+      'sources, turns on a safety pack, asks only about gaps, offers designs, builds the assistant ' +
+      'and publishes its bot page. A builder in ally-ai proposes changes; the draft service applies them.',
+    reuseWhen:
+      'A request wants to create an assistant from a website, or a guided, step-by-step way for a ' +
+      'business owner to set one up.',
+    extendVia:
+      'The draft step machine and BotDraftService (later steps are added, not forked).',
+    modules: ['ally-be:src/bot-draft', 'ally-ai:app/core/builder'],
+    adminRoute: '/chatbots/new',
+    keywords: [
+      'onboarding',
+      'new assistant',
+      'setup',
+      'website',
+      'crawl',
+      'safety pack',
     ],
   },
   {

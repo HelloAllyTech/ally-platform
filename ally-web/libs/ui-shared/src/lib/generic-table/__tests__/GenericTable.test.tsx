@@ -11,6 +11,8 @@ vi.mock("../FilterPopover", () => ({
     <div>
       <button onClick={() => props.onSelectSingle(props.column?.key, "v1")}>select-single</button>
       <button onClick={props.onSaveMultiSelect}>save-multi</button>
+      <span data-testid="search-text-value">{props.searchText}</span>
+      <span data-testid="text-value">{props.textValue}</span>
     </div>
   ),
 }));
@@ -144,17 +146,75 @@ describe("GenericTable", () => {
     fireEvent.click(screen.getByRole("button", { name: /filter/i }));
 
     // "Call Name" should now appear both as the table header and as an
-    // entry in the add-filter column picker.
+    // entry in the add-filter column picker — the picker's entry renders
+    // first in document order, so it's entries[0], not entries[length - 1]
+    // (that's the header label, a different click path entirely).
     const callNameEntries = screen.getAllByText("Call Name");
     expect(callNameEntries.length).toBeGreaterThan(1);
 
-    fireEvent.click(callNameEntries[callNameEntries.length - 1]);
+    fireEvent.click(callNameEntries[0]);
     const singleButtons = screen.getAllByText("select-single");
     fireEvent.click(singleButtons[singleButtons.length - 1]);
 
     expect(onFilterChange).toHaveBeenCalledWith(
       expect.objectContaining({ filter: [{ key: "callName", value: "v1" }] }),
     );
+  });
+
+  it("scrolls the add-filter column list internally instead of the whole page, when there are many filterable columns", () => {
+    // A table with many filterable columns (e.g. custom fields) had no
+    // scroll container here at all — the list just grew past the viewport,
+    // so scrolling it scrolled the whole page behind it along with it.
+    const columns = Array.from({ length: 30 }, (_, i) => ({
+      key: `col${i}`,
+      header: `Column ${i}`,
+      filterable: true,
+      filterType: "text",
+    }));
+    render(<GenericTable columns={columns as any} data={[]} showSelectedFilters />);
+
+    fireEvent.click(screen.getByRole("button", { name: /filter/i }));
+
+    const firstEntry = screen.getAllByText("Column 0")[0];
+    const scrollContainer = firstEntry.closest("div.overflow-y-auto");
+    expect(scrollContainer).toHaveClass("max-h-[300px]");
+  });
+
+  it("prefills the TEXT filter's own value box with the already-applied value when reopened", () => {
+    // TEXT has its own dedicated draft (not the option-list search box).
+    // Reopening the popover used to always blank it out, so re-applying
+    // without retyping silently cleared the filter that was already active.
+    const columns = [
+      { key: "callName", header: "Call Name", filterable: true, filterType: "text" },
+    ];
+    render(
+      <GenericTable
+        columns={columns as any}
+        data={[{ callName: "" }]}
+        showSelectedFilters
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /filter/i }));
+    // The picker's entry renders first in document order — entries[0], not
+    // entries[length - 1] (the header label, a different click path).
+    const callNameEntries = screen.getAllByText("Call Name");
+    fireEvent.click(callNameEntries[0]);
+    const singleButtons = screen.getAllByText("select-single");
+    fireEvent.click(singleButtons[singleButtons.length - 1]);
+
+    // Reopen the same column's filter popover via the header (a separate
+    // entry point from the "+ Filter" chip used above, sharing the same
+    // underlying state/handlers owned by GenericTable).
+    const headerCell = screen
+      .getAllByText("Call Name")
+      .map(el => el.closest("th"))
+      .find((th): th is HTMLElement => th !== null) as HTMLElement;
+    fireEvent.click(within(headerCell).getByText("Call Name"));
+    const filterButtons = screen.getAllByText("Filter");
+    fireEvent.click(filterButtons[filterButtons.length - 1]);
+
+    expect(screen.getAllByTestId("text-value").pop()).toHaveTextContent("v1");
   });
 
   it("renders Load More and calls handler when not loading", () => {

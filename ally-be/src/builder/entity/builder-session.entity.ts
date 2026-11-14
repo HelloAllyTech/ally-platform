@@ -6,7 +6,13 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
-import { BuilderSessionStatus, BuilderStage } from '../enum/builder.enum';
+import type { PlanRecord } from 'src/product-planning/type/plan-record.type';
+import {
+  BuilderSessionKind,
+  BuilderSessionStatus,
+  BuilderSessionVisibility,
+  BuilderStage,
+} from '../enum/builder.enum';
 
 /**
  * One Builder session: a PRD interview that (once the PRD is ready) becomes
@@ -30,6 +36,12 @@ import { BuilderSessionStatus, BuilderStage } from '../enum/builder.enum';
 })
 @Index('idx_builder_sessions_archived_at', ['archivedAt'], {
   where: '"deletedAt" IS NULL',
+})
+@Index('idx_builder_sessions_private_author', ['createdBy', 'updatedAt'], {
+  where: `"visibility" = 'private' AND "deletedAt" IS NULL`,
+})
+@Index('idx_builder_sessions_lead', ['leadUserId'], {
+  where: '"leadUserId" IS NOT NULL AND "deletedAt" IS NULL',
 })
 export class BuilderSession extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -144,6 +156,20 @@ export class BuilderSession extends BaseWithoutTenantEntity {
   handoffContext?: string | null;
 
   /**
+   * Who the session was requested for, when not a person: today only `debrief_pm_agent`
+   * ("Hand to Builder" on a Debrief PM agent idea, plan §11.5). Builder knows nothing
+   * about the requester beyond this name: it tells the registered requester when an
+   * interview turn ends (`builderRequesters`), and the UI shows a small marker. Null for a
+   * session a person started.
+   */
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  requestedBy?: string | null;
+
+  /** The requester's own id for the work (the PM agent's idea id). Opaque to Builder. */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  requestRef?: string | null;
+
+  /**
    * Set when someone archives the session. Null = active. Sessions are shared,
    * so archiving hides it from every Builder user's default feed view — it does not touch status, and never cascades to the PRD,
    * transcript, runs, events, PRs or reports underneath it.
@@ -151,6 +177,56 @@ export class BuilderSession extends BaseWithoutTenantEntity {
   @Column({ type: 'timestamp', nullable: true })
   archivedAt?: Date | null;
 
+  /** See BuilderSessionKind. Every pre-existing row is BUILD. */
+  @Column({
+    type: 'varchar',
+    length: 16,
+    enum: BuilderSessionKind,
+    default: BuilderSessionKind.BUILD,
+  })
+  kind!: BuilderSessionKind;
+
+  /**
+   * See BuilderSessionVisibility. Every pre-existing row is SHARED, and every
+   * query a Builder surface runs keeps PRIVATE rows out; the plan's own
+   * surfaces show them to their author only.
+   */
+  @Column({
+    type: 'varchar',
+    length: 16,
+    enum: BuilderSessionVisibility,
+    default: BuilderSessionVisibility.SHARED,
+  })
+  visibility!: BuilderSessionVisibility;
+
+  /**
+   * The plan's current lead: who is working it now, one at a time, null while
+   * nobody has taken it on. NOT the creator — `createdBy` is the author and
+   * never changes. No FK, like createdBy. Unused by BUILD sessions.
+   */
+  @Column({ type: 'int', nullable: true })
+  leadUserId?: number | null;
+
+  /**
+   * The plan's own record (PlanRecord): idea-stage verdicts, impact tags,
+   * success measure, closure, launch and review state. Its own column, not
+   * `metadata`, which the interview-summary writer replaces wholesale.
+   * `select: false`: lists return whole rows and never need it.
+   */
+  @Column({ type: 'jsonb', nullable: true, select: false })
+  plan?: PlanRecord | null;
+
+  /**
+   * Where the plan is, derived by code (derivePlanStage) and written only by
+   * PlanStageService. Null for BUILD sessions. Mirrored onto the opportunity.
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  planStage?: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  planStageAt?: Date | null;
+
+  /** The author: who started the session. Immutable. */
   @Column({ type: 'int' })
   createdBy!: number;
 

@@ -99,9 +99,9 @@ export type KnowledgeCorpus = 'whatsapp_qa';
 
 // ── Answering agent ─────────────────────────────────────────────────────────
 
-export type KnowledgeAnswerIntent = 'answer' | 'decline' | 'clarify';
+type KnowledgeAnswerIntent = 'answer' | 'decline' | 'clarify';
 
-export type KnowledgeDeclineReason =
+type KnowledgeDeclineReason =
   | 'none'
   | 'no_hits'
   | 'below_threshold'
@@ -195,10 +195,20 @@ export interface AgentRunResponse extends KnowledgeAnswerResponse {
   turn_type?: AgentTurnType;
 }
 
-export interface KnowledgePersonaRequest {
+interface KnowledgePersonaRequest {
   display_name?: string;
   system_prompt?: string;
   tone?: string;
+  /** The safety pack's rules block (chunk 20a); ally-ai renders it after the instructions. */
+  safety_rules?: string;
+  /** The pack's id; ally-ai enforces a health pack's Never rules in its check too. */
+  safety_pack?: string;
+  /** Topics the owner asked it not to talk about (chunk 20a-2). */
+  avoid_topics?: string[];
+  /** What it's for (chunk 20a-2); ally-ai adds the purpose's section before the safety rules. */
+  purpose?: string;
+  /** "Something else": the owner's own description. */
+  purpose_note?: string;
 }
 
 export interface KnowledgeCitation {
@@ -269,7 +279,7 @@ export interface CrisisCheckResponse {
 }
 
 /** What a streamed run is doing now (ally-ai `trace.STATUS_LABELS`). */
-export type AgentStatusCode =
+type AgentStatusCode =
   | 'thinking'
   | 'searching'
   | 'found'

@@ -15,6 +15,7 @@ import {
 } from '../entity/prompt-version.entity';
 import { PromptTranslation } from '../entity/prompt-translation.entity';
 import { PromptTranslationService } from './prompt-translation.service';
+import { emitPromptPublished } from '../util/prompt-published.events';
 import { PromptSharedService } from './prompt-shared.service';
 import { TRANSLATABLE_PROMPT_TYPES } from '../constants/prompt.constants';
 import {
@@ -325,7 +326,40 @@ export class PromptVersioningService {
     });
     // This process serves the new version at once; others within the cache TTL.
     this.promptShared.invalidate();
+    if (result.previousVersion !== result.version) {
+      // Subscribers (the Debrief agent's releases) hear about it after the
+      // commit; they never fail or slow the publish.
+      void this.announcePublished(promptId, result).catch(() => undefined);
+    }
     return result;
+  }
+
+  private async announcePublished(
+    promptId: string,
+    result: { version: number; previousVersion: number | null },
+  ): Promise<void> {
+    const [row] = await this.dataSource.query(
+      `SELECT p."promptCode", pv."createdBy", pv.source, pv.note
+         FROM prompts p JOIN prompts_versions pv ON pv."promptId" = p.id
+        WHERE p.id = $1 AND pv.version = $2`,
+      [promptId, result.version],
+    );
+    if (!row) return;
+    await emitPromptPublished(
+      {
+        promptId,
+        promptCode: row.promptCode,
+        version: result.version,
+        previousVersion: result.previousVersion,
+        createdBy: row.createdBy != null ? Number(row.createdBy) : null,
+        source: row.source ?? null,
+        note: row.note ?? null,
+      },
+      (err) =>
+        this.logger.warn(
+          `[SKILLS_STORE] a publish listener failed for ${row.promptCode}: ${err.message}`,
+        ),
+    );
   }
 
   /**

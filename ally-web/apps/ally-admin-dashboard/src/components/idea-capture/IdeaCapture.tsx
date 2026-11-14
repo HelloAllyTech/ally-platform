@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { Tooltip } from "@ally-ui-mono/ui-shared";
+import { ANALYTICS_EVENTS, ANALYTICS_PROPS, Tooltip, useAnalytics } from "@ally-ui-mono/ui-shared";
 import { useCreateRoadmapIdeaDraftMutation, useTranscribeRoadmapIdeaMutation } from "@api";
 import { FeatureToggleKey, Permissions, ROUTES } from "@constants";
 import { useUser } from "@hooks";
@@ -55,25 +55,32 @@ const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).leng
  * creates the real, readiness-checked opportunity).
  *
  * THE MIC STARTS ITSELF. Opening is the user gesture, so recording starts inside the click
- * handler — no second "start" tap between having the thought and saying it. Pause, Stop and the
- * keyboard remain: stopping the mic leaves the screen and the text exactly where they are.
+ * handler — no second "start" tap between having the thought and saying it. The orb is the one
+ * mic control: tapping it pauses (which releases the microphone) and tapping again resumes.
+ * Save and Close stop it too, and the text stays exactly where it is.
  *
  * WORDS ARRIVE PHRASE BY PHRASE. Speech is recorded here and transcribed by the backend (see
  * useSpeechCapture for why not the browser's own recognition), so each phrase lands a moment
- * after the speaker pauses. Save waits for any phrase still being transcribed.
+ * after the speaker pauses. Until it does, an animated ellipsis sits where the next words will
+ * appear, so the lag reads as "working", not "broken". Save waits for any phrase still in flight.
  *
- * Access mirrors filing an opportunity (the VOTE permission and the roadmap toggle), because the
- * draft endpoints do; anyone else never sees the button.
+ * Access mirrors filing an opportunity (the VOTE permission, the roadmap toggle and Product
+ * Planning — Ideas), because the draft endpoints do; anyone else never sees the button.
  */
 export const IdeaCaptureLauncher: React.FC = () => {
   const { permissions, features } = useUser();
   const allowed =
     !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP) &&
-    hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP);
+    hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP) &&
+    // Parking an idea is filing's first step: Product Planning — Ideas, as ally-be checks.
+    hasFeature(features, FeatureToggleKey.PRODUCT_PLANNING_IDEAS);
 
   const navigate = useNavigate();
+  const { track } = useAnalytics();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  /** A copy of the text laid out behind the textarea, to place the transcribing dots after it. */
+  const mirrorRef = useRef<HTMLDivElement>(null);
 
   const [mounted, setMounted] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -144,11 +151,22 @@ export const IdeaCaptureLauncher: React.FC = () => {
     if (mounted && !saved) writeUnsent(text);
   }, [text, mounted, saved]);
 
+  /** Scrolls the dots' layer with the textarea, so the dots stay after the last word. */
+  const syncMirror = useCallback(() => {
+    const field = textareaRef.current;
+    const mirror = mirrorRef.current;
+    if (!field || !mirror) return;
+    // At the bottom, the dots may have wrapped onto a line the textarea doesn't have yet.
+    const atBottom = field.scrollTop + field.clientHeight >= field.scrollHeight - 2;
+    mirror.scrollTop = atBottom ? mirror.scrollHeight : field.scrollTop;
+  }, []);
+
   // Keep the newest words in view while dictating.
   useEffect(() => {
     const el = textareaRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [text, speech.transcribing]);
+    syncMirror();
+  }, [text, speech.transcribing, finishing, syncMirror]);
 
   const open = () => {
     const rect = buttonRef.current?.getBoundingClientRect();
@@ -164,6 +182,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
     setFinishing(false);
     setConfirmingClose(false);
     setMounted(true);
+    track(ANALYTICS_EVENTS.IDEA_CAPTURE_SESSION_STARTED);
     // Inside the click, so the mic opens as part of the user's gesture.
     speech.start();
     requestAnimationFrame(() => requestAnimationFrame(() => setRevealed(true)));
@@ -206,8 +225,12 @@ export const IdeaCaptureLauncher: React.FC = () => {
       toast.error("No words were caught. Try the mic again, or type your idea.");
       return;
     }
+    const captureMode = usedVoice.current ? "voice" : "typed";
     try {
-      await createDraft({ rawText, captureMode: usedVoice.current ? "voice" : "typed" }).unwrap();
+      await createDraft({ rawText, captureMode }).unwrap();
+      track(ANALYTICS_EVENTS.IDEA_CAPTURE_DRAFT_SAVED, {
+        [ANALYTICS_PROPS.CAPTURE_MODE]: captureMode,
+      });
       writeUnsent("");
       setConfirmingClose(false);
       setSaved(true);
@@ -228,7 +251,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
           "Could not save that idea. Your words are still here — try again.",
       );
     }
-  }, [isSaving, finishing, speech, createDraft, finishClose, navigate]);
+  }, [isSaving, finishing, speech, createDraft, finishClose, navigate, track]);
 
   // Keyboard: Esc closes (safely), Cmd/Ctrl+Enter saves.
   useEffect(() => {
@@ -275,7 +298,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
     status === "listening"
       ? "Capturing the absolute first, raw version of your idea. No structure needed — just talk."
       : status === "paused"
-        ? "Take your time. Resume when the next thought arrives."
+        ? "Take your time. Tap the mic when the next thought arrives."
         : status === "denied"
           ? "Allow the microphone from your browser's address bar, or just type your idea below."
           : status === "unavailable"
@@ -289,6 +312,10 @@ export const IdeaCaptureLauncher: React.FC = () => {
   const hasText = text.trim().length > 0;
   /** Words may be on their way even before any are on screen. */
   const canSave = (hasText || isListening || speech.transcribing) && !isSaving && !finishing;
+  /** Words recorded but not on screen yet: show the dots where they will land. */
+  const showDots = speech.transcribing || finishing;
+  /** Dictated phrases are joined with a space, so the dots leave one too. */
+  const dotsGap = text && !/\s$/.test(text) ? " " : "";
 
   const overlay = mounted
     ? createPortal(
@@ -408,56 +435,47 @@ export const IdeaCaptureLauncher: React.FC = () => {
 
             {/* the words */}
             <div className="relative mt-4 flex min-h-0 flex-1 flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-sm md:p-5">
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={event => setText(event.target.value.slice(0, IDEA_DRAFT_TEXT_MAX))}
-                placeholder="Your idea appears here as you speak. You can edit it, or just type."
-                aria-label="Your idea"
-                className="min-h-0 w-full flex-1 resize-none bg-transparent text-lg leading-relaxed text-white outline-none placeholder:text-white/30 md:text-xl"
-              />
-              {(speech.transcribing || finishing) && (
-                <p className="mt-2 text-base italic text-white/45" aria-live="polite">
-                  Writing down what you said…
-                </p>
-              )}
+              <div className="relative min-h-0 flex-1">
+                {showDots && (
+                  <div
+                    ref={mirrorRef}
+                    aria-hidden="true"
+                    data-testid="idea-transcribing-dots"
+                    className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-lg leading-relaxed text-transparent md:text-xl"
+                  >
+                    {text}
+                    {dotsGap}
+                    <span className="idea-dots text-white/70">
+                      <span>.</span>
+                      <span>.</span>
+                      <span>.</span>
+                    </span>
+                  </div>
+                )}
+                <textarea
+                  ref={textareaRef}
+                  value={text}
+                  onChange={event => setText(event.target.value.slice(0, IDEA_DRAFT_TEXT_MAX))}
+                  onScroll={syncMirror}
+                  placeholder={
+                    showDots && !text
+                      ? ""
+                      : "Your idea appears here as you speak. You can edit it, or just type."
+                  }
+                  aria-label="Your idea"
+                  className="relative h-full w-full resize-none bg-transparent text-lg leading-relaxed text-white outline-none placeholder:text-white/30 md:text-xl"
+                />
+              </div>
+              <span className="sr-only" aria-live="polite">
+                {showDots ? "Transcribing" : ""}
+              </span>
               <span className="absolute bottom-2 right-4 text-[11px] tabular-nums text-white/25">
                 {text.length}/{IDEA_DRAFT_TEXT_MAX}
               </span>
             </div>
 
-            {/* controls */}
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={speech.stop}
-                  disabled={status !== "listening" && status !== "paused"}
-                  className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-white/15 px-4 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-                >
-                  <span className="h-2.5 w-2.5 rounded-[2px] bg-current" aria-hidden="true" />
-                  Stop mic
-                </button>
-                {canMic && status === "idle" && (
-                  <button
-                    type="button"
-                    onClick={speech.start}
-                    className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-white/15 px-4 text-sm text-white/80 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-                  >
-                    <MicBulbIcon size={16} /> Talk again
-                  </button>
-                )}
-                {status === "paused" && (
-                  <button
-                    type="button"
-                    onClick={speech.resume}
-                    className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-white/15 px-4 text-sm text-white/80 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-                  >
-                    Resume
-                  </button>
-                )}
-              </div>
-
+            {/* save — the orb above is the only mic control */}
+            <div className="mt-4 flex items-center justify-end gap-3">
               <Tooltip label="Saves privately to My drafts. Nothing is published." align="top">
                 <button
                   type="button"
@@ -500,6 +518,11 @@ export const IdeaCaptureLauncher: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        if (textRef.current.trim()) {
+                          track(ANALYTICS_EVENTS.IDEA_CAPTURE_SESSION_ABANDONED, {
+                            [ANALYTICS_PROPS.CAPTURE_MODE]: usedVoice.current ? "voice" : "typed",
+                          });
+                        }
                         writeUnsent("");
                         setConfirmingClose(false);
                         finishClose();
@@ -545,7 +568,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
 
   return (
     <>
-      <Tooltip label="Say an idea" align="bottom">
+      <Tooltip label="Say an idea" align="right">
         <button
           ref={buttonRef}
           type="button"

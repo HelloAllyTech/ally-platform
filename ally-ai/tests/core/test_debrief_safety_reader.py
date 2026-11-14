@@ -2,7 +2,6 @@
 point at a real turn of the right speaker."""
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.core.debrief.safety_reader import (
     LearnerDistress,
@@ -101,44 +100,3 @@ async def test_no_answer_is_none_not_an_empty_reading(dispatch_returns):
     dispatch_returns(None)
     reading, _ = await read_safety(TRANSCRIPT, "en")
     assert reading is None
-
-
-class TestEndpoint:
-    @pytest.fixture
-    def client(self):
-        from app.core.config import settings
-        from app.main import app
-
-        c = TestClient(app)
-        c.headers.update({"x-api-key": settings.API.X_API_KEY})
-        return c
-
-    def _body(self):
-        return {
-            "transcript": [t.model_dump() for t in TRANSCRIPT],
-            "language": "en",
-        }
-
-    def test_no_usable_answer_is_a_502(self, client, dispatch_returns):
-        dispatch_returns(None)
-        r = client.post("/api/v1/debrief/safety-reader", json=self._body())
-        assert r.status_code == 502
-
-    def test_returns_the_reading(self, client, dispatch_returns):
-        dispatch_returns(
-            SafetyReading(
-                risk_cues=[
-                    RiskCue(
-                        turn_index=2,
-                        quote="no point",
-                        category="hopelessness",
-                        learner_response="missed",
-                    )
-                ]
-            )
-        )
-        r = client.post("/api/v1/debrief/safety-reader", json=self._body())
-        assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["risk_cues"][0]["turn_index"] == 2
-        assert body["learner_distress"] == []

@@ -3,10 +3,15 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
-import { useContextChunkActionMutation, useGetContextChunkQuery } from "@api";
+import {
+  useContextChunkActionMutation,
+  useGetContextChunkQuery,
+  useSetContextChunkAudienceMutation,
+} from "@api";
 import { en } from "@constants";
 import { ContextChunkDetail, ContextCollection, ContextChunkSourceLink } from "@types";
 
+import { AudienceEditor, audienceOf } from "./AudiencePicker";
 import { errorReason, humanise, nounsFor, studioHref } from "./contextLibraryFormat";
 import { useContextLibraryScope } from "./contextLibraryScope";
 import {
@@ -73,6 +78,7 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({
   const { tenantId, orgNames } = useContextLibraryScope();
   const { data, isLoading, isError, error, refetch } = useGetContextChunkQuery({ code, tenantId });
   const [act] = useContextChunkActionMutation();
+  const [setChunkAudience] = useSetContextChunkAudienceMutation();
   const [editing, setEditing] = useState(false);
   // What the last action changed, shown before the server confirms it.
   const [optimistic, setOptimistic] = useState<
@@ -212,10 +218,36 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-xs text-typography-600">{chunk.code}</span>
             <OriginBadge origin={chunk.origin} />
-            <AudienceBadge chunk={chunk} ownTenantId={tenantId} orgNames={orgNames} />
+            {tenantId && <AudienceBadge chunk={chunk} ownTenantId={tenantId} orgNames={orgNames} />}
             <ChunkStatusWords chunk={chunk} noun={noun} />
           </div>
           <p className="text-lg font-medium leading-snug text-typography-900">{chunk.statement}</p>
+
+          {!tenantId && (
+            // A platform admin re-targets any entry Ally owns, distilled ones included.
+            <AudienceEditor
+              value={audienceOf(chunk)}
+              badge={<AudienceBadge chunk={chunk} orgNames={orgNames} />}
+              orgNames={orgNames}
+              canEdit={canEditLibrary}
+              locked={
+                chunk.ownerTenantId
+                  ? en.contextLibrary.audience.ownedByOrganisation
+                  : synced
+                    ? en.contextLibrary.audience.followsStudio
+                    : undefined
+              }
+              onSave={async audience => {
+                try {
+                  await setChunkAudience({ code: chunk.code, audience }).unwrap();
+                  toast.success(en.contextLibrary.audience.saved);
+                } catch (error) {
+                  toast.error(errorReason(error) || en.contextLibrary.audience.saveFailed);
+                  throw error;
+                }
+              }}
+            />
+          )}
 
           {collection &&
             Object.entries(collection.attributes)

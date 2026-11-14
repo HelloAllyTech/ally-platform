@@ -327,6 +327,7 @@ export class LearnController {
           'title',
           'scenario',
           'description',
+          'descriptionAudioUrl',
           'coverImageUrl',
           'coverVideoUrl',
           'status',

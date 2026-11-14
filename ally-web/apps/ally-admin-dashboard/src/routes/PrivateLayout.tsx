@@ -12,8 +12,7 @@ import {
   useGetCharacterLibraryEnabledQuery,
 } from "@api";
 import { Sidebar, AccessDenied, ErrorBoundary } from "@components";
-import { ColorModeToggle } from "@components/color-mode-toggle/ColorModeToggle";
-import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
+import { NotificationBell } from "@components/notification-bell/NotificationBell";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import {
@@ -61,6 +60,11 @@ interface PrivateLayoutProps {
    * prop = no email gate (fully backward compatible).
    */
   allowedEmails?: string[];
+  /**
+   * No padding around the page: for full-screen flows that draw their own frame (Agents v2
+   * onboarding, chunk 20d).
+   */
+  fullBleed?: boolean;
 }
 
 export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
@@ -71,6 +75,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   alsoRequiredFeatures,
   requiredOrgToggle,
   allowedEmails,
+  fullBleed = false,
 }) => {
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
@@ -198,16 +203,16 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   /*
     "Denied" and "we could not find out" are not the same answer, and until now they rendered
     the identical screen.
-    
+
     Failing CLOSED is right and stays: while entitlements are unknown, nothing gates open. What
     was wrong is what the reader was TOLD. A platform admin holding 215 permissions saw "this
     page isn't turned on for your role yet" because the API was down for ninety seconds, and
     the copy sent them to ask an admin for access they already had. It cost this session twice
     — once on a slow direct navigation, once on a backend restart.
-    
+
     So: still no children until the answer is known, but a load says it is loading and a
     failure says it failed and offers a retry.
-    
+
     Only routes that actually GATE on something get the failure screen. A route requiring
     neither a permission nor a feature is reachable regardless, and a blip on an endpoint it
     never consults must not block it.
@@ -253,10 +258,11 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
             scroll height far past the content, producing a phantom second
             scrollbar and empty white space you can scroll into below the page. */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {/* The app-wide top bar. On a phone it carries the menu button; from md up it exists for the
-              global idea-capture mic and the light/dark switch, pinned top-right on every screen. */}
-          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:h-12 md:px-4">
-            {/* 44px target: the only way into navigation on a phone. */}
+          {/* Phone only: the menu button is the one way into navigation there. From md up the
+              Sidebar is always on screen and carries the idea mic and light/dark switch itself,
+              so no second bar is drawn. */}
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:hidden">
+            {/* 44px target. */}
             <button
               type="button"
               onClick={() => setIsMobileNavOpen(true)}
@@ -264,19 +270,20 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
               aria-expanded={isMobileNavOpen}
               aria-controls="admin-nav-sidebar"
               data-testid="admin-mobile-menu-button"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 md:hidden"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
             >
               <Menu size={24} aria-hidden="true" />
             </button>
-            <div className="ml-auto flex items-center gap-1">
-              <ColorModeToggle />
-              <IdeaCaptureLauncher />
+            <div className="ml-auto">
+              <NotificationBell placement="below" />
             </div>
           </div>
           {/* The barrier sits inside the shell, not around it: a page that
               throws during render should cost the admin that page, not the
               sidebar, the nav and their way out of it. */}
-          <div className="relative min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
+          <div
+            className={`relative min-h-0 flex-1 overflow-y-auto ${fullBleed ? "" : "p-4 lg:p-6"}`}
+          >
             <ErrorBoundary resetKey={pathname}>
               {entitlementsLoading ? (
                 <div

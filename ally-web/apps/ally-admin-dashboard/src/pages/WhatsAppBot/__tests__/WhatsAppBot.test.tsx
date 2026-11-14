@@ -1,6 +1,6 @@
 import React from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,9 +27,17 @@ vi.mock("@constants", async () => {
     loadFailed: "Could not load",
     homeTabs: {
       bots: "Chatbots",
+      inbox: "Inbox",
       connectors: "Connectors",
       defaults: "Defaults",
       library: "Knowledge library",
+      archived: "Archived",
+    },
+    archived: {
+      empty: "Nothing archived",
+      emptyHint: "Removed ones appear here",
+      removed: "Removed {date}",
+      loadFailed: "Could not load archived",
     },
     status: { draft: "Draft", live: "Live", paused: "Paused" },
     role: { viewer: "Viewer", editor: "Editor", owner: "Owner" },
@@ -97,11 +105,22 @@ const bot = (over: Partial<Chatbot> = {}): Chatbot => ({
 });
 
 let mockList: { chatbots: Chatbot[]; canCreate: boolean };
+const mockArchive = vi.fn((_id: string) => ({ unwrap: () => Promise.resolve() }));
+const mockRestore = vi.fn((_id: string) => ({ unwrap: () => Promise.resolve() }));
 let mockBot: Chatbot | undefined;
+let mockArchived: { chatbots: Chatbot[] };
 
 vi.mock("@api", () => ({
   useGetChatbotsQuery: () => ({ data: mockList, isLoading: false, isError: false }),
   useGetChatbotQuery: () => ({ data: mockBot, isLoading: false, isError: false }),
+  useArchiveChatbotMutation: () => [mockArchive, { isLoading: false }],
+  useRestoreChatbotMutation: () => [mockRestore, { isLoading: false }],
+  useGetArchivedChatbotsQuery: () => ({
+    data: mockArchived,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
 }));
 
 /** Mirrors the shared Tabs: one span per tab. */
@@ -124,6 +143,8 @@ vi.mock("@components", () => ({
 }));
 vi.mock("@components/types", () => ({ ButtonVariant: { PRIMARY: "primary" } }));
 
+// The inbox (chunk 11a) has its own tests; here it's just the tab's content.
+vi.mock("../../Inbox", () => ({ Inbox: () => <div data-testid="inbox" /> }));
 vi.mock("../shared", () => ({
   fill: (text: string, values: Record<string, unknown>) =>
     text.replace(/\{(\w+)\}/g, (_m, key: string) => String(values[key])),
@@ -145,28 +166,17 @@ vi.mock("../ConnectorsTab", () => ({
   BotConnectorsTab: withRoles("bot-connectors"),
 }));
 vi.mock("../CorpusTab", () => ({ CorpusTab: stub("library") }));
-vi.mock("../CreateChatbotPanel", () => ({ CreateChatbotPanel: () => null }));
 vi.mock("../TemplatesTab", () => ({ TemplatesTab: stub("replies") }));
-vi.mock("../ChatbotOverviewTab", () => ({ ChatbotOverviewTab: withRoles("overview") }));
 vi.mock("../AgentTab", () => ({ AgentTab: withRoles("agent") }));
 vi.mock("../ChatbotSettingsTab", () => ({ ChatbotSettingsTab: withRoles("settings") }));
-vi.mock("../ChatbotTestTab", () => ({ ChatbotTestTab: stub("test") }));
-vi.mock("../ConversationsTab", () => ({ ConversationsTab: stub("conversations") }));
-vi.mock("../KnowledgeTab", () => ({ KnowledgeTab: withRoles("knowledge") }));
-vi.mock("../PeopleTab", () => ({ PeopleTab: withRoles("people") }));
-vi.mock("../PersonaTab", () => ({ PersonaTab: withRoles("persona") }));
-vi.mock("../UnansweredTab", () => ({ UnansweredTab: stub("unanswered") }));
-vi.mock("../UsageTab", () => ({ UsageTab: stub("usage") }));
 
 const { WhatsAppBot } = await import("../WhatsAppBot");
-const { ChatbotPage } = await import("../ChatbotPage");
 
 const renderAt = (path: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/chatbots" element={<WhatsAppBot />} />
-        <Route path="/chatbots/:botId" element={<ChatbotPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -174,6 +184,7 @@ const renderAt = (path: string) =>
 describe("Chatbots home", () => {
   beforeEach(() => {
     mockList = { chatbots: [bot()], canCreate: true };
+    mockArchived = { chatbots: [] };
   });
 
   it("lists the bots as cards with their status and activity", () => {
@@ -193,93 +204,105 @@ describe("Chatbots home", () => {
     expect(screen.getByTestId("replies").dataset.bot).toBe("");
   });
 
-  it("shows a member only their bots — no creating, no platform tabs", () => {
+  it("shows a member only their bots and the inbox — no creating, no platform tabs", () => {
     mockList = { chatbots: [bot({ myRole: ChatbotMemberRole.VIEWER })], canCreate: false };
     renderAt("/chatbots?tab=defaults");
     expect(screen.queryByText("New chatbot")).toBeNull();
-    expect(screen.queryByTestId("tabs")).toBeNull();
+    // The inbox (chunk 11a) is for everyone who can see an assistant.
+    expect(screen.getByTestId("tabs").textContent).toBe("ChatbotsInboxArchived");
+    expect(screen.queryByTestId("defaults-settings")).toBeNull();
     expect(screen.queryByTestId("defaults-settings")).toBeNull();
     expect(screen.getByText("Policy helper")).toBeTruthy();
+  });
+
+  it("lets an owner remove an assistant from its ··· menu, even one still being set up", async () => {
+    mockList = {
+      chatbots: [bot({ status: ChatbotStatus.DRAFT, setupDraftId: "draft-1" })],
+      canCreate: true,
+    };
+    mockArchive.mockClear();
+    renderAt("/chatbots");
+    fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove assistant" }));
+    // Asked in a dialog on the page, not the browser's own confirm box.
+    const dialog = screen.getByRole("dialog", { name: "Remove Policy helper?" });
+    expect(dialog.textContent).toContain("Its conversations are kept.");
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(mockArchive).toHaveBeenCalledWith("bot-1");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("removes nothing when the owner keeps it", () => {
+    mockArchive.mockClear();
+    renderAt("/chatbots");
+    fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove assistant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+    expect(mockArchive).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("says so, and stays open, when removing fails", async () => {
+    mockArchive.mockImplementationOnce(() => ({ unwrap: () => Promise.reject(new Error("500")) }));
+    renderAt("/chatbots");
+    fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove assistant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(await screen.findByText("Couldn't remove it. Try again.")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("gives no menu to someone who doesn't own the assistant", () => {
+    mockList = { chatbots: [bot({ myRole: ChatbotMemberRole.EDITOR })], canCreate: true };
+    renderAt("/chatbots");
+    expect(screen.queryByRole("button", { name: "More for Policy helper" })).toBeNull();
+  });
+
+  it("keeps removed assistants under Archived, to open and read", () => {
+    mockArchived = {
+      chatbots: [bot({ id: "bot-9", name: "Old helper", archivedAt: "2026-11-10T09:00:00Z" })],
+    };
+    renderAt("/chatbots?tab=archived");
+    expect(screen.getByText("Old helper")).toBeTruthy();
+    expect(screen.getByText(/^Removed /)).toBeTruthy();
+    // Removed already: its menu offers Restore, never Remove.
+    fireEvent.click(screen.getByRole("button", { name: "More for Old helper" }));
+    expect(screen.queryByRole("menuitem", { name: "Remove assistant" })).toBeNull();
+  });
+
+  it("lets an owner restore a removed assistant from its ··· menu", async () => {
+    mockArchived = {
+      chatbots: [bot({ id: "bot-9", name: "Old helper", archivedAt: "2026-11-10T09:00:00Z" })],
+    };
+    mockRestore.mockClear();
+    renderAt("/chatbots?tab=archived");
+    fireEvent.click(screen.getByRole("button", { name: "More for Old helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Restore assistant" }));
+    await waitFor(() => expect(mockRestore).toHaveBeenCalledWith("bot-9"));
+  });
+
+  it("gives no Restore to someone who doesn't own the removed assistant", () => {
+    mockArchived = {
+      chatbots: [
+        bot({
+          name: "Old helper",
+          archivedAt: "2026-11-10T09:00:00Z",
+          myRole: ChatbotMemberRole.VIEWER,
+        }),
+      ],
+    };
+    renderAt("/chatbots?tab=archived");
+    expect(screen.queryByRole("button", { name: "More for Old helper" })).toBeNull();
+  });
+
+  it("says when nothing has been archived", () => {
+    renderAt("/chatbots?tab=archived");
+    expect(screen.getByText("Nothing archived")).toBeTruthy();
   });
 
   it("tells a member with no bots who to ask", () => {
     mockList = { chatbots: [], canCreate: false };
     renderAt("/chatbots");
     expect(screen.getByText("You haven't been added to a chatbot yet")).toBeTruthy();
-  });
-});
-
-describe("Chatbot page", () => {
-  beforeEach(() => {
-    mockBot = bot();
-  });
-
-  it("opens on the overview", () => {
-    renderAt("/chatbots/bot-1");
-    expect(screen.getByTestId("overview")).toBeTruthy();
-  });
-
-  it("hands every tab the bot", () => {
-    renderAt("/chatbots/bot-1?tab=conversations");
-    expect(screen.getByTestId("conversations").dataset.bot).toBe("bot-1");
-  });
-
-  it("falls back to the overview for an unknown tab", () => {
-    renderAt("/chatbots/bot-1?tab=nonsense");
-    expect(screen.getByTestId("overview")).toBeTruthy();
-  });
-
-  it("lets a viewer look but not change", () => {
-    mockBot = bot({ myRole: ChatbotMemberRole.VIEWER });
-    renderAt("/chatbots/bot-1?tab=persona");
-    expect(screen.getByTestId("persona").dataset.edit).toBe("false");
-  });
-
-  it("keeps the tab row short: configuration lives under Settings", () => {
-    renderAt("/chatbots/bot-1");
-    const ids = Array.from(screen.getByTestId("tabs").children).map(tab =>
-      tab.getAttribute("data-testid"),
-    );
-    expect(ids).toEqual([
-      "tab-overview",
-      "tab-persona",
-      "tab-knowledge",
-      "tab-test",
-      "tab-conversations",
-      "tab-unanswered",
-      "tab-usage",
-      "tab-settings",
-    ]);
-  });
-
-  it("opens Settings on Agent, with the other sections beside it", () => {
-    renderAt("/chatbots/bot-1?tab=settings");
-    expect(screen.getByTestId("agent").dataset.edit).toBe("true");
-    for (const id of ["agent", "replies", "people", "connectors", "general"]) {
-      expect(screen.getByTestId(`tab-${id}`)).toBeTruthy();
-    }
-  });
-
-  it("opens a section of Settings from its own link", () => {
-    renderAt("/chatbots/bot-1?tab=settings&section=general");
-    expect(screen.getByTestId("settings")).toBeTruthy();
-  });
-
-  it("still opens a section from an older link to it as a tab", () => {
-    renderAt("/chatbots/bot-1?tab=people");
-    expect(screen.getByTestId("people")).toBeTruthy();
-    expect(screen.getByTestId("tab-general")).toBeTruthy();
-  });
-
-  it("keeps team and numbers to owners", () => {
-    mockBot = bot({ myRole: ChatbotMemberRole.EDITOR });
-    renderAt("/chatbots/bot-1?tab=connectors");
-    expect(screen.getByTestId("bot-connectors").dataset.manage).toBe("false");
-  });
-
-  it("puts the open-question count on the Unanswered tab", () => {
-    mockBot = bot({ stats: { ...bot().stats, openUnanswered: 4 } });
-    renderAt("/chatbots/bot-1");
-    expect(screen.getByTestId("tab-unanswered").textContent).toBe("Unanswered (4)");
   });
 });

@@ -56,6 +56,7 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
     super.key,
     required this.scenarioSessionId,
     this.fromLogs = false,
+    this.ownSession = false,
     this.pathId,
     this.caseId,
     this.languageId,
@@ -66,6 +67,10 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
   /// RN `route.params.fromLogs`: reached from a historical Call Logs row,
   /// so the debrief is read-only and leaving never forces a rating.
   final bool fromLogs;
+
+  /// From the logs, the viewer's own session: their debrief comes from the
+  /// learner view (read-only here), not the supervisor's.
+  final bool ownSession;
 
   /// RN `route.params.pathId` / `caseId`: the session belongs to a path or
   /// case, so back returns to its details and "Try another" is hidden.
@@ -105,6 +110,35 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
   FeedbackValue _existingFeedback = (rating: 0, tags: const <String>[], comment: '');
 
   TranscriptFocusRequest? _momentRequest;
+
+  /// How far the title, stars and checklist have folded away (0 shown, 1
+  /// gone): follows the open tab's vertical scroll over the header's height.
+  double _headerCollapse = 0;
+  final _headerKey = GlobalKey();
+
+  /// The header's height, measured after layout (never read mid-layout).
+  double _headerHeight = 120;
+
+  bool _onContentScroll(ScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return false;
+    // Only the tab's own list (the nearest one), not lists inside it.
+    if (n.depth > 2) return false;
+    final pixels = n.metrics.pixels;
+    // Notifications can arrive during layout (ensureVisible, a jump): settle
+    // after the frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = _headerKey.currentContext?.findRenderObject();
+      if (box is RenderBox && box.hasSize && _headerCollapse == 0) _headerHeight = box.size.height;
+      if (_headerHeight <= 0) return;
+      final next = (pixels / _headerHeight).clamp(0.0, 1.0);
+      if (next != _headerCollapse && ((next - _headerCollapse).abs() > 0.01 || next == 0 || next == 1)) {
+        setState(() => _headerCollapse = next);
+      }
+    });
+    return false;
+  }
+
   int _momentRequestCount = 0;
 
   /// RN `useHideReviewDetails`'s `hideReviewDetails` (starts `true`).
@@ -115,7 +149,8 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     api: () => ref.read(askAiChatApiProvider),
     // Read-only (from Logs): no thread — it's keyed by session, so an admin
     // would otherwise be typing into the learner's own conversation.
-    sessionId: widget.fromLogs ? '' : widget.scenarioSessionId,
+    // The learner's own session from the logs keeps their thread (Ask Ally).
+    sessionId: widget.fromLogs && !widget.ownSession ? '' : widget.scenarioSessionId,
   );
 
   @override
@@ -336,7 +371,19 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
   void _openMoment(String messageId) {
     _momentRequestCount++;
     setState(() {
-      _momentRequest = (messageId: messageId, requestId: _momentRequestCount);
+      _momentRequest = (messageId: messageId, quote: null, requestId: _momentRequestCount);
+      _activeTab = FeedbackTab.transcript;
+    });
+    final index = _tabs.indexOf(FeedbackTab.transcript);
+    if (index != -1) _tabController?.animateTo(index);
+  }
+
+  /// "See this moment" under a debrief card's quote: the transcript at the
+  /// turn holding those words (web `handleSeeQuote`).
+  void _openQuote(String quote) {
+    _momentRequestCount++;
+    setState(() {
+      _momentRequest = (messageId: '', quote: quote, requestId: _momentRequestCount);
       _activeTab = FeedbackTab.transcript;
     });
     final index = _tabs.indexOf(FeedbackTab.transcript);
@@ -449,7 +496,13 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     final controller = _tabController;
     if (controller == null || !mounted) return;
     final tab = _tabs[controller.index];
-    if (tab != _activeTab) setState(() => _activeTab = tab);
+    // Another tab starts with the title (and its back arrow) showing again.
+    if (tab != _activeTab) {
+      setState(() {
+        _activeTab = tab;
+        _headerCollapse = 0;
+      });
+    }
   }
 
   /// RN re-runs `fetchSimulationDetailsWithRetry` when `activeLanguageCode`
@@ -511,6 +564,13 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _CollapsingHeader(
+                    collapse: showTabs ? _headerCollapse : 0,
+                    child: Column(
+                      key: _headerKey,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                   Padding(
                     padding: EdgeInsets.only(top: rn.vs(8), bottom: rn.vs(8), left: 10, right: 20),
                     child: Row(
@@ -541,12 +601,20 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
                       padding: EdgeInsets.only(left: 10, right: 10, bottom: rn.vs(8)),
                       child: EventChecklist(scenarioSessionId: widget.scenarioSessionId),
                     ),
+                      ],
+                    ),
+                  ),
                   if (showTabs) ...[
+                    // The tab bar stays; the title, stars and checklist above it fold
+                    // away as the tab's content scrolls, so the debrief gets the screen.
                     _buildTabBar(),
                     Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [for (final tab in _tabs) _buildScene(tab)],
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: _onContentScroll,
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [for (final tab in _tabs) _buildScene(tab)],
+                        ),
                       ),
                     ),
                   ],
@@ -723,9 +791,13 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
           sessionId: widget.scenarioSessionId,
           summary: _summary,
           retryLimitReached: _retryLimitReached,
-          readOnly: widget.fromLogs,
+          // The learner's own session from the logs is the full learner view,
+          // Ask Ally included; read-only is for someone else's (supervisors).
+          readOnly: widget.fromLogs && !widget.ownSession,
+          supervisorView: widget.fromLogs && !widget.ownSession,
           // Anchors are chips only when there's a transcript to open.
           onOpenMoment: (_summary?.showTranscriptTab ?? true) ? _openMoment : null,
+          onSeeQuote: (_summary?.showTranscriptTab ?? true) ? _openQuote : null,
         );
       case FeedbackTab.transcript:
         return SimulationTranscriptTab(
@@ -772,6 +844,31 @@ class _ReviewButton extends StatelessWidget {
             'assets/icons/chatBubble.svg',
             colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The screen's title block, folding up by [collapse] (0 open, 1 gone) and
+/// fading as it goes; gone from the accessibility tree once fully folded.
+class _CollapsingHeader extends StatelessWidget {
+  const _CollapsingHeader({required this.collapse, required this.child});
+
+  final double collapse;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (collapse <= 0) return child;
+    return ExcludeSemantics(
+      excluding: collapse >= 1,
+      child: ClipRect(
+        key: const Key('simulation-feedback-header'),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          heightFactor: 1 - collapse,
+          child: Opacity(opacity: (1 - collapse).clamp(0.0, 1.0), child: child),
         ),
       ),
     );

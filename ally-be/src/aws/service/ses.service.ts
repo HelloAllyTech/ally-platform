@@ -81,6 +81,9 @@ export class SESService {
    *   200-recipient batch buries the signal it is meant to raise.
    * @param params.purpose Short label for the alert ("login OTP", "streak
    *   reminder"). Never include recipient content.
+   * @param params.maskRecipientsInLog Log `***@domain` instead of the address.
+   *   The bot page sets it (its recipients are members of the public); other
+   *   callers keep logging the address until that is decided for them.
    */
   async sendEmail(params: {
     from?: string;
@@ -90,6 +93,7 @@ export class SESService {
     isHtml?: boolean;
     alertOnFailure?: boolean;
     purpose?: string;
+    maskRecipientsInLog?: boolean;
   }): Promise<boolean> {
     const {
       from,
@@ -99,6 +103,7 @@ export class SESService {
       isHtml = false,
       alertOnFailure = true,
       purpose,
+      maskRecipientsInLog = false,
     } = params;
     const toAddresses = Array.isArray(to) ? to : [to];
 
@@ -124,7 +129,12 @@ export class SESService {
         }),
       );
 
-      this.logger.info(`Email sent to ${toAddresses.join(', ')}`);
+      this.logger.info(
+        `Email sent to ${(maskRecipientsInLog
+          ? toAddresses.map(maskEmail)
+          : toAddresses
+        ).join(', ')}`,
+      );
 
       return true;
     } catch (error) {
@@ -159,4 +169,10 @@ export class SESService {
       throw new EmailSendFailedException();
     }
   }
+}
+
+/** `asha@example.com` → `***@example.com`. */
+export function maskEmail(address: string): string {
+  const at = address.lastIndexOf('@');
+  return at < 0 ? '***' : `***${address.slice(at)}`;
 }

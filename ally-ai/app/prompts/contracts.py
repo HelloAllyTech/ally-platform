@@ -559,6 +559,280 @@ class UserIdentifyUserInputs(PromptInputs):
     conversations: str
 
 
+class DebriefPmBuilderAnswersSystemInputs(PromptInputs):
+    """`debrief/pm_builder_answers_system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_debrief_pm_builder_answers_system",
+        name="Debrief PM agent: answering Builder",
+        description=(
+            "Instructions for the Debrief PM agent when it answers Builder's interview "
+            "questions on an idea handed to Builder (R2-20). It answers only from its "
+            "own brief, says it can't answer rather than guessing (a person answers "
+            "those), and never quotes anyone. The brief and question go in the user "
+            "message; the answer is structured."
+        ),
+    )
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+    output_format: ClassVar[Optional[str]] = "structured"
+
+
+class BuilderChangeInputs(PromptInputs):
+    """`builder/change.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_change",
+        name="Assistant Home: Change by Chat",
+        description=(
+            'Turns an owner\'s request ("make it more formal", "don\'t discuss '
+            "prices\") into a proposed change to their assistant's settings (chunk "
+            "20a-2). Code builds the before and after; ally-be applies it only when "
+            "the owner confirms. Safety can't be weakened: the model refuses, and code "
+            "never lets a change reach the safety pack."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    current: str
+    safety: str
+    request: str
+
+
+class CheckupJudgeInputs(PromptInputs):
+    """`checkup/judge.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_checkup_judge",
+        name="Checkup: Judge a Reply",
+        description=(
+            "Checks one assistant reply for meaning in a checkup (chunk 20a-2): the "
+            "expected facts, what it must not say, and anything made up. Automatic "
+            "checks decide the rest; this judge can fail a case, never pass one."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    question: str
+    history: str
+    expected: str
+    facts: str
+    must_not: str
+    also_ok: str
+    sources: str
+    reply: str
+
+
+class AgentPurposeAnswerInputs(PromptInputs):
+    """`agent/purpose_answer.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_answer",
+        name="Chatbot Agent: Purpose, Answer Questions",
+        description=(
+            'How an assistant whose owner chose "Answer questions" uses what it '
+            "knows (chunk 20a-2). Placed after the owner's instructions and before "
+            "the safety rules, so safety wins."
+        ),
+    )
+
+
+class AgentPurposeEnquiriesInputs(PromptInputs):
+    """`agent/purpose_enquiries.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_enquiries",
+        name="Chatbot Agent: Purpose, Bring in Customers",
+        description=(
+            'How an assistant whose owner chose "Bring in customers" recommends '
+            "what fits and offers to pass details on (chunk 20a-2). Placed after the "
+            "owner's instructions and before the safety rules."
+        ),
+    )
+
+
+class AgentPurposeTrainingInputs(PromptInputs):
+    """`agent/purpose_training.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_training",
+        name="Chatbot Agent: Purpose, Train My Team",
+        description=(
+            'How an assistant whose owner chose "Train my team" explains '
+            "procedures and quizzes staff (chunk 20a-2). Placed after the owner's "
+            "instructions and before the safety rules."
+        ),
+    )
+
+
+class AgentPurposeGuideInputs(PromptInputs):
+    """`agent/purpose_guide.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_guide",
+        name="Chatbot Agent: Purpose, Guide Step by Step",
+        description=(
+            'How an assistant whose owner chose "Guide people step by step" '
+            "gives one step at a time, in the source's order (chunk 20a-2). Placed "
+            "after the owner's instructions and before the safety rules."
+        ),
+    )
+
+
+class CheckupQuestionsInputs(PromptInputs):
+    """`checkup/questions.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_checkup_questions",
+        name="Checkup: Write Test Questions",
+        description=(
+            "Writes an assistant's checkup questions from what we learned about the "
+            "business (chunk 20a-2), each answered by one or two learned details. Code "
+            "keeps each question's details as its expected facts and source, and drops "
+            "a question that names a detail it wasn't given."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    audience: str
+    business: str
+    facts: str
+    count: str
+    language: str
+
+
+class BuilderSystemInputs(PromptInputs):
+    """`builder/system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_system",
+        name="Onboarding Builder: Conversation",
+        description=(
+            "The setup guide new customers talk to when they create an assistant "
+            "(chunk 20a). One call per owner message: it replies, offers quick "
+            "replies and proposes changes to the draft, which ally-be checks and "
+            "applies. It never chooses the safety pack."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    answers: str
+    draft: str
+    history: str
+    learned: str
+    message: str
+    pages: str
+    pending: str
+    safety_pack: str
+    step: str
+    step_guide: str
+
+
+class BuilderExtractInputs(PromptInputs):
+    """`builder/extract.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_extract",
+        name="Onboarding Builder: Extract Facts",
+        description=(
+            "Reads a batch of crawled website pages and returns the details the "
+            "assistant needs, each tied to the page it came from. Details without a "
+            "valid page are dropped in code."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    known: str
+    pages: str
+
+
+class BuilderClassifyInputs(PromptInputs):
+    """`builder/classify.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_classify",
+        name="Onboarding Builder: Classify Industry",
+        description=(
+            "Chooses the business's industry from a fixed list. ally-be maps the "
+            "industry to its safety pack in code; the model never picks the pack."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    description: str
+    learned: str
+    pages: str
+
+
+class BuilderGapsInputs(PromptInputs):
+    """`builder/gaps.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_gaps",
+        name="Onboarding Builder: Find Gaps",
+        description=(
+            "Checks what we learned against the industry's fixed checklist and the "
+            "site's own content, and lists what the owner should be asked."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    answers: str
+    checklist: str
+    learned: str
+    pages: str
+
+
+class BuilderPurposesInputs(PromptInputs):
+    """`builder/purposes.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_purposes",
+        name="Onboarding Builder: Tailor the Purposes",
+        description=(
+            "Recommends one of the four purposes (answer, enquiries, training, guide) "
+            'and tailors each card\'s "Best for" and sample exchange to the business '
+            "(chunk 20a-2). What each will and won't do is fixed in code."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    audience: str
+    learned: str
+    suggested: str
+
+
+class BuilderDraftInputs(PromptInputs):
+    """`builder/draft.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_draft",
+        name="Onboarding Builder: Draft the Assistant",
+        description=(
+            "Writes the assistant's introduction, instructions, tone, topics, "
+            "suggested questions, pre-chat questions and decline wording from what "
+            "we learned and the owner's answers."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    answers: str
+    decline_hint: str
+    design: str
+    learned: str
+    prechat_rule: str
+    safety_pack: str
+    tone_hint: str
+
+
 def _collect_contracts() -> dict[str, type[PromptInputs]]:
     """Every PromptInputs subclass that declares a prompt, keyed by its code."""
     found: dict[str, type[PromptInputs]] = {}

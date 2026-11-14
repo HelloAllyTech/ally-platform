@@ -960,6 +960,55 @@ export const PRODUCT_UPDATES_CONSOLIDATE = definePrompt(
   },
 );
 
+/** src/prompts/planning/safety_review.txt */
+export const PLANNING_SAFETY_REVIEW = definePrompt(
+  'planning_safety_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/privacy_review.txt */
+export const PLANNING_PRIVACY_REVIEW = definePrompt(
+  'planning_privacy_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/ai_quality_review.txt */
+export const PLANNING_AI_QUALITY_REVIEW = definePrompt(
+  'planning_ai_quality_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/outcome_review.txt */
+export const PLANNING_OUTCOME_REVIEW = definePrompt(
+  'planning_outcome_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/launch_plan.txt */
+export const PLANNING_LAUNCH_PLAN = definePrompt(
+  'planning_launch_plan',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/research_plan.txt */
+export const PLANNING_RESEARCH_PLAN = definePrompt(
+  'planning_research_plan',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/signal_scout.txt */
+export const PLANNING_SIGNAL_SCOUT = definePrompt(
+  'planning_signal_scout',
+  {},
+  { output: 'json' },
+);
+
 /** src/prompts/roadmap/classify_goal.txt */
 export const ROADMAP_CLASSIFY_GOAL = definePrompt(
   'roadmap_classify_goal',
@@ -1265,6 +1314,19 @@ export const DEBRIEF_QUALITY_RUBRIC = definePrompt(
   },
 );
 
+/** src/prompts/debrief_quality/judge_system.txt */
+export const DEBRIEF_QUALITY_JUDGE_SYSTEM = definePrompt(
+  'debrief_quality_judge_system',
+  {},
+  {
+    name: "Debrief Quality Judge's Instructions",
+    description:
+      "What the independent debrief-quality judge is told to do after the rubric, the transcript and the debrief: list the risk cues, score the eight dimensions, list the hard fails. A pinned rule: a change is approved by the clinical advisor or the owner, and bumps ally-ai's DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION. The Evaluator inside a debrief run keeps ally-ai's own copy.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/debrief/safety_reader_system.txt */
 export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
   'debrief_safety_reader_system',
@@ -1304,6 +1366,19 @@ export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/debrief/progress_system.txt */
+export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
+  'debrief_progress_system',
+  {},
+  {
+    name: 'Debrief Progress Agent',
+    description:
+      "The debrief agent's Progress agent: reads this session's evidence map with the learner's progress profile (past sessions' Analyst observations, past points and their review verdicts, the last progress report, the learner's own words, Foundational Skills levels) and proposes up to 3 skill trends, follow-ups on past points and one focus. Code vetoes any trend the record contradicts. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/debrief/writer_system.txt */
 export const DEBRIEF_WRITER_SYSTEM = definePrompt(
   'debrief_writer_system',
@@ -1325,6 +1400,58 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
     name: 'Debrief Reviser',
     description:
       "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged, adding any uncovered risk cue to the important moment's `others`. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/planner_system.txt */
+export const DEBRIEF_PLANNER_SYSTEM = definePrompt(
+  'debrief_planner_system',
+  {},
+  {
+    name: 'Debrief planner',
+    description:
+      "The orchestrated debrief's planner (challenger releases only): runs after the safety reader and the Analyst; from the session profile, a summary of the Analyst's evidence map (pivotal moments with their turns, skills observed / partial / missed, the AI client's faults: the Analyst's words, no quotes) and the registry agents' manifests, never the transcript, chooses which analysis agents run and says why the others don't; once more after a failed evaluation, with the Evaluator's critique. The step composes the profile, the evidence summary, the manifests and the limits around this text. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/protocol_check_system.txt */
+export const DEBRIEF_PROTOCOL_CHECK_SYSTEM = definePrompt(
+  'debrief_protocol_check_system',
+  {},
+  {
+    name: 'Debrief protocol check',
+    description:
+      "Registry agent: checks the session against the learner's organisation's own protocols and says which the learner followed or missed, as findings. The step composes the protocols, the risk cues, the transcript and the findings contract around this text. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/history_deep_system.txt */
+export const DEBRIEF_HISTORY_DEEP_SYSTEM = definePrompt(
+  'debrief_history_deep_system',
+  {},
+  {
+    name: 'Debrief history (deep)',
+    description:
+      "Registry agent: reads the learner's last debriefs with this session's evidence map and names a pattern only when three or more sessions support it, as findings. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/language_specialist_system.txt */
+export const DEBRIEF_LANGUAGE_SPECIALIST_SYSTEM = definePrompt(
+  'debrief_language_specialist_system',
+  {},
+  {
+    name: 'Debrief language specialist',
+    description:
+      'Registry agent: reads code-mixed and Indian-language sessions for what a Writer could get wrong (meaning that depends on the language, deliberate code-mixing, quotes that must keep their script), as findings. Release-only.',
     category: 'evaluation',
     output: 'structured',
   },
@@ -1356,15 +1483,14 @@ export const DEBRIEF_REFLECTION_CHECK_SYSTEM = definePrompt(
 );
 
 /** src/prompts/debrief/improver_system.txt */
-export const DEBRIEF_IMPROVER_SYSTEM = definePrompt(
+export const DEBRIEF_PM_AGENT_SYSTEM = definePrompt(
   'debrief_improver_system',
   {},
   {
-    name: 'Debrief Improver',
+    name: 'Debrief PM agent',
     description:
-      "The Improver's instructions: reads aggregate signals from debrief runs, writes the weekly report and proposes ideas. Its own skill; changes go through a person.",
+      "The PM agent's instructions (one Deep Agent in ally-ai): how it plans, investigates, proposes ideas through ally-be's gateway tools, routes them (itself, Builder, Bug Hunter, a person), keeps its memory and writes the report. The run's inputs arrive as its first message, not as variables. On the never-list itself: changes go through a person.",
     category: 'evaluation',
-    output: 'structured',
   },
 );
 

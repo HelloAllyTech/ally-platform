@@ -165,6 +165,11 @@ export const ANALYTICS_EVENTS = {
 
   // Admin
   SIDEBAR_INTERACTION: "sidebar_interaction",
+  // Admin idea capture (the header mic-and-bulb). Save rate = draft_saved / session_started,
+  // split by capture_mode. Never send the idea's text.
+  IDEA_CAPTURE_SESSION_STARTED: "idea_capture_session_started",
+  IDEA_CAPTURE_DRAFT_SAVED: "idea_capture_draft_saved",
+  IDEA_CAPTURE_SESSION_ABANDONED: "idea_capture_session_abandoned",
 } as const;
 
 /** `source` values for the /v2 homepage's `home_v2_*` events. */
@@ -374,4 +379,7 @@ export const ANALYTICS_PROPS = {
 
   // Sidebar context
   ACTION: "action",
+
+  // Idea capture: "voice" when any of the text was dictated, else "typed"
+  CAPTURE_MODE: "capture_mode",
 } as const;

@@ -273,8 +273,8 @@ export class AgentReleaseService {
         existing ??
         (await createSeed(
           AgentReleaseStatus.DRAFT,
-          'The defaults in code changed; promoted at boot while no release ' +
-            'had been authored or promoted by a person.',
+          'The defaults in code changed; put live on start-up because no ' +
+            'person had written a release or put one live yet.',
         ));
       await repo.update(ga.id, {
         status: AgentReleaseStatus.RETIRED,

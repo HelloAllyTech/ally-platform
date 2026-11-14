@@ -141,7 +141,7 @@ function SelectedFiltersView<T extends Record<string, any>>({
   };
 
   return (
-    <div className="flex flex-row gap-2 mb-2 items-center">
+    <div className="flex flex-row flex-wrap gap-2 mb-2 items-center">
       {sort.key && sort.value && renderSort()}
       {renderFilter()}
       {renderAddFilter()}

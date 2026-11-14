@@ -124,11 +124,13 @@ class KnowledgeAgentSettings(BaseModel):
 class AgentRuntimeSettings(BaseModel):
     """Agents v2 runtime: the LangGraph agent graph behind `/agent/run`.
 
-    Dark until ENABLED: the route answers 404 and nothing is opened at startup, so
-    deploying the code changes nothing until it is switched on.
+    On by default: chatbots answer with the agent unless ENABLED is set false here
+    (the route then answers 404 and ally-be answers in safe mode) or the platform's
+    "Answer with the agent" switch is off. The checkpoint database is optional: without
+    one, chatbot runs are simply not stored (nothing reads them back to answer).
     """
 
-    ENABLED: bool = Field(False)
+    ENABLED: bool = Field(True)
     # Postgres for LangGraph's checkpoint tables, in their own database — ally-be's
     # database is never written to. Unset = in-memory checkpoints (lost on restart),
     # with a warning at startup.
@@ -160,6 +162,26 @@ class AgentRuntimeSettings(BaseModel):
     # o-series; ignored for others). Unset = the provider default ("medium"). The
     # latency lever if the agent step is too slow; see CHUNK-03A-NOTES.md.
     AGENT_REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = None
+
+
+class BuilderSettings(BaseModel):
+    """Onboarding builder (chunk 20a): the setup guide behind `/builder/*`.
+
+    On by default: ally-be's onboarding (chat, website reading, document uploads)
+    depends on it. ENABLED=false is the kill switch: the routes then answer 404.
+    It keeps no state of its own (ally-be holds the draft), so unlike the agent
+    runtime it needs no checkpointer.
+    """
+
+    ENABLED: bool = Field(True)
+    # Hard cap on one builder step, sub-tasks included. Below ally-be's 60-second
+    # relay deadline, so ally-be always gets a clean `error: timeout`.
+    STEP_TIMEOUT_SECONDS: float = Field(45.0, gt=0, le=120)
+    # One fact-extraction call for a batch of pages, during the crawl.
+    EXTRACT_TIMEOUT_SECONDS: float = Field(40.0, gt=0, le=120)
+    # Reasoning effort for the conversation step and fact extraction on an OpenAI
+    # reasoning model; the other sub-tasks use the provider default.
+    REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = "low"
 
 
 class HelplineSettings(BaseModel):
@@ -270,10 +292,12 @@ class DebriefSettings(BaseModel):
     # (DEBRIEF_QUALITY_JUDGE.MODEL), so neither grades work by its own model.
     ANALYST_MODEL: str = Field("gemini-2.5-pro")
     PROGRESS_READER_MODEL: str = Field("gemini-2.5-flash")
+    # The progress agent (replaced the Progress reader on the GA path): cheap.
+    PROGRESS_AGENT_MODEL: str = Field("gemini-2.5-flash")
     WRITER_MODEL: str = Field("gemini-3-flash-preview")
     EVALUATOR_MODEL: str = Field("gemini-2.5-flash")
     REVISER_MODEL: str = Field("gemini-3-flash-preview")
-    IMPROVER_MODEL: str = Field("gemini-2.5-pro")
+    PM_AGENT_MODEL: str = Field("gemini-2.5-pro")
 
 
 class RagQualityJudgeSettings(BaseModel):
@@ -453,6 +477,7 @@ class AppSettings(BaseSettings):
         default_factory=KnowledgeAgentSettings
     )
     AGENT_RUNTIME: AgentRuntimeSettings = Field(default_factory=AgentRuntimeSettings)
+    BUILDER: BuilderSettings = Field(default_factory=BuilderSettings)
     HELPLINE: HelplineSettings = Field(default_factory=HelplineSettings)
     DRIFT_JUDGE: DriftJudgeSettings = Field(default_factory=DriftJudgeSettings)
     LANGUAGE_JUDGE: LanguageJudgeSettings = Field(default_factory=LanguageJudgeSettings)

@@ -1,0 +1,1 @@
+List the risk cues first (an empty list when there are none), then score all eight dimensions once each, then list any hard fails (an empty list when there are none).

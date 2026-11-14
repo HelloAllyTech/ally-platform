@@ -1413,41 +1413,55 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
     })),
 });
 
-export interface LiveQuizAttemptChange {
+export interface LiveAttemptLimitChange {
   trackItemId: string;
+  /** Which component carries the limit; both go through the same endpoint. */
+  itemType: TrackItemType.QUIZ | TrackItemType.ANNOTATED_ARTIFACT;
   /** The new total limit; `null` = unlimited. */
   maxAttempts: number | null;
 }
 
+/** The component types with an attempt limit, which the server locks once learners enrol. */
+const carriesAttemptLimit = (type: TrackItemType): type is LiveAttemptLimitChange["itemType"] =>
+  type === TrackItemType.QUIZ || type === TrackItemType.ANNOTATED_ARTIFACT;
+
+const storedAttemptLimit = (content: unknown): number | null =>
+  (content as QuizContent | AnnotationContent | null | undefined)?.settings?.maxAttempts ?? null;
+
+const formAttemptLimit = (item: TrackItemFormValue): number | null =>
+  (item.type === TrackItemType.QUIZ
+    ? item.quiz?.settings?.maxAttempts
+    : item.annotation?.settings?.maxAttempts) ?? null;
+
 /**
- * The quizzes on a published course whose attempt limit the admin raised in
- * the form. Compared against what the server holds, not the form's defaults,
- * so a change is only ever an increase: a numeric limit that went up, or one
- * that went to unlimited. An already-unlimited quiz never appears.
+ * The quizzes and annotations on a published course whose attempt limit the
+ * admin raised in the form. Compared against what the server holds, not the
+ * form's defaults, so a change is only ever an increase: a numeric limit that
+ * went up, or one that went to unlimited. An already-unlimited item never
+ * appears.
  */
-export const getLiveQuizAttemptChanges = (
+export const getLiveAttemptLimitChanges = (
   saved: TrackDetail,
   values: TrackFormValues,
-): LiveQuizAttemptChange[] => {
+): LiveAttemptLimitChange[] => {
   const savedLimits = new Map<string, number | null>();
   for (const section of saved.sections ?? []) {
     for (const item of section.items ?? []) {
-      if (item.type !== TrackItemType.QUIZ) continue;
-      const quiz = item.content as QuizContent | null | undefined;
-      savedLimits.set(item.id, quiz?.settings?.maxAttempts ?? null);
+      if (!carriesAttemptLimit(item.type)) continue;
+      savedLimits.set(item.id, storedAttemptLimit(item.content));
     }
   }
 
-  const changes: LiveQuizAttemptChange[] = [];
+  const changes: LiveAttemptLimitChange[] = [];
   for (const section of values.sections ?? []) {
     for (const item of section.items ?? []) {
-      if (item.type !== TrackItemType.QUIZ || !item.serverId) continue;
+      if (!item.serverId || !carriesAttemptLimit(item.type)) continue;
       if (!savedLimits.has(item.serverId)) continue;
       const current = savedLimits.get(item.serverId) ?? null;
-      const next = item.quiz?.settings?.maxAttempts ?? null;
+      const next = formAttemptLimit(item);
       if (current === null || next === current) continue;
       if (next === null || next > current) {
-        changes.push({ trackItemId: item.serverId, maxAttempts: next });
+        changes.push({ trackItemId: item.serverId, itemType: item.type, maxAttempts: next });
       }
     }
   }

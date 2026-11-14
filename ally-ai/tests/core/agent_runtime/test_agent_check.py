@@ -4,13 +4,19 @@ import pytest
 
 from app.core.agent_runtime.check import (
     REJECTIONS,
+    TEAM_WILL_CONFIRM,
+    Rejection,
     check_reply,
     detail_kinds,
+    fallback_contact,
     looks_factual,
     mentions_sources,
+    offers_slot,
     organisation_of,
     plain_text,
     rejection_feedback,
+    says_it_has_nothing,
+    touches_topic,
     unsupported_details,
 )
 from app.core.agent_runtime.prompt import NO_TOPICS, format_topics
@@ -670,3 +676,265 @@ class TestTopicsOfferedOnce:
             organisation=self.BOT,
         )
         assert rejection is None
+
+
+class TestOrganisationFromPageTitles:
+    """Crawled pages are titled "Page — Business" (chunk 20a): the business is the
+    shared side, never the page label (chunk 20a-2)."""
+
+    BOT = {
+        "persona": {"display_name": "Bright Minds Academy assistant"},
+        "knowledge_topics": [
+            "Bright Minds Academy — Coaching for Class 8 to 12 in Kothrud",
+            "Batch timings — Bright Minds Academy",
+            "Courses — Bright Minds Academy",
+            "Contact — Bright Minds Academy",
+        ],
+    }
+
+    def test_the_business_is_the_name_and_page_labels_are_topics(self):
+        org = organisation_of(self.BOT)
+        assert "Bright Minds Academy" in org.terms
+        assert "Batch timings" not in org.terms
+        assert "Courses" not in org.terms
+        assert "Batch timings" in org.topics
+
+    def test_an_ordinary_question_doesnt_name_the_organisation(self):
+        org = organisation_of(self.BOT)
+        assert not org.named_in("What are the morning and evening batch timings?")
+        assert org.named_in("Where is Bright Minds Academy?")
+
+    def test_shared_prefixes_still_name_the_organisation(self):
+        org = organisation_of(
+            {"knowledge_topics": ["Ally FAQ – About Ally", "Ally FAQ – Pricing"]}
+        )
+        assert "Ally FAQ" in org.terms
+        assert org.topics == ("About Ally", "Pricing")
+
+
+class TestSaysItHasNothing:
+    """A reply that opens by saying it has nothing is a decline, whatever the model
+    labelled it (chunk 20a-2: curly apostrophes, and "I don't have a …")."""
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "I don’t have a refund policy. Ask your organisation instead.",
+            "I don’t have information about that.",
+            "Sorry, I don’t have the batch timings.",
+            "I don't have any details on parking.",
+        ],
+    )
+    def test_declines(self, text):
+        assert says_it_has_nothing(text)
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "We don’t have a cancellation fee.",
+            "I don’t have to ask: yes, it is free.",
+            "Yes, there is parking in the basement.",
+        ],
+    )
+    def test_answers(self, text):
+        assert not says_it_has_nothing(text)
+
+
+class TestFallbackContact:
+    """Every decline gives the owner's fallback contact (onboarding's "When it
+    doesn't know"), word for word from the bot's decline wording (chunk 20a-2)."""
+
+    WORDING = "I don't have that information — please call +91 20 0000 4400."
+
+    def test_a_decline_without_it_gets_the_configured_contact(self):
+        result, _ = review(
+            "decline",
+            "I can't share a staff member's personal number.",
+            decline_text=self.WORDING,
+        )
+        assert result["intent"] == "decline"
+        assert result["answer"] == (
+            "I can't share a staff member's personal number. "
+            "Please call +91 20 0000 4400."
+        )
+
+    def test_a_decline_that_has_it_is_left_alone(self):
+        text = "I don't have that. Please call +91 20 0000 4400 to ask."
+        result, _ = review("decline", text, decline_text=self.WORDING)
+        assert result["answer"] == text
+
+    def test_an_invented_number_is_removed_and_the_configured_one_added(self):
+        result, _ = review(
+            "decline",
+            "I don't have her number. Try 98765 43210.",
+            decline_text=self.WORDING,
+            passages=[],
+        )
+        assert "98765" not in result["answer"]
+        assert result["answer"].endswith("Please call +91 20 0000 4400.")
+
+    def test_no_contact_in_the_wording_adds_nothing(self):
+        text = "I don't have that information."
+        result, _ = review("decline", text, decline_text="Please ask our front desk.")
+        assert result["answer"] == text
+
+    def test_answers_are_untouched(self):
+        result, _ = review(
+            "answer", "It costs Rs. 1,800.", citations=[1], decline_text=self.WORDING
+        )
+        assert "4400" not in result["answer"]
+
+    def test_the_contact_clause(self):
+        assert fallback_contact(self.WORDING) == "Please call +91 20 0000 4400."
+        assert fallback_contact("Please ask our front desk.") == ""
+
+
+class TestOutRefund:
+    """3a eval case `out-refund`: the reply declines in words but the model labelled
+    it an answer and cited where to go. The label follows what the reply does, so
+    ally-be files it as unanswered (chunk 20a-2)."""
+
+    def test_a_cited_answer_that_says_it_has_nothing_is_a_decline(self):
+        result, _ = review(
+            "answer",
+            "I don’t have any information about a refund policy. Please ask your "
+            "organisation, who manage access and billing.",
+            citations=[1],
+        )
+        assert result["intent"] == "decline"
+        assert result["citations"] == []
+        assert result["answer"].startswith("I don’t have any information")
+
+
+class TestBookingOffers:
+    """The assistant can't book, so offers to are trimmed (chunk 20a-2)."""
+
+    def test_an_offer_to_book_is_trimmed_and_how_to_book_stays(self):
+        result, _ = review(
+            "answer",
+            "Couples sessions are 75 minutes. You can book on WhatsApp. "
+            "Would you like me to book a slot for you?",
+            citations=[1],
+        )
+        assert result["answer"] == (
+            "Couples sessions are 75 minutes. You can book on WhatsApp."
+        )
+
+    def test_a_decline_keeps_its_contact_and_loses_the_offer(self):
+        result, _ = review(
+            "decline",
+            "I can't diagnose anyone. I can help you find and book a consultation.",
+            decline_text="Please call +91 20 0000 4400.",
+        )
+        assert result["answer"] == (
+            "I can't diagnose anyone. Please call +91 20 0000 4400."
+        )
+
+    def test_a_reply_that_is_only_an_offer_is_kept(self):
+        text = "Would you like me to book a slot for you?"
+        result, _ = review("decline", text)
+        assert result["answer"] == text
+
+
+class TestAvoidTopics:
+    """Topics the owner asked it not to talk about (chunk 20a-2)."""
+
+    def test_a_question_about_an_avoided_topic_gets_the_decline_wording(self):
+        result, _ = review(
+            "answer",
+            "A session costs Rs. 2,000.",
+            citations=[1],
+            question="What are your prices?",
+            avoid_topics=["prices"],
+        )
+        assert result["intent"] == "decline"
+        assert result["answer"] == ""  # ally-be sends the owner's decline wording
+
+    def test_unrelated_questions_are_still_answered(self):
+        result, _ = review(
+            "answer",
+            "We open at 9 am on weekdays.",
+            citations=[1],
+            question="what time do you open?",
+            avoid_topics=["prices"],
+        )
+        assert result["intent"] == "answer"
+        assert result["answer"] == "We open at 9 am on weekdays."
+
+    def test_a_reply_that_brings_one_up_is_declined(self):
+        result, _ = review(
+            "answer",
+            "Our pricing starts at Rs. 2,000.",
+            citations=[1],
+            question="Tell me about sessions",
+            avoid_topics=["prices"],
+        )
+        assert result["intent"] == "decline"
+
+    def test_topic_matching(self):
+        assert touches_topic("How do your prices work?", "prices")
+        assert touches_topic("Is pricing different online?", "prices")
+        assert touches_topic("Do you know other clinics nearby?", "other clinics")
+        assert not touches_topic("Which clinic is closest?", "other clinics")
+        assert not touches_topic("When do you open?", "prices")
+
+
+class TestSlotOffers:
+    """Bring in customers never presents a time as free, a slot or booked (chunk 20a-2,
+    round 6's PE2); opening hours from the documents are untouched."""
+
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "What name and phone should I pass on for the 5:00 PM slot tomorrow?",
+            "Shall I pass your details so they can book you for tomorrow at 5 pm?",
+            "There's a slot on Saturday if that suits you.",
+            "3 pm is free on Monday.",
+            "We have an appointment at 11:30 am.",
+            "You're booked for Friday.",
+            "The 10 am slot works.",
+        ],
+    )
+    def test_the_slot_wording_is_caught(self, sentence):
+        assert offers_slot(sentence), sentence
+
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "We're open until 8 pm.",
+            "Monday to Friday: 9:00 am to 8:00 pm; Saturday 9:00 am to 5:00 pm.",
+            "Online sessions are also available from 7:00 am on weekdays.",
+            "We are closed on Sunday.",
+            "You can book on WhatsApp at +91 20 0000 4411.",
+            "Book a first consultation on our website.",
+            "Our WhatsApp line is answered during opening hours only.",
+        ],
+    )
+    def test_the_opening_hours_wording_is_kept(self, sentence):
+        assert not offers_slot(sentence), sentence
+
+    def test_an_enquiries_reply_offering_a_slot_goes_back_to_be_rewritten(self):
+        text = (
+            "I can't book appointments directly. What name and phone number should "
+            "I pass on for the 5:00 PM slot tomorrow?"
+        )
+        result, rejection = review("clarify", text, purpose="enquiries")
+        assert rejection == Rejection.OFFERS_SLOT
+        # Without time to rewrite, it goes out without the slot.
+        assert "5:00 PM" not in result["answer"]
+        assert result["answer"] == (
+            "I can't book appointments directly. " + TEAM_WILL_CONFIRM
+        )
+        assert "the team will confirm" in REJECTIONS[Rejection.OFFERS_SLOT]
+
+    def test_opening_hours_go_through_for_enquiries(self):
+        text = "We're open until 8 pm on weekdays and 5 pm on Saturdays."
+        result, rejection = review("answer", text, citations=[1], purpose="enquiries")
+        assert rejection is None
+        assert result["answer"] == text
+
+    def test_only_bring_in_customers_is_checked(self):
+        text = "There's a slot on Saturday at 10 am."
+        for purpose in (None, "answer", "training", "guide"):
+            _, rejection = review("answer", text, citations=[1], purpose=purpose)
+            assert rejection != Rejection.OFFERS_SLOT, purpose

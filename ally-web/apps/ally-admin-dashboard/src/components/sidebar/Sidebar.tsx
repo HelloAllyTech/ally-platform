@@ -40,6 +40,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { CustomImage } from "@ally-ui-mono/ui-shared";
 import { useAnalytics, ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@ally-ui-mono/ui-shared";
+import { useGetInboxCountsQuery } from "@api";
 import {
   ArrowDown,
   Book,
@@ -63,6 +64,9 @@ import { UserModal } from "@components";
 // Direct path, not the @components barrel: this file is the barrel's own
 // neighbour and several suites mock it wholesale.
 import { AgentAvatar } from "@components/agent-avatar";
+import { ColorModeToggle } from "@components/color-mode-toggle/ColorModeToggle";
+import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
+import { NotificationBell } from "@components/notification-bell/NotificationBell";
 import { SIDEBAR_ITEMS, ROUTES, en, profileSettings, USER_MODAL_FIELDS_IDS } from "@constants";
 import { useClickOutside, useUser } from "@hooks";
 
@@ -89,6 +93,23 @@ const defaultProfileUploadValues: {
   profileImageUrl: "",
 };
 
+/** Unread chats in the inbox (chunk 11a), refreshed every minute and on every inbox event. */
+const InboxNavBadge: React.FC = () => {
+  const { data } = useGetInboxCountsQuery(undefined, {
+    pollingInterval: 60_000,
+    skipPollingIfUnfocused: true,
+  });
+  if (!data?.unread) return null;
+  return (
+    <span
+      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white"
+      title={`${data.unread} unread`}
+    >
+      {data.unread}
+    </span>
+  );
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobileClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -103,6 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     uploadProfileImage,
     refetchUser,
     features,
+    permissions,
   } = useUser();
   const { track } = useAnalytics();
 
@@ -174,7 +196,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
   useEffect(() => {
     const isCreateRoute =
       location.pathname.includes(ROUTES.CREATE_SIMULATION) ||
-      location.pathname.includes(ROUTES.CREATE_PATH);
+      location.pathname.includes(ROUTES.CREATE_PATH) ||
+      // Onboarding's chat and canvas need the width (chunk 20a).
+      location.pathname.startsWith(ROUTES.CHATBOT_NEW);
 
     setIsRouteForceCollapsed(isCreateRoute);
 
@@ -350,6 +374,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     switch (id) {
       case SIDEBAR_ITEMS.BUILDER:
         return <BuilderNavBadge />;
+      // The inbox lives in AI Chatbots (chunk 11a): its unread chats show on that tab.
+      case SIDEBAR_ITEMS.WHATSAPP_BOT:
+        return <InboxNavBadge />;
       default:
         return undefined;
     }
@@ -477,12 +504,42 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
                 />
               ))}
             </ul>
+            {/* Signed in, permissions known, and no page to open: say so, not a blank sidebar. */}
+            {showExpanded &&
+              !isSearching &&
+              filteredNavigationItems.length === 0 &&
+              Boolean(permissions?.length) && (
+                <p
+                  data-testid="sidebar-no-access"
+                  className="px-3 py-2 text-sm text-typography-600"
+                >
+                  {en.common.noMenuAccess}
+                </p>
+              )}
             {showExpanded && isSearching && displayedNavItems.length === 0 && (
               <p className="px-3 py-2 text-sm text-typography-600">{en.common.noMenuResults}</p>
             )}
           </SortableContext>
         </DndContext>
       </nav>
+    </div>
+  );
+
+  /*
+    The app-wide quick actions — "Say an idea" and the light/dark switch — live in the primary
+    nav rather than a bar of their own, so the shell has one navigation, not two. A row when the
+    sidebar is expanded, a column under the nav icons when it is collapsed to a rail.
+  */
+  const quickActions = (
+    <div
+      data-testid="sidebar-quick-actions"
+      className={`flex flex-shrink-0 items-center gap-1 border-t border-border-light pt-3 ${
+        showExpanded ? "flex-row px-2" : "flex-col"
+      }`}
+    >
+      <NotificationBell placement="above" />
+      <IdeaCaptureLauncher />
+      <ColorModeToggle />
     </div>
   );
 
@@ -625,6 +682,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         </div>
 
         {sidebarItems}
+        {quickActions}
         {profileSection}
       </div>
       {isMobileOpen && (

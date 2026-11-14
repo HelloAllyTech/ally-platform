@@ -97,12 +97,15 @@ export const makeEngine = ({
   promptShared,
   replyService = { match: jest.fn().mockResolvedValue(null) },
   documents = { find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]) },
+  conversations,
 }: {
   aiService: EngineAiService;
   promptShared: { getPromptsByOptions: jest.Mock };
   replyService?: unknown;
   /** The ChatbotDocument repository. */
   documents?: unknown;
+  /** The shared store, for who holds a chat (chunk 11a); without it no chat is held. */
+  conversations?: { holderOf: jest.Mock };
 }): ChatbotEngineService =>
   new ChatbotEngineService(
     documents as never,
@@ -112,4 +115,5 @@ export const makeEngine = ({
     aiService as never,
     promptShared as never,
     new AgentRuntimeRunner(documents as never, aiService as never),
+    conversations as never,
   );

@@ -101,6 +101,9 @@ jobs:
       # every PR check was green). Build here so that class of break fails the
       # pull request, not the release.
       - name: Build (nest build)
+        # Outgrew Node's default heap on 2026-11-11 (OOM, exit 134); the runner has 7 GB.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run build
 
   actionlint:

@@ -62,5 +62,33 @@ export const canQuickAddRoadmap = (
   permissions: string[] | undefined,
   features: string[] | undefined,
 ): boolean =>
-  !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP) &&
+  canFileIdeas(permissions, features) &&
   hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD);
+
+/**
+ * Whether this reader may file an idea at all: the guided interview, idea capture (park it) and,
+ * with its own toggle on top, quick add.
+ *
+ * The VOTE permission AND the `product_planning_ideas` toggle, the pair ally-be checks on every
+ * filing door. The toggle is on by default for platform admins and platform-only, so an
+ * org-restricted admin, or one whose Ideas toggle was switched off, sees no filing button rather
+ * than one that answers 403. Viewing and voting are unaffected.
+ *
+ * Fails closed: an empty `features` (toggle fetch failed) hides the doors.
+ */
+export const canFileIdeas = (
+  permissions: string[] | undefined,
+  features: string[] | undefined,
+): boolean =>
+  !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP) &&
+  hasFeature(features, FeatureToggleKey.PRODUCT_PLANNING_IDEAS);
+
+/**
+ * Whether this reader gets the planning Lead's tabs (Needs a lead, Signals) and actions.
+ *
+ * The `product_planning_lead` toggle alone: it is platform-only on the server, so an
+ * org-restricted admin never holds it here either. Every lead action is checked again on the
+ * server; this only decides what is shown. Fails closed on an empty `features`.
+ */
+export const canLeadRoadmapPlans = (features: string[] | undefined): boolean =>
+  hasFeature(features, FeatureToggleKey.PRODUCT_PLANNING_LEAD);

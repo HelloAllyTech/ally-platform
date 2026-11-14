@@ -248,7 +248,8 @@ export class AppConfigService {
   get builderHealthUrls(): Record<string, string> {
     const defaults: Record<string, string> = {
       'ally-be': `${this.publicApiBaseUrl}/api/health`,
-      'ally-web:admin': 'https://admin.helloally.ai',
+      'ally-web:admin': 'https://app.helloally.ai/admin/',
+      'ally-web:frontends': 'https://app.helloally.ai/admin/',
     };
     try {
       const raw = this.configService.get<string>('BUILDER_HEALTH_URLS', '');
@@ -593,6 +594,11 @@ export class AppConfigService {
       // I/O). Unset → the trace service falls back to the private audio
       // bucket; never a public one.
       agentTraceBucket: this.configService.get<string>('AGENT_TRACE_S3_BUCKET'),
+      // Bot page images (chunk 20d): private. Unset → the private audio bucket, under a
+      // `bot-images/` prefix; a bucket of its own is a launch item.
+      botImagesBucket:
+        this.configService.get<string>('BOT_IMAGES_S3_BUCKET') ||
+        this.configService.get<string>('AUDIO_STORAGE_S3_BUCKET'),
     };
   }
 
@@ -1018,6 +1024,18 @@ export class AppConfigService {
   }
 
   /**
+   * Optional dedicated secret for the Debrief harness's run tokens (the
+   * bearer token ally-ai's debrief graph sends to the gateway tools). Empty
+   * when unset, and that is supported: `DebriefRunTokenService` then derives
+   * one as HMAC-SHA256(JWT_ACCESS_SECRET, 'debrief-gateway-v1'), so it is
+   * never the access secret itself and a user JWT can never pass as a run
+   * token (nor the reverse). Never leaves ally-be.
+   */
+  get debriefGatewaySecret(): string {
+    return this.configService.get<string>('DEBRIEF_GATEWAY_SECRET', '');
+  }
+
+  /**
    * User ids allowed to put a new version of a PINNED prompt live — the judge
    * rubrics, measuring instruments and guards in `PINNED_PROMPTS`.
    *
@@ -1052,6 +1070,63 @@ export class AppConfigService {
       'ADMIN_APP_BASE_URL',
       'http://localhost:8081',
     );
+  }
+
+  /**
+   * The bot page (Agents v2, chunk 12b). Its link is `<baseUrl>/b/<slug>`. The page is a second
+   * entry of the admin dashboard, so the base URL defaults to `ADMIN_APP_BASE_URL`; set
+   * `BOT_PAGE_BASE_URL` once the page has its own domain. The public API answers browsers from
+   * `origin` only. Turnstile runs on public pages only while its secret is set.
+   */
+  /**
+   * Agent-first onboarding (chunk 20a). `crawlAllowHosts` lets the crawl read hosts that resolve to
+   * private addresses (the local fixture server) and is honoured in local and development only;
+   * production always gets an empty list.
+   */
+  get botDraft() {
+    const hosts = (
+      this.configService.get<string>('BOT_DRAFT_CRAWL_ALLOW_HOSTS', '') || ''
+    )
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean);
+    const devOrTest =
+      this.isLocal || this.isDevelopment || this.nodeEnv === 'test';
+    return {
+      crawlAllowHosts: devOrTest ? hosts : [],
+      crawlsPerDay:
+        Number(
+          this.configService.get<string>('BOT_DRAFT_CRAWLS_PER_DAY', '20'),
+        ) || 20,
+    };
+  }
+
+  get botPage() {
+    const baseUrl = (
+      this.configService.get<string>('BOT_PAGE_BASE_URL') || this.adminBaseUrl
+    ).replace(/\/+$/, '');
+    let origin = baseUrl;
+    try {
+      origin = new URL(baseUrl).origin;
+    } catch {
+      // Joi checked it is a URI; keep the raw value if URL still disagrees.
+    }
+    return {
+      baseUrl,
+      origin,
+      turnstileSiteKey: this.configService.get<string>(
+        'TURNSTILE_SITE_KEY',
+        '',
+      ),
+      turnstileSecretKey: this.configService.get<string>(
+        'TURNSTILE_SECRET_KEY',
+        '',
+      ),
+      visitorSecret: this.configService.get<string>(
+        'BOT_PAGE_VISITOR_SECRET',
+        '',
+      ),
+    };
   }
 
   get courseCopilot() {

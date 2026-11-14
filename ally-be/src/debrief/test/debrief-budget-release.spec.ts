@@ -1,14 +1,12 @@
 import {
   DEBRIEF_MODELS,
+  DEBRIEF_REPLY_DEFAULT,
   DEBRIEF_SEED_BUNDLE,
   DebriefRecipeKey,
   DebriefStep,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
-import {
-  effectiveRunCeiling,
-  estimateStepCostUsd,
-} from '../util/debrief-budget.util';
+import { effectiveRunCeiling, modelPrices } from '../util/debrief-budget.util';
 
 const settings = DEBRIEF_SEED_BUNDLE.settings;
 
@@ -38,7 +36,9 @@ describe('debrief release bundle', () => {
         steps: all,
         reply: new Set(),
       }).join('\n'),
-    ).toContain('in the LLM catalog for ally-be');
+    ).toContain(
+      `${DEBRIEF_REPLY_DEFAULT.model} is not an active model in the LLM catalog for ally-ai`,
+    );
   });
 
   it('refuses a recipe that drops a mandatory step or reorders the loop', () => {
@@ -100,17 +100,17 @@ describe('debrief budget', () => {
     ).toBe(0);
   });
 
-  it('never runs an unpriced model, and rules-only steps are free', () => {
-    expect(
-      estimateStepCostUsd(DebriefStep.WRITER, 'some-new-model', 1000),
-    ).toBe(Infinity);
-    expect(estimateStepCostUsd(DebriefStep.CHECKS, null, 1000)).toBe(0);
-    const writer = estimateStepCostUsd(
-      DebriefStep.WRITER,
+  it('prices every priced model per million tokens and leaves out unpriced ones', () => {
+    const prices = modelPrices([
       'gemini-3-flash-preview',
-      30_000,
+      'some-new-model',
+      null,
+      'gemini-3-flash-preview',
+    ]);
+    expect(Object.keys(prices)).toEqual(['gemini-3-flash-preview']);
+    expect(prices['gemini-3-flash-preview'].input_per_m).toBeGreaterThan(0);
+    expect(prices['gemini-3-flash-preview'].output_per_m).toBeGreaterThan(
+      prices['gemini-3-flash-preview'].input_per_m,
     );
-    expect(writer).toBeGreaterThan(0.005);
-    expect(writer).toBeLessThan(0.1);
   });
 });

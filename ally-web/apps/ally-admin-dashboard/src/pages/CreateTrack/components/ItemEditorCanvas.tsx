@@ -21,7 +21,7 @@ interface ItemEditorCanvasProps {
   itemIndex: number;
   type: TrackItemType;
   onDelete: () => void;
-  /** The course is live; only the quiz editor reads it (attempt limits can still go up). */
+  /** The course is live; the quiz and annotation editors read it (attempt limits can still go up). */
   isPublished?: boolean;
 }
 
@@ -50,7 +50,7 @@ export const ItemEditorCanvas: FC<ItemEditorCanvasProps> = ({
     case TrackItemType.QUIZ:
       return <QuizItemEditor {...props} isPublished={isPublished} />;
     case TrackItemType.ANNOTATED_ARTIFACT:
-      return <AnnotationItemEditor {...props} />;
+      return <AnnotationItemEditor {...props} isPublished={isPublished} />;
     case TrackItemType.GAME: {
       const gameKey = watch(`sections.${sectionIndex}.items.${itemIndex}.game.gameKey`);
       if (gameKey === TrackGameKey.BREATHING_EXERCISE) {

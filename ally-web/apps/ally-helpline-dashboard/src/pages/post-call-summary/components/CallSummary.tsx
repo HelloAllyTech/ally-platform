@@ -368,7 +368,11 @@ const CallSummary: FC<CallSummaryProps> = ({
     const isEnhancing = enhancing === field.key;
     const enhanceEndAdornment =
       field.isEnhanceable && shouldAllowEdit && value && value.trim() ? (
-        <Tooltip label={t("summary.enhance")} align="bottom">
+        // The button itself is pinned to the textarea's bottom-right corner,
+        // leaving almost no room below it — a "bottom"-aligned tooltip ended
+        // up overlapping the button it was meant to label, blocking clicks
+        // on it entirely. "top" opens away from the edge the button sits on.
+        <Tooltip label={t("summary.enhance")} align="top">
           <span className="absolute bottom-2 right-2">
             <EnhanceButton
               fieldName={field.key}
@@ -461,7 +465,15 @@ const CallSummary: FC<CallSummaryProps> = ({
     navigateToCallLogs();
   };
 
-  if (canShowSummary && isSummaryLoading) {
+  // Only when there's nothing on screen yet. Without the `!summaryData`
+  // guard, every autosave re-triggered this the same way it used to
+  // re-trigger the "not found" branch below: updateCallSummary invalidates
+  // the CallSummary tag, isSummaryLoading pulses true for that background
+  // refetch, and the whole form — the textarea the counsellor is mid-keystroke
+  // in — unmounts for a spinner and remounts a moment later, taking focus
+  // with it. Confirmed 2026-11 ("type a letter, it autosaves, have to click
+  // back into the field to keep typing").
+  if (canShowSummary && isSummaryLoading && !summaryData) {
     return (
       <div className="flex justify-center items-center h-[calc(100dvh-80px)]">
         <Loading withOverlay={false} />
@@ -533,7 +545,16 @@ const CallSummary: FC<CallSummaryProps> = ({
         <div className={`overflow-y-auto font-primary pb-[60px] ${className}`}>
           {sections.map(({ title, icon, key }, index) => {
             const sectionFields = getSectionFields(key, visibleFields, translatedFields);
-            if (sectionFields?.length === 0) return null;
+            // A section with no built-in fields configured as visible still
+            // has to render if it holds any custom fields — this used to drop
+            // the whole accordion (custom fields included) the moment a
+            // section's built-in fields were hidden, which is how a tenant's
+            // "Flow" custom fields (Comments, Counsellor Comment) vanished
+            // entirely: Flow has only one built-in field, and it wasn't in
+            // this tenant's visible-fields config. Fixed 2026-11.
+            const sectionHasCustomFields =
+              customFieldsActive && (customFieldValues ?? []).some(f => f.sectionKey === key);
+            if (sectionFields?.length === 0 && !sectionHasCustomFields) return null;
 
             return (
               <motion.div

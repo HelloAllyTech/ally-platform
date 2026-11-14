@@ -1,14 +1,21 @@
-import { FC, useEffect, useId, useState } from "react";
+import { FC, KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 
 import { Flag, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
   useFlagDebriefCardMutation,
+  useAnswerDebriefPulseMutation,
   useSetDebriefHelpfulMutation,
   useUndoDebriefFlagMutation,
 } from "@api";
-import { DebriefCorrection, DebriefFlagReason, DebriefMyFlag } from "@types";
+import {
+  DebriefCorrection,
+  DebriefFlagReason,
+  DebriefMyFlag,
+  DebriefPulse,
+  DebriefPulseQuestion,
+} from "@types";
 
 const REASONS: DebriefFlagReason[] = [
   "didnt_say",
@@ -38,7 +45,47 @@ export const CardFlag: FC<{
 }> = ({ sessionId, section, cardLabel, flag, correction }) => {
   const { t, i18n } = useTranslation();
   const formId = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  // PRD §9: the sheet keeps focus inside it, and closing it hands focus back
+  // to "This isn't right".
+  const opener = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+  const setOpen = (next: boolean) => {
+    if (!next) returnFocus.current = true;
+    setOpenState(next);
+  };
+  useEffect(() => {
+    if (!open && returnFocus.current) {
+      returnFocus.current = false;
+      opener.current?.focus();
+    }
+  }, [open]);
+  const trapFocus = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = [
+      ...event.currentTarget.querySelectorAll<HTMLElement>(
+        "input:not([disabled]), textarea:not([disabled]), button:not([disabled])",
+      ),
+    ].filter(el => {
+      // A radio group is one tab stop: the checked choice, or the first.
+      if (!(el instanceof HTMLInputElement) || el.type !== "radio") return true;
+      return reason ? el.checked : el.value === REASONS[0];
+    });
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
   const [reason, setReason] = useState<DebriefFlagReason | null>(null);
   const [note, setNote] = useState("");
   const [failed, setFailed] = useState(false);
@@ -96,6 +143,7 @@ export const CardFlag: FC<{
   if (!open) {
     return (
       <button
+        ref={opener}
         type="button"
         className={`${linkButton} self-start`}
         aria-label={t("postSim.debriefCards.flag.openLabel", { card: cardLabel })}
@@ -125,9 +173,7 @@ export const CardFlag: FC<{
         event.preventDefault();
         void submit();
       }}
-      onKeyDown={event => {
-        if (event.key === "Escape") setOpen(false);
-      }}
+      onKeyDown={trapFocus}
       data-testid="debrief-flag-form"
     >
       <fieldset className="flex flex-col gap-1">
@@ -213,6 +259,60 @@ export const DebriefHelpful: FC<{ sessionId: string; helpful: boolean | null }> 
       {helpful !== null && (
         <span role="status" className="font-primary text-xs text-typography-700">
           {t("postSim.debriefCards.helpful.thanks")}
+        </span>
+      )}
+    </div>
+  );
+};
+
+const PULSE_QUESTIONS: DebriefPulseQuestion[] = ["knew_next", "fair"];
+
+/**
+ * The post-launch pulse (PRD §9): on 1 in 10 debriefs for 8 weeks, two
+ * yes/no questions under "Was this helpful?". The server decides which
+ * debriefs ask; answering again changes the answer.
+ */
+export const DebriefPulseCard: FC<{ sessionId: string; pulse: DebriefPulse }> = ({
+  sessionId,
+  pulse,
+}) => {
+  const { t } = useTranslation();
+  const [answer, { isLoading }] = useAnswerDebriefPulseMutation();
+  const answered = PULSE_QUESTIONS.every(q => pulse[q] !== null);
+  return (
+    <div
+      data-testid="debrief-pulse"
+      className="flex flex-col gap-3 rounded-lg border border-primary-100 bg-primary-50 p-4"
+    >
+      <p className="font-primary text-sm text-typography-800">
+        {t("postSim.debriefCards.pulse.intro")}
+      </p>
+      {PULSE_QUESTIONS.map(question => (
+        <fieldset key={question} className="flex flex-wrap items-center gap-2">
+          <legend className="mb-1 w-full font-primary text-sm font-semibold text-typography-900">
+            {t(`postSim.debriefCards.pulse.${question}`)}
+          </legend>
+          {[true, false].map(value => (
+            <button
+              key={String(value)}
+              type="button"
+              aria-pressed={pulse[question] === value}
+              disabled={isLoading}
+              onClick={() => void answer({ sessionId, question, answer: value })}
+              className={`inline-flex min-h-[44px] min-w-[64px] items-center justify-center rounded-md border px-3 font-primary text-sm ${
+                pulse[question] === value
+                  ? "border-primary-600 bg-white font-semibold text-typography-900"
+                  : "border-primary-100 bg-white text-typography-800"
+              }`}
+            >
+              {value ? t("postSim.debriefCards.pulse.yes") : t("postSim.debriefCards.pulse.no")}
+            </button>
+          ))}
+        </fieldset>
+      ))}
+      {answered && (
+        <span role="status" className="font-primary text-xs text-typography-700">
+          {t("postSim.debriefCards.pulse.thanks")}
         </span>
       )}
     </div>

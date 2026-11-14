@@ -43,6 +43,25 @@ export enum UserRole {
   LISTENER = 'LISTENER',
   /** Text helpline supervisor: a LISTENER who can also monitor, whisper and transfer. */
   HELPLINE_SUPERVISOR = 'HELPLINE_SUPERVISOR',
+  /**
+   * The Debrief console's clinical advisor: expert verdicts with the agreement
+   * answers, comments, escalated flags, and approving pinned rules. Additive,
+   * like EVALUATOR: it carries `review:admin:debriefs` and nothing else, and is
+   * held alongside the account's normal role (usually PLATFORM_ADMIN). Gate on
+   * the permission, never on this name. Platform-managed (see
+   * PLATFORM_MANAGED_ROLES): the generic role picker can't grant it, because
+   * the advisor reads debriefs from every organisation.
+   */
+  CLINICAL_ADVISOR = 'CLINICAL_ADVISOR',
+  /**
+   * The Debrief owner (migration 1981901200000): carries
+   * `manage:admin:debrief-settings` and nothing else — Debrief settings,
+   * budgets, switching organisations on, releases, the PM agent, held debriefs
+   * and Agent logs. Additive and platform-managed like CLINICAL_ADVISOR: it
+   * reaches every organisation's debriefs, so it is granted person by person
+   * in User Management > Clinical advisors, never by the role picker.
+   */
+  DEBRIEF_OWNER = 'DEBRIEF_OWNER',
 }
 
 /**
@@ -120,8 +139,16 @@ export const PLATFORM_TIER_ROLES: UserRole[] = [
  * Only `changeUserRoles` is constrained. `assignRole` is the single-role path
  * that platform-admin.service itself calls to grant PLATFORM_ADMIN, so guarding
  * it would break the very screen this constant protects.
+ *
+ * CLINICAL_ADVISOR is here for a different reason: it isn't staff, but it
+ * reads debriefs from every organisation, so a tenant-scoped picker must never
+ * hand it out. It is granted person by person by the Ally team (user_groups).
  */
-export const PLATFORM_MANAGED_ROLES: UserRole[] = PLATFORM_TIER_ROLES;
+export const PLATFORM_MANAGED_ROLES: UserRole[] = [
+  ...PLATFORM_TIER_ROLES,
+  UserRole.CLINICAL_ADVISOR,
+  UserRole.DEBRIEF_OWNER,
+];
 
 export enum AppType {
   APP = 'APP',

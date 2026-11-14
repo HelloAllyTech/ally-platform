@@ -392,6 +392,20 @@ describe('RoadmapSplitMergeService', () => {
       );
     });
 
+    it('tells the vote-balance trigger this transaction only moves votes, before any write', async () => {
+      // Without this the trigger reads each re-inserted rollup row as new spend and raises for
+      // any voter who has used most of their balance — a 500 on every merge.
+      setupMerge(
+        [{ userId: 1, opportunityId: A, periodKey: '2026-07', votes: 10 }],
+        [A],
+      );
+      await service.merge(ACTOR, { primaryId: SRC, sourceIds: [A] });
+      const firstQuery = manager.query.mock.calls[0][0] as string;
+      expect(firstQuery).toContain(
+        `set_config('app.roadmap_reshape', 'on', true)`,
+      );
+    });
+
     it('conserves a rollup total well past the old 100-vote cap', async () => {
       // Under the vote-grant ledger a user's balance keeps accruing (daily + monthly grants),
       // so a rollup exceeding 100 is now perfectly legitimate — this used to be the "impossible,

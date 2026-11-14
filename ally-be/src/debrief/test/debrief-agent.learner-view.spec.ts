@@ -12,6 +12,8 @@ function build(opts: {
   endedMinutesAgo?: number;
   profile?: Record<string, unknown> | null;
   region?: 'india' | 'outside_india';
+  stoppedMinutesAgo?: number;
+  feedback?: Record<string, unknown> | null;
 }) {
   const ended = new Date(Date.now() - (opts.endedMinutesAgo ?? 10) * 60_000);
   const dataSource = {
@@ -32,6 +34,7 @@ function build(opts: {
                   tenant_id: 't1',
                   status: 'ENDED',
                   ended_at: ended,
+                  feedback: opts.feedback ?? null,
                 },
               ],
     ),
@@ -40,7 +43,15 @@ function build(opts: {
   const overrides = {
     save: jest.fn(async () => undefined),
     get: jest.fn(async () =>
-      opts.live === false ? null : { values: { live: true } },
+      opts.live === false
+        ? opts.stoppedMinutesAgo !== undefined
+          ? {
+              values: {
+                stoppedAt: Date.now() - opts.stoppedMinutesAgo * 60_000,
+              },
+            }
+          : null
+        : { values: { live: true } },
     ),
   };
   return new DebriefAgentService(
@@ -75,6 +86,70 @@ describe('DebriefAgentService.learnerView', () => {
     });
   });
 
+  it('keeps a debrief already written after an emergency stop (FR-46)', async () => {
+    const view = await build({
+      live: false,
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: { opening: 'x' },
+          language: 'en',
+          steps: [],
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view).toMatchObject({ state: 'ready', cards: { opening: 'x' } });
+  });
+
+  it('says "not available" after an emergency stop, not today’s debrief (FR-46)', async () => {
+    // A session that ended after the stop: nothing written by the agent.
+    expect(
+      await build({
+        live: false,
+        stoppedMinutesAgo: 30,
+        endedMinutesAgo: 10,
+        feedback: { supervisorNote: 'today’s note' },
+      }).learnerView('s', 7),
+    ).toEqual({ state: 'not_available', stopped: true });
+    // A held run in the stopped organisation: no person-finished debrief either.
+    expect(
+      await build({
+        live: false,
+        stoppedMinutesAgo: 30,
+        runs: [{ mode: 'live', status: 'needs_person', steps: [] }],
+      }).learnerView('s', 7),
+    ).toEqual({ state: 'not_available', stopped: true });
+  });
+
+  it('keeps today’s note written before an emergency stop (FR-46)', async () => {
+    expect(
+      await build({
+        live: false,
+        stoppedMinutesAgo: 10,
+        endedMinutesAgo: 60,
+        feedback: { supervisorNote: 'today’s note' },
+      }).learnerView('s', 7),
+    ).toEqual({ state: 'not_available' });
+  });
+
+  it('remembers when an organisation was stopped, and forgets it when switched back on', async () => {
+    const svc = build({});
+    const overrides = (svc as any).overrides;
+    await svc.setLive('t1', false, 1);
+    expect(overrides.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        change: { set: { stoppedAt: expect.any(Number) }, clear: ['live'] },
+      }),
+    );
+    await svc.setLive('t1', true, 1);
+    expect(overrides.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        change: { set: { live: true }, clear: ['stoppedAt'] },
+      }),
+    );
+  });
+
   it('serves a published live debrief, cards only', async () => {
     const view = await build({
       runs: [
@@ -92,9 +167,27 @@ describe('DebriefAgentService.learnerView', () => {
       cards: { opening: 'x' },
       language: 'hi',
       distress: false,
+      riskCue: false,
       supportLines: expect.any(Array),
       practice: [],
     });
+  });
+
+  it('says when the safety reading found a risk cue, so the support lines show without an important moment', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: { opening: 'x' },
+          language: 'en',
+          steps: [],
+          hasRiskCue: true,
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view).toMatchObject({ state: 'ready', riskCue: true });
+    expect((view as any).supportLines.length).toBeGreaterThan(0);
   });
 
   it('gives Tele-MANAS when the organisation set no support lines', async () => {
@@ -193,14 +286,30 @@ describe('DebriefAgentService.learnerView', () => {
     ).toBe('not_available');
   });
 
-  it('a run a person must finish reads as on its way', async () => {
+  it('a run a person must finish reads as on its way with a risk cue, else taking longer', async () => {
     expect(
       (
         await build({
-          runs: [{ mode: 'live', status: 'needs_person', steps: [] }],
+          runs: [
+            {
+              mode: 'live',
+              status: 'needs_person',
+              hasRiskCue: true,
+              steps: [],
+            },
+          ],
         }).learnerView('s', 7)
       ).state,
     ).toBe('on_its_way');
+    for (const status of ['needs_person', 'failed']) {
+      expect(
+        (
+          await build({
+            runs: [{ mode: 'live', status, hasRiskCue: false, steps: [] }],
+          }).learnerView('s', 7)
+        ).state,
+      ).toBe('taking_longer');
+    }
   });
 });
 
@@ -237,7 +346,7 @@ describe('DebriefAgentService.onSessionEnded', () => {
         cards: null,
       })),
     };
-    const releases = { syncSeed: jest.fn() };
+    const releases = { syncSeed: jest.fn(), getGa: jest.fn(async () => null) };
     const overrides = {
       get: jest.fn(async () => (live ? { values: { live: true } } : null)),
     };
@@ -283,6 +392,33 @@ describe('DebriefAgentService.onSessionEnded', () => {
       await jest.advanceTimersByTimeAsync(LIVE_START_DELAY_MS);
       expect(runner.run).not.toHaveBeenCalled();
     }
+  });
+
+  it('a short session reads as the opening and one card: no Practise next, no skill words (plan §8.2)', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          recipeKey: 'short',
+          language: 'en',
+          steps: [],
+          cards: {
+            opening: 'o',
+            work_on_this: [{ lead: 'w', scenario_id: 7 }],
+            practise_next: { skill: 'x', reason: 'y', scenario_id: 41 },
+            skill_words: [{ skill: 'x', word: 'strength' }],
+          },
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.cards).toMatchObject({
+      opening: 'o',
+      practise_next: null,
+      skill_words: [],
+    });
+    expect(view.cards?.work_on_this).toHaveLength(1);
+    expect(view.practice).toEqual([]);
   });
 
   it('links only roleplays the learner can still open', async () => {

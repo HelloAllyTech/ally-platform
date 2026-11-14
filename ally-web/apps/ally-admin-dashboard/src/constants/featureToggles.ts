@@ -55,11 +55,18 @@ export const FeatureToggleKey = {
   // Quick add: file an opportunity straight onto the roadmap, skipping the guided interview's
   // readiness check. A curator shortcut granted to named admins, independent of MANAGE.
   PRODUCT_ROADMAP_QUICK_ADD: "product_roadmap_quick_add",
+  // Product Planning: the two roles of the roadmap's idea-to-outcome plan. IDEAS (on by default)
+  // files ideas through every door; LEAD takes a filed idea through PRD, design, build, launch
+  // and outcome. Both platform-only. Mirrors ally-be FeatureToggleKey.
+  PRODUCT_PLANNING_IDEAS: "product_planning_ideas",
+  PRODUCT_PLANNING_LEAD: "product_planning_lead",
   ADMIN_USER_MANAGEMENT: "admin_user_management",
   MULTI_TENANT_ALLOWLIST_MANAGEMENT: "multi_tenant_allowlist_management",
   BUG_HUNTER: "bug_hunter",
   /** Signs off clinical guidance in Debriefs → Knowledge (the clinical advisor). */
   DEBRIEF_CLINICAL_SIGN_OFF: "debrief_clinical_sign_off",
+  /** Debriefs › Settings › Schedules: engineering, granted person by person. Mirrors ally-be. */
+  DEBRIEF_SCHEDULES: "debrief_schedules",
   BUILDER: "builder",
   // The Context Library page: documents, entries and use-case grants. Mirrors ally-be.
   CONTEXT_LIBRARY: "context_library",
@@ -138,7 +145,8 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.BUG_HUNTER, FeatureToggleKey.BUG_HUNTER],
     [sidebarItems.BUILDER, FeatureToggleKey.BUILDER],
     [sidebarItems.ANALYTICS, FeatureToggleKey.ANALYTICS],
-    [sidebarItems.DEBRIEFS, FeatureToggleKey.ANALYTICS],
+    // DEBRIEFS is not here: the Analytics toggle OR the clinical advisor's, with a console
+    // permission (utils/navigation.ts), as the console's routes require.
     [sidebarItems.COMPETENCIES, FeatureToggleKey.COMPETENCIES],
     [sidebarItems.AI_LAB, FeatureToggleKey.AI_LAB],
     [sidebarItems.ROLEPLAY_SESSION_LOGS, FeatureToggleKey.ROLEPLAY_SESSION_LOGS],
@@ -178,6 +186,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.ANALYTICS_SUGGESTIONS]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   // The Debriefs console sits on Analytics access; sign-off rides with it.
   [FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
+  [FeatureToggleKey.DEBRIEF_SCHEDULES]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
 
   [FeatureToggleKey.MANAGE_SCENARIO_LANGUAGES]:
     FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
@@ -223,6 +232,8 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.PRODUCT_ROADMAP]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.PRODUCT_ROADMAP_MANAGE]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
+  [FeatureToggleKey.PRODUCT_PLANNING_IDEAS]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
+  [FeatureToggleKey.PRODUCT_PLANNING_LEAD]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
 
   [FeatureToggleKey.AGENT_TEST_CASES]: FEATURE_TOGGLE_SECTIONS.TESTING,
   [FeatureToggleKey.ROLEPLAY_SESSION_LOGS]: FEATURE_TOGGLE_SECTIONS.TESTING,

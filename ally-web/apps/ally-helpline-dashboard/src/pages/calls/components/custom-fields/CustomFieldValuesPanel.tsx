@@ -247,7 +247,12 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
     }
 
     if (field.fieldType === CustomFieldType.BOOLEAN) {
-      const boolLabel = value === "true" ? "Yes" : "No";
+      // Anything other than the literal "true"/"false" is unanswered, not a
+      // "No" — same "--" no-selection convention as SINGLE_SELECT above.
+      // Falling through to "No" for an unset value made every Yes/No field
+      // look like it was already answered "No" before a counsellor ever
+      // touched it.
+      const boolLabel = value === "true" ? "Yes" : value === "false" ? "No" : "--";
       return (
         <div key={field.fieldDefinitionId} className="flex gap-1 items-center">
           <span className="font-medium text-lg text-typography-800 md:whitespace-nowrap">
@@ -258,8 +263,10 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
             disabled={!isEditable}
             value={boolLabel}
             valueClassName={`${isEditable ? "text-typography-900" : "text-typography-800"} text-lg font-primary`}
-            onChange={v => handleChange(field.fieldDefinitionId, v === "Yes" ? "true" : "false")}
-            options={["Yes", "No"]}
+            onChange={v =>
+              handleChange(field.fieldDefinitionId, v === "Yes" ? "true" : v === "No" ? "false" : null)
+            }
+            options={["--", "Yes", "No"]}
           />
         </div>
       );

@@ -6,6 +6,7 @@ import { KNOWLEDGE_ANSWER_LIMITS } from '../../ai/constants/knowledge-answer.con
 import type {
   AgentRetrievalMeta,
   AgentRunResponse,
+  AgentRunRequest,
   KnowledgeAnswerRequest,
   KnowledgeAnswerResponse,
   KnowledgeRetrievalMeta,
@@ -102,12 +103,9 @@ export class AgentRuntimeRunner {
     const conversationId = turn.conversationId ?? `preview-${randomUUID()}`;
     const startedAt = Date.now();
     try {
-      const body = buildAgentRunRequest(request, {
+      const body = await this.requestFor(turn, request, knowledge, {
         conversationId,
         runId,
-        chatbotId: turn.chatbot.id,
-        knowledgeTopics: await this.knowledgeTopics(knowledge),
-        declineText: turn.settings.declineText,
       });
       const response =
         live && turn.channel.capabilities?.streaming
@@ -158,6 +156,25 @@ export class AgentRuntimeRunner {
         throw new AgentFallbackFailedError(v1Error, agent);
       }
     }
+  }
+
+  /**
+   * The body `/agent/run` gets for this turn. One place, so the owner's "How it works"
+   * (chunk 20d-2, `describe`) is built from exactly what a run sends.
+   */
+  async requestFor(
+    turn: ChatTurn,
+    request: KnowledgeAnswerRequest,
+    knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
+    run: { conversationId: string; runId: string },
+  ): Promise<AgentRunRequest> {
+    return buildAgentRunRequest(request, {
+      conversationId: run.conversationId,
+      runId: run.runId,
+      chatbotId: turn.chatbot.id,
+      knowledgeTopics: await this.knowledgeTopics(knowledge),
+      declineText: turn.settings.declineText,
+    });
   }
 
   /**

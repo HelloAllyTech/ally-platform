@@ -1,7 +1,9 @@
 import { createHash } from 'crypto';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { LoggerService } from '../../logger/logger.service';
+import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
 import { LlmUsageService } from '../../analytics/service/llm-usage.service';
 import { S3Service } from '../../aws/service/s3.service';
 import { AppConfigService } from '../../config/config.service';
@@ -22,6 +24,8 @@ export const DEBRIEF_READ_ALOUD_VOICE = {
   speaker: 'priya',
 } as const;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** A signed link lives long enough to play a whole debrief. */
 const LINK_SECONDS = 60 * 60;
 
@@ -34,6 +38,11 @@ const SARVAM_LANGUAGE: Record<string, string> = {
   ta: 'ta-IN',
 };
 
+/** Where a session's read-aloud audio lives in the private audio bucket. */
+export const DEBRIEF_AUDIO_PREFIX = 'debrief-audio/';
+export const debriefAudioPrefix = (sessionId: string): string =>
+  `${DEBRIEF_AUDIO_PREFIX}${sessionId}/`;
+
 /**
  * Read-aloud (v9 FR-29): one card's audio, generated on the first tap and
  * cached in the private audio bucket under the session, keyed by the exact
@@ -41,7 +50,9 @@ const SARVAM_LANGUAGE: Record<string, string> = {
  * gets new audio. A card the Ally team removed is never read.
  */
 @Injectable()
-export class DebriefAudioService {
+export class DebriefAudioService implements OnModuleInit {
+  private readonly logger = LoggerService.getInstance(DebriefAudioService.name);
+
   constructor(
     @InjectRepository(DebriefFeedback)
     private readonly feedbackRows: Repository<DebriefFeedback>,
@@ -49,7 +60,72 @@ export class DebriefAudioService {
     private readonly s3: S3Service,
     private readonly config: AppConfigService,
     private readonly usage: LlmUsageService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  onModuleInit(): void {
+    // Debrief › Settings › Schedules: when this runs is data (debrief_schedules).
+    scheduledTaskRegistry.registerConfigurable(
+      'debrief-audio-retention',
+      async () => {
+        const n = await this.sweepDeletedSessions();
+        return n === 0
+          ? 'No audio to remove'
+          : `Audio removed for ${n} deleted ${n === 1 ? 'session' : 'sessions'}`;
+      },
+    );
+  }
+
+  /** Delete every cached read-aloud file of one session. */
+  async deleteSessionAudio(sessionId: string): Promise<number> {
+    const bucket = this.config.s3.audioBucket as string;
+    const { keys } = await this.s3.listObjects({
+      bucket,
+      prefix: debriefAudioPrefix(sessionId),
+    });
+    for (const key of keys) await this.s3.deleteObject({ bucket, key });
+    return keys.length;
+  }
+
+  /**
+   * Plan §13: deleting a session deletes its debrief, versions, audio and
+   * flags. The rows go with the session (foreign keys cascade); its audio
+   * is in S3, so this removes the audio of every session that no longer
+   * exists, however it was deleted. Returns how many sessions it cleared.
+   */
+  async sweepDeletedSessions(): Promise<number> {
+    const bucket = this.config.s3.audioBucket as string;
+    if (!bucket) return 0;
+    const { prefixes } = await this.s3.listObjects({
+      bucket,
+      prefix: DEBRIEF_AUDIO_PREFIX,
+      delimiter: '/',
+    });
+    const ids = prefixes
+      .map((p) => p.slice(DEBRIEF_AUDIO_PREFIX.length).replace(/\/$/, ''))
+      .filter((id) => UUID.test(id));
+    if (!ids.length) return 0;
+    const alive: Array<{ id: string }> = await this.dataSource.query(
+      `SELECT id::text AS id FROM scenario_sessions WHERE id = ANY($1::uuid[])`,
+      [ids],
+    );
+    const kept = new Set(alive.map((r) => r.id));
+    let cleared = 0;
+    for (const id of ids.filter((x) => !kept.has(x))) {
+      try {
+        const n = await this.deleteSessionAudio(id);
+        cleared++;
+        this.logger.info(
+          `[debrief] removed ${n} audio file(s) of deleted session ${id}`,
+        );
+      } catch (e) {
+        this.logger.warn(
+          `[debrief] could not remove audio of deleted session ${id}: ${(e as Error).message}`,
+        );
+      }
+    }
+    return cleared;
+  }
 
   async audioUrl(
     sessionId: string,
@@ -79,7 +155,7 @@ export class DebriefAudioService {
       )
       .digest('hex')
       .slice(0, 24);
-    const key = `debrief-audio/${sessionId}/${hash}.mp3`;
+    const key = `${debriefAudioPrefix(sessionId)}${hash}.mp3`;
 
     let cached = true;
     try {

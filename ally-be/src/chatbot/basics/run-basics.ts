@@ -1,0 +1,262 @@
+/**
+ * Run the conversation basics (and a bot's own cases) against one chatbot, through the same path a
+ * website visitor's message takes: the engine, then the hand-over bookkeeping, with real stored
+ * conversations so history and "declined twice" behave as they do live.
+ *
+ *   npm run chatbot:basics -- --bot <chatbot id> [--cases <file.json>] [--only <id,id>]
+ *                             [--out <report.json>] [--concurrency <n>] [--keep]
+ *
+ * Each case gets its own throwaway contact and conversation, deleted at the end unless `--keep`.
+ * It calls the bot's models, so it costs what the same chats would. No alert is sent: alerts are
+ * the channel's job, and this runner is not a channel. Meant for local and staging stacks.
+ *
+ * Exits 1 when a must-pass case fails.
+ */
+import 'reflect-metadata';
+import { config as loadEnv } from 'dotenv';
+loadEnv();
+
+import { randomUUID } from 'crypto';
+import { readFileSync, writeFileSync } from 'fs';
+import { NestFactory } from '@nestjs/core';
+import { DataSource } from 'typeorm';
+import { AppModule } from '../../app.module';
+import {
+  WaMessageDirection,
+  WaMessageStatus,
+} from '../../whatsapp/enum/whatsapp.enum';
+import { WEB_CHANNEL } from '../bot-page/bot-page-public.service';
+import { ChatbotEngineService } from '../engine/chatbot-engine.service';
+import { Chatbot } from '../entity/chatbot.entity';
+import { ChatbotAccessMode } from '../enum/chatbot.enum';
+import {
+  ConversationChannel,
+  ConversationMessageRole,
+} from '../enum/conversation.enum';
+import { HandoverService } from '../handover/handover.service';
+import { ChatbotSettingsService } from '../service/chatbot-settings.service';
+import { ConversationService } from '../service/conversation.service';
+import { PLATFORM_BASICS, type BasicsCase } from './basics-cases';
+import { failuresOf } from './basics-evaluate';
+
+function arg(name: string): string | undefined {
+  const at = process.argv.indexOf(`--${name}`);
+  return at > -1 ? process.argv[at + 1] : undefined;
+}
+
+interface TurnReport {
+  user: string;
+  reply: string;
+  handledBy: string;
+  turnType: string | null;
+  runtime: string | null;
+  latencyMs: number;
+  failures: string[];
+}
+
+async function main(): Promise<void> {
+  const botId = arg('bot');
+  if (!botId) throw new Error('--bot <chatbot id> is required');
+  const extra: BasicsCase[] = arg('cases')
+    ? JSON.parse(readFileSync(arg('cases')!, 'utf8'))
+    : [];
+  const only = arg('only')?.split(',');
+  const cases = [...PLATFORM_BASICS, ...extra].filter(
+    (c) => !only || only.includes(c.id),
+  );
+
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    logger: ['error', 'warn'],
+  });
+  const dataSource = app.get(DataSource);
+  const engine = app.get(ChatbotEngineService, { strict: false });
+  const handover = app.get(HandoverService, { strict: false });
+  const conversations = app.get(ConversationService, { strict: false });
+  const settingsService = app.get(ChatbotSettingsService, { strict: false });
+  const created: { contactIds: string[]; conversationIds: string[] } = {
+    contactIds: [],
+    conversationIds: [],
+  };
+
+  const report: Record<string, unknown>[] = [];
+  let mustPassFailed = 0;
+  try {
+    const stored = await dataSource
+      .getRepository(Chatbot)
+      .findOne({ where: { id: botId } });
+    if (!stored) throw new Error(`Chatbot ${botId} not found`);
+    // As the website does: the page's own gate decides who may chat, not the bot's list.
+    const chatbot: Chatbot = {
+      ...stored,
+      accessMode: ChatbotAccessMode.ANYONE,
+    };
+    const settings = await settingsService.getForChatbot(chatbot);
+    const runTag = randomUUID().slice(0, 8);
+    console.log(`Basics for "${chatbot.name}" (${botId}), run ${runTag}\n`);
+
+    const concurrency = Math.max(1, Number(arg('concurrency') ?? 4));
+
+    /** One case in its own throwaway conversation, turn by turn. */
+    const runCase = async (item: BasicsCase): Promise<TurnReport[]> => {
+      const externalId = `basics:${runTag}:${item.id}`;
+      const contact = await conversations.resolveContact(
+        { chatbotId: chatbot.id },
+        ConversationChannel.WEB,
+        externalId,
+      );
+      created.contactIds.push(contact.id);
+      const conversation = await conversations.openConversation(
+        chatbot.id,
+        contact.id,
+        ConversationChannel.WEB,
+        { idleWindowMinutes: settings.conversationIdleMinutes },
+      );
+      created.conversationIds.push(conversation.id);
+
+      const turns: TurnReport[] = [];
+      for (const turn of item.turns) {
+        const inbound = await conversations.appendMessage(conversation.id, {
+          channel: ConversationChannel.WEB,
+          direction: WaMessageDirection.INBOUND,
+          role: ConversationMessageRole.USER,
+          text: turn.user,
+          status: WaMessageStatus.SENT,
+        });
+        const history = await conversations.recentHistory(conversation.id);
+        const startedAt = Date.now();
+        let decision = await engine.respond({
+          chatbot,
+          settings,
+          text: turn.user,
+          history,
+          isFirstMessage: history.length <= 1,
+          sender: { externalId, label: `basics ${item.id}` },
+          channel: WEB_CHANNEL,
+          conversationId: conversation.id,
+          providerMessageId: inbound.id,
+        });
+        if (!decision.held) {
+          decision = await handover.afterDecision(
+            chatbot,
+            conversation.id,
+            decision,
+          );
+          await conversations.appendMessage(conversation.id, {
+            channel: ConversationChannel.WEB,
+            direction: WaMessageDirection.OUTBOUND,
+            role: ConversationMessageRole.ASSISTANT,
+            text: decision.body,
+            status: WaMessageStatus.SENT,
+            handledBy: decision.handledBy,
+            retrievalMeta: decision.retrievalMeta ?? null,
+            agentRunId: decision.agent?.runId ?? null,
+            agentRuntime: decision.agent?.runtime ?? null,
+            inReplyToId: inbound.id,
+          });
+        }
+        turns.push({
+          user: turn.user,
+          reply: decision.body,
+          handledBy: decision.handledBy,
+          turnType: decision.turnType ?? null,
+          runtime: decision.agent?.runtime ?? null,
+          latencyMs: Date.now() - startedAt,
+          failures: failuresOf(decision, turn.expect),
+        });
+      }
+      return turns;
+    };
+
+    // Cases are independent conversations, so several run at once; a case's own turns stay in order.
+    const results: TurnReport[][] = new Array(cases.length);
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(concurrency, cases.length) }, async () => {
+        while (next < cases.length) {
+          const at = next++;
+          results[at] = await runCase(cases[at]);
+        }
+      }),
+    );
+
+    cases.forEach((item, at) => {
+      const turns = results[at];
+      const failed = turns.some((t) => t.failures.length);
+      if (failed && item.mustPass) mustPassFailed++;
+      report.push({ ...item, passed: !failed, turns });
+      const mark = failed ? (item.mustPass ? 'FAIL!' : 'fail ') : 'pass ';
+      console.log(`${mark} ${item.id} (${item.kind})`);
+      for (const t of turns) {
+        console.log(
+          `      > ${t.user}\n      < [${t.handledBy}${t.turnType ? `/${t.turnType}` : ''}` +
+            `${t.runtime ? ` ${t.runtime}` : ''} ${t.latencyMs}ms] ${t.reply.replace(/\s+/g, ' ').slice(0, 160)}` +
+            (t.failures.length ? `\n      ✗ ${t.failures.join('; ')}` : ''),
+        );
+      }
+    });
+
+    const passed = report.filter((r) => r.passed).length;
+    const crisisFalse = report
+      .flatMap((r) => r.turns as TurnReport[])
+      .filter((t) => t.failures.includes('got the crisis reply')).length;
+    console.log(
+      `\n${passed}/${report.length} cases passed; ${mustPassFailed} must-pass failed; ` +
+        `${crisisFalse} unwanted crisis replies`,
+    );
+    const out = arg('out');
+    if (out) {
+      writeFileSync(
+        out,
+        JSON.stringify({ botId, runTag, at: new Date(), report }, null, 2),
+      );
+      console.log(`Report: ${out}`);
+    }
+  } finally {
+    if (!process.argv.includes('--keep')) {
+      await removeRuns(dataSource, created);
+    }
+    await app.close();
+  }
+  // Exit explicitly: the app's queue and Redis clients keep the process alive after close().
+  process.exit(mustPassFailed ? 1 : 0);
+}
+
+/** Delete this run's throwaway contacts and conversations, so the inbox and metrics never see them. */
+async function removeRuns(
+  dataSource: DataSource,
+  {
+    contactIds,
+    conversationIds,
+  }: { contactIds: string[]; conversationIds: string[] },
+): Promise<void> {
+  if (!conversationIds.length && !contactIds.length) return;
+  await dataSource.transaction(async (tx) => {
+    if (conversationIds.length) {
+      await tx.query(
+        `DELETE FROM chatbot_message_feedback WHERE conversation_id = ANY($1)`,
+        [conversationIds],
+      );
+      await tx.query(
+        `DELETE FROM chatbot_messages WHERE conversation_id = ANY($1)`,
+        [conversationIds],
+      );
+      await tx.query(`DELETE FROM chatbot_conversations WHERE id = ANY($1)`, [
+        conversationIds,
+      ]);
+    }
+    if (contactIds.length) {
+      await tx.query(
+        `DELETE FROM chatbot_contact_identities WHERE contact_id = ANY($1)`,
+        [contactIds],
+      );
+      await tx.query(`DELETE FROM chatbot_contacts WHERE id = ANY($1)`, [
+        contactIds,
+      ]);
+    }
+  });
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

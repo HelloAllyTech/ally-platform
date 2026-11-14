@@ -86,8 +86,8 @@ export const ORG_COLLECTIONS = (): CollectionProfile[] =>
  * The ROUTE decides the scope — `?tenantId=` names the organisation, checked against the admin's
  * allowlist by `@OrgScopedRoute` and again here — never a request body. Within it, an admin sees
  * only collections that take organisation entries; in those, their organisation's own entries
- * (which they may add, edit, archive and pin) and the global ones, read-only, so they can avoid
- * duplicating Ally's material. Never another organisation's, never Settings, documents or the
+ * (which they may add, edit, archive and pin), and read-only, the global ones and those a platform
+ * admin targeted at them, so they can avoid duplicating Ally's material. Never another organisation's, never Settings, documents or the
  * learning loops' changes, and Insights only for their own entries and their own learners' gaps.
  *
  * Replaces the Ally guide library's organisation routes (`v1/guide/admin/org-library/*`) and is
@@ -136,7 +136,7 @@ export class ContextLibraryOrgController {
 
   /**
    * A chunk this organisation may see: in a collection that takes organisation entries, and
-   * global or its own. Anything else is the same 404 as a missing code, so codes cannot be
+   * global, its own, or targeted at it by a platform admin (read-only here, like global ones). Anything else is the same 404 as a missing code, so codes cannot be
    * probed.
    */
   private async visibleChunk(code: string, tenantId: string): Promise<ClChunk> {
@@ -144,7 +144,9 @@ export class ContextLibraryOrgController {
     const profile = getProfile(chunk.collectionId);
     if (
       !takesOrgEntries(profile) ||
-      (!chunk.isGlobal && chunk.ownerTenantId !== tenantId)
+      (!chunk.isGlobal &&
+        chunk.ownerTenantId !== tenantId &&
+        !(chunk.tenantIds ?? []).includes(tenantId))
     ) {
       throw new NotFoundException(`No chunk ${code}`);
     }
@@ -176,9 +178,11 @@ export class ContextLibraryOrgController {
       `SELECT collection_id, status, COUNT(*) AS n,
               COUNT(*) FILTER (WHERE owner_tenant_id = $1) AS own
          FROM cl_chunks
-        WHERE (is_global = true OR owner_tenant_id = $1)
+        WHERE (is_global = true OR owner_tenant_id = $1 OR $2 = ANY(tenant_ids))
         GROUP BY collection_id, status`,
-      [tenantId],
+      // The same id twice: owner_tenant_id is uuid and tenant_ids text[], and one reused $n
+      // can't be both.
+      [tenantId, tenantId],
     );
     return profiles
       .filter((p) => rows.some((r) => r.id === p.id))

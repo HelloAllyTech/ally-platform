@@ -117,6 +117,20 @@ export class FeatureToggleGuard implements CanActivate {
       return true;
     }
 
+    // Alternate-toggle branch: the route names a second toggle that also opens
+    // it. The caller is marked so the route's scope check can confine them to
+    // what that toggle is for (see FeatureToggleOptions.alsoAllowedBy).
+    if (
+      options.alsoAllowedBy &&
+      (await this.featureToggleService.hasToggle(
+        user.id,
+        options.alsoAllowedBy,
+      ))
+    ) {
+      request.viaAlternateToggle = options.alsoAllowedBy;
+      return true;
+    }
+
     // Org-level branch: no per-user toggle row, but the caller's tenant has the
     // feature switched on. This is the only way a non-PLATFORM_ADMIN reaches a
     // toggle-gated surface — admin_feature_toggles has no rows for them.

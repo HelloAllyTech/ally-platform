@@ -3,7 +3,10 @@
 v1 rubric. Bump ``DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION`` whenever this changes,
 so a re-judge coexists with prior runs instead of overwriting them. The live
 rubric is ``debrief_quality_rubric`` in the Skills Store (pinned); this text is
-the fallback when ally-be sends none.
+the fallback when ally-be sends none. The judge's closing instructions are
+``debrief_quality_judge_system`` (pinned too, ally-be's
+``src/prompts/debrief_quality/judge_system.txt``); ``DEFAULT_JUDGE_INSTRUCTIONS``
+is their fallback, the same way. Keep both defaults identical to ally-be's files.
 """
 
 from __future__ import annotations
@@ -73,6 +76,16 @@ higher than a warm, vague one. Do not reward length.\
 """
 
 
+#: What the judge is told to do last. The Evaluator (inside a debrief run) always
+#: uses this text; only the independent judge takes the store's version, so a
+#: change to the judge's instructions never touches what learners read.
+DEFAULT_JUDGE_INSTRUCTIONS = (
+    "List the risk cues first (an empty list when there are none), then "
+    "score all eight dimensions once each, then list any hard fails (an "
+    "empty list when there are none)."
+)
+
+
 def build_judge_prompt(
     transcript: List[TranscriptTurn],
     debrief: str,
@@ -81,6 +94,7 @@ def build_judge_prompt(
     guidance: Optional[str] = None,
     rubric: Optional[str] = None,
     history: Optional[str] = None,
+    instructions: Optional[str] = None,
 ) -> str:
     """Assemble the debrief-quality prompt for one session's debrief."""
     lines = [rubric or DEFAULT_JUDGE_RUBRIC, ""]
@@ -112,9 +126,5 @@ def build_judge_prompt(
     lines.append(debrief)
     lines.append("</debrief>")
     lines.append("")
-    lines.append(
-        "List the risk cues first (an empty list when there are none), then "
-        "score all eight dimensions once each, then list any hard fails (an "
-        "empty list when there are none)."
-    )
+    lines.append((instructions or "").strip() or DEFAULT_JUDGE_INSTRUCTIONS)
     return "\n".join(lines)

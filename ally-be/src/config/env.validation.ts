@@ -23,6 +23,8 @@ export const validationSchema = Joi.object({
   DB_USERNAME: Joi.string().required(),
   DB_PASSWORD: Joi.string().required(),
   DB_DATABASE: Joi.string().required(),
+  // false in production, where the deploy migrates before the swap (see migration-runner.ts)
+  DB_MIGRATIONS_ON_BOOT: Joi.boolean().default(true),
 
   // AI
   AI_SERVICE_API_URL: Joi.string().required(),
@@ -114,6 +116,17 @@ export const validationSchema = Joi.object({
   // Incoming-webhook URL for the Ally team's alert channel (plan §7.12, Q8).
   ALLY_GUIDE_ALERT_WEBHOOK_URL: Joi.string().uri().optional().allow(''),
   LIVEKIT_GUIDE_AGENT_NAME: Joi.string().optional(),
+  // Agents v2 bot page (chunk 12b). The base URL defaults to ADMIN_APP_BASE_URL, which hosts the
+  // page; Turnstile is off while its secret is empty; the visitor-token secret is derived from the
+  // access secret when unset.
+  BOT_PAGE_BASE_URL: Joi.string().uri().optional().allow(''),
+  TURNSTILE_SITE_KEY: Joi.string().optional().allow(''),
+  TURNSTILE_SECRET_KEY: Joi.string().optional().allow(''),
+  BOT_PAGE_VISITOR_SECRET: Joi.string().optional().allow(''),
+  // Agent-first onboarding (chunk 20a). Allow-list for the local fixture sites (ignored outside
+  // local and development), and the per-owner daily crawl cap.
+  BOT_DRAFT_CRAWL_ALLOW_HOSTS: Joi.string().optional().allow(''),
+  BOT_DRAFT_CRAWLS_PER_DAY: Joi.number().integer().min(1).optional(),
 
   SCENARIO_PATH_ITEM_MIN_DURATION_FOR_COMPLETION: Joi.string().optional(),
 
@@ -172,8 +185,13 @@ export const validationSchema = Joi.object({
   // Comma-separated addresses for the daily team digest.
   PRODUCT_UPDATES_DIGEST_TO: Joi.string().allow('').optional(),
   PRODUCT_UPDATES_DIGEST_HOUR: Joi.number().integer().min(0).max(23).optional(),
-  /** Publicly reachable base URL a GitHub-hosted runner can call this API back on. */
+  /**
+   * Publicly reachable base URL a GitHub-hosted runner can call this API back
+   * on; also how ally-ai's debrief graph reaches the Debrief gateway tools.
+   */
   PUBLIC_API_BASE_URL: Joi.string().uri().optional(),
+  // Signs the Debrief harness's run tokens; derived from JWT_ACCESS_SECRET when unset.
+  DEBRIEF_GATEWAY_SECRET: Joi.string().allow('').optional(),
 
   // PostHog product analytics. Optional: without a key the client is disabled
   // and every capture is a no-op, which is what local/CI/test runs want.

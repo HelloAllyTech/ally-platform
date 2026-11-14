@@ -36,6 +36,7 @@ from typing import Any, Dict, Optional, Tuple, Type, TypeVar
 from pydantic import BaseModel
 
 from app.core.config import settings
+from app.core.llm.capture import call_started, reply_of, usage_reported
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
 from app.utils.logger import get_logger
 
@@ -429,6 +430,7 @@ def _emit_usage(
     `scenario_session_id` ties the cost to the session it was spent on; the
     judges have no room, so without it their spend has no session to land on.
     """
+    usage_reported(usage[0], usage[1])
     try:
         from app.core.llm_usage.emitter import emit_llm_usage_blocking
 
@@ -869,6 +871,15 @@ async def generate_structured(
         "model": resolved_model,
         "fell_back_from": fell_back_from,
     }
+    # The debrief's Agent logs: the exact message and the full reply, only
+    # when a caller opened a capture (app/core/llm/capture.py).
+    captured = call_started(
+        prompt=prompt,
+        system=system,
+        task=task,
+        provider=resolved_provider,
+        model=resolved_model,
+    )
 
     deadline = time.monotonic() + timeout if timeout else None
 
@@ -888,7 +899,9 @@ async def generate_structured(
         )
 
     try:
-        parsed = await attempt(resolved_provider, resolved_model)
+        parsed = await _attempt_recorded(
+            attempt, resolved_provider, resolved_model, captured
+        )
     except Exception as e:
         # `resolve_target` only falls back when a key is ABSENT. An expired key
         # is present, so it passes that check and fails here instead — which is
@@ -923,11 +936,27 @@ async def generate_structured(
             retry[0],
             retry[1],
         )
-        parsed = await attempt(*retry)
+        if captured is not None:
+            captured["fell_back_from"] = resolved_model
+            captured["provider"], captured["model"] = retry
+            captured["error"] = None
+        parsed = await _attempt_recorded(attempt, retry[0], retry[1], captured)
         meta["provider"], meta["model"] = retry
         meta["fell_back_from"] = resolved_provider
 
+    if captured is not None:
+        captured["reply"] = reply_of(parsed)
     return parsed, meta
+
+
+async def _attempt_recorded(attempt, provider: str, model: str, captured):
+    """One provider attempt; a failure is noted on the capture, then raised."""
+    try:
+        return await attempt(provider, model)
+    except Exception as e:
+        if captured is not None:
+            captured["error"] = f"{provider}/{model}: {type(e).__name__}: {e}"[:1000]
+        raise
 
 
 _GENERATORS = {

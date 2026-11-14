@@ -60,6 +60,8 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
 import { ComfortAudioModule } from './comfort-audio/comfort-audio.module';
 import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
+import { BotPageModule } from './chatbot/bot-page/bot-page.module';
+import { BotDraftModule } from './bot-draft/bot-draft.module';
 import { ScenarioReportModule } from './scenario-report/scenario-report.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { AppVersionModule } from './app-version/app-version.module';
@@ -74,6 +76,7 @@ import { BlogModule } from './blog/blog.module';
 import { LabModule } from './lab/lab.module';
 import { SkillExperimentModule } from './skill-experiment/skill-experiment.module';
 import { ProductRoadmapModule } from './product-roadmap/product-roadmap.module';
+import { ProductPlanningModule } from './product-planning/product-planning.module';
 import { LogsModule } from './logs/logs.module';
 import { PostHogModule } from './posthog/posthog.module';
 import { ChangelogModule } from './changelog/changelog.module';
@@ -149,6 +152,8 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     ComfortAudioModule,
     KnowledgeBaseModule,
     WhatsAppModule,
+    BotPageModule,
+    BotDraftModule,
     ScenarioReportModule,
     SchedulerModule,
     AppVersionModule,
@@ -163,6 +168,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     LabModule,
     SkillExperimentModule,
     ProductRoadmapModule,
+    ProductPlanningModule,
     LogsModule,
     ChangelogModule,
     ProductUpdatesModule,

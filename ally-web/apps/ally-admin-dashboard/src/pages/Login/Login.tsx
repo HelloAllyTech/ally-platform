@@ -62,7 +62,10 @@ export const Login: React.FC = () => {
   const isLoading = isGeneratingOTP || isVerifyingOTP;
 
   useEffect(() => {
-    const rememberedEmail = localStorage.getItem("rememberedEmail");
+    // Namespaced since the app moved onto the helpline dashboard's origin
+    // (app.helloally.ai/admin) - both apps used "rememberedEmail" before.
+    const rememberedEmail =
+      localStorage.getItem("adminRememberedEmail") ?? localStorage.getItem("rememberedEmail");
     if (rememberedEmail) {
       setEmail(rememberedEmail);
     }
@@ -143,7 +146,7 @@ export const Login: React.FC = () => {
       return;
     }
     if (rememberMe) {
-      localStorage.setItem("rememberedEmail", email);
+      localStorage.setItem("adminRememberedEmail", email);
     }
     generateOTP({ email: email.trim() });
   };

@@ -40,7 +40,34 @@ import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefAudioService } from '../service/debrief-audio.service';
 import { DebriefReplyService } from '../service/debrief-reply.service';
+import { DebriefLearnerEventsService } from '../service/debrief-learner-events.service';
+import {
+  DEBRIEF_CLIENT_EVENT_KINDS,
+  DEBRIEF_PLATFORMS,
+  DEBRIEF_PULSE_QUESTIONS,
+  DebriefPulseQuestion,
+} from '../entity/debrief-learner-event.entity';
 
+class PlatformDto {
+  @ApiProperty({ required: false, enum: DEBRIEF_PLATFORMS })
+  @IsOptional()
+  @IsString()
+  platform?: string;
+}
+class LearnerEventDto extends PlatformDto {
+  @ApiProperty({ enum: DEBRIEF_CLIENT_EVENT_KINDS })
+  @IsIn(DEBRIEF_CLIENT_EVENT_KINDS as unknown as string[])
+  kind!: (typeof DEBRIEF_CLIENT_EVENT_KINDS)[number];
+}
+class PulseDto extends PlatformDto {
+  @ApiProperty({ enum: DEBRIEF_PULSE_QUESTIONS })
+  @IsIn(DEBRIEF_PULSE_QUESTIONS as unknown as string[])
+  question!: DebriefPulseQuestion;
+
+  @ApiProperty()
+  @IsBoolean()
+  answer!: boolean;
+}
 class HelpfulDto {
   @ApiProperty()
   @IsBoolean()
@@ -52,6 +79,16 @@ class ReplyDto {
   @IsString()
   @MaxLength(4000)
   message!: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'The card the question is about, when the learner asked from one (e.g. `work_on_this[0]`)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(48)
+  section?: string;
 }
 
 class FlagDto {
@@ -88,6 +125,7 @@ export class DebriefLearnerController {
     private readonly replies: DebriefReplyService,
     private readonly audio: DebriefAudioService,
     private readonly events: EventEmitter2,
+    private readonly learnerEvents: DebriefLearnerEventsService,
     private readonly toggles: FeatureToggleService,
   ) {}
 
@@ -118,11 +156,39 @@ export class DebriefLearnerController {
     description:
       'Sent by the app once the ready debrief has been on screen, in the foreground, for at least 2 seconds.',
   })
-  opened(
+  async opened(
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @CurrentUser() user: TokenUser,
+    @Body() body: PlatformDto = {},
   ) {
-    return this.feedback.markOpened(sessionId, user.id);
+    const res = await this.feedback.markOpened(sessionId, user.id);
+    await this.learnerEvents.recordForLearner(
+      sessionId,
+      user.id,
+      'opened',
+      DebriefLearnerEventsService.platform(body?.platform),
+    );
+    return res;
+  }
+
+  @Post('sessions/:sessionId/events')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary: 'Something the learner did that only the app can see (v9 §3.3)',
+    description:
+      'read_through: the end of the first Work-on-this card was on screen. practise_next_click: "Practise this next" was tapped. waited: the working screen was shown. left_before_ready: the learner left while it was still working. Recorded once per session and kind.',
+  })
+  event(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: TokenUser,
+    @Body() body: LearnerEventDto,
+  ) {
+    return this.learnerEvents.recordForLearner(
+      sessionId,
+      user.id,
+      body.kind,
+      DebriefLearnerEventsService.platform(body.platform),
+    );
   }
 
   @Get('sessions/:sessionId/supervisor')
@@ -148,12 +214,16 @@ export class DebriefLearnerController {
     description:
       'Generated on the first request and cached by the card text, so a second play makes no TTS call.',
   })
-  readAloud(
+  async readAloud(
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @Param('section') section: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.audio.audioUrl(sessionId, user.id, section);
+    const res = await this.audio.audioUrl(sessionId, user.id, section);
+    void this.learnerEvents
+      .recordForLearner(sessionId, user.id, 'listened', null)
+      .catch(() => undefined);
+    return res;
   }
 
   @Get('sessions/:sessionId')
@@ -166,7 +236,32 @@ export class DebriefLearnerController {
     @CurrentUser() user: TokenUser,
   ) {
     const view = await this.agent.learnerView(sessionId, user.id);
-    return this.feedback.decorate(view, user.id);
+    const decorated = await this.feedback.decorate(view, user.id);
+    // PRD §9: the pulse, only on a debrief it asks on.
+    const pulse = await this.learnerEvents.pulseFor(view, user.id);
+    return pulse ? { ...decorated, pulse } : decorated;
+  }
+
+  @Put('sessions/:sessionId/pulse')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary:
+      'The post-launch pulse (PRD §9): "Did you know what to practise next?" / "Did this feel fair?"',
+    description:
+      'Asked on 1 in 10 debriefs for the first 8 weeks after an organisation goes live (the view carries `pulse` then). One answer per question; answering again changes it. 404 on a debrief the pulse does not ask on.',
+  })
+  pulse(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Body() body: PulseDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.learnerEvents.answerPulse(
+      sessionId,
+      user.id,
+      body.question,
+      body.answer,
+      DebriefLearnerEventsService.platform(body.platform),
+    );
   }
 
   @Put('sessions/:sessionId/helpful')
@@ -222,7 +317,9 @@ export class DebriefLearnerController {
   ) {
     // Ownership and a published debrief are checked before the stream opens,
     // so a refusal is an ordinary HTTP error, not a broken stream.
-    const stream = await this.replies.stream(sessionId, user.id, body.message);
+    const stream = await this.replies.stream(sessionId, user.id, body.message, {
+      section: body.section ?? null,
+    });
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');

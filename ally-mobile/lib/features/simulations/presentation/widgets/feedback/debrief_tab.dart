@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/localization/translate_ref.dart';
+import '../../../../../core/realtime/connectivity.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_fonts.dart';
 import '../../../../../core/widgets/ask_ai_chat/ask_ai_chat.dart';
@@ -42,8 +43,10 @@ class DebriefTab extends ConsumerStatefulWidget {
     required this.summary,
     required this.retryLimitReached,
     this.onOpenMoment,
+    this.onSeeQuote,
     this.readOnly = false,
-  });
+    bool? supervisorView,
+  }) : supervisorView = supervisorView ?? readOnly;
 
   final AskAiChatController chat;
 
@@ -52,7 +55,15 @@ class DebriefTab extends ConsumerStatefulWidget {
   final SimulationSummary? summary;
   final bool retryLimitReached;
   final ValueChanged<String>? onOpenMoment;
+
+  /// "See this moment" under a debrief card's quote: the transcript at the
+  /// turn holding those words.
+  final ValueChanged<String>? onSeeQuote;
   final bool readOnly;
+
+  /// Whose view of the debrief: the supervisor's (Roleplay Logs, someone
+  /// else's session) or the learner's own. Defaults to [readOnly].
+  final bool supervisorView;
 
   @override
   ConsumerState<DebriefTab> createState() => _DebriefTabState();
@@ -65,7 +76,7 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
     sessionId: widget.sessionId,
     // Roleplay Logs: the supervisor's view of the learner's debrief (v9
     // FR-26); a 403 (another organisation) or not_available keeps the note.
-    supervisor: widget.readOnly,
+    supervisor: widget.supervisorView,
   );
 
   @override
@@ -155,18 +166,14 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
           const SizedBox(height: 12),
         ],
         if (chat.error != null) ...[
-          AskAiErrorBanner(message: chat.error!, onRetry: chat.retry),
+          AskAiErrorBanner(message: chat.error!, onRetry: chat.retry, calm: true),
           const SizedBox(height: 12),
         ],
         SizedBox(key: _threadEndKey, height: 0),
-        AskAiReplyInput(
-          placeholder: ref.t('postSim.debriefCards.reply.placeholder'),
-          disabled: chat.isStreaming,
-          onSend: chat.sendMessage,
-        ),
         // v9 Q47: supervisors read this thread, and the learner is told.
+        // The composer itself docks at the bottom of the screen ([_composer]).
         Padding(
-          padding: const EdgeInsets.only(top: 8),
+          padding: EdgeInsets.zero,
           child: Text(
             ref.t('postSim.debriefCards.supervisor.canRead'),
             key: const Key('ask-ally-supervisor-can-read'),
@@ -180,6 +187,14 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
       ],
     );
   }
+
+  /// Ask Ally's composer, docked by [DebriefCards] while the reflective
+  /// question is in view (design A5).
+  Widget _composer(AskAiChatController chat) => AskAiReplyInput(
+    placeholder: ref.t('postSim.debriefCards.reply.placeholder'),
+    disabled: chat.isStreaming,
+    onSend: chat.sendMessage,
+  );
 
   /// Roleplay Logs: the learner's Ask Ally thread, read-only (web
   /// `supervisor-thread`).
@@ -223,12 +238,23 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
 
   @override
   Widget build(BuildContext context) {
+    // "You're offline … It will load when you're back online": a debrief
+    // that didn't load asks again by itself on reconnecting.
+    if (!widget.readOnly) {
+      ref.listen<AsyncValue<bool>>(isOfflineProvider, (previous, next) {
+        final state = _learnerDebrief.view?.state;
+        final failed = state == LearnerDebriefState.offline || state == LearnerDebriefState.failed;
+        if (previous?.value == true && next.value == false && failed) _learnerDebrief.retry();
+      });
+    }
     final chat = widget.chat;
     if (_showingLearnerDebrief) {
       return DebriefCards(
         controller: _learnerDebrief,
         replyThread: widget.readOnly ? _supervisorThread(_learnerDebrief.view?.supervisor) : _askAlly(chat),
+        composer: widget.readOnly ? null : _composer(chat),
         readOnly: widget.readOnly,
+        onSeeQuote: widget.onSeeQuote,
       );
     }
     final note = widget.summary?.supervisorNote;

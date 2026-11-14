@@ -1,0 +1,361 @@
+/* The inbox (chunk 11a). */
+/* A fixed panel: the page doesn't scroll, the list and the chat scroll inside it. Its height is the
+   window less what sits above it (set by the page that holds it, `--ally-inbox-top`). */
+.ally-inbox {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  height: calc(100vh - var(--ally-inbox-top, 220px));
+  min-height: 420px;
+  overflow: hidden;
+  background: var(--ally-bg);
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-lg);
+}
+.ally-inbox__list-pane {
+  border-right: 1px solid var(--ally-line);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Only the chats scroll; the title and filters stay put above them. */
+.ally-inbox__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ally-inbox__back {
+  display: none;
+}
+.ally-inbox__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ally-inbox__filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ally-inbox__tab {
+  border: 1px solid var(--ally-line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--ally-surface);
+  color: var(--ally-ink);
+  cursor: pointer;
+  min-height: 36px;
+}
+.ally-inbox__tab[aria-pressed="true"] {
+  border-color: var(--ally-accent);
+  color: var(--ally-accent);
+}
+.ally-inbox__selects {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.ally-inbox__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ally-inbox__item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--ally-radius-md);
+  padding: 10px 12px;
+  background: none;
+  color: var(--ally-ink);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ally-inbox__item[aria-current="true"],
+.ally-inbox__item:hover {
+  background: var(--ally-surface);
+  border-color: var(--ally-line);
+}
+.ally-inbox__item-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ally-inbox__preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ally-inbox__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.ally-inbox__safety {
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+}
+.ally-inbox__needs {
+  background: var(--ally-accent-soft);
+  color: var(--ally-accent);
+}
+.ally-inbox__unread {
+  margin-left: auto;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ally-accent);
+  color: var(--ally-on-accent);
+  font-size: 12px;
+  line-height: 22px;
+  text-align: center;
+}
+.ally-inbox__main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+/* The chat: its header stays at the top, the thread scrolls, the reply box stays at the bottom. */
+.ally-inbox__chat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  padding: 16px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ally-inbox__chat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ally-inbox__banner {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
+}
+.ally-inbox__intake {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.ally-inbox__intake dd {
+  margin: 0;
+}
+.ally-inbox__thread {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ally-inbox__msg {
+  max-width: 85%;
+}
+.ally-inbox__msg--user {
+  align-self: flex-end;
+}
+.ally-inbox__author {
+  margin: 0 0 4px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ally-inbox__bubble {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ally-inbox__msg--user .ally-inbox__bubble {
+  background: var(--ally-surface-2);
+}
+.ally-inbox__msg--agent_human .ally-inbox__bubble {
+  border-color: var(--ally-accent);
+}
+.ally-inbox__sources {
+  margin: 4px 0 0;
+}
+.ally-inbox__reply {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  position: sticky;
+  bottom: -16px;
+  margin-bottom: -16px;
+  padding: 8px 0 16px;
+  background: var(--ally-bg);
+  border-top: 1px solid var(--ally-line);
+}
+.ally-inbox__reply .ally-input {
+  width: 100%;
+}
+/* A phone: the list, or the chat with a way back to it. */
+@media (max-width: 959px) {
+  .ally-inbox {
+    grid-template-columns: minmax(0, 1fr);
+    height: calc(100vh - var(--ally-inbox-top-phone, 180px));
+  }
+  .ally-inbox__list-pane {
+    border-right: 0;
+  }
+  .ally-inbox__main {
+    display: none;
+  }
+  .ally-inbox[data-chat-open="true"] .ally-inbox__list-pane {
+    display: none;
+  }
+  .ally-inbox[data-chat-open="true"] .ally-inbox__main {
+    display: flex;
+  }
+  .ally-inbox__back {
+    display: block;
+    align-self: flex-start;
+    margin: 12px 16px 0;
+  }
+  .ally-inbox__chat {
+    padding: 12px 16px;
+  }
+}
+.ally-inbox__main > .ally-empty {
+  padding: 24px;
+}
+
+/* ── Chunk 20d-2 ── */
+/* One row style: the open chat has a background and an accent bar; hover is lighter. */
+.ally-inbox__item {
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: var(--ally-radius-sm);
+}
+.ally-inbox__item:hover {
+  background: var(--ally-surface-2);
+  border-color: transparent;
+}
+.ally-inbox__item[aria-current="true"] {
+  background: var(--ally-sunken);
+  border-left-color: var(--ally-accent);
+}
+.ally-inbox__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ally-channel {
+  display: inline-flex;
+  color: var(--ally-muted);
+}
+.ally-channel--whatsapp {
+  color: var(--ally-good);
+}
+/* Filters and channel on one row where they fit, all 36 px. */
+.ally-inbox__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ally-inbox__controls .ally-inbox__selects {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 6px;
+}
+.ally-inbox__controls .ally-input {
+  min-height: 36px;
+  height: 36px;
+  padding: 0 28px 0 10px;
+  font-size: 14px;
+  width: auto;
+  flex: 1 1 120px;
+}
+.ally-inbox__tab {
+  min-height: 36px;
+  font: 400 14px/1 var(--ally-font-ui);
+}
+.ally-inbox__sound[aria-pressed="true"] {
+  color: var(--ally-ink);
+}
+/* The chat's header: the name, with Take over on its line. */
+.ally-inbox__chat-head {
+  flex-direction: column;
+  gap: 2px;
+}
+.ally-inbox__chat-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.ally-inbox__chat-name .ally-heading {
+  margin: 0;
+  font-size: 20px;
+}
+.ally-inbox__chat-head > .ally-small {
+  margin: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+/* Bubbles: readable width, a date once a day, groups close together. */
+.ally-inbox__msg {
+  max-width: min(560px, 85%);
+}
+.ally-inbox__msg--grouped {
+  margin-top: -8px;
+}
+.ally-inbox__day {
+  align-self: center;
+  margin: 4px 0;
+  font: 500 12px/1 var(--ally-font-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ally-faint);
+}
+.ally-inbox__rating {
+  margin: 4px 0 0;
+}
+.ally-inbox__rating--up {
+  background: var(--ally-good-bg);
+  color: var(--ally-good);
+}
+.ally-inbox__rating--down {
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+}
+.ally-inbox__nothing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--ally-muted);
+  text-align: center;
+}

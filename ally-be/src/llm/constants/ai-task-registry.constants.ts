@@ -899,11 +899,13 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     id: 'debrief-safety-reader',
     task: LlmTask.DEBRIEF_SAFETY_READER,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'Every debrief run, whatever the recipe',
+    trigger:
+      'Every debrief run, whatever the recipe; and every Ask Ally reply that passed the crisis keyword screen',
     detail:
       "Finds the client's risk cues and how the learner responded, and the learner's own " +
       'distress. Mandatory: a recipe cannot drop it. Recall is gated at 100% on the seeded ' +
-      'safety set before any change to its prompt or model.',
+      'safety set before any change to its prompt or model. Ask Ally runs it on the ' +
+      "learner's message inside its reply request, for distress the keywords miss.",
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
@@ -927,7 +929,7 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_AI,
     trigger: 'Standard runs for a learner with past debriefs',
     detail:
-      "Compares the session's evidence with the learner's past Work-on-this points; says only what the evidence supports.",
+      "The progress agent (prompt debrief_progress_system): reads the session's evidence with the learner's progress profile and proposes up to 3 skill trends, follow-ups and a focus; code vetoes any trend the record contradicts. Older releases run the Progress reader's comparison with past Work-on-this points.",
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
@@ -972,15 +974,79 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'debrief release bundle (recipes.standard.steps[reviser].model)',
   },
   {
+    id: 'debrief-planner',
+    task: LlmTask.DEBRIEF_PLANNER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Every run on a challenger release with the orchestrator on, after the safety reading; once more after a failed evaluation (the top-up)',
+    detail:
+      'Chooses which registry agents run from the session profile and their manifests (never the transcript). Structured, temperature 0; past 8 s, or on any failure, the run takes the default plan (the recipe) and records it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'debrief release bundle (orchestrator.plannerModel)',
+    promptOverride: 'debrief_planner_system',
+  },
+  {
+    id: 'debrief-protocol-check',
+    task: LlmTask.DEBRIEF_PROTOCOL_CHECK,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Orchestrated runs whose plan chose it: the organisation has protocols the session touches, or a risk cue',
+    detail:
+      "Registry agent: the session against the organisation's own protocols (get_org_protocols), as findings for the Writer.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (orchestrator.agents[protocol_check].model); default the registry manifest',
+    promptOverride: 'debrief_protocol_check_system',
+  },
+  {
+    id: 'debrief-history-deep',
+    task: LlmTask.DEBRIEF_HISTORY_DEEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Orchestrated runs whose plan chose it: three or more past debriefs and a pattern worth naming',
+    detail:
+      "Registry agent: the learner's last debriefs (get_learner_history) against this session's evidence map, as findings.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (orchestrator.agents[history_deep].model); default the registry manifest',
+    promptOverride: 'debrief_history_deep_system',
+  },
+  {
+    id: 'debrief-language-specialist',
+    task: LlmTask.DEBRIEF_LANGUAGE_SPECIALIST,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Orchestrated runs whose plan chose it: a code-mixed or Indian-language session, or quotes in another script',
+    detail:
+      'Registry agent: what a Writer in the session language could get wrong, as findings.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (orchestrator.agents[language_specialist].model); default the registry manifest',
+    promptOverride: 'debrief_language_specialist_system',
+  },
+  {
     id: 'debrief-reply',
     task: LlmTask.DEBRIEF_REPLY,
-    runtime: LlmRuntime.ALLY_BE,
+    runtime: LlmRuntime.ALLY_AI,
     trigger:
       'A learner replies under the reflective question of a published Debrief-agent debrief',
     detail:
       'Ask Ally: answers from the published debrief and the transcript, streamed, one short reply ' +
-      'per message (≤ $0.05). A first-person risk statement gets the fixed support reply instead, ' +
-      'and the Safety reader reads each message alongside. Replaces coaching-chat for switched-on organisations.',
+      'per message (≤ $0.05). A LangChain create_agent loop in ally-ai (app/core/ask_ally), up to ' +
+      '4 passes, calling tools through the ally-be Debrief gateway when a question needs them: ' +
+      'search_guidance (Context Library, Debrief Guidance), get_learner_history and ' +
+      'get_live_detections (v9 FR-43); the last pass never calls a tool. ally-be screens first: a ' +
+      'first-person risk statement gets the fixed support reply instead, and the Safety reader ' +
+      'reads each message alongside; ally-be also runs the reply checks, keeps the thread and ' +
+      'relays the stream. Replaces coaching-chat for switched-on organisations.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
@@ -1002,6 +1068,24 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'DEBRIEF_READ_ALOUD_VOICE in debrief-audio.service.ts',
   },
   {
+    id: 'scenario-description-narration',
+    task: LlmTask.SCENARIO_DESCRIPTION_NARRATION,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'An author publishes a role-play, or edits the description of a published one; also the ' +
+      'backfill script and the retry sweep for a failed attempt',
+    detail:
+      'Speech of the role-play description, one standard narrator voice per language, made in ' +
+      'the background and stored in the assets bucket. Skipped when the text, voice and language ' +
+      'match the stored audio, so a re-save makes no TTS call. Failures retry up to 3 times ' +
+      'over about an hour and never block the save.',
+    kind: AiTaskKind.SPEECH,
+    provider: 'sarvam',
+    defaultModel: 'bulbul:v3',
+    configuredBy:
+      'SCENARIO_NARRATION_VOICE in scenario-description-audio.service.ts',
+  },
+  {
     id: 'debrief-reflection-check',
     task: LlmTask.DEBRIEF_REFLECTION_CHECK,
     runtime: LlmRuntime.ALLY_BE,
@@ -1019,15 +1103,28 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
   },
   {
     id: 'debrief-improver',
-    task: LlmTask.DEBRIEF_IMPROVER,
+    task: LlmTask.DEBRIEF_PM_AGENT,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'Daily, and on demand from the Debrief Console',
+    trigger:
+      'Weekly, a deeper review monthly, on demand from the Debrief Console, and when a Builder ' +
+      'interview handed over with "Hand to Builder" asks a question',
     detail:
-      'The Improver: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
+      'The PM agent, one Deep Agent in ally-ai (app/core/pm_agent): reads expert comments, metric failure points ' +
+      'and redacted reporting views (never transcripts), plans, investigates with read-only subagents, and proposes ' +
+      'ideas routed to itself, Builder, Bug Hunter or a person through ally-be gateway tools that refuse the ' +
+      'never-list. Every model call (main agent and subagents) is one row. Falls back to ' +
+      'DEBRIEF_MODELS.pmAgentBackup. Paid from the learning budget, capped per run (pmAgentRunCapUsd). ' +
+      'Also answers Builder interview questions for a handed-over idea (R2-20, POST /pm-agent/builder-answers): ' +
+      'one structured call from the idea brief alone (no tools, no learner text), at most $0.10 each, ' +
+      'escalating to a person what the brief does not settle. Its instructions are the Skills Store ' +
+      'prompt ally_ai_debrief_pm_builder_answers_system (not pinned); its model is DEBRIEF_MODELS.pmAgent, ' +
+      'not the prompt row.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
-    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.improver)',
+    configuredBy:
+      'DEBRIEF_MODELS.pmAgent / pmAgentBackup in debrief-release.constants.ts',
+    promptOverride: 'debrief_improver_system',
   },
   {
     id: 'rag-quality-judge',
@@ -1171,6 +1268,135 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy:
       'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per bot: chatbots.model',
     promptOverride: 'ally_ai_agent_system',
+  },
+  {
+    id: 'onboarding-builder-step',
+    task: LlmTask.ONBOARDING_BUILDER_STEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Someone setting up an assistant at /chatbots/new sends a message or taps a quick reply',
+    detail:
+      'One call per owner message that needs a reply written (quick replies with a fixed answer, such as Skip for now, need none): the setup guide replies and proposes changes to the draft. It sees summaries of the pages read (titles and headings), what we learned, the answers so far and the draft — never whole pages. ally-be checks every proposed change (paths, schema, safety lock) before writing. 45-second step cap.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_system',
+  },
+  {
+    id: 'onboarding-extract-facts',
+    task: LlmTask.ONBOARDING_EXTRACT_FACTS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'A website is read during onboarding: once per batch of 8 pages',
+    detail:
+      'Reads up to 8 crawled pages (text capped per page) and returns the details for What we learned, each citing the page it came from by number; a detail citing no page in the batch is dropped and counted. At most 50 pages per site, so about 7 calls per onboarding — the largest share of its cost.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_extract',
+  },
+  {
+    id: 'onboarding-classify',
+    task: LlmTask.ONBOARDING_CLASSIFY,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner confirms What we learned during onboarding',
+    detail:
+      'One call per onboarding: chooses the industry from a fixed list of 13. ally-be maps the industry to its safety pack in code (PACK_FOR_INDUSTRY); the model never chooses the pack.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_classify',
+  },
+  {
+    id: 'onboarding-gaps',
+    task: LlmTask.ONBOARDING_GAPS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Right after the industry is chosen during onboarding',
+    detail:
+      "One call per onboarding: checks what we learned against the industry's fixed checklist (in ally-ai code) and adds at most 2 gaps of the site's own. At most 3 gaps are asked, then the three fixed questions.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_gaps',
+  },
+  {
+    id: 'onboarding-purposes',
+    task: LlmTask.ONBOARDING_PURPOSES,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner answers the last onboarding question',
+    detail:
+      "One call per onboarding (chunk 20a-2): recommends one of the purposes (answer questions, bring in customers, train my team, guide step by step) and tailors each card's Best for and sample exchange. What each will and won't do is fixed in code.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_purposes',
+  },
+  {
+    id: 'onboarding-draft',
+    task: LlmTask.ONBOARDING_DRAFT,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner chooses a design during onboarding',
+    detail:
+      "One call per build: writes the assistant's introduction, instructions, tone, topics, suggested questions, pre-chat questions (enquiries only) and decline wording from what we learned and the owner's answers. Any sentence stating a number we were never given is dropped in code.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_draft',
+  },
+  {
+    id: 'onboarding-change',
+    task: LlmTask.ONBOARDING_CHANGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner asks for a change in "Change your assistant"',
+    detail:
+      "One call per request: proposes a before and after for a fixed set of settings, or refuses one that would weaken safety. Nothing is applied until the owner confirms; ally-be applies it through the assistant home's field saves.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_change',
+  },
+  {
+    id: 'checkup-judge',
+    task: LlmTask.CHECKUP_JUDGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      "An assistant's checkup runs (onboarding, Run again, after a change, or an eval suite)",
+    detail:
+      'One call per graded question that needs a reading for meaning: are the expected facts there, is anything it must not say there, did it make anything up. Automatic checks decide the rest; the judge can fail a question, never pass one.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_checkup_judge',
+  },
+  {
+    id: 'checkup-questions',
+    task: LlmTask.CHECKUP_QUESTIONS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      "An onboarding assistant's checkup is written (before its first run)",
+    detail:
+      "One call per checkup: phrases up to 12 test questions, each answered by one or two of the business's learned details. Code keeps the details as the question's expected facts and source, and drops a question naming a detail it wasn't given.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_checkup_questions',
   },
   {
     id: 'corpus-embedding',
@@ -1821,6 +2047,25 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-5-mini',
     configuredBy: 'LLM_REASONING_MODEL',
     promptOverride: 'the prompt row for each roadmap call',
+  },
+  {
+    id: 'product-planning-ai',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'A roadmap plan runs a review-board check, drafts launch materials, plans user research, reviews an outcome, or the weekly signal scout runs',
+    detail:
+      'The planning_* prompts: the safety, privacy and AI-quality reviewers (cold, from the PRD and ' +
+      'design only), the outcome reviewer (scheduled after release), the launch planner, the ' +
+      "research planner and the weekly signal scout. Every call is priced into the plan's " +
+      'spend ledger (plan_spend_entries). Nothing they write leaves Ally without a person ' +
+      'publishing it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'the planning_* prompt row for each call',
   },
   {
     id: 'roadmap-opportunity-copilot',

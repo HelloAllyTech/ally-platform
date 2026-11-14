@@ -44,6 +44,11 @@ export interface BuilderSession {
   error: string | null;
   /** Set once anyone archives the session; the feed is shared across Builder users. */
   archivedAt: string | null;
+  /**
+   * Set when an agent requested the session (today only `debrief_pm_agent`, "Hand to Builder"
+   * on a Debrief PM agent idea); null for a session a person started.
+   */
+  requestedBy?: string | null;
   /** User id of whoever started the session. */
   createdBy: number;
   /** Display name of whoever started it (email when blank); null if the user is gone. */
@@ -644,6 +649,16 @@ export interface BuilderPrFeedback {
 export interface BuilderSettings {
   id: string;
   enabled: boolean;
+  /**
+   * Builder's own new-session door. Off once plans start on the Product Roadmap: new work is
+   * filed as an idea there and its plan comes here to build.
+   */
+  builderDirectInterviewEnabled?: boolean;
+  /** Planning on the roadmap (idea to outcome). */
+  planningEnabled?: boolean;
+  planCeilingUsd?: string;
+  planIdeaCeilingUsd?: string;
+  planCloseConfirmVotes?: number;
   /** Whether Builder reviews its own open pull requests. Writes findings, touches no branch. */
   autoReviewEnabled: boolean;
   /** Whether a review that found nothing may submit an approving review. */
@@ -1313,7 +1328,8 @@ export interface BuilderUpNext {
 }
 
 export type BuilderHistoryEntryType = "decision" | "ask" | "tell" | "start" | "putback";
-export type BuilderHistorySurface = "now" | "session" | "slack" | "rule";
+/** `requester`: an agent that requested the session answered (the PM agent, "Hand to Builder"). */
+export type BuilderHistorySurface = "now" | "session" | "slack" | "rule" | "requester";
 
 export interface BuilderHistoryItem {
   id: string;
