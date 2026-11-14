@@ -75,6 +75,16 @@ export const REPEAT_MAX = 500;
 export const REPEAT_LIMIT_WORDS = '500 entries at a time';
 const REPEAT_MAX_DAYS = 366;
 const REPEAT_FIRST = 5;
+/** The details that make a time "already there" for Repeat weekly: text and choices only. */
+const SAME_TYPES = new Set<ListFieldType>([
+  ListFieldType.TEXT,
+  ListFieldType.LONG_TEXT,
+  ListFieldType.SELECT,
+  ListFieldType.RELATION,
+  ListFieldType.PHONE,
+  ListFieldType.EMAIL,
+  ListFieldType.URL,
+]);
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const YMD = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -492,15 +502,16 @@ export class ListOwnerService {
       }
     }
     // A time counts as already there only for an entry with the same details, so Dr Rao's
-    // 10:00 isn't skipped because Dr Mehta has 10:00. Only plain values take part.
+    // 10:00 isn't skipped because Dr Mehta has 10:00. Only text and choice details take part
+    // (practitioner, table, teacher): numbers, durations and yes/no don't, so a 50-minute
+    // batch still skips Dr Mehta's 30-minute 10:00.
     const same = Object.fromEntries(
       Object.entries(values).filter(
-        ([, v]) =>
+        ([k, v]) =>
           v !== null &&
           v !== '' &&
-          (typeof v === 'string' ||
-            typeof v === 'number' ||
-            typeof v === 'boolean'),
+          typeof v === 'string' &&
+          SAME_TYPES.has(list.field(k)?.type as ListFieldType),
       ),
     );
     const times: { value: string; at: number }[] = [];

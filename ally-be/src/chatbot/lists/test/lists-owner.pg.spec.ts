@@ -303,6 +303,40 @@ describePg('Lists, the owner’s section (Postgres)', () => {
       expect(rao).toMatchObject({ count: 35, skipped: 0 });
     });
 
+    it('counts a time as already there by its text and choice details, not its numbers', async () => {
+      await records.create(bot, 'slots', OWNER, {
+        starts_at: '2026-11-16T04:30:00Z', // Mon 10:00 in India
+        practitioner: 'Dr Mehta',
+        duration: 30,
+      });
+      const mehta = await owner.repeat(
+        await chatbot(),
+        'slots',
+        OWNER,
+        {
+          ...week,
+          values: { practitioner: 'Dr Mehta', duration: 50, open: true },
+          dry_run: true,
+        },
+        NOW,
+      );
+      expect(mehta).toMatchObject({ count: 34, skipped: 1 });
+      expect(mehta.first[0]).toBe('Mon 16 Nov 2026, 11:00');
+
+      const rao = await owner.repeat(
+        await chatbot(),
+        'slots',
+        OWNER,
+        {
+          ...week,
+          values: { practitioner: 'Dr Rao', duration: 50 },
+          dry_run: true,
+        },
+        NOW,
+      );
+      expect(rao).toMatchObject({ count: 35, skipped: 0 });
+    });
+
     it('needs every needed detail before it adds anything', async () => {
       await owner.install(await chatbot(), 'table_reservations');
       const refused = await refusal(
