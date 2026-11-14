@@ -341,6 +341,13 @@ export class WhatsAppInboundService {
         // The Agents v2 run's thread and the message its run id is derived from.
         conversationId: conversation.id,
         providerMessageId: inbound.providerMessageId,
+        // The shared store's contact, for the run token (chunk 6): list tools act for this person.
+        contactId:
+          (await this.sharedStore?.contactIdFor(
+            settings,
+            contact,
+            chatbot.id,
+          )) ?? null,
       });
 
       // A team member has this chat (chunk 11a): the engine didn't answer, so nothing is sent.

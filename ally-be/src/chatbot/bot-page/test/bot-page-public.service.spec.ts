@@ -732,6 +732,23 @@ describe('BotPagePublicService', () => {
     ]);
   });
 
+  it('publicCitations shows a list record as the list and the record (chunk 6)', () => {
+    expect(
+      publicCitations([
+        {
+          document_title: 'Slots',
+          section_path: 'Thu 19 Nov 2026, 11:15',
+          source_url: '',
+          record_id: 'rec-1',
+        },
+        { document_title: 'Fees', section_path: 'Students', source_url: '' },
+      ]),
+    ).toEqual([
+      { title: 'Slots · Thu 19 Nov 2026, 11:15', url: null },
+      { title: 'Fees', url: null },
+    ]);
+  });
+
   describe('feedback on an answer (chunk Q2a)', () => {
     const answer = (handledBy: string) => [
       {

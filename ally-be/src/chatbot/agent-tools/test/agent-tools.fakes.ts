@@ -155,7 +155,19 @@ export class RecordingTool implements AgentGatewayTool<{ note: string }> {
   }
 }
 
-export function makeGateway(tools: AgentGatewayTool[], config = appConfig()) {
+/** List tools (chunk 6): none resolve unless a test adds them. */
+export class FakeListTools {
+  readonly tools = new Map<string, AgentGatewayTool>();
+  async resolve(chatbotId: string, name: string) {
+    return this.tools.get(`${chatbotId}:${name}`);
+  }
+}
+
+export function makeGateway(
+  tools: AgentGatewayTool[],
+  config = appConfig(),
+  listTools = new FakeListTools(),
+) {
   const db = new FakeGatewayDb();
   const tokens = new AgentRunTokenService(config);
   const gateway = new AgentGatewayService(
@@ -163,6 +175,7 @@ export function makeGateway(tools: AgentGatewayTool[], config = appConfig()) {
     config,
     tokens,
     new AgentToolRegistry(tools),
+    listTools as never,
   );
-  return { db, tokens, gateway };
+  return { db, tokens, gateway, listTools };
 }

@@ -49,13 +49,15 @@ describe('ChatbotEngineService: the tool gateway', () => {
   const setup = ({
     agentAnswer = AGENT_ANSWER as unknown,
     abilities,
-    acted = [] as string[],
+    acted = [] as (string | { tool: string; result: unknown })[],
     crisis = false,
+    definitions = [] as { name: string }[],
   }: {
     agentAnswer?: unknown;
     abilities?: Record<string, 'do_it' | 'never'>;
-    acted?: string[];
+    acted?: (string | { tool: string; result: unknown })[];
     crisis?: boolean;
+    definitions?: { name: string }[];
   } = {}) => {
     const aiService = engineAiService(ANSWER, agentAnswer);
     aiService.checkWhatsAppCrisis.mockResolvedValue({
@@ -67,14 +69,25 @@ describe('ChatbotEngineService: the tool gateway', () => {
       find: jest
         .fn()
         .mockResolvedValue(
-          acted.map((tool) => ({ tool, status: ToolRunStatus.OK })),
+          acted.map((row) =>
+            typeof row === 'string'
+              ? { tool: row, status: ToolRunStatus.OK }
+              : { ...row, status: ToolRunStatus.OK },
+          ),
         ),
+    };
+    const listTools = {
+      offeredFor: jest.fn().mockResolvedValue({
+        definitions,
+        omitted: definitions.length ? ['find_more'] : [],
+      }),
     };
     const engine = makeEngine({
       aiService,
       promptShared: { getPromptsByOptions: jest.fn().mockResolvedValue([]) },
       toolRuns,
       tools: [{ name: 'hand_over' }],
+      listTools,
     });
     const turn = (over: Partial<ChatTurn> = {}): ChatTurn => ({
       chatbot: chatbotFixture({ settings: abilities ? { abilities } : {} }),
@@ -95,7 +108,7 @@ describe('ChatbotEngineService: the tool gateway', () => {
       contactId: 'contact-1',
       ...over,
     });
-    return { engine, aiService, toolRuns, turn };
+    return { engine, aiService, toolRuns, listTools, turn };
   };
 
   const sentRequest = (aiService: { runAgent: jest.Mock }) =>
@@ -258,6 +271,101 @@ describe('ChatbotEngineService: the tool gateway', () => {
       );
       await h.engine.respond(h.turn());
       expect(h.toolRuns.find).not.toHaveBeenCalled();
+      expect(h.aiService.answerKnowledgeQuestionWithin).toHaveBeenCalled();
+    });
+  });
+
+  describe('list tools (chunk 6)', () => {
+    const FIND = {
+      name: 'find_slots',
+      description: 'Look up entries in Slots.',
+      input_schema: { type: 'object', properties: {} },
+      kind: 'find',
+    };
+    const CREATE = { ...FIND, name: 'create_appointments', kind: 'create' };
+    const BOOKED = {
+      tool: 'create_appointments',
+      result: {
+        list: { key: 'appointments', name: 'Appointments' },
+        passages: [{ record_title: 'Thu 19 Nov 2026, 11:00' }],
+      },
+    };
+
+    it('sends the definitions, the omitted names and a token listing them', async () => {
+      const h = setup({ definitions: [FIND, CREATE] });
+      await h.engine.respond(h.turn());
+      const { gateway } = sentRequest(h.aiService);
+      expect(gateway.tools).toEqual(['find_slots', 'create_appointments']);
+      expect(gateway.definitions).toEqual([FIND, CREATE]);
+      expect(gateway.omitted).toEqual(['find_more']);
+      expect((jwt.decode(gateway.token) as { tools: string[] }).tools).toEqual([
+        'find_slots',
+        'create_appointments',
+      ]);
+      expect(h.listTools.offeredFor).toHaveBeenCalledWith(
+        'bot-1',
+        {},
+        {
+          knowsPerson: true,
+        },
+      );
+    });
+
+    it("is exactly today's request for a bot with no lists", async () => {
+      const h = setup();
+      await h.engine.respond(h.turn());
+      expect(sentRequest(h.aiService)).not.toHaveProperty('gateway');
+    });
+
+    it('a WhatsApp run with no contact is offered no person lists; Preview is', async () => {
+      const wa = setup({ definitions: [FIND] });
+      await wa.engine.respond(wa.turn({ contactId: null }));
+      expect(wa.listTools.offeredFor).toHaveBeenCalledWith(
+        'bot-1',
+        {},
+        {
+          knowsPerson: false,
+        },
+      );
+      const preview = setup({ definitions: [FIND] });
+      await preview.engine.respond(
+        preview.turn({ contactId: null, conversationId: undefined }),
+      );
+      expect(preview.listTools.offeredFor).toHaveBeenCalledWith(
+        'bot-1',
+        {},
+        {
+          knowsPerson: true,
+        },
+      );
+    });
+
+    it('a run that fails after a create says what was done, not v1', async () => {
+      const h = setup({
+        definitions: [FIND, CREATE],
+        acted: [{ tool: 'find_slots', result: {} }, BOOKED],
+      });
+      h.aiService.runAgent.mockRejectedValue(
+        new AiUpstreamError('late', ErrorCode.AI_SERVICE_TIMEOUT),
+      );
+      const decision = await h.engine.respond(h.turn());
+      expect(decision).toMatchObject({
+        handledBy: WaHandledBy.ERROR,
+        body: 'Done: Thu 19 Nov 2026, 11:00 in Appointments.',
+      });
+      expect(h.aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
+    });
+
+    it('a run that fails after only a find falls back to v1: a find did nothing', async () => {
+      const h = setup({
+        definitions: [FIND],
+        acted: [{ tool: 'find_slots', result: {} }],
+      });
+      h.aiService.runAgent.mockRejectedValue(
+        new AiUpstreamError('late', ErrorCode.AI_SERVICE_TIMEOUT),
+      );
+      const decision = await h.engine.respond(h.turn());
+      expect(decision.handledBy).toBe(WaHandledBy.RAG);
       expect(h.aiService.answerKnowledgeQuestionWithin).toHaveBeenCalled();
     });
   });

@@ -10,6 +10,7 @@ import {
   ChatbotStatus,
 } from '../../enum/chatbot.enum';
 import { AgentRunTokenService } from '../../agent-tools/agent-run-token.service';
+import { ListToolsService } from '../../agent-tools/list-tools.service';
 import { AgentToolRegistry } from '../../agent-tools/tools';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ToolRun } from '../../entity/tool-run.entity';
@@ -106,6 +107,12 @@ export const AGENT_GATEWAY_TEST_PROVIDERS = [
   },
   { provide: AgentToolRegistry, useValue: new AgentToolRegistry([]) },
   { provide: AgentRunTokenService, useValue: {} },
+  {
+    provide: ListToolsService,
+    useValue: {
+      offeredFor: jest.fn().mockResolvedValue({ definitions: [], omitted: [] }),
+    },
+  },
 ];
 
 /** The engine with its v2 runner, everyone it reads mocked. Anyone may chat with the bot. */
@@ -117,6 +124,7 @@ export const makeEngine = ({
   conversations,
   toolRuns = { find: jest.fn().mockResolvedValue([]) },
   tools = [],
+  listTools,
 }: {
   aiService: EngineAiService;
   promptShared: { getPromptsByOptions: jest.Mock };
@@ -129,6 +137,8 @@ export const makeEngine = ({
   toolRuns?: { find: jest.Mock };
   /** The gateway tools ally-be serves (chunk 3b); none by default. */
   tools?: { name: string }[];
+  /** The bot's list tools (chunk 6); none by default. */
+  listTools?: { offeredFor: jest.Mock };
 }): ChatbotEngineService =>
   new ChatbotEngineService(
     documents as never,
@@ -147,6 +157,11 @@ export const makeEngine = ({
         publicApiBaseUrl: 'http://api.test',
         jwt: { accessToken: { secret: 'access' } },
       } as never),
+      (listTools ?? {
+        offeredFor: jest
+          .fn()
+          .mockResolvedValue({ definitions: [], omitted: [] }),
+      }) as never,
     ),
     conversations as never,
   );

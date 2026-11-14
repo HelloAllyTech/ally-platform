@@ -11,10 +11,13 @@ export type AgentToolContext = Pick<
   'chatbotId' | 'conversationId' | 'runId' | 'contactId'
 >;
 
-/** What a tool did. A failure is an answer the agent reads, never a thrown error. */
+/**
+ * What a tool did. A failure is an answer the agent reads, never a thrown error: a short code, and
+ * for a list refusal (chunk 6) its message and alternatives in `result`.
+ */
 export type AgentToolOutcome =
   | { ok: true; result: Record<string, unknown> }
-  | { ok: false; error: string };
+  | { ok: false; error: string; result?: Record<string, unknown> };
 
 /**
  * One tool the chatbot agent can call through the gateway (chunk 3b). Adding a tool is one module

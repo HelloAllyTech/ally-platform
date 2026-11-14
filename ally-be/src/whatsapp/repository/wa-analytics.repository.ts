@@ -239,6 +239,7 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
         WHERE m."createdAt" >= $1
           AND m."createdAt" < $2
           AND m.citations IS NOT NULL
+          AND citation->>'record_id' IS NULL
           AND ($3::uuid IS NULL OR ${conversationInBotSql('m.conversation_id').replace(/:scopeBot/g, '$3')})
         GROUP BY citation->>'document_id'
         ORDER BY citations DESC`,

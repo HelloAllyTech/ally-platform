@@ -353,3 +353,91 @@ describe('AgentGatewayService', () => {
     );
   });
 });
+
+describe('AgentGatewayService: list tools (chunk 6)', () => {
+  /** A list tool resolved for one bot only, as `ListToolsService.resolve` does. */
+  function withList(abilities: Record<string, string> | undefined) {
+    const built = makeGateway([]);
+    const find = new RecordingTool('find_slots');
+    const create = new RecordingTool('create_appointments');
+    built.listTools.tools.set(`${BOT_A}:find_slots`, find);
+    built.listTools.tools.set(`${BOT_A}:create_appointments`, create);
+    built.db.bots.set(BOT_A, { abilities: abilities as never });
+    const token = built.tokens.sign(
+      claimsFor({ tools: ['find_slots', 'create_appointments', 'find_other'] }),
+    );
+    const call = (
+      name: string,
+      opts: { chatbotId?: string; step?: number } = {},
+    ) =>
+      built.gateway.call(
+        name,
+        {
+          apiKey: SERVICE_KEY,
+          authorization: `Bearer ${
+            opts.chatbotId
+              ? built.tokens.sign(
+                  claimsFor({ chatbotId: opts.chatbotId, tools: [name] }),
+                )
+              : token
+          }`,
+        },
+        { run_id: 'run-1', step: opts.step ?? 0, input: { note: 'x' } },
+      );
+    return { ...built, find, create, call };
+  }
+
+  it('runs a find with no abilities set: reads are on by default', async () => {
+    const { call, find } = withList(undefined);
+    await expect(call('find_slots')).resolves.toMatchObject({ ok: true });
+    expect(find.calls).toHaveLength(1);
+  });
+
+  it('answers 404 for an unknown list, and for another bot’s list', async () => {
+    const { call } = withList(undefined);
+    await expect(call('find_other')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      call('find_slots', { chatbotId: BOT_B }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('answers 403 for a write that isn’t Do it, and for a find set to Never', async () => {
+    await expect(
+      withList(undefined).call('create_appointments'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      withList({ find_slots: 'never' }).call('find_slots'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('stores a refusal’s message and alternatives, and replays them', async () => {
+    const { call, create, db } = withList({ create_appointments: 'do_it' });
+    create.outcome = {
+      ok: false,
+      error: 'unique_taken',
+      result: {
+        message: 'That slot is already taken.',
+        passages: [{ record_id: 's2' }],
+      },
+    };
+    const first = await call('create_appointments');
+    expect(first).toEqual({
+      ok: false,
+      error: 'unique_taken',
+      result: {
+        message: 'That slot is already taken.',
+        passages: [{ record_id: 's2' }],
+      },
+      replayed: false,
+    });
+    expect(db.runs[0]).toMatchObject({
+      status: ToolRunStatus.ERROR,
+      error_code: 'unique_taken',
+    });
+    await expect(call('create_appointments')).resolves.toEqual({
+      ...first,
+      replayed: true,
+    });
+    expect(create.calls).toHaveLength(1);
+  });
+});

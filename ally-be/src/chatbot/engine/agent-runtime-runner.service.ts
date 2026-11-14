@@ -14,6 +14,11 @@ import type {
 import { AiService } from '../../ai/service/ai.service';
 import { LoggerService } from '../../logger/logger.service';
 import { AgentRunTokenService } from '../agent-tools/agent-run-token.service';
+import { listDoneLine, parseListToolName } from '../agent-tools/list-tools';
+import {
+  isPreviewConversation,
+  ListToolsService,
+} from '../agent-tools/list-tools.service';
 import { AgentToolRegistry } from '../agent-tools/tools';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
 import { ToolRun, ToolRunStatus } from '../entity/tool-run.entity';
@@ -62,17 +67,30 @@ export class AgentFallbackFailedError extends Error {
 
 /**
  * The v2 run failed after a gateway tool had already acted (chunk 3b), so v1 must not answer: the
- * message has been dealt with. `tool` is what acted: `hand_over` gets the hand-over message, and
- * anything else the bot's fallback wording.
+ * message has been dealt with. `tool` is what acted: `hand_over` gets the hand-over message; a list
+ * write (chunk 6) gets `done`, "Done: {record} in {list}."; anything else the bot's fallback wording.
  */
 export class AgentActedError extends Error {
   constructor(
     readonly tool: string,
     readonly agent: AgentRunRef,
+    readonly done?: string,
   ) {
     super(`The agent run failed after ${tool} acted`);
     this.name = 'AgentActedError';
   }
+}
+
+/** "Done: {record} in {list}." from a list write's stored result; undefined if it isn't one. */
+function doneLineOf(
+  result: Record<string, unknown> | null | undefined,
+): string | undefined {
+  const list = (result?.list as { name?: unknown } | undefined)?.name;
+  const passages = result?.passages as { record_title?: unknown }[] | undefined;
+  const title = passages?.[0]?.record_title;
+  return typeof list === 'string' && typeof title === 'string'
+    ? listDoneLine(title, list)
+    : undefined;
 }
 
 /** `/agent/run`'s debug-only list of every retrieved chunk; not stored on the message. */
@@ -101,6 +119,7 @@ export class AgentRuntimeRunner {
     private readonly toolRuns: Repository<ToolRun>,
     private readonly tools: AgentToolRegistry,
     private readonly runTokens: AgentRunTokenService,
+    private readonly listTools: ListToolsService,
   ) {}
 
   /**
@@ -160,14 +179,18 @@ export class AgentRuntimeRunner {
       if (acted) {
         this.logger.warn(
           `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}) after ` +
-            `${acted} acted; not answering with v1`,
+            `${acted.tool} acted; not answering with v1`,
         );
-        throw new AgentActedError(acted, {
-          runtime: AgentRuntimeUsed.V2_FALLBACK,
-          runId,
-          conversationId,
-          fallbackReason,
-        });
+        throw new AgentActedError(
+          acted.tool,
+          {
+            runtime: AgentRuntimeUsed.V2_FALLBACK,
+            runId,
+            conversationId,
+            fallbackReason,
+          },
+          acted.done,
+        );
       }
       this.logger.warn(
         `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}); ` +
@@ -214,9 +237,14 @@ export class AgentRuntimeRunner {
       declineText: turn.settings.declineText,
     });
     if (run.withGateway === false) return body;
-    // The tools this bot has on, from its OWN stored settings (chunk 3b). None: exactly today's
-    // request, with no token signed.
-    const tools = this.tools.servedFor(turn.chatbot.settings);
+    // The tools this bot has on, from its OWN stored settings (chunk 3b), and its list tools
+    // (chunk 6). None: exactly today's request, with no token signed.
+    const contactId = turn.contactId ?? null;
+    const lists = await this.listToolsFor(turn, run.conversationId, contactId);
+    const tools = [
+      ...this.tools.servedFor(turn.chatbot.settings),
+      ...lists.definitions.map((def) => def.name),
+    ];
     if (!tools.length) return body;
     return {
       ...body,
@@ -226,28 +254,68 @@ export class AgentRuntimeRunner {
           chatbotId: turn.chatbot.id,
           conversationId: run.conversationId,
           runId: run.runId,
-          contactId: turn.contactId ?? null,
+          contactId,
           tools,
         }),
         tools,
+        ...(lists.definitions.length ? { definitions: lists.definitions } : {}),
+        ...(lists.omitted.length ? { omitted: lists.omitted } : {}),
       },
     };
   }
 
   /**
-   * The gateway tool that acted in this run, if any: `hand_over` first, since it decides the
-   * reply. A lookup failure is read as nothing acted, as before 3b.
+   * The list tools this run gets (chunk 6). Preview knows no person but is offered them (a find on
+   * a person's list returns nothing; writes are checked and rolled back); a channel whose contact
+   * isn't known (WhatsApp with the shared store off) isn't offered the tools of person lists. A
+   * failure to read the lists offers none: the run goes on as before.
    */
-  private async actedIn(runId: string): Promise<string | null> {
+  private async listToolsFor(
+    turn: ChatTurn,
+    conversationId: string,
+    contactId: string | null,
+  ) {
     try {
-      const rows = await this.toolRuns.find({
-        where: { runId, status: ToolRunStatus.OK },
-        select: ['tool'],
-      });
+      return await this.listTools.offeredFor(
+        turn.chatbot.id,
+        turn.chatbot.settings,
+        {
+          knowsPerson:
+            contactId !== null || isPreviewConversation(conversationId),
+        },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not read the bot's lists: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return { definitions: [], omitted: [] };
+    }
+  }
+
+  /**
+   * The gateway tool that acted in this run, if any: `hand_over` first, since it decides the
+   * reply; then the last list write, with its "Done:" line. A find only read, so it doesn't count:
+   * v1 may still answer. A lookup failure is read as nothing acted, as before 3b.
+   */
+  private async actedIn(
+    runId: string,
+  ): Promise<{ tool: string; done?: string } | null> {
+    try {
+      const rows = (
+        await this.toolRuns.find({
+          where: { runId, status: ToolRunStatus.OK },
+          select: ['tool', 'step', 'result'],
+          order: { step: 'ASC' },
+        })
+      ).filter((row) => parseListToolName(row.tool)?.kind !== 'find');
       if (!rows.length) return null;
-      return rows.some((row) => row.tool === 'hand_over')
-        ? 'hand_over'
-        : rows[0].tool;
+      if (rows.some((row) => row.tool === 'hand_over')) {
+        return { tool: 'hand_over' };
+      }
+      const last = rows[rows.length - 1];
+      return { tool: last.tool, done: doneLineOf(last.result) };
     } catch (error) {
       this.logger.warn(
         `Could not read the run's tool calls: ${

@@ -14,8 +14,9 @@ import { LoggerService } from '../../logger/logger.service';
 import { ToolRunStatus } from '../entity/tool-run.entity';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 import { AgentRunTokenService } from './agent-run-token.service';
+import { abilityFor } from './list-tools';
+import { ListToolsService } from './list-tools.service';
 import {
-  abilityOn,
   AgentToolOutcome,
   AgentToolRegistry,
   type AgentToolContext,
@@ -30,7 +31,12 @@ export const STALE_CLAIM_SECONDS = 30;
 /** What every gateway call answers. */
 export type AgentGatewayResponse =
   | { ok: true; result: Record<string, unknown>; replayed: boolean }
-  | { ok: false; error: string; replayed: boolean };
+  | {
+      ok: false;
+      error: string;
+      result?: Record<string, unknown>;
+      replayed: boolean;
+    };
 
 interface ToolRunRow {
   id: string;
@@ -64,6 +70,7 @@ export class AgentGatewayService {
     private readonly config: AppConfigService,
     private readonly tokens: AgentRunTokenService,
     private readonly registry: AgentToolRegistry,
+    private readonly listTools: ListToolsService,
   ) {}
 
   async call(
@@ -77,14 +84,18 @@ export class AgentGatewayService {
     }
     // 2. The run token: signature, expiry and kind.
     const claims = this.tokens.verify(headers.authorization);
-    // 3. The tool.
-    const tool = this.registry.get(name);
+    // 3. The tool: a built-in one, or a live list of the token's bot (chunk 6). No other bot's.
+    const tool =
+      this.registry.get(name) ??
+      (await this.listTools.resolve(claims.chatbotId, name));
     if (!tool) throw new NotFoundException(`No agent tool ${name}`);
     // 4. The token lists it, and the bot still has it on.
     if (!claims.tools.includes(name)) {
       throw new ForbiddenException(`This run may not call ${name}`);
     }
-    if (!abilityOn(await this.storedSettings(claims.chatbotId), name)) {
+    if (
+      abilityFor(await this.storedSettings(claims.chatbotId), name) !== 'do_it'
+    ) {
       throw new ForbiddenException(`${name} is off for this assistant`);
     }
     // 5. The body: exactly { run_id, step, input }.
@@ -126,7 +137,7 @@ export class AgentGatewayService {
       [
         claimed.id,
         outcome.ok ? ToolRunStatus.OK : ToolRunStatus.ERROR,
-        outcome.ok ? JSON.stringify(outcome.result) : null,
+        outcome.result ? JSON.stringify(outcome.result) : null,
         outcome.ok ? null : outcome.error,
         ms,
       ],
@@ -237,7 +248,11 @@ export class AgentGatewayService {
     }
     if (existing.status === ToolRunStatus.ERROR) {
       return {
-        replay: { ok: false, error: existing.error_code ?? 'internal' },
+        replay: {
+          ok: false,
+          error: existing.error_code ?? 'internal',
+          ...(existing.result ? { result: existing.result } : {}),
+        },
       };
     }
     const [reclaimed] = rowsOf(

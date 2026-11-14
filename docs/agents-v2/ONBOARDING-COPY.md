@@ -739,3 +739,5 @@ says when a save can't be made. More lines for the home's sections are added her
 **The `{why}` reasons (5a, in the engine):** it should be text · it's longer than {max} characters · it should be a number · it should be a whole number of minutes · it should be a date like 2026-11-20 · it should be a date and time with its offset, like 2026-11-20T11:15:00+05:30 · it should be one of {values} · it should be yes or no · it isn't a phone number · it isn't an email address · it isn't a web address · it should be an entry's id · that entry doesn't exist · it isn't a field of this list · its type can't change while entries have a value for it · {n} entries already break it (adding a rule).
 
 **`{limit}` (5a):** 50 lists · 100 fields · 200,000 entries · 32 KB per entry · 5,000 rows a file · 5 MB a file · 20 rules.
+
+**When a run fails after a list write (6):** Done: {record title} in {list}. *(Sent instead of the bot's fallback wording when the assistant booked or changed something and then couldn't finish its reply; the record's title as the list shows it, the list's name as the owner wrote it.)*

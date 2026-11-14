@@ -69,6 +69,7 @@ describePg('AgentGatewayService (Postgres)', () => {
         new HandOverTool(dataSource, handover, conversations),
         note,
       ]),
+      { resolve: async () => undefined } as never,
     );
     const call = (
       tool: string,

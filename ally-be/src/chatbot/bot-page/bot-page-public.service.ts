@@ -1149,9 +1149,11 @@ export function publicCitations(
   const seen = new Set<string>();
   const out: PublicCitation[] = [];
   for (const citation of citations ?? []) {
-    const title = String(
-      citation.document_title ?? citation.title ?? '',
-    ).trim();
+    // A list record (chunk 6) reads "Slots · Thu 13 Nov, 11:15": the list, then the record.
+    const name = String(citation.document_title ?? citation.title ?? '').trim();
+    const section = String(citation.section_path ?? '').trim();
+    const title =
+      citation.record_id && name && section ? `${name} · ${section}` : name;
     if (!title || seen.has(title)) continue;
     seen.add(title);
     const url = String(citation.source_url ?? '');

@@ -147,6 +147,18 @@ export interface AgentGatewayBlock {
   url: string;
   token: string;
   tools: string[];
+  /**
+   * The generated list tools (chunk 6), each `{ name, description, input_schema, kind }`. Sent
+   * only when the run has one; at most 12.
+   */
+  definitions?: {
+    name: string;
+    description: string;
+    input_schema: { type: 'object'; properties: Record<string, unknown> };
+    kind: 'find' | 'create' | 'update';
+  }[];
+  /** List tools the bot has on that didn't fit under the cap; named in the run's trace. */
+  omitted?: string[];
 }
 
 export interface AgentRunRequest extends KnowledgeAnswerRequest {
@@ -235,6 +247,11 @@ export interface KnowledgeCitation {
   section_path: string;
   source_url: string;
   similarity: number;
+  /**
+   * Set when the passage was a list record (chunk 6): `document_title` is the list's name,
+   * `section_path` the record's title, `document_id` empty and `chunk_id` the record's id.
+   */
+  record_id?: string;
 }
 
 export interface KnowledgeRetrievalMeta {

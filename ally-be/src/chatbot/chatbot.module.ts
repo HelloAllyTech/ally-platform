@@ -38,6 +38,7 @@ import { AgentGatewayController } from './agent-tools/agent-gateway.controller';
 import { AgentGatewayService } from './agent-tools/agent-gateway.service';
 import { AgentRunTokenService } from './agent-tools/agent-run-token.service';
 import { HandOverTool } from './agent-tools/hand-over.tool';
+import { ListToolsService } from './agent-tools/list-tools.service';
 import { AGENT_GATEWAY_TOOLS, AgentToolRegistry } from './agent-tools/tools';
 import { ToolRun } from './entity/tool-run.entity';
 import { Collection } from './entity/collection.entity';
@@ -125,6 +126,7 @@ import { ListRecordsService } from './lists/list-records.service';
       inject: [HandOverTool],
     },
     AgentToolRegistry,
+    ListToolsService,
     // Lists (chunk 5a): the engine 6's tools and 5b's screens use.
     ListRecordsService,
     ListDefinitionsService,

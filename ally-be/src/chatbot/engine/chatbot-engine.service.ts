@@ -437,9 +437,15 @@ export class ChatbotEngineService {
       };
     }
     if (acted) {
+      // A list write that was done (chunk 6) says so; anything else gets the fallback wording.
+      const done =
+        answerResult.status === 'rejected' &&
+        answerResult.reason instanceof AgentActedError
+          ? answerResult.reason.done
+          : undefined;
       return {
         handledBy: WaHandledBy.ERROR,
-        body: settings.fallbackText,
+        body: done ?? settings.fallbackText,
         alert: degradedAlert,
         ...(agent ? { agent } : {}),
       };
