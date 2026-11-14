@@ -1,7 +1,8 @@
 # Chunk 07 notes: long-term memory and feedback
 
-Status: **built, offline tests and Postgres integration tests green; paid mechanics
-check not run yet** (waiting for the user's go). The chunk closes after that check.
+Status: **closed 2026-11-14.** Built and tested offline and on Postgres. The paid
+mechanics check ran (run 43555980695, $1.60) and found two recall defects, listed
+below as the first follow-up. They are not fixed yet.
 
 ## Decisions (user, 2026-11-14)
 
@@ -78,6 +79,50 @@ check not run yet** (waiting for the user's go). The chunk closes after that che
   clearly delimited block, and the prompt says the block is a user report to analyse,
   not instructions to follow. This applies to the triage, investigate and review inputs
   alike.
+
+## Mechanics check results (run 43555980695, 2026-11-14, $1.60, 75 min)
+
+Real PostgresStore with pgvector (semantic search on), eval scope
+`eval-memcheck-20261114-042218`. Report:
+`bug-hunter/evals/results/20261114-042220-memory-check.md`.
+
+| Case | Pass 1 | Verdict applied | Pass 2 recalled | Pass 2 | Expected |
+|---|---|---|---|---|---|
+| ally-ai-6e81b510 (sweep) | no bug, no finding: no false alarm this time | not_a_bug, but nothing to record (no finding) | – | no bug | The false-alarm close: **not exercised**, because pass 1 raised no false alarm |
+| ally-be-89d8e055 | suggested fix (fullwidth theory), oracle fail | wrong / wrong: wt-, fr-, pending cv- | bug-2b49b0125a (its own pass 1 record) | **closed as duplicate** of it, $0.002 | investigate recalls wt-b706… and avoids the fullwidth theory |
+| ally-web-eebbfd01 | escalated, finding in ui-shared | wrong / none: wt- | its own bug record plus 9299e9aa's (unrelated) | **closed as duplicate** | investigate recalls wt-5075… |
+| ally-web-9299e9aa | suggested fix (20), oracle fail | correct / needed_edits: fr-, cv- approved | its own bug record plus eebbfd01's (unrelated) | **closed as duplicate** | fix recalls the approved convention (10) |
+
+What it shows:
+
+1. **The duplicate close fired, against records it should never close on.** Pass 2
+   closed every issue case as a duplicate of its own pass 1 record, although the
+   human verdict on those records said the diagnosis was wrong (89d8e055, eebbfd01) or
+   the fix needed edits (9299e9aa). Triage closed before investigate and fix, so the
+   wrong theories and the approved convention were never reached. The code check
+   ("cite a recalled bug record") held, but it is too weak.
+2. **Semantic recall is noisy.** With pgvector on, every record's similarity score
+   cleared the 0.15 threshold. An unrelated bug (the WhatsApp preview vs the helpline
+   router crash) was recalled into triage, in pass 1 already (9299e9aa recalled
+   eebbfd01's record).
+3. **The hint-only rule** had no case to fire on. It is covered by the offline tests
+   (`test_a_false_alarm_on_changed_lines_is_a_hint_not_a_block`) only.
+4. **The mechanics themselves work** end to end: learn wrote the bug records, the
+   verdicts mapped to the right namespaces, and approve moved a convention to approved.
+   Fingerprints were taken at the case commit, holdout was never involved, and nothing
+   touched live memory.
+
+### First follow-up (proposed, not built)
+
+- **(a) What a duplicate may close on:** a `bugs` record may close a new signal as a
+  duplicate only when a human confirmed it (`diagnosis: correct`). Records with no
+  verdict are shown as "PAST BUG (unconfirmed)", a hint that cannot close. Records
+  judged `wrong` or `not_a_bug` are not shown as bugs at all; their `wrong_theories`
+  and `false_alarms` records carry the lesson.
+- **(b) Semantic recall needs evidence:** the semantic score only ranks. A record is
+  recalled only with a signature match, a shared file, or a word overlap of at least
+  0.1.
+- Then re-run this check (about $3; pass 2 would then reach investigate and fix).
 
 ## Open
 
