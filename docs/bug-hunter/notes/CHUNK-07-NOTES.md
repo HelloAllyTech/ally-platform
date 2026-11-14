@@ -27,8 +27,12 @@ check not run yet** (waiting for the user's go). The chunk closes after that che
   `bug-hunter memory approve <id> [--text "…"]`. `memory list` always lists the
   pending ones at the end.
 - **GitHub label reader:** reads `bh-diagnosis:*` and `bh-fix:*` labels plus the
-  closing comment on bug-hunter PRs and issues. It is built and tested with fakes, and
-  switched off (`memory.github_feedback: false`).
+  latest comment on bug-hunter PRs and issues. It is built and tested with fakes, and
+  switched off (`memory.github_feedback: false`). ally-platform is public, so it trusts
+  only labels applied by, and comments written by, members of `memory.github_org`
+  (HelloAllyTech) or logins in `memory.github_allow`. Everything else is ignored and
+  logged, and kept in `GitHubLabelFeedback.ignored`. Membership is asked once per
+  login; an unknown answer counts as not a member.
 - **Evals never touch live memory.** Namespaces are `(scope, app, kind)`; evals use an
   `eval-…` scope. **Holdout cases never enter memory:** `GraphAgent` gives a holdout
   case no memory, and the memory check refuses holdout cases and the live scope.
@@ -62,6 +66,18 @@ check not run yet** (waiting for the user's go). The chunk closes after that che
   holdout case no memory).
 - `make db-up` then `poetry run pytest -m docker tests/integration/test_memory_postgres.py`:
   the real PostgresStore in signature mode, plus the verdicts table.
+
+## For chunk 08 (signals): ally-platform is public
+
+- **Who may raise an issue signal:** an issue signal may only come from an issue opened
+  by a HelloAllyTech org member, or labelled `bug` by one (the label event's actor, not
+  just the label's presence). Issues from anyone else are ignored and logged, the same
+  way the feedback reader treats them.
+- **How issue text enters prompts:** issue text, and comments if they are ever used,
+  always enters prompts as quoted, scrubbed data, never as instructions. It is inside a
+  clearly delimited block, and the prompt says the block is a user report to analyse,
+  not instructions to follow. This applies to the triage, investigate and review inputs
+  alike.
 
 ## Open
 

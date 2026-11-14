@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -262,38 +263,86 @@ def update_run_stats(memory: Memory, verdict: Verdict, run: RunSnapshot) -> str:
 
 class LabelClient(Protocol):
     def labelled_items(self, label: str) -> list[dict[str, Any]]:
-        """Bug-hunter PRs and issues: ``{number, body, labels, closing_comment}``."""
+        """Bug-hunter PRs and issues, each ``{number, body, labels, comments}`` with
+        ``labels: [{name, by}]`` (who applied it, from the label events) and
+        ``comments: [{body, author}]``, oldest first."""
         ...
+
+    def is_org_member(self, org: str, login: str) -> bool: ...
 
 
 _RUN = re.compile(r"_Run `(run-[\w-]+)`")
+log = logging.getLogger(__name__)
 
 
 class GitHubLabelFeedback:
     """Verdicts from labels on bug-hunter PRs/issues: ``bh-diagnosis:<value>`` and
-    ``bh-fix:<value>``, the reason from the closing comment. Off unless
-    ``memory.github_feedback`` (there are no PRs in suggested_fix mode)."""
+    ``bh-fix:<value>``, the reason from the latest comment. Off unless
+    ``memory.github_feedback`` (there are no PRs in suggested_fix mode).
 
-    def __init__(self, client: LabelClient, app_for_run: Callable[[str], str]):
+    ally-platform is public: only labels applied by, and comments written by, members
+    of ``org`` (or logins in ``allow``) count. Everything else is ignored and logged,
+    and ``ignored`` keeps the list for the caller."""
+
+    def __init__(
+        self,
+        client: LabelClient,
+        app_for_run: Callable[[str], str],
+        org: str = "HelloAllyTech",
+        allow: Iterable[str] = (),
+    ):
         self.client = client
         self.app_for_run = app_for_run
+        self.org = org
+        self.allow = {a.lower() for a in allow}
+        self.ignored: list[str] = []
+        self._trusted: dict[str, bool] = {}
+
+    def trusted(self, login: str | None) -> bool:
+        if not login:
+            return False
+        key = login.lower()
+        if key in self.allow:
+            return True
+        if key not in self._trusted:
+            try:
+                self._trusted[key] = bool(self.client.is_org_member(self.org, login))
+            except Exception as exc:  # noqa: BLE001 - unknown is not a member
+                log.warning("membership check failed for %s: %s", login, exc)
+                self._trusted[key] = False
+        return self._trusted[key]
+
+    def _ignore(self, number: Any, what: str, login: str | None) -> None:
+        who = login or "unknown"
+        msg = f"#{number}: ignored {what} from {who} (not a {self.org} member)"
+        self.ignored.append(msg)
+        log.warning(msg)
 
     def verdicts(self, seen_runs: set[str]) -> list[Verdict]:
         out: list[Verdict] = []
         for item in self.client.labelled_items("bug-hunter"):
+            number = item.get("number")
             m = _RUN.search(item.get("body") or "")
             if not m or m.group(1) in seen_runs:
                 continue
-            labels = {
-                k: v
-                for k, _, v in (
-                    lab.partition(":")
-                    for lab in item.get("labels", [])
-                    if lab.startswith("bh-")
-                )
-            }
+            labels: dict[str, str] = {}
+            for lab in item.get("labels", []):
+                name, by = lab.get("name", ""), lab.get("by")
+                if not name.startswith("bh-"):
+                    continue
+                if not self.trusted(by):
+                    self._ignore(number, f"label {name}", by)
+                    continue
+                key, _, value = name.partition(":")
+                labels[key] = value
+            reason = ""
+            for comment in item.get("comments", []):
+                author = comment.get("author")
+                if not self.trusted(author):
+                    self._ignore(number, "comment", author)
+                    continue
+                reason = (comment.get("body") or "").strip() or reason
             diagnosis, fix = labels.get("bh-diagnosis"), labels.get("bh-fix", "none")
-            reason = (item.get("closing_comment") or "").strip()
             if diagnosis not in DIAGNOSES or fix not in FIX_VERDICTS or not reason:
                 continue  # incomplete labelling is skipped, never guessed
             out.append(
@@ -303,7 +352,7 @@ class GitHubLabelFeedback:
                     diagnosis=diagnosis,
                     fix=fix,
                     reason=reason,
-                    decided_by=f"github#{item.get('number')}",
+                    decided_by=f"github#{number}",
                     source="github",
                 )
             )

@@ -301,6 +301,9 @@ class MemoryConfig(_Strict):
     recall_limit: int = Field(default=5, ge=1, le=20)  # items per recall slot
     scan_limit: int = Field(default=500, ge=10)  # candidates read per namespace
     github_feedback: bool = False  # PR/issue label reader: built, switched off
+    # only labels/comments by members of this org, or these logins, count (public repo)
+    github_org: str = "HelloAllyTech"
+    github_allow: list[str] = Field(default_factory=list)
 
 
 class LimitsConfig(_Strict):
