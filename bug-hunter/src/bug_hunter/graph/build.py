@@ -52,7 +52,7 @@ def build_graph(deps: GraphDeps, checkpointer: BaseCheckpointSaver | None = None
     graph.add_edge(START, "intake")
     graph.add_edge("intake", "triage")
     graph.add_conditional_edges(
-        "triage", after_triage, ["investigate", "report", "escalate"]
+        "triage", after_triage, ["investigate", "reproduce", "report", "escalate"]
     )
     graph.add_conditional_edges(
         "investigate", after_investigate, ["reproduce", "report", "escalate"]

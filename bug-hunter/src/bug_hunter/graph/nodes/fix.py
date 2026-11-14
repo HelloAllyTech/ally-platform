@@ -256,6 +256,7 @@ def make_fix_node(deps: GraphDeps):
                 deps.app,
                 f"{state.finding.title}: {state.finding.hypothesis}",
                 [repo_path(f, deps.app_prefix) for f in state.finding.suspected_files],
+                reused_from=state.reused_from,
             )
         if recall:
             from bug_hunter.memory.recall import ids_in

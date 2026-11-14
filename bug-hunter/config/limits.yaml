@@ -38,7 +38,8 @@ nodes:
 # Long-term memory (chunk 07): LangGraph PostgresStore in the bughunter database.
 memory:
   semantic: auto        # auto | on | off: pgvector search when available, else signature/app/file lookup
-  recall_limit: 5       # items per recall slot (triage, investigate, fix)
+  recall_limit: 5       # records per recall query, at most 5
+  min_word_overlap: 0.1 # recall needs a signature match, a shared file or this word overlap; similarity only ranks
   scan_limit: 500       # candidates read per namespace before ranking in code
   github_feedback: false  # PR/issue label reader; built and tested, switched off until pr mode
   github_org: HelloAllyTech   # the repo is public: only this org's members' labels and comments count

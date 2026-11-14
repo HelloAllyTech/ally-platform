@@ -24,6 +24,8 @@ from bug_hunter.memory.records import KINDS, MODELS, Record, kind_of, now
 from bug_hunter.safety.phi import scrub
 
 LIVE = "live"
+MAX_RECALL = 5  # records per recall query, whatever the caller asks for
+MIN_WORD_OVERLAP = 0.1  # 2026-11-14 check: related 0.19-0.64, unrelated <= 0.05
 # fields that are identifiers, paths, hashes or enums: never scrubbed (a scrubbed
 # path would not match the code it points at)
 NOT_TEXT = {
@@ -38,6 +40,7 @@ NOT_TEXT = {
     "fingerprints",
     "diagnosis",
     "fix_verdict",
+    "finding",  # scrubbed field by field in scrub_record
     "key",
     "sources",
 }
@@ -54,6 +57,19 @@ def overlap(a: set[str], b: set[str]) -> float:
 
 def scrub_record(record: Record) -> Record:
     data = record.model_dump()
+    if isinstance(data.get("finding"), dict):
+        data["finding"] = {
+            k: (
+                scrub(v)
+                if isinstance(v, str) and k not in ("suspected_files", "app")
+                else v
+            )
+            for k, v in data["finding"].items()
+        }
+        if isinstance(data["finding"].get("evidence"), list):
+            data["finding"]["evidence"] = [
+                scrub(e) for e in data["finding"]["evidence"]
+            ]
     for name, value in data.items():
         if name in NOT_TEXT:
             continue
@@ -72,12 +88,14 @@ class Memory:
         semantic: bool = False,
         scan_limit: int = 500,
         recall_limit: int = 5,
+        min_word_overlap: float = MIN_WORD_OVERLAP,
     ):
         self.store = store
         self.scope = scope
         self.semantic = semantic
         self.scan_limit = scan_limit
         self.recall_limit = recall_limit
+        self.min_word_overlap = min_word_overlap
 
     # --- namespaces -------------------------------------------------------------
 
@@ -175,18 +193,20 @@ class Memory:
         scored: list[tuple[float, Record]] = []
         for item in items:
             record = MODELS[kind].model_validate(item.value)
-            score = 0.0
-            if signature and record.signature == signature:
-                score += 3.0
-            if q_files and record.files:
-                score += 2.0 * len(q_files & set(record.files)) / len(q_files)
-            score += overlap(q_words, words(record.text))
+            same_signature = bool(signature) and record.signature == signature
+            shared = len(q_files & set(record.files)) if q_files and record.files else 0
+            word_overlap = overlap(q_words, words(record.text))
+            # evidence decides whether a record is recalled; similarity only ranks
+            if not (same_signature or shared or word_overlap >= self.min_word_overlap):
+                continue
+            score = 3.0 * same_signature + 2.0 * shared / max(1, len(q_files))
+            score += word_overlap
             if self.semantic and item.score is not None:
                 score += float(item.score)
-            if score > 0.15:
-                scored.append((score, record))
+            scored.append((score, record))
         scored.sort(key=lambda sr: sr[0], reverse=True)
-        found = [r for _, r in scored[: limit or self.recall_limit]]
+        cap = min(limit or self.recall_limit, MAX_RECALL)
+        found = [r for _, r in scored[:cap]]
         if touch:
             for r in found:
                 self.touch(kind, r)
@@ -248,6 +268,7 @@ def open_memory(
             semantic=semantic,
             scan_limit=cfg.scan_limit,
             recall_limit=cfg.recall_limit,
+            min_word_overlap=cfg.min_word_overlap,
         )
     finally:
         conn.close()

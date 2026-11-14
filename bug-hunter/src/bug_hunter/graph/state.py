@@ -222,6 +222,8 @@ class BugState(BaseModel):
     counterexamples: list[Counterexample] = Field(default_factory=list)  # review.v4
     disputed: bool = False  # a reviewer counterexample was disputed by the fixer
     recalled: list[str] = Field(default_factory=list)  # memory ids shown to nodes
+    regression_of: str | None = None  # a confirmed past bug whose code changed since
+    reused_from: str | None = None  # confirmed diagnosis reused; investigate skipped
     risk_level: Literal["low", "medium", "high", "human_only"] | None = None
     confidence: Confidence | None = None
     attempts: int = 0  # fix attempts (chunk 06)

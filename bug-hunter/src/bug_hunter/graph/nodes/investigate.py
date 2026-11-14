@@ -124,7 +124,10 @@ def make_investigate_node(deps: GraphDeps):
             from bug_hunter.memory.recall import investigate_recall
 
             recall = investigate_recall(
-                deps.memory, state.app or deps.app, state.signal.raw_summary
+                deps.memory,
+                state.app or deps.app,
+                state.signal.raw_summary,
+                regression_of=state.regression_of,
             )
             if recall:
                 deps.scratchpad.append_note(

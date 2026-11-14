@@ -96,7 +96,7 @@ def test_two_passes_recall_the_simulated_verdict(repo_config, tmp_path) -> None:
     assert set(fa_ids) <= set(row["pass2"]["recalled"]) and row["recalled_memory"]
     assert any(c.startswith("ended_as") for c in row["changes"])
     md = path.read_text()
-    assert "| yes |" in md and fa_ids[0] in md
+    assert fa_ids[0] in md and "expected row" in md
     assert report["meta"]["cost_usd_total"] == pytest.approx(0.2)
     # the false alarm carries fingerprints taken at the case's commit
     _, fa = memory.get(fa_ids[0])
@@ -159,3 +159,21 @@ def test_graph_agent_never_gives_a_holdout_case_memory(
             run,
         )
     assert seen == ["eval-memory", None]
+
+
+def test_expected_and_applied_rows() -> None:
+    from evals.memory_check import applied_row, expected_row
+
+    assert expected_row("wrong", "wrong", True).startswith("5")
+    assert expected_row("correct", "needed_edits", True).startswith("3")
+    assert expected_row("correct", "worked", True).startswith("1")
+    assert expected_row("not_a_bug", "none", False).startswith("none")
+    assert applied_row({"memory_route": "reuse:bug-1"}, "bug-1") == (
+        "3 reuse diagnosis (bug-1)"
+    )
+    assert applied_row({"memory_route": "", "recalled": ["bug-1"]}, "bug-1").startswith(
+        "4"
+    )
+    assert applied_row({"memory_route": "", "recalled": []}, "bug-1") == (
+        "not recalled as a bug"
+    )

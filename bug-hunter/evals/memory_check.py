@@ -22,7 +22,12 @@ import yaml
 
 from bug_hunter import spend
 from bug_hunter.config import BugHunterConfig
-from bug_hunter.memory.feedback import apply_verdict, approve_convention, load_run
+from bug_hunter.memory.feedback import (
+    apply_verdict,
+    approve_convention,
+    bug_id,
+    load_run,
+)
 from bug_hunter.memory.store import Memory
 from bug_hunter.memory.verdicts import Verdict
 from evals.metrics import CaseResult
@@ -70,9 +75,43 @@ def _summary(row: CaseResult) -> dict[str, Any]:
         "finding": row.finding_title,
         "oracle": row.oracle_pass,
         "recalled": list(row.recalled),
+        "memory_route": row.memory_route,
         "cost_usd": round(row.cost_usd, 4),
         "error": row.error,
     }
+
+
+ROWS = {
+    "duplicate": "1 close as duplicate",
+    "regression": "2 possible regression",
+    "reuse": "3 reuse diagnosis",
+    "hint": "4 hint only",
+    "hidden": "5 not shown as a bug",
+}
+
+
+def expected_row(diagnosis: str, fix: str, had_finding: bool) -> str:
+    """The row the pass-1 bug record should fall in for pass 2 (same commit, so its
+    lines are unchanged)."""
+    if not had_finding:
+        return "none (no finding in pass 1)"
+    if diagnosis in ("wrong", "not_a_bug"):
+        return ROWS["hidden"]
+    if fix in ("wrong", "needed_edits"):
+        return ROWS["reuse"]
+    return ROWS["duplicate"]
+
+
+def applied_row(pass2: dict[str, Any], own_bug: str) -> str:
+    route = pass2.get("memory_route") or ""
+    kind = route.split(":", 1)[0]
+    if kind in ROWS:
+        return ROWS[kind] + f" ({route.split(':', 1)[1]})"
+    if kind == "known_false_alarm":
+        return "false alarm closed (" + route.split(":", 1)[1] + ")"
+    if own_bug in (pass2.get("recalled") or []):
+        return ROWS["hint"] + f" ({own_bug})"
+    return "not recalled as a bug"
 
 
 def changes(first: dict[str, Any], second: dict[str, Any]) -> list[str]:
@@ -170,6 +209,10 @@ def run_memory_check(
             info["applied_fix"] = verdict.fix
             if not run.finding:
                 info["note"] = "pass 1 had no finding: only the run record and stats"
+            info["expected_row"] = expected_row(
+                e.diagnosis, verdict.fix, bool(run.finding)
+            )
+            info["own_bug"] = bug_id(run.run_id)
             rows[e.case]["verdict"] = info
 
     def write(partial: bool) -> None:
@@ -177,6 +220,8 @@ def run_memory_check(
             if "pass1" in r and "pass2" in r:
                 written = set((r.get("verdict") or {}).get("written") or [])
                 r["recalled_memory"] = bool(written & set(r["pass2"]["recalled"]))
+                v = r.get("verdict") or {}
+                r["applied_row"] = applied_row(r["pass2"], v.get("own_bug", ""))
                 r["changes"] = changes(r["pass1"], r["pass2"])
         report = {
             "meta": {
@@ -219,8 +264,8 @@ def render(report: dict[str, Any]) -> str:
         f"${meta['cost_usd_total']:.2f} of ${meta['cost_cap_usd']:.2f}"
         + (f" · stopped: {meta['stopped_reason']}" if meta["stopped_reason"] else ""),
         "",
-        "| case | mode | pass 1 | verdict | written | pass 2 recalled | pass 2 | "
-        "recalled the verdict? | what changed |",
+        "| case | mode | pass 1 | verdict | expected row | row applied | pass 2 "
+        "recalled | pass 2 | what changed |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
 
@@ -235,10 +280,10 @@ def render(report: dict[str, Any]) -> str:
         lines.append(
             f"| `{cid}` | {r['mode']} | {cell(r.get('pass1'))} | "
             f"{v.get('diagnosis', '–')}/{v.get('applied_fix', v.get('fix', '–'))} | "
-            f"{', '.join(v.get('written') or []) or v.get('skipped', '–')} | "
+            f"{v.get('expected_row', v.get('skipped', '–'))} | "
+            f"{r.get('applied_row', '–')} | "
             f"{', '.join((r.get('pass2') or {}).get('recalled') or []) or '–'} | "
             f"{cell(r.get('pass2'))} | "
-            f"{'yes' if r.get('recalled_memory') else 'no'} | "
             f"{'; '.join(r.get('changes') or [])} |"
         )
     lines += ["", f"Memory after the check: {len(report['memory'])} records"]

@@ -12,6 +12,8 @@ def after_triage(state: BugState) -> str:
         return "escalate"
     if state.status in CLOSED:
         return "report"
+    if state.reused_from and state.finding is not None:
+        return "reproduce"  # a confirmed diagnosis from memory: skip investigate
     return "investigate"
 
 

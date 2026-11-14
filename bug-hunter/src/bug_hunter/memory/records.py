@@ -74,7 +74,11 @@ class BugRecord(Record):
     status: str = ""  # the run's final status
     diagnosis: str | None = None  # human verdict, when given
     fix_verdict: str | None = None
+    verdict_reason: str = ""
     fingerprints: list[LineFingerprint] = Field(default_factory=list)
+    # the finding as investigate wrote it: reused when a confirmed diagnosis had a
+    # fix that was wrong or needed edits (triage skips investigate)
+    finding: dict | None = None
 
 
 class FalseAlarmRecord(Record):

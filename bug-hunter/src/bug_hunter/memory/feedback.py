@@ -121,6 +121,7 @@ def bug_record_for(run: RunSnapshot, read: Reader | None = None) -> BugRecord | 
         fix_summary=run.patch_rationale[:600],
         status=run.status,
         fingerprints=prints,
+        finding=dict(f),
     )
 
 
@@ -139,6 +140,7 @@ def apply_verdict(
     bug = found[1] if found else bug_record_for(run, read)
     if bug is not None:
         bug.diagnosis, bug.fix_verdict = verdict.diagnosis, verdict.fix
+        bug.verdict_reason = verdict.reason
         written.append(memory.put("bugs", bug).id)
 
     if verdict.diagnosis == "not_a_bug" and f:

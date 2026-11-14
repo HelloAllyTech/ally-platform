@@ -52,8 +52,10 @@ def snapshot(**kw) -> fb.RunSnapshot:
         signal_source="issue",
         signal_summary="x() returns 0 not 3",
         finding={
+            "app": "ally-be",
             "title": "x returns 0",
             "category": "logic",
+            "severity": "medium",
             "suspected_files": ["src/x.ts"],
             "evidence": ["src/x.ts:2 — returns 0"],
             "hypothesis": "x returns a constant 0",
@@ -480,16 +482,6 @@ def test_triage_cannot_close_on_a_record_it_was_not_shown(
     )
     out = make_triage_node(deps)(initial_state(deps, SIGNAL))
     assert out["status"] == "triaged"
-
-
-def test_a_duplicate_signal_is_closed_as_duplicate(config, repo, tmp_path) -> None:
-    memory = in_memory()
-    memory.put("bugs", fb.bug_record_for(snapshot(), reader(repo)))
-    bid = fb.bug_id("run-1")
-    deps = triage_deps(config, repo, tmp_path, decide("duplicate", match=bid), memory)
-    out = make_triage_node(deps)(initial_state(deps, SIGNAL))
-    assert out["status"] == "closed_duplicate" and out["duplicate_of"] == bid
-    assert f"PAST BUG {bid}" in str(deps.models["triage"].calls[0][0].content)
 
 
 # --- the graph: learn and the risk gate ----------------------------------------------

@@ -52,6 +52,7 @@ class AgentResult:
     disputed: bool = False
     recalled: list[str] = field(default_factory=list)  # memory ids the run was shown
     finding_title: str = ""
+    memory_route: str = ""  # duplicate:/known_false_alarm:/regression:/reuse:<id>
     fix_attempts: int = 0
     final_outcome: str | None = None  # pr | escalated | no_bug | rejected | other
     stop_reason: str | None = None
@@ -209,11 +210,26 @@ class GraphAgent:
             counterexamples=counterexample_counts(state),
             disputed=state.disputed,
             recalled=list(state.recalled),
+            memory_route=memory_route(state),
             finding_title=state.finding.title if state.finding else "",
             fix_attempts=state.attempts,
             final_outcome=final_outcome(state.status),
             stop_reason=state.stop_reason,
         )
+
+
+def memory_route(state: Any) -> str:
+    """What memory decided for this run, if anything (chunk 07)."""
+    dup = state.duplicate_of or ""
+    if state.status == "closed_duplicate" and dup.startswith("bug-"):
+        return f"duplicate:{dup}"
+    if state.status == "closed_not_bug" and dup.startswith("fa-"):
+        return f"known_false_alarm:{dup}"
+    if state.reused_from:
+        return f"reuse:{state.reused_from}"
+    if state.regression_of:
+        return f"regression:{state.regression_of}"
+    return ""
 
 
 def final_outcome(status: str) -> str:

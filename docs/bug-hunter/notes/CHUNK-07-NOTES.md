@@ -112,7 +112,29 @@ What it shows:
    Fingerprints were taken at the case commit, holdout was never involved, and nothing
    touched live memory.
 
-### First follow-up (proposed, not built)
+### First follow-up: built 2026-11-14 (offline), re-check pending
+
+The user's rule for a matching past bug record (enforced in triage code, one test per
+row in `tests/test_memory_rows.py`):
+
+1. diagnosis correct, fix worked or no fix verdict yet, lines unchanged: close as
+   duplicate;
+2. diagnosis correct, lines changed: investigate, with "possible regression of bug-…"
+   (`state.regression_of`; investigate recalls it). Changed lines take precedence over
+   the fix verdict;
+3. diagnosis correct, fix wrong or needed_edits: skip investigate, reuse the stored
+   finding (`state.reused_from`), then reproduce and fix with the past fix, its verdict
+   reason and the approved conventions;
+4. no verdict: "UNCONFIRMED PAST BUG", a hint only, never closes;
+5. diagnosis wrong or not_a_bug: not shown as a bug; the wrong-theory or false-alarm
+   record carries the lesson.
+
+Recall: similarity only ranks. A record is recalled only with a matching signature, a
+shared file, or a word overlap of at least `memory.min_word_overlap` (0.1; in the
+2026-11-14 check, related pairs scored 0.19–0.64 and unrelated ones at most 0.05).
+Capped at 5 records per query. Bug records now store the finding and the verdict reason.
+
+### The proposal it replaced
 
 - **(a) What a duplicate may close on:** a `bugs` record may close a new signal as a
   duplicate only when a human confirmed it (`diagnosis: correct`). Records with no

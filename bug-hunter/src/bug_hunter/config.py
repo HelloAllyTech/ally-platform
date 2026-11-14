@@ -298,7 +298,10 @@ class MemoryConfig(_Strict):
     # auto: pgvector + the embeddings role when the server has the extension, else
     # lookup by error signature, app and file paths; on: require pgvector; off: never
     semantic: Literal["auto", "on", "off"] = "auto"
-    recall_limit: int = Field(default=5, ge=1, le=20)  # items per recall slot
+    recall_limit: int = Field(default=5, ge=1, le=5)  # records per recall query
+    # a record is recalled only with a matching signature, a shared file or this
+    # much word overlap (Jaccard); similarity only ranks
+    min_word_overlap: float = Field(default=0.1, ge=0.0, le=1.0)
     scan_limit: int = Field(default=500, ge=10)  # candidates read per namespace
     github_feedback: bool = False  # PR/issue label reader: built, switched off
     # only labels/comments by members of this org, or these logins, count (public repo)

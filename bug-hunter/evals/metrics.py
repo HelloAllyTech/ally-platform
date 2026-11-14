@@ -38,6 +38,7 @@ class CaseResult:
     disputed: bool = False
     recalled: list[str] = field(default_factory=list)  # memory ids shown (chunk 07)
     finding_title: str = ""
+    memory_route: str = ""
     fix_attempts: int = 0
     final_outcome: str | None = None
     stop_reason: str | None = None
