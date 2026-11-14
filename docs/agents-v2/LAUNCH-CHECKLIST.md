@@ -72,6 +72,13 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **The new list routes go on the public wiki's `repos/ally-be.md`** at PR time (Docs guard).
 - [ ] **A Bring in customers assistant with Add on may still ask for a name and number before booking**, because its purpose section asks for them. Don't turn Add on for an enquiries pilot until that prompt is settled (`CHUNK-05B-NOTES.md`, "Live action cases").
 
+## 8a: memory, light
+
+- [ ] **Push `ally_ai_agent_memory`, `ally_ai_memory_check`, `ally_ai_conversation_summary` and `ally_ai_agent_purpose_enquiries_can_book` with the code.** All four are new prompts whose variables ship with them (no deploy order to follow); the approved texts are in `CHUNK-08A-NOTES.md`.
+- [ ] **Memory stays off for every assistant until its memory cases pass; turn it on first for one pilot** ("Remember people between chats" in How it works, `settings.memory.on`). The rolling summary and the person's name are on for every v2 assistant.
+- [ ] **Run 8a's migration (`1981900951000-AddMemoryEntries`) with the others in the release.**
+- [ ] **Memory follows retention.** A line goes once it was last said before the `retentionDays` cutoff (and open items after 30 days, context after 180); with retention at 0, preferences are kept until forgotten.
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).
