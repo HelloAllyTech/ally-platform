@@ -36,7 +36,7 @@ import { WEB_CHANNEL } from '../bot-page/bot-page-public.service';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
 import type { ChatbotDecision } from '../engine/chatbot-engine.types';
 import { Chatbot } from '../entity/chatbot.entity';
-import { ChatbotAccessMode } from '../enum/chatbot.enum';
+import { AgentRuntimeUsed, ChatbotAccessMode } from '../enum/chatbot.enum';
 import {
   ConversationChannel,
   ConversationMessageRole,
@@ -44,6 +44,7 @@ import {
 import { HandoverService } from '../handover/handover.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import { ConversationService } from '../service/conversation.service';
+import { MemoryService } from '../memory/memory.service';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import {
   PLATFORM_BASICS,
@@ -79,6 +80,10 @@ interface TurnReport {
   gatewaySteps?: { summary: string; ms: number }[];
 }
 
+/** A reply asking for the person's name (chunk 8a's `--answer-name`). */
+const ASKS_NAME =
+  /(?:what(?:'s| is) your (?:full )?name|what name|which name|(?:tell|give|share|let) me (?:know )?(?:the |your )?(?:full )?name|name (?:should|to put|for the booking|on the booking)[^.!?]*\?|your (?:full )?name\?|(?:may|can) i (?:have|get|take) (?:the |your )?(?:full )?name)/i;
+
 async function main(): Promise<void> {
   const botId = arg('bot');
   if (!botId) throw new Error('--bot <chatbot id> is required');
@@ -91,6 +96,7 @@ async function main(): Promise<void> {
   );
   const repeat = Math.max(1, Number(arg('repeat') ?? 1));
   const classifierOnly = process.argv.includes('--classifier-only');
+  const answerName = arg('answer-name');
 
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn'],
@@ -98,6 +104,7 @@ async function main(): Promise<void> {
   const dataSource = app.get(DataSource);
   const engine = app.get(ChatbotEngineService, { strict: false });
   const handover = app.get(HandoverService, { strict: false });
+  const memory = app.get(MemoryService, { strict: false });
   const conversations = app.get(ConversationService, { strict: false });
   const settingsService = app.get(ChatbotSettingsService, { strict: false });
   const created: { contactIds: string[]; conversationIds: string[] } = {
@@ -210,15 +217,43 @@ async function main(): Promise<void> {
       const previewHistory: { role: string; content: string }[] = [];
 
       const turns: TurnReport[] = [];
-      for (const turn of item.turns) {
+      // `--answer-name` (chunk 8a): who has been asked for their name, and who gives it
+      // with their next message ("yes, please book it. I'm Rahul").
+      const named = new Set<string>();
+      const pending = new Set<string>();
+      const nameOf = (who: string) =>
+        who === 'first' ? answerName! : `${answerName} ${who}`;
+      const withName = (who: string, text: string) => {
+        if (!pending.has(who)) return text;
+        pending.delete(who);
+        return `${text.replace(/[.!?]*$/, '')}. I'm ${nameOf(who)}`;
+      };
+      const laterTurnFor = (index: number, who: string, preview: boolean) =>
+        item.turns
+          .slice(index + 1)
+          .some((t) =>
+            preview
+              ? Boolean(t.preview)
+              : !t.preview && (t.as ?? 'first') === who,
+          );
+      /** A reply that asks for the name: once is fine, twice fails (chunk 8a). */
+      const askedName = (who: string, body: string): string[] => {
+        if (!answerName || !ASKS_NAME.test(body)) return [];
+        if (named.has(who)) return ['asked for the name again'];
+        named.add(who);
+        pending.add(who);
+        return [];
+      };
+      for (const [index, turn] of item.turns.entries()) {
         if (turn.preview) {
           // Try it (chunk 6): no stored conversation, no contact; Preview's own history.
-          previewHistory.push({ role: 'user', content: turn.user });
+          const said = withName('try-it', turn.user);
+          previewHistory.push({ role: 'user', content: said });
           const startedAt = Date.now();
-          const decision = await engine.respond({
+          let decision = await engine.respond({
             chatbot,
             settings,
-            text: turn.user,
+            text: said,
             history: [...previewHistory],
             isFirstMessage: previewHistory.length <= 1,
             sender: { externalId: `basics:${runTag}:preview`, label: 'Try it' },
@@ -226,15 +261,39 @@ async function main(): Promise<void> {
             providerMessageId: randomUUID(),
           });
           previewHistory.push({ role: 'assistant', content: decision.body });
+          const previewNameFailures = askedName('try-it', decision.body);
+          let previewSaid = said;
+          if (pending.has('try-it') && !laterTurnFor(index, 'try-it', true)) {
+            // Nothing more to say in this case: they give the name on its own.
+            const name = withName('try-it', '').replace(/^\. /, '');
+            previewHistory.push({ role: 'user', content: name });
+            decision = await engine.respond({
+              chatbot,
+              settings,
+              text: name,
+              history: [...previewHistory],
+              isFirstMessage: false,
+              sender: {
+                externalId: `basics:${runTag}:preview`,
+                label: 'Try it',
+              },
+              channel: WEB_CHANNEL,
+              providerMessageId: randomUUID(),
+            });
+            previewHistory.push({ role: 'assistant', content: decision.body });
+            previewSaid = `${said} → ${name}`;
+            previewNameFailures.push(...askedName('try-it', decision.body));
+          }
           const steps = gatewayStepsOf(decision);
           turns.push({
-            user: `[Try it] ${turn.user}`,
+            user: `[Try it] ${previewSaid}`,
             reply: decision.body,
             handledBy: decision.handledBy,
             turnType: decision.turnType ?? null,
             runtime: decision.agent?.runtime ?? null,
             latencyMs: Date.now() - startedAt,
             failures: [
+              ...previewNameFailures,
               ...failuresOf(decision, turn.expect, steps),
               ...(await recordFailures(
                 dataSource,
@@ -255,56 +314,83 @@ async function main(): Promise<void> {
         );
         const contact = { id: contactId };
         const conversation = { id: conversationId };
-        const inbound = await conversations.appendMessage(conversation.id, {
-          channel: ConversationChannel.WEB,
-          direction: WaMessageDirection.INBOUND,
-          role: ConversationMessageRole.USER,
-          text: turn.user,
-          status: WaMessageStatus.SENT,
-        });
-        const history = await conversations.recentHistory(conversation.id);
-        const startedAt = Date.now();
-        let decision = await engine.respond({
-          chatbot,
-          settings,
-          text: turn.user,
-          history,
-          isFirstMessage: history.length <= 1,
-          sender: { externalId, label: `basics ${item.id}` },
-          channel: WEB_CHANNEL,
-          conversationId: conversation.id,
-          providerMessageId: inbound.id,
-          contactId: contact.id,
-        });
-        if (!decision.held) {
-          decision = await handover.afterDecision(
-            chatbot,
-            conversation.id,
-            decision,
-          );
-          await conversations.appendMessage(conversation.id, {
+        const exchange = async (text: string) => {
+          const inbound = await conversations.appendMessage(conversation.id, {
             channel: ConversationChannel.WEB,
-            direction: WaMessageDirection.OUTBOUND,
-            role: ConversationMessageRole.ASSISTANT,
-            text: decision.body,
+            direction: WaMessageDirection.INBOUND,
+            role: ConversationMessageRole.USER,
+            text,
             status: WaMessageStatus.SENT,
-            handledBy: decision.handledBy,
-            retrievalMeta: decision.retrievalMeta ?? null,
-            agentRunId: decision.agent?.runId ?? null,
-            agentRuntime: decision.agent?.runtime ?? null,
-            inReplyToId: inbound.id,
           });
+          const history = await conversations.recentHistory(conversation.id);
+          let decision = await engine.respond({
+            chatbot,
+            settings,
+            text,
+            history,
+            isFirstMessage: history.length <= 1,
+            sender: { externalId, label: `basics ${item.id}` },
+            channel: WEB_CHANNEL,
+            conversationId: conversation.id,
+            providerMessageId: inbound.id,
+            contactId: contact.id,
+          });
+          if (!decision.held) {
+            decision = await handover.afterDecision(
+              chatbot,
+              conversation.id,
+              decision,
+            );
+            await conversations.appendMessage(conversation.id, {
+              channel: ConversationChannel.WEB,
+              direction: WaMessageDirection.OUTBOUND,
+              role: ConversationMessageRole.ASSISTANT,
+              text: decision.body,
+              status: WaMessageStatus.SENT,
+              handledBy: decision.handledBy,
+              retrievalMeta: decision.retrievalMeta ?? null,
+              agentRunId: decision.agent?.runId ?? null,
+              agentRuntime: decision.agent?.runtime ?? null,
+              inReplyToId: inbound.id,
+            });
+            // What the run asked to remember, as the bot page applies it after the reply
+            // (chunk 8a), awaited here so the next turn sees it.
+            await memory?.afterTurn({
+              chatbot,
+              conversationId: conversation.id,
+              runId: decision.agent?.runId,
+              pending:
+                decision.agent?.runtime === AgentRuntimeUsed.V2
+                  ? decision.agent.memory
+                  : undefined,
+            });
+          }
+          return decision;
+        };
+        const startedAt = Date.now();
+        const who = turn.as ?? 'first';
+        let said = withName(who, turn.user);
+        let decision = await exchange(said);
+        const nameFailures = askedName(who, decision.body);
+        if (pending.has(who) && !laterTurnFor(index, who, false)) {
+          // Nothing more for them to say in this case: they give the name on its own.
+          const name = nameOf(who);
+          pending.delete(who);
+          decision = await exchange(name);
+          said = `${said} → ${name}`;
+          nameFailures.push(...askedName(who, decision.body));
         }
         const crisis = decision.handledBy === WaHandledBy.CRISIS;
         const steps = gatewayStepsOf(decision);
         turns.push({
-          user: turn.as ? `[${turn.as}] ${turn.user}` : turn.user,
+          user: turn.as ? `[${turn.as}] ${said}` : said,
           reply: decision.body,
           handledBy: decision.handledBy,
           turnType: decision.turnType ?? null,
           runtime: decision.agent?.runtime ?? null,
           latencyMs: Date.now() - startedAt,
           failures: [
+            ...nameFailures,
             ...failuresOf(decision, turn.expect, steps),
             ...(await recordFailures(dataSource, chatbot.id, contact.id, turn)),
           ],
