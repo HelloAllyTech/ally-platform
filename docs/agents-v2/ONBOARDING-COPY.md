@@ -741,3 +741,309 @@ says when a save can't be made. More lines for the home's sections are added her
 **`{limit}` (5a):** 50 lists · 100 fields · 200,000 entries · 32 KB per entry · 5,000 rows a file · 5 MB a file · 20 rules.
 
 **When a run fails after a list write (6):** Done: {record title} in {list}. *(Sent instead of the bot's fallback wording when the assistant booked or changed something and then couldn't finish its reply; the record's title as the list shows it, the list's name as the owner wrote it.)*
+
+**Added in 5b (ally-be, in the engine):**
+
+- **in_use:** {n} entries in {list} use this. Cancel or move them first. · One: 1 entry in {list} uses this. Cancel or move it first. *(Two lists are joined with "and".)*
+- **More `{why}` reasons:** there's already a list with this name · there's none called {name} · no detail lets your assistant fill it in · it should be a date and time · choose at least one day of the week · they should be like 10:00 · it should be after the start · it should be 5 to 720 minutes · it should be a date like 2026-11-20, on or after the start · it should be within a year
+- **More `{limit}`:** 500 entries at a time
+
+
+## 27. Lists in the dashboard (5b)
+
+*(Draft for Shehbaz's approval at 5b's stop. The owner's Lists section on the assistant's home. On screen, say entries, details, "can move to" and "linked to"; never record, field, transition or relation. `{list}` and `{detail}` read in lower case mid-sentence. Statuses and choices show as written, with `_` as a space and a capital first letter: "No show".)*
+
+**The section:**
+
+- Lists
+- Bookings, leads and orders your assistant can look up and keep.
+- Each list is a table you own. Your assistant can look things up in it and, if you let it, add and change entries, always under the rules you set here.
+
+**No lists yet:**
+
+- Keep your bookings, leads and orders here
+- Your assistant can look things up in them and, if you let it, book and change entries.
+- Start from a ready-made list
+- Appointments, classes, orders and more, set up for you.
+- Start from scratch
+- Name it, then add the details you want to keep.
+
+**Tabs:**
+
+- Your lists
+- Add a list
+- Add a list
+
+**The blocks under the table:**
+
+- Details
+- What each entry keeps. Your assistant only sees what you let it see.
+- Rules
+- Your assistant and your team both follow these. A change that breaks one is stopped, with the reason.
+- What your assistant can do
+- It only ever acts for the person it's talking to, and always under this list's rules.
+
+**Entries:**
+
+- Search {list}
+- Filters
+- Any {detail}
+- Clear filters
+- Sort by {detail}
+- Add an entry
+- Edit {title}
+- Edit
+- Open
+- Delete {title}
+- Show more
+- {shown} of {total}
+- By your assistant
+- No entries yet
+- Add the first one, or turn on Add below and your assistant will add them as people book.
+- Add one, or fill the next few weeks at once with Repeat weekly.
+- Nothing matches “{query}”.
+- Nothing matches these filters.
+- Clear
+- We couldn't load these entries.
+- Try again
+- {list} starts with example choices for {detail}. Replace them with your own.
+- Replace them
+- Not set
+
+**An entry (add and edit):**
+
+- New entry in {list}
+- Edit entry
+- Needed
+- Save
+- Add it
+- Saving…
+- Saved
+- Cancel
+- Close
+- Couldn't save. Try again.
+- Reload
+- Yes
+- No
+- Choose…
+- Choose a person
+- Choose from {list}
+- Search {list}
+- Nothing matches.
+- From {status}, it can move to {next}.
+- {status} is where it ends.
+- Added by you on {date}
+- Added by {name} on {date}
+- Added by your assistant on {date}
+- Added from a file on {date}
+- Open the conversation
+- Your assistant never sees this.
+
+**Date and time pickers:**
+
+- Choose a date
+- Time
+- Previous month
+- Next month
+- Today
+
+**Delete:**
+
+- Delete this entry?
+- {title} leaves the list. You can undo it for a few seconds.
+- Delete it
+- Keep it
+- Entry deleted
+- Undo
+
+**Details:**
+
+- Add a detail
+- Name
+- Kind
+- *Kinds:*
+  - Short text
+  - Long text
+  - Number
+  - Amount (₹)
+  - Date
+  - Date and time
+  - Minutes
+  - Choice
+  - Yes or no
+  - Phone number
+  - Email
+  - Web address
+  - Linked to another list
+  - Linked to a person
+- Linked to {list}
+- Linked to a person in your chats
+- Which list?
+- Choices
+- Add a choice
+- Remove {value}
+- Every entry needs this
+- Starts as
+- Nothing
+- Move {detail} up
+- Move {detail} down
+- Remove {detail}
+- Past entries keep their values, but it isn't shown or asked for any more.
+- Privacy
+- Your assistant can see this
+- Your assistant can fill this in
+- Hide most of it from your assistant
+- Never take this from a conversation
+- Whose entry is this?
+- Each entry belongs to this person. Your assistant only ever sees the entries of the person it's talking to.
+- Nobody's: it's one shared list
+- This can't change now that the list has entries: each one already belongs to someone.
+- Save
+- Cancel
+- Change {detail}
+
+**Rules, in plain words:**
+
+- Add a rule
+- No rules yet. Add one to stop double bookings or a full class.
+- {n} rules
+- 1 rule
+- Which kind of rule?
+- Remove this rule
+- Add the rule
+- Cancel
+- *Kinds:*
+  - Only one entry per…
+  - At most a number of entries per…
+  - At most a number per person
+  - A choice can only move in order
+- Only one entry per {detail}.
+- At most {n} entries per {detail}.
+- As many entries per {detail} as its {number}.
+- At most {n} per person.
+- {detail} can only move like this:
+- {from} can move to {to}.
+- New entries start as {values}.
+- Not counting entries whose {detail} is {values}.
+- or
+- So two people can't book the same {detail}.
+- So a {detail} stops taking entries once it's full.
+- So one person can't hold more than {n} at a time.
+- So nothing skips a step: an entry moves only the way you set here.
+- *The add-a-rule form:*
+  - Per
+  - How many
+  - A number
+  - Its own number
+  - Not counting entries whose
+  - is
+  - From
+  - Can move to
+  - New entries start as
+- {n} entries already break this rule. Change them first, or adjust the rule.
+- Open {title}
+
+**What your assistant can do:**
+
+- Look things up in it
+- Add entries
+- Change entries
+- Do it
+- Never
+- It might say
+- “{title} is free. Shall I book it?”
+- “Here's what I found in {list}.”
+- “Done: you're booked for {title}.”
+- “Done: I've added that to {list}.”
+- “Done: I've changed that for you.”
+- Add and Change appear once a detail lets your assistant fill it in.
+- Your assistant will book only after the person confirms. Check new entries for the first few days.
+- Got it
+
+**Start from a ready-made list (the guided setup):**
+
+- Start from a ready-made list
+- Step {n} of {total}
+- *Step names:*
+  - Choose a list
+  - Make it yours
+  - Add times
+  - Let your assistant use it
+  - Try it
+- Next
+- Back
+- Skip
+- Done
+- Close
+- Use this list
+- Comes with {list}
+- People can ask
+- What it keeps
+- You already have it
+- Setting it up…
+- {list} is ready.
+- Couldn't set it up. Try again.
+- Make {list} yours
+- These are examples to get you started. Replace them with your own {detail}.
+- Example
+- Add
+- Add one of your {detail}
+- Keep at least one.
+- Add the times people can book
+- Pick the days and hours. You can change or remove any of them later.
+- What can your assistant do with {list}?
+- Start with looking things up. Turn on Add and Change once you've tried a booking in Try it.
+- Try it out
+- Ask your assistant what a customer would. Nothing you do in Try it is saved.
+- Open Try it
+- Go to {list}
+
+**Repeat weekly until:**
+
+- Repeat weekly
+- Repeat weekly until
+- Days
+- Mon · Tue · Wed · Thu · Fri · Sat · Sun
+- From
+- Until
+- Every
+- {n} minutes
+- 1 hour
+- Repeat until
+- This adds {n} {list}.
+- This adds 1 entry.
+- That adds nothing. Check the days and times.
+- {n} are already there, so they're skipped.
+- The first few:
+- Add them
+- Adding…
+- Added {n} {list}.
+- That's more than 500 at once. Choose an earlier end date.
+- Counting…
+
+**Start from scratch:**
+
+- Start a new list
+- What's it called?
+- Orders, Rooms, Waiting list…
+- You'll add its details next.
+- Create the list
+
+**Switch assistant:**
+
+- Switch assistant
+- Your assistants
+- You're here
+- WhatsApp
+- Website
+- Page
+- Not shared yet
+
+**Try it:**
+
+- Test only: this wasn't saved.
+
+**The purpose's honest limit (How it works):**
+
+- What it can't do yet
+- It books into your {list} list. It can't take payments yet.

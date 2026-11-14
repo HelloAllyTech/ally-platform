@@ -38,6 +38,7 @@ export * from "./evaluatorPortal";
 export * from "./productRoadmap";
 export * from "./whatsappBot";
 export * from "./chatbots";
+export * from "./userLists";
 export * from "./botDrafts";
 export * from "./checkup";
 export * from "./changes";

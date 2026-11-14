@@ -876,6 +876,10 @@
 .ally-home[data-section="conversations"] .ally-home__main {
   max-width: none;
 }
+/* Lists (chunk 5b): a table needs the room. */
+.ally-home[data-section="lists"] .ally-home__main {
+  max-width: 1120px;
+}
 .ally-home[data-section="conversations"] .ally-inbox__head {
   justify-content: flex-end;
 }
@@ -1330,5 +1334,95 @@
   }
   .ally-numbers__docs .ally-numbers__bar {
     display: none;
+  }
+}
+
+/* ── Switch assistant (chunk 5b) ── */
+.ally-switcher {
+  position: relative;
+}
+.ally-switcher__button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ally-line-strong);
+  border-radius: 10px;
+  background: var(--ally-surface);
+  color: var(--ally-muted);
+  cursor: pointer;
+}
+.ally-switcher__button::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+.ally-switcher__button:hover,
+.ally-switcher__button[aria-expanded="true"] {
+  color: var(--ally-ink);
+  background: var(--ally-sunken);
+}
+.ally-switcher__button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--ally-accent-soft);
+  border-color: var(--ally-accent);
+}
+.ally-switcher__pop {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 320px;
+  padding: 6px;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-surface);
+  box-shadow: var(--ally-shadow-hover);
+}
+.ally-switcher__menu {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ally-switcher__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ally-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ally-switcher__item:hover,
+.ally-switcher__item:focus-visible {
+  outline: none;
+  background: var(--ally-sunken);
+}
+.ally-switcher__item[aria-current="true"] {
+  background: var(--ally-accent-soft);
+}
+.ally-switcher__name {
+  font-weight: 500;
+}
+.ally-switcher__channels {
+  color: var(--ally-faint);
+  font-size: 13px;
+}
+.ally-switcher__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 16px;
+}
+@media (max-width: 959px) {
+  .ally-switcher__button {
+    width: 44px;
+    height: 44px;
   }
 }

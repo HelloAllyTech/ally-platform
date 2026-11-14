@@ -142,11 +142,13 @@ const WhyList: React.FC<{ whys: Why[] }> = ({ whys }) => (
  * through the same test stream Preview used (so answers, sources and the crisis path match the
  * live page). Nothing here is stored as a conversation.
  */
-export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: () => void }> = ({
-  bot,
-  page,
-  onClose,
-}) => {
+export const TryIt: React.FC<{
+  bot: Chatbot;
+  page: BotPageView | null;
+  onClose: () => void;
+  /** A question to start with, put in the box (Lists' guided setup, chunk 5b). */
+  question?: string;
+}> = ({ bot, page, onClose, question }) => {
   const preview = usePreviewPage(bot, page);
   const copy = useMemo(() => pickCopy(preview?.language ?? "en", "en"), [preview?.language]);
   const stream = useChatbotTestStream();
@@ -156,6 +158,7 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
   const [error, setError] = useState<string | null>(null);
   const conversation = useRef<string | undefined>();
   const [whys, setWhys] = useState<Why[]>([]);
+  const draft = useMemo(() => (question ? { text: question } : null), [question]);
   const { data: home } = useGetAssistantHomeQuery(bot.id);
   const topics = (home?.fields.avoidTopics?.value as string[] | undefined) ?? [];
 
@@ -205,6 +208,17 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
           // As on the page: the thumbs show under the assistant's own answers (chunk Q2a).
           rateable: ["rag", "declined", "clarified"].includes(String(result.handledBy)),
         },
+        // A booking or change in Try it is checked, then rolled back (chunk 6): say so (5b).
+        ...(result.previewWrite
+          ? [
+              {
+                id: `n${Date.now()}`,
+                role: "notice" as const,
+                text: HOME.userLists.tryIt.testOnly,
+                citations: [],
+              },
+            ]
+          : []),
       ]);
     } catch {
       setError(copy.errors.INTERNAL);
@@ -258,6 +272,7 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
               // Shown so the owner sees what visitors see; Preview stores no messages, so a
               // rating here isn't counted (chunk Q2a).
               onRate={() => undefined}
+              returnedDraft={draft}
             />
           </div>
         </PhonePreview>

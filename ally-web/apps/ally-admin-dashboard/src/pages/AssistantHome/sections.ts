@@ -2,6 +2,8 @@
 export const SECTION_IDS = [
   "overview",
   "knows",
+  // Chunk 5b: the owner's lists (bookings, leads, orders).
+  "lists",
   "personality",
   "safety",
   // Chunk 20d-2: everything it follows, in the order it applies.

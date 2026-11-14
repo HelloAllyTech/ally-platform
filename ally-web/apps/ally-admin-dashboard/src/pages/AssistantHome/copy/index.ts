@@ -3,6 +3,7 @@ import { CHECKUP_CONTROLS } from "./checkup";
 import { HOW, WHY } from "./how";
 import { LISTS } from "./lists";
 import { ALL_NUMBERS } from "./numbers";
+import { USER_LISTS } from "./userLists";
 
 /**
  * Every string the assistant home shows, from `docs/agents-v2/ONBOARDING-COPY.md` §20, word for
@@ -28,6 +29,7 @@ export const HOME = {
   sections: {
     overview: "Overview",
     knows: "What it knows",
+    lists: "Lists",
     personality: "Personality",
     safety: "Safety",
     how: "How it works",
@@ -39,6 +41,7 @@ export const HOME = {
   subtitles: {
     overview: "How your assistant is doing, and what needs you.",
     knows: "Everything your assistant answers from.",
+    lists: "Bookings, leads and orders your assistant can look up and keep.",
     personality: "How it introduces itself and how it talks.",
     safety: "Rules your assistant always follows.",
     how: "Everything your assistant follows, and the parts you can change.",
@@ -312,6 +315,7 @@ export const HOME = {
     settingsHint: "This assistant's own engine settings. Only platform admins see this.",
   },
   lists: LISTS,
+  userLists: USER_LISTS,
   /** Each section's `?` (chunk 20d-2, deck §25). */
   help: {
     label: "What is {section}?",
