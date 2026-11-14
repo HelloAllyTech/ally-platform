@@ -1,7 +1,8 @@
 """Did the person confirm the time a write would book? (chunk 6 follow-up)
 
 Before a create or update that points at a dated record (a slot, a class, a table,
-a visit), the record's day and time must match what the person said: a time named
+an event), or that sets a date and time itself (a site visit's time, chunk 5b §9),
+the day and time must match what the person said: a time named
 in their latest message or the one before, and their day if they named one
 ("Thursday", "tomorrow", "19 Nov"), worked out from today where the business is.
 Read from the person's own messages, never from what the model says they said.
@@ -149,6 +150,58 @@ NOT_FOUND = (
 )
 
 
+# A date and time as the agent writes one: "2026-11-21T16:00:00+05:30". Its day and
+# time are read as written: the business's own wall time, since the agent writes the
+# business's offset.
+_WRITTEN = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})")
+_SHORT_DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+_SHORT_MONTHS = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+
+
+def _own_time_unconfirmed(
+    value: str,
+    messages: Sequence[str],
+    today: str,
+    current_moments: Sequence[Tuple[Day, Optional[int]]],
+) -> Optional[str]:
+    """Why a date and time the agent wrote itself isn't what the person confirmed, or
+    None. A value that isn't a date and time is left to ally-be, which refuses it."""
+    match = _WRITTEN.match(value)
+    if not match:
+        return None
+    year, month, day = (int(match.group(i)) for i in (1, 2, 3))
+    try:
+        written = date(year, month, day)
+    except ValueError:
+        return None
+    minutes = int(match.group(4)) * 60 + int(match.group(5))
+    moment: Tuple[Day, Optional[int]] = ((day, month), minutes)
+    if moment in current_moments:
+        return None  # an update that keeps the time the entry already has
+    title = (
+        f"{_SHORT_DAYS[written.weekday()]} {day} {_SHORT_MONTHS[month - 1]} {year}, "
+        f"{minutes // 60:02d}:{minutes % 60:02d}"
+    )
+    times = named_times(messages)
+    days = named_days(messages, today_of(today))
+    if minutes not in times or (days is not None and (day, month) not in days):
+        return NOT_CONFIRMED.format(title=title)
+    return None
+
+
 def unconfirmed(
     properties: Mapping[str, Mapping[str, Any]],
     values: Mapping[str, Any],
@@ -166,7 +219,13 @@ def unconfirmed(
     for key, prop in properties.items():
         dated = prop.get("dated")
         value = str(values.get(key) or "").strip()
-        if not (prop.get("relation") and dated and value):
+        if not (dated and value):
+            continue
+        if not prop.get("relation"):
+            # A date and time the agent fills in itself (a site visit's "at", 5b §9).
+            why = _own_time_unconfirmed(value, messages, today, current_moments)
+            if why:
+                return why
             continue
         target = _record(passages, value)
         if target is None:

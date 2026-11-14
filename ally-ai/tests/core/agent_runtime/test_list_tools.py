@@ -924,3 +924,99 @@ class TestNamedTimesAndDays:
         ]
         assert person_messages(history, "third") == ["second", "third"]
         assert person_messages(history, "second") == ["first", "second"]
+
+
+# Site visits and Bookings as ally-be marks them (chunk 5b §9): a visit's own time,
+# and a booking's class.
+VISIT_PROPS = {
+    "listing": {"type": "string", "relation": "property_listings"},
+    "at": {"type": "string", "dated": "datetime"},
+}
+BOOKING_PROPS = {
+    "class": {"type": "string", "relation": "classes", "dated": "datetime"}
+}
+LISTING = {
+    "record_id": "L1",
+    "section_path": "Baner 2BHK, Sus Road",
+    "text": "id: L1\nTitle: Baner 2BHK, Sus Road",
+}
+YOGA = {
+    "record_id": "C1",
+    "document_title": "Classes",
+    "section_path": "Evening yoga",
+    "text": "id: C1\nName: Evening yoga\nStarts at: Thu 19 Nov 2026, 18:00",
+}
+
+
+class TestTheTimeCheckFromTheDefinition:
+    def check(self, props, values, passages, said, **kwargs):
+        from app.core.agent_runtime.tools.confirmed import unconfirmed
+
+        return unconfirmed(props, values, passages, said, TODAY, **kwargs)
+
+    def test_a_site_visit_at_a_time_the_person_didnt_confirm_is_refused(self):
+        why = self.check(
+            VISIT_PROPS,
+            {"listing": "L1", "at": "2026-11-21T11:00:00+05:30"},
+            [LISTING],
+            ["Can I see it on Saturday 21 Nov at 4?"],
+        )
+        assert why == (
+            "Not done: the person hasn't confirmed this exact day and time "
+            "(Sat 21 Nov 2026, 11:00). Ask them to confirm the day and time before "
+            "you book it."
+        )
+
+    def test_a_site_visit_at_the_time_they_said_goes_through(self):
+        assert (
+            self.check(
+                VISIT_PROPS,
+                {"listing": "L1", "at": "2026-11-21T16:00:00+05:30"},
+                [LISTING],
+                ["Can I see it on Saturday 21 Nov at 4?"],
+            )
+            is None
+        )
+
+    def test_a_site_visit_with_no_time_named_is_refused(self):
+        assert self.check(
+            VISIT_PROPS,
+            {"listing": "L1", "at": "2026-11-21T16:00:00+05:30"},
+            [LISTING],
+            ["yes, book a visit"],
+        ).startswith("Not done:")
+
+    def test_an_update_that_keeps_the_visits_time_isnt_checked(self):
+        visit = {
+            "record_id": "V1",
+            "section_path": "Sat 21 Nov 2026, 16:00",
+            "text": "id: V1\nAt: Sat 21 Nov 2026, 16:00\nStatus: requested",
+        }
+        assert (
+            self.check(
+                VISIT_PROPS,
+                {"id": "V1", "at": "2026-11-21T16:00:00+05:30", "status": "cancelled"},
+                [visit],
+                ["cancel my visit please"],
+                updating="V1",
+            )
+            is None
+        )
+
+    def test_a_booking_checks_the_classs_time(self):
+        refused = self.check(
+            BOOKING_PROPS,
+            {"class": "C1"},
+            [YOGA],
+            ["book me into evening yoga on Thursday at 7 pm"],
+        )
+        assert refused and "Evening yoga" in refused
+        assert (
+            self.check(
+                BOOKING_PROPS,
+                {"class": "C1"},
+                [YOGA],
+                ["book me into evening yoga on Thursday at 6 pm"],
+            )
+            is None
+        )
