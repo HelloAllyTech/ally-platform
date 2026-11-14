@@ -103,6 +103,16 @@ const MAX_NAME = 120;
 export class ListDefinitionsService {
   constructor(private readonly dataSource: DataSource) {}
 
+  /** Inside the caller's transaction when it passes one (a ready-made pair installs in one). */
+  private tx<T>(
+    opts: { manager?: EntityManager },
+    work: (m: EntityManager) => Promise<T>,
+  ): Promise<T> {
+    return opts.manager
+      ? work(opts.manager)
+      : this.dataSource.transaction(work);
+  }
+
   // ---- lists ----------------------------------------------------------------------------------
 
   async listLists(
@@ -125,15 +135,24 @@ export class ListDefinitionsService {
   }
 
   async getList(chatbotId: string, key: string): Promise<ListDefinitionView> {
-    const m = this.dataSource.manager;
+    return this.getListIn(this.dataSource.manager, chatbotId, key);
+  }
+
+  /** One list, read inside the caller's transaction (a ready-made install). */
+  async getListIn(
+    m: EntityManager,
+    chatbotId: string,
+    key: string,
+  ): Promise<ListDefinitionView> {
     return this.view(m, await this.mustLoad(m, chatbotId, key));
   }
 
   async createList(
     chatbotId: string,
     input: ListInput,
+    opts: { manager?: EntityManager } = {},
   ): Promise<ListDefinitionView> {
-    return this.dataSource.transaction(async (m) => {
+    return this.tx(opts, async (m) => {
       // One list definition change per bot at a time: keys and the list limit are per bot.
       await m.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         `lists-bot:${chatbotId}`,
@@ -426,8 +445,9 @@ export class ListDefinitionsService {
     chatbotId: string,
     key: string,
     input: ListRuleInput,
+    opts: { manager?: EntityManager } = {},
   ): Promise<ListDefinitionView> {
-    return this.dataSource.transaction(async (m) => {
+    return this.tx(opts, async (m) => {
       const list = await this.mustLoad(m, chatbotId, key, true);
       if (!Object.values(ListConstraintKind).includes(input.kind)) {
         throw refuse.invalidValue(

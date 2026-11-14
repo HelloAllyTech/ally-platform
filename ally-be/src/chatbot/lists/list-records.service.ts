@@ -3,7 +3,10 @@ import { DataSource, EntityManager } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { CollectionConstraint } from '../entity/collection-constraint.entity';
 import { CollectionField } from '../entity/collection-field.entity';
-import { CollectionRecord } from '../entity/collection-record.entity';
+import {
+  CollectionRecord,
+  RecordActorRef,
+} from '../entity/collection-record.entity';
 import { RecordEvent } from '../entity/record-event.entity';
 import { RecordLink } from '../entity/record-link.entity';
 import {
@@ -23,7 +26,12 @@ import { LIMIT_WORDS, LIST_LIMITS } from './list-limits';
 import { ListLock, ruleLock, takeLocks, valueLock } from './list-locks';
 import { LIST_COPY, ListRefusalException, refuse } from './list-refusals';
 import { matchesWhere, Sql, summable, whereSql } from './list-rules';
-import { LoadedList, loadList, TitleResolver } from './list-store';
+import {
+  LoadedList,
+  loadList,
+  loadListById,
+  TitleResolver,
+} from './list-store';
 import {
   actorRef,
   CapacityConfig,
@@ -36,8 +44,10 @@ import {
   ListScope,
   ListWriteOptions,
   ListWriteResult,
+  RecordCreator,
   TransitionsConfig,
   UniqueConfig,
+  WhereClause,
 } from './list-types';
 
 type Data = Record<string, unknown>;
@@ -47,6 +57,7 @@ interface RecordRow {
   collection_id: string;
   data: Data;
   contact_id: string | null;
+  created_by?: RecordActorRef | null;
   version: number;
   deleted_at: Date | null;
   createdAt: Date;
@@ -58,6 +69,8 @@ const ROLLBACK = Symbol('list-dry-run');
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 const MAX_ALTERNATIVES = 3;
+/** How many of the entries that use a record an `in_use` refusal lists. */
+const IN_USE_RECORDS = 50;
 
 const iso = (d: Date | string | null | undefined): string | null =>
   d ? new Date(d).toISOString() : null;
@@ -236,6 +249,7 @@ export class ListRecordsService {
       if (opts.version !== undefined && row.version !== opts.version) {
         throw refuse.versionConflict();
       }
+      await this.assertNotInUse(m, chatbotId, list, row.id);
       const deletedAt = new Date();
       await m.update(
         CollectionRecord,
@@ -405,6 +419,17 @@ export class ListRecordsService {
           'use eq, contains, from or to',
         );
       }
+    }
+
+    // Search (chunk 5b, people only): any text field contains it.
+    const term = typeof q.search === 'string' ? q.search.trim() : '';
+    if (term && !isAgent(actor)) {
+      const escaped = term.replace(/[\\%_]/g, (c) => `\\${c}`);
+      const pattern = sql.p(`%${escaped}%`);
+      const searched = list.fields
+        .filter((f) => CONTAINS_TYPES.has(f.type))
+        .map((f) => `${sql.text(f.key, 'r.')} ILIKE ${pattern} ESCAPE '\\'`);
+      where.push(searched.length ? `(${searched.join(' OR ')})` : 'FALSE');
     }
 
     // The count and sum run over the filters alone, with only their parameters.
@@ -1151,6 +1176,137 @@ export class ListRecordsService {
 
   // ---- views ----------------------------------------------------------------------------------
 
+  /**
+   * An entry that live entries in another list point at, through a required relation, can't be
+   * deleted (chunk 5b): the bookings would keep a slot that's gone. Counted as each list's unique
+   * or capacity rule on that relation counts them (a cancelled booking doesn't count), else every
+   * live entry.
+   */
+  private async assertNotInUse(
+    m: EntityManager,
+    chatbotId: string,
+    list: LoadedList,
+    recordId: string,
+  ): Promise<void> {
+    const refs: { collection_id: string; field_key: string }[] = await m.query(
+      `SELECT c.id AS collection_id, f.key AS field_key
+         FROM collection_fields f
+         JOIN collections c ON c.id = f.collection_id
+        WHERE c.chatbot_id = $1 AND c.deleted_at IS NULL AND f.archived_at IS NULL
+          AND f.type = $2 AND f.required AND f.options->>'to' = $3
+        ORDER BY c."createdAt", f.position`,
+      [chatbotId, ListFieldType.RELATION, list.collection.key],
+    );
+    if (!refs.length) return;
+    let total = 0;
+    const names: string[] = [];
+    const records: { id: string; title: string }[] = [];
+    const titles = new TitleResolver(m, chatbotId);
+    for (const ref of refs) {
+      const other = await loadListById(m, chatbotId, ref.collection_id);
+      if (!other) continue;
+      const counted = other.rules.find(
+        (rule) =>
+          (rule.kind === ListConstraintKind.UNIQUE &&
+            ((rule.config as unknown as UniqueConfig).fields ?? []).includes(
+              ref.field_key,
+            )) ||
+          (rule.kind === ListConstraintKind.CAPACITY &&
+            (rule.config as unknown as CapacityConfig).field === ref.field_key),
+      );
+      const where = (counted?.config as { where?: WhereClause } | undefined)
+        ?.where;
+      const sql = new Sql();
+      const rows: { id: string; data: Data; n: number }[] = await m.query(
+        `SELECT id, data, count(*) OVER ()::int AS n FROM collection_records
+          WHERE collection_id = ${sql.p(other.collection.id)} AND deleted_at IS NULL
+            AND data @> ${sql.p(JSON.stringify({ [ref.field_key]: recordId }))}::jsonb
+            AND ${whereSql(sql, where)}
+          ORDER BY "createdAt", id
+          LIMIT ${sql.p(IN_USE_RECORDS)}`,
+        sql.params,
+      );
+      if (!rows.length) continue;
+      total += rows[0].n;
+      if (!names.includes(other.collection.name)) {
+        names.push(other.collection.name);
+      }
+      await titles.preload(other, rows);
+      for (const row of rows) {
+        if (records.length >= IN_USE_RECORDS) break;
+        records.push({
+          id: row.id,
+          title: await titles.title(other, row.data),
+        });
+      }
+    }
+    if (total) {
+      throw refuse.inUse(total, names.join(' and '), records);
+    }
+  }
+
+  /**
+   * Who made each record, for people (chunk 5b's "Created by"): a user by name ("You" is the
+   * reader), the assistant with its conversation, or an import. Never shown to the agent.
+   */
+  private async creators(
+    m: EntityManager,
+    chatbotId: string,
+    actor: ListActor,
+    records: CollectionRecord[],
+  ): Promise<(ref: RecordActorRef | undefined) => RecordCreator | null> {
+    const runIds = new Set<string>();
+    const userIds = new Set<number>();
+    for (const r of records) {
+      const ref = r.createdBy;
+      if (ref?.kind === 'agent' && ref.run_id) runIds.add(ref.run_id);
+      if (ref && ref.kind !== 'agent' && typeof ref.user_id === 'number') {
+        userIds.add(ref.user_id);
+      }
+    }
+    const conversations = new Map<string, string>();
+    if (runIds.size) {
+      const rows: { run_id: string; conversation_id: string }[] = await m.query(
+        `SELECT DISTINCT run_id, conversation_id FROM tool_runs
+            WHERE chatbot_id = $1 AND run_id = ANY($2::text[])`,
+        [chatbotId, [...runIds]],
+      );
+      for (const row of rows) {
+        conversations.set(row.run_id, row.conversation_id);
+      }
+    }
+    const names = new Map<number, string>();
+    if (userIds.size) {
+      const rows: { id: number; name: string | null }[] = await m.query(
+        `SELECT id, name FROM users WHERE id = ANY($1::int[])`,
+        [[...userIds]],
+      );
+      for (const row of rows) {
+        if (row.name) names.set(Number(row.id), row.name);
+      }
+    }
+    const me = actor.kind === 'user' ? actor.userId : null;
+    return (ref) => {
+      if (!ref?.kind) return null;
+      if (ref.kind === 'agent') {
+        const conversation = conversations.get(ref.run_id);
+        return {
+          kind: 'agent',
+          ...(conversation ? { conversation_id: conversation } : {}),
+        };
+      }
+      const name =
+        typeof ref.user_id === 'number' ? names.get(ref.user_id) : undefined;
+      return {
+        kind: ref.kind,
+        ...(name ? { name } : {}),
+        ...(ref.kind === 'user' && me !== null && ref.user_id === me
+          ? { you: true as const }
+          : {}),
+      };
+    };
+  }
+
   private entity(row: RecordRow): CollectionRecord {
     return {
       id: row.id,
@@ -1158,7 +1314,7 @@ export class ListRecordsService {
       collectionId: row.collection_id,
       data: row.data,
       contactId: row.contact_id,
-      createdBy: { kind: 'import', user_id: null },
+      createdBy: row.created_by ?? { kind: 'import', user_id: null },
       version: row.version,
       deletedAt: row.deleted_at,
       createdAt: row.createdAt,
@@ -1194,6 +1350,9 @@ export class ListRecordsService {
         data: Object.fromEntries(visible.map((f) => [f.key, r.data?.[f.key]])),
       })),
     );
+    const creators = agent
+      ? null
+      : await this.creators(m, chatbotId, actor, records);
     const out: ListRecordView[] = [];
     for (const record of records) {
       const data: Data = {};
@@ -1218,6 +1377,7 @@ export class ListRecordsService {
         contact_id: record.contactId ?? null,
         created_at: iso(record.createdAt)!,
         updated_at: iso(record.updatedAt)!,
+        ...(creators ? { created_by: creators(record.createdBy) } : {}),
         ...(record.deletedAt !== undefined
           ? { deleted_at: iso(record.deletedAt) }
           : {}),

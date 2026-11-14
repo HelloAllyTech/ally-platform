@@ -32,6 +32,7 @@ import { ChatbotMember } from '../entity/chatbot-member.entity';
 import { ChatbotAudience } from '../entity/chatbot-audience.entity';
 import { Chatbot } from '../entity/chatbot.entity';
 import { Connector } from '../entity/connector.entity';
+import { ToolRunStatus } from '../entity/tool-run.entity';
 import {
   AgentRuntimeUsed,
   ChatbotAccessMode,
@@ -123,6 +124,8 @@ export interface ChatbotTestResult {
   turnType: AgentTurnType | null;
   runtimeAllowed: boolean;
   conversationId: string;
+  /** The run booked or changed a list entry, checked and not saved (chunk 5b). */
+  previewWrite?: boolean;
 }
 
 /** A bot's documents as the knowledge tab lists them. */
@@ -930,13 +933,35 @@ export class ChatbotService {
         })
       : decision.body;
 
-    return this.toTestResult(decision, {
+    const result = this.toTestResult(decision, {
       reply,
       settings,
       conversationId,
       latencyMs: Date.now() - startedAt,
       usedDraft: Boolean(dto.draft),
     });
+    result.previewWrite = await this.previewWrote(decision.agent?.runId);
+    return result;
+  }
+
+  /**
+   * Whether a Try it run booked or changed something in a list (chunk 5b): Preview checks the
+   * write, then rolls it back, so the console says "Test only: this wasn't saved." A failed
+   * lookup reads as no write.
+   */
+  private async previewWrote(runId: string | null | undefined) {
+    if (!runId) return false;
+    try {
+      const rows: unknown[] = await this.chatbotRepository.manager.query(
+        `SELECT 1 FROM tool_runs
+          WHERE run_id = $1 AND status = $2 AND tool ~ '^(create|update)_'
+          LIMIT 1`,
+        [runId, ToolRunStatus.OK],
+      );
+      return Array.isArray(rows) && rows.length > 0;
+    } catch {
+      return false;
+    }
   }
 
   /** One Preview test as the console shows it. */

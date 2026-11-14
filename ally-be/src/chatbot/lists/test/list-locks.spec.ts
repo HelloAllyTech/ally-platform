@@ -68,4 +68,13 @@ describe('copy deck §26', () => {
       'This would go over the limit of 50 lists.',
     );
   });
+
+  it('words in_use as the 5b brief does', () => {
+    expect(LIST_COPY.in_use(3, 'Appointments')).toBe(
+      '3 entries in Appointments use this. Cancel or move them first.',
+    );
+    expect(LIST_COPY.in_use(1, 'Appointments')).toBe(
+      '1 entry in Appointments uses this. Cancel or move it first.',
+    );
+  });
 });

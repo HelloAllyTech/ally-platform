@@ -167,15 +167,17 @@ export class TitleResolver {
     }
     const newContacts = [...contactIds].filter((id) => !this.contacts.has(id));
     if (newContacts.length) {
-      const found: { id: string; display_name: string | null }[] =
-        await this.manager.query(
-          `SELECT id, display_name FROM chatbot_contacts
-            WHERE chatbot_id = $1 AND id = ANY($2::uuid[])`,
-          [this.chatbotId, newContacts],
-        );
+      const found: ContactRow[] = await this.manager.query(
+        `${CONTACT_SELECT} WHERE c.chatbot_id = $1 AND c.id = ANY($2::uuid[])`,
+        [this.chatbotId, newContacts],
+      );
       for (const id of newContacts) this.contacts.set(id, null);
       for (const row of found) {
-        this.contacts.set(row.id, row.display_name ?? 'A contact');
+        // People read the inbox's label (chunk 5b); the agent keeps the name alone.
+        this.contacts.set(
+          row.id,
+          this.agent ? (row.display_name ?? 'A contact') : contactLabel(row),
+        );
       }
     }
   }
@@ -224,4 +226,45 @@ export class TitleResolver {
     }
     return list.collection.name;
   }
+}
+
+/** A contact as the owner's screens label it: its name and channel (chunk 5b). */
+export interface ContactRow {
+  id: string;
+  display_name: string | null;
+  /** The WhatsApp number, if the contact has one: only its last 4 are ever shown. */
+  whatsapp: string | null;
+  channel: string | null;
+}
+
+/** A contact, with its WhatsApp identity and the channel it was first seen on. */
+export const CONTACT_SELECT = `SELECT c.id, c.display_name,
+    (SELECT i.external_id FROM chatbot_contact_identities i
+      WHERE i.contact_id = c.id AND i.channel = 'whatsapp' ORDER BY i."createdAt" LIMIT 1) AS whatsapp,
+    (SELECT i.channel FROM chatbot_contact_identities i
+      WHERE i.contact_id = c.id ORDER BY i."createdAt" LIMIT 1) AS channel
+  FROM chatbot_contacts c`;
+
+/** Four digits from an id, the same every time, as the inbox tags a visitor. */
+function tag(id: string): string {
+  let hash = 0;
+  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return String(hash % 10000).padStart(4, '0');
+}
+
+/**
+ * The inbox's label for a person (20d-2): their name, else "Visitor · 4821" with a WhatsApp
+ * number's last 4, else 4 digits from the contact's id. Never a whole number or email.
+ */
+export function contactLabel(row: ContactRow): string {
+  if (row.display_name?.trim()) return row.display_name.trim();
+  const phone = String(row.whatsapp ?? '');
+  return `Visitor · ${/\d{4}$/.test(phone) ? phone.slice(-4) : tag(row.id)}`;
+}
+
+/** The channel a contact came from, in the owner's words. */
+export function contactChannel(row: ContactRow): string {
+  if (row.whatsapp || row.channel === 'whatsapp') return 'WhatsApp';
+  if (row.channel === 'email') return 'Email';
+  return 'Bot page';
 }

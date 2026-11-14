@@ -51,7 +51,9 @@ export interface ListToolProperty {
   maximum?: number;
   /**
    * A relation (chunk 6 follow-up): the list it points at, and whether that list is dated. ally-ai
-   * checks a dated target's day and time against what the person confirmed before it writes.
+   * checks a dated target's day and time against what the person confirmed before it writes. A
+   * date-and-time field the agent fills in itself is `dated` with no `relation` (5b §9): ally-ai
+   * checks its own value.
    */
   relation?: string;
   dated?: 'date' | 'datetime';
@@ -207,6 +209,14 @@ function valueProperty(
   }
   if (f.type === ListFieldType.BOOLEAN) {
     return choice(`${f.label}; ${blank}`, YES_NO);
+  }
+  if (f.type === ListFieldType.DATETIME) {
+    // A time the agent fills in itself (a site visit's "at", 5b §9): ally-ai checks it against
+    // the day and time the person confirmed, as it does a dated relation's target.
+    return {
+      ...text(`${f.label}: ${valueHint(f)}; ${blank}`),
+      dated: 'datetime',
+    };
   }
   return text(`${f.label}: ${valueHint(f)}; ${blank}`);
 }
@@ -406,28 +416,30 @@ function updateDescription(list: ListView, names: Map<string, string>): string {
 // ---- which tools a list has, and which a run gets -------------------------------------------
 
 /**
- * The tools one list generates, whatever the bot's abilities: find when the agent may read it,
- * create and update when it may write it and at least one field is writable.
+ * Which lists are dated, for the confirmed-time check (chunk 6, widened in 5b §9): a list with a
+ * live date-and-time field is `datetime` (Slots, Tables, Classes, Events), even when a date field
+ * comes first; one with only a date is `date`. Read from the definition, so a list made from
+ * scratch is marked the same way.
  */
-/** Each list's date or date-time, as the engine's alternatives read it: its first such field. */
 export function datedLists(
   lists: ListView[],
 ): Map<string, 'date' | 'datetime'> {
   const out = new Map<string, 'date' | 'datetime'>();
   for (const list of lists) {
-    const field = live(list).find(
-      (f) => f.type === ListFieldType.DATE || f.type === ListFieldType.DATETIME,
-    );
-    if (field) {
-      out.set(
-        list.key,
-        field.type === ListFieldType.DATE ? 'date' : 'datetime',
-      );
+    const fields = live(list);
+    if (fields.some((f) => f.type === ListFieldType.DATETIME)) {
+      out.set(list.key, 'datetime');
+    } else if (fields.some((f) => f.type === ListFieldType.DATE)) {
+      out.set(list.key, 'date');
     }
   }
   return out;
 }
 
+/**
+ * The tools one list generates, whatever the bot's abilities: find when the agent may read it,
+ * create and update when it may write it and at least one field is writable.
+ */
 export function listToolDefinitions(
   list: ListView,
   names: Map<string, string> = new Map(),

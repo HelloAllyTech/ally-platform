@@ -13,7 +13,8 @@ export type ListRefusalCode =
   | 'transition_not_allowed'
   | 'not_found'
   | 'version_conflict'
-  | 'limit_exceeded';
+  | 'limit_exceeded'
+  | 'in_use';
 
 export interface ListRefusal {
   code: ListRefusalCode;
@@ -23,7 +24,8 @@ export interface ListRefusal {
   conflict?: {
     /** For `unique_taken` and `capacity_full` on a relation: up to 3 targets that would pass. */
     alternatives?: ListRecordView[];
-    /** For a rule that existing records break: the records that break it. */
+    /** For a rule that existing records break: the records that break it. For `in_use`: the
+     * live entries that point at the one being deleted. */
     records?: { id: string; title: string }[];
   };
 }
@@ -39,6 +41,7 @@ const STATUS: Record<ListRefusalCode, HttpStatus> = {
   limit_reached: HttpStatus.CONFLICT,
   transition_not_allowed: HttpStatus.CONFLICT,
   version_conflict: HttpStatus.CONFLICT,
+  in_use: HttpStatus.CONFLICT,
 };
 
 /**
@@ -82,6 +85,11 @@ export const LIST_COPY = {
     `Someone changed this entry just now. Reload and try again.`,
   limit_exceeded: (limit: string) =>
     `This would go over the limit of ${limit}.`,
+  /** Chunk 5b: deleting an entry that live entries elsewhere point at. */
+  in_use: (n: number, lists: string) =>
+    n === 1
+      ? `1 entry in ${lists} uses this. Cancel or move it first.`
+      : `${n} entries in ${lists} use this. Cancel or move them first.`,
 };
 
 export const refuse = {
@@ -117,5 +125,11 @@ export const refuse = {
     new ListRefusalException({
       code: 'limit_exceeded',
       message: LIST_COPY.limit_exceeded(limit),
+    }),
+  inUse: (n: number, lists: string, records: { id: string; title: string }[]) =>
+    new ListRefusalException({
+      code: 'in_use',
+      message: LIST_COPY.in_use(n, lists),
+      conflict: { records },
     }),
 };

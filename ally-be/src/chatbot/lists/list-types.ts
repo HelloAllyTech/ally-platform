@@ -97,6 +97,11 @@ export interface ListQuery {
   aggregate?: string;
   /** Users only: include deleted records (to restore them). */
   includeDeleted?: boolean;
+  /**
+   * Users only (chunk 5b): entries where any text, long text, phone, email or URL field contains
+   * this, ignoring case; ANDed with the filters.
+   */
+  search?: string;
 }
 
 /** A record as an actor may see it. */
@@ -111,7 +116,18 @@ export interface ListRecordView {
   contact_id: string | null;
   created_at: string;
   updated_at: string;
+  /** People's reads only (chunk 5b): who made it. Left out for the agent. */
+  created_by?: RecordCreator | null;
   deleted_at?: string | null;
+}
+
+/** "Created by" on an entry's form: You, a teammate, your assistant (and its chat), or an import. */
+export interface RecordCreator {
+  kind: 'user' | 'agent' | 'import';
+  name?: string;
+  /** The reader made it. */
+  you?: true;
+  conversation_id?: string;
 }
 
 export interface ListQueryResult {

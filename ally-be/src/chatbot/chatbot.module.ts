@@ -50,6 +50,7 @@ import { RecordLink } from './entity/record-link.entity';
 import { ListController } from './lists/list.controller';
 import { ListCsvService } from './lists/list-csv.service';
 import { ListDefinitionsService } from './lists/list-definitions.service';
+import { ListOwnerService } from './lists/list-owner.service';
 import { ListRecordsService } from './lists/list-records.service';
 
 /**
@@ -131,6 +132,8 @@ import { ListRecordsService } from './lists/list-records.service';
     ListRecordsService,
     ListDefinitionsService,
     ListCsvService,
+    // The owner's Lists section (chunk 5b): ready-made lists, Repeat weekly, switches.
+    ListOwnerService,
   ],
   exports: [
     // The Checkup (chunk 20a-2) asks questions through Preview's path.

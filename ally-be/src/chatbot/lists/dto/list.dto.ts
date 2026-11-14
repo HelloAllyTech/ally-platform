@@ -266,6 +266,15 @@ export class QueryListRecordsDto {
   @IsOptional()
   @IsBoolean()
   include_deleted?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Entries where any text, phone, email or web address detail contains this (chunk 5b)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
 }
 
 export class ListRecordDto {
@@ -288,4 +297,91 @@ export class ImportListDto {
   @IsOptional()
   @IsString()
   commit?: string;
+}
+
+// ---- chunk 5b ------------------------------------------------------------------------------------
+
+export class InstallReadyMadeDto {
+  @ApiPropertyOptional({
+    description:
+      "The 'your services' options to install with, by list and field: { appointments: { service: ['Haircut'] } }",
+  })
+  @IsOptional()
+  @IsObject()
+  options?: Record<string, Record<string, string[]>>;
+}
+
+export class RepeatListRecordsDto {
+  @ApiProperty({ example: 'starts_at', description: 'A date-and-time field' })
+  @IsString()
+  field!: string;
+
+  @ApiProperty({ example: [1, 2, 3, 4, 5], description: '1 Monday … 7 Sunday' })
+  @IsArray()
+  @ArrayMaxSize(7)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(7, { each: true })
+  days!: number[];
+
+  @ApiProperty({ example: '10:00' })
+  @IsString()
+  start!: string;
+
+  @ApiProperty({
+    example: '17:00',
+    description: 'No entry starts at or after it',
+  })
+  @IsString()
+  end!: string;
+
+  @ApiProperty({ example: 60 })
+  @IsInt()
+  @Min(5)
+  @Max(720)
+  every_minutes!: number;
+
+  @ApiPropertyOptional({
+    example: '2026-11-16',
+    description: 'Today if left out',
+  })
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @ApiProperty({ example: '2026-11-20', description: 'The last day, included' })
+  @IsString()
+  until!: string;
+
+  @ApiPropertyOptional({
+    example: { practitioner: 'Dr Mehta' },
+    description: 'Other details for every entry it adds',
+  })
+  @IsOptional()
+  @IsObject()
+  values?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Count only: nothing is added' })
+  @IsOptional()
+  @IsBoolean()
+  dry_run?: boolean;
+}
+
+const ABILITY = ['do_it', 'never'] as const;
+
+export class ListAbilitiesDto {
+  @ApiPropertyOptional({ enum: ABILITY })
+  @IsOptional()
+  @IsIn(ABILITY)
+  find?: 'do_it' | 'never';
+
+  @ApiPropertyOptional({ enum: ABILITY })
+  @IsOptional()
+  @IsIn(ABILITY)
+  create?: 'do_it' | 'never';
+
+  @ApiPropertyOptional({ enum: ABILITY })
+  @IsOptional()
+  @IsIn(ABILITY)
+  update?: 'do_it' | 'never';
 }

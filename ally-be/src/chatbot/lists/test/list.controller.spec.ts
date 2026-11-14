@@ -101,6 +101,40 @@ const CALLS: [
     ChatbotMemberRole.EDITOR,
     (c, b) => c.importCsv(b, 'slots', { buffer: Buffer.from('') } as never, {}),
   ],
+  // Chunk 5b.
+  [
+    'readyMadeCatalogue',
+    ChatbotMemberRole.VIEWER,
+    (c, b) => c.readyMadeCatalogue(b),
+  ],
+  [
+    'searchContacts',
+    ChatbotMemberRole.VIEWER,
+    (c, b) => c.searchContacts(b, 'asha'),
+  ],
+  [
+    'installReadyMade',
+    ChatbotMemberRole.EDITOR,
+    (c, b) => c.installReadyMade(b, 'appointments', {}),
+  ],
+  [
+    'setAbilities',
+    ChatbotMemberRole.EDITOR,
+    (c, b) => c.setAbilities(b, 'appointments', { create: 'do_it' }),
+  ],
+  [
+    'repeatRecords',
+    ChatbotMemberRole.EDITOR,
+    (c, b) =>
+      c.repeatRecords(b, 'slots', {
+        field: 'starts_at',
+        days: [1],
+        start: '10:00',
+        end: '11:00',
+        every_minutes: 60,
+        until: '2026-12-01',
+      }),
+  ],
 ];
 
 /** A member at `role` on BOT only: the real access service's answers. */
@@ -121,6 +155,7 @@ function build(role: ChatbotMemberRole) {
   const any = () => new Proxy({}, { get: () => jest.fn(async () => ({})) });
   const controller = new ListController(
     access as never,
+    any() as never,
     any() as never,
     any() as never,
     any() as never,

@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Res,
   UploadedFile,
@@ -34,9 +35,12 @@ import {
   AddListRuleDto,
   CreateListDto,
   ImportListDto,
+  InstallReadyMadeDto,
+  ListAbilitiesDto,
   ListFieldDto,
   ListRecordDto,
   QueryListRecordsDto,
+  RepeatListRecordsDto,
   UpdateListDto,
   UpdateListFieldDto,
   UpdateListRecordDto,
@@ -44,6 +48,7 @@ import {
 import { ListCsvService } from './list-csv.service';
 import { ListDefinitionsService } from './list-definitions.service';
 import { LIST_LIMITS } from './list-limits';
+import { ListAbilities, ListOwnerService } from './list-owner.service';
 import { ListRecordsService } from './list-records.service';
 import type { ListActor, ListFilter, ListQuery } from './list-types';
 
@@ -84,21 +89,112 @@ export class ListController {
     private readonly definitions: ListDefinitionsService,
     private readonly records: ListRecordsService,
     private readonly csv: ListCsvService,
+    private readonly owner: ListOwnerService,
   ) {}
 
   // ---- lists ----------------------------------------------------------------------------------
 
   @Get(':id/lists')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
-  @ApiOperation({ summary: "The bot's lists, with their fields and rules" })
+  @ApiOperation({
+    summary:
+      "The bot's lists, with their fields and rules, the assistant's switches and the bot's time zone",
+  })
   async listLists(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('include_deleted') includeDeleted?: string,
   ) {
+    const { chatbot } = await this.access.assert(id);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.listLists(id, {
+        includeDeleted: includeDeleted === 'true',
+      }),
+    );
+  }
+
+  // ---- chunk 5b: ready-made lists, people, the assistant's switches ----------------------------
+
+  @Get(':id/lists/ready-made')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({ summary: 'The ready-made lists an owner can add, grouped' })
+  async readyMadeCatalogue(@Param('id', ParseUUIDPipe) id: string) {
     await this.access.assert(id);
-    return this.definitions.listLists(id, {
-      includeDeleted: includeDeleted === 'true',
-    });
+    return this.owner.catalogue();
+  }
+
+  @Post(':id/lists/ready-made/:name')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary:
+      'Add a ready-made list (and the list it points at), with no entries',
+    description:
+      'One transaction. A list with the same key already there is refused. Add and Change start at Never.',
+  })
+  async installReadyMade(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('name') name: string,
+    @Body() dto: InstallReadyMadeDto,
+  ) {
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.install(chatbot, name, dto?.options);
+  }
+
+  @Get(':id/lists/contacts')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({
+    summary: "This bot's people, for an entry linked to a person",
+    description:
+      'Matches a name, phone or email; returns only the inbox label and the channel, most recent first.',
+  })
+  async searchContacts(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+  ) {
+    await this.access.assert(id);
+    return this.owner.contacts(
+      id,
+      typeof search === 'string' ? search : '',
+      limit ? Number(limit) || 20 : 20,
+    );
+  }
+
+  @Put(':id/lists/:key/abilities')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'What the assistant may do with this list: Do it or Never',
+    description:
+      "Changes only this list's find_, create_ and update_ abilities (hand_over stays platform-admin only), and the list's agent switches with them.",
+  })
+  async setAbilities(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('key') key: string,
+    @Body() dto: ListAbilitiesDto,
+  ) {
+    await this.access.assert(id, EDITOR);
+    const change: Partial<ListAbilities> = {};
+    if (dto.find) change.find = dto.find;
+    if (dto.create) change.create = dto.create;
+    if (dto.update) change.update = dto.update;
+    return this.owner.setAbilities(id, key, change);
+  }
+
+  @Post(':id/lists/:key/records/repeat')
+  @HttpCode(200)
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Repeat weekly until: add an entry for each day and time',
+    description:
+      'At most 500 at a time; times that already have an entry are skipped. dry_run counts only.',
+  })
+  async repeatRecords(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('key') key: string,
+    @Body() dto: RepeatListRecordsDto,
+  ) {
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.repeat(chatbot, key, user(), dto);
   }
 
   @Post(':id/lists')
@@ -108,8 +204,11 @@ export class ListController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateListDto,
   ) {
-    await this.access.assert(id, EDITOR);
-    return this.definitions.createList(id, dto);
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.createList(id, dto),
+    );
   }
 
   @Get(':id/lists/:key')
@@ -121,8 +220,11 @@ export class ListController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('key') key: string,
   ) {
-    await this.access.assert(id);
-    return this.definitions.getList(id, key);
+    const { chatbot } = await this.access.assert(id);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.getList(id, key),
+    );
   }
 
   @Patch(':id/lists/:key')
@@ -133,8 +235,11 @@ export class ListController {
     @Param('key') key: string,
     @Body() dto: UpdateListDto,
   ) {
-    await this.access.assert(id, EDITOR);
-    return this.definitions.updateList(id, key, dto);
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.updateList(id, key, dto),
+    );
   }
 
   @Delete(':id/lists/:key')
@@ -144,8 +249,11 @@ export class ListController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('key') key: string,
   ) {
-    await this.access.assert(id, EDITOR);
-    return this.definitions.deleteList(id, key);
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.deleteList(id, key),
+    );
   }
 
   @Post(':id/lists/:listId/restore')
@@ -158,8 +266,11 @@ export class ListController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('listId', ParseUUIDPipe) listId: string,
   ) {
-    await this.access.assert(id, EDITOR);
-    return this.definitions.restoreList(id, listId);
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.restoreList(id, listId),
+    );
   }
 
   // ---- fields ---------------------------------------------------------------------------------
@@ -172,8 +283,11 @@ export class ListController {
     @Param('key') key: string,
     @Body() dto: ListFieldDto,
   ) {
-    await this.access.assert(id, EDITOR);
-    return this.definitions.addField(id, key, dto);
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.addField(id, key, dto),
+    );
   }
 
   @Patch(':id/lists/:key/fields/:field')
@@ -189,8 +303,11 @@ export class ListController {
     @Param('field') field: string,
     @Body() dto: UpdateListFieldDto,
   ) {
-    await this.access.assert(id, EDITOR);
-    return this.definitions.updateField(id, key, field, dto);
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.updateField(id, key, field, dto),
+    );
   }
 
   @Delete(':id/lists/:key/fields/:field')
@@ -201,8 +318,11 @@ export class ListController {
     @Param('key') key: string,
     @Param('field') field: string,
   ) {
-    await this.access.assert(id, EDITOR);
-    return this.definitions.archiveField(id, key, field);
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.archiveField(id, key, field),
+    );
   }
 
   // ---- rules ----------------------------------------------------------------------------------
@@ -219,8 +339,11 @@ export class ListController {
     @Param('key') key: string,
     @Body() dto: AddListRuleDto,
   ) {
-    await this.access.assert(id, EDITOR);
-    return this.definitions.addRule(id, key, dto);
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.addRule(id, key, dto),
+    );
   }
 
   @Delete(':id/lists/:key/rules/:ruleId')
@@ -231,8 +354,11 @@ export class ListController {
     @Param('key') key: string,
     @Param('ruleId', ParseUUIDPipe) ruleId: string,
   ) {
-    await this.access.assert(id, EDITOR);
-    return this.definitions.removeRule(id, key, ruleId);
+    const { chatbot } = await this.access.assert(id, EDITOR);
+    return this.owner.decorate(
+      chatbot,
+      await this.definitions.removeRule(id, key, ruleId),
+    );
   }
 
   // ---- records --------------------------------------------------------------------------------
@@ -242,7 +368,7 @@ export class ListController {
   @ApiOperation({
     summary: 'Entries, with simple filters',
     description:
-      'Query: sort (key or -key), limit, cursor, include_deleted, and eq.<key>, contains.<key>, from.<key>, to.<key>.',
+      'Query: sort (key or -key), limit, cursor, include_deleted, search, and eq.<key>, contains.<key>, from.<key>, to.<key>.',
   })
   async listRecords(
     @Param('id', ParseUUIDPipe) id: string,
@@ -261,6 +387,7 @@ export class ListController {
       aggregate:
         typeof query.aggregate === 'string' ? query.aggregate : undefined,
       includeDeleted: query.include_deleted === 'true',
+      search: typeof query.search === 'string' ? query.search : undefined,
     };
     return this.records.query(id, key, user(), q);
   }
@@ -284,6 +411,7 @@ export class ListController {
       limit: dto.limit,
       aggregate: dto.aggregate,
       includeDeleted: dto.include_deleted,
+      search: dto.search,
     });
   }
 
