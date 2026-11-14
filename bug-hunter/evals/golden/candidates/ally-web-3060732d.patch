@@ -1,0 +1,62 @@
+diff --git a/libs/ui-shared/src/lib/generic-table/GenericTable.tsx b/libs/ui-shared/src/lib/generic-table/GenericTable.tsx
+index e1b0ab6d2c..b0f2d0d797 100644
+--- a/libs/ui-shared/src/lib/generic-table/GenericTable.tsx
++++ b/libs/ui-shared/src/lib/generic-table/GenericTable.tsx
+@@ -303,8 +303,10 @@ export const GenericTable = forwardRef(
+         </table>
+         {handleLoadMore && (
+           <div
+-            onClick={handleLoadMore}
+-            className="flex cursor-pointer mt-4 text-center items-center pb-[60px]"
++            onClick={isLoading ? undefined : handleLoadMore}
++            className={`flex mt-4 text-center items-center pb-[60px] ${
++              isLoading ? "cursor-not-allowed" : "cursor-pointer"
++            }`}
+           >
+             <Plus size={20} />
+             <span className="font-['IBM_Plex_Serif'] text-[16px] ml-[5px]">{loadMoreLabel}</span>
+diff --git a/libs/ui-shared/src/lib/generic-table/__tests__/GenericTable.test.tsx b/libs/ui-shared/src/lib/generic-table/__tests__/GenericTable.test.tsx
+index 69e494307c..3209f84036 100644
+--- a/libs/ui-shared/src/lib/generic-table/__tests__/GenericTable.test.tsx
++++ b/libs/ui-shared/src/lib/generic-table/__tests__/GenericTable.test.tsx
+@@ -157,20 +157,36 @@ describe("GenericTable", () => {
+     );
+   });
+ 
+-  it("renders Load More and spinner when loading", () => {
++  it("renders Load More and calls handler when not loading", () => {
+     const handleLoadMore = vi.fn();
+     const { container } = render(
+       <GenericTable
+         columns={[{ key: "name", header: "Name" }] as any}
+         data={[{ name: "A" }]}
+         handleLoadMore={handleLoadMore}
+-        isLoading
++        isLoading={false}
+       />,
+     );
+ 
+     fireEvent.click(screen.getByText("Load More"));
+     expect(handleLoadMore).toHaveBeenCalledTimes(1);
+     // Carbon's Loading spinner renders as `.cds--loading` (no progressbar role).
++    expect(container.querySelector(".cds--loading")).not.toBeInTheDocument();
++  });
++
++  it("does not call handleLoadMore when already loading", () => {
++    const handleLoadMore = vi.fn();
++    const { container } = render(
++      <GenericTable
++        columns={[{ key: "name", header: "Name" }] as any}
++        data={[{ name: "A" }]}
++        handleLoadMore={handleLoadMore}
++        isLoading
++      />,
++    );
++
++    fireEvent.click(screen.getByText("Load More"));
++    expect(handleLoadMore).not.toHaveBeenCalled();
+     expect(container.querySelector(".cds--loading")).toBeInTheDocument();
+   });
+-});
++});
+\ No newline at end of file

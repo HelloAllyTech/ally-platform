@@ -1,0 +1,136 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/nav-sidebar/__test__/NavSideBar.test.tsx b/apps/ally-helpline-dashboard/src/components/nav-sidebar/__test__/NavSideBar.test.tsx
+index 0e17680516..1a633e9e56 100644
+--- a/apps/ally-helpline-dashboard/src/components/nav-sidebar/__test__/NavSideBar.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/nav-sidebar/__test__/NavSideBar.test.tsx
+@@ -92,7 +92,17 @@ vi.mock("@assets", () => ({
+ vi.mock("@components", () => ({
+   AppTooltip: ({ children }: any) => children,
+   ConfirmationDialog: vi.fn(
+-    ({ isOpen, onClose, onButtonClick, title, content, buttonText, icon, ...props }: any) => {
++    ({
++      isOpen,
++      onClose,
++      onButtonClick,
++      title,
++      content,
++      buttonText,
++      icon,
++      buttonVariant,
++      ...props
++    }: any) => {
+       if (!isOpen) return null;
+       return (
+         <div data-testid="mock-confirmation-dialog" {...props}>
+@@ -105,7 +115,7 @@ vi.mock("@components", () => ({
+           <button data-testid="dialog-confirm-button" onClick={onButtonClick}>
+             {buttonText}
+           </button>
+-          {icon && <div data-testid="dialog-icon">{icon}</div>}
++          {icon && <div data-testid="dialog-icon">{icon({})}</div>}
+         </div>
+       );
+     },
+diff --git a/libs/ui-shared/src/lib/simulation/SimulationInterface.tsx b/libs/ui-shared/src/lib/simulation/SimulationInterface.tsx
+index ede7bfb8d5..1bee5450ef 100644
+--- a/libs/ui-shared/src/lib/simulation/SimulationInterface.tsx
++++ b/libs/ui-shared/src/lib/simulation/SimulationInterface.tsx
+@@ -636,7 +636,7 @@ export const SimulationInterface: FC<SimulationInterfaceProps> = ({
+   return (
+     <motion.div
+       data-testid="simulation-interface"
+-      layout
++      layout="position"
+       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+       className="w-full flex justify-center items-center flex-1 relative"
+     >
+diff --git a/libs/ui-shared/src/lib/simulation/SimulationPage.tsx b/libs/ui-shared/src/lib/simulation/SimulationPage.tsx
+index e4cb80e9a5..788b168610 100644
+--- a/libs/ui-shared/src/lib/simulation/SimulationPage.tsx
++++ b/libs/ui-shared/src/lib/simulation/SimulationPage.tsx
+@@ -444,7 +444,7 @@ export const SimulationPage: FC<SimulationPageProps> = ({
+         </div>
+       </div>
+ 
+-      <motion.div layout className="w-full flex flex-1 gap-2 min-h-0 overflow-hidden">
++      <motion.div layout="position" className="w-full flex flex-1 gap-2 min-h-0 overflow-hidden">
+         <SimulationInterface
+           roomStatus={roomStatus}
+           roomData={roomData}
+diff --git a/libs/ui-shared/src/lib/simulation/__tests__/ActorVideo.test.tsx b/libs/ui-shared/src/lib/simulation/__tests__/ActorVideo.test.tsx
+index b61e4369b5..45bc6d5af4 100644
+--- a/libs/ui-shared/src/lib/simulation/__tests__/ActorVideo.test.tsx
++++ b/libs/ui-shared/src/lib/simulation/__tests__/ActorVideo.test.tsx
+@@ -8,7 +8,7 @@ const useTracks = vi.fn();
+ 
+ vi.mock("@livekit/components-react", () => ({
+   useTracks: (...args: any[]) => useTracks(...args),
+-  VideoTrack: (props: any) => <div data-testid="livekit-video-track" {...props} />,
++  VideoTrack: ({ trackRef, ...props }: any) => <div data-testid="livekit-video-track" {...props} />,
+ }));
+ 
+ vi.mock("livekit-client", () => ({
+diff --git a/libs/ui-shared/src/lib/simulation/__tests__/SimulationInterface.test.tsx b/libs/ui-shared/src/lib/simulation/__tests__/SimulationInterface.test.tsx
+index 3aaa91d48a..5b0cc138d0 100644
+--- a/libs/ui-shared/src/lib/simulation/__tests__/SimulationInterface.test.tsx
++++ b/libs/ui-shared/src/lib/simulation/__tests__/SimulationInterface.test.tsx
+@@ -7,7 +7,7 @@ import { ChecklistMode } from "../types";
+ 
+ vi.mock("framer-motion", () => ({
+   motion: {
+-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
++    div: ({ children, layout, ref, ...props }: any) => <div {...props}>{children}</div>,
+   },
+   AnimatePresence: ({ children }: any) => children,
+ }));
+diff --git a/libs/ui-shared/src/lib/simulation/__tests__/SimulationPage.test.tsx b/libs/ui-shared/src/lib/simulation/__tests__/SimulationPage.test.tsx
+index 04c157f96b..ab6c30dfc9 100644
+--- a/libs/ui-shared/src/lib/simulation/__tests__/SimulationPage.test.tsx
++++ b/libs/ui-shared/src/lib/simulation/__tests__/SimulationPage.test.tsx
+@@ -7,7 +7,7 @@ import { WARNING_THRESHOLD } from "../waveformConstants";
+ 
+ vi.mock("framer-motion", () => ({
+   motion: {
+-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
++    div: ({ children, layout, ref, ...props }: any) => <div {...props}>{children}</div>,
+   },
+   AnimatePresence: ({ children }: any) => children,
+ }));
+@@ -177,3 +177,24 @@ describe("SimulationPage text-chat roleplay", () => {
+     expect(room.registerTextStreamHandler).not.toHaveBeenCalled();
+   });
+ });
++
++describe("SimulationPage rendering", () => {
++  beforeEach(() => {
++    vi.spyOn(window.HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
++    vi.spyOn(window.HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
++  });
++
++  afterEach(() => {
++    vi.restoreAllMocks();
++  });
++  
++  it("should not receive a warning about a non-boolean attribute `layout`", () => {
++    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
++    renderPage();
++    expect(consoleWarnSpy).not.toHaveBeenCalledWith(
++      expect.stringContaining("Warning: Received `true` for a non-boolean attribute `layout`.")
++    );
++    consoleWarnSpy.mockRestore();
++  });
++});
++
+diff --git a/libs/ui-shared/src/test-setup.ts b/libs/ui-shared/src/test-setup.ts
+index 4832d5779d..ecd3077ba8 100644
+--- a/libs/ui-shared/src/test-setup.ts
++++ b/libs/ui-shared/src/test-setup.ts
+@@ -34,3 +34,9 @@ Object.defineProperty(window, "matchMedia", {
+     dispatchEvent: vi.fn(),
+   })),
+ });
++
++// Mock HTMLMediaElement.prototype.pause
++Object.defineProperty(HTMLMediaElement.prototype, "pause", {
++  writable: true,
++  value: vi.fn(),
++});

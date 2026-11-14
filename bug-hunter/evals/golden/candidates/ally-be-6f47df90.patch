@@ -1,0 +1,89 @@
+diff --git a/src/language/constants/glossary.constants.ts b/src/language/constants/glossary.constants.ts
+index f83cd008c4..bd98242d64 100644
+--- a/src/language/constants/glossary.constants.ts
++++ b/src/language/constants/glossary.constants.ts
+@@ -78,3 +78,22 @@ export const TIER_HYSTERESIS = 0.15;
+  * (see `unconsumedAnnotationsQuery`).
+  */
+ export const GLOSSARY_CONSOLIDATION_ANNOTATION_LIMIT = 200;
++
++/**
++ * How far back the consolidation read reaches.
++ *
++ * A glossary rule goes into the agent's every-turn prompt, so the evidence
++ * behind it has to describe the agent we ship NOW. An unbounded read does not:
++ * measured 2026-09-02, the unconsumed pool stretched back to 2026-04-06 and
++ * spanned two different agent LLMs per language, so 1,044 annotations would
++ * have written today's prompt from a retired model's mistakes.
++ *
++ * 90 days deliberately matches the scheduler's own worklist window
++ * (`queryCandidateLanguages`) — a language qualifies for consolidation on
++ * 90-day-recent annotations, so those are the annotations it should mine.
++ *
++ * Annotations older than this are never mined and stay permanently unconsumed;
++ * that is intended, not a leak. Rows with a NULL `occurredAt` (none exist in
++ * production) cannot satisfy a recency test and are excluded by the same token.
++ */
++export const GLOSSARY_CONSOLIDATION_RECENCY_DAYS = 90;
+diff --git a/src/language/service/language-glossary.service.ts b/src/language/service/language-glossary.service.ts
+index 2c2b568dd8..f1eb5d8c17 100644
+--- a/src/language/service/language-glossary.service.ts
++++ b/src/language/service/language-glossary.service.ts
+@@ -17,6 +17,7 @@ import {
+   GLOSSARY_CONSOLIDATION_ANNOTATION_LIMIT,
+   GLOSSARY_CONSOLIDATION_DIMENSIONS,
+   GLOSSARY_CONSOLIDATION_PROMPT_CODE,
++  GLOSSARY_CONSOLIDATION_RECENCY_DAYS,
+   GLOSSARY_GENERATION_PROMPT_CODE,
+   GLOSSARY_LEXICAL_CONTRADICTION_MIN,
+   GLOSSARY_MIN_CLUSTER_SUPPORT,
+@@ -1158,6 +1159,10 @@ export class LanguageGlossaryService {
+    * 13 of its 2,409 unconsumed annotations (1,675 of the hidden ones
+    * non-fluency, i.e. immediately usable) and scheduled consolidation had
+    * produced nothing for 8 days across every language.
++   *
++   * Bounded to GLOSSARY_CONSOLIDATION_RECENCY_DAYS: a rule reaches the agent's
++   * every-turn prompt, so it must generalize the agent we ship now, not one
++   * retired two models ago. See that constant for the measurement.
+    */
+   private unconsumedAnnotationsQuery(
+     languageValue: string,
+@@ -1170,6 +1175,9 @@ export class LanguageGlossaryService {
+         dimensions: [...GLOSSARY_CONSOLIDATION_DIMENSIONS],
+       })
+       .andWhere('a.conditionedOut = false')
++      .andWhere('a.occurredAt > now() - make_interval(days => :recencyDays)', {
++        recencyDays: GLOSSARY_CONSOLIDATION_RECENCY_DAYS,
++      })
+       .andWhere(excludeTestTenants('a."tenant_id"'));
+     // Skipped when empty: `<> ALL('{}')` is true for every row, but an empty
+     // array parameter gives Postgres no element type to infer.
+diff --git a/src/language/service/test/language-glossary.service.spec.ts b/src/language/service/test/language-glossary.service.spec.ts
+index fae34e6273..26bcbc487f 100644
+--- a/src/language/service/test/language-glossary.service.spec.ts
++++ b/src/language/service/test/language-glossary.service.spec.ts
+@@ -515,6 +515,24 @@ describe('LanguageGlossaryService', () => {
+       ).toBe(true);
+     });
+ 
++    it('bounds the annotation read to the recency window', async () => {
++      // A rule lands in the every-turn prompt, so it must generalize the agent
++      // we ship now. Without this the read reached back to April across two
++      // retired agent models.
++      setAnnotationPool([annotation('a1')]);
++      getCompletion.mockResolvedValue(JSON.stringify(consolidationOutput));
++
++      await service.consolidateGlossary(6);
++
++      const recency = annotationQb.andWhere.mock.calls.find(
++        (c: any[]) =>
++          typeof c[0] === 'string' && c[0].includes('make_interval'),
++      );
++      expect(recency).toBeDefined();
++      expect(recency[0]).toContain('a.occurredAt > now()');
++      expect(recency[1].recencyDays).toBe(90);
++    });
++
+     it('skips proposals duplicating existing content lines or proposals', async () => {
+       setAnnotationPool([annotation('a1')]);
+       glossaryRepository.findSection.mockResolvedValue(

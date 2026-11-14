@@ -1,0 +1,57 @@
+diff --git a/src/language/service/language-glossary.service.ts b/src/language/service/language-glossary.service.ts
+index 74750f471e..f96c2c9373 100644
+--- a/src/language/service/language-glossary.service.ts
++++ b/src/language/service/language-glossary.service.ts
+@@ -819,7 +819,7 @@ export class LanguageGlossaryService {
+           if (profileId) overlayEntries++;
+         }
+ 
+-        if (newEntryIds.length === 0 && existing) continue;
++        if (newEntryIds.length === 0) continue;
+ 
+         let acceptedHere = 0;
+         if (options.autoAccept && newEntryIds.length > 0) {
+diff --git a/src/language/service/test/language-glossary.service.spec.ts b/src/language/service/test/language-glossary.service.spec.ts
+index 2d953cfc50..5ae94443f0 100644
+--- a/src/language/service/test/language-glossary.service.spec.ts
++++ b/src/language/service/test/language-glossary.service.spec.ts
+@@ -704,6 +704,39 @@ describe('LanguageGlossaryService', () => {
+       );
+     });
+ 
++    it('does not persist a phantom overlay section when its only proposal dedupes against the just-copied global content', async () => {
++      // No overlay copy exists yet for p1, but the global section it would be
++      // seeded from already contains the one proposal routed to it.
++      glossaryRepository.findSection.mockImplementation(
++        (_languageId: number, sectionCode: string, profileId?: string) => {
++          if (profileId) return Promise.resolve(null);
++          return Promise.resolve(
++            makeSection({ sectionCode, content: '- overlay rule' }),
++          );
++        },
++      );
++      getCompletion.mockResolvedValue(
++        JSON.stringify([
++          {
++            sectionCode: 'clinical_terms',
++            title: 'Clinical terms',
++            injectionMode: 'retrieved',
++            proposals: [
++              // Supported only by tenant-2 (attached to p1) → overlay.
++              { markdown: '- overlay rule', sourceAnnotationIndexes: [2] },
++            ],
++          },
++        ]),
++      );
++
++      const result = await service.consolidateGlossary(6);
++
++      expect(result.proposed).toBe(0);
++      expect(result.skippedDuplicates).toBe(1);
++      expect(result.sections).toEqual([]);
++      expect(glossaryRepository.save).not.toHaveBeenCalled();
++    });
++
+     it('auto-accept publishes entries into content and records them accepted', async () => {
+       const result = await service.consolidateGlossary(6, 'rsi', {
+         autoAccept: true,

@@ -1,0 +1,75 @@
+diff --git a/src/learn/dto/create-scenario.dto.ts b/src/learn/dto/create-scenario.dto.ts
+index 3c8bcc7d9e..da5dbd2dc3 100644
+--- a/src/learn/dto/create-scenario.dto.ts
++++ b/src/learn/dto/create-scenario.dto.ts
+@@ -169,10 +169,11 @@ export class CreateScenarioDto {
+   @ApiProperty({
+     description: 'Profession of the AI client persona',
+     example: 'Student',
++    required: true,
+   })
+   @IsString()
+-  @IsOptional()
+-  profession?: string;
++  @IsNotEmpty()
++  profession!: string;
+ 
+   @ApiProperty({
+     description: 'Personality of the AI client persona',
+diff --git a/src/learn/dto/update-scenario.dto.ts b/src/learn/dto/update-scenario.dto.ts
+index 925c3bd00f..fa6d6ea09a 100644
+--- a/src/learn/dto/update-scenario.dto.ts
++++ b/src/learn/dto/update-scenario.dto.ts
+@@ -169,9 +169,11 @@ export class UpdateScenarioDto {
+   @ApiProperty({
+     description: 'Profession of the AI client persona',
+     example: 'Student',
++    required: true,
+   })
+   @IsString()
+   @IsOptional()
++  @IsNotEmpty()
+   profession?: string;
+ 
+   @ApiProperty({
+diff --git a/src/learn/service/test/scenario.service.spec.ts b/src/learn/service/test/scenario.service.spec.ts
+index 991f9d1d59..6dc95f7310 100644
+--- a/src/learn/service/test/scenario.service.spec.ts
++++ b/src/learn/service/test/scenario.service.spec.ts
+@@ -2217,6 +2217,7 @@ describe('ScenarioService', () => {
+         gender: 'Male' as any,
+         currentLocation: 'NY',
+         openingStatements: ['Hi'],
++        profession: 'Doctor',
+         optGuardrails: true,
+         currentState: true,
+       };
+@@ -2243,6 +2244,7 @@ describe('ScenarioService', () => {
+         age: 30,
+         gender: 'Male' as any,
+         currentLocation: 'NY',
++        profession: 'Doctor',
+         openingStatements: ['Hi'],
+       };
+       scenarioSharedService.getScenarioVoice.mockRejectedValue(
+diff --git a/src/scenario-character/dto/scenario-character.dto.ts b/src/scenario-character/dto/scenario-character.dto.ts
+index 5996db977c..b663ccccf1 100644
+--- a/src/scenario-character/dto/scenario-character.dto.ts
++++ b/src/scenario-character/dto/scenario-character.dto.ts
+@@ -44,13 +44,13 @@ export class ScenarioCharacterRequestDto {
+ 
+   @ApiProperty({
+     description: 'Scenario character profession',
+-    required: false,
++    required: true,
+   })
+-  @IsOptional()
++  @IsNotEmpty()
+   @Transform(TrimStringTransform)
+   @IsString()
+   @MaxLength(200)
+-  profession?: string;
++  profession!: string;
+ 
+   @ApiProperty({ description: 'Scenario character current location' })
+   @Transform(TrimStringTransform)

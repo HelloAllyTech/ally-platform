@@ -1,0 +1,175 @@
+diff --git a/src/learn/controller/learn.controller.ts b/src/learn/controller/learn.controller.ts
+index 9b29fe18e5..749d92b240 100644
+--- a/src/learn/controller/learn.controller.ts
++++ b/src/learn/controller/learn.controller.ts
+@@ -327,6 +327,7 @@ export class LearnController {
+         // record. The @Public() sibling below deliberately does not.
+         includeCompletion: true,
+         includeTextChatAvailability: true,
++        includeAvailableLanguages: true,
+       },
+       languageCode,
+     );
+diff --git a/src/learn/controller/test/learn.controller.spec.ts b/src/learn/controller/test/learn.controller.spec.ts
+index 937630b0aa..2ba47f1b17 100644
+--- a/src/learn/controller/test/learn.controller.spec.ts
++++ b/src/learn/controller/test/learn.controller.spec.ts
+@@ -497,6 +497,7 @@ describe('LearnController', () => {
+           // Authenticated detail attaches the learner's own completion record.
+           includeCompletion: true,
+           includeTextChatAvailability: true,
++          includeAvailableLanguages: true,
+         },
+         'mr',
+       );
+diff --git a/src/learn/interface/session.interface.ts b/src/learn/interface/session.interface.ts
+index 81cc189f82..064e179fa3 100644
+--- a/src/learn/interface/session.interface.ts
++++ b/src/learn/interface/session.interface.ts
+@@ -1,3 +1,4 @@
++import { AvailableLanguageItem } from 'src/common/util/language-availability.util';
+ import { Scenarios } from '../entity/scenarios.entity';
+ import { TriggerWarnings } from '../entity/trigger-warnings.entity';
+ import { ScenarioCompletionSummary } from './scenario-completion.interface';
+@@ -17,4 +18,10 @@ export interface GetScenarioResponse extends Scenarios {
+    * session start re-checks both.
+    */
+   textChatAvailable?: boolean;
++  /**
++   * The languages this scenario has a voice for, in the same shape the
++   * catalog list returns. Set only when GetScenarioByIdOptions.
++   * includeAvailableLanguages is; null when no language is voiced.
++   */
++  availableLanguages?: AvailableLanguageItem[] | null;
+ }
+diff --git a/src/learn/service/scenario.service.ts b/src/learn/service/scenario.service.ts
+index d57d709c40..419719a9a9 100644
+--- a/src/learn/service/scenario.service.ts
++++ b/src/learn/service/scenario.service.ts
+@@ -188,6 +188,7 @@ import {
+   LlmProviderName,
+ } from 'src/llm/constants/llm-model-registry.constants';
+ import {
++  AvailableLanguageItem,
+   buildAvailableLanguagesMap,
+   getDistinctScenarioLanguageIds,
+   getLanguageVoiceIds,
+@@ -524,9 +525,38 @@ export class ScenarioService {
+       scenario.textChatAvailable = await this.isTextChatAvailable(scenario.id);
+     }
+ 
++    if (options?.includeAvailableLanguages) {
++      scenario.availableLanguages = await this.getVoicedLanguages(scenario.id);
++    }
++
+     return scenario;
+   }
+ 
++  /**
++   * The languages a scenario has a voice for, built exactly as the catalog
++   * list builds them. Read separately for the same reason as
++   * isTextChatAvailable: the learner detail query never selects `metadata`,
++   * and this needs only its `languageVoices` key.
++   */
++  private async getVoicedLanguages(
++    scenarioId: number,
++  ): Promise<AvailableLanguageItem[] | null> {
++    const rows: { languageVoices: Record<string, unknown> | null }[] =
++      await this.scenariosRepository.query(
++        `SELECT "metadata"->'languageVoices' AS "languageVoices"
++         FROM "scenarios" WHERE "id" = $1 LIMIT 1`,
++        [scenarioId],
++      );
++    const languageIds = getLanguageVoiceIds(rows?.[0]?.languageVoices);
++    if (!languageIds.length) return null;
++    const languagesMap = buildAvailableLanguagesMap(
++      await this.sharedLanguageService.getLanguagesByIds(languageIds),
++    );
++    return languageIds
++      .map((languageId) => languagesMap.get(languageId))
++      .filter((language): language is AvailableLanguageItem => !!language);
++  }
++
+   /**
+    * Text chat is offered to a learner only when their org has it switched on
+    * AND the scenario's author offered it. Read separately from the learner
+diff --git a/src/learn/service/test/scenario.service.spec.ts b/src/learn/service/test/scenario.service.spec.ts
+index 99926b5943..905dc9983c 100644
+--- a/src/learn/service/test/scenario.service.spec.ts
++++ b/src/learn/service/test/scenario.service.spec.ts
+@@ -1828,6 +1828,58 @@ describe('ScenarioService', () => {
+       await expect(service.getScenario(999)).rejects.toThrow(NotFoundException);
+     });
+ 
++    describe('availableLanguages', () => {
++      beforeEach(() => {
++        scenariosRepository.getScenarioById.mockResolvedValue({
++          ...mockScenario,
++        } as any);
++        (scenariosRepository as any).query = jest.fn();
++      });
++
++      it('is not attached unless the caller asks for it', async () => {
++        const result = await service.getScenario(1);
++
++        expect(result.availableLanguages).toBeUndefined();
++        expect((scenariosRepository as any).query).not.toHaveBeenCalled();
++      });
++
++      // A course player holds only the detail. Without this a Kannada-only
++      // roleplay offered no language and its start fell back to English.
++      it('lists the voiced languages even when English has no voice', async () => {
++        (scenariosRepository as any).query.mockResolvedValue([
++          { languageVoices: { '8': 'kn-voice', '2': 'hi-voice', '5': null } },
++        ]);
++        sharedLanguageService.getLanguagesByIds.mockResolvedValue([
++          { id: 2, label: 'Hindi', value: 'hi' },
++          { id: 8, label: 'Kannada', value: 'kn' },
++        ] as any);
++
++        const result = await service.getScenario(1, {
++          includeAvailableLanguages: true,
++        });
++
++        expect(sharedLanguageService.getLanguagesByIds).toHaveBeenCalledWith([
++          2, 8,
++        ]);
++        expect(result.availableLanguages).toEqual([
++          { language_id: 2, label: 'Hindi', value: 'hi' },
++          { language_id: 8, label: 'Kannada', value: 'kn' },
++        ]);
++      });
++
++      it('is null when no language is voiced', async () => {
++        (scenariosRepository as any).query.mockResolvedValue([
++          { languageVoices: null },
++        ]);
++
++        const result = await service.getScenario(1, {
++          includeAvailableLanguages: true,
++        });
++
++        expect(result.availableLanguages).toBeNull();
++      });
++    });
++
+     describe('textChatAvailable', () => {
+       beforeEach(() => {
+         scenariosRepository.getScenarioById.mockResolvedValue({
+diff --git a/src/learn/type/scenario-filter.type.ts b/src/learn/type/scenario-filter.type.ts
+index c9f099bd65..a70ee0331f 100644
+--- a/src/learn/type/scenario-filter.type.ts
++++ b/src/learn/type/scenario-filter.type.ts
+@@ -44,4 +44,12 @@ export type GetScenarioByIdOptions = {
+    * caller's tenant.
+    */
+   includeTextChatAvailability?: boolean;
++  /**
++   * Attach `availableLanguages` — the languages this scenario has a voice for.
++   * The learner detail query never selects `metadata`, so without this a
++   * client holding only the detail (a course player) has no languages to
++   * offer and its start falls back to English, which a scenario voiced only
++   * in Hindi or Kannada rejects with "Voice not found".
++   */
++  includeAvailableLanguages?: boolean;
+ };

@@ -1,0 +1,110 @@
+diff --git a/src/analytics/constants/admin-analytics-chart-registry.constants.ts b/src/analytics/constants/admin-analytics-chart-registry.constants.ts
+index 3ceedab430..3266439b22 100644
+--- a/src/analytics/constants/admin-analytics-chart-registry.constants.ts
++++ b/src/analytics/constants/admin-analytics-chart-registry.constants.ts
+@@ -1823,7 +1823,7 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
+       kind: 'chart',
+       chartType: 'LineChart',
+       componentFile: f('Analytics/BugAgentPerformance.tsx'),
+-      note: 'Distinct top-level findings filed per UTC day across every repo and source, with a trailing 7-day mean; the one daily series on the tab, there to show the count falling. /v1/analytics/bug-agent-performance found[]',
++      note: 'Distinct top-level findings filed per UTC day across every repo and source, excluding any since dismissed or rejected, with a trailing 7-day mean; the one daily series on the tab, there to show the count falling. /v1/analytics/bug-agent-performance found[]',
+     },
+   ];
+ 
+diff --git a/src/analytics/dto/bug-agent-performance-analytics.dto.ts b/src/analytics/dto/bug-agent-performance-analytics.dto.ts
+index 85f7f0765c..209f5c2bc0 100644
+--- a/src/analytics/dto/bug-agent-performance-analytics.dto.ts
++++ b/src/analytics/dto/bug-agent-performance-analytics.dto.ts
+@@ -121,7 +121,7 @@ export class FoundDayDto {
+ 
+   @ApiProperty({
+     description:
+-      'Distinct top-level findings filed that day, every source and repo together. A quiet day is a real 0.',
++      'Distinct top-level findings filed that day, every source and repo together, excluding any since dismissed or rejected. A quiet day is a real 0.',
+   })
+   filed!: number;
+ 
+diff --git a/src/bug-hunter/repository/bug-finding.repository.ts b/src/bug-hunter/repository/bug-finding.repository.ts
+index 1fbb398ba2..fb37532917 100644
+--- a/src/bug-hunter/repository/bug-finding.repository.ts
++++ b/src/bug-hunter/repository/bug-finding.repository.ts
+@@ -918,9 +918,14 @@ export class BugFindingRepository extends Repository<BugFinding> {
+ 
+   /**
+    * Distinct top-level findings filed per UTC calendar day, every source and
+-   * every repo together — the raw material for the Bug Agent tab's
+-   * "bugs found per day" trend, whose whole purpose is to show the count
+-   * going DOWN as the codebases get cleaner. Day-bucketed (not week like its
++   * every repo together, minus the ones that turned out not to be bugs — the
++   * raw material for the Bug Agent tab's "bugs found per day" trend, whose
++   * whole purpose is to show the count going DOWN as the codebases get
++   * cleaner. A finding later dismissed (verifier refuted it) or rejected (a
++   * human did) is excluded by its CURRENT status, so a day's count can fall
++   * after the fact as its findings are ruled on; that is the right reading
++   * for "real bugs found", and the operations panel's stacked chart is the
++   * one that shows the declined share. Day-bucketed (not week like its
+    * siblings) because the sweeps are nightly, so a day is the natural grain
+    * and a week would hide a change for seven days. Only days with at least
+    * one finding come back; the service gap-fills zeros, since a quiet night
+@@ -939,10 +944,11 @@ export class BugFindingRepository extends Repository<BugFinding> {
+       WHERE f.parent_finding_id IS NULL
+         AND f."createdAt" >= $1
+         AND f."createdAt" < $2
++        AND f.status <> ALL($3::text[])
+       GROUP BY 1
+       ORDER BY 1
+       `,
+-      [start, end],
++      [start, end, FINDING_DECLINED_STATUSES],
+     );
+     return rows.map((row) => ({ day: row.day, filed: Number(row.filed) }));
+   }
+diff --git a/src/bug-hunter/repository/test/bug-finding.repository.daily-filed-totals.spec.ts b/src/bug-hunter/repository/test/bug-finding.repository.daily-filed-totals.spec.ts
+index 9c072dc68d..ef10e57f2d 100644
+--- a/src/bug-hunter/repository/test/bug-finding.repository.daily-filed-totals.spec.ts
++++ b/src/bug-hunter/repository/test/bug-finding.repository.daily-filed-totals.spec.ts
+@@ -1,12 +1,16 @@
+ import { DataSource } from 'typeorm';
+ 
+-import { BugFindingRepository } from '../bug-finding.repository';
++import {
++  BugFindingRepository,
++  FINDING_DECLINED_STATUSES,
++} from '../bug-finding.repository';
+ 
+ /**
+  * `dailyFiledTotals` feeds the Bug Agent tab's "bugs found per day" trend.
+  * What matters is pinned here: the window is applied in SQL as a half-open
+  * range, child findings (re-discoveries) are excluded so nothing counts
+- * twice, and the count comes back as a number.
++ * twice, findings since dismissed or rejected are left out because they were
++ * not bugs, and the count comes back as a number.
+  */
+ describe('BugFindingRepository.dailyFiledTotals', () => {
+   const build = () => {
+@@ -26,13 +30,24 @@ describe('BugFindingRepository.dailyFiledTotals', () => {
+     await repo.dailyFiledTotals(start, end);
+ 
+     const [sql, params] = query.mock.calls[0];
+-    expect(params).toEqual([start, end]);
++    expect(params).toEqual([start, end, FINDING_DECLINED_STATUSES]);
+     expect(sql).toContain(`date_trunc('day', f."createdAt")`);
+     expect(sql).toContain('f.parent_finding_id IS NULL');
+     expect(sql).toContain('f."createdAt" >= $1');
+     expect(sql).toContain('f."createdAt" < $2');
+   });
+ 
++  it('leaves out findings that were dismissed or rejected, by their current status', async () => {
++    const { repo, query } = build();
++    query.mockResolvedValue([]);
++
++    await repo.dailyFiledTotals(new Date(), new Date());
++
++    const [sql, params] = query.mock.calls[0];
++    expect(sql).toContain('f.status <> ALL($3::text[])');
++    expect(params[2]).toEqual(['dismissed', 'rejected']);
++  });
++
+   it('reads the count back as a number', async () => {
+     const { repo, query } = build();
+     const day = new Date('2026-01-06T00:00:00.000Z');

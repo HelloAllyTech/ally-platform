@@ -1,0 +1,238 @@
+diff --git a/src/learn/interface/session.interface.ts b/src/learn/interface/session.interface.ts
+index b5956e0b62..e2e0983b69 100644
+--- a/src/learn/interface/session.interface.ts
++++ b/src/learn/interface/session.interface.ts
+@@ -9,8 +9,4 @@ export interface GetScenarioResponse extends Scenarios {
+    * includeCompletion); absent on the @Public() endpoint.
+    */
+   completion?: ScenarioCompletionSummary | null;
+-  /**
+-   * The number of simulation states (units/components) defined for this scenario.
+-   */
+-  simulationCount?: number;
+ }
+diff --git a/src/learn/service/scenario.service.ts b/src/learn/service/scenario.service.ts
+index f39e115799..7fe10a732f 100644
+--- a/src/learn/service/scenario.service.ts
++++ b/src/learn/service/scenario.service.ts
+@@ -503,10 +503,6 @@ export class ScenarioService {
+       scenario.completion = completions.get(scenario.id) ?? null;
+     }
+ 
+-    scenario.simulationCount = Array.isArray(scenario.metadata?.states)
+-      ? scenario.metadata.states.length
+-      : 0;
+-
+     return scenario;
+   }
+ 
+diff --git a/src/learn/service/test/scenario.service.spec.ts b/src/learn/service/test/scenario.service.spec.ts
+index a79731645e..f7104129fd 100644
+--- a/src/learn/service/test/scenario.service.spec.ts
++++ b/src/learn/service/test/scenario.service.spec.ts
+@@ -1787,116 +1787,6 @@ describe('ScenarioService', () => {
+   });
+ 
+   describe('getScenario', () => {
+-    it('should return scenario with correct simulationCount when states are present', async () => {
+-      const mockScenarioWithStates = {
+-        ...mockScenario,
+-        metadata: {
+-          ...mockScenario.metadata,
+-          states: [
+-            {
+-              id: '1',
+-              name: 'State 1',
+-              guidelines: 'guidelines 1',
+-              scoreLower: 0,
+-              scoreUpper: 100,
+-              ragEnabled: true,
+-            },
+-            {
+-              id: '2',
+-              name: 'State 2',
+-              guidelines: 'guidelines 2',
+-              scoreLower: 100,
+-              scoreUpper: 200,
+-              ragEnabled: true,
+-            },
+-            {
+-              id: '3',
+-              name: 'State 3',
+-              guidelines: 'guidelines 3',
+-              scoreLower: 200,
+-              scoreUpper: 300,
+-              ragEnabled: true,
+-            },
+-          ],
+-        },
+-      };
+-      scenariosRepository.getScenarioById.mockResolvedValue(
+-        mockScenarioWithStates,
+-      );
+-
+-      const result = await service.getScenario(1);
+-
+-      expect(result).toEqual(
+-        expect.objectContaining({
+-          ...mockScenarioWithStates,
+-          simulationCount: 3,
+-        }),
+-      );
+-    });
+-
+-    it('should return scenario with simulationCount of 0 when no states are present', async () => {
+-      const mockScenarioWithoutStates = {
+-        ...mockScenario,
+-        metadata: {
+-          ...mockScenario.metadata,
+-          states: [],
+-        },
+-      };
+-      scenariosRepository.getScenarioById.mockResolvedValue(
+-        mockScenarioWithoutStates,
+-      );
+-
+-      const result = await service.getScenario(1);
+-
+-      expect(result).toEqual(
+-        expect.objectContaining({
+-          ...mockScenarioWithoutStates,
+-          simulationCount: 0,
+-        }),
+-      );
+-    });
+-
+-    it('should return scenario with simulationCount of 0 when metadata is null', async () => {
+-      const mockScenarioWithNullMetadata = {
+-        ...mockScenario,
+-        metadata: undefined,
+-      };
+-      scenariosRepository.getScenarioById.mockResolvedValue(
+-        mockScenarioWithNullMetadata,
+-      );
+-
+-      const result = await service.getScenario(1);
+-
+-      expect(result).toEqual(
+-        expect.objectContaining({
+-          ...mockScenarioWithNullMetadata,
+-          simulationCount: 0,
+-        }),
+-      );
+-    });
+-
+-    it('should return scenario with simulationCount of 0 when metadata.states is undefined', async () => {
+-      const mockScenarioWithUndefinedStates = {
+-        ...mockScenario,
+-        metadata: {
+-          ...mockScenario.metadata,
+-          states: undefined,
+-        },
+-      };
+-      scenariosRepository.getScenarioById.mockResolvedValue(
+-        mockScenarioWithUndefinedStates,
+-      );
+-
+-      const result = await service.getScenario(1);
+-
+-      expect(result).toEqual(
+-        expect.objectContaining({
+-          ...mockScenarioWithUndefinedStates,
+-          simulationCount: 0,
+-        }),
+-      );
+-    });
+-
+     it('should return scenario when found', async () => {
+       scenariosRepository.getScenarioById.mockResolvedValue(mockScenario);
+ 
+diff --git a/src/track/repository/track.repository.ts b/src/track/repository/track.repository.ts
+index c3a6f8e1cb..f4a3b66d94 100644
+--- a/src/track/repository/track.repository.ts
++++ b/src/track/repository/track.repository.ts
+@@ -8,14 +8,22 @@ import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
+ import { Track } from '../entity/track.entity';
+ import {
+   TrackFilterOptions,
++  TrackItemType,
+   TrackSortBy,
+   TrackStatus,
+ } from '../type/track.type';
+ import { TrackEnrollment } from '../entity/track-enrollment.entity';
++import { TrackItem } from '../entity/track-item.entity';
+ import { AssignmentStatus } from 'src/common/type/common.type';
+ 
+ export interface TrackWithEnrollment extends Track {
+   enrollment?: TrackEnrollment;
++  /**
++   * ROLEPLAY items only, computed live — distinct from `totalItems`, which
++   * counts every section item (quizzes, videos, annotations included). This
++   * is what a course card's "N simulations" label should read.
++   */
++  simulationsCount: number;
+ }
+ 
+ @Injectable()
+@@ -94,6 +102,14 @@ export class TrackRepository extends Repository<Track> {
+         'enrollment',
+         '"enrollment"."trackId" = track.id AND enrollment.userId = :userId AND "enrollment"."deletedAt" IS NULL',
+       )
++      .addSelect((subQuery) => {
++        return subQuery
++          .select('COUNT(*)')
++          .from(TrackItem, 'trackItem')
++          .where('"trackItem"."trackId" = track.id')
++          .andWhere(`"trackItem"."type" = '${TrackItemType.ROLEPLAY}'`)
++          .andWhere('"trackItem"."deletedAt" IS NULL');
++      }, 'simulationsCount')
+       .setParameters({ userId: options.userId })
+       .where('track.status = :status', { status: TrackStatus.ACTIVE });
+ 
+@@ -131,7 +147,19 @@ export class TrackRepository extends Repository<Track> {
+       query.offset(options.offset);
+     }
+ 
+-    const [data, count] = await query.getManyAndCount();
++    // `addSelect`'s scalar subquery isn't a mapped relation, so it doesn't
++    // come back on the hydrated entities from `getMany()` — pull it from the
++    // parallel raw rows instead. `getCount()` re-derives its own COUNT(1)
++    // query from the same builder, so this is still the usual two queries
++    // getManyAndCount() would have run, not an extra one.
++    const [{ entities, raw }, count] = await Promise.all([
++      query.getRawAndEntities<{ simulationsCount: string }>(),
++      query.getCount(),
++    ]);
++    const data = entities.map((track, index) => ({
++      ...track,
++      simulationsCount: parseInt(raw[index]?.simulationsCount ?? '0', 10),
++    }));
+     return { data: data as TrackWithEnrollment[], count };
+   }
+ 
+diff --git a/src/track/service/track-enrollment.service.ts b/src/track/service/track-enrollment.service.ts
+index b24ae31331..425f9a40d6 100644
+--- a/src/track/service/track-enrollment.service.ts
++++ b/src/track/service/track-enrollment.service.ts
+@@ -119,6 +119,7 @@ export class TrackEnrollmentService {
+           languageCode: translation ? preferred : null,
+           coverImageUrl: track.coverImageUrl,
+           totalItems: track.totalItems,
++          simulationsCount: track.simulationsCount,
+           estimatedDurationMinutes: track.estimatedDurationMinutes,
+           enrolled: !!track.enrollment,
+           completedItems: track.enrollment?.completedItems ?? 0,
+@@ -182,6 +183,13 @@ export class TrackEnrollmentService {
+       coverImageUrl: structure.coverImageUrl,
+       status: structure.status,
+       totalItems: structure.totalItems,
++      simulationsCount: structure.sections.reduce(
++        (sum, section) =>
++          sum +
++          section.items.filter((item) => item.type === TrackItemType.ROLEPLAY)
++            .length,
++        0,
++      ),
+       estimatedDurationMinutes: structure.estimatedDurationMinutes,
+       enrolled: !!enrollment,
+       trackEnrollmentId: enrollment?.id ?? null,

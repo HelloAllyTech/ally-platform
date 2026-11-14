@@ -1,0 +1,48 @@
+diff --git a/ally-be/src/auth/guards/jwt-auth.guard.ts b/ally-be/src/auth/guards/jwt-auth.guard.ts
+index 9d5be00f8..ff7125d3a 100644
+--- a/ally-be/src/auth/guards/jwt-auth.guard.ts
++++ b/ally-be/src/auth/guards/jwt-auth.guard.ts
+@@ -1,4 +1,8 @@
+-import { ExecutionContext, Injectable } from '@nestjs/common';
++import {
++  ExecutionContext,
++  Injectable,
++  UnauthorizedException,
++} from '@nestjs/common';
+ import { Reflector } from '@nestjs/core';
+ import { AuthGuard } from '@nestjs/passport';
+ import { IS_PUBLIC_KEY } from '../decorators/auth.metadata';
+@@ -23,4 +27,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
+     }
+     return super.canActivate(context);
+   }
++
++  handleRequest(err: any, user: any, info: any) {
++    if (info?.name === 'JsonWebTokenError' || info?.message === 'jwt expired') {
++      throw new UnauthorizedException('Token expired');
++    }
++
++    if (err || !user) {
++      throw err || new UnauthorizedException();
++    }
++    return user;
++  }
+ }
+diff --git a/ally-be/src/auth/guards/test/jwt-auth-guard.spec.ts b/ally-be/src/auth/guards/test/jwt-auth-guard.spec.ts
+index d3b964516..b4cb5847f 100644
+--- a/ally-be/src/auth/guards/test/jwt-auth-guard.spec.ts
++++ b/ally-be/src/auth/guards/test/jwt-auth-guard.spec.ts
+@@ -111,4 +111,13 @@ describe('JwtAuthGuard', () => {
+     );
+     expect(mockCanActivate).toHaveBeenCalledWith(mockContext);
+   });
++
++  it('should throw UnauthorizedException with custom message for expired token', () => {
++    const error = new Error('jwt expired');
++    error.name = 'JsonWebTokenError';
++
++    expect(() => guard.handleRequest(null, null, error)).toThrow(
++      'Token expired',
++    );
++  });
+ });

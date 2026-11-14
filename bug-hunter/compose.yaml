@@ -1,0 +1,23 @@
+# Local Postgres for the bug hunter's own state: LangGraph checkpoints (chunk 05) and the
+# long-term store (chunk 07). Dev only; production uses a separate `bughunter` database on
+# ally-be's server (spec §15). Port 5433 keeps clear of ally-be's 5432 and Bug Hunter v1's 5477.
+# The named volume holds the checkpoints: never prune Docker volumes on this machine.
+services:
+  postgres:
+    image: pgvector/pgvector:pg14
+    container_name: bughunter-pg
+    environment:
+      POSTGRES_USER: bughunter
+      POSTGRES_PASSWORD: bughunter
+      POSTGRES_DB: bughunter
+    ports:
+      - "5433:5432"
+    volumes:
+      - bughunter-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bughunter -d bughunter"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  bughunter-pg-data:

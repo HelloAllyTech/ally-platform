@@ -1,0 +1,76 @@
+diff --git a/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx b/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx
+index 0d0e2b5eef..65d9b58de0 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx
+@@ -340,8 +340,28 @@ export const BuildView: React.FC<BuildViewProps> = ({
+    * above the phase rail because they are the only thing on this page a person
+    * can act on to change the outcome.
+    */
++  // A hold is a live thing — a run sitting on the ceiling, counting down —
++  // so it goes stale the moment the run ends, and a terminal session can still
++  // be holding a cached one from before it stopped.
+   const budgetHeld = Boolean(budget?.hold) && (isLive || isWaiting);
+-  const budgetOver = Boolean(budget?.exceeded) && (isLive || isWaiting);
++
++  /**
++   * Being over the ceiling is not a live thing, and this is shown on a stopped
++   * session on purpose.
++   *
++   * It used to need the session live or waiting, on the same reasoning as the
++   * hold above. For `exceeded` that is exactly backwards: the ceiling is *why*
++   * the session stopped, so hiding the control on a stopped session hides the
++   * only way to restart it. A session that went over budget with a question
++   * still unanswered showed no spend, no banner, no Raise button and no
++   * explanation — every route out was behind the thing doing the blocking, and
++   * `raiseBudget` on the server has no status guard precisely because it is
++   * meant to be reachable from there.
++   *
++   * Still hidden once a raise could not change anything: a completed or
++   * cancelled session's ceiling is history.
++   */
++  const budgetOver = Boolean(budget?.exceeded) && status !== "COMPLETED" && status !== "CANCELLED";
+ 
+   return (
+     <div className="flex min-h-0 flex-1 flex-col">
+diff --git a/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildView.budget.test.tsx b/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildView.budget.test.tsx
+index 644830ade6..a6bc5d5ea7 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildView.budget.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildView.budget.test.tsx
+@@ -122,12 +122,35 @@ describe("BuildView budget banner", () => {
+   it("drops a stale held banner once the run has ended on its own", () => {
+     // The budget query stops polling once the session goes terminal, so a
+     // FAILED/CANCELLED/expired-hold session can still be sitting on a cached
+-    // response whose `hold` is truthy from before it stopped. Nothing is
+-    // live to raise money for any more, so the banner must not render.
++    // response whose `hold` is truthy from before it stopped. A hold is a live
++    // thing — a run counting down on the ceiling — so that one is stale.
+     budget = held;
+     render(<BuildView sessionId="session-1" status="FAILED" currentStage="CODING" />);
+ 
+     expect(screen.queryByText("Paused — this build has spent its budget")).toBeNull();
++  });
++
++  /**
++   * The state this was actually found in.
++   *
++   * A session stopped over its ceiling with a question still unanswered: the
++   * raise is the only way to answer it, restart anything, or even see what was
++   * spent. Hiding the control here hid every route out of the session behind
++   * the thing that was blocking it. `exceeded` is a durable fact, not a live
++   * one, and `raiseBudget` has no status guard on the server for this reason.
++   */
++  it("still offers the raise on a session stopped over its ceiling", () => {
++    budget = { ...held, hold: null };
++    render(<BuildView sessionId="session-1" status="FAILED" currentStage="CODING" />);
++
++    expect(screen.getByRole("button", { name: "Raise budget" })).toBeInTheDocument();
++  });
++
++  /** A raise cannot unblock a session that has nothing left to do. */
++  it("stops offering it once the session is finished", () => {
++    budget = { ...held, hold: null };
++    render(<BuildView sessionId="session-1" status="COMPLETED" currentStage="CODING" />);
++
+     expect(screen.queryByRole("button", { name: "Raise budget" })).toBeNull();
+   });
+ });

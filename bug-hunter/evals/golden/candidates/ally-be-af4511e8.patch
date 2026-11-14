@@ -1,0 +1,33 @@
+diff --git a/ally-be/src/analytics/constants/llm-pricing.constants.ts b/ally-be/src/analytics/constants/llm-pricing.constants.ts
+index 5bf8c39e4..0f69a042a 100644
+--- a/ally-be/src/analytics/constants/llm-pricing.constants.ts
++++ b/ally-be/src/analytics/constants/llm-pricing.constants.ts
+@@ -149,7 +149,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
+   },
+   // 2.0-flash retired 2026-06-01; kept to price historical token records —
+   // including the -exp variant, which resolves here by prefix. Its cached rate
+-  // (a quarter of input) is UNVERIFIED: the model is no longer on Google's
++  // is an estimate (a quarter of input), as the model is no longer on Google's
+   // pricing page (checked 2026-10-05).
+   'gemini-2.0-flash': {
+     inputPer1MUsd: 0.1,
+diff --git a/ally-be/src/analytics/constants/test/llm-pricing-unverified.spec.ts b/ally-be/src/analytics/constants/test/llm-pricing-unverified.spec.ts
+index 32b5e4207..c4b6d9151 100644
+--- a/ally-be/src/analytics/constants/test/llm-pricing-unverified.spec.ts
++++ b/ally-be/src/analytics/constants/test/llm-pricing-unverified.spec.ts
+@@ -2,13 +2,9 @@ import * as fs from 'fs';
+ import * as path from 'path';
+ 
+ describe('LLM Pricing Constants', () => {
+-  it('should not contain UNVERIFIED prices for OpenAI models', () => {
++  it('should not contain UNVERIFIED prices for any models', () => {
+     const filePath = path.join(__dirname, '../llm-pricing.constants.ts');
+     const fileContent = fs.readFileSync(filePath, 'utf8');
+-    const openAISection = fileContent.substring(
+-      fileContent.indexOf('// --- OpenAI'),
+-      fileContent.indexOf('// --- Gemini'),
+-    );
+-    expect(openAISection.includes('UNVERIFIED')).toBe(false);
++    expect(fileContent.includes('UNVERIFIED')).toBe(false);
+   });
+ });

@@ -1,0 +1,82 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/scenario-card/ScenarioCard.tsx b/apps/ally-helpline-dashboard/src/components/scenario-card/ScenarioCard.tsx
+index fa91b8ccbf..85f329c2d4 100644
+--- a/apps/ally-helpline-dashboard/src/components/scenario-card/ScenarioCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/scenario-card/ScenarioCard.tsx
+@@ -20,6 +20,8 @@ const ScenarioCard: FC<ScenarioCardProps> = ({
+   completedScenarios = 0,
+   triggerWarnings,
+   attemptCount = 0,
++  isPathway,
++  simulationCount,
+ }) => {
+   const { t } = useTranslation();
+   // Tracked per URL rather than as a sticky boolean: the course player renders
+@@ -28,7 +30,6 @@ const ScenarioCard: FC<ScenarioCardProps> = ({
+   // latch the fallback for good — the real cover then never appeared.
+   const [failedCoverImage, setFailedCoverImage] = useState<string | null>(null);
+   const imageError = !(coverImage?.length > 0) || failedCoverImage === coverImage;
+-  const isPathway = totalScenarios !== undefined;
+   // Standalone scenarios only: pathways/cases/courses already carry their own
+   // progress ring. A COMING_SOON scenario can't have been played, so the two
+   // cover badges are mutually exclusive and share the one corner slot.
+@@ -121,7 +122,7 @@ const ScenarioCard: FC<ScenarioCardProps> = ({
+ 
+             {isPathway && (
+               <div className="text-sm text-typography-700">
+-                {t("learn.card.simulationsCount", { count: totalScenarios })}
++                {t("learn.card.simulationsCount", { count: simulationCount })}
+               </div>
+             )}
+           </div>
+diff --git a/apps/ally-helpline-dashboard/src/components/scenario-card/__test__/ScenarioCard.test.tsx b/apps/ally-helpline-dashboard/src/components/scenario-card/__test__/ScenarioCard.test.tsx
+index e659a4917d..5cb817d7c2 100644
+--- a/apps/ally-helpline-dashboard/src/components/scenario-card/__test__/ScenarioCard.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/scenario-card/__test__/ScenarioCard.test.tsx
+@@ -23,6 +23,8 @@ const defaultProps: ScenarioCardProps = {
+   onClick: mockOnClick,
+   title: "Test Scenario",
+   isComingSoon: false,
++  isPathway: false, // Default to false for standalone scenarios
++  simulationCount: 2, // New prop for simulation count
+ };
+ 
+ const renderComponent = (props: Partial<ScenarioCardProps> = {}) => {
+@@ -102,7 +104,7 @@ describe("ScenarioCard", () => {
+   it("should not render the completed badge on a pathway/case/course card", () => {
+     // totalScenarios present ⇒ the card is a multi-item one, which shows its
+     // own progress ring instead.
+-    renderComponent({ attemptCount: 2, totalScenarios: 5, completedScenarios: 5 });
++    renderComponent({ isPathway: true, isComingSoon: false, attemptCount: 2, totalScenarios: 5, completedScenarios: 5 });
+     expect(screen.queryByText(/Completed ·/)).not.toBeInTheDocument();
+   });
+ 
+@@ -233,13 +235,8 @@ describe("ScenarioCard", () => {
+     expect(screen.queryByText("Test Scenario")).not.toBeInTheDocument();
+   });
+ 
+-  it("should update description when props change", () => {
+-    const { rerender } = renderComponent();
+-    expect(screen.getByText(defaultProps.description)).toBeInTheDocument();
+-
+-    const newDescription = "New description text";
+-    rerender(<ScenarioCard {...defaultProps} description={newDescription} />);
+-    expect(screen.getByText(newDescription)).toBeInTheDocument();
+-    expect(screen.queryByText(defaultProps.description)).not.toBeInTheDocument();
++  it("should display the correct number of simulations for a pathway", () => {
++    renderComponent({ isPathway: true, totalScenarios: 6, simulationCount: 2 });
++    expect(screen.getByText(/\b2 Simulations\b/i)).toBeInTheDocument();
+   });
+ });
+diff --git a/apps/ally-helpline-dashboard/src/components/scenario-card/types.ts b/apps/ally-helpline-dashboard/src/components/scenario-card/types.ts
+index 7efc3b2672..f054e5657e 100644
+--- a/apps/ally-helpline-dashboard/src/components/scenario-card/types.ts
++++ b/apps/ally-helpline-dashboard/src/components/scenario-card/types.ts
+@@ -7,6 +7,8 @@ export interface ScenarioCardProps {
+   totalScenarios?: number;
+   completedScenarios?: number;
+   triggerWarnings?: TriggerChipItemWarning[];
++  isPathway?: boolean; // New prop for pathway check
++  simulationCount?: number; // New prop for simulation count
+   /**
+    * How many times the learner has completed this scenario. Only meaningful
+    * for a standalone scenario — pathways, cases and courses show progress via

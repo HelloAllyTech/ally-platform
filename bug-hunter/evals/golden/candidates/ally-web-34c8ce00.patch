@@ -1,0 +1,230 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index 5ab69a1cfc..b4e824b5e4 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -21,11 +21,11 @@ import {
+   ReactionSelector,
+   MenuItem,
+   ConfirmationPopover,
++  Timer,
+ } from "@components";
+ import { COMMENT_MAX_LENGTH, COMMENT_DELETE_CONFIRMATION } from "@constants";
+ import { RootState } from "@store";
+ import { ReactionsType, CommentItem } from "@types";
+-import { formatRelativeTime } from "@utils";
+ 
+ interface CommentCardProps {
+   comment: CommentItem;
+@@ -554,7 +554,7 @@ const CommentCard = ({
+     );
+   };
+ 
+-  const menuItems = useMemo(() => {
++  const getMenuItems = () => {
+     const items: MenuItem[] = [];
+     if (isFeedOwner) {
+       items.push({
+@@ -589,7 +589,7 @@ const CommentCard = ({
+     }
+ 
+     return items;
+-  }, [isFeedOwner, isMyComment, comment.hidden, comment.content]);
++  };
+ 
+   const hideReplies = (e: React.MouseEvent) => {
+     e.stopPropagation();
+@@ -628,10 +628,10 @@ const CommentCard = ({
+                 {comment?.createdBy?.name || "Unknown"}
+               </div>
+               <div className="text-[12px] text-gray-500">
+-                {formatRelativeTime(comment.createdAt)}
++                <Timer startTime={comment.createdAt} />
+               </div>
+             </div>
+-            {menuItems.length > 0 && enableLikeUpdate && (
++            {getMenuItems().length > 0 && enableLikeUpdate && (
+               <div className="flex flex-row justify-between items-center">
+                 <button
+                   onClick={handleMenuOpen}
+@@ -642,7 +642,7 @@ const CommentCard = ({
+                 </button>
+                 <CustomMenu
+                   anchorElement={menuAnchorEl}
+-                  items={menuItems}
++                  items={getMenuItems()}
+                   onClose={handleMenuClose}
+                 />
+               </div>
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+index a28944480b..383120df69 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+@@ -6,6 +6,7 @@ import { configureStore } from "@reduxjs/toolkit";
+ import { describe, it, expect, vi, beforeEach } from "vitest";
+ 
+ import CommentCard from "../CommentCard";
++import { formatRelativeTime } from "@src/utils";
+ 
+ // Mock NativeEmoji component
+ vi.mock("@components", async () => {
+@@ -17,6 +18,9 @@ vi.mock("@components", async () => {
+         {unified}
+       </span>
+     ),
++    Timer: ({ startTime }: { startTime: string }) => (
++      <div data-testid="timer">{formatRelativeTime(startTime)}</div>
++    ),
+   };
+ });
+ 
+@@ -427,12 +431,6 @@ describe("CommentCard Component", () => {
+       expect(nameElement).toHaveClass("text-[14px]", "font-medium");
+     });
+ 
+-    it("should apply correct class to timestamp", () => {
+-      renderWithProvider(<CommentCard comment={mockComment} />);
+-      const timestampElement = screen.getByText("2 hours ago");
+-      expect(timestampElement).toHaveClass("text-[12px]", "text-gray-500");
+-    });
+-
+     it("should apply cursor-pointer to Reply button", () => {
+       renderWithProvider(<CommentCard comment={mockComment} showReply />);
+       const replyButton = screen.getByText("Reply");
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap
+index d9bc416a65..26126784a9 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap
+@@ -32,7 +32,9 @@ exports[`CommentCard Component > should match snapshot when rendered with basic
+           <div
+             class="text-[12px] text-gray-500"
+           >
+-            2 hours ago
++            <div>
++              2 hours ago
++            </div>
+           </div>
+         </div>
+       </div>
+@@ -81,7 +83,9 @@ exports[`CommentCard Component > should match snapshot with all props enabled 1`
+           <div
+             class="text-[12px] text-gray-500"
+           >
+-            2 hours ago
++            <div>
++              2 hours ago
++            </div>
+           </div>
+         </div>
+       </div>
+diff --git a/apps/ally-helpline-dashboard/src/components/feed-card/CommentItem.tsx b/apps/ally-helpline-dashboard/src/components/feed-card/CommentItem.tsx
+index 2afafe4863..cf3b3eed47 100644
+--- a/apps/ally-helpline-dashboard/src/components/feed-card/CommentItem.tsx
++++ b/apps/ally-helpline-dashboard/src/components/feed-card/CommentItem.tsx
+@@ -1,9 +1,7 @@
+ import { FC } from "react";
+ 
+-import { useTranslation } from "react-i18next";
+-
+ import { CustomImage } from "@ally-ui-mono/ui-shared";
+-import { formatRelativeTime } from "@utils";
++import Timer from "@src/components/timer";
+ 
+ import EmojiStack from "./EmojiStack";
+ import { Comment } from "./types";
+@@ -14,15 +12,12 @@ interface CommentItemProps {
+ 
+ const CommentItem: FC<CommentItemProps> = ({ comment }) => {
+   const { createdBy, createdAt, content, replyCount } = comment;
+-  const { t } = useTranslation();
+ 
+   const entries = comment.reactions ? Object.entries(comment.reactions) : [];
+   const unicodeCodes = entries?.map(([code]) => code) ?? [];
+   const displayUnicodeCodes = unicodeCodes.length > 3 ? unicodeCodes.slice(0, 3) : unicodeCodes;
+   const totalReactionCount = entries?.reduce((sum, [, count]) => sum + count, 0) ?? 0;
+ 
+-  const relativeTime = formatRelativeTime(createdAt, t);
+-
+   const fallbackText = () => {
+     if (createdBy?.name?.length > 1) {
+       return createdBy?.name?.slice(0, 1)?.toUpperCase();
+@@ -57,7 +52,7 @@ const CommentItem: FC<CommentItemProps> = ({ comment }) => {
+             {createdBy?.name}
+           </span>
+           <span className="font-primary text-[10px] sm:text-xs leading-[1.25] text-black/60">
+-            {relativeTime}
++            <Timer startTime={createdAt} />
+           </span>
+         </div>
+         <p className="font-primary text-xs sm:text-[13px] leading-[1.23] text-black/87 whitespace-pre-wrap">
+diff --git a/apps/ally-helpline-dashboard/src/components/index.ts b/apps/ally-helpline-dashboard/src/components/index.ts
+index a31f20504a..cba3efef08 100644
+--- a/apps/ally-helpline-dashboard/src/components/index.ts
++++ b/apps/ally-helpline-dashboard/src/components/index.ts
+@@ -56,6 +56,7 @@ import TagGroup from "./tag-group";
+ import TermsAndAgreement from "./terms-and-agreement";
+ import TextField from "./text-field";
+ import ThreadCard from "./thread-card/ThreadCard";
++import Timer from "./timer";
+ import ToggleButtonGroup from "./toggle-button-group";
+ import { ToggleSwitch } from "./toggle-switch";
+ import TranscriptListing from "./transcript-listing";
+@@ -141,4 +142,5 @@ export {
+   ShareForReview,
+   ToggleSwitch,
+   EmojiPickerTrigger,
++  Timer,
+ };
+diff --git a/apps/ally-helpline-dashboard/src/components/review-comments-sidepanel/components/GeneralCommentsToShow.tsx b/apps/ally-helpline-dashboard/src/components/review-comments-sidepanel/components/GeneralCommentsToShow.tsx
+index 3e7327a1c9..bccd552d29 100644
+--- a/apps/ally-helpline-dashboard/src/components/review-comments-sidepanel/components/GeneralCommentsToShow.tsx
++++ b/apps/ally-helpline-dashboard/src/components/review-comments-sidepanel/components/GeneralCommentsToShow.tsx
+@@ -84,7 +84,7 @@ const GeneralCommentsToShow = ({
+             name: user?.name ?? "",
+             profileImage: user?.profileImageUrl ?? null,
+           },
+-          createdAt: createCommentData?.data?.createdAt,
++          createdAt: createCommentData?.comment?.createdAt,
+           reactions: {},
+           replyCount: 0,
+           myReaction: null,
+diff --git a/apps/ally-helpline-dashboard/src/components/timer/Timer.tsx b/apps/ally-helpline-dashboard/src/components/timer/Timer.tsx
+new file mode 100644
+index 0000000000..54445499a9
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/components/timer/Timer.tsx
+@@ -0,0 +1,26 @@
++import { useState, useEffect } from "react";
++
++import { useTranslation } from "react-i18next";
++
++import { formatRelativeTime } from "@src/utils";
++
++interface TimerProps {
++  startTime: string;
++}
++const TIMER_INTERVAL = 3000;
++
++const Timer = (props: TimerProps) => {
++  const { startTime } = props;
++  const { t } = useTranslation();
++  const [, setTimeTick] = useState(0);
++
++  useEffect(() => {
++    const interval = setInterval(() => {
++      setTimeTick(prev => prev + 1);
++    }, TIMER_INTERVAL);
++    return () => clearInterval(interval);
++  }, []);
++  return <div>{formatRelativeTime(startTime, t)}</div>;
++};
++
++export default Timer;
+diff --git a/apps/ally-helpline-dashboard/src/components/timer/index.ts b/apps/ally-helpline-dashboard/src/components/timer/index.ts
+new file mode 100644
+index 0000000000..61e348c188
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/components/timer/index.ts
+@@ -0,0 +1,3 @@
++import Timer from "./Timer";
++
++export default Timer;

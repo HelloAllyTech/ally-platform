@@ -1,0 +1,40 @@
+diff --git a/src/scenario-character/service/scenario-character.service.ts b/src/scenario-character/service/scenario-character.service.ts
+index ea2b7ddf97..c93c37a744 100644
+--- a/src/scenario-character/service/scenario-character.service.ts
++++ b/src/scenario-character/service/scenario-character.service.ts
+@@ -212,6 +212,10 @@ export class ScenarioCharacterService {
+ 
+     await this.assertInScope(scenarioCharacter);
+ 
++    if (!scenarioCharacter.knowledgeSources) {
++      scenarioCharacter.knowledgeSources = [];
++    }
++
+     return scenarioCharacter;
+   }
+ 
+diff --git a/src/scenario-character/service/test/scenario-character.service.spec.ts b/src/scenario-character/service/test/scenario-character.service.spec.ts
+index fefacebd3b..16b2b24f22 100644
+--- a/src/scenario-character/service/test/scenario-character.service.spec.ts
++++ b/src/scenario-character/service/test/scenario-character.service.spec.ts
+@@ -363,6 +363,20 @@ describe('ScenarioCharacterService', () => {
+         service.getScenarioCharacterById('char-uuid-1'),
+       ).rejects.toThrow(ForbiddenException);
+     });
++
++    it('returns character with knowledgeSources as an empty array if it is null or undefined', async () => {
++      const characterWithUndefinedKnowledgeSources = {
++        ...mockCharacter,
++        knowledgeSources: undefined,
++      };
++      mockRepo.findOne.mockResolvedValue(
++        characterWithUndefinedKnowledgeSources as ScenarioCharacter,
++      );
++
++      const res = await service.getScenarioCharacterById('char-uuid-1');
++
++      expect(res.knowledgeSources).toEqual([]);
++    });
+   });
+ 
+   describe('updateScenarioCharacter', () => {

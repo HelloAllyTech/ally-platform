@@ -1,0 +1,76 @@
+diff --git a/src/health/controller/health.controller.ts b/src/health/controller/health.controller.ts
+index 5020c64786..a2e9f17d8a 100644
+--- a/src/health/controller/health.controller.ts
++++ b/src/health/controller/health.controller.ts
+@@ -56,7 +56,10 @@ export class HealthController {
+   @HealthCheck()
+   check() {
+     return this.health.check([
+-      () => this.db.pingCheck(this.configService.database.database as string),
++      () =>
++        this.db.pingCheck(this.configService.database.database as string, {
++          timeout: CHECK_TIMEOUT_MS,
++        }),
+       () => this.checkRedis(),
+       () =>
+         this.checkAiService(
+diff --git a/src/health/controller/test/health.controller.spec.ts b/src/health/controller/test/health.controller.spec.ts
+new file mode 100644
+index 0000000000..d946459a0b
+--- /dev/null
++++ b/src/health/controller/test/health.controller.spec.ts
+@@ -0,0 +1,54 @@
++import { Test, TestingModule } from '@nestjs/testing';
++import { HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
++import { HealthController } from '../health.controller';
++import { AppConfigService } from '../../../config/config.service';
++import { RedisService } from '../../../redis/service/redis.service';
++
++describe('HealthController', () => {
++  let controller: HealthController;
++  let db: jest.Mocked<TypeOrmHealthIndicator>;
++
++  beforeEach(async () => {
++    const module: TestingModule = await Test.createTestingModule({
++      controllers: [HealthController],
++      providers: [
++        {
++          provide: HealthCheckService,
++          useValue: {
++            check: jest.fn((checks: Array<() => Promise<unknown>>) =>
++              Promise.all(checks.map((check) => check())),
++            ),
++          },
++        },
++        {
++          provide: AppConfigService,
++          useValue: {
++            database: { database: 'ally_test' },
++            ai: { apiUrl: undefined, learnApiUrl: undefined },
++          },
++        },
++        {
++          provide: TypeOrmHealthIndicator,
++          useValue: {
++            pingCheck: jest
++              .fn()
++              .mockResolvedValue({ ally_test: { status: 'up' } }),
++          },
++        },
++        {
++          provide: RedisService,
++          useValue: { ping: jest.fn().mockResolvedValue(undefined) },
++        },
++      ],
++    }).compile();
++
++    controller = module.get<HealthController>(HealthController);
++    db = module.get(TypeOrmHealthIndicator);
++  });
++
++  it('pings the database with the same deadline documented and used for the other checks, not terminus default 1s', async () => {
++    await controller.check();
++
++    expect(db.pingCheck).toHaveBeenCalledWith('ally_test', { timeout: 2000 });
++  });
++});

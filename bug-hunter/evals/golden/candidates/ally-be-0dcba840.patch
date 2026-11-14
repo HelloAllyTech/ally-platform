@@ -1,0 +1,77 @@
+diff --git a/src/track/service/test/track-enrollment.breathing-exercise.spec.ts b/src/track/service/test/track-enrollment.breathing-exercise.spec.ts
+index 3c8a0275c1..d0fcaafceb 100644
+--- a/src/track/service/test/track-enrollment.breathing-exercise.spec.ts
++++ b/src/track/service/test/track-enrollment.breathing-exercise.spec.ts
+@@ -92,7 +92,7 @@ describe('TrackEnrollmentService — Breathing Exercise', () => {
+       status: SessionItemStatus.UNLOCKED,
+     });
+ 
+-    const result = await service.startItem(ITEM_ID);
++    const result: any = await service.startItem(ITEM_ID);
+ 
+     expect(trackProgressService.completeItem).toHaveBeenCalledWith(
+       PROGRESS_ID,
+@@ -101,4 +101,37 @@ describe('TrackEnrollmentService — Breathing Exercise', () => {
+     expect(result.completion).toMatchObject({ completed: true });
+     expect(result.gameKey).toBe(TrackGameKey.BREATHING_EXERCISE);
+   });
++
++  it('sends the breathing exercise configuration to the client', async () => {
++    stubPermittedItemProgress(breathingExerciseItem, {
++      id: PROGRESS_ID,
++      trackEnrollmentId: 'enr-1',
++      status: SessionItemStatus.UNLOCKED,
++    });
++
++    const result: any = await service.startItem(ITEM_ID);
++
++    expect(result.breathingExercise).toEqual(
++      breathingExerciseItem.content.breathingExercise,
++    );
++  });
++
++  it('does not add a breathingExercise key to other games', async () => {
++    stubPermittedItemProgress(
++      {
++        id: ITEM_ID,
++        type: TrackItemType.GAME,
++        content: { gameKey: TrackGameKey.SNAKE },
++      },
++      {
++        id: PROGRESS_ID,
++        trackEnrollmentId: 'enr-1',
++        status: SessionItemStatus.UNLOCKED,
++      },
++    );
++
++    const result: any = await service.startItem(ITEM_ID);
++
++    expect(result).not.toHaveProperty('breathingExercise');
++  });
+ });
+diff --git a/src/track/service/track-enrollment.service.ts b/src/track/service/track-enrollment.service.ts
+index 75773d49a8..3511ca272a 100644
+--- a/src/track/service/track-enrollment.service.ts
++++ b/src/track/service/track-enrollment.service.ts
+@@ -42,7 +42,7 @@ import { TrackProgressService } from './track-progress.service';
+ import { TrackLocalizationService } from './track-localization.service';
+ import { TrackTranslation } from '../entity/track-translation.entity';
+ import { TrackTranslationFallbackReason } from '../type/track-translation.type';
+-import { GameContent } from '../type/game.type';
++import { GameContent, TrackGameKey } from '../type/game.type';
+ import { BucketSortContent } from '../type/bucket-sort.type';
+ import { sanitizeBucketSortForLearner } from './track-bucket-sort.sanitizer';
+ import {
+@@ -711,6 +711,12 @@ export class TrackEnrollmentService {
+           bestScore: progress.meta?.bestGameScore ?? null,
+           playCount: progress.meta?.gamePlayCount ?? 0,
+           completion,
++          // The breathing exercise is native, not an HTML bundle, so the client
++          // has nothing to run unless the author's timings and wording come with
++          // the payload.
++          ...(game.gameKey === TrackGameKey.BREATHING_EXERCISE
++            ? { breathingExercise: game.breathingExercise }
++            : {}),
+         };
+       }
+ 

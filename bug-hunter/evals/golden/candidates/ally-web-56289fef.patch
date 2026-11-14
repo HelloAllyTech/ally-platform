@@ -1,0 +1,208 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
+index 2b45356d13..4702c5f473 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
+@@ -236,6 +236,7 @@ export const TrackPlayer: FC = () => {
+         currentItemId={itemId}
+         overallPct={nav.overallPct}
+         onExit={nav.exitToOverview}
++        onSegmentClick={nav.goToItem}
+       />
+ 
+       <div className="min-h-0 flex-1 overflow-hidden">
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/PlayerTopBar.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/PlayerTopBar.tsx
+index e6a6b84fde..e8275e59a8 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/PlayerTopBar.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/PlayerTopBar.tsx
+@@ -13,6 +13,7 @@ interface PlayerTopBarProps {
+   currentItemId: string;
+   overallPct: number;
+   onExit: () => void;
++  onSegmentClick: (itemId: string) => void;
+ }
+ 
+ /**
+@@ -25,6 +26,7 @@ export const PlayerTopBar: FC<PlayerTopBarProps> = ({
+   currentItemId,
+   overallPct,
+   onExit,
++  onSegmentClick,
+ }) => {
+   const { t } = useTranslation();
+ 
+@@ -45,7 +47,11 @@ export const PlayerTopBar: FC<PlayerTopBarProps> = ({
+           {t("tracks2.player.overallProgress", { pct: overallPct })}
+         </span>
+       </div>
+-      <SegmentedProgressRail sectionItems={sectionItems} currentItemId={currentItemId} />
++      <SegmentedProgressRail
++        sectionItems={sectionItems}
++        currentItemId={currentItemId}
++        onSegmentClick={onSegmentClick}
++      />
+     </header>
+   );
+ };
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/SegmentedProgressRail.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/SegmentedProgressRail.tsx
+index b2c6b0fb95..ceadf6849c 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/SegmentedProgressRail.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/SegmentedProgressRail.tsx
+@@ -1,5 +1,7 @@
+ import { FC } from "react";
+ 
++import { useTranslation } from "react-i18next";
++
+ import { TrackItemStatus } from "@types";
+ 
+ import { FlatTrackItem } from "../useTrackPlayerNavigation";
+@@ -9,29 +11,45 @@ interface SegmentedProgressRailProps {
+   sectionItems: FlatTrackItem[];
+   /** Id of the item currently open in the player. */
+   currentItemId: string;
++  /** Jumps the player to a completed item so it can be revisited. */
++  onSegmentClick: (itemId: string) => void;
+ }
+ 
+ /**
+  * A one-segment-per-item progress rail for the current section. Completed
+- * items fill; the active item is highlighted; the rest are muted.
++ * items fill and are clickable to revisit; the active item is highlighted;
++ * the rest are muted and inert — incomplete items can't be skipped to ahead
++ * of the player's own completion gating.
+  */
+ export const SegmentedProgressRail: FC<SegmentedProgressRailProps> = ({
+   sectionItems,
+   currentItemId,
++  onSegmentClick,
+ }) => {
++  const { t } = useTranslation();
++
+   return (
+-    <div className="flex w-full items-center gap-1" aria-hidden>
++    <div className="flex w-full items-center gap-1">
+       {sectionItems.map(({ item }) => {
+         const isCompleted = item.status === TrackItemStatus.COMPLETED;
+         const isCurrent = item.id === currentItemId;
+-        return (
+-          <span
+-            key={item.id}
+-            className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+-              isCompleted ? "bg-primary-500" : isCurrent ? "bg-primary-300" : "bg-neutral-200"
+-            }`}
+-          />
+-        );
++        const className = `h-1.5 flex-1 rounded-full transition-colors duration-300 ${
++          isCompleted ? "bg-primary-500" : isCurrent ? "bg-primary-300" : "bg-neutral-200"
++        }`;
++
++        if (isCompleted) {
++          return (
++            <button
++              key={item.id}
++              type="button"
++              onClick={() => onSegmentClick(item.id)}
++              aria-label={t("tracks2.player.reviewItem", { title: item.title })}
++              className={className}
++            />
++          );
++        }
++
++        return <span key={item.id} className={className} aria-hidden />;
+       })}
+     </div>
+   );
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/__tests__/SegmentedProgressRail.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/__tests__/SegmentedProgressRail.test.tsx
+new file mode 100644
+index 0000000000..b7219be022
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/__tests__/SegmentedProgressRail.test.tsx
+@@ -0,0 +1,89 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { describe, expect, it, vi } from "vitest";
++
++import { TrackItemStatus, TrackItemType } from "@types";
++
++import { FlatTrackItem } from "../../useTrackPlayerNavigation";
++import { SegmentedProgressRail } from "../SegmentedProgressRail";
++
++const buildSectionItems = (): FlatTrackItem[] => [
++  {
++    item: {
++      id: "item-1",
++      type: TrackItemType.ARTICLE,
++      order: 0,
++      title: "Completed item",
++      description: null,
++      scenarioId: null,
++      caseId: null,
++      completionCriteria: null,
++      contentMeta: null,
++      status: TrackItemStatus.COMPLETED,
++      startedAt: null,
++      completedAt: null,
++      score: null,
++      attemptCount: null,
++      maxWatchedPct: null,
++    },
++    sectionId: "section-1",
++    sectionTitle: "Section 1",
++    indexInSection: 0,
++    sectionItemCount: 2,
++  },
++  {
++    item: {
++      id: "item-2",
++      type: TrackItemType.ARTICLE,
++      order: 1,
++      title: "Current item",
++      description: null,
++      scenarioId: null,
++      caseId: null,
++      completionCriteria: null,
++      contentMeta: null,
++      status: TrackItemStatus.UNLOCKED,
++      startedAt: null,
++      completedAt: null,
++      score: null,
++      attemptCount: null,
++      maxWatchedPct: null,
++    },
++    sectionId: "section-1",
++    sectionTitle: "Section 1",
++    indexInSection: 1,
++    sectionItemCount: 2,
++  },
++];
++
++describe("SegmentedProgressRail", () => {
++  it("jumps to a completed item's segment when clicked", async () => {
++    const onSegmentClick = vi.fn();
++    render(
++      <SegmentedProgressRail
++        sectionItems={buildSectionItems()}
++        currentItemId="item-2"
++        onSegmentClick={onSegmentClick}
++      />,
++    );
++
++    // Before the fix, completed segments were plain non-interactive spans
++    // with no click handler at all — a control that looks like a step
++    // indicator but is genuinely dead on click.
++    await userEvent.click(screen.getByRole("button", { name: "Review Completed item" }));
++
++    expect(onSegmentClick).toHaveBeenCalledWith("item-1");
++  });
++
++  it("does not expose an in-progress segment as a clickable control", () => {
++    render(
++      <SegmentedProgressRail
++        sectionItems={buildSectionItems()}
++        currentItemId="item-2"
++        onSegmentClick={vi.fn()}
++      />,
++    );
++
++    expect(screen.queryByRole("button", { name: /Current item/ })).not.toBeInTheDocument();
++  });
++});

@@ -1,0 +1,329 @@
+diff --git a/src/llm-agent/provider/gemini-agent.provider.ts b/src/llm-agent/provider/gemini-agent.provider.ts
+index 8d092168eb..db4d76adea 100644
+--- a/src/llm-agent/provider/gemini-agent.provider.ts
++++ b/src/llm-agent/provider/gemini-agent.provider.ts
+@@ -1,3 +1,4 @@
++import { randomUUID } from 'crypto';
+ import { GoogleGenAI } from '@google/genai';
+ import { modelSupportsTemperature } from 'src/common/util/llm-model.util';
+ import {
+@@ -19,8 +20,17 @@ const STOP_REASONS: Record<string, AgentStopReason> = {
+   MALFORMED_FUNCTION_CALL: 'invalid_tool_call',
+ };
+ 
+-/** Gemini has no tool-call id, so we mint one and resolve it back by name. */
+-const syntheticId = (name: string, index: number) => `gemini_${name}_${index}`;
++/**
++ * Gemini has no tool-call id, so we mint one and resolve it back by name.
++ *
++ * Unique per response, not only within it: an agent turn makes several passes,
++ * and `gemini_save_character_draft_0` from the second pass used to collide
++ * with the first pass's — so everything that joins a turn's calls to their
++ * results by id (the turn receipt, "did an edit fail and stay unrepaired")
++ * read the later result for both calls.
++ */
++const syntheticId = (name: string, index: number, response: string) =>
++  `gemini_${name}_${index}_${response}`;
+ 
+ /**
+  * Gemini adapter over `@google/genai`.
+@@ -117,10 +127,11 @@ export class GeminiAgentProvider implements IAgentLlmProvider {
+     if (text) {
+       content.push({ type: 'text', text });
+     }
++    const response = randomUUID().slice(0, 8);
+     calls.forEach((call, index) => {
+       content.push({
+         type: 'tool_use',
+-        id: syntheticId(call.name, index),
++        id: syntheticId(call.name, index, response),
+         name: call.name,
+         input: call.input,
+       });
+diff --git a/src/llm-agent/provider/test/gemini-agent.provider.spec.ts b/src/llm-agent/provider/test/gemini-agent.provider.spec.ts
+index e0b5a8d81c..e9059c94f4 100644
+--- a/src/llm-agent/provider/test/gemini-agent.provider.spec.ts
++++ b/src/llm-agent/provider/test/gemini-agent.provider.spec.ts
+@@ -79,7 +79,7 @@ describe('GeminiAgentProvider', () => {
+       { type: 'text', text: 'Looking those up.' },
+       {
+         type: 'tool_use',
+-        id: 'gemini_get_voices_0',
++        id: expect.stringMatching(/^gemini_get_voices_0_[0-9a-f]{8}$/),
+         name: 'get_voices',
+         input: {},
+       },
+@@ -87,6 +87,27 @@ describe('GeminiAgentProvider', () => {
+     expect(final.usage.inputTokens).toBe(12);
+   });
+ 
++  it('mints ids no other response repeats, so a turn of several passes can join calls to results', async () => {
++    // An agent turn calls the same tool in two passes. With ids unique only
++    // within a response, both calls were `gemini_save_character_draft_0`, and
++    // the receipt read the second call's result for the first.
++    const call = () =>
++      fakeClient([
++        chunk([{ functionCall: { name: 'search', args: {} } }], 'STOP'),
++      ]);
++    const first = await drain(
++      new GeminiAgentProvider('key', call()),
++      request(),
++    );
++    const second = await drain(
++      new GeminiAgentProvider('key', call()),
++      request(),
++    );
++
++    const idOf = (final: any) => final.content[0].id;
++    expect(idOf(first.final)).not.toBe(idOf(second.final));
++  });
++
+   it('lets a truncated turn outrank its own tool calls', async () => {
+     // Arguments cut off at the cap are as unusable as any other provider's;
+     // the caller's max_tokens retry is what recovers from it.
+diff --git a/src/llm-agent/runtime/agent-turn-receipt.util.ts b/src/llm-agent/runtime/agent-turn-receipt.util.ts
+index 12746fed1f..e028d71e8f 100644
+--- a/src/llm-agent/runtime/agent-turn-receipt.util.ts
++++ b/src/llm-agent/runtime/agent-turn-receipt.util.ts
+@@ -28,7 +28,13 @@ export interface AgentReceiptCall {
+   result: Record<string, any> | undefined;
+ }
+ 
+-/** Calls and results as the transcript stores them, joined by tool_use id. */
++/**
++ * Calls and results as the transcript stores them, joined by tool_use id.
++ *
++ * By occurrence, not by id alone: Gemini's ids were unique only within one
++ * response until 2026-10-21, so a stored turn can hold two calls with the same
++ * id. The nth call with an id gets the nth result with it.
++ */
+ export function joinCallsToResults(
+   toolCalls: AgentTurnCall[] | Record<string, any>[] | null | undefined,
+   toolResults:
+@@ -37,16 +43,15 @@ export function joinCallsToResults(
+     | null
+     | undefined,
+ ): AgentReceiptCall[] {
+-  const byId = new Map(
+-    (toolResults ?? []).map((result: Record<string, any>) => [
+-      String(result?.toolUseId),
+-      result,
+-    ]),
+-  );
+-  return (toolCalls ?? []).map((call: Record<string, any>) => ({
++  const queues = new Map<string, Record<string, any>[]>();
++  for (const result of (toolResults ?? []) as Record<string, any>[]) {
++    const id = String(result?.toolUseId);
++    queues.set(id, [...(queues.get(id) ?? []), result]);
++  }
++  return ((toolCalls ?? []) as Record<string, any>[]).map((call) => ({
+     name: String(call?.name ?? ''),
+     input: (call?.input ?? {}) as Record<string, any>,
+-    result: byId.get(String(call?.id))?.result as
++    result: queues.get(String(call?.id))?.shift()?.result as
+       | Record<string, any>
+       | undefined,
+   }));
+@@ -122,9 +127,9 @@ export function buildAgentTurnReceipt(input: {
+ 
+   for (const call of input.calls) {
+     if (!call.name || vocabulary.isEnding(call.name)) continue;
+-    // A call with no result never ran to completion (an interrupted turn);
+-    // it is neither done nor failed.
+-    if (!call.result) continue;
++    // A call with no result never ran to completion (an interrupted turn),
++    // and one the runner refused never ran at all: neither is done or failed.
++    if (!call.result || call.result.notRun) continue;
+     if (call.result.ok === false) {
+       failed.push(
+         `${vocabulary.describeAttempt(call.name, call.input)} — ${
+diff --git a/src/llm-agent/runtime/test/agent-turn-receipt.util.spec.ts b/src/llm-agent/runtime/test/agent-turn-receipt.util.spec.ts
+index 857bd4ee6a..6114620769 100644
+--- a/src/llm-agent/runtime/test/agent-turn-receipt.util.spec.ts
++++ b/src/llm-agent/runtime/test/agent-turn-receipt.util.spec.ts
+@@ -79,6 +79,35 @@ describe('agent turn receipts', () => {
+     expect(receipt.failed).toEqual(['Search "q" — the corpus was unreachable']);
+   });
+ 
++  it('joins a repeated id by occurrence and leaves out a call that never ran', () => {
++    const receipt = buildAgentTurnReceipt({
++      calls: joinCallsToResults(
++        [
++          { id: 'g_0', name: 'search', input: { query: 'one' } },
++          { id: 'g_0', name: 'search', input: { query: 'two' } },
++          { id: 'x', name: 'edit', input: {} },
++        ],
++        [
++          { toolUseId: 'g_0', name: 'search', result: { ok: true, hits: [1] } },
++          {
++            toolUseId: 'g_0',
++            name: 'search',
++            result: { ok: false, message: 'timed out' },
++          },
++          {
++            toolUseId: 'x',
++            name: 'edit',
++            result: { ok: false, error: 'not_available', notRun: true },
++          },
++        ],
++      ),
++      vocabulary,
++      changed: [],
++    });
++    expect(receipt.searched).toEqual(['Search "one" — 1 hits']);
++    expect(receipt.failed).toEqual(['Search "two" — timed out']);
++  });
++
+   it("names a validation failure's first errors", () => {
+     expect(
+       describeToolFailure({
+diff --git a/src/llm-agent/runtime/test/validated-turn.runner.spec.ts b/src/llm-agent/runtime/test/validated-turn.runner.spec.ts
+index 8d210cd268..ed65c2c390 100644
+--- a/src/llm-agent/runtime/test/validated-turn.runner.spec.ts
++++ b/src/llm-agent/runtime/test/validated-turn.runner.spec.ts
+@@ -4,6 +4,7 @@ import {
+   ValidatedTurnAgent,
+   ValidatedTurnState,
+ } from '../agent-turn.types';
++import { joinCallsToResults } from '../agent-turn-receipt.util';
+ import { flushHeldFrames, runValidatedTurn } from '../validated-turn.runner';
+ 
+ /**
+@@ -377,6 +378,66 @@ describe('runValidatedTurn', () => {
+     expect(execute).not.toHaveBeenCalledWith('ask_user', expect.anything());
+   });
+ 
++  it('does not hold a refused call against the reply: it never ran', async () => {
++    // Seen live on gemini-2.5-pro: the draft saved, then the model tried to
++    // save again in the next pass. That call was not offered and never ran;
++    // the saved draft stands, so there is no failed edit to repair.
++    passes = [
++      pass([call('p1', 'confirm_publish')]),
++      pass([call('e1', 'edit')]),
++      pass([call('f1', 'finish_turn', { message: 'Confirm below.' })]),
++    ];
++
++    const { turn } = await run();
++
++    expect(resultFor('e1')).toMatchObject({
++      error: 'not_available',
++      notRun: true,
++    });
++    expect(turn.rejections).toBe(0);
++    expect(turn.warnings).toEqual([]);
++    expect(execute).not.toHaveBeenCalledWith('edit', expect.anything());
++  });
++
++  it('joins calls to results by occurrence when a provider repeats an id across passes', async () => {
++    // Gemini's ids were unique only within one response: the same tool in two
++    // passes got the same id, and a join by id alone read the later result for both.
++    execute.mockImplementationOnce(() =>
++      Promise.resolve({ modelResult: { ok: true }, summary: 'Edited' }),
++    );
++    execute.mockImplementationOnce(() =>
++      Promise.resolve({
++        modelResult: { ok: false, error: 'patch_failed', message: 'bad path' },
++        summary: 'Edit rejected',
++      }),
++    );
++    passes = [
++      pass([call('same', 'edit')]),
++      pass([call('same', 'edit')]),
++      pass([
++        call('f1', 'finish_turn', {
++          message: 'The second change did not land.',
++        }),
++      ]),
++      pass([
++        call('f2', 'finish_turn', {
++          message: 'The second change did not land.',
++        }),
++      ]),
++    ];
++    state.changed = true;
++
++    const { turn } = await run();
++
++    // The last edit failed and nothing repaired it: held once, then delivered.
++    expect(turn.rejections).toBe(1);
++    // Each call reads its own result; by id alone both would read the failure.
++    const edits = joinCallsToResults(turn.toolCalls, turn.toolResults).filter(
++      (joined) => joined.name === 'edit',
++    );
++    expect(edits.map((joined) => joined.result?.ok)).toEqual([true, false]);
++  });
++
+   it('nudges a prose-only pass twice, then delivers its notes with a warning', async () => {
+     passes = [
+       pass([text('Here is my answer.')], 'end_turn'),
+diff --git a/src/llm-agent/runtime/validated-turn.runner.ts b/src/llm-agent/runtime/validated-turn.runner.ts
+index 5a921b598e..9e8862b32f 100644
+--- a/src/llm-agent/runtime/validated-turn.runner.ts
++++ b/src/llm-agent/runtime/validated-turn.runner.ts
+@@ -434,6 +434,9 @@ async function* runCalls(
+           modelResult: {
+             ok: false,
+             error: 'not_available',
++            // Never ran, so it changed nothing and failed at nothing: the
++            // checks below and the receipt leave it out.
++            notRun: true,
+             message: turn.endRequestedBy
+               ? `Not run: ${turn.endRequestedBy} already ended the turn — only ` +
+                 `\`${agent.closingTool}\` is left.`
+@@ -506,7 +509,9 @@ async function replyProblems(
+     });
+   }
+ 
+-  const failedHere = others.filter((use) => results.get(use.id)?.ok === false);
++  const failedHere = others.filter(
++    (use) => results.get(use.id)?.ok === false && !results.get(use.id)?.notRun,
++  );
+   if (failedHere.length) {
+     problems.push({
+       key: `failed:${failedHere.map((use) => use.id).join(',')}`,
+@@ -544,7 +549,7 @@ async function replyProblems(
+ 
+   // An edit that failed in an earlier step, with no successful edit since.
+   const edits = joinCallsToResults(turn.toolCalls, turn.toolResults).filter(
+-    (call) => agent.isEdit(call.name) && call.result,
++    (call) => agent.isEdit(call.name) && call.result && !call.result.notRun,
+   );
+   const lastFailure = edits
+     .map((call) => call.result?.ok === false)
+diff --git a/src/scenario-character/service/test/character-interview-validated-turn.spec.ts b/src/scenario-character/service/test/character-interview-validated-turn.spec.ts
+index 3ef8547f84..e7a65e8b1d 100644
+--- a/src/scenario-character/service/test/character-interview-validated-turn.spec.ts
++++ b/src/scenario-character/service/test/character-interview-validated-turn.spec.ts
+@@ -205,6 +205,32 @@ describe('CharacterInterviewOrchestratorService — validated turns', () => {
+     expect(assistantRow().metadata.workingNotes).toEqual(['Saving.']);
+   });
+ 
++  it('ignores a second save the turn no longer offered — the first one stands', async () => {
++    // Seen live on gemini-2.5-pro (2026-10-21): after the draft saved, the
++    // model sent save_character_draft again. It is refused without running,
++    // and must not read as a failed save under a reply that says it saved.
++    passes = [
++      pass([draft('d1')]),
++      pass([draft('d2')]),
++      pass([
++        call('f1', 'finish_turn', {
++          message: "Aisha's draft is ready for your review.",
++        }),
++      ]),
++    ];
++
++    const frames = await collect();
++
++    expect(toolsExecute.mock.calls.map(([name]) => name)).toEqual([
++      'save_character_draft',
++      'finish_turn',
++    ]);
++    const receipt = frames.find((f) => f.event === 'receipt').data;
++    expect(receipt.failed).toEqual([]);
++    expect(receipt.warnings).toEqual([]);
++    expect(assistantRow().metadata.rejections).toBeUndefined();
++  });
++
+   it('will not say the draft is ready when save_character_draft failed', async () => {
+     toolsExecute.mockImplementationOnce(async () => ({
+       modelResult: {

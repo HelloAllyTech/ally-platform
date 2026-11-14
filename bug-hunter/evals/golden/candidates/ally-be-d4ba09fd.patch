@@ -1,0 +1,88 @@
+diff --git a/src/settings/service/settings.shared.ts b/src/settings/service/settings.shared.ts
+index 129bfc3eea..9cdfade4b2 100644
+--- a/src/settings/service/settings.shared.ts
++++ b/src/settings/service/settings.shared.ts
+@@ -23,7 +23,7 @@ export class SettingsShared {
+   async createGlobalSettings(
+     createAppVersionSettingsDto: CreateAppVersionSettingsDto,
+   ): Promise<{ data: GlobalSettings[] }> {
+-    const userId = Number(ExecutionManager.getUserId());
++    const userId = Number(ExecutionManager.getUserId() ?? 0);
+ 
+     this.validateGlobalSettingsKeys(createAppVersionSettingsDto);
+ 
+@@ -77,7 +77,7 @@ export class SettingsShared {
+   async updateGlobalSettings(
+     updateAppVersionSettingsDto: UpdateAppVersionSettingsDto,
+   ): Promise<{ data: GlobalSettings[] }> {
+-    const userId = Number(ExecutionManager.getUserId());
++    const userId = Number(ExecutionManager.getUserId() ?? 0);
+ 
+     this.validateGlobalSettingsKeys(updateAppVersionSettingsDto);
+ 
+diff --git a/src/settings/service/test/settings.shared.service.spec.ts b/src/settings/service/test/settings.shared.service.spec.ts
+new file mode 100644
+index 0000000000..d3ac86063c
+--- /dev/null
++++ b/src/settings/service/test/settings.shared.service.spec.ts
+@@ -0,0 +1,60 @@
++import { Test, TestingModule } from '@nestjs/testing';
++import { SettingsShared } from '../settings.shared';
++import { GlobalSettingsRepository } from '../../repository/global-settings.repository';
++import { ExecutionManager } from '../../../common/execution/execution-manager';
++import { AppVersionSettingsEnum } from '../../type/settings.type';
++
++describe('SettingsShared', () => {
++  let service: SettingsShared;
++  let repository: GlobalSettingsRepository;
++
++  beforeEach(async () => {
++    const module: TestingModule = await Test.createTestingModule({
++      providers: [
++        SettingsShared,
++        {
++          provide: GlobalSettingsRepository,
++          useValue: {
++            create: jest.fn(),
++            save: jest.fn(),
++            find: jest.fn(),
++            findOne: jest.fn(),
++            update: jest.fn(),
++          },
++        },
++      ],
++    }).compile();
++
++    service = module.get<SettingsShared>(SettingsShared);
++    repository = module.get<GlobalSettingsRepository>(GlobalSettingsRepository);
++  });
++
++  it('should be defined', () => {
++    expect(service).toBeDefined();
++  });
++
++  describe('updateGlobalSettings', () => {
++    it('should use userId 0 when userId is not in the execution context', async () => {
++      const dto = { ios: '1.0.0' };
++      const existingSetting = {
++        id: '1',
++        name: AppVersionSettingsEnum.ios,
++        value: { minimumSupportedVersion: '0.9.0' },
++        createdBy: 1,
++        updatedBy: 1,
++      };
++
++      (repository.find as jest.Mock).mockResolvedValue([existingSetting]);
++      (repository.update as jest.Mock).mockResolvedValue(undefined);
++
++      await ExecutionManager.runWithContext(async () => {
++        await service.updateGlobalSettings(dto);
++      });
++
++      expect(repository.update).toHaveBeenCalledWith(existingSetting.id, {
++        value: { minimumSupportedVersion: '1.0.0' },
++        updatedBy: 0,
++      });
++    });
++  });
++});

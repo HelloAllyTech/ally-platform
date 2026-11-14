@@ -1,0 +1,54 @@
+diff --git a/ally-be/src/badge/service/badge-tenant.service.ts b/ally-be/src/badge/service/badge-tenant.service.ts
+index f0176de2e..6d5bb0cb6 100644
+--- a/ally-be/src/badge/service/badge-tenant.service.ts
++++ b/ally-be/src/badge/service/badge-tenant.service.ts
+@@ -144,10 +144,7 @@ export class BadgeTenantService {
+       this.logger.log(`Badge ${badge.id} assigned to tenants`);
+       return finalTenantIds;
+     } catch (error) {
+-      this.logger.error(
+-        `Failed to assign badge ${badge.id} to tenants`,
+-        error.stack,
+-      );
++      this.logger.error(`Failed to assign badge ${badge.id} to tenants`, error);
+       throw new InternalServerErrorException(
+         `Failed to assign badge ${badge.id} to tenants`,
+       );
+diff --git a/ally-be/src/badge/service/test/badge-tenant.service.spec.ts b/ally-be/src/badge/service/test/badge-tenant.service.spec.ts
+index 336287291..6bd404c34 100644
+--- a/ally-be/src/badge/service/test/badge-tenant.service.spec.ts
++++ b/ally-be/src/badge/service/test/badge-tenant.service.spec.ts
+@@ -5,6 +5,7 @@ import {
+   BadRequestException,
+   InternalServerErrorException,
+   NotFoundException,
++  Logger,
+ } from '@nestjs/common';
+ import { BadgeTenantService } from '../badge-tenant.service';
+ import { BadgeTenant } from '../../entity/badge-tenant.entity';
+@@ -280,16 +281,23 @@ describe('BadgeTenantService', () => {
+       expect(result).toEqual(['tenant-1', 'tenant-2']);
+     });
+ 
+-    it('should throw an error on DB error', async () => {
++    it('should throw an error on DB error and log the error', async () => {
+       const badge = {
+         id: 'badge-1',
+         visibilityType: BadgeVisibilityType.PUBLIC,
+       } as Badge;
+-      mockTenantsRepository.find.mockRejectedValue(new Error('DB error'));
++      const dbError = new Error('DB error');
++      mockTenantsRepository.find.mockRejectedValue(dbError);
++
++      const loggerSpy = jest.spyOn(Logger.prototype, 'error');
+ 
+       await expect(service.assignBadgeToTenants(badge)).rejects.toThrow(
+         InternalServerErrorException,
+       );
++      expect(loggerSpy).toHaveBeenCalledWith(
++        `Failed to assign badge ${badge.id} to tenants`,
++        dbError,
++      );
+     });
+   });
+ 

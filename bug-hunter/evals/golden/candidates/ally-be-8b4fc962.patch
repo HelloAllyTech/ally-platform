@@ -1,0 +1,214 @@
+diff --git a/src/custom-fields/service/custom-fields.service.ts b/src/custom-fields/service/custom-fields.service.ts
+index 8168395ff2..b24c138ab6 100644
+--- a/src/custom-fields/service/custom-fields.service.ts
++++ b/src/custom-fields/service/custom-fields.service.ts
+@@ -29,6 +29,7 @@ import {
+ import { SUMMARY_SECTIONS } from '../../settings/constants/summary-sections.constants';
+ import { ExecutionManager } from '../../common/execution/execution-manager';
+ import { PermissionValidator } from '../../authorization/service/permission-validator.service';
++import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+ import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
+ import { DEFAULT_FIELD_TEMPLATES } from '../constants/default-field-templates.constants';
+ import { UserService } from '../../user/service/user.service';
+@@ -72,6 +73,7 @@ export class CustomFieldsService {
+     private readonly valueRepo: Repository<ChatCustomFieldValue>,
+     private readonly permissionValidator: PermissionValidator,
+     private readonly userService: UserService,
++    private readonly tenantScopeService: TenantScopeService,
+   ) {}
+ 
+   private resolveTenantId(override?: string): string {
+@@ -80,8 +82,17 @@ export class CustomFieldsService {
+     return tenantId;
+   }
+ 
++  /**
++   * Which tenant's definitions a call acts on. Naming a tenant needs
++   * SYSTEM_ACCESS, and — because every platform admin holds it, allowlisted
++   * or not — the named tenant must also be inside the caller's organization
++   * scope. Naming none means the caller's own tenant, which a write checks
++   * too: an allowlisted admin's own organization is not on their allowlist
++   * unless it was put there.
++   */
+   private async resolveTenantIdWithSystemCheck(
+     override?: string,
++    { write }: { write: boolean } = { write: false },
+   ): Promise<string> {
+     if (override) {
+       const userId = ExecutionManager.getUserId();
+@@ -95,10 +106,14 @@ export class CustomFieldsService {
+           'You do not have permission to access another tenant',
+         );
+       }
++      await this.tenantScopeService.assertTenantInScope(override);
+       return override;
+     }
+     const tenantId = ExecutionManager.getTenantId();
+     if (!tenantId) throw new BadRequestException('Tenant ID is required');
++    if (write) {
++      await this.tenantScopeService.assertTenantInScope(tenantId);
++    }
+     return tenantId;
+   }
+ 
+@@ -131,7 +146,9 @@ export class CustomFieldsService {
+ 
+   async createDefinition(dto: CreateCustomFieldDefinitionDto) {
+     const { tenantId: dtoTenantId, ...fieldDto } = dto;
+-    const tenantId = await this.resolveTenantIdWithSystemCheck(dtoTenantId);
++    const tenantId = await this.resolveTenantIdWithSystemCheck(dtoTenantId, {
++      write: true,
++    });
+     const userId = ExecutionManager.getUserId();
+     if (!userId) throw new BadRequestException('User ID is required');
+ 
+@@ -221,7 +238,9 @@ export class CustomFieldsService {
+ 
+   async updateDefinition(id: string, dto: UpdateCustomFieldDefinitionDto) {
+     const { tenantId: dtoTenantId, ...fieldDto } = dto;
+-    const tenantId = await this.resolveTenantIdWithSystemCheck(dtoTenantId);
++    const tenantId = await this.resolveTenantIdWithSystemCheck(dtoTenantId, {
++      write: true,
++    });
+     const userId = ExecutionManager.getUserId();
+     if (!userId) throw new BadRequestException('User ID is required');
+ 
+@@ -291,8 +310,12 @@ export class CustomFieldsService {
+   }
+ 
+   async deleteDefinition(id: string, overrideTenantId?: string) {
+-    const tenantId =
+-      await this.resolveTenantIdWithSystemCheck(overrideTenantId);
++    const tenantId = await this.resolveTenantIdWithSystemCheck(
++      overrideTenantId,
++      {
++        write: true,
++      },
++    );
+     const userId = ExecutionManager.getUserId();
+     if (!userId) throw new BadRequestException('User ID is required');
+ 
+diff --git a/src/custom-fields/service/test/custom-fields.service.spec.ts b/src/custom-fields/service/test/custom-fields.service.spec.ts
+index 53c3aa7ddd..300409a10e 100644
+--- a/src/custom-fields/service/test/custom-fields.service.spec.ts
++++ b/src/custom-fields/service/test/custom-fields.service.spec.ts
+@@ -20,6 +20,8 @@ import { CallDetails } from '../../../chat/entity/call.details.entity';
+ import { ScribeSessionMode } from '../../../common/constants/chat.constants';
+ import { ExecutionManager } from '../../../common/execution/execution-manager';
+ import { PermissionValidator } from '../../../authorization/service/permission-validator.service';
++import { TenantScopeService } from '../../../authorization/service/tenant-scope.service';
++import { PERMISSIONS } from '../../../authorization/constants/permissions.constants';
+ import { UserService } from '../../../user/service/user.service';
+ import { DEFAULT_FIELD_TEMPLATES } from '../../constants/default-field-templates.constants';
+ 
+@@ -30,6 +32,10 @@ describe('CustomFieldsService', () => {
+   let definitionRepo: jest.Mocked<Repository<CustomFieldDefinition>>;
+   let valueRepo: jest.Mocked<Repository<ChatCustomFieldValue>>;
+   let permissionValidator: jest.Mocked<PermissionValidator>;
++  let permissionsService: {
++    isMultiTenantAdmin: jest.Mock;
++    getUserPermissions: jest.Mock;
++  };
+   let userService: jest.Mocked<UserService>;
+ 
+   const mockTenantId = 'tenant-uuid';
+@@ -95,6 +101,25 @@ describe('CustomFieldsService', () => {
+       save: jest.fn(),
+     } as any;
+ 
++    // The real resolver: an unrestricted platform admin unless a test makes
++    // them allowlisted, in which case they hold 'allowed-tenant' only.
++    permissionsService = {
++      isMultiTenantAdmin: jest.fn().mockResolvedValue(false),
++      getUserPermissions: jest
++        .fn()
++        .mockResolvedValue([PERMISSIONS.SYSTEM_ACCESS]),
++    };
++    const tenantScopeService = new TenantScopeService(
++      permissionsService as any,
++      {
++        find: jest.fn().mockResolvedValue([{ tenantId: 'allowed-tenant' }]),
++      } as any,
++      {
++        find: jest.fn().mockResolvedValue([{ id: 'allowed-tenant' }]),
++        findOne: jest.fn().mockResolvedValue(null),
++      } as any,
++    );
++
+     const module: TestingModule = await Test.createTestingModule({
+       providers: [
+         CustomFieldsService,
+@@ -122,6 +147,10 @@ describe('CustomFieldsService', () => {
+           provide: UserService,
+           useValue: { get: jest.fn() },
+         },
++        {
++          provide: TenantScopeService,
++          useValue: tenantScopeService,
++        },
+       ],
+     }).compile();
+ 
+@@ -1314,4 +1343,62 @@ describe('CustomFieldsService', () => {
+       expect(definitionRepo.save).not.toHaveBeenCalled();
+     });
+   });
++
++  // ─── organization-restricted platform admin ───────────────────────────────
++
++  describe('as a platform admin restricted to one organization', () => {
++    const baseDto = {
++      name: 'New Field',
++      fieldType: CustomFieldType.SINGLE_SELECT,
++      options: [{ id: 'opt-1', label: 'A', order: 0 }],
++      sectionKey: 'intake',
++      editPermission: CustomFieldEditPermission.BOTH,
++      displayOrder: 1,
++    };
++
++    beforeEach(() => {
++      permissionValidator.validatePermissions.mockResolvedValue(true);
++      permissionsService.isMultiTenantAdmin.mockResolvedValue(true);
++    });
++
++    it('reads the definitions of an allowlisted organization', async () => {
++      definitionRepo.find.mockResolvedValue([]);
++
++      await expect(service.getDefinitions('allowed-tenant')).resolves.toEqual(
++        expect.anything(),
++      );
++      expect(definitionRepo.find).toHaveBeenCalledWith(
++        expect.objectContaining({
++          where: expect.objectContaining({ tenantId: 'allowed-tenant' }),
++        }),
++      );
++    });
++
++    it('refuses to read another organization', async () => {
++      await expect(service.getDefinitions('other-tenant')).rejects.toThrow(
++        ForbiddenException,
++      );
++      expect(definitionRepo.find).not.toHaveBeenCalled();
++    });
++
++    it('refuses to create a definition in another organization', async () => {
++      await expect(
++        service.createDefinition({ ...baseDto, tenantId: 'other-tenant' }),
++      ).rejects.toThrow(ForbiddenException);
++      expect(definitionRepo.save).not.toHaveBeenCalled();
++    });
++
++    it('refuses a write that falls back to their own, un-allowlisted organization', async () => {
++      await expect(service.createDefinition(baseDto)).rejects.toThrow(
++        ForbiddenException,
++      );
++      expect(definitionRepo.save).not.toHaveBeenCalled();
++    });
++
++    it('refuses to delete a definition in another organization', async () => {
++      await expect(
++        service.deleteDefinition('def-1', 'other-tenant'),
++      ).rejects.toThrow(ForbiddenException);
++    });
++  });
+ });

@@ -1,0 +1,158 @@
+diff --git a/src/builder/service/builder-build.service.ts b/src/builder/service/builder-build.service.ts
+index 35c4f0574a..087a9890f9 100644
+--- a/src/builder/service/builder-build.service.ts
++++ b/src/builder/service/builder-build.service.ts
+@@ -1786,6 +1786,51 @@ export class BuilderBuildService {
+   }
+ 
+   /** Close a run and move the session with it. */
++  /**
++   * Give a failed review its pull request back.
++   *
++   * `dispatchReviewRun` stamps `reviewedSha` BEFORE dispatching, which is
++   * correct and load-bearing: reconcile runs every five minutes and would
++   * otherwise send a second reviewer at a pull request the first is still
++   * reading. But the stamp says "a review was attempted at this commit", and
++   * `considerReviewRun` reads it as "this commit has been reviewed".
++   *
++   * For a run that finished, those are the same thing. For one that failed
++   * they are not, and nothing told them apart — so a single failure left the
++   * pull request permanently unreviewable: the head never moves again on its
++   * own, so `reviewedSha === headSha` holds forever, no second review is ever
++   * dispatched, `reviewPassedSha` is never written, and approval and
++   * auto-merge both wait on evidence that cannot now arrive. ally-be#503 has
++   * sat in exactly that state since 2026-09-17, and migration
++   * 1971200000000 records ally-be#494 doing the same thing before it.
++   *
++   * `reviewRunCount` is deliberately NOT rolled back. It is what bounds this:
++   * a pull request still gets at most BUILDER_MAX_REVIEW_RUNS_PER_PR
++   * dispatches, so an engine that fails every time costs two runs rather than
++   * an endless supply. Clearing the sha buys a retry, not a loop.
++   */
++  private async releaseReviewClaim(
++    run: BuilderBuildRun,
++    status: BuilderRunStatus,
++  ): Promise<void> {
++    if (run.mode !== BuilderRunMode.REVIEW) return;
++    if (!run.pullRequestId) return;
++    if (
++      status !== BuilderRunStatus.FAILED &&
++      status !== BuilderRunStatus.TIMED_OUT &&
++      status !== BuilderRunStatus.CANCELLED
++    )
++      return;
++
++    await this.pullRequestRepository.update(
++      { id: run.pullRequestId },
++      { reviewedSha: null },
++    );
++    this.logger.info(
++      `Review run ${run.id} ${status}; cleared the review claim on its pull request so the next tick can try again.`,
++    );
++  }
++
+   async settleRun(
+     run: BuilderBuildRun,
+     status: BuilderRunStatus,
+@@ -1806,6 +1851,8 @@ export class BuilderBuildService {
+       { status, error, completedAt, runnerMinutes },
+     );
+ 
++    await this.releaseReviewClaim(run, status);
++
+     const session = await this.sessionRepository.findOne({
+       where: { id: run.sessionId },
+     });
+diff --git a/src/builder/service/test/builder-build.service.spec.ts b/src/builder/service/test/builder-build.service.spec.ts
+index 61f04892fc..9c7e2dd480 100644
+--- a/src/builder/service/test/builder-build.service.spec.ts
++++ b/src/builder/service/test/builder-build.service.spec.ts
+@@ -79,6 +79,7 @@ describe('BuilderBuildService', () => {
+     increment: jest.Mock;
+     findOne: jest.Mock;
+     count: jest.Mock;
++    update: jest.Mock;
+   };
+   let questionRepository: { isGroupComplete: jest.Mock; update: jest.Mock };
+   let settingsService: { get: jest.Mock };
+@@ -139,6 +140,7 @@ describe('BuilderBuildService', () => {
+       increment: jest.fn(),
+       findOne: jest.fn(),
+       count: jest.fn().mockResolvedValue(0),
++      update: jest.fn(),
+     };
+     questionRepository = {
+       isGroupComplete: jest.fn().mockResolvedValue(true),
+@@ -779,6 +781,72 @@ describe('BuilderBuildService', () => {
+       return run;
+     };
+ 
++    /**
++     * The stranding this repo has now seen twice.
++     *
++     * `reviewedSha` is stamped before a review is dispatched, so reconcile
++     * cannot send two reviewers at one pull request. But the stamp means "a
++     * review was attempted here" and the guard reads it as "this commit has
++     * been reviewed" — identical for a run that finished, not for one that
++     * failed. A single failure therefore left the pull request unreviewable
++     * for good: its head never moves on its own, so no second review is ever
++     * dispatched, `reviewPassedSha` is never written, and approval and
++     * auto-merge wait on evidence that can no longer arrive.
++     */
++    describe('a review run that failed', () => {
++      const reviewRun = (status: BuilderRunStatus) => {
++        const run = {
++          id: 'run-9',
++          sessionId: 'session-1',
++          mode: BuilderRunMode.REVIEW,
++          pullRequestId: 'pr-1',
++          startedAt: new Date(),
++          dispatchedAt: new Date(),
++        };
++        sessionRepository.findOne.mockResolvedValue({
++          id: 'session-1',
++          status: BuilderSessionStatus.BUILDING,
++        });
++        runRepository.isLatestForSession.mockResolvedValue(true);
++        return service.settleRun(run as any, status, 'boom');
++      };
++
++      it('hands the pull request back so the next tick can retry', async () => {
++        await reviewRun(BuilderRunStatus.FAILED);
++
++        expect(pullRequestRepository.update).toHaveBeenCalledWith(
++          { id: 'pr-1' },
++          { reviewedSha: null },
++        );
++      });
++
++      it('does the same when it timed out or was stopped', async () => {
++        await reviewRun(BuilderRunStatus.TIMED_OUT);
++        await reviewRun(BuilderRunStatus.CANCELLED);
++
++        expect(pullRequestRepository.update).toHaveBeenCalledTimes(2);
++      });
++
++      /**
++       * `reviewRunCount` is what bounds the retry. Rolling it back too would
++       * turn a failing engine into an endless supply of review runs; leaving
++       * it means a pull request still gets at most the cap, and clearing the
++       * sha buys a retry rather than a loop.
++       */
++      it('does not refund the attempt', async () => {
++        await reviewRun(BuilderRunStatus.FAILED);
++
++        expect(pullRequestRepository.increment).not.toHaveBeenCalled();
++      });
++
++      /** A review that SUCCEEDED has genuinely reviewed that commit. */
++      it('leaves the claim alone when the review finished', async () => {
++        await reviewRun(BuilderRunStatus.SUCCEEDED);
++
++        expect(pullRequestRepository.update).not.toHaveBeenCalled();
++      });
++    });
++
+     it('takes a session back off COMPLETED when its own run then fails', async () => {
+       const run = settling(BuilderSessionStatus.COMPLETED);
+ 

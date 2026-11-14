@@ -1,0 +1,58 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/track-visuals/__tests__/trackItemMeta.test.ts b/apps/ally-helpline-dashboard/src/components/track-visuals/__tests__/trackItemMeta.test.ts
+new file mode 100644
+index 0000000000..2a05446d15
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/components/track-visuals/__tests__/trackItemMeta.test.ts
+@@ -0,0 +1,36 @@
++import { TFunction } from "i18next";
++import { describe, expect, it } from "vitest";
++
++import { TrackDetailItem, TrackItemType } from "@types";
++
++import { getTrackItemMeta } from "../trackItemMeta";
++
++// Echoes the key plus its score interpolation, so assertions can tell
++// "roleplay" from "roleplay · min score N" without loading real translations.
++const t = ((key: string, opts?: { score?: number }) =>
++  opts?.score === undefined ? key : `${key}:${opts.score}`) as unknown as TFunction;
++
++const roleplayItem = (minScore?: number | null): TrackDetailItem =>
++  ({
++    type: TrackItemType.ROLEPLAY,
++    completionCriteria: minScore === undefined ? {} : { minScore },
++  }) as unknown as TrackDetailItem;
++
++describe("getTrackItemMeta — roleplay minimum score", () => {
++  it("shows a real threshold", () => {
++    expect(getTrackItemMeta(roleplayItem(70), t)).toBe(
++      "tracks2.meta.roleplay · tracks2.meta.minScore:70",
++    );
++  });
++
++  // 0 is the builder's unconfigured default and gates nothing, so surfacing it
++  // would advertise a hurdle the learner does not actually have to clear.
++  it("omits a minimum of 0", () => {
++    expect(getTrackItemMeta(roleplayItem(0), t)).toBe("tracks2.meta.roleplay");
++  });
++
++  it("omits an unset minimum", () => {
++    expect(getTrackItemMeta(roleplayItem(undefined), t)).toBe("tracks2.meta.roleplay");
++    expect(getTrackItemMeta(roleplayItem(null), t)).toBe("tracks2.meta.roleplay");
++  });
++});
+diff --git a/apps/ally-helpline-dashboard/src/components/track-visuals/trackItemMeta.ts b/apps/ally-helpline-dashboard/src/components/track-visuals/trackItemMeta.ts
+index f8ff03573d..8bbe01d245 100644
+--- a/apps/ally-helpline-dashboard/src/components/track-visuals/trackItemMeta.ts
++++ b/apps/ally-helpline-dashboard/src/components/track-visuals/trackItemMeta.ts
+@@ -36,7 +36,10 @@ export const getTrackItemMeta = (item: TrackDetailItem, t: TFunction): string =>
+     case TrackItemType.ARTICLE:
+       return t("tracks2.meta.article");
+     case TrackItemType.ROLEPLAY: {
+-      if (criteria?.minScore) {
++      // A minScore of 0 is the unconfigured default and gates nothing (see
++      // meetsMinimumScore in ally-be), so only a real threshold is shown —
++      // advertising "min score 0" would read as a hurdle that isn't there.
++      if (criteria?.minScore != null && criteria.minScore > 0) {
+         return `${t("tracks2.meta.roleplay")} · ${t("tracks2.meta.minScore", {
+           score: criteria.minScore,
+         })}`;

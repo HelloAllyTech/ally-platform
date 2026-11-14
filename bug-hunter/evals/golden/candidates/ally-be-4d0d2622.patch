@@ -1,0 +1,128 @@
+diff --git a/src/community/consumer/community.event.consumer.ts b/src/community/consumer/community.event.consumer.ts
+index 36b372c27f..739a1600f9 100644
+--- a/src/community/consumer/community.event.consumer.ts
++++ b/src/community/consumer/community.event.consumer.ts
+@@ -48,6 +48,9 @@ export class CommunityEventConsumer {
+         reaction.tenantId,
+         scorePoints.REACTION,
+       );
++      this.logger.info(
++        `Incremented reaction score for user ${reaction.createdBy} for review ${review.id}`,
++      );
+     } catch (error) {
+       this.logger.error(
+         `Failed to increment reaction score for user ${reaction.createdBy}: ${error.message}`,
+@@ -70,6 +73,9 @@ export class CommunityEventConsumer {
+         removedReaction.tenantId,
+         scorePoints.REACTION,
+       );
++      this.logger.info(
++        `Decremented reaction score for user ${removedReaction.createdBy} for review ${review.id}`,
++      );
+     } catch (error) {
+       this.logger.error(
+         `Failed to decrement reaction score for user ${removedReaction.createdBy}: ${error.message}`,
+@@ -92,6 +98,9 @@ export class CommunityEventConsumer {
+         comment.tenantId,
+         scorePoints.COMMENT,
+       );
++      this.logger.info(
++        `Incremented comment score for user ${comment.createdBy} for review ${review.id}`,
++      );
+     } catch (error) {
+       this.logger.error(
+         `Failed to increment comment score for user ${comment.createdBy}: ${error.message}`,
+@@ -155,6 +164,9 @@ export class CommunityEventConsumer {
+           }
+         },
+       );
++      this.logger.info(
++        `Decremented comment score for user ${comment.createdBy} for review ${review.id}`,
++      );
+     } catch (error) {
+       this.logger.error(
+         `Failed to decrement comment score for user ${comment.createdBy}: ${error.message}`,
+@@ -177,6 +189,9 @@ export class CommunityEventConsumer {
+         reaction.tenantId,
+         scorePoints.REACTION,
+       );
++      this.logger.info(
++        `Incremented comment reaction score for user ${reaction.createdBy} for review ${comment.id}`,
++      );
+     } catch (error) {
+       this.logger.error(
+         `Failed to increment comment reaction score for user ${reaction.createdBy}: ${error.message}`,
+@@ -199,6 +214,9 @@ export class CommunityEventConsumer {
+         removedReaction.tenantId,
+         scorePoints.REACTION,
+       );
++      this.logger.info(
++        `Decremented comment reaction score for user ${removedReaction.createdBy} for review ${comment.id}`,
++      );
+     } catch (error) {
+       this.logger.error(
+         `Failed to decrement comment reaction score for user ${removedReaction.createdBy}: ${error.message}`,
+@@ -234,6 +252,7 @@ export class CommunityEventConsumer {
+         userId,
+         userDateEntryBeforeUpdation,
+       } as MinutesPlayedUpdatedEventParams);
++      this.logger.info(`Upserted minutes played score for user ${userId}`);
+     } catch (error) {
+       this.logger.error(
+         `Failed to add minutes played for user ${userId}: ${error.message}`,
+diff --git a/src/community/repository/test/user-daily-score.repository.spec.ts b/src/community/repository/test/user-daily-score.repository.spec.ts
+index 18e40f82db..62629f4604 100644
+--- a/src/community/repository/test/user-daily-score.repository.spec.ts
++++ b/src/community/repository/test/user-daily-score.repository.spec.ts
+@@ -182,8 +182,8 @@ describe('UserDailyScoreRepository', () => {
+         expect.arrayContaining([
+           mockUserId,
+           mockTenantId,
+-          expect.any(String),
+-          0.5,
++          expect.any(Date),
++          -0.5,
+         ]),
+       );
+     });
+@@ -234,15 +234,14 @@ describe('UserDailyScoreRepository', () => {
+       ).rejects.toThrow('Database connection failed');
+     });
+ 
+-    it('should use negative score in INSERT for new rows', async () => {
++    it('should pass negative amount as parameter for decrementing', async () => {
+       mockQuery.mockResolvedValue(undefined);
+ 
+       await repository.decrementTotalScore(mockUserId, mockTenantId, 0.5);
+ 
+-      expect(mockQuery).toHaveBeenCalledWith(
+-        expect.stringContaining('-$4'),
+-        expect.any(Array),
+-      );
++      const queryCall = mockQuery.mock.calls[0];
++      const amount = queryCall[1][3];
++      expect(amount).toBe(-0.5);
+     });
+   });
+ 
+diff --git a/src/community/repository/user-daily-score.repository.ts b/src/community/repository/user-daily-score.repository.ts
+index e573e09a14..67f1004d55 100644
+--- a/src/community/repository/user-daily-score.repository.ts
++++ b/src/community/repository/user-daily-score.repository.ts
+@@ -92,13 +92,13 @@ export class UserDailyScoreRepository extends Repository<UserDailyScores> {
+     await userDailyScoreRepo.query(
+       `
+       INSERT INTO user_daily_scores ("id", "userId", "tenant_id", "date", "minutesPlayed", "totalScore", "createdAt", "updatedAt")
+-      VALUES (uuid_generate_v4(), $1, $2, $3, 0, -$4, NOW(), NOW())
++      VALUES (uuid_generate_v4(), $1, $2, $3, 0, $4, NOW(), NOW())
+       ON CONFLICT ("userId", "tenant_id", "date")
+       DO UPDATE SET
+-        "totalScore" = user_daily_scores."totalScore" - $4,
++        "totalScore" = user_daily_scores."totalScore" + $4,
+         "updatedAt" = NOW()
+       `,
+-      [userId, tenantId, normalizedDate, amount],
++      [userId, tenantId, normalizedDate, -amount],
+     );
+   }
+ 

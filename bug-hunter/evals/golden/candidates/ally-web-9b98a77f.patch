@@ -1,0 +1,135 @@
+diff --git a/apps/ally-helpline-dashboard/src/constants/api.ts b/apps/ally-helpline-dashboard/src/constants/api.ts
+index f96be5a75b..6452211060 100644
+--- a/apps/ally-helpline-dashboard/src/constants/api.ts
++++ b/apps/ally-helpline-dashboard/src/constants/api.ts
+@@ -110,6 +110,6 @@ export const ApiEndpoints = {
+     GET_AVAILABLE_BADGES: "/v1/badges/me/available",
+     GET_MY_BADGES: "/v1/badges/me",
+     GET_BADGES_COUNT: "/v1/badges/me/count",
+-    UPDATE_BADGE_VIEW_STATUS: (badgeId: string) => `/v1/badges/me/${badgeId}/`,
++    UPDATE_BADGE_VIEW_STATUS: (badgeId: string) => `/v1/badges/me/${badgeId}/viewed`,
+   },
+ };
+diff --git a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/AchievementsViewAll.tsx b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/AchievementsViewAll.tsx
+index d4f95abf52..1e69032b5f 100644
+--- a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/AchievementsViewAll.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/AchievementsViewAll.tsx
+@@ -51,17 +51,18 @@ export const AchievementsViewAll: FC = () => {
+   }> => {
+     return badgesData
+       .map(categoryData => {
++        const badgesArray = categoryData.badges || [];
+         const filteredBadges =
+           activeFilter === LockedStatus.UNLOCKED
+-            ? categoryData.data.filter(badge => badge.lockStatus === LockedStatus.UNLOCKED)
+-            : categoryData.data;
++            ? badgesArray.filter(badge => badge.lockStatus === LockedStatus.UNLOCKED)
++            : badgesArray;
+ 
+         return {
+-          category: categoryData.categories,
++          category: categoryData.category,
+           badges: filteredBadges,
+         };
+       })
+-      .filter(group => group.badges.length > 0);
++      .filter(group => group.badges && group.badges.length > 0);
+   };
+ 
+   const groupedBadges = getFilteredBadgesByCategory();
+diff --git a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx
+index f48e891791..533d5b4075 100644
+--- a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx
+@@ -109,8 +109,8 @@ import { AchievementsViewAll } from "../AchievementsViewAll";
+ 
+ const mockBadgesData = [
+   {
+-    categories: "SIMULATION_MINUTES",
+-    data: [
++    category: "SIMULATION_MINUTES",
++    badges: [
+       {
+         id: "badge-1",
+         title: "First Steps",
+@@ -128,8 +128,8 @@ const mockBadgesData = [
+     ],
+   },
+   {
+-    categories: "ACTIVE_DAY_STREAK",
+-    data: [
++    category: "ACTIVE_DAY_STREAK",
++    badges: [
+       {
+         id: "badge-3",
+         title: "Consistent Learner",
+@@ -140,8 +140,8 @@ const mockBadgesData = [
+     ],
+   },
+   {
+-    categories: "COMMENTS_REACTIONS_GIVEN",
+-    data: [
++    category: "COMMENTS_REACTIONS_GIVEN",
++    badges: [
+       {
+         id: "badge-4",
+         title: "Community Member",
+@@ -279,8 +279,8 @@ describe("AchievementsViewAll Component", () => {
+       mockUseGetAvailableBadgesQuery.mockReturnValue({
+         data: [
+           {
+-            categories: "SIMULATION_MINUTES",
+-            data: [{ id: "badge-1", name: "Test Badge", lockStatus: "UNLOCKED" }],
++            category: "SIMULATION_MINUTES",
++            badges: [{ id: "badge-1", name: "Test Badge", lockStatus: "UNLOCKED" }],
+           },
+         ],
+         isLoading: true,
+@@ -302,8 +302,8 @@ describe("AchievementsViewAll Component", () => {
+       mockUseGetAvailableBadgesQuery.mockReturnValue({
+         data: [
+           {
+-            categories: "SIMULATION_MINUTES",
+-            data: [{ id: "badge-1", name: "Test Badge", lockStatus: "UNLOCKED" }],
++            category: "SIMULATION_MINUTES",
++            badges: [{ id: "badge-1", name: "Test Badge", lockStatus: "UNLOCKED" }],
+           },
+         ],
+         isLoading: true,
+@@ -609,8 +609,8 @@ describe("AchievementsViewAll Component", () => {
+       mockUseGetAvailableBadgesQuery.mockReturnValue({
+         data: [
+           {
+-            categories: "SIMULATION_MINUTES",
+-            data: [
++            category: "SIMULATION_MINUTES",
++            badges: [
+               {
+                 id: "badge-1",
+                 title: "Locked Badge",
+@@ -679,8 +679,8 @@ describe("AchievementsViewAll Component", () => {
+       mockUseGetAvailableBadgesQuery.mockReturnValue({
+         data: [
+           {
+-            categories: "SIMULATION_MINUTES",
+-            data: [
++            category: "SIMULATION_MINUTES",
++            badges: [
+               {
+                 id: "badge-incomplete",
+                 title: undefined,
+diff --git a/apps/ally-helpline-dashboard/src/types/badge.ts b/apps/ally-helpline-dashboard/src/types/badge.ts
+index 2e284419e8..5623ba5100 100644
+--- a/apps/ally-helpline-dashboard/src/types/badge.ts
++++ b/apps/ally-helpline-dashboard/src/types/badge.ts
+@@ -26,8 +26,8 @@ export interface AchievementItemData {
+ }
+ 
+ export interface AchievementItemDataResponse {
+-  data: AchievementItemData[];
+-  categories: BadgeCategory;
++  badges: AchievementItemData[];
++  category: BadgeCategory;
+ }
+ 
+ export enum ViewedStatus {

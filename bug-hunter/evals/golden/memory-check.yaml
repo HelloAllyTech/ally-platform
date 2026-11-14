@@ -1,0 +1,39 @@
+# Chunk 07 mechanics check: cases that produced false alarms or wrong diagnoses in
+# earlier runs. Pass 1 runs with an empty eval-scoped memory; each verdict below is
+# applied (source: simulated, written by hand from the case's known truth); pass 2
+# runs the same cases and reports what it recalled and what changed.
+# Holdout cases are refused. This is a mechanics check, not a quality eval: the
+# simulated reasons name the real cause, as a human reviewer would.
+# Kept to 4 cases (~$3). ally-ai-learn-995242d7 (wrong theory, ~$0.9 a pass) is the
+# next one to add if a wider check is wanted.
+entries:
+  - case: ally-ai-6e81b510   # the only false alarm so far (sweep, 2026-11-09); case is disputed
+    mode: sweep
+    diagnosis: not_a_bug
+    fix: none
+    reason: >-
+      Not a bug: the casing difference between the prompt wording ("Supportive
+      engagement") and the schema enum value is intentional and does not change the
+      evaluation.
+  - case: ally-be-89d8e055   # theory: fullwidth brackets; real cause: zero-width spaces
+    mode: issue
+    diagnosis: wrong
+    fix: wrong
+    reason: >-
+      Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B),
+      e.g. {​name​}; fullwidth brackets are not involved.
+  - case: ally-web-eebbfd01   # mechanism right, wrong file
+    mode: issue
+    diagnosis: wrong
+    fix: none
+    reason: >-
+      Wrong place: useLocation() is called by the helpline app's PageviewTracker, which
+      is mounted outside the Router; the fix belongs there, not in ui-shared.
+  - case: ally-web-9299e9aa   # diagnosis right, fix used the API maximum (20)
+    mode: issue
+    diagnosis: correct
+    fix: needed_edits
+    reason: >-
+      Send only the most recent 10 messages, the same window ally-be keeps, in a named
+      constant; not the API's maximum of 20.
+    approve_convention: true   # simulates `bug-hunter memory approve` between passes

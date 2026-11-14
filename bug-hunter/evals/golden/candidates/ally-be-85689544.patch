@@ -1,0 +1,67 @@
+diff --git a/src/ai/service/ai.service.ts b/src/ai/service/ai.service.ts
+index fe29f5ad7a..04613ebf63 100644
+--- a/src/ai/service/ai.service.ts
++++ b/src/ai/service/ai.service.ts
+@@ -861,6 +861,9 @@ export class AiService {
+         : errCode
+           ? `network_${errCode}`
+           : 'unknown';
++      const requestDataForLog = redactBody
++        ? `[redacted ${dataSize}B — this endpoint carries PII/PHI]`
++        : JSON.stringify(data);
+       this.logger.error(
+         `AI Request FAIL | execId=${execId} | endpoint=${endpoint} | ` +
+           `category=${failureCategory} | elapsedMs=${elapsedMs} | ` +
+@@ -870,7 +873,7 @@ export class AiService {
+           `upstreamTraceId=${upstreamTraceId ?? 'none'} | ` +
+           `upstreamDetail=${JSON.stringify(upstreamDetail)} | ` +
+           `upstreamBody=${upstreamBodyStr} | ` +
+-          `dataSize=${dataSize}B | requestData=${JSON.stringify(data)}`,
++          `dataSize=${dataSize}B | requestData=${requestDataForLog}`,
+         error.stack,
+       );
+       this.eventEmitter.emit('exception', {
+diff --git a/src/ai/service/test/ai.service.spec.ts b/src/ai/service/test/ai.service.spec.ts
+index b889631209..e34f4e7efe 100644
+--- a/src/ai/service/test/ai.service.spec.ts
++++ b/src/ai/service/test/ai.service.spec.ts
+@@ -427,6 +427,39 @@ describe('AiService', () => {
+     });
+   });
+ 
++  describe('makeRequest', () => {
++    it('should redact request data in error logs when redactBody is true', async () => {
++      jest.setTimeout(45000);
++      const error = new Error('Test error');
++      mockedAxios.mockRejectedValue(error);
++      const requestData = {
++        question: 'this is a sensitive question',
++        session_id: '123',
++        organisation_id: '456',
++        audience: { include_global: true },
++      };
++
++      await expect(
++        service.answerKnowledgeQuestion(requestData),
++      ).rejects.toThrow();
++
++      const failLogs = mockLogger.error.mock.calls.filter((call) =>
++        call[0].includes('AI Request FAIL'),
++      );
++      expect(failLogs.length).toBeGreaterThan(0);
++
++      const unredactedLogFound = failLogs.some((call) =>
++        call[0].includes(requestData.question),
++      );
++      expect(unredactedLogFound).toBe(false);
++
++      const redactedLogFound = failLogs.some((call) =>
++        call[0].includes('redacted'),
++      );
++      expect(redactedLogFound).toBe(true);
++    });
++  });
++
+   describe('Error Handling', () => {
+     it('should handle network errors', async () => {
+       const networkError = { code: 'ENOTFOUND', message: 'Network error' };

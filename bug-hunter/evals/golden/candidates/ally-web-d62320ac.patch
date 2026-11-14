@@ -1,0 +1,61 @@
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/cards/ItemCard.tsx b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/cards/ItemCard.tsx
+index 7e2d026f62..4e8add9d84 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/cards/ItemCard.tsx
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/cards/ItemCard.tsx
+@@ -78,7 +78,11 @@ export const ItemCard: FC<ItemCardProps> = ({
+ 
+   const typeWord = t(entry.typeWordKey);
+   const minutes = card.meta?.minutes;
+-  const format = card.meta?.format && card.meta.format !== typeWord ? card.meta.format : null;
++  // The server's format often repeats the type word ("video"); show it only when it adds something.
++  const format =
++    card.meta?.format && card.meta.format.toLowerCase() !== typeWord.toLowerCase()
++      ? card.meta.format
++      : null;
+   const meta =
+     [format, minutes ? t("guide.card.meta.minutes", { count: minutes }) : null]
+       .filter(Boolean)
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/state/__tests__/helpers.test.ts b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/state/__tests__/helpers.test.ts
+index 764cce3109..2da1780e81 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/state/__tests__/helpers.test.ts
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/state/__tests__/helpers.test.ts
+@@ -63,6 +63,26 @@ describe("scene collapse", () => {
+     expect(visible.map(e => e.id)).toEqual(["scene:a", "m1", "k1", "receipt:a", "m2"]);
+   });
+ 
++  it("hides the empty learner message an intent-only turn leaves behind", () => {
++    const withIntent: FeedEntry[] = [
++      ...entries,
++      {
++        kind: "message",
++        id: "m3",
++        role: "learner",
++        text: "  ",
++        status: "final",
++        turnId: "u3",
++        clientTurnId: null,
++        seq: 7,
++        sceneId: null,
++      },
++    ];
++    expect(
++      visibleEntries(withIntent, { a: scene("a", false) }, new Set()).map(e => e.id),
++    ).not.toContain("m3");
++  });
++
+   it("finds a scene's first card for Skip intro", () => {
+     expect(firstCardInScene(entries, "a")).toBe("k1");
+     expect(firstCardInScene(entries, "b")).toBeNull();
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/state/sceneGrouping.ts b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/state/sceneGrouping.ts
+index ff20f6b6ea..7974f00b50 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/state/sceneGrouping.ts
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/state/sceneGrouping.ts
+@@ -18,6 +18,8 @@ export const visibleEntries = (
+ ): FeedEntry[] =>
+   entries.filter(entry => {
+     if (entry.kind === "crisis") return false;
++    // A Continue or Start is stored as an empty learner message: nothing to show.
++    if (entry.kind === "message" && entry.role === "learner" && !entry.text.trim()) return false;
+     const sceneId = entry.sceneId;
+     if (!sceneId) return true;
+     const scene = scenes[sceneId];

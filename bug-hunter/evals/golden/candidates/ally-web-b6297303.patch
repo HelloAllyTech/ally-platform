@@ -1,0 +1,107 @@
+diff --git a/apps/ally-admin-dashboard/src/components/builder/BuilderNotificationBell.tsx b/apps/ally-admin-dashboard/src/components/builder/BuilderNotificationBell.tsx
+index b63d3ac034..0dcc6d03f5 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/BuilderNotificationBell.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/BuilderNotificationBell.tsx
+@@ -1,11 +1,11 @@
+ import { FC, useEffect, useRef, useState } from "react";
+ 
++import { Notification } from "@icons";
+ import { useNavigate } from "react-router-dom";
+ 
+ import { Button } from "@ally-ui-mono/ui-shared";
+ import { useGetBuilderNotificationsQuery, useMarkBuilderNotificationsReadMutation } from "@api";
+ import { en, ROUTES } from "@constants";
+-import { Notification } from "@icons";
+ import { BuilderNotification } from "@types";
+ import { formatDateTime } from "@utils";
+ 
+diff --git a/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx b/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+index 95a1f3d6b2..edc22586e1 100644
+--- a/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+@@ -785,10 +785,18 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
+     // array is valid. We require `name` specifically (not just "any field
+     // touched") because that's what the backend validates as mandatory;
+     // filtering on OR would allow guidelines-only states that still 400.
+-    if (Array.isArray((simulationData as any).states)) {
+-      const filledStates = ((simulationData as any).states as any[]).filter(
+-        s => typeof s?.name === "string" && s.name.trim().length > 0,
+-      );
++    const unfilteredStates = (simulationData as any).states as any[] | undefined;
++    let filledStates: any[] | undefined;
++    const removedStateIds: string[] = [];
++
++    if (Array.isArray(unfilteredStates)) {
++      filledStates = unfilteredStates.filter(s => {
++        const isFilled = typeof s?.name === "string" && s.name.trim().length > 0;
++        if (!isFilled) {
++          removedStateIds.push(s.id);
++        }
++        return isFilled;
++      });
+       // When all state cards are blank the user hasn't configured any states.
+       // Send null (not []) so the backend treats this as "not configured" and
+       // skips validation against the prompt variant's {state_x_guidelines}.
+@@ -797,6 +805,19 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
+       (simulationData as any).states = filledStates.length > 0 ? filledStates : undefined;
+     }
+ 
++    // A knowledge-source lock pointing at a state that was just filtered out
++    // (e.g. for being unnamed) must be cleared or reassigned, otherwise the
++    // roleplay may fail to save or the knowledge may be hidden all session.
++    if (Array.isArray((simulationData as any).knowledgeSources)) {
++      (simulationData as any).knowledgeSources = (
++        (simulationData as any).knowledgeSources as any[]
++      ).map(ks =>
++        ks.unlocksFromStateId && removedStateIds.includes(ks.unlocksFromStateId)
++          ? { ...ks, unlocksFromStateId: null }
++          : ks,
++      );
++    }
++
+     // The partner-org tag only means something for Partner Sim entries; when
+     // the category is anything else the field is hidden in the form, so clear
+     // the stale value instead of persisting it invisibly.
+diff --git a/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx b/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
+index 7c9d1192db..d5c6a8596b 100644
+--- a/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
+@@ -1041,4 +1041,36 @@ describe("CreateSimulation", () => {
+       );
+     });
+   });
+-});
++
++  describe("Knowledge Source Unlocks", () => {
++    it("should clear unlocksFromStateId for knowledge sources when the state is unnamed and filtered out on save", async () => {
++      mockParams.id = "existing-id";
++      mockFormMethods.getValues.mockReturnValue({
++        title: "Test",
++        description: "Test Description",
++        states: [
++          { id: "state-1", name: "Named State" },
++          { id: "state-2", name: "" },
++        ],
++        knowledgeSources: [{ id: "ks-1", title: "Test", content: "Test", unlocksFromStateId: "state-2" }],
++        triggerWarningIds: [],
++      });
++
++      renderCreateSimulation();
++      const saveDraftButton = screen.getAllByText("Save Draft")[0];
++      fireEvent.click(saveDraftButton);
++
++      await waitFor(() => {
++        expect(mockUpdateSimulation).toHaveBeenCalledWith(
++          expect.objectContaining({
++            id: "existing-id",
++            simulation: expect.objectContaining({
++              states: [{ id: "state-1", name: "Named State" }],
++              knowledgeSources: [{ id: "ks-1", title: "Test", content: "Test", unlocksFromStateId: null }],
++            }),
++          }),
++        );
++      });
++    });
++  });
++});
+\ No newline at end of file

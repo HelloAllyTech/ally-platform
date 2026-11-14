@@ -1,0 +1,78 @@
+[tool.poetry]
+name = "bug-hunter"
+version = "0.1.0"
+description = "Bug Hunter v2: a LangGraph agent that finds and fixes bugs in the ally-platform apps"
+authors = ["Ally <engineering@helloally.ai>"]
+license = "Proprietary"
+readme = "README.md"
+packages = [{ include = "bug_hunter", from = "src" }, { include = "evals" }]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.14"
+pydantic = "^2.11.7"
+pyyaml = "^6.0.2"
+typer = "^0.28.0"
+# init_chat_model / init_embeddings live in the `langchain` package. The provider
+# packages match ally-ai's lock so the API keys and versions already in use apply.
+langchain = "^1.0.0"
+langchain-core = "^1.6.5"
+langchain-openai = "^1.1.12"
+langchain-google-genai = "^4.2.0"
+tree-sitter = ">=0.23,<1.0"
+tree-sitter-language-pack = ">=1.0,<2.0"
+tiktoken = ">=0.9,<1.0"
+langgraph = "^1.2"
+langgraph-checkpoint-postgres = "^3.2"
+python-dotenv = "^1.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^26.3.1"
+isort = "^5.13.2"
+flake8 = "^7.0.0"
+pytest = "^8.0.0"
+pytest-asyncio = "^0.23.0"
+pytest-mock = "^3.12.0"
+
+[tool.poetry.scripts]
+bug-hunter = "bug_hunter.cli:app"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+# Black configuration (matches ally-ai)
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+# isort configuration (matches ally-ai)
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--tb=short --strict-markers -m 'not docker and not slow'"
+markers = [
+    "docker: needs a Docker daemon; runs the real sandbox (slow)",
+    "slow: works on the real monorepo (repo map of all five apps); seconds to a minute",
+]

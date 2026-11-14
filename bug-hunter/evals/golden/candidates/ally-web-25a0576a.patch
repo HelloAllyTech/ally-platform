@@ -1,0 +1,381 @@
+diff --git a/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx b/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx
+index ebce390d8f..765fa26be2 100644
+--- a/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx
++++ b/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx
+@@ -43,7 +43,7 @@ export const AutoTerminationRuleField: React.FC<AutoTerminationRuleFieldProps> =
+ 
+   const { setValue, watch } = formMethods;
+ 
+-  const watchedRules = watch(TERMINATION_RULES_FIELD) || [createEmptyRule()];
++  const watchedRules = watch(TERMINATION_RULES_FIELD) || [];
+ 
+   const { data: sessionEventsData } = useGetSessionEventsQuery({
+     offset: DEFAULT_OFFSET,
+diff --git a/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx b/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx
+index 2ac71648a8..d47e4f3220 100644
+--- a/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx
+@@ -177,7 +177,7 @@ describe("AutoTerminationRuleField", () => {
+       expect(screen.queryByText("Auto Termination Rules")).not.toBeInTheDocument();
+     });
+ 
+-    it("displays one rule card by default", () => {
++    it("displays no rule cards by default when terminationEvents is empty", () => {
+       mockUseGetSessionEventsQuery.mockReturnValue({
+         data: { data: [] },
+       });
+@@ -190,8 +190,9 @@ describe("AutoTerminationRuleField", () => {
+         </TestWrapper>,
+       );
+ 
+-      const dropdowns = screen.getAllByTestId("custom-dropdown");
+-      expect(dropdowns).toHaveLength(1);
++      const dropdowns = screen.queryAllByTestId("custom-dropdown");
++      expect(dropdowns).toHaveLength(0);
++      expect(screen.getByText("Add Rule")).toBeInTheDocument();
+     });
+   });
+ 
+@@ -214,7 +215,7 @@ describe("AutoTerminationRuleField", () => {
+       });
+     });
+ 
+-    it("displays event options from API response", () => {
++    it("displays event options from API response when a rule exists", () => {
+       const mockEvents = [
+         { id: "event-1", name: "Event One" },
+         { id: "event-2", name: "Event Two" },
+@@ -225,8 +226,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: mockEvents },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -238,13 +243,17 @@ describe("AutoTerminationRuleField", () => {
+       expect(screen.getByText("Event Three")).toBeInTheDocument();
+     });
+ 
+-    it("handles empty API response", () => {
++    it("handles empty API response when a rule exists", () => {
+       mockUseGetSessionEventsQuery.mockReturnValue({
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -253,13 +262,17 @@ describe("AutoTerminationRuleField", () => {
+       expect(select).toBeInTheDocument();
+     });
+ 
+-    it("handles undefined API response", () => {
++    it("handles undefined API response when a rule exists", () => {
+       mockUseGetSessionEventsQuery.mockReturnValue({
+         data: undefined,
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -275,8 +288,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -298,8 +315,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -452,8 +473,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: mockEvents },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -584,8 +609,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -599,8 +628,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -685,8 +718,9 @@ describe("AutoTerminationRuleField", () => {
+         </TestWrapper>,
+       );
+ 
+-      // Should render with default empty rule
+-      expect(screen.getByTestId("custom-dropdown")).toBeInTheDocument();
++      // Should render with no rules, only the add button
++      expect(screen.queryByTestId("custom-dropdown")).not.toBeInTheDocument();
++      expect(screen.getByText("Add Rule")).toBeInTheDocument();
+     });
+ 
+     it("handles events with missing id or name fields", () => {
+@@ -700,8 +734,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: mockEvents },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+diff --git a/apps/ally-helpline-dashboard/src/components/dropdown/__test__/__snapshots__/Dropdown.test.tsx.snap b/apps/ally-helpline-dashboard/src/components/dropdown/__test__/__snapshots__/Dropdown.test.tsx.snap
+index 95247818cb..8e67ebd2c9 100644
+--- a/apps/ally-helpline-dashboard/src/components/dropdown/__test__/__snapshots__/Dropdown.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/components/dropdown/__test__/__snapshots__/Dropdown.test.tsx.snap
+@@ -3,13 +3,13 @@
+ exports[`Dropdown Component > should match snapshot with default props 1`] = `
+ <DocumentFragment>
+   <div
+-    class="MuiAutocomplete-root MuiAutocomplete-hasClearIcon MuiAutocomplete-hasPopupIcon css-1snukod-MuiAutocomplete-root"
++    class="MuiAutocomplete-root MuiAutocomplete-hasClearIcon MuiAutocomplete-hasPopupIcon css-17u8l62-MuiAutocomplete-root"
+   >
+     <div
+-      class="MuiFormControl-root MuiFormControl-fullWidth MuiTextField-root css-cmpglg-MuiFormControl-root-MuiTextField-root"
++      class="MuiFormControl-root MuiFormControl-fullWidth MuiTextField-root css-wb57ya-MuiFormControl-root-MuiTextField-root"
+     >
+       <div
+-        class="MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth MuiInputBase-formControl MuiInputBase-sizeSmall MuiInputBase-adornedEnd MuiAutocomplete-inputRoot css-1n04w30-MuiInputBase-root-MuiOutlinedInput-root"
++        class="MuiInputBase-root MuiOutlinedInput-root MuiInputBase-colorPrimary MuiInputBase-fullWidth MuiInputBase-formControl MuiInputBase-sizeSmall MuiInputBase-adornedEnd MuiAutocomplete-inputRoot css-154xyx0-MuiInputBase-root-MuiOutlinedInput-root"
+       >
+         <input
+           aria-autocomplete="list"
+@@ -17,7 +17,7 @@ exports[`Dropdown Component > should match snapshot with default props 1`] = `
+           aria-invalid="false"
+           autocapitalize="none"
+           autocomplete="off"
+-          class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall MuiInputBase-inputAdornedEnd MuiAutocomplete-input MuiAutocomplete-inputFocused css-13meb6w-MuiInputBase-input-MuiOutlinedInput-input"
++          class="MuiInputBase-input MuiOutlinedInput-input MuiInputBase-inputSizeSmall MuiInputBase-inputAdornedEnd MuiAutocomplete-input MuiAutocomplete-inputFocused css-19qh8xo-MuiInputBase-input-MuiOutlinedInput-input"
+           id=":r0:"
+           role="combobox"
+           spellcheck="false"
+@@ -25,18 +25,18 @@ exports[`Dropdown Component > should match snapshot with default props 1`] = `
+           value="Option A"
+         />
+         <div
+-          class="MuiAutocomplete-endAdornment css-1uhhrmm-MuiAutocomplete-endAdornment"
++          class="MuiAutocomplete-endAdornment css-p1olib-MuiAutocomplete-endAdornment"
+         >
+           <button
+             aria-label="Clear"
+-            class="MuiButtonBase-root MuiIconButton-root MuiIconButton-sizeMedium MuiAutocomplete-clearIndicator css-1x7n7v0-MuiButtonBase-root-MuiIconButton-root-MuiAutocomplete-clearIndicator"
++            class="MuiButtonBase-root MuiIconButton-root MuiIconButton-sizeMedium MuiAutocomplete-clearIndicator css-1glvl0p-MuiButtonBase-root-MuiIconButton-root-MuiAutocomplete-clearIndicator"
+             tabindex="-1"
+             title="Clear"
+             type="button"
+           >
+             <svg
+               aria-hidden="true"
+-              class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall css-120dh41-MuiSvgIcon-root"
++              class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall css-ptiqhd-MuiSvgIcon-root"
+               data-testid="CloseIcon"
+               focusable="false"
+               viewBox="0 0 24 24"
+@@ -45,17 +45,20 @@ exports[`Dropdown Component > should match snapshot with default props 1`] = `
+                 d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+               />
+             </svg>
++            <span
++              class="MuiTouchRipple-root css-8je8zh-MuiTouchRipple-root"
++            />
+           </button>
+           <button
+             aria-label="Open"
+-            class="MuiButtonBase-root MuiIconButton-root MuiIconButton-sizeMedium MuiAutocomplete-popupIndicator css-2y136s-MuiButtonBase-root-MuiIconButton-root-MuiAutocomplete-popupIndicator"
++            class="MuiButtonBase-root MuiIconButton-root MuiIconButton-sizeMedium MuiAutocomplete-popupIndicator css-qzbt6i-MuiButtonBase-root-MuiIconButton-root-MuiAutocomplete-popupIndicator"
+             tabindex="-1"
+             title="Open"
+             type="button"
+           >
+             <svg
+               aria-hidden="true"
+-              class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-1umw9bq-MuiSvgIcon-root"
++              class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-i4bv87-MuiSvgIcon-root"
+               data-testid="ArrowDropDownIcon"
+               focusable="false"
+               viewBox="0 0 24 24"
+@@ -64,17 +67,19 @@ exports[`Dropdown Component > should match snapshot with default props 1`] = `
+                 d="M7 10l5 5 5-5z"
+               />
+             </svg>
++            <span
++              class="MuiTouchRipple-root css-8je8zh-MuiTouchRipple-root"
++            />
+           </button>
+         </div>
+         <fieldset
+           aria-hidden="true"
+-          class="MuiOutlinedInput-notchedOutline css-18p5xg2-MuiNotchedOutlined-root-MuiOutlinedInput-notchedOutline"
++          class="MuiOutlinedInput-notchedOutline css-1d3z3hw-MuiOutlinedInput-notchedOutline"
+         >
+           <legend
+-            class="css-1nf2c5d-MuiNotchedOutlined-root"
++            class="css-ihdtdm"
+           >
+             <span
+-              aria-hidden="true"
+               class="notranslate"
+             >
+               ​
+diff --git a/apps/ally-helpline-dashboard/src/components/toggle-button-group/__test__/__snapshots__/ToggleButtonGroup.test.tsx.snap b/apps/ally-helpline-dashboard/src/components/toggle-button-group/__test__/__snapshots__/ToggleButtonGroup.test.tsx.snap
+index b656b78ed8..ec05fd7546 100644
+--- a/apps/ally-helpline-dashboard/src/components/toggle-button-group/__test__/__snapshots__/ToggleButtonGroup.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/components/toggle-button-group/__test__/__snapshots__/ToggleButtonGroup.test.tsx.snap
+@@ -3,12 +3,12 @@
+ exports[`ToggleButtonGroup > should match snapshot when disabled 1`] = `
+ <DocumentFragment>
+   <div
+-    class="MuiToggleButtonGroup-root MuiToggleButtonGroup-horizontal h-9 !rounded-[4px] bg-neutral-100 border-[0.5px] border-border css-10wsuro-MuiToggleButtonGroup-root"
++    class="MuiToggleButtonGroup-root h-9 !rounded-[4px] bg-neutral-100 border-[0.5px] border-border css-1908ofk-MuiToggleButtonGroup-root"
+     role="group"
+   >
+     <button
+       aria-pressed="false"
+-      class="MuiButtonBase-root Mui-disabled MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButton-root Mui-disabled MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButtonGroup-firstButton css-1n3mat1-MuiButtonBase-root-MuiToggleButton-root"
++      class="MuiButtonBase-root Mui-disabled MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButton-root Mui-disabled MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButtonGroup-firstButton css-mswh2k-MuiButtonBase-root-MuiToggleButton-root"
+       disabled=""
+       tabindex="-1"
+       type="button"
+@@ -18,7 +18,7 @@ exports[`ToggleButtonGroup > should match snapshot when disabled 1`] = `
+     </button>
+     <button
+       aria-pressed="true"
+-      class="MuiButtonBase-root Mui-disabled MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButton-root Mui-selected Mui-disabled MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButtonGroup-middleButton css-1n3mat1-MuiButtonBase-root-MuiToggleButton-root"
++      class="MuiButtonBase-root Mui-disabled MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButton-root Mui-selected Mui-disabled MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButtonGroup-middleButton css-mswh2k-MuiButtonBase-root-MuiToggleButton-root"
+       disabled=""
+       tabindex="-1"
+       type="button"
+@@ -28,7 +28,7 @@ exports[`ToggleButtonGroup > should match snapshot when disabled 1`] = `
+     </button>
+     <button
+       aria-pressed="false"
+-      class="MuiButtonBase-root Mui-disabled MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButton-root Mui-disabled MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButtonGroup-lastButton css-1n3mat1-MuiButtonBase-root-MuiToggleButton-root"
++      class="MuiButtonBase-root Mui-disabled MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButton-root Mui-disabled MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal Mui-disabled MuiToggleButtonGroup-lastButton css-mswh2k-MuiButtonBase-root-MuiToggleButton-root"
+       disabled=""
+       tabindex="-1"
+       type="button"
+@@ -43,35 +43,44 @@ exports[`ToggleButtonGroup > should match snapshot when disabled 1`] = `
+ exports[`ToggleButtonGroup > should match snapshot when rendered with default props 1`] = `
+ <DocumentFragment>
+   <div
+-    class="MuiToggleButtonGroup-root MuiToggleButtonGroup-horizontal h-9 !rounded-[4px] bg-neutral-100 border-[0.5px] border-border css-10wsuro-MuiToggleButtonGroup-root"
++    class="MuiToggleButtonGroup-root h-9 !rounded-[4px] bg-neutral-100 border-[0.5px] border-border css-1908ofk-MuiToggleButtonGroup-root"
+     role="group"
+   >
+     <button
+       aria-pressed="true"
+-      class="MuiButtonBase-root MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButton-root Mui-selected MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButtonGroup-firstButton css-1n3mat1-MuiButtonBase-root-MuiToggleButton-root"
++      class="MuiButtonBase-root MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButton-root Mui-selected MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButtonGroup-firstButton css-mswh2k-MuiButtonBase-root-MuiToggleButton-root"
+       tabindex="0"
+       type="button"
+       value="optionA"
+     >
+       Option A
++      <span
++        class="MuiTouchRipple-root css-8je8zh-MuiTouchRipple-root"
++      />
+     </button>
+     <button
+       aria-pressed="false"
+-      class="MuiButtonBase-root MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButton-root MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButtonGroup-middleButton css-1n3mat1-MuiButtonBase-root-MuiToggleButton-root"
++      class="MuiButtonBase-root MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButton-root MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButtonGroup-middleButton css-mswh2k-MuiButtonBase-root-MuiToggleButton-root"
+       tabindex="0"
+       type="button"
+       value="optionB"
+     >
+       Option B
++      <span
++        class="MuiTouchRipple-root css-8je8zh-MuiTouchRipple-root"
++      />
+     </button>
+     <button
+       aria-pressed="false"
+-      class="MuiButtonBase-root MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButton-root MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButtonGroup-lastButton css-1n3mat1-MuiButtonBase-root-MuiToggleButton-root"
++      class="MuiButtonBase-root MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButton-root MuiToggleButton-sizeMedium MuiToggleButton-standard MuiToggleButtonGroup-grouped MuiToggleButtonGroup-groupedHorizontal MuiToggleButtonGroup-lastButton css-mswh2k-MuiButtonBase-root-MuiToggleButton-root"
+       tabindex="0"
+       type="button"
+       value="optionC"
+     >
+       Option C
++      <span
++        class="MuiTouchRipple-root css-8je8zh-MuiTouchRipple-root"
++      />
+     </button>
+   </div>
+ </DocumentFragment>

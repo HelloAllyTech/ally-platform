@@ -1,0 +1,181 @@
+diff --git a/src/builder/repository/builder-build.repository.ts b/src/builder/repository/builder-build.repository.ts
+index 3f1b498e94..6bdead104d 100644
+--- a/src/builder/repository/builder-build.repository.ts
++++ b/src/builder/repository/builder-build.repository.ts
+@@ -45,6 +45,22 @@ export class BuilderBuildRunRepository extends Repository<BuilderBuildRun> {
+    * plain status check keeps seeing a blocker that nothing will ever clear,
+    * and every later fix and review dispatch is refused in silence.
+    */
++  /**
++   * Is this the newest run of its session?
++   *
++   * Asked when a run settles a second time — the agent's claim first, the
++   * runner's evidence after it — so that a later correction can only touch a
++   * session this run is still the current owner of.
++   */
++  async isLatestForSession(runId: string, sessionId: string): Promise<boolean> {
++    const latest = await this.findOne({
++      where: { sessionId },
++      order: { createdAt: 'DESC' },
++      select: ['id'],
++    });
++    return latest?.id === runId;
++  }
++
+   async countBlockingRuns(sessionId: string): Promise<number> {
+     return this.createQueryBuilder('run')
+       .where('run.sessionId = :sessionId', { sessionId })
+diff --git a/src/builder/service/builder-build.service.ts b/src/builder/service/builder-build.service.ts
+index 148673cd57..84b1775c6c 100644
+--- a/src/builder/service/builder-build.service.ts
++++ b/src/builder/service/builder-build.service.ts
+@@ -1754,13 +1754,43 @@ export class BuilderBuildService {
+ 
+     // Only the run's own outcome moves the session; a session already
+     // cancelled by a human stays cancelled.
++    //
++    // The exception is this run correcting itself. A run reports its outcome
++    // once — but the runner also reports one, from evidence, after the agent
++    // has finished: work pushed with no pull request, a branch that went
++    // nowhere. Those arrive second, and the guard above swallowed them, so a
++    // run whose agent said "done" settled the session COMPLETED and the
++    // runner's truthful "failed" moments later updated only the run row.
++    //
++    // That is the worst shape this can take: the session reads Done in green,
++    // its own latest run reads Failed, no pull request exists, and COMPLETED
++    // is deliberately not restartable — so the page offers no way onward from
++    // a success that did not happen.
++    //
++    // Narrow on purpose. Only a FAILED settlement, only from the session's own
++    // latest run, and only over a COMPLETED that the same run just set.
++    // Evidence may correct a claim; a claim may not overwrite evidence, and
++    // nothing here lets an older run reopen a session that has moved on.
++    const correctingItsOwnClaim =
++      session.status === BuilderSessionStatus.COMPLETED &&
++      (status === BuilderRunStatus.FAILED ||
++        status === BuilderRunStatus.TIMED_OUT) &&
++      (await this.runRepository.isLatestForSession(run.id, session.id));
++
+     if (
+       session.status !== BuilderSessionStatus.BUILDING &&
+-      session.status !== BuilderSessionStatus.WAITING_FOR_INPUT
++      session.status !== BuilderSessionStatus.WAITING_FOR_INPUT &&
++      !correctingItsOwnClaim
+     ) {
+       return;
+     }
+ 
++    if (correctingItsOwnClaim) {
++      this.logger.warn(
++        `Builder run ${run.id} reported done and then failed; correcting session ${session.id} back from COMPLETED.`,
++      );
++    }
++
+     if (status === BuilderRunStatus.SUCCEEDED) {
+       // An epic mid-series is not finished: the next milestone dispatches and
+       // the session stays BUILDING. Marking it COMPLETED here would tell the
+diff --git a/src/builder/service/test/builder-build.service.spec.ts b/src/builder/service/test/builder-build.service.spec.ts
+index 3cc1fd6f1b..b7f50cf75d 100644
+--- a/src/builder/service/test/builder-build.service.spec.ts
++++ b/src/builder/service/test/builder-build.service.spec.ts
+@@ -54,6 +54,7 @@ describe('BuilderBuildService', () => {
+     listRecent: jest.Mock;
+     countBlockingRuns: jest.Mock;
+     findLatest: jest.Mock;
++    isLatestForSession: jest.Mock;
+   };
+   let eventRepository: { listByRun: jest.Mock; latestOfType: jest.Mock };
+   let pullRequestRepository: { increment: jest.Mock; findOne: jest.Mock };
+@@ -106,6 +107,7 @@ describe('BuilderBuildService', () => {
+       // resume exists, so this is a query rather than a status filter.
+       countBlockingRuns: jest.fn().mockResolvedValue(0),
+       findLatest: jest.fn().mockResolvedValue(null),
++      isLatestForSession: jest.fn().mockResolvedValue(false),
+     };
+     eventRepository = {
+       listByRun: jest.fn().mockResolvedValue([]),
+@@ -794,6 +796,84 @@ describe('BuilderBuildService', () => {
+     });
+   });
+ 
++  /**
++   * A run reports its outcome once — but the runner reports one too, from
++   * evidence, after the agent has finished. When the agent claims done and the
++   * runner then finds no pull request, the second report is the true one.
++   */
++  describe('evidence correcting a success the agent claimed', () => {
++    const settling = (sessionStatus: BuilderSessionStatus, latest = true) => {
++      const run = {
++        id: 'run-1',
++        sessionId: 'session-1',
++        startedAt: new Date(),
++        dispatchedAt: new Date(),
++      };
++      sessionRepository.findOne.mockResolvedValue({
++        id: 'session-1',
++        status: sessionStatus,
++      });
++      runRepository.isLatestForSession.mockResolvedValue(latest);
++      return run;
++    };
++
++    it('takes a session back off COMPLETED when its own run then fails', async () => {
++      const run = settling(BuilderSessionStatus.COMPLETED);
++
++      await service.settleRun(
++        run as any,
++        BuilderRunStatus.FAILED,
++        'Work was pushed but no pull request exists.',
++      );
++
++      expect(sessionRepository.update).toHaveBeenCalledWith(
++        { id: 'session-1' },
++        expect.objectContaining({ status: BuilderSessionStatus.FAILED }),
++      );
++    });
++
++    /**
++     * The guard this narrows still has to hold: a human pressing stop is not
++     * overruled by a run finishing a moment later.
++     */
++    it('leaves a session a person cancelled alone', async () => {
++      const run = settling(BuilderSessionStatus.CANCELLED);
++
++      await service.settleRun(run as any, BuilderRunStatus.FAILED, 'boom');
++
++      expect(sessionRepository.update).not.toHaveBeenCalledWith(
++        { id: 'session-1' },
++        expect.objectContaining({ status: BuilderSessionStatus.FAILED }),
++      );
++    });
++
++    it('does not let a stale run reopen a session that has moved on', async () => {
++      const run = settling(BuilderSessionStatus.COMPLETED, false);
++
++      await service.settleRun(run as any, BuilderRunStatus.FAILED, 'boom');
++
++      expect(sessionRepository.update).not.toHaveBeenCalledWith(
++        { id: 'session-1' },
++        expect.objectContaining({ status: BuilderSessionStatus.FAILED }),
++      );
++    });
++
++    /**
++     * One direction only. Evidence may correct a claim; a claim may not
++     * overwrite evidence.
++     */
++    it('never turns a failed session green', async () => {
++      const run = settling(BuilderSessionStatus.FAILED);
++
++      await service.settleRun(run as any, BuilderRunStatus.SUCCEEDED, null);
++
++      expect(sessionRepository.update).not.toHaveBeenCalledWith(
++        { id: 'session-1' },
++        expect.objectContaining({ status: BuilderSessionStatus.COMPLETED }),
++      );
++    });
++  });
++
+   describe('spend and concurrency guards', () => {
+     it('refuses a dispatch while another is already starting for the session', async () => {
+       // Two admins answering the last question of a group at once, or one

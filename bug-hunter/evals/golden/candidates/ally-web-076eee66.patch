@@ -1,0 +1,310 @@
+diff --git a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx
+index d4f4f1ac6d..2f2f445fd9 100644
+--- a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx
++++ b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx
+@@ -1,11 +1,13 @@
+-import { FC, Fragment, useEffect, useRef } from "react";
++import { FC, Fragment, useEffect, useMemo, useRef } from "react";
+ 
+ import { UseFormReturn } from "react-hook-form";
+ 
++import { useGetPromptsByTypeQuery } from "@api";
+ import { FORM_FIELD_IDS, SESSION_TIMER_CONFIG } from "@constants";
+ import { FormFieldConfig } from "@types";
+ 
+ import { FormField } from "./FormField";
++import { getAvailableVariableName } from "../../utils/availableVariables";
+ 
+ export interface CreateSimulationSubSectionProps {
+   items: FormFieldConfig[];
+@@ -31,8 +33,49 @@ export const CreateSimulationSubSection: FC<CreateSimulationSubSectionProps> = (
+     }
+   }, [timerMode, formMethods]);
+ 
+-  // Filter fields based on conditions
++  // Resolve the placeholder set referenced by the picked main-agent
++  // variant ONCE per render. We use this at the parent layer (rather
++  // than letting FormField self-hide via return-null) so the wrapping
++  // <div className="w-[48%]"> AND any `isDashedLineAbove` divider are
++  // skipped together with the field. Self-hiding inside FormField left
++  // ghost gaps and orphan dashed lines because the parent had already
++  // committed to rendering the wrappers.
++  //
++  // FormField keeps its own `hideWhenUnused` guard as defense-in-depth
++  // for callsites that render it directly (without this wrapper), but
++  // in this layout we want the gate enforced one level up.
++  const selectedMainPromptCode = formMethods.watch(FORM_FIELD_IDS.SELECTED_MAIN_PROMPT_CODE) as
++    | string
++    | undefined;
++  const { data: mainAgentPrompts } = useGetPromptsByTypeQuery("main_agent", {
++    // Only worth the query when at least one field could be gated.
++    skip: !items?.some(i => i.hideWhenUnused && i.promptVariable),
++  });
++  const usedPlaceholders = useMemo<Set<string> | null>(() => {
++    if (!mainAgentPrompts) return null; // not loaded yet → no hiding
++    if (!selectedMainPromptCode) return null; // no variant → default → no hiding
++    const match = mainAgentPrompts.find(p => p.promptCode === selectedMainPromptCode);
++    if (!match) return null; // variant missing (deleted / sync race) → no hiding
++    return new Set((match.availableVariables ?? []).map(getAvailableVariableName));
++  }, [mainAgentPrompts, selectedMainPromptCode]);
++
++  // Filter fields based on conditions. The order matters: mandatory
++  // override beats hideWhenUnused (mirrors the safety guard inside
++  // FormField), and the visibleWhen predicate is checked last.
+   const shouldRenderField = (field: FormFieldConfig) => {
++    // Variant-driven hiding: skip the whole render (wrapper + dashed
++    // line + content) when the picked variant's body doesn't reference
++    // the field's placeholder. Mandatory fields are never hidden — the
++    // form can't save without them.
++    if (
++      field.hideWhenUnused &&
++      field.promptVariable &&
++      !field.isMandatory &&
++      usedPlaceholders !== null &&
++      !usedPlaceholders.has(field.promptVariable)
++    ) {
++      return false;
++    }
+     // Check custom visibility condition
+     if (field.visibleWhen) {
+       const formValues = formMethods.getValues();
+diff --git a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx
+index 217db11e1a..864edb0989 100644
+--- a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx
+@@ -22,6 +22,43 @@ vi.mock("../FormField", () => ({
+ // hooks from the barrel. Empty mock keeps the import resolving cleanly.
+ vi.mock("@hooks", () => ({}));
+ 
++// Mock for the prompts-by-type query that drives the parent-level
++// variant gate. Tests override `mainAgentPromptsMock.current` to
++// simulate "loaded" / "unloaded" / "variant not found" states.
++const { mainAgentPromptsMock } = vi.hoisted(() => ({
++  mainAgentPromptsMock: {
++    current: undefined as
++      | undefined
++      | Array<{
++          promptCode: string;
++          availableVariables: Array<{ name: string } | string>;
++        }>,
++  },
++}));
++
++vi.mock("@api", () => ({
++  // src/store/index.ts imports `baseAPI` from "@api". Provide a no-op
++  // shim so the store can boot under the test harness.
++  baseAPI: {
++    reducerPath: "baseAPI",
++    reducer: (state: unknown = {}) => state,
++    middleware: () => (next: (a: unknown) => unknown) => (action: unknown) => next(action),
++    util: { resetApiState: vi.fn() },
++    injectEndpoints: vi.fn(() => ({})),
++  },
++  useGetPromptsByTypeQuery: () => ({ data: mainAgentPromptsMock.current }),
++}));
++
++vi.mock("@api/baseApi", () => ({
++  baseAPI: {
++    reducerPath: "baseAPI",
++    reducer: (state: unknown = {}) => state,
++    middleware: () => (next: (a: unknown) => unknown) => (action: unknown) => next(action),
++    util: { resetApiState: vi.fn() },
++    injectEndpoints: vi.fn(() => ({})),
++  },
++}));
++
+ // Wrapper component to provide form context
+ const TestWrapper = ({ children, defaultValues = {} }: any) => {
+   const formMethods = useForm({ defaultValues });
+@@ -57,6 +94,10 @@ describe("CreateSimulationSubSection", () => {
+ 
+   beforeEach(() => {
+     vi.clearAllMocks();
++    // Reset the variant-prompts mock to the default "not loaded yet"
++    // state so tests that don't care about variant gating render
++    // every field (the gate is a no-op until data lands).
++    mainAgentPromptsMock.current = undefined;
+   });
+ 
+   describe("Rendering", () => {
+@@ -863,4 +904,180 @@ describe("CreateSimulationSubSection", () => {
+       });
+     });
+   });
++
++  describe("Variant-driven field hiding (hideWhenUnused)", () => {
++    // When a field opts into hide-when-unused AND the picked variant
++    // doesn't reference its placeholder, the parent must skip the
++    // entire fragment — wrapper div, dashed line, AND content — so
++    // the flex-wrap layout doesn't carry ghost gaps or orphan
++    // dividers from an empty 48% slot.
++    //
++    // We render the same item shape used in production: a wrapper
++    // around FormField with `data-testid="form-field-<id>"` (provided
++    // by the FormField mock above). The wrapper div has either
++    // `w-[48%]` or `w-full`. We assert on both the field's testid
++    // AND the wrapper-class count to confirm the wrapper went away.
++
++    const gatedField: FormFieldConfig = {
++      id: "gated" as any,
++      label: "Gated",
++      type: "text",
++      isMandatory: false,
++      promptVariable: "gated_placeholder",
++      hideWhenUnused: true,
++    };
++    const otherField: FormFieldConfig = {
++      id: "other" as any,
++      label: "Other",
++      type: "text",
++    };
++
++    it("skips wrapper, dashed line, and content together when variant doesn't reference the placeholder", () => {
++      mainAgentPromptsMock.current = [
++        {
++          promptCode: "v1",
++          // No `gated_placeholder` in this variant's reconciled list.
++          availableVariables: [{ name: "other" }],
++        },
++      ];
++
++      const itemsWithDashedLineAbove: FormFieldConfig[] = [
++        otherField,
++        { ...gatedField, isDashedLineAbove: true },
++      ];
++
++      const { container } = render(
++        <TestWrapper defaultValues={{ selectedMainPromptCode: "v1" }}>
++          {(formMethods: any) => (
++            <CreateSimulationSubSection
++              items={itemsWithDashedLineAbove}
++              formMethods={formMethods}
++            />
++          )}
++        </TestWrapper>,
++      );
++
++      // Field content is gone.
++      expect(screen.queryByTestId("form-field-gated")).not.toBeInTheDocument();
++      // Only ONE wrapper div should be present (for `otherField`); the
++      // gated field's wrapper is also gone so no ghost 48% slot.
++      const wrappers = container.querySelectorAll(".w-\\[48\\%\\], .w-full");
++      // Filter out the outer flex container which uses w-[60%]; only
++      // count the per-field 48% / w-full wrappers added inside the map.
++      const fieldWrappers = Array.from(wrappers).filter(n => !n.classList.contains("flex-row"));
++      expect(fieldWrappers.length).toBe(1);
++      // The orphan dashed line above the gated field is also gone.
++      expect(container.querySelector(".border-dashed")).not.toBeInTheDocument();
++    });
++
++    it("renders the field when the variant references the placeholder", () => {
++      mainAgentPromptsMock.current = [
++        {
++          promptCode: "v1",
++          availableVariables: [{ name: "gated_placeholder" }, { name: "other" }],
++        },
++      ];
++
++      render(
++        <TestWrapper defaultValues={{ selectedMainPromptCode: "v1" }}>
++          {(formMethods: any) => (
++            <CreateSimulationSubSection
++              items={[otherField, gatedField]}
++              formMethods={formMethods}
++            />
++          )}
++        </TestWrapper>,
++      );
++
++      expect(screen.getByTestId("form-field-gated")).toBeInTheDocument();
++      expect(screen.getByTestId("form-field-other")).toBeInTheDocument();
++    });
++
++    it("renders the field while the prompts list is still loading (no-flicker)", () => {
++      // Default test state — `mainAgentPromptsMock.current = undefined`
++      // simulates the in-flight query. Gate is a no-op so the field
++      // stays visible while we wait for variant data.
++      render(
++        <TestWrapper defaultValues={{ selectedMainPromptCode: "v1" }}>
++          {(formMethods: any) => (
++            <CreateSimulationSubSection
++              items={[otherField, gatedField]}
++              formMethods={formMethods}
++            />
++          )}
++        </TestWrapper>,
++      );
++
++      expect(screen.getByTestId("form-field-gated")).toBeInTheDocument();
++    });
++
++    it("renders the field when no variant is picked (default Prompt #1 in effect)", () => {
++      mainAgentPromptsMock.current = [
++        { promptCode: "v1", availableVariables: [{ name: "other" }] },
++      ];
++
++      // `selectedMainPromptCode` undefined → scenario uses the default
++      // main_agent prompt. We have no way to know what it references
++      // without an extra lookup, so the safe default is "show all"
++      // (matches FormField's own behavior).
++      render(
++        <TestWrapper defaultValues={{}}>
++          {(formMethods: any) => (
++            <CreateSimulationSubSection
++              items={[otherField, gatedField]}
++              formMethods={formMethods}
++            />
++          )}
++        </TestWrapper>,
++      );
++
++      expect(screen.getByTestId("form-field-gated")).toBeInTheDocument();
++    });
++
++    it("renders the field when the picked variant is missing from the list (deleted / sync race)", () => {
++      mainAgentPromptsMock.current = [
++        { promptCode: "v1", availableVariables: [{ name: "other" }] },
++      ];
++
++      // Form has a variant code that the loaded list doesn't contain.
++      // Treat as "we don't know what it references" → show everything.
++      render(
++        <TestWrapper defaultValues={{ selectedMainPromptCode: "deleted_variant" }}>
++          {(formMethods: any) => (
++            <CreateSimulationSubSection
++              items={[otherField, gatedField]}
++              formMethods={formMethods}
++            />
++          )}
++        </TestWrapper>,
++      );
++
++      expect(screen.getByTestId("form-field-gated")).toBeInTheDocument();
++    });
++
++    it("never hides a mandatory field even when variant doesn't reference its placeholder", () => {
++      mainAgentPromptsMock.current = [
++        { promptCode: "v1", availableVariables: [{ name: "other" }] },
++      ];
++
++      // Mandatory + hideWhenUnused is technically a misconfiguration;
++      // the parent should refuse to hide it (same belt-and-braces as
++      // FormField's internal guard).
++      const mandatoryField: FormFieldConfig = {
++        ...gatedField,
++        id: "mandatory" as any,
++        isMandatory: true,
++      };
++
++      render(
++        <TestWrapper defaultValues={{ selectedMainPromptCode: "v1" }}>
++          {(formMethods: any) => (
++            <CreateSimulationSubSection items={[mandatoryField]} formMethods={formMethods} />
++          )}
++        </TestWrapper>,
++      );
++
++      expect(screen.getByTestId("form-field-mandatory")).toBeInTheDocument();
++    });
++  });
+ });

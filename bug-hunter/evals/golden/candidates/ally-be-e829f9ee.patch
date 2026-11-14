@@ -1,0 +1,108 @@
+diff --git a/src/track/dto/test/upsert-track-structure.dto.spec.ts b/src/track/dto/test/upsert-track-structure.dto.spec.ts
+new file mode 100644
+index 0000000000..cb63309a69
+--- /dev/null
++++ b/src/track/dto/test/upsert-track-structure.dto.spec.ts
+@@ -0,0 +1,63 @@
++import { plainToInstance } from 'class-transformer';
++import { validate } from 'class-validator';
++import { BreathingExerciseContentDto } from '../upsert-track-structure.dto';
++
++describe('BreathingExerciseContentDto', () => {
++  const createValidDto = (): BreathingExerciseContentDto => {
++    const dto = new BreathingExerciseContentDto();
++    dto.inhale = 5;
++    dto.holdIn = 5;
++    dto.exhale = 5;
++    dto.holdOut = 5;
++    dto.cycles = 3;
++    dto.inhaleText = 'Inhale';
++    dto.holdInText = 'Hold';
++    dto.exhaleText = 'Exhale';
++    dto.holdOutText = 'Hold';
++    return dto;
++  };
++
++  it('should pass validation with positive durations', async () => {
++    const dto = createValidDto();
++    const errors = await validate(
++      plainToInstance(BreathingExerciseContentDto, dto),
++    );
++    expect(errors.length).toBe(0);
++  });
++
++  it('should fail validation if inhale duration is 0', async () => {
++    const dto = createValidDto();
++    dto.inhale = 0;
++    const errors = await validate(
++      plainToInstance(BreathingExerciseContentDto, dto),
++    );
++    expect(errors.length).toBe(1); // This will fail before the fix
++  });
++
++  it('should fail validation if holdIn duration is 0', async () => {
++    const dto = createValidDto();
++    dto.holdIn = 0;
++    const errors = await validate(
++      plainToInstance(BreathingExerciseContentDto, dto),
++    );
++    expect(errors.length).toBe(1); // This will fail before the fix
++  });
++
++  it('should fail validation if exhale duration is 0', async () => {
++    const dto = createValidDto();
++    dto.exhale = 0;
++    const errors = await validate(
++      plainToInstance(BreathingExerciseContentDto, dto),
++    );
++    expect(errors.length).toBe(1); // This will fail before the fix
++  });
++
++  it('should fail validation if holdOut duration is 0', async () => {
++    const dto = createValidDto();
++    dto.holdOut = 0;
++    const errors = await validate(
++      plainToInstance(BreathingExerciseContentDto, dto),
++    );
++    expect(errors.length).toBe(1); // This will fail before the fix
++  });
++});
+diff --git a/src/track/dto/upsert-track-structure.dto.ts b/src/track/dto/upsert-track-structure.dto.ts
+index 84513ca90c..a508620b29 100644
+--- a/src/track/dto/upsert-track-structure.dto.ts
++++ b/src/track/dto/upsert-track-structure.dto.ts
+@@ -8,6 +8,7 @@ import {
+   IsNumber,
+   IsObject,
+   IsOptional,
++  IsPositive,
+   IsString,
+   IsUUID,
+   Max,
+@@ -54,22 +55,22 @@ export class UpsertTrackItemCompletionCriteriaDto {
+ export class BreathingExerciseContentDto {
+   @ApiProperty({ description: 'Duration of inhale phase (seconds)' })
+   @IsNumber()
+-  @Min(0)
++  @IsPositive()
+   inhale!: number;
+ 
+   @ApiProperty({ description: 'Duration of hold phase after inhale (seconds)' })
+   @IsNumber()
+-  @Min(0)
++  @IsPositive()
+   holdIn!: number;
+ 
+   @ApiProperty({ description: 'Duration of exhale phase (seconds)' })
+   @IsNumber()
+-  @Min(0)
++  @IsPositive()
+   exhale!: number;
+ 
+   @ApiProperty({ description: 'Duration of hold phase after exhale (seconds)' })
+   @IsNumber()
+-  @Min(0)
++  @IsPositive()
+   holdOut!: number;
+ 
+   @ApiProperty({ description: 'Total number of breathing cycles' })

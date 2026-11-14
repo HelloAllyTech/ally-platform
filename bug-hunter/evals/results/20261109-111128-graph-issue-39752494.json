@@ -1,0 +1,104 @@
+{
+ "meta": {
+  "agent": "graph",
+  "mode": "issue",
+  "git_sha": "3975249415a7333e3ee05dcaa7377cf18bab1138",
+  "prompt_versions": "investigate.v1, reproduce.v1, triage.v1",
+  "models": {
+   "triage": "openai:gpt-5-mini",
+   "investigate": "openai:gpt-5",
+   "fix": "openai:gpt-5",
+   "review": "google_genai:gemini-2.5-pro",
+   "embeddings": "openai:text-embedding-3-small"
+  },
+  "timestamp": "2026-11-09T11:11:21+00:00",
+  "cases": 1,
+  "stopped_reason": null,
+  "free_gb_start": 12.25,
+  "skipped_for_mode": [],
+  "cost_cap_usd": 10.0,
+  "cost_usd_total": 0.0008,
+  "cases_done": 1,
+  "cases_remaining": 0,
+  "free_gb_end": 12.25
+ },
+ "metrics": {
+  "total": {
+   "cases": 1,
+   "bugs": 0,
+   "clean": 1,
+   "detected": 0,
+   "missed": 0,
+   "false_alarms": 0,
+   "repro_attempted": 0,
+   "repro_valid": 0,
+   "fix_attempted": 0,
+   "fix_pass": 0,
+   "escalate_expected": 0,
+   "escalate_correct": 0,
+   "errors": 0,
+   "tokens": 1219,
+   "cost_usd": 0.000774,
+   "seconds": 6.5,
+   "sandbox_seconds": 0.0,
+   "rates": {
+    "detection": null,
+    "false_alarm": 0.0,
+    "reproduction": null,
+    "fix_pass": null,
+    "escalation_correct": null,
+    "error": 0.0
+   }
+  },
+  "ally-be": {
+   "cases": 1,
+   "bugs": 0,
+   "clean": 1,
+   "detected": 0,
+   "missed": 0,
+   "false_alarms": 0,
+   "repro_attempted": 0,
+   "repro_valid": 0,
+   "fix_attempted": 0,
+   "fix_pass": 0,
+   "escalate_expected": 0,
+   "escalate_correct": 0,
+   "errors": 0,
+   "tokens": 1219,
+   "cost_usd": 0.000774,
+   "seconds": 6.5,
+   "sandbox_seconds": 0.0,
+   "rates": {
+    "detection": null,
+    "false_alarm": 0.0,
+    "reproduction": null,
+    "fix_pass": null,
+    "escalation_correct": null,
+    "error": 0.0
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "ally-be-b29aa1be",
+   "app": "ally-be",
+   "kind": "clean",
+   "expected": "no_bug",
+   "outcome": "clean",
+   "found": false,
+   "escalated": false,
+   "patch_applied": null,
+   "repro_valid": null,
+   "oracle_pass": null,
+   "tokens": 1219,
+   "cost_usd": 0.000774,
+   "seconds": 6.5,
+   "sandbox_seconds": 0.0,
+   "run_id": "run-20261109-111121-4cddc1",
+   "error": null,
+   "trace_url": null,
+   "status": "closed_not_bug",
+   "confidence": "medium"
+  }
+ ]
+}

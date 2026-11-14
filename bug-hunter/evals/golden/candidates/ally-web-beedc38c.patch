@@ -1,0 +1,113 @@
+diff --git a/ally-web/apps/ally-admin-dashboard/src/components/agent-builder-copilot/__tests__/useAgentBuilderGeneration.test.tsx b/ally-web/apps/ally-admin-dashboard/src/components/agent-builder-copilot/__tests__/useAgentBuilderGeneration.test.tsx
+index 0610cc0d84..2960303906 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/components/agent-builder-copilot/__tests__/useAgentBuilderGeneration.test.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/components/agent-builder-copilot/__tests__/useAgentBuilderGeneration.test.tsx
+@@ -314,7 +314,9 @@ describe("useAgentBuilderGeneration — chained stages", () => {
+     for (const request of later) {
+       expect(request.establishedContext).toEqual(expected);
+     }
+-    for (const request of requests.filter(r => STAGE_ONE.includes(String(r.field)))) {
++    for (const request of requests.filter(
++      r => String(r.field) !== "challenge_description" && STAGE_ONE.includes(String(r.field)),
++    )) {
+       expect(request.establishedContext).toBeUndefined();
+     }
+   });
+@@ -328,11 +330,17 @@ describe("useAgentBuilderGeneration — chained stages", () => {
+     const { result } = renderHook(() => useAgentBuilderGeneration(form));
+ 
+     act(() => result.current.start(INPUTS));
++    // With `persona` held, `challenge_description` (which now depends on it)
++    // should remain "active", while `spoken_languages` (also stage one, but
++    // independent) should finish.
+     await waitFor(() =>
+-      expect(result.current.tasks.find(t => t.field === "challenge_description")?.status).toBe(
++      expect(result.current.tasks.find(t => t.field === "spoken_languages")?.status).toBe(
+         "done",
+       ),
+     );
++    expect(result.current.tasks.find(t => t.field === "challenge_description")?.status).toBe(
++      "active",
++    );
+ 
+     expect(fieldsRequested()).not.toContain("title");
+     expect(result.current.tasks.find(t => t.field === "title")?.status).toBe("waiting");
+@@ -357,6 +365,27 @@ describe("useAgentBuilderGeneration — chained stages", () => {
+     expect(result.current.tasks.find(t => t.field === "backstory")?.status).toBe("done");
+   });
+ 
++  it("sends the generated persona as context to challenge description generation", async () => {
++    const { form } = makeForm();
++    const { result } = renderHook(() => useAgentBuilderGeneration(form));
++
++    act(() => result.current.start(INPUTS));
++    await waitFor(() => expect(result.current.phase).toBe("done"));
++
++    const personaRequest = requests.find(r => r.field === "persona");
++    const challengeRequest = requests.find(r => r.field === "challenge_description");
++
++    // Persona is called with no context
++    expect(personaRequest?.establishedContext).toBeUndefined();
++
++    // Challenge description is called with persona context. The `challengeDescription`
++    // is undefined because it has not been generated yet.
++    expect(challengeRequest?.establishedContext).toEqual({
++      persona: { name: "Suchi", age: 34, gender: "female" },
++      challengeDescription: undefined,
++    });
++  });
++
+   it("never fires the waiting fields when stopped during the foundation", async () => {
+     state.holds.persona = new Promise<void>(() => {});
+     const { form } = makeForm();
+diff --git a/ally-web/apps/ally-admin-dashboard/src/components/agent-builder-copilot/useAgentBuilderGeneration.ts b/ally-web/apps/ally-admin-dashboard/src/components/agent-builder-copilot/useAgentBuilderGeneration.ts
+index 796eba0f91..dfae7b9098 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/components/agent-builder-copilot/useAgentBuilderGeneration.ts
++++ b/ally-web/apps/ally-admin-dashboard/src/components/agent-builder-copilot/useAgentBuilderGeneration.ts
+@@ -455,13 +455,39 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
+         });
+       };
+ 
+-      // Stage one fires now; its settle becomes the context stage two reads.
+-      for (const { field } of fieldPlan.filter(t => isStageOne(t.field))) {
+-        runsByField.set(field, runTask({ key: field, field }));
+-      }
+-      foundation = Promise.allSettled(
+-        [...FOUNDATION_FIELDS].map(field => runsByField.get(field) ?? Promise.resolve()),
+-      ).then(() => readEstablishedContext(formMethods));
++      // Stage one fires now. `persona` and `spoken_languages` run in parallel.
++      // `challenge_description` runs after `persona` completes, using its output
++      // as context to ensure consistency. The final `foundation` promise for
++      // stage two waits for all three to settle.
++      const personaRun = runTask({ key: "persona", field: "persona" });
++      runsByField.set("persona", personaRun);
++
++      const challengeDescRun = personaRun.then(() => {
++        if (abortedRef.current) return Promise.resolve();
++        // Read just the persona from the form; challenge_description isn't there
++        // yet. This becomes the context for generating the description.
++        const personaContext = readEstablishedContext(formMethods);
++        return runTask({
++          key: "challenge_description",
++          field: "challenge_description",
++          establishedContext: personaContext,
++        });
++      });
++      runsByField.set("challenge_description", challengeDescRun);
++
++      // `spoken_languages` is independent of the other foundation fields and can
++      // run in parallel with `persona`.
++      runsByField.set(
++        SPOKEN_LANGUAGES_FIELD.field,
++        runTask({ key: SPOKEN_LANGUAGES_FIELD.field, field: SPOKEN_LANGUAGES_FIELD.field }),
++      );
++
++      // The `foundation` promise resolves once both foundation fields have
++      // settled, and its value is the context for all stage-two calls.
++      foundation = Promise.allSettled([personaRun, challengeDescRun]).then(() =>
++        abortedRef.current ? undefined : readEstablishedContext(formMethods),
++      );
++
+       for (const { field } of fieldPlan.filter(t => !isStageOne(t.field))) {
+         runsByField.set(field, runAfterFoundation({ key: field, field }));
+       }

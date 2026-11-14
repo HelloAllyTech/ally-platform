@@ -1,0 +1,124 @@
+diff --git a/src/chat/repository/chat.repository.ts b/src/chat/repository/chat.repository.ts
+index 85b04a934f..0231c717f2 100644
+--- a/src/chat/repository/chat.repository.ts
++++ b/src/chat/repository/chat.repository.ts
+@@ -50,11 +50,15 @@ export class ChatRepository extends Repository<Chat> {
+       counselorId: params.counselorId,
+     });
+ 
++    // Use take/skip (not limit/offset) so pagination counts unique chats. The
++    // leftJoinAndMapMany on customFieldValues produces N rows per chat; raw
++    // SQL LIMIT would cap at N rows then dedup, returning fewer than the
++    // requested page size and hiding chats from later pages.
+     if (params.limit) {
+-      query.limit(params.limit);
++      query.take(params.limit);
+     }
+     if (params.offset) {
+-      query.offset(params.offset);
++      query.skip(params.offset);
+     }
+     if (params.sortBy) {
+       const sortOrder =
+@@ -132,8 +136,9 @@ export class ChatRepository extends Repository<Chat> {
+ 
+     query.andWhere('chat.tenant_id = :tenantId', { tenantId });
+ 
+-    if (filters.limit) query.limit(filters.limit);
+-    if (filters.offset) query.offset(filters.offset);
++    // See getCallLogsQuery for why take/skip instead of limit/offset.
++    if (filters.limit) query.take(filters.limit);
++    if (filters.offset) query.skip(filters.offset);
+ 
+     this.applySorting(
+       query,
+diff --git a/src/chat/repository/test/chat.repository.spec.ts b/src/chat/repository/test/chat.repository.spec.ts
+index af49daecda..d54a23715f 100644
+--- a/src/chat/repository/test/chat.repository.spec.ts
++++ b/src/chat/repository/test/chat.repository.spec.ts
+@@ -36,6 +36,8 @@ describe('ChatRepository', () => {
+       orderBy: jest.fn().mockReturnThis(),
+       limit: jest.fn().mockReturnThis(),
+       offset: jest.fn().mockReturnThis(),
++      take: jest.fn().mockReturnThis(),
++      skip: jest.fn().mockReturnThis(),
+       getRawOne: jest.fn(),
+       getManyAndCount: jest.fn(),
+     };
+@@ -489,8 +491,8 @@ describe('ChatRepository', () => {
+         'chat.status = :status',
+         { status: ChatStatus.ENDED },
+       );
+-      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10);
+-      expect(mockQueryBuilder.offset).toHaveBeenCalledWith(5);
++      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
++      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(5);
+       expect(result).toEqual({ data: mockChats, count: 2 });
+     });
+ 
+@@ -510,7 +512,7 @@ describe('ChatRepository', () => {
+       );
+     });
+ 
+-    it('should not apply limit/offset when not provided', async () => {
++    it('should not apply pagination when limit/offset not provided', async () => {
+       mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+ 
+       await repository.getCallLogsQuery({
+@@ -518,6 +520,27 @@ describe('ChatRepository', () => {
+         tenantId: mockTenantId,
+       });
+ 
++      expect(mockQueryBuilder.take).not.toHaveBeenCalled();
++      expect(mockQueryBuilder.skip).not.toHaveBeenCalled();
++    });
++
++    it('should use take/skip (not limit/offset) so the customFieldValues 1-to-many join does not deflate the page size', async () => {
++      // Regression: query.limit() / query.offset() apply at the SQL row level,
++      // so a chat with N customFieldValues consumes N rows of the page. After
++      // dedup that returned fewer than `limit` unique chats and stranded later
++      // pages. take/skip wrap the query in a subquery on chat.id so pagination
++      // counts unique entities.
++      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
++
++      await repository.getCallLogsQuery({
++        counselorId: mockUserId,
++        tenantId: mockTenantId,
++        limit: 25,
++        offset: 50,
++      });
++
++      expect(mockQueryBuilder.take).toHaveBeenCalledWith(25);
++      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(50);
+       expect(mockQueryBuilder.limit).not.toHaveBeenCalled();
+       expect(mockQueryBuilder.offset).not.toHaveBeenCalled();
+     });
+@@ -571,10 +594,27 @@ describe('ChatRepository', () => {
+         'chat.tenant_id = :tenantId',
+         { tenantId: mockTenantId },
+       );
+-      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10);
++      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+       expect(result).toEqual({ data: mockChats, count: 1 });
+     });
+ 
++    it('should use take/skip (not limit/offset) so the customFieldValues 1-to-many join does not deflate the page size', async () => {
++      // Regression: see getCallLogsQuery for the same issue. The admin query
++      // also leftJoinAndMapMany's customFieldValues, so pagination must count
++      // unique chats, not raw joined rows.
++      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
++
++      await repository.getAdminCallLogsQuery(mockTenantId, {
++        limit: 25,
++        offset: 25,
++      });
++
++      expect(mockQueryBuilder.take).toHaveBeenCalledWith(25);
++      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(25);
++      expect(mockQueryBuilder.limit).not.toHaveBeenCalled();
++      expect(mockQueryBuilder.offset).not.toHaveBeenCalled();
++    });
++
+     it('should apply default sorting when not provided', async () => {
+       mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+ 

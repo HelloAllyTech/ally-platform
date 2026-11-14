@@ -1,0 +1,153 @@
+diff --git a/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts b/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts
+index 0d234ad026..e78907d39b 100644
+--- a/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts
++++ b/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts
+@@ -696,8 +696,8 @@ export class BugHunterPipelineController {
+       repo: repo ?? run.repo,
+       runId: run.id,
+       apiBaseUrl: this.configService.publicApiBaseUrl,
+-      engine: dispatched.counterpart?.engine ?? 'claude-code',
+-      model: dispatched.counterpart?.model ?? 'claude-sonnet-5',
++      engine: dispatched.counterpart?.engine ?? 'gemini',
++      model: dispatched.counterpart?.model ?? 'gemini-2.5-pro',
+       sweepEngine: dispatched.sweepEngine ?? null,
+     });
+   }
+@@ -742,8 +742,8 @@ export class BugHunterPipelineController {
+       apiBaseUrl: this.configService.publicApiBaseUrl,
+       prUrl: finding.prUrl,
+       prNumber,
+-      engine: dispatched?.counterpart?.engine ?? 'claude-code',
+-      model: dispatched?.counterpart?.model ?? 'claude-sonnet-5',
++      engine: dispatched?.counterpart?.engine ?? 'gemini',
++      model: dispatched?.counterpart?.model ?? 'gemini-2.5-pro',
+       fixEngine: dispatched?.fixEngine ?? null,
+     });
+   }
+diff --git a/src/bug-hunter/service/bug-verify-fix.service.ts b/src/bug-hunter/service/bug-verify-fix.service.ts
+index 1491b028e8..4f1881c539 100644
+--- a/src/bug-hunter/service/bug-verify-fix.service.ts
++++ b/src/bug-hunter/service/bug-verify-fix.service.ts
+@@ -52,9 +52,12 @@ export interface VerifyFixDispatch {
+ 
+ /**
+  * The other vendor. A verifier on the same model family as the fixer shares
+- * its blind spots, so the pairing is forced: Gemini checks Claude's work and
+- * Claude checks Gemini's. OpenCode is a shell around one of those two, so it
+- * is classified by the model it ran.
++ * its blind spots, so the pairing is forced: Claude reads a Gemini-made fix
++ * and Gemini reads a Claude-made one. OpenCode is a shell around one of the
++ * two, so it is classified by the model it ran. Claude Code is kept as an
++ * engine for exactly this (decided 2026-10-07): Gemini and OpenCode do the
++ * bulk of the work, and the second opinion is where another vendor earns
++ * its cost.
+  */
+ export function counterpartFor(
+   fixEngine: string | null,
+diff --git a/src/bug-hunter/service/test/bug-hunter-finder.service.spec.ts b/src/bug-hunter/service/test/bug-hunter-finder.service.spec.ts
+index ff0d483443..90b499c4fa 100644
+--- a/src/bug-hunter/service/test/bug-hunter-finder.service.spec.ts
++++ b/src/bug-hunter/service/test/bug-hunter-finder.service.spec.ts
+@@ -171,7 +171,7 @@ describe('BugHunterFinderService', () => {
+ 
+       decisions.decide = decideWith({
+         D1: { pick: ['code_review', 'browser_errors', 'nonsense'] },
+-        D2: { pick: { engine: 'claude-code', model: 'claude-sonnet-5' } },
++        D2: { pick: { engine: 'opencode', model: 'gemini-2.5-pro' } },
+       });
+       plan = await service.ensurePlan(
+         run({
+@@ -181,8 +181,8 @@ describe('BugHunterFinderService', () => {
+       );
+       expect(plan.senses).toEqual(['code_review', 'browser_errors']);
+       expect(plan.model).toEqual({
+-        engine: 'claude-code',
+-        model: 'claude-sonnet-5',
++        engine: 'opencode',
++        model: 'gemini-2.5-pro',
+       });
+     });
+   });
+diff --git a/src/bug-hunter/service/test/bug-verify-fix.service.spec.ts b/src/bug-hunter/service/test/bug-verify-fix.service.spec.ts
+index b266101743..46948ebed3 100644
+--- a/src/bug-hunter/service/test/bug-verify-fix.service.spec.ts
++++ b/src/bug-hunter/service/test/bug-verify-fix.service.spec.ts
+@@ -35,15 +35,15 @@ describe('counterpartFor', () => {
+     defaultModel: 'gemini-2.5-pro',
+     escalationModel: 'gemini-2.5-pro',
+   };
+-  it('pairs Claude fixes with Gemini verifiers and the reverse', () => {
+-    expect(counterpartFor('claude-code', 'claude-sonnet-5', settings)).toEqual({
+-      engine: 'gemini',
+-      model: 'gemini-2.5-pro',
+-    });
++  it('pairs a Gemini-made fix with a Claude verifier and the reverse', () => {
+     expect(counterpartFor('gemini', 'gemini-2.5-pro', settings)).toEqual({
+       engine: 'claude-code',
+       model: 'claude-sonnet-5',
+     });
++    expect(counterpartFor('claude-code', 'claude-sonnet-5', settings)).toEqual({
++      engine: 'gemini',
++      model: 'gemini-2.5-pro',
++    });
+   });
+   it('classifies OpenCode by the model it ran, and falls back to the platform default when the fix run is unknown', () => {
+     expect(counterpartFor('opencode', 'gemini-2.5-pro', settings).engine).toBe(
+@@ -98,8 +98,8 @@ describe('BugVerifyFixService', () => {
+     bugHunterService = {
+       getRun: jest.fn().mockResolvedValue({
+         id: 'run-fix',
+-        engine: 'claude-code',
+-        model: 'claude-sonnet-5',
++        engine: 'gemini',
++        model: 'gemini-2.5-pro',
+       }),
+       startRun: jest.fn().mockResolvedValue({ id: 'run-verify' }),
+       closeRun: jest.fn(),
+@@ -149,8 +149,8 @@ describe('BugVerifyFixService', () => {
+         runId: 'run-verify',
+         prNumber: 812,
+         prHeadSha: 'head-1',
+-        fixEngine: 'claude-code',
+-        counterpart: { engine: 'gemini', model: 'gemini-2.5-pro' },
++        fixEngine: 'gemini',
++        counterpart: { engine: 'claude-code', model: 'claude-sonnet-5' },
+       });
+       expect(findingRepository.update).toHaveBeenCalledWith(
+         'f-1',
+@@ -220,7 +220,7 @@ describe('BugVerifyFixService', () => {
+           verifyFix: {
+             runId: 'run-verify',
+             prHeadSha: 'head-1',
+-            counterpart: { engine: 'gemini', model: 'gemini-2.5-pro' },
++            counterpart: { engine: 'claude-code', model: 'claude-sonnet-5' },
+           },
+         },
+       });
+diff --git a/src/bug-hunter/type/bug-hunter-finder.type.ts b/src/bug-hunter/type/bug-hunter-finder.type.ts
+index e823834da4..17fa549baa 100644
+--- a/src/bug-hunter/type/bug-hunter-finder.type.ts
++++ b/src/bug-hunter/type/bug-hunter-finder.type.ts
+@@ -38,7 +38,13 @@ export const BUG_HUNTER_SENSE_DESCRIPTIONS: Record<BugHunterSense, string> = {
+ /** What started a Finder run. `scheduled` is the nightly cron; the rest are event triggers. */
+ export type FinderTriggerKind = 'scheduled' | 'manual' | 'merge' | 'report';
+ 
+-/** The engines and models the Finder may run on: two tiers from each installable vendor. */
++/**
++ * The engines and models the Finder may run on. Gemini and OpenCode carry
++ * the bulk of the work; Claude Code stays on the menu (decided 2026-10-07)
++ * for the Finder to pick where its record on the scoreboard earns the cost,
++ * and for the Verifier to read a Gemini-made fix with another vendor's eyes.
++ * The rule's default is always the platform setting, which is Gemini.
++ */
+ export const BUG_HUNTER_FINDER_MODEL_MENU: {
+   engine: BugHunterEngine;
+   model: string;
+@@ -46,6 +52,7 @@ export const BUG_HUNTER_FINDER_MODEL_MENU: {
+ }[] = [
+   { engine: 'gemini', model: 'gemini-2.5-flash', tier: 'fast' },
+   { engine: 'gemini', model: 'gemini-2.5-pro', tier: 'strong' },
++  { engine: 'opencode', model: 'gemini-2.5-pro', tier: 'strong' },
+   { engine: 'claude-code', model: 'claude-sonnet-5', tier: 'fast' },
+   { engine: 'claude-code', model: 'claude-opus-5', tier: 'strong' },
+ ];

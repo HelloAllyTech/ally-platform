@@ -1,0 +1,34 @@
+diff --git a/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx b/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx
+index 55794be9d9..7a647e3656 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx
+@@ -286,7 +286,7 @@ export const BuildView: React.FC<BuildViewProps> = ({ sessionId, status, current
+    * above the phase rail because they are the only thing on this page a person
+    * can act on to change the outcome.
+    */
+-  const budgetHeld = Boolean(budget?.hold);
++  const budgetHeld = Boolean(budget?.hold) && (isLive || isWaiting);
+   const budgetOver = Boolean(budget?.exceeded) && (isLive || isWaiting);
+ 
+   return (
+diff --git a/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildView.budget.test.tsx b/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildView.budget.test.tsx
+index b892762681..b5146d8385 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildView.budget.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildView.budget.test.tsx
+@@ -117,4 +117,16 @@ describe("BuildView budget banner", () => {
+     expect(screen.queryByText("Paused — this build has spent its budget")).toBeNull();
+     expect(screen.queryByText("Spend is past the ceiling")).toBeNull();
+   });
++
++  it("drops a stale held banner once the run has ended on its own", () => {
++    // The budget query stops polling once the session goes terminal, so a
++    // FAILED/CANCELLED/expired-hold session can still be sitting on a cached
++    // response whose `hold` is truthy from before it stopped. Nothing is
++    // live to raise money for any more, so the banner must not render.
++    budget = held;
++    render(<BuildView sessionId="session-1" status="FAILED" currentStage="CODING" />);
++
++    expect(screen.queryByText("Paused — this build has spent its budget")).toBeNull();
++    expect(screen.queryByRole("button", { name: "Raise budget" })).toBeNull();
++  });
+ });

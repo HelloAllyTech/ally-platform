@@ -1,0 +1,137 @@
+diff --git a/ally-be/src/bug-hunter/constants/bug-hunt-sweep-prompt.ts b/ally-be/src/bug-hunter/constants/bug-hunt-sweep-prompt.ts
+index a5a5ce124e..8993128723 100644
+--- a/ally-be/src/bug-hunter/constants/bug-hunt-sweep-prompt.ts
++++ b/ally-be/src/bug-hunter/constants/bug-hunt-sweep-prompt.ts
+@@ -53,6 +53,13 @@ export interface KnownNonBug {
+   note?: string | null;
+ }
+ 
++/** One bug still open in this repo — see `openBugs`. */
++export interface OpenBug {
++  title: string;
++  file?: string | null;
++  symbol?: string | null;
++}
++
+ export interface SweepPromptContext {
+   repo: string;
+   runId: string;
+@@ -76,6 +83,18 @@ export interface SweepPromptContext {
+    * teach it to stop reporting real bugs.
+    */
+   knownNonBugs?: KnownNonBug[];
++  /**
++   * Bugs still open in this repo, newest first.
++   *
++   * The server's dedupe matches file + symbol, so the same root cause filed
++   * under a different symbol — "scheduled time events fail" one night,
++   * "immediately active time events fail" the next, or both in one round —
++   * opened a second row every time. The sweep could not avoid that: it was
++   * never shown what was already open. Seeing the list lets it skip a bug
++   * that is already tracked, or file under that bug's exact file and symbol
++   * so dedupe touches the existing row.
++   */
++  openBugs?: OpenBug[];
+   /**
+    * Which CLI will run this prompt: "claude-code" (default) or "gemini".
+    *
+@@ -162,6 +181,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
+     mode,
+     deep,
+     knownNonBugs = [],
++    openBugs = [],
+     engine = 'claude-code',
+     memories = [],
+     senses = [...BUG_HUNTER_MODEL_SENSES],
+@@ -305,6 +325,24 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
+         ]
+       : []),
+     ``,
++    ...(openBugs.length
++      ? [
++          ``,
++          `### Already open — do NOT file a second one`,
++          `These bugs in "${repo}" are already tracked and not yet fixed, newest first. If something you find tonight has the same root cause as one of them — even when the symptom, the event, the endpoint or your wording differs — it is that bug, not a new one: leave it out, or, when you have new evidence, report it with exactly that bug's file and symbol so it is recorded against the same row.`,
++          DATA_BEGIN('open bugs'),
++          ...openBugs.map((entry) => {
++            const where = [entry.file, entry.symbol]
++              .filter(Boolean)
++              .join(' · ');
++            return (
++              `  - ${clip(entry.title)}` + (where ? ` (${clip(where)})` : '')
++            );
++          }),
++          DATA_END,
++        ]
++      : []),
++    ``,
+     ...(memories.length
+       ? [
+           ``,
+@@ -326,6 +364,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
+     `  - touchesGuardedPath=true for migrations, auth/permission gating, payments, or any other security-sensitive service. Be generous with this flag; it costs a review, and getting it wrong costs a production incident.`,
+     `  - source is one of: test_failure, lint_error, code_review, production_log, reported_bug. Browser errors from finder 4 file as production_log — there is no separate source for them.`,
+     ``,
++    `One root cause is one finding. Two symptoms of the same defect — two event types, two endpoints, two log lines failing on the same state update or the same missing value — go in ONE finding whose description names both, with the file and symbol of the shared cause. A fix for one that would also fix the other means they are the same bug.`,
+     `Then persist them all in ONE call, dropping any duplicates you produced within this round:`,
+     `  curl -sS -X POST "${findingsUrl}" -H "Content-Type: application/json" ${auth} -d '{"repo":"${repo}","findings":[...]}'`,
+     `The response's "items" array comes back in the same order you sent, each with an "id" — use those ids in every later call about a finding. You do NOT need to dedupe against previous runs: the server matches each finding against still-open rows and touches the existing one instead of inserting, so a bug rediscovered tonight keeps its history.`,
+diff --git a/ally-be/src/bug-hunter/constants/test/bug-hunt-sweep-prompt.spec.ts b/ally-be/src/bug-hunter/constants/test/bug-hunt-sweep-prompt.spec.ts
+index d0193acaa1..5768cea3c0 100644
+--- a/ally-be/src/bug-hunter/constants/test/bug-hunt-sweep-prompt.spec.ts
++++ b/ally-be/src/bug-hunter/constants/test/bug-hunt-sweep-prompt.spec.ts
+@@ -455,6 +455,30 @@ describe('buildSweepPrompt', () => {
+       },
+     ];
+ 
++    it('lists bugs already open, and tells the agent one root cause is one finding', () => {
++      // Two findings filed in one round for one LangGraph state-update error —
++      // "scheduled" and "immediately active" time events — reached Needs you
++      // as a pair because the sweep never saw what was open and named a
++      // different symbol for each symptom.
++      const p = build({
++        openBugs: [
++          {
++            title: 'Scheduled time events fail on an ambiguous state update',
++            file: 'app/graph/time_events.py',
++            symbol: 'schedule_time_events',
++          },
++        ],
++      });
++      expect(p).toMatch(/Already open — do NOT file a second one/);
++      expect(p).toContain(
++        'Scheduled time events fail on an ambiguous state update',
++      );
++      expect(p).toContain('app/graph/time_events.py · schedule_time_events');
++      expect(p).toMatch(/exactly that bug's file and symbol/);
++      expect(p).toMatch(/One root cause is one finding/);
++      expect(build({ openBugs: [] })).not.toMatch(/Already open/);
++    });
++
+     it('says nothing at all when there is nothing settled', () => {
+       // A heading with an empty list under it is prompt weight for no
+       // information, and this text competes with the protocol it precedes.
+diff --git a/ally-be/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts b/ally-be/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts
+index 42ab096f85..53692d29ff 100644
+--- a/ally-be/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts
++++ b/ally-be/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts
+@@ -742,6 +742,11 @@ export class BugHunterPipelineController {
+       }),
+       { repo },
+     );
++    // What is already open here, so a later night (or a second symptom
++    // tonight) of an existing bug is not filed again under a new symbol.
++    const openBugs = (await this.bugFindingService.listOpenForRepo(repo)).map(
++      (row) => ({ title: row.title, file: row.file, symbol: row.symbol }),
++    );
+     // The always-on half of memory: the strongest notebook entries for this
+     // repo, rendered up front. Recorded as a memory lookup like a search, so
+     // the telemetry counts the context the agent was handed either way.
+@@ -769,6 +774,7 @@ export class BugHunterPipelineController {
+       senses: plan.senses,
+       light: plan.light,
+       knownNonBugs,
++      openBugs,
+       engine,
+       memories: memories.map((m) => ({
+         id: m.id,

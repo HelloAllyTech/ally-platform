@@ -1,0 +1,81 @@
+diff --git a/apps/ally-admin-dashboard/src/components/icons/index.tsx b/apps/ally-admin-dashboard/src/components/icons/index.tsx
+index 60cbbeb75f..ca42377f2c 100644
+--- a/apps/ally-admin-dashboard/src/components/icons/index.tsx
++++ b/apps/ally-admin-dashboard/src/components/icons/index.tsx
+@@ -30,6 +30,7 @@ import {
+   Calendar as CCalendar,
+   ChartBar as CChartBar,
+   Chat as CChat,
++  UserSpeaker as CUserSpeaker,
+   Chemistry as CChemistry,
+   Roadmap as CRoadmap,
+   Idea as CIdea,
+@@ -101,6 +102,7 @@ import {
+   ViewOff as CViewOff,
+   WarningAlt as CWarningAlt,
+   ZoomIn as CZoomIn,
++  MachineLearningModel as CMachineLearningModel,
+ } from "@carbon/icons-react";
+ import { Heading1 as LHeading1, Heading2 as LHeading2, Heading3 as LHeading3 } from "lucide-react";
+ 
+@@ -190,6 +192,11 @@ export const FailIcon = createCarbonIcon(CMisuse);
+ export const Filter = createCarbonIcon(CFilter);
+ export const FocusLens = createCarbonIcon(CZoomIn);
+ export const Globe = createCarbonIcon(CGlobe);
++/** Voices (TTS) — a persona with a speaker, i.e. the side that talks. The
++ *  microphone belongs to Speech Recognition, the side that listens. */
++export const UserSpeaker = createCarbonIcon(CUserSpeaker);
++/** Language Model (LLM) registry. */
++export const MachineLearningModel = createCarbonIcon(CMachineLearningModel);
+ export const GroupBranch = createCarbonIcon(CFlowConnection);
+ export const HappyEmoji = createCarbonIcon(CFaceSatisfied);
+ export const ImageIcon = createCarbonIcon(CImage);
+diff --git a/apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx b/apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx
+index f4f17d7d14..3a26da4978 100644
+--- a/apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx
++++ b/apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx
+@@ -12,6 +12,7 @@ import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-ki
+ import {
+   BarChart3,
+   Chemistry,
++  MachineLearningModel,
+   Roadmap,
+   Close,
+   Document,
+@@ -39,6 +40,7 @@ import {
+   ManageAccounts,
+   Globe,
+   Mic,
++  UserSpeaker,
+   CharacterLibrary,
+   FrameSource,
+   Guardrails,
+@@ -172,12 +174,14 @@ export const Sidebar: React.FC = () => {
+         return <HappyEmoji />;
+       case SIDEBAR_ITEMS.CHARACTER_LIBRARY:
+         return <CharacterLibrary />;
++      // Voices is TTS — the side that talks — so a persona with a speaker. The
++      // microphone belongs to Speech Recognition, the side that listens.
+       case SIDEBAR_ITEMS.SCENARIO_VOICES:
+-        return <Mic />;
++        return <UserSpeaker size={20} />;
+       case SIDEBAR_ITEMS.STT_CONFIGS:
+         return <Mic />;
+       case SIDEBAR_ITEMS.LLM_CONFIGS:
+-        return <FrameSource />;
++        return <MachineLearningModel size={20} />;
+       case SIDEBAR_ITEMS.SCENARIO_LANGUAGES:
+         return <Globe />;
+       case SIDEBAR_ITEMS.MANAGE_GUARDRAILS:
+diff --git a/apps/ally-admin-dashboard/src/components/sidebar/__tests__/Sidebar.test.tsx b/apps/ally-admin-dashboard/src/components/sidebar/__tests__/Sidebar.test.tsx
+index 43b25f0df1..77acebae2b 100644
+--- a/apps/ally-admin-dashboard/src/components/sidebar/__tests__/Sidebar.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/sidebar/__tests__/Sidebar.test.tsx
+@@ -43,6 +43,7 @@ vi.mock("@assets", () => ({
+   ManageAccounts: () => <svg data-testid="manage-accounts" />,
+   Globe: () => <svg data-testid="globe" />,
+   Mic: () => <svg data-testid="mic" />,
++  UserSpeaker: () => <svg data-testid="user-speaker" />,
+   CharacterLibrary: () => <svg data-testid="character-library" />,
+   FrameSource: () => <svg data-testid="frame-source" />,
+   Guardrails: () => <svg data-testid="guardrails" />,

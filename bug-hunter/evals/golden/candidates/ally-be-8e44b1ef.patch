@@ -1,0 +1,60 @@
+diff --git a/src/product-updates/service/product-update-ingest.service.ts b/src/product-updates/service/product-update-ingest.service.ts
+index a7c57b2797..4d94b27215 100644
+--- a/src/product-updates/service/product-update-ingest.service.ts
++++ b/src/product-updates/service/product-update-ingest.service.ts
+@@ -92,7 +92,9 @@ export class ProductUpdateIngestService {
+       journalLabel: entry.label,
+       prNumber: entry.pr?.number ?? null,
+       prUrl: entry.pr?.url ?? entry.compare?.url ?? null,
+-      author: entry.pr?.author ?? entry.actor,
++      // Capped to the column: sources insert in batches of 500, so one
++      // oversized value would fail every entry in the pass.
++      author: (entry.pr?.author ?? entry.actor)?.slice(0, 120) ?? null,
+       subjects: entry.pr
+         ? [entry.pr.title]
+         : entry.commits.map((commit) => commit.subject),
+diff --git a/src/product-updates/util/journal-parser.util.ts b/src/product-updates/util/journal-parser.util.ts
+index 6e8fef0130..7e70f9e9d4 100644
+--- a/src/product-updates/util/journal-parser.util.ts
++++ b/src/product-updates/util/journal-parser.util.ts
+@@ -38,9 +38,12 @@ const HEADER = /^## (\S+) — ([\w.-]+)(?: \(([^)]*)\))?\s*$/;
+ const LABEL_LINE =
+   /^- \*\*(For release notes|Internal|Needs a release note):\*\* ?(.*)$/;
+ const TECHNICAL_LINE = /^- \*\*Technical:\*\* (.*)$/;
+-const PR_TECHNICAL = /^(.*) · \[#(\d+)\]\(([^)]+)\) · @(.*)$/;
++// The actor is the handle alone: a hand-corrected entry can trail a note after
++// it (`@ally-docs-bot[bot] _(corrected — …)_`), and that note must not become
++// the author, which is a varchar(120).
++const PR_TECHNICAL = /^(.*) · \[#(\d+)\]\(([^)]+)\) · @(\S+).*$/;
+ const PUSH_TECHNICAL =
+-  /^(\d+) commit\(s\)(?: · \[compare\]\(([^)]+)\))?(?: · @(.*))?$/;
++  /^(\d+) commit\(s\)(?: · \[compare\]\(([^)]+)\))?(?: · @(\S+).*)?$/;
+ const COMMIT_LINE = /^\s+- (.*) \(([0-9a-f]{7,40})\)\s*$/;
+ const COMPARE_URL = /\/compare\/([^./]+(?:\^)?)\.\.\.([0-9a-f]{7,40})/;
+ 
+diff --git a/src/product-updates/util/test/journal-parser.util.spec.ts b/src/product-updates/util/test/journal-parser.util.spec.ts
+index ebe2c69b81..88ab0cb090 100644
+--- a/src/product-updates/util/test/journal-parser.util.spec.ts
++++ b/src/product-updates/util/test/journal-parser.util.spec.ts
+@@ -92,6 +92,21 @@ describe('parseJournal', () => {
+     expect(entries[0].actor).toBe('gksoriginals');
+   });
+ 
++  it('keeps only the handle when a corrected entry trails a note after it', () => {
++    const { entries, skipped } = parseJournal(
++      PREAMBLE +
++        `## 2026-08-14T05:02:57Z — ally-ai-learn\n- **Internal:** Internal change with no visible impact.\n- **Technical:** chore: sync wiki routing index · [#142](https://github.com/HelloAllyTech/ally-ai-learn/pull/142) · @ally-docs-bot[bot] _(corrected — the original entry hit a since-fixed bug where a transient PR-lookup failure produced a blank technical line)_\n\n\n` +
++        `## 2026-08-13T05:02:57Z — ally-be\n- **Internal:** x\n- **Technical:** 1 commit(s) · @gksoriginals _(corrected)_\n  - fix: a (aaaaaaa)\n\n\n`,
++    );
++
++    expect(skipped).toBe(0);
++    expect(entries.map((e) => e.actor)).toEqual([
++      'gksoriginals',
++      'ally-docs-bot[bot]',
++    ]);
++    expect(entries[1].pr?.title).toBe('chore: sync wiki routing index');
++  });
++
+   it('reads all three labels', () => {
+     const { entries } = parseJournal(
+       PREAMBLE +

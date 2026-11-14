@@ -1,0 +1,140 @@
+diff --git a/src/learn/service/scenario-session.service.ts b/src/learn/service/scenario-session.service.ts
+index c97d2a6101..b1c66b61ef 100644
+--- a/src/learn/service/scenario-session.service.ts
++++ b/src/learn/service/scenario-session.service.ts
+@@ -99,6 +99,7 @@ import { UpdateReflectionPromptResponseDto } from '../dto/reflection-prompts-req
+ import { ScenarioSessionReflectionPromptResponse } from '../entity/scenario-session-reflection-prompt-response.entity';
+ import { SCENARIO_SESSION_REFLECTION_PROMPTS } from '../constants/scenario-session-reflection-prompt.constants';
+ import { ScenariosRepository } from '../repository/scenario.repository';
++import { getSessionDurationInSeconds } from 'src/review/util/review.util';
+ 
+ /** Cache for preview room metadata (used when dispatching agent directly in local dev) */
+ const previewRoomMetadataCache = new Map<string, object>();
+@@ -281,6 +282,11 @@ export class ScenarioSessionService {
+         statuses ?? `${ScenarioSessionStatus.ENDED}`,
+       );
+ 
++    scenarioSessions.forEach((scenarioSession) => {
++      delete (scenarioSession as any).scenario.prompt;
++      delete (scenarioSession as any).scenario.metadata;
++    });
++
+     return { data: scenarioSessions };
+   }
+ 
+@@ -291,6 +297,11 @@ export class ScenarioSessionService {
+         `${ScenarioSessionStatus.ENDED}`,
+       );
+ 
++    scenarioSessions.forEach((scenarioSession) => {
++      delete (scenarioSession as any).scenario.prompt;
++      delete (scenarioSession as any).scenario.metadata;
++    });
++
+     return { data: scenarioSessions };
+   }
+ 
+@@ -310,6 +321,14 @@ export class ScenarioSessionService {
+       throw new BadRequestException('Scenario session not found');
+     }
+ 
++    if (scenarioSession.startedAt && scenarioSession.endedAt) {
++      const callDuration = getSessionDurationInSeconds(
++        scenarioSession.startedAt,
++        scenarioSession.endedAt,
++      );
++      (scenarioSession as any).details.callDuration = callDuration;
++    }
++
+     // Filter events to only include those with ACTIVE session events (null when
+     // visibility is PASSIVE or event missing), then remove sensitive fields
+     if ((scenarioSession as any).events) {
+@@ -339,7 +358,10 @@ export class ScenarioSessionService {
+ 
+     const scenario = (scenarioSession as any).scenario;
+     if (scenario) {
+-      delete scenario.metadata;
++      scenario.metadata = {
++        experienceMode:
++          scenario.metadata?.experienceMode ?? ExperienceMode.FEEDBACK,
++      };
+       delete scenario.prompt;
+     }
+ 
+diff --git a/src/learn/service/test/scenario-session.service.spec.ts b/src/learn/service/test/scenario-session.service.spec.ts
+index 5c64b1dd01..25a4689000 100644
+--- a/src/learn/service/test/scenario-session.service.spec.ts
++++ b/src/learn/service/test/scenario-session.service.spec.ts
+@@ -532,9 +532,11 @@ describe('ScenarioSessionService', () => {
+ 
+   describe('getScenarioSessions', () => {
+     it('should return scenario sessions with default status', async () => {
+-      const mockSessions = [mockScenarioSession];
++      const mockSessions = [
++        { ...mockScenarioSession, scenario: { ...mockScenario } },
++      ];
+       scenarioSessionRepository.getScenarioSessions.mockResolvedValue(
+-        mockSessions,
++        mockSessions as any,
+       );
+ 
+       const result = await service.getScenarioSessions(
+@@ -542,7 +544,9 @@ describe('ScenarioSessionService', () => {
+         mockPagination,
+       );
+ 
+-      expect(result).toEqual({ data: mockSessions });
++      expect(result.data).toHaveLength(1);
++      expect(result.data[0]).not.toHaveProperty('scenario.prompt');
++      expect(result.data[0]).not.toHaveProperty('scenario.metadata');
+       expect(
+         scenarioSessionRepository.getScenarioSessions,
+       ).toHaveBeenCalledWith(
+@@ -553,10 +557,12 @@ describe('ScenarioSessionService', () => {
+     });
+ 
+     it('should return scenario sessions with custom status', async () => {
+-      const mockSessions = [mockScenarioSession];
++      const mockSessions = [
++        { ...mockScenarioSession, scenario: { ...mockScenario } },
++      ];
+       const customStatus = ScenarioSessionStatus.ACTIVE;
+       scenarioSessionRepository.getScenarioSessions.mockResolvedValue(
+-        mockSessions,
++        mockSessions as any,
+       );
+ 
+       const result = await service.getScenarioSessions(
+@@ -565,7 +571,9 @@ describe('ScenarioSessionService', () => {
+         customStatus,
+       );
+ 
+-      expect(result).toEqual({ data: mockSessions });
++      expect(result.data).toHaveLength(1);
++      expect(result.data[0]).not.toHaveProperty('scenario.prompt');
++      expect(result.data[0]).not.toHaveProperty('scenario.metadata');
+       expect(
+         scenarioSessionRepository.getScenarioSessions,
+       ).toHaveBeenCalledWith(mockCounselorId, mockPagination, customStatus);
+@@ -574,14 +582,18 @@ describe('ScenarioSessionService', () => {
+ 
+   describe('getAdminScenarioSessions', () => {
+     it('should return admin scenario sessions', async () => {
+-      const mockSessions = [mockScenarioSession];
++      const mockSessions = [
++        { ...mockScenarioSession, scenario: { ...mockScenario } },
++      ];
+       scenarioSessionRepository.getAdminScenarioSessions.mockResolvedValue(
+-        mockSessions,
++        mockSessions as any,
+       );
+ 
+       const result = await service.getAdminScenarioSessions(mockPagination);
+ 
+-      expect(result).toEqual({ data: mockSessions });
++      expect(result.data).toHaveLength(1);
++      expect(result.data[0]).not.toHaveProperty('scenario.prompt');
++      expect(result.data[0]).not.toHaveProperty('scenario.metadata');
+       expect(
+         scenarioSessionRepository.getAdminScenarioSessions,
+       ).toHaveBeenCalledWith(mockPagination, ScenarioSessionStatus.ENDED);

@@ -1,0 +1,31 @@
+diff --git a/ally-be/src/auth/guards/jwt-auth.guard.ts b/ally-be/src/auth/guards/jwt-auth.guard.ts
+index 60ae6cd05..b03601d8b 100644
+--- a/ally-be/src/auth/guards/jwt-auth.guard.ts
++++ b/ally-be/src/auth/guards/jwt-auth.guard.ts
+@@ -36,6 +36,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
+         throw new UnauthorizedException(info.message);
+       }
+     }
++    if (info instanceof Error) {
++      throw new UnauthorizedException(info.message);
++    }
+     if (err || !user) {
+       throw err || new UnauthorizedException();
+     }
+diff --git a/ally-be/src/auth/guards/test/jwt-auth.guard.spec.ts b/ally-be/src/auth/guards/test/jwt-auth.guard.spec.ts
+index 52d6dd618..a057348fe 100644
+--- a/ally-be/src/auth/guards/test/jwt-auth.guard.spec.ts
++++ b/ally-be/src/auth/guards/test/jwt-auth.guard.spec.ts
+@@ -53,5 +53,12 @@ describe('JwtAuthGuard', () => {
+         new UnauthorizedException('invalid token'),
+       );
+     });
++
++    it('should throw UnauthorizedException with the error message for generic errors', () => {
++      const info = new Error('Some other error');
++      expect(() => guard.handleRequest(null, null, info)).toThrow(
++        new UnauthorizedException('Some other error'),
++      );
++    });
+   });
+ });

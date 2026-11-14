@@ -1,0 +1,68 @@
+diff --git a/ally-be/src/progress/service/test/xp-award.service.spec.ts b/ally-be/src/progress/service/test/xp-award.service.spec.ts
+index 8b54db99a4..114d9f52b0 100644
+--- a/ally-be/src/progress/service/test/xp-award.service.spec.ts
++++ b/ally-be/src/progress/service/test/xp-award.service.spec.ts
+@@ -38,6 +38,7 @@ describe('XpAwardService', () => {
+   let userProgressRepository: jest.Mocked<UserProgressRepository>;
+   let sessionEngagement: jest.Mocked<SessionEngagementRepository>;
+   let eventEmitter: jest.Mocked<EventEmitter2>;
++  let dataSource: DataSource;
+ 
+   /** Whatever the transaction callback returns, run it against a stub manager. */
+   const manager = {} as never;
+@@ -95,6 +96,7 @@ describe('XpAwardService', () => {
+     userProgressRepository = module.get(UserProgressRepository);
+     sessionEngagement = module.get(SessionEngagementRepository);
+     eventEmitter = module.get(EventEmitter2);
++    dataSource = module.get(DataSource);
+   });
+ 
+   const awardSession = (durationMs: number) =>
+@@ -290,10 +292,24 @@ describe('XpAwardService', () => {
+       );
+     });
+ 
+-    it('throws when the ledger write fails', async () => {
+-      xpEventRepository.insertAwards.mockRejectedValue(new Error('pg down'));
++    it('retries on a transient database error and succeeds', async () => {
++      const error = new Error('pg down');
++      const transactionMock = jest
++        .fn()
++        .mockRejectedValueOnce(error)
++        .mockRejectedValueOnce(error)
++        .mockImplementation(async (cb: (m: unknown) => Promise<void>) =>
++          cb(manager),
++        );
+ 
+-      await expect(awardSession(10 * 60 * 1000)).rejects.toThrow('pg down');
++      (dataSource.transaction as jest.Mock).mockImplementation(transactionMock);
++
++      xpEventRepository.insertAwards.mockResolvedValue(20);
++
++      await awardSession(10 * 60 * 1000);
++
++      expect(transactionMock).toHaveBeenCalledTimes(4);
++      expect(xpEventRepository.insertAwards).toHaveBeenCalled();
+     });
+   });
+ 
+diff --git a/ally-be/src/progress/service/xp-award.service.ts b/ally-be/src/progress/service/xp-award.service.ts
+index 6b423a44e9..bfe1e574c4 100644
+--- a/ally-be/src/progress/service/xp-award.service.ts
++++ b/ally-be/src/progress/service/xp-award.service.ts
+@@ -6,6 +6,7 @@ import {
+   toBusinessDateString,
+   toBusinessWeekKey,
+ } from 'src/common/util/date.util';
++import { RetryOnFail } from 'src/common/decorator/retry.decorator';
+ import { ProgressTenantResolver } from './progress-tenant.resolver';
+ import { UserProgressRepository } from '../repository/user-progress.repository';
+ import { SessionEngagementRepository } from '../repository/session-engagement.repository';
+@@ -131,6 +132,7 @@ export class XpAwardService {
+    * matters — XP v2 never reads the score. What it must still have is turns: the learner
+    * either did the practice or they did not, and the sweeper does not change that.
+    */
++  @RetryOnFail()
+   async awardForSession(params: {
+     userId: number;
+     tenantId: string;

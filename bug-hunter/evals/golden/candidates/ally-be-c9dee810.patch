@@ -1,0 +1,114 @@
+diff --git a/ally-be/src/bug-hunter/service/bug-case-budget.service.ts b/ally-be/src/bug-hunter/service/bug-case-budget.service.ts
+index af6482bec5..0476519d11 100644
+--- a/ally-be/src/bug-hunter/service/bug-case-budget.service.ts
++++ b/ally-be/src/bug-hunter/service/bug-case-budget.service.ts
+@@ -114,10 +114,14 @@ export class BugCaseBudgetService {
+    */
+   async assertCanStartSession(
+     finding: BugFinding,
+-    options: { force?: boolean; userId: number | null },
++    options: {
++      force?: boolean;
++      userId: number | null;
++      ignore?: readonly BugCaseBudgetKind[];
++    },
+   ): Promise<void> {
+     const budget = this.read(finding);
+-    const refusal = explainSessionRefusal(budget);
++    const refusal = explainSessionRefusal(budget, options.ignore);
+     if (!refusal) return;
+     if (!options.force || options.userId == null) {
+       throw new ForbiddenException(refusal);
+diff --git a/ally-be/src/bug-hunter/service/bug-fix-session.service.ts b/ally-be/src/bug-hunter/service/bug-fix-session.service.ts
+index 1234696bb9..2c2a0f211c 100644
+--- a/ally-be/src/bug-hunter/service/bug-fix-session.service.ts
++++ b/ally-be/src/bug-hunter/service/bug-fix-session.service.ts
+@@ -324,6 +324,11 @@ export class BugFixSessionService {
+     await this.budgetService.assertCanStartSession(finding, {
+       force: false,
+       userId: null,
++      // The escalation cap stops Bug Hunter asking again, and asking once is
++      // usually what reached it. Answering resolves that question, so it must
++      // not also block the session the answer was given to start — that left
++      // every answered bug at Needs input. The other caps still apply.
++      ignore: actor === 'answer' ? ['escalations'] : [],
+     });
+     await this.dispatchFix(finding, repo, actor);
+     return this.bugFindingService.getOne(finding.id);
+diff --git a/ally-be/src/bug-hunter/service/test/bug-fix-session.service.spec.ts b/ally-be/src/bug-hunter/service/test/bug-fix-session.service.spec.ts
+index 88e3ed2424..e4353f5123 100644
+--- a/ally-be/src/bug-hunter/service/test/bug-fix-session.service.spec.ts
++++ b/ally-be/src/bug-hunter/service/test/bug-fix-session.service.spec.ts
+@@ -282,9 +282,11 @@ describe('BugFixSessionService', () => {
+ 
+       await service.continueAfterAnswer('finding-1');
+ 
++      // The answer resolves the question that spent the escalation cap, so
++      // that cap alone must not refuse the session; every other cap still does.
+       expect(budgetService.assertCanStartSession).toHaveBeenCalledWith(
+         expect.objectContaining({ id: 'finding-1' }),
+-        { force: false, userId: null },
++        { force: false, userId: null, ignore: ['escalations'] },
+       );
+       expect(github.dispatchWorkflow).toHaveBeenCalled();
+       expect(bugHunterService.appendEvent).toHaveBeenCalledWith(
+diff --git a/ally-be/src/bug-hunter/type/bug-case-budget.type.ts b/ally-be/src/bug-hunter/type/bug-case-budget.type.ts
+index 8cfe181477..63c3ae81e7 100644
+--- a/ally-be/src/bug-hunter/type/bug-case-budget.type.ts
++++ b/ally-be/src/bug-hunter/type/bug-case-budget.type.ts
+@@ -93,9 +93,13 @@ export function withBudgetDefaults(
+   };
+ }
+ 
+-/** The first kind whose cap is met or passed, or null while everything is under. */
+-export function exceededKind(budget: BugCaseBudget): BugCaseBudgetKind | null {
++/** The first kind whose cap is met or passed, or null while everything is under. `ignore` leaves kinds out of the check. */
++export function exceededKind(
++  budget: BugCaseBudget,
++  ignore: readonly BugCaseBudgetKind[] = [],
++): BugCaseBudgetKind | null {
+   for (const kind of BUG_CASE_BUDGET_KINDS) {
++    if (ignore.includes(kind)) continue;
+     if (budget.caps[kind] > 0 && budget.used[kind] >= budget.caps[kind])
+       return kind;
+   }
+@@ -138,8 +142,11 @@ export function overrideBudget(
+ }
+ 
+ /** Why a session cannot start, in the words shown to the admin, or null when it can. */
+-export function explainSessionRefusal(budget: BugCaseBudget): string | null {
+-  const kind = exceededKind(budget);
++export function explainSessionRefusal(
++  budget: BugCaseBudget,
++  ignore: readonly BugCaseBudgetKind[] = [],
++): string | null {
++  const kind = exceededKind(budget, ignore);
+   if (!kind) return null;
+   const words: Record<BugCaseBudgetKind, string> = {
+     sessions: `I have already run ${budget.used.sessions} fix session${budget.used.sessions === 1 ? '' : 's'} on this bug, which is the budget.`,
+diff --git a/ally-be/src/bug-hunter/type/test/bug-case-budget.type.spec.ts b/ally-be/src/bug-hunter/type/test/bug-case-budget.type.spec.ts
+index cafe595526..587a7ab9f6 100644
+--- a/ally-be/src/bug-hunter/type/test/bug-case-budget.type.spec.ts
++++ b/ally-be/src/bug-hunter/type/test/bug-case-budget.type.spec.ts
+@@ -80,6 +80,21 @@ describe('bug case budget', () => {
+     expect(explainSessionRefusal(spent)).toMatch(/start it anyway/);
+   });
+ 
++  it('leaves ignored kinds out of the refusal, and still refuses on the rest', () => {
++    const asked = chargeBudget(withBudgetDefaults(null), 'escalations', 1);
++    expect(explainSessionRefusal(asked)).toMatch(/asked for help/);
++    expect(explainSessionRefusal(asked, ['escalations'])).toBeNull();
++
++    const askedAndSpent = chargeBudget(
++      chargeBudget(asked, 'sessions', 1),
++      'sessions',
++      1,
++    );
++    expect(explainSessionRefusal(askedAndSpent, ['escalations'])).toMatch(
++      /already run 2 fix sessions/,
++    );
++  });
++
+   it('records an override and lifts the exhausted flag so the next breach is seen again', () => {
+     const spent = chargeBudget(
+       chargeBudget(withBudgetDefaults(null), 'sessions', 1),

@@ -1,0 +1,49 @@
+diff --git a/ally-be/src/learn/service/stage-director-memories.service.ts b/ally-be/src/learn/service/stage-director-memories.service.ts
+index 68d70221c..3d823d2af 100644
+--- a/ally-be/src/learn/service/stage-director-memories.service.ts
++++ b/ally-be/src/learn/service/stage-director-memories.service.ts
+@@ -1,5 +1,5 @@
+ import { randomUUID } from 'crypto';
+-import { Injectable } from '@nestjs/common';
++import { Injectable, InternalServerErrorException } from '@nestjs/common';
+ import { In } from 'typeorm';
+ import { LoggerService } from 'src/logger/logger.service';
+ import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
+@@ -153,7 +153,9 @@ export class StageDirectorMemoriesService {
+           (error as Error)?.message ?? error
+         }`,
+       );
+-      return { memories: copies, mapped: false };
++      throw new InternalServerErrorException(
++        `Failed to map memories: ${(error as Error)?.message ?? error}`,
++      );
+     }
+   }
+ 
+diff --git a/ally-be/src/learn/service/test/stage-director-memories.service.spec.ts b/ally-be/src/learn/service/test/stage-director-memories.service.spec.ts
+index 68ceeb304..6d50ca5de 100644
+--- a/ally-be/src/learn/service/test/stage-director-memories.service.spec.ts
++++ b/ally-be/src/learn/service/test/stage-director-memories.service.spec.ts
+@@ -127,15 +127,14 @@ describe('StageDirectorMemoriesService.mapMemories', () => {
+     expect(memories[1].unlocksInStateIds).toEqual(['s2', 's3']);
+   });
+ 
+-  it('copies knowledge sources as they are when the model fails', async () => {
++  it('throws an error when the model fails', async () => {
+     const { service } = build(new Error('timeout'));
+-    const { memories, mapped } = await service.mapMemories({
+-      knowledgeSources: SOURCES,
+-      states: STATES,
+-    });
+-    expect(mapped).toBe(false);
+-    expect(memories.map((m) => m.id)).toEqual(['k1', 'k2', 'k3']);
+-    expect(memories[2].unlocksFromStateId).toBe('s2');
++    await expect(
++      service.mapMemories({
++        knowledgeSources: SOURCES,
++        states: STATES,
++      }),
++    ).rejects.toThrow('Failed to map memories: timeout');
+   });
+ 
+   it('does not call the model with fewer than two states', async () => {

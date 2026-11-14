@@ -1,0 +1,71 @@
+diff --git a/apps/ally-admin-dashboard/src/constants/__tests__/user.test.ts b/apps/ally-admin-dashboard/src/constants/__tests__/user.test.ts
+index e480ddd39c..aa5615129e 100644
+--- a/apps/ally-admin-dashboard/src/constants/__tests__/user.test.ts
++++ b/apps/ally-admin-dashboard/src/constants/__tests__/user.test.ts
+@@ -57,17 +57,33 @@ describe("resolveAdminRole", () => {
+     ).toBe(UserRole.SUPER_DUPER_ADMIN);
+   });
+ 
+-  it("leaves a non-super-admin role exactly as the backend reported it", () => {
+-    // Only the super-admin tiers are hoisted, so no existing user's gating moves.
++  it("leaves a non-portal role exactly as the backend reported it", () => {
++    // ADMIN alone isn't hoisted, so no existing ADMIN-only user's gating moves.
+     expect(
+       resolveAdminRole({ role: UserRole.ADMIN, roles: [UserRole.ADMIN, UserRole.LEARNER] }),
+     ).toBe(UserRole.ADMIN);
++  });
++
++  it("recovers MULTI_TENANT_ADMIN when the backend collapsed to a non-portal role", () => {
++    // determineUserRole's priority list has no MULTI_TENANT_ADMIN branch, so a
++    // user holding [LEARNER, ADMIN, MULTI_TENANT_ADMIN] collapses to "ADMIN" —
++    // which the portal's surface gate (adminLoginRolesFor) doesn't admit, even
++    // though the user genuinely holds a portal-eligible role.
+     expect(
+       resolveAdminRole({
+         role: UserRole.ADMIN,
+-        roles: [UserRole.ADMIN, UserRole.MULTI_TENANT_ADMIN],
++        roles: [UserRole.LEARNER, UserRole.ADMIN, UserRole.MULTI_TENANT_ADMIN],
+       }),
+-    ).toBe(UserRole.ADMIN);
++    ).toBe(UserRole.MULTI_TENANT_ADMIN);
++  });
++
++  it("still prefers a held super-admin tier over MULTI_TENANT_ADMIN", () => {
++    expect(
++      resolveAdminRole({
++        role: UserRole.SUPER_ADMIN,
++        roles: [UserRole.MULTI_TENANT_ADMIN, UserRole.SUPER_ADMIN],
++      }),
++    ).toBe(UserRole.SUPER_ADMIN);
+   });
+ 
+   it("falls back to role when roles is absent or empty", () => {
+diff --git a/apps/ally-admin-dashboard/src/constants/user.ts b/apps/ally-admin-dashboard/src/constants/user.ts
+index 63f5dbfb8a..99ae3e5f33 100644
+--- a/apps/ally-admin-dashboard/src/constants/user.ts
++++ b/apps/ally-admin-dashboard/src/constants/user.ts
+@@ -372,14 +372,20 @@ export const adminLoginRolesFor = (embedded: boolean): UserRole[] => [
+  * `role: "LEARNER"`, which no super-admin gate would accept.
+  *
+  * The fix is to prefer the `roles` array the backend now sends and pick the
+- * highest admin tier in it. Only the super-admin tiers are hoisted: everything
+- * else falls through to the backend's own answer, so no existing user's gating
+- * changes. Falls back to `role` for any client or cache entry predating
+- * `roles`.
++ * highest admin tier in it. Every role this console's own login admits
++ * (`adminLoginRolesFor`) must be hoisted here, or the same collapse bug just
++ * resurfaces one tier down: MULTI_TENANT_ADMIN was missing from this list even
++ * though it's a valid portal-login role, so a user holding
++ * [LEARNER, ADMIN, MULTI_TENANT_ADMIN] collapsed to "ADMIN" (ADMIN outranks
++ * the backend's own fallback) and got bounced by the portal's surface gate,
++ * which doesn't accept plain ADMIN. Roles outside this list fall through to
++ * the backend's own answer, so no other user's gating changes. Falls back to
++ * `role` for any client or cache entry predating `roles`.
+  */
+ const ADMIN_ROLE_PRECEDENCE: UserRole[] = [
+   UserRole.SUPER_DUPER_ADMIN,
+   UserRole.SUPER_ADMIN,
++  UserRole.MULTI_TENANT_ADMIN,
+   UserRole.INTERNAL,
+ ];
+ 

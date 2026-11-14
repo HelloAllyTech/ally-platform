@@ -1,0 +1,53 @@
+diff --git a/src/builder/service/builder-pull-request.service.ts b/src/builder/service/builder-pull-request.service.ts
+index 00fac8aa2a..ac30c35c40 100644
+--- a/src/builder/service/builder-pull-request.service.ts
++++ b/src/builder/service/builder-pull-request.service.ts
+@@ -2073,9 +2073,11 @@ export class BuilderPullRequestService {
+    *
+    *  - The branch moved: opencode pushed, so the items are addressed. CI and
+    *    the next review judge whether they really are.
+-   *  - opencode's run finished and the branch did not move: it answered
+-   *    without changing code (its reply on the PR says why), so the items are
+-   *    dismissed rather than asked again.
++   *  - opencode's run finished and the branch did not move: nothing it did
++   *    reached the branch, whatever its reply says — on ally-mobile#114 it
++   *    switched branches, opencode skipped the push, and the reply claimed
++   *    every item fixed. The items go back to PENDING and the round counts,
++   *    so the escalation rules, not a reply, decide when to stop.
+    *  - Neither within the timeout: the items go back to PENDING for another
+    *    request, which the per-PR ceiling bounds.
+    */
+@@ -2098,7 +2100,10 @@ export class BuilderPullRequestService {
+         event: 'issue_comment',
+       });
+       if (answer?.status === 'completed') {
+-        status = BuilderPrFeedbackStatus.DISMISSED;
++        status = BuilderPrFeedbackStatus.PENDING;
++        this.logger.warn(
++          `[BUILDER] opencode finished on ${pullRequest.repo}#${pullRequest.prNumber} without pushing; its feedback goes back to pending.`,
++        );
+       } else if (Date.now() - requestedAt.getTime() > OC_FIX_TIMEOUT_MS) {
+         status = BuilderPrFeedbackStatus.PENDING;
+       }
+diff --git a/src/builder/service/test/builder-pull-request.service.spec.ts b/src/builder/service/test/builder-pull-request.service.spec.ts
+index 64c4c8ec3a..745b9eb5ab 100644
+--- a/src/builder/service/test/builder-pull-request.service.spec.ts
++++ b/src/builder/service/test/builder-pull-request.service.spec.ts
+@@ -1228,7 +1228,7 @@ describe('BuilderPullRequestService', () => {
+       expect(github.createIssueComment).not.toHaveBeenCalled();
+     });
+ 
+-    it('dismisses it when opencode answered without changing the branch', async () => {
++    it('puts it back to pending when opencode finished without pushing anything', async () => {
+       github.findRunSince.mockResolvedValue({
+         id: '9',
+         status: 'completed',
+@@ -1248,7 +1248,7 @@ describe('BuilderPullRequestService', () => {
+       );
+       expect(feedbackRepository.update).toHaveBeenCalledWith(
+         { pullRequestId: 'pr-1', status: 'in_fix' },
+-        expect.objectContaining({ status: 'dismissed' }),
++        expect.objectContaining({ status: 'pending' }),
+       );
+     });
+ 

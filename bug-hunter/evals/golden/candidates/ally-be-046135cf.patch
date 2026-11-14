@@ -1,0 +1,401 @@
+diff --git a/src/ai/service/ai.service.ts b/src/ai/service/ai.service.ts
+index 8ef6e5522f..3f8e4db4bb 100644
+--- a/src/ai/service/ai.service.ts
++++ b/src/ai/service/ai.service.ts
+@@ -665,6 +665,18 @@ export class AiService {
+     return response;
+   }
+ 
++  /**
++   * Starts a run in ai-learn, which answers 202 at once and does the work in
++   * the background. Any 2xx is success and its body is ignored — including
++   * ai-learn's answer to a report_id it is already running.
++   *
++   * That case is real: a retry here resends the same report_id, and when an
++   * earlier attempt reached ai-learn but its response was lost (reset,
++   * timeout), the retry is a second request for a run already in progress.
++   * ai-learn dedupes on report_id; a non-2xx answer to a duplicate would be
++   * retried and then fail the report (and cancel the live run), so a
++   * duplicate must stay a 2xx.
++   */
+   @RetryOnFail(3, 1000)
+   async triggerScenarioReportGenerate(
+     request: ScenarioReportGenerateRequest,
+@@ -694,6 +706,12 @@ export class AiService {
+    * is still durably recorded in our DB; ai-learn will eventually
+    * finish naturally and its final webhook will be ignored by ally-be's
+    * status-update guard.
++   *
++   * Also sent when ally-be gives up on a report itself (30-minute expiry,
++   * failed trigger), including from the timeout cron, so it carries an
++   * explicit 10s timeout: ai-learn only flips a flag, and the 5-minute
++   * makeRequest default would hold the user's cancel request, or the cron
++   * tick, hostage to an unhealthy ai-learn.
+    */
+   async triggerScenarioReportCancel(reportId: string): Promise<void> {
+     try {
+@@ -704,6 +722,7 @@ export class AiService {
+         'post',
+         undefined,
+         true,
++        10_000,
+       );
+     } catch {
+       // Don't escalate — the user already sees CANCELLED in the UI.
+diff --git a/src/ai/service/test/ai.service.spec.ts b/src/ai/service/test/ai.service.spec.ts
+index e34f4e7efe..9765039900 100644
+--- a/src/ai/service/test/ai.service.spec.ts
++++ b/src/ai/service/test/ai.service.spec.ts
+@@ -561,4 +561,64 @@ describe('AiService', () => {
+       );
+     });
+   });
++
++  describe('scenario report trigger and cancel', () => {
++    const request = {
++      prompt: 'helper prompt',
++      turns: 5,
++      language: 'en',
++      scenario_id: 10,
++      report_id: 'report-uuid-1',
++      metadata: {},
++    } as any;
++
++    it('treats any 2xx as started, including ai-learn reporting a duplicate report_id', async () => {
++      mockedAxios.mockResolvedValue({
++        status: 200,
++        data: { report_id: 'report-uuid-1', status: 'already_running' },
++      });
++
++      await expect(
++        service.triggerScenarioReportGenerate(request),
++      ).resolves.toBeUndefined();
++      expect(mockedAxios).toHaveBeenCalledTimes(1);
++    });
++
++    // Why ai-learn has to dedupe: when a first attempt's response is lost
++    // after ai-learn accepted it, the retry asks for the same report again.
++    it('resends the same report_id when it retries', async () => {
++      mockedAxios
++        .mockRejectedValueOnce(
++          Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
++        )
++        .mockResolvedValueOnce({ status: 202, data: {} });
++
++      await service.triggerScenarioReportGenerate(request);
++
++      expect(mockedAxios).toHaveBeenCalledTimes(2);
++      expect(mockedAxios.mock.calls[0][0].data.report_id).toBe('report-uuid-1');
++      expect(mockedAxios.mock.calls[1][0].data.report_id).toBe('report-uuid-1');
++    });
++
++    it('sends cancel with a short timeout and never throws', async () => {
++      mockedAxios.mockRejectedValue(
++        Object.assign(new Error('timeout of 10000ms exceeded'), {
++          code: 'ECONNABORTED',
++        }),
++      );
++
++      await expect(
++        service.triggerScenarioReportCancel('report-uuid-1'),
++      ).resolves.toBeUndefined();
++      expect(mockedAxios).toHaveBeenCalledWith(
++        expect.objectContaining({
++          method: 'post',
++          url: expect.stringContaining(
++            'api/v1/scenario-report/cancel/report-uuid-1',
++          ),
++          timeout: 10_000,
++        }),
++      );
++    });
++  });
+ });
+diff --git a/src/scenario-report/service/scenario-report.service.spec.ts b/src/scenario-report/service/scenario-report.service.spec.ts
+index 4cf0bac086..b72c455c9a 100644
+--- a/src/scenario-report/service/scenario-report.service.spec.ts
++++ b/src/scenario-report/service/scenario-report.service.spec.ts
+@@ -783,4 +783,206 @@ describe('ScenarioReportService', () => {
+       );
+     });
+   });
++
++  // ally-be marks a report FAILED after 30 minutes, or when the trigger
++  // fails, but used to leave ai-learn running the simulated turns and the
++  // evaluator for a report nobody would see. Each give-up now sends the same
++  // cancel a user's click does — best-effort, after the report is FAILED.
++  describe('giving up on a report stops its run in ai-learn', () => {
++    const flush = () => new Promise((resolve) => setImmediate(resolve));
++    const oldPending = (id: string) =>
++      ({
++        ...mockReport,
++        id,
++        status: ScenarioReportStatus.IN_PROGRESS,
++        createdAt: new Date(Date.now() - 31 * TIME.MINUTE_IN_MS),
++      }) as ScenarioReport;
++
++    describe('on TTL expiry', () => {
++      it('cancels the run once the report is marked FAILED', async () => {
++        scenarioReportRepository.findOne.mockResolvedValue(
++          oldPending(reportId),
++        );
++
++        await service.handleExpiredReportGeneration(reportId);
++
++        expect(aiService.triggerScenarioReportCancel).toHaveBeenCalledWith(
++          reportId,
++        );
++        expect(
++          scenarioReportRepository.update.mock.invocationCallOrder[0],
++        ).toBeLessThan(
++          aiService.triggerScenarioReportCancel.mock.invocationCallOrder[0],
++        );
++      });
++
++      it('leaves the cancel to the replica that won the update', async () => {
++        scenarioReportRepository.findOne.mockResolvedValue(
++          oldPending(reportId),
++        );
++        scenarioReportRepository.update.mockResolvedValue({
++          affected: 0,
++        } as any);
++
++        await service.handleExpiredReportGeneration(reportId);
++
++        expect(aiService.triggerScenarioReportCancel).not.toHaveBeenCalled();
++      });
++
++      it('sends nothing for a report that already ended', async () => {
++        scenarioReportRepository.findOne.mockResolvedValue({
++          ...mockReport,
++          status: ScenarioReportStatus.COMPLETED,
++        } as ScenarioReport);
++
++        await service.handleExpiredReportGeneration(reportId);
++
++        expect(aiService.triggerScenarioReportCancel).not.toHaveBeenCalled();
++      });
++
++      it('a failing cancel does not undo or fail the expiry', async () => {
++        scenarioReportRepository.findOne.mockResolvedValue(
++          oldPending(reportId),
++        );
++        aiService.triggerScenarioReportCancel.mockRejectedValue(
++          new Error('ai-learn down'),
++        );
++
++        await expect(
++          service.handleExpiredReportGeneration(reportId),
++        ).resolves.toBeUndefined();
++        expect(scenarioReportRepository.update).toHaveBeenCalledWith(
++          expect.objectContaining({ id: reportId }),
++          expect.objectContaining({ status: ScenarioReportStatus.FAILED }),
++        );
++        expect(
++          scenarioReportNotificationService.notifyUpdate,
++        ).toHaveBeenCalledWith(userId, reportId);
++      });
++    });
++
++    describe('in the stale-report cron', () => {
++      it('cancels every report it marked FAILED', async () => {
++        scenarioReportRepository.find.mockResolvedValue([
++          oldPending('r-1'),
++          oldPending('r-2'),
++        ]);
++        scenarioReportRepository.update.mockResolvedValue({
++          affected: 2,
++        } as any);
++
++        await service.markStaleReportsAsFailed();
++
++        expect(aiService.triggerScenarioReportCancel).toHaveBeenCalledTimes(2);
++        expect(aiService.triggerScenarioReportCancel).toHaveBeenCalledWith(
++          'r-1',
++        );
++        expect(aiService.triggerScenarioReportCancel).toHaveBeenCalledWith(
++          'r-2',
++        );
++      });
++
++      it('sends nothing when the update did not mark anything', async () => {
++        scenarioReportRepository.find.mockResolvedValue([oldPending('r-1')]);
++        scenarioReportRepository.update.mockResolvedValue({
++          affected: 0,
++        } as any);
++
++        await service.markStaleReportsAsFailed();
++
++        expect(aiService.triggerScenarioReportCancel).not.toHaveBeenCalled();
++      });
++
++      it('sends nothing when the update failed, leaving the next tick to retry', async () => {
++        scenarioReportRepository.find.mockResolvedValue([oldPending('r-1')]);
++        scenarioReportRepository.update.mockRejectedValue(new Error('db'));
++
++        await service.markStaleReportsAsFailed();
++
++        expect(aiService.triggerScenarioReportCancel).not.toHaveBeenCalled();
++      });
++
++      it('one failing cancel neither throws nor stops the others', async () => {
++        scenarioReportRepository.find.mockResolvedValue([
++          oldPending('r-1'),
++          oldPending('r-2'),
++        ]);
++        scenarioReportRepository.update.mockResolvedValue({
++          affected: 2,
++        } as any);
++        aiService.triggerScenarioReportCancel.mockImplementation(
++          async (id: string) => {
++            if (id === 'r-1') throw new Error('ai-learn down');
++          },
++        );
++
++        await expect(
++          service.markStaleReportsAsFailed(),
++        ).resolves.toBeUndefined();
++        expect(aiService.triggerScenarioReportCancel).toHaveBeenCalledWith(
++          'r-2',
++        );
++        expect(
++          scenarioReportNotificationService.notifyUpdate,
++        ).toHaveBeenCalledTimes(2);
++      });
++    });
++
++    describe('when the trigger fails', () => {
++      const create = () =>
++        service.createScenarioReport(
++          scenarioId,
++          { languageId: 1, turns: 5, helperAgentPrompt: 'helper prompt' },
++          userId,
++        );
++
++      beforeEach(() => {
++        scenarioReportRepository.find.mockResolvedValue([]);
++        scenarioReportRepository.create.mockReturnValue(
++          mockReport as ScenarioReport,
++        );
++        scenarioReportRepository.save.mockResolvedValue({
++          ...mockReport,
++          id: reportId,
++        } as ScenarioReport);
++      });
++
++      // The generate call retries, so it can fail after an earlier attempt
++      // reached ai-learn and started the run.
++      it('cancels a run the generate request may have started', async () => {
++        aiService.triggerScenarioReportGenerate.mockRejectedValue(
++          new Error('socket hang up'),
++        );
++
++        await create();
++        await flush();
++        await flush();
++
++        expect(scenarioReportRepository.update).toHaveBeenCalledWith(
++          reportId,
++          expect.objectContaining({ status: ScenarioReportStatus.FAILED }),
++        );
++        expect(aiService.triggerScenarioReportCancel).toHaveBeenCalledWith(
++          reportId,
++        );
++      });
++
++      it('sends nothing when it failed before asking ai-learn for anything', async () => {
++        scenarioSharedService.createMetadataForScenario.mockRejectedValue(
++          new Error('scenario missing'),
++        );
++
++        await create();
++        await flush();
++        await flush();
++
++        expect(aiService.triggerScenarioReportGenerate).not.toHaveBeenCalled();
++        expect(scenarioReportRepository.update).toHaveBeenCalledWith(
++          reportId,
++          expect.objectContaining({ status: ScenarioReportStatus.FAILED }),
++        );
++        expect(aiService.triggerScenarioReportCancel).not.toHaveBeenCalled();
++      });
++    });
++  });
+ });
+diff --git a/src/scenario-report/service/scenario-report.service.ts b/src/scenario-report/service/scenario-report.service.ts
+index 4d670cfad6..f5beae4a97 100644
+--- a/src/scenario-report/service/scenario-report.service.ts
++++ b/src/scenario-report/service/scenario-report.service.ts
+@@ -195,6 +195,11 @@ export class ScenarioReportService {
+     languageCode: string,
+     scenarioOverride?: GetAdminScenarioDto,
+   ): Promise<void> {
++    // Whether ai-learn may have been asked to start this run. The generate
++    // call retries, so it can fail here after an earlier attempt already
++    // reached ai-learn — and once we mark the report FAILED, that run must
++    // be told to stop.
++    let generateRequested = false;
+     try {
+       const metadata =
+         await this.scenarioSharedService.createMetadataForScenario(
+@@ -209,6 +214,7 @@ export class ScenarioReportService {
+           languageCode,
+         );
+ 
++      generateRequested = true;
+       await this.aiService.triggerScenarioReportGenerate({
+         prompt: translatedPrompt,
+         turns: report.config.turns,
+@@ -256,6 +262,30 @@ export class ScenarioReportService {
+         report.createdBy,
+         report.id,
+       );
++
++      if (generateRequested) {
++        await this.cancelInAiLearn(report.id);
++      }
++    }
++  }
++
++  /**
++   * Tell ai-learn to stop a run ally-be has stopped waiting for, so it stops
++   * paying for turns and an evaluation nobody will see — the same request a
++   * user's Cancel sends. Best-effort and never throws: the report's status in
++   * our DB is the source of truth, ai-learn answers 202 whether or not the run
++   * is still live, and any late webhook hits the end-status guard in
++   * updateScenarioReport.
++   */
++  private async cancelInAiLearn(reportId: string): Promise<void> {
++    try {
++      await this.aiService.triggerScenarioReportCancel(reportId);
++    } catch (error) {
++      this.logger.warn(
++        `Cancel propagation to ai-learn failed for report ${reportId}: ${
++          error instanceof Error ? error.message : String(error)
++        }`,
++      );
+     }
+   }
+ 
+@@ -592,6 +622,9 @@ export class ScenarioReportService {
+         report.createdBy,
+         reportId,
+       );
++      // Only the caller that won the conditional update sends it: every
++      // replica hears the key expire.
++      await this.cancelInAiLearn(reportId);
+     }
+   }
+ 
+@@ -632,6 +665,11 @@ export class ScenarioReportService {
+             report.id,
+           );
+         }
++        // A report that finished between the read and the update gets a
++        // cancel for a run that has already ended, which ai-learn ignores.
++        await Promise.all(
++          staleReports.map((report) => this.cancelInAiLearn(report.id)),
++        );
+       }
+     } catch (error) {
+       this.logger.error(

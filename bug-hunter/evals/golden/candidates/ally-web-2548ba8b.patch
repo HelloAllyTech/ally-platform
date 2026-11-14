@@ -1,0 +1,133 @@
+diff --git a/apps/ally-helpline-dashboard/src/hooks/useLiveKitRoom.ts b/apps/ally-helpline-dashboard/src/hooks/useLiveKitRoom.ts
+index c1d1b4a786..b5b30680ba 100644
+--- a/apps/ally-helpline-dashboard/src/hooks/useLiveKitRoom.ts
++++ b/apps/ally-helpline-dashboard/src/hooks/useLiveKitRoom.ts
+@@ -622,7 +622,6 @@ export const useLiveKitRoom = (
+       // Cleanup on route change to avoid duplicate listeners and ensure disconnect
+       cleanupRoom();
+     };
+-    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [id]);
+ 
+   useEffect(() => {
+@@ -630,7 +629,6 @@ export const useLiveKitRoom = (
+       localStorage.removeItem(LOCAL_STORAGE_KEYS.ROOM_DATA);
+       cleanupRoom();
+     };
+-    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+ 
+   useEffect(() => {
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
+index 355188d516..9734abc6a1 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
+@@ -283,6 +283,12 @@ export const TrackPlayer: FC = () => {
+             }}
+             className="h-full min-h-0"
+           >
++            <div className="p-4">
++              {nav.current && <h1 className="text-2xl font-bold">{nav.current.item.title}</h1>}
++              {nav.current?.item.description && (
++                <p className="text-gray-600 mt-2">{nav.current.item.description}</p>
++              )}
++            </div>
+             {hasDiscussion ? (
+               <div data-testid="track-item-scroll" className="h-full min-h-0 overflow-y-auto">
+                 <div className="h-full min-h-0">
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx
+new file mode 100644
+index 0000000000..773d4a7aa2
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx
+@@ -0,0 +1,90 @@
++
++import { vi } from "vitest";
++import { render, screen } from "@testing-library/react";
++import { MemoryRouter, Route, Routes } from "react-router-dom";
++import { Provider } from "react-redux";
++import { store } from "@store";
++import { TrackPlayer } from "../TrackPlayer";
++import * as api from "@api";
++import { TrackDetail, TrackItemStatus, TrackItemType } from "@types";
++
++vi.mock("@api", async () => ({
++  ...(await vi.importActual<typeof api>("@api")),
++  useGetLearnTrackDetailQuery: vi.fn(),
++  useStartTrackItemMutation: vi.fn(),
++}));
++
++const mockTrackDetail: TrackDetail = {
++  id: "track1",
++  title: "Test Track",
++  description: "Test Track Description",
++  coverImageUrl: null,
++  status: "IN_PROGRESS",
++  totalItems: 1,
++  simulationsCount: 0,
++  estimatedDurationMinutes: 10,
++  enrolled: true,
++  trackEnrollmentId: "enroll1",
++  completedItems: 0,
++  completedAt: null,
++  sections: [
++    {
++      id: "section1",
++      title: "Test Section",
++      description: "Test Section Description",
++      order: 1,
++      items: [
++        {
++          id: "item1",
++          type: TrackItemType.ARTICLE,
++          order: 1,
++          title: "Test Item Title",
++          description: "Test Item Description",
++          scenarioId: null,
++          caseId: null,
++          completionCriteria: null,
++          contentMeta: null,
++          status: TrackItemStatus.UNLOCKED,
++          startedAt: null,
++          completedAt: null,
++          score: null,
++          attemptCount: null,
++          maxWatchedPct: null,
++        },
++      ],
++    },
++  ],
++};
++
++const mockStartTrackItemMutation = [
++  vi.fn().mockResolvedValue({
++    unwrap: vi.fn().mockResolvedValue({
++      type: TrackItemType.ARTICLE,
++      html: "<p>Hello</p>",
++    }),
++  }),
++];
++
++describe("TrackPlayer", () => {
++  it("should display the item title and description", () => {
++    (api.useGetLearnTrackDetailQuery as vi.Mock).mockReturnValue({
++      data: mockTrackDetail,
++      isError: false,
++      refetch: vi.fn(),
++    });
++    (api.useStartTrackItemMutation as vi.Mock).mockReturnValue(mockStartTrackItemMutation);
++
++    render(
++      <Provider store={store}>
++        <MemoryRouter initialEntries={["/track/track1/item1"]}>
++          <Routes>
++            <Route path="/track/:trackId/:itemId" element={<TrackPlayer />} />
++          </Routes>
++        </MemoryRouter>
++      </Provider>
++    );
++
++    expect(screen.getByText("Test Item Title")).toBeInTheDocument();
++    expect(screen.getByText("Test Item Description")).toBeInTheDocument();
++  });
++});

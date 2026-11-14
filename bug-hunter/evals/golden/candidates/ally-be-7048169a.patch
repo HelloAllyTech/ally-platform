@@ -1,0 +1,47 @@
+diff --git a/src/product-roadmap/repository/roadmap-opportunity.repository.ts b/src/product-roadmap/repository/roadmap-opportunity.repository.ts
+index 191fdb1bed..79987d48c7 100644
+--- a/src/product-roadmap/repository/roadmap-opportunity.repository.ts
++++ b/src/product-roadmap/repository/roadmap-opportunity.repository.ts
+@@ -472,9 +472,11 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
+               COALESCE((SELECT COUNT(*)::int FROM roadmap_opportunity_comments c
+                          WHERE c."opportunityId" = opp.id
+                            AND c."deletedAt" IS NULL), 0)                    AS "commentCount",
+-              COALESCE(owner_user.name, opp."owner")                         AS "ownerDisplay"
++              COALESCE(owner_user.name, opp."owner")                         AS "ownerDisplay",
++              qrank.rank                                                     AS "queueRank"
+          FROM roadmap_opportunities opp
+          LEFT JOIN users owner_user ON owner_user.id = opp."ownerUserId"
++         LEFT JOIN ${QUEUE_RANK_SQL} qrank ON qrank.id = opp.id
+         WHERE opp.id = $1 AND opp."deletedAt" IS NULL`,
+       [id, userId, periodKey],
+     );
+diff --git a/src/product-roadmap/repository/test/roadmap-opportunity.repository.spec.ts b/src/product-roadmap/repository/test/roadmap-opportunity.repository.spec.ts
+new file mode 100644
+index 0000000000..e3c6041d80
+--- /dev/null
++++ b/src/product-roadmap/repository/test/roadmap-opportunity.repository.spec.ts
+@@ -0,0 +1,24 @@
++import { DataSource } from 'typeorm';
++import { RoadmapOpportunityRepository } from '../roadmap-opportunity.repository';
++
++/**
++ * findOneWithScore backs create(), update() (including the OPPORTUNITY_UPSERTED websocket
++ * payload) and the GET-by-id deep link. It must project queueRank the same way projectedQuery
++ * does for listOpportunities/listBoard — otherwise the queue position badge renders blank
++ * until the next full list refresh, even though the opportunity has a real position.
++ */
++describe('RoadmapOpportunityRepository.findOneWithScore', () => {
++  it('projects queueRank so the badge does not need a full list refresh to appear', async () => {
++    const query = jest.fn().mockResolvedValue([{ id: 'opp-1' }]);
++    const dataSource = {
++      createEntityManager: jest.fn(),
++      query,
++    } as unknown as DataSource;
++
++    const repository = new RoadmapOpportunityRepository(dataSource);
++    await repository.findOneWithScore('opp-1', 7, '2026-08');
++
++    const [sql] = query.mock.calls[0];
++    expect(sql).toMatch(/"queueRank"/);
++  });
++});

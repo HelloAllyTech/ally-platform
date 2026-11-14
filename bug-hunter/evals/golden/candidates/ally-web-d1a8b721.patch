@@ -1,0 +1,96 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/transcript-listing/TranscriptListing.tsx b/apps/ally-helpline-dashboard/src/components/transcript-listing/TranscriptListing.tsx
+index 0134430c14..2024bb9093 100644
+--- a/apps/ally-helpline-dashboard/src/components/transcript-listing/TranscriptListing.tsx
++++ b/apps/ally-helpline-dashboard/src/components/transcript-listing/TranscriptListing.tsx
+@@ -216,8 +216,17 @@ const TranscriptListing: FC<TranscriptListingProps> = ({
+   const nearEndLastCallRef = useRef(0);
+ 
+   const [activeIndex, setActiveIndex] = useState(-1);
+-  /** Message currently marked as the jumped-to moment; cleared on a timer. */
+-  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
++  /**
++   * Message currently marked as the jumped-to moment, plus the requestId that
++   * asked for it; cleared on a timer. requestId rides along so a repeat tap on
++   * the same message still produces a new object and re-triggers the
++   * scroll/highlight effect below — a plain messageId string would be
++   * `Object.is`-equal to the current state and React would bail out.
++   */
++  const [focusedMessage, setFocusedMessage] = useState<{
++    id: string;
++    requestId: number;
++  } | null>(null);
+   const [audioIsPlaying, setAudioIsPlaying] = useState(false);
+   const [seekTarget, setSeekTarget] = useState<number | null>(null);
+   const [transcriptSeekRequest, setTranscriptSeekRequest] =
+@@ -324,22 +333,19 @@ const TranscriptListing: FC<TranscriptListingProps> = ({
+     const targetId = String(focusRequest.messageId);
+     if (!transcriptList.some(message => getMessageId(message) === targetId)) return;
+     handledFocusRequestRef.current = focusRequest.requestId;
+-    setFocusedMessageId(targetId);
++    setFocusedMessage({ id: targetId, requestId: focusRequest.requestId });
+   }, [focusRequest, transcriptList]);
+ 
+   // Scroll only once the highlighted row has rendered and its ref is attached,
+   // then let the highlight expire on its own.
+   useEffect(() => {
+-    if (!focusedMessageId) return undefined;
++    if (!focusedMessage) return undefined;
+     focusedItemRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+-    focusHighlightTimerRef.current = setTimeout(
+-      () => setFocusedMessageId(null),
+-      FOCUS_HIGHLIGHT_MS,
+-    );
++    focusHighlightTimerRef.current = setTimeout(() => setFocusedMessage(null), FOCUS_HIGHLIGHT_MS);
+     return () => {
+       if (focusHighlightTimerRef.current) clearTimeout(focusHighlightTimerRef.current);
+     };
+-  }, [focusedMessageId]);
++  }, [focusedMessage]);
+ 
+   // ── While playing, prefetch when near the chronological end of loaded data ──
+   useEffect(() => {
+@@ -439,7 +445,7 @@ const TranscriptListing: FC<TranscriptListingProps> = ({
+               : transcriptList.map((transcript, index) => {
+                   const isItemActive = index === activeIndex;
+                   const isItemFocused =
+-                    focusedMessageId !== null && getMessageId(transcript) === focusedMessageId;
++                    focusedMessage !== null && getMessageId(transcript) === focusedMessage.id;
+                   return (
+                     <TranscriptItem
+                       key={`${transcript.senderId}-${transcript.startSeconds}-${index}`}
+diff --git a/apps/ally-helpline-dashboard/src/components/transcript-listing/__tests__/TranscriptListing.test.tsx b/apps/ally-helpline-dashboard/src/components/transcript-listing/__tests__/TranscriptListing.test.tsx
+index ffaabb19f1..3c159af980 100644
+--- a/apps/ally-helpline-dashboard/src/components/transcript-listing/__tests__/TranscriptListing.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/transcript-listing/__tests__/TranscriptListing.test.tsx
+@@ -133,4 +133,31 @@ describe("TranscriptListing moment focus", () => {
+     expect(scrollIntoView).toHaveBeenCalledTimes(2);
+     expect(rowFor("The moment in question")?.className).toContain("ring-2");
+   });
++
++  it("scrolls again when the same chip is tapped a second time before the highlight expires", () => {
++    const { rerender } = render(
++      <TranscriptListing
++        transcriptList={transcriptList as any}
++        hasMore={false}
++        focusRequest={{ messageId: "22", requestId: 1 }}
++      />,
++    );
++
++    // Well within the 2.5s highlight window — the learner tapped again
++    // because they weren't sure the first tap registered.
++    act(() => {
++      vi.advanceTimersByTime(1000);
++    });
++
++    rerender(
++      <TranscriptListing
++        transcriptList={transcriptList as any}
++        hasMore={false}
++        focusRequest={{ messageId: "22", requestId: 2 }}
++      />,
++    );
++
++    expect(scrollIntoView).toHaveBeenCalledTimes(2);
++    expect(rowFor("The moment in question")?.className).toContain("ring-2");
++  });
+ });

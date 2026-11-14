@@ -1,0 +1,91 @@
+diff --git a/src/builder/service/builder-pull-request.service.ts b/src/builder/service/builder-pull-request.service.ts
+index 0b3a53da8b..7c880631c8 100644
+--- a/src/builder/service/builder-pull-request.service.ts
++++ b/src/builder/service/builder-pull-request.service.ts
+@@ -702,8 +702,15 @@ export class BuilderPullRequestService {
+   ): Promise<void> {
+     if (remote.mergeableState !== 'behind' || !remote.headSha) return;
+ 
++    // Deliberately not gated on `autoFixEnabled`. Bringing a branch up to date
++    // with master is bookkeeping, not a fix: no agent, no model, no runner, one
++    // GitHub API call. `autoFixEnabled` is the switch for spending money on
++    // runs, and tying this to it meant that turning off expensive work also
++    // turned off the free work — leaving green, approved pull requests stuck at
++    // `behind`, which is not `clean`, which is what the merge prompt waits for.
++    // So the loop went quiet with nothing to show and nothing to click.
+     const settings = await this.settingsService.get();
+-    if (!settings.enabled || !settings.autoFixEnabled) return;
++    if (!settings.enabled) return;
+ 
+     const author = await this.github.getCommitAuthor(
+       pullRequest.repo,
+diff --git a/src/builder/service/test/builder-pull-request.service.spec.ts b/src/builder/service/test/builder-pull-request.service.spec.ts
+index bb0bbf0652..3f7d6630b4 100644
+--- a/src/builder/service/test/builder-pull-request.service.spec.ts
++++ b/src/builder/service/test/builder-pull-request.service.spec.ts
+@@ -1204,6 +1204,46 @@ describe('BuilderPullRequestService', () => {
+       );
+     });
+ 
++    /**
++     * The setting this actually ran into.
++     *
++     * This used to be gated on `autoFixEnabled`, which conflated two different
++     * things: spending money on agent runs, and a single GitHub API call that
++     * merges master in. Running with review on and fix off — the deliberate
++     * "don't spend, just tell me" setting — therefore left green, approved pull
++     * requests parked at `behind`, which is not `clean`, which is what the
++     * merge prompt waits for. The loop went quiet with nothing to click.
++     */
++    it('keeps the branch current even with auto-fix switched off', async () => {
++      settingsService.get.mockResolvedValue({
++        enabled: true,
++        autoFixEnabled: false,
++        autoReviewEnabled: true,
++        maxFixRunsPerPr: 3,
++      });
++
++      await reconcileWith({ headSha: 'abc1234def', ...behind });
++
++      expect(github.updatePullRequestBranch).toHaveBeenCalledWith(
++        'ally-be',
++        42,
++        'abc1234def',
++      );
++    });
++
++    /** The kill switch still means everything off. */
++    it('stops when the kill switch is off', async () => {
++      settingsService.get.mockResolvedValue({
++        enabled: false,
++        autoFixEnabled: true,
++        maxFixRunsPerPr: 3,
++      });
++
++      await reconcileWith({ headSha: 'abc1234def', ...behind });
++
++      expect(github.updatePullRequestBranch).not.toHaveBeenCalled();
++    });
++
+     /**
+      * `dirty` is a real conflict needing a person or a fix run, and `blocked`
+      * is a missing approval. Merging master in fixes neither, and trying would
+@@ -1245,18 +1285,6 @@ describe('BuilderPullRequestService', () => {
+ 
+       expect(github.updatePullRequestBranch).not.toHaveBeenCalled();
+     });
+-
+-    it('respects the same switch that governs pushing to an open PR', async () => {
+-      settingsService.get.mockResolvedValue({
+-        enabled: true,
+-        autoFixEnabled: false,
+-        maxFixRunsPerPr: 3,
+-      });
+-
+-      await reconcileWith({ headSha: 'abc1234def', ...behind });
+-
+-      expect(github.updatePullRequestBranch).not.toHaveBeenCalled();
+-    });
+   });
+ 
+   /**

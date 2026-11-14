@@ -1,0 +1,53 @@
+diff --git a/src/learn/service/scenario-session.service.ts b/src/learn/service/scenario-session.service.ts
+index 05f154a3aa..bed84ad5a3 100644
+--- a/src/learn/service/scenario-session.service.ts
++++ b/src/learn/service/scenario-session.service.ts
+@@ -194,16 +194,25 @@ export class ScenarioSessionService {
+     scenarioSessionId: string,
+     tenantId: string,
+   ): Promise<void> {
+-    const randomPrompts = this.pickRandomUniquePrompts(2);
+-    const toCreate = randomPrompts.map((prompt) =>
+-      this.scenarioSessionReflectionPromptResponseRepository.create({
+-        scenarioSessionId,
+-        promptId: prompt.promptId,
+-        response: undefined,
+-        tenantId,
+-      }),
+-    );
+-    await this.scenarioSessionReflectionPromptResponseRepository.save(toCreate);
++    const existing =
++      await this.scenarioSessionReflectionPromptResponseRepository.find({
++        where: { scenarioSessionId },
++      });
++
++    if (!existing.length) {
++      const randomPrompts = this.pickRandomUniquePrompts(2);
++      const toCreate = randomPrompts.map((prompt) =>
++        this.scenarioSessionReflectionPromptResponseRepository.create({
++          scenarioSessionId,
++          promptId: prompt.promptId,
++          response: undefined,
++          tenantId,
++        }),
++      );
++      await this.scenarioSessionReflectionPromptResponseRepository.save(
++        toCreate,
++      );
++    }
+   }
+ 
+   private pickRandomUniquePrompts(count: number) {
+diff --git a/src/learn/service/test/scenario-session.service.spec.ts b/src/learn/service/test/scenario-session.service.spec.ts
+index 6261ca7ce9..5c7503f9f1 100644
+--- a/src/learn/service/test/scenario-session.service.spec.ts
++++ b/src/learn/service/test/scenario-session.service.spec.ts
+@@ -213,7 +213,7 @@ describe('ScenarioSessionService', () => {
+     };
+ 
+     const mockScenarioSessionReflectionPromptResponseRepo = {
+-      find: jest.fn(),
++      find: jest.fn().mockResolvedValue([]),
+       findOne: jest.fn(),
+       create: jest.fn(),
+       save: jest.fn(),

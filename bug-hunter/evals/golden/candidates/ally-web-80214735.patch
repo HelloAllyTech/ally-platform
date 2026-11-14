@@ -1,0 +1,61 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/thread-card/ThreadCard.tsx b/apps/ally-helpline-dashboard/src/components/thread-card/ThreadCard.tsx
+index 5d69c7d397..b41a378bc6 100644
+--- a/apps/ally-helpline-dashboard/src/components/thread-card/ThreadCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/thread-card/ThreadCard.tsx
+@@ -17,7 +17,7 @@ const ThreadCard = ({ thread, isFeedOwner }: ThreadCardProps) => {
+   };
+   return (
+     <div
+-      className="w-full min-w-[350px] font-primary border-[0.5px] rounded-lg px-4 py-2 flex flex-col gap-2"
++      className="w-full min-w-[250px] font-primary border-[0.5px] rounded-lg px-4 py-2 flex flex-col gap-2"
+       key={thread.id}
+     >
+       <div className="flex items-center min-h-9 border-b-[0.5px] pb-2">
+diff --git a/apps/ally-helpline-dashboard/src/components/thread-card/__tests__/ThreadCard.test.tsx b/apps/ally-helpline-dashboard/src/components/thread-card/__tests__/ThreadCard.test.tsx
+index 5ff282dfb7..91b7346e73 100644
+--- a/apps/ally-helpline-dashboard/src/components/thread-card/__tests__/ThreadCard.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/thread-card/__tests__/ThreadCard.test.tsx
+@@ -187,10 +187,10 @@ describe("ThreadCard Component", () => {
+       expect(mainContainer).toHaveClass("border-[0.5px]", "rounded-lg");
+     });
+ 
+-    it("should have minimum width of 350px", () => {
++    it("should have minimum width of 250px", () => {
+       const { container } = render(<ThreadCard thread={mockThread} />);
+       const mainContainer = container.firstChild as HTMLElement;
+-      expect(mainContainer).toHaveClass("min-w-[350px]");
++      expect(mainContainer).toHaveClass("min-w-[250px]");
+     });
+ 
+     it("should have padding classes", () => {
+diff --git a/apps/ally-helpline-dashboard/src/components/thread-card/__tests__/__snapshots__/ThreadCard.test.tsx.snap b/apps/ally-helpline-dashboard/src/components/thread-card/__tests__/__snapshots__/ThreadCard.test.tsx.snap
+index c7f13b702d..c7187d6752 100644
+--- a/apps/ally-helpline-dashboard/src/components/thread-card/__tests__/__snapshots__/ThreadCard.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/components/thread-card/__tests__/__snapshots__/ThreadCard.test.tsx.snap
+@@ -3,7 +3,7 @@
+ exports[`ThreadCard Component > should match snapshot when comments are expanded 1`] = `
+ <DocumentFragment>
+   <div
+-    class="w-full min-w-[350px] font-primary border-[0.5px] rounded-lg px-4 py-2 flex flex-col gap-2"
++    class="w-full min-w-[250px] font-primary border-[0.5px] rounded-lg px-4 py-2 flex flex-col gap-2"
+   >
+     <div
+       class="flex items-center min-h-9 border-b-[0.5px] pb-2"
+@@ -90,7 +90,7 @@ exports[`ThreadCard Component > should match snapshot when comments are expanded
+ exports[`ThreadCard Component > should match snapshot when rendered with multiple comments 1`] = `
+ <DocumentFragment>
+   <div
+-    class="w-full min-w-[350px] font-primary border-[0.5px] rounded-lg px-4 py-2 flex flex-col gap-2"
++    class="w-full min-w-[250px] font-primary border-[0.5px] rounded-lg px-4 py-2 flex flex-col gap-2"
+   >
+     <div
+       class="flex items-center min-h-9 border-b-[0.5px] pb-2"
+@@ -177,7 +177,7 @@ exports[`ThreadCard Component > should match snapshot when rendered with multipl
+ exports[`ThreadCard Component > should match snapshot when rendered with single comment 1`] = `
+ <DocumentFragment>
+   <div
+-    class="w-full min-w-[350px] font-primary border-[0.5px] rounded-lg px-4 py-2 flex flex-col gap-2"
++    class="w-full min-w-[250px] font-primary border-[0.5px] rounded-lg px-4 py-2 flex flex-col gap-2"
+   >
+     <div
+       class="flex items-center min-h-9 border-b-[0.5px] pb-2"

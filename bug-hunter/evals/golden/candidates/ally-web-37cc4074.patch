@@ -1,0 +1,61 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/scenario-card/ScenarioCard.tsx b/apps/ally-helpline-dashboard/src/components/scenario-card/ScenarioCard.tsx
+index 76f2b8ea27..fa91b8ccbf 100644
+--- a/apps/ally-helpline-dashboard/src/components/scenario-card/ScenarioCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/scenario-card/ScenarioCard.tsx
+@@ -22,7 +22,12 @@ const ScenarioCard: FC<ScenarioCardProps> = ({
+   attemptCount = 0,
+ }) => {
+   const { t } = useTranslation();
+-  const [imageError, setImageError] = useState(false);
++  // Tracked per URL rather than as a sticky boolean: the course player renders
++  // this card before its scenario request resolves, so the first paint has no
++  // cover. Handing "" to <img> makes the browser fire `error`, which used to
++  // latch the fallback for good — the real cover then never appeared.
++  const [failedCoverImage, setFailedCoverImage] = useState<string | null>(null);
++  const imageError = !(coverImage?.length > 0) || failedCoverImage === coverImage;
+   const isPathway = totalScenarios !== undefined;
+   // Standalone scenarios only: pathways/cases/courses already carry their own
+   // progress ring. A COMING_SOON scenario can't have been played, so the two
+@@ -46,7 +51,7 @@ const ScenarioCard: FC<ScenarioCardProps> = ({
+           })}
+           className={`w-full h-full object-cover rounded-[12px] ${isComingSoon ? "blur-[2px] grayscale opacity-50" : ""}`}
+           loading="lazy"
+-          onError={() => setImageError(true)}
++          onError={() => setFailedCoverImage(coverImage)}
+         />
+       ) : (
+         <div className="w-full h-full flex items-center justify-center text-typography-800 bg-gray-100">
+diff --git a/apps/ally-helpline-dashboard/src/components/scenario-card/__test__/ScenarioCard.test.tsx b/apps/ally-helpline-dashboard/src/components/scenario-card/__test__/ScenarioCard.test.tsx
+index 4ebe9a9c21..e659a4917d 100644
+--- a/apps/ally-helpline-dashboard/src/components/scenario-card/__test__/ScenarioCard.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/scenario-card/__test__/ScenarioCard.test.tsx
+@@ -124,6 +124,29 @@ describe("ScenarioCard", () => {
+     expect(screen.queryByAltText("Test Scenario scenario cover")).not.toBeInTheDocument();
+   });
+ 
++  // The course player renders this card before its scenario request resolves,
++  // so the first paint has no cover URL at all.
++  it("should not hand an empty src to <img> while the cover is still loading", () => {
++    renderComponent({ coverImage: "" });
++
++    expect(screen.queryByAltText("Test Scenario scenario cover")).not.toBeInTheDocument();
++  });
++
++  it("should show a cover that arrives after an earlier one failed", () => {
++    const { rerender } = render(
++      <ScenarioCard {...defaultProps} coverImage="https://example.com/pending.jpg" />,
++    );
++    fireEvent.error(screen.getByAltText("Test Scenario scenario cover"));
++
++    rerender(<ScenarioCard {...defaultProps} coverImage="https://example.com/arrived.jpg" />);
++
++    expect(screen.getByAltText("Test Scenario scenario cover")).toHaveAttribute(
++      "src",
++      "https://example.com/arrived.jpg",
++    );
++    expect(screen.queryByText("Image not available")).not.toBeInTheDocument();
++  });
++
+   it("should apply blur and grayscale styles when isComingSoon and image loaded", () => {
+     renderComponent({ isComingSoon: true });
+     const image = screen.getByAltText("Test Scenario scenario cover");

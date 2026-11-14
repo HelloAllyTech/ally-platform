@@ -1,0 +1,65 @@
+diff --git a/apps/ally-helpline-dashboard/src/api/tracks.ts b/apps/ally-helpline-dashboard/src/api/tracks.ts
+index eec307795e..9ca4ab764f 100644
+--- a/apps/ally-helpline-dashboard/src/api/tracks.ts
++++ b/apps/ally-helpline-dashboard/src/api/tracks.ts
+@@ -67,10 +67,11 @@ export const applyCompletionToDetailDraft = (
+ const tracksAPI = baseAPI.injectEndpoints({
+   endpoints: builder => ({
+     /** List Track 2.0 tracks visible to the learner (with progress). */
+-    getLearnTracks: builder.query<GetLearnTracksResponse, void>({
+-      query: () => ({
++    getLearnTracks: builder.query<GetLearnTracksResponse, { languageCode: string }>({
++      query: ({ languageCode }) => ({
+         url: ApiEndpoints.TRACKS.GET_TRACKS,
+         method: HttpMethod.GET,
++        params: { languageCode },
+       }),
+       providesTags: [TAG_TYPES.LEARN_TRACKS],
+     }),
+diff --git a/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx b/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx
+index dfd6e38d36..6dab05f297 100644
+--- a/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx
+@@ -61,7 +61,7 @@ export const Learn: FC = () => {
+     data: tracksData,
+     isLoading: isTracksLoading,
+     refetch: refetchTracks,
+-  } = useGetLearnTracksQuery();
++  } = useGetLearnTracksQuery({ languageCode: i18n.language });
+   const tracks = tracksData?.data ?? [];
+ 
+   const {
+diff --git a/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx b/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx
+index b5294e310b..2fbd9faef6 100644
+--- a/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx
+@@ -30,7 +30,7 @@ const {
+   mockUseGetScenariosQuery: vi.fn(),
+   mockUseGetScenarioPathwaysQuery: vi.fn(),
+   mockUseGetScenarioCasesQuery: vi.fn(),
+-  mockUseGetLearnTracksQuery: vi.fn(() => ({
++  mockUseGetLearnTracksQuery: vi.fn((args: any) => ({
+     data: { data: [] },
+     isLoading: false,
+     refetch: vi.fn(),
+@@ -42,7 +42,7 @@ vi.mock("@api", () => ({
+   useGetScenariosQuery: (args: any) => mockUseGetScenariosQuery(args),
+   useGetScenarioPathwaysQuery: (args: any) => mockUseGetScenarioPathwaysQuery(args),
+   useGetScenarioCasesQuery: (args: any) => mockUseGetScenarioCasesQuery(args),
+-  useGetLearnTracksQuery: () => mockUseGetLearnTracksQuery(),
++  useGetLearnTracksQuery: (args: any) => mockUseGetLearnTracksQuery(args),
+ }));
+ 
+ import { Learn } from "../Learn";
+@@ -1058,6 +1058,11 @@ describe("Learn Component", () => {
+         languageCode: expect.any(String), // i18n.language
+       }),
+     );
++    expect(mockUseGetLearnTracksQuery).toHaveBeenCalledWith(
++      expect.objectContaining({
++        languageCode: expect.any(String), // i18n.language
++      }),
++    );
+   });
+ 
+   it("should return a valid React element", () => {

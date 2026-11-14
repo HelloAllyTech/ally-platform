@@ -1,0 +1,115 @@
+diff --git a/src/analytics/repository/language-analytics.repository.ts b/src/analytics/repository/language-analytics.repository.ts
+index a1dc5fc70e..45a4623892 100644
+--- a/src/analytics/repository/language-analytics.repository.ts
++++ b/src/analytics/repository/language-analytics.repository.ts
+@@ -318,14 +318,21 @@ export class LanguageAnalyticsRepository {
+    * #2 in the morning and #3 in the afternoon on 2026-08-28; joining to the
+    * scenario would attribute both to #3 and quietly invent the comparison.
+    *
+-   * `promptVersion` is already derived from this same map, keeping only the
+-   * VALUE. The key was there all along, which is why prompt attribution needs
+-   * no migration and works on every session already judged.
++   * `selectedMainPromptCode` FIRST, because it is unambiguous. The
++   * promptVersions fallback exists for sessions predating it, and it is a
++   * heuristic: that map can carry several main-agent entries, and picking
++   * alphabetically returned `..._main_agent_prompt` in preference to
++   * `..._main_agent_prompt_full` and `..._working_memory_split` — every session
++   * attributed to the base prompt, which is what the first version of this
++   * shipped and what the numbers exposed. Longest key first is a better guess,
++   * because variants are suffixes of the base code, but it is still a guess:
++   * treat fallback rows as approximate and prefer the recorded field.
+    */
+-  private static readonly MAIN_PROMPT_CODE_SQL = `(
+-    SELECT k FROM jsonb_object_keys(ss."metadata"->'promptVersions') AS k
+-     WHERE k LIKE '%main_agent%' OR k LIKE '%base_role%'
+-     ORDER BY k LIMIT 1)`;
++  private static readonly MAIN_PROMPT_CODE_SQL = `COALESCE(
++    ss."metadata"->>'selectedMainPromptCode',
++    (SELECT k FROM jsonb_object_keys(ss."metadata"->'promptVersions') AS k
++      WHERE k LIKE '%main_agent%' OR k LIKE '%base_role%'
++      ORDER BY length(k) DESC, k LIMIT 1))`;
+ 
+   /** Session denominators grouped by which main-agent prompt ran. */
+   async sessionTotalsByMainPrompt(f: LanguageAnalyticsFilters): Promise<
+diff --git a/src/learn/service/scenario-session.service.ts b/src/learn/service/scenario-session.service.ts
+index 910d6ba929..1ad97c569c 100644
+--- a/src/learn/service/scenario-session.service.ts
++++ b/src/learn/service/scenario-session.service.ts
+@@ -3573,10 +3573,25 @@ export class ScenarioSessionService {
+       });
+ 
+     // Tag the session as a V2V test so it can be filtered downstream.
++    //
++    // `selectedMainPromptCode` is captured here for the same reason
++    // `startScenarioSession` captures it: analytics cannot otherwise tell which
++    // main-agent prompt produced a session. It was missing on this path, so
++    // every V2V run — the sessions we deliberately generate to COMPARE prompts
++    // — was the one population that could not be attributed to one.
++    //
++    // Read from the scenario at start time, not at analysis time: a scenario's
++    // selected prompt mutates, and on 2026-08-28 scenario 440 ran on two
++    // different prompts within an hour.
++    const v2vSelectedMainPromptCode = scenario?.metadata
++      ?.selectedMainPromptCode as string | undefined;
+     scenarioSession.metadata = {
+       ...(scenarioSession.metadata ?? {}),
+       v2vTest: true,
+       v2vMaxExchanges: maxExchanges,
++      ...(v2vSelectedMainPromptCode
++        ? { selectedMainPromptCode: v2vSelectedMainPromptCode }
++        : {}),
+     };
+     await this.scenarioSessionRepository.save(scenarioSession);
+ 
+diff --git a/src/learn/service/test/v2v-prompt-attribution.spec.ts b/src/learn/service/test/v2v-prompt-attribution.spec.ts
+new file mode 100644
+index 0000000000..fb44faa518
+--- /dev/null
++++ b/src/learn/service/test/v2v-prompt-attribution.spec.ts
+@@ -0,0 +1,46 @@
++/**
++ * V2V sessions must record which main-agent prompt ran.
++ *
++ * They are the sessions deliberately generated to COMPARE prompts, and they
++ * were the one population that could not be attributed to one:
++ * `startScenarioSession` captured `selectedMainPromptCode`,
++ * `startV2VTestSession` did not, so every A/B run landed in the analytics
++ * 'unknown' bucket.
++ */
++describe('startV2VTestSession — prompt attribution', () => {
++  const buildMetadata = (
++    existing: Record<string, unknown> | undefined,
++    maxExchanges: number,
++    selected: string | undefined,
++  ) => ({
++    ...(existing ?? {}),
++    v2vTest: true,
++    v2vMaxExchanges: maxExchanges,
++    ...(selected ? { selectedMainPromptCode: selected } : {}),
++  });
++
++  it('records the scenario’s selected prompt alongside the v2v tags', () => {
++    const md = buildMetadata(
++      { sessionName: 'SS-1' },
++      20,
++      'ally_ai_learn_system_main_agent_prompt_working_memory_split',
++    );
++
++    expect(md).toMatchObject({
++      sessionName: 'SS-1',
++      v2vTest: true,
++      v2vMaxExchanges: 20,
++      selectedMainPromptCode:
++        'ally_ai_learn_system_main_agent_prompt_working_memory_split',
++    });
++  });
++
++  it('omits the key entirely when the scenario has no selected prompt', () => {
++    // Absent, not null: analytics COALESCEs to a promptVersions fallback, and a
++    // null would shadow it.
++    const md = buildMetadata(undefined, 12, undefined);
++
++    expect(md).not.toHaveProperty('selectedMainPromptCode');
++    expect(md.v2vTest).toBe(true);
++  });
++});

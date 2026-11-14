@@ -1,0 +1,109 @@
+diff --git a/src/learn/repository/scenario-version.repository.ts b/src/learn/repository/scenario-version.repository.ts
+index 0c5a666d53..355389f129 100644
+--- a/src/learn/repository/scenario-version.repository.ts
++++ b/src/learn/repository/scenario-version.repository.ts
+@@ -16,9 +16,11 @@ export class ScenarioVersionRepository extends Repository<ScenarioVersion> {
+   }
+ 
+   /**
+-   * Next version number for a scenario. Counts soft-deleted rows too (via the
+-   * raw max) so numbers are never reused. Safe to call inside a transaction by
+-   * passing the entity manager.
++   * Next version number for a scenario, computed over NON-deleted rows only, so
++   * the number of a deleted top version is reused (delete v18 → next is v18).
++   * The partial unique index is scoped to `deletedAt IS NULL`, so the new live
++   * row never collides with the soft-deleted one. Safe to call inside a
++   * transaction by passing the entity manager.
+    */
+   async getNextVersionNumber(
+     scenarioId: number,
+@@ -27,9 +29,9 @@ export class ScenarioVersionRepository extends Repository<ScenarioVersion> {
+     const repo = em ? em.getRepository(ScenarioVersion) : this;
+     const row = await repo
+       .createQueryBuilder('v')
+-      .withDeleted()
+       .select('MAX(v.versionNumber)', 'max')
+       .where('v.scenarioId = :scenarioId', { scenarioId })
++      .andWhere('v.deletedAt IS NULL')
+       .getRawOne<{ max: string | null }>();
+     return (row?.max ? Number(row.max) : 0) + 1;
+   }
+diff --git a/src/learn/service/scenario-version.service.ts b/src/learn/service/scenario-version.service.ts
+index b18a7b9c09..faa76c600b 100644
+--- a/src/learn/service/scenario-version.service.ts
++++ b/src/learn/service/scenario-version.service.ts
+@@ -83,20 +83,25 @@ export class ScenarioVersionService {
+       // Branch: fork an existing version's data into a new draft.
+       const parent = await this.getVersion(scenarioId, dto.fromVersionId);
+       parentVersionId = parent.id;
+-      config = parent.config ?? {};
++      // The published version's stored config is a snapshot that can drift from
++      // the live scenario when it's edited directly (outside the version
++      // system). Rebuild from the live state so branching the published version
++      // always captures current edits. Drafts/archived snapshots are authored
++      // in the version system (or intentionally frozen), so clone them as-is.
++      config =
++        parent.status === ScenarioVersionStatus.PUBLISHED
++          ? await this.buildConfigFromScenario(scenarioId)
++          : (parent.config ?? {});
+     } else {
+-      // Default: seed from the published version, else the live scenario.
++      // Default: seed from the published version, else the live scenario. The
++      // published snapshot can be stale (see above), so always rebuild from live.
+       const published = scenario.publishedVersionId
+         ? await this.scenarioVersionRepository.findOne({
+             where: { id: scenario.publishedVersionId, scenarioId },
+           })
+         : null;
+-      if (published) {
+-        parentVersionId = published.id;
+-        config = published.config ?? {};
+-      } else {
+-        config = await this.buildConfigFromScenario(scenarioId);
+-      }
++      parentVersionId = published?.id ?? null;
++      config = await this.buildConfigFromScenario(scenarioId);
+     }
+ 
+     // getNextVersionNumber is a read-then-insert, so two concurrent creates can
+diff --git a/src/learn/service/test/scenario-version.service.spec.ts b/src/learn/service/test/scenario-version.service.spec.ts
+index fc1f260793..7a011913cc 100644
+--- a/src/learn/service/test/scenario-version.service.spec.ts
++++ b/src/learn/service/test/scenario-version.service.spec.ts
+@@ -101,6 +101,36 @@ describe('ScenarioVersionService', () => {
+       });
+     });
+ 
++    it('branching the PUBLISHED version rebuilds from the live scenario (not the stale snapshot)', async () => {
++      // The published version's stored config is stale (no skill); the live
++      // scenario has it. Branching must capture the live state.
++      (versionRepo.findOne as jest.Mock).mockResolvedValue({
++        id: 'v-pub',
++        scenarioId: 10,
++        status: ScenarioVersionStatus.PUBLISHED,
++        config: { title: 'stale', selectedMainPromptCode: undefined },
++      });
++      (scenarioService.getAdminScenario as jest.Mock).mockResolvedValue({
++        title: 'live',
++        metadata: { selectedMainPromptCode: 'variant_x' },
++        triggerWarnings: [],
++        terminationEvents: [],
++        behaviorInstructions: [],
++      });
++
++      await service.createVersion(10, { fromVersionId: 'v-pub' }, 1);
++
++      const created = txVersionRepo.create.mock.calls[0][0];
++      expect(created.parentVersionId).toBe('v-pub');
++      // Rebuilt from live, so the current skill version is carried.
++      expect(created.config).toMatchObject({
++        title: 'live',
++        selectedMainPromptCode: 'variant_x',
++        status: ScenarioStatus.DRAFT,
++      });
++      expect(scenarioService.getAdminScenario).toHaveBeenCalledWith(10);
++    });
++
+     it('creates a blank draft with mappedEvents:[] when empty', async () => {
+       await service.createVersion(10, { empty: true, name: 'from scratch' }, 1);
+ 

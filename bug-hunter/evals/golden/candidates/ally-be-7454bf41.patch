@@ -1,0 +1,102 @@
+diff --git a/src/analytics/constants/llm-pricing.constants.ts b/src/analytics/constants/llm-pricing.constants.ts
+index 6c194d9b05..f00aab6198 100644
+--- a/src/analytics/constants/llm-pricing.constants.ts
++++ b/src/analytics/constants/llm-pricing.constants.ts
+@@ -93,17 +93,17 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
+   'text-embedding-3-small': { inputPer1MUsd: 0.02, outputPer1MUsd: 0 },
+ 
+   // --- Gemini (verified 2026-06) ---
+-  // cachedInputPer1MUsd: UNVERIFIED — the vendor page could not be reached
+-  // when these were added (2026-10); confirm against
+-  // ai.google.dev/gemini-api/docs/pricing. They are a quarter of the input
+-  // rate; if Google has since moved the 2.5 models to a deeper cache discount
+-  // these OVERSTATE cached spend slightly, which is the safe direction.
+-  // 2.5-pro is tiered: 1.25/10 for prompts <=200k tokens, 2.50/15 above; we
+-  // price at the <=200k tier (consistent with the v1 approximation note above).
++  // cachedInputPer1MUsd for the 2.5 models: Google's "Context caching price"
++  // at ai.google.dev/gemini-api/docs/pricing, checked 2026-10-05 — a tenth of
++  // the input rate (2.5-pro 0.125, 2.5-flash 0.03, text/image/video). Explicit
++  // caches also bill storage per token-hour; that isn't modelled here.
++  // 2.5-pro is tiered: 1.25/10 (cached 0.125) for prompts <=200k tokens,
++  // 2.50/15 (cached 0.25) above; we price at the <=200k tier (consistent with
++  // the v1 approximation note above).
+   'gemini-2.5-pro': {
+     inputPer1MUsd: 1.25,
+     outputPer1MUsd: 10,
+-    cachedInputPer1MUsd: 0.31,
++    cachedInputPer1MUsd: 0.125,
+   },
+   // Required, not optional: every Indic language except Malayalam moved onto
+   // 2.5-flash in 1881000000000-MoveLanguagesOffExperimentalGemini. Their
+@@ -114,10 +114,12 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
+   'gemini-2.5-flash': {
+     inputPer1MUsd: 0.3,
+     outputPer1MUsd: 2.5,
+-    cachedInputPer1MUsd: 0.075,
++    cachedInputPer1MUsd: 0.03,
+   },
+   // 2.0-flash retired 2026-06-01; kept to price historical token records —
+-  // including the -exp variant, which resolves here by prefix.
++  // including the -exp variant, which resolves here by prefix. Its cached rate
++  // (a quarter of input) is UNVERIFIED: the model is no longer on Google's
++  // pricing page (checked 2026-10-05).
+   'gemini-2.0-flash': {
+     inputPer1MUsd: 0.1,
+     outputPer1MUsd: 0.4,
+diff --git a/src/analytics/constants/test/llm-pricing.constants.spec.ts b/src/analytics/constants/test/llm-pricing.constants.spec.ts
+index ce25483151..2695eaaf80 100644
+--- a/src/analytics/constants/test/llm-pricing.constants.spec.ts
++++ b/src/analytics/constants/test/llm-pricing.constants.spec.ts
+@@ -143,8 +143,8 @@ describe('computeServiceCostUsd — cached prompt tokens (OpenAI, Gemini)', () =
+         cachedTokens: 1_000_000,
+       },
+     );
+-    // all 1M prompt cached at $0.075/1M + 1M output at $2.50/1M
+-    expect(costUsd).toBeCloseTo(0.075 + 2.5, 6);
++    // all 1M prompt cached at $0.03/1M + 1M output at $2.50/1M
++    expect(costUsd).toBeCloseTo(0.03 + 2.5, 6);
+   });
+ 
+   it('is unchanged when nothing was cached', () => {
+diff --git a/src/analytics/service/test/coding-agent-cost-analytics.service.spec.ts b/src/analytics/service/test/coding-agent-cost-analytics.service.spec.ts
+index 0f1be02ccf..b27130975d 100644
+--- a/src/analytics/service/test/coding-agent-cost-analytics.service.spec.ts
++++ b/src/analytics/service/test/coding-agent-cost-analytics.service.spec.ts
+@@ -99,8 +99,8 @@ describe('CodingAgentCostAnalyticsService', () => {
+     ]);
+     const result = await monthly();
+ 
+-    // $1.25 for the runner row at the full input rate + $0.31 all-cached.
+-    expect(result.totalCostUsd.builder).toBeCloseTo(1.25 + 0.31, 4);
++    // $1.25 for the runner row at the full input rate + $0.125 all-cached.
++    expect(result.totalCostUsd.builder).toBeCloseTo(1.25 + 0.125, 4);
+   });
+ 
+   it('gap-fills a bucket with no usage to real zeros rather than omitting it', async () => {
+diff --git a/src/analytics/service/test/platform-analytics.service.spec.ts b/src/analytics/service/test/platform-analytics.service.spec.ts
+index 146eea2ad2..4f36163ed6 100644
+--- a/src/analytics/service/test/platform-analytics.service.spec.ts
++++ b/src/analytics/service/test/platform-analytics.service.spec.ts
+@@ -1020,7 +1020,7 @@ describe('PlatformAnalyticsService', () => {
+       llmUsageRepo.getTokenUsageByModelAndTask.mockResolvedValue([
+         {
+           service: 'llm',
+-          model: 'gemini-2.5-pro', // 1.25 in / 10 out / 0.31 cached per 1M
++          model: 'gemini-2.5-pro', // 1.25 in / 10 out / 0.125 cached per 1M
+           provider: 'gemini',
+           task: 'drift_judge',
+           promptTokens: 1_000_000,
+@@ -1037,10 +1037,10 @@ describe('PlatformAnalyticsService', () => {
+ 
+       const result = await service.getTokenConsumption({ range: '30d' });
+ 
+-      // 500k fresh × 1.25 + 500k cached × 0.31 + (100k + 400k) out × 10
+-      // = 0.625 + 0.155 + 5 = 5.78
++      // 500k fresh × 1.25 + 500k cached × 0.125 + (100k + 400k) out × 10
++      // = 0.625 + 0.0625 + 5 = 5.6875, rounded to 5.69
+       expect(result.points[0]).toMatchObject({
+-        estimatedCostUsd: 5.78,
++        estimatedCostUsd: 5.69,
+         priced: true,
+       });
+     });

@@ -1,0 +1,66 @@
+# Budgets, caps and attempts (docs/bug-hunter/CONTEXT.md rule 7; spec §7, §12, §13a).
+run:
+  max_fix_attempts: 3
+  max_tokens: 1500000         # per graph run, billed tokens of every call (history re-sent each turn, mostly cached); cost is the tighter cap
+  max_wall_clock_s: 2700      # 45 minutes per graph run
+  max_wall_clock_s_by_app:
+    ally-web: 4500            # 75 minutes: Vitest verify runs take 10-15 min each
+  max_cost_usd: 1.50          # per graph run; the run escalates with "budget exceeded" past any of the three
+  max_tool_turns: 30          # per tool loop (investigate, reproduce); the loop then answers with what it has
+  max_repro_attempts: 3       # a submitted test that passes (or runs nothing) goes back to the agent this many times
+  max_fix_lines_changed: 80   # a fix diff over this many changed lines escalates instead of opening a PR
+sweep:
+  max_runs_per_day: 5
+  max_prs_per_day: 3
+approval:
+  expiry_days: 7
+# Pull requests (chunk 06). push is a CLI flag, never a default; auto_merge stays off until chunk 09.
+pr:
+  auto_merge: false
+  # suggested_fix (default): a verified, reviewed fix ends as a report with the patch;
+  # no branch, no PR, no approval row. pr: draft PR + human approval. Switching to pr
+  # needs a holdout milestone with >= 60% fix pass (docs/bug-hunter/CONTEXT.md).
+  output_mode: suggested_fix
+sandbox:
+  cpus: 2
+  memory_mb: 8192            # ally-web's three Vitest suites run a 5 GB Node heap each
+  timeout_s: 1800             # per command inside the container
+  install_timeout_s: 1800     # dependency install (network on), per app
+  pids_limit: 2048
+# Per-node token budgets for prompt assembly (spec §7). Nodes without a model have none.
+nodes:
+  triage: 12000
+  investigate: 60000
+  reproduce: 40000
+  fix: 60000
+  review: 30000
+  learn: 8000
+# Long-term memory (chunk 07): LangGraph PostgresStore in the bughunter database.
+memory:
+  semantic: auto        # auto | on | off: pgvector search when available, else signature/app/file lookup
+  recall_limit: 5       # records per recall query, at most 5
+  min_word_overlap: 0.1 # recall needs a signature match, a shared file or this word overlap; similarity only ranks
+  scan_limit: 500       # candidates read per namespace before ranking in code
+  github_feedback: false  # PR/issue label reader; built and tested, switched off until pr mode
+  github_org: HelloAllyTech   # the repo is public: only this org's members' labels and comments count
+  github_allow: []            # extra trusted logins (e.g. a bot), if ever needed
+# Context engine (chunk 03).
+context:
+  token_safety_margin: 0.15   # budgets are enforced at (1 - margin): Gemini counts differently from tiktoken
+  chars_per_token_offline: 3  # overestimate when tiktoken's encoding is not available offline
+  repo_map_keep_commits: 2    # cached map versions kept per app
+  outline_first_min_lines: 800   # the first read_file of a longer file returns its outline, not its first 400 lines
+# Kept artefacts (diff, scratchpad, report, escalation) under runs/artefacts/<run_id>/.
+artefacts:
+  max_age_days: 30
+  max_size_mb: 500
+# Eval harness (chunk 04).
+evals:
+  min_free_gb: 5              # stop the harness cleanly below this much free host disk
+  max_cost_usd: 10            # stop the harness cleanly once the cases run so far cost this much
+  since_months: 12            # how far back to mine fix commits (full history for thin apps)
+  max_src_lines: 60           # real-bug candidates: source lines changed (tests excluded)
+  max_src_lines_thin_apps: 120   # ally-ai, ally-ai-learn, ally-mobile have few fixes
+  clean_window_days: 30       # a feat/chore is "clean" if no fix touched its lines within this
+  clean_min_src_lines: 5
+  clean_max_src_lines: 200

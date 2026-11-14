@@ -1,0 +1,34 @@
+diff --git a/src/analytics/service/platform-analytics.service.ts b/src/analytics/service/platform-analytics.service.ts
+index f0d7cb6871..85d3b634c0 100644
+--- a/src/analytics/service/platform-analytics.service.ts
++++ b/src/analytics/service/platform-analytics.service.ts
+@@ -107,8 +107,7 @@ export class PlatformAnalyticsService {
+     query: AnalyticsOverviewQueryDto,
+     defaultBucketFor: (range: AnalyticsRange) => AnalyticsBucket,
+   ): Promise<AnalyticsWindow> {
+-    const needsFloor =
+-      (query.range ?? '30d') === 'all' && !query.from && !query.to;
++    const needsFloor = (query.range ?? '30d') === 'all';
+     return resolveAnalyticsWindow(query, {
+       defaultRange: '30d',
+       defaultBucketFor,
+diff --git a/src/analytics/service/test/platform-analytics.service.spec.ts b/src/analytics/service/test/platform-analytics.service.spec.ts
+index fab01dd283..54c138e28c 100644
+--- a/src/analytics/service/test/platform-analytics.service.spec.ts
++++ b/src/analytics/service/test/platform-analytics.service.spec.ts
+@@ -397,6 +397,15 @@ describe('PlatformAnalyticsService', () => {
+       expect(result.previous).not.toBeNull();
+     });
+ 
++    it('fetches the data floor when range is "all" even with a "from" date', async () => {
++      await service.getOverview({
++        range: 'all',
++        from: '2024-01-01',
++        to: '2024-02-01',
++      });
++      expect(repo.getDataFloor).toHaveBeenCalled();
++    });
++
+     it('rejects range=all on an endpoint with no data floor', async () => {
+       // Token consumption resolves a calendar window only; answering "all time"
+       // there would mean inventing a start date.

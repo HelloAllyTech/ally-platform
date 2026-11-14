@@ -1,0 +1,52 @@
+diff --git a/src/builder/eval/service/builder-eval.service.ts b/src/builder/eval/service/builder-eval.service.ts
+index 795985e0ca..3d815a3753 100644
+--- a/src/builder/eval/service/builder-eval.service.ts
++++ b/src/builder/eval/service/builder-eval.service.ts
+@@ -514,8 +514,8 @@ export class BuilderEvalService {
+               ...(candidate.model !== undefined
+                 ? { model: candidate.model ?? '' }
+                 : {}),
+-              ...(candidate.temperature !== undefined &&
+-              candidate.temperature !== null
++              // null clears the row's override, as it does from the editor.
++              ...(candidate.temperature !== undefined
+                 ? { temperature: candidate.temperature }
+                 : {}),
+             } as any,
+diff --git a/src/builder/eval/test/builder-eval.service.spec.ts b/src/builder/eval/test/builder-eval.service.spec.ts
+index 00e8530128..d8b67069be 100644
+--- a/src/builder/eval/test/builder-eval.service.spec.ts
++++ b/src/builder/eval/test/builder-eval.service.spec.ts
+@@ -326,4 +326,32 @@ describe('BuilderEvalService', () => {
+       { publishedAt: expect.any(Date) },
+     );
+   });
++
++  it('publishes a cleared temperature as a cleared override', async () => {
++    const promptsService = {
++      findIdByCode: jest.fn().mockResolvedValue('prompt-1'),
++      updatePrompt: jest.fn().mockResolvedValue(true),
++    };
++    const service = new BuilderEvalService(
++      { getRepository: () => ({ update: jest.fn() }) } as any,
++      {} as any,
++      {} as any,
++      promptsService as any,
++    );
++
++    await (service as any).publish({
++      id: 'suite-2',
++      createdBy: 7,
++      candidate: {
++        promptCode: 'builder_interviewer_system',
++        temperature: null,
++      },
++    });
++
++    expect(promptsService.updatePrompt).toHaveBeenCalledWith(
++      'prompt-1',
++      { temperature: null },
++      { evalApproved: true },
++    );
++  });
+ });

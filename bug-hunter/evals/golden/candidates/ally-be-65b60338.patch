@@ -1,0 +1,244 @@
+diff --git a/src/analytics/controller/analytics.controller.ts b/src/analytics/controller/analytics.controller.ts
+index 434cdc69c4..b8576f58e5 100644
+--- a/src/analytics/controller/analytics.controller.ts
++++ b/src/analytics/controller/analytics.controller.ts
+@@ -383,6 +383,7 @@ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+ import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
+ import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+ import { OrgScopedRoute } from 'src/auth/decorators/org-scoped-route.decorator';
++import { CallerScopedRoute } from 'src/auth/decorators/caller-scoped-route.decorator';
+ import { PlatformWidePermissions } from 'src/auth/decorators/platform-wide.decorator';
+ import {
+   ADMIN_ANALYTICS_CHART_REGISTRY,
+@@ -1066,6 +1067,7 @@ export class AnalyticsController {
+   }
+ 
+   @Get('chart-preferences')
++  @CallerScopedRoute()
+   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+   @ApiOperation({
+     summary: "The caller's saved per-chart controls (super-admin)",
+@@ -1090,6 +1092,7 @@ export class AnalyticsController {
+   }
+ 
+   @Put('chart-preferences')
++  @CallerScopedRoute()
+   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+   @ApiOperation({
+     summary: "Save the caller's per-chart controls (super-admin)",
+diff --git a/src/analytics/controller/test/analytics-org-scoped-routes.spec.ts b/src/analytics/controller/test/analytics-org-scoped-routes.spec.ts
+index 99b54ae1a4..7f4c0c4d35 100644
+--- a/src/analytics/controller/test/analytics-org-scoped-routes.spec.ts
++++ b/src/analytics/controller/test/analytics-org-scoped-routes.spec.ts
+@@ -5,6 +5,7 @@ import { getMetadataStorage } from 'class-validator';
+ import { AnalyticsController } from '../analytics.controller';
+ import { FEATURE_TOGGLE_KEY } from '../../../auth/decorators/feature-toggle.decorator';
+ import { ORG_SCOPED_ROUTE_KEY } from '../../../auth/decorators/org-scoped-route.decorator';
++import { CALLER_SCOPED_ROUTE_KEY } from '../../../auth/decorators/caller-scoped-route.decorator';
+ import { FeatureToggleKey } from '../../../authorization/constants/admin-feature-toggle.constants';
+ 
+ /**
+@@ -66,7 +67,21 @@ const ORG_SCOPED_ANALYTICS_ROUTES = [
+   'xp-growth',
+ ];
+ 
+-type Route = { method: string; path: string; orgScoped: boolean };
++/**
++ * The Analytics routes that touch only the caller's own rows, open to a
++ * restricted admin with no organization named. Pinned for the same reason.
++ */
++const CALLER_SCOPED_ANALYTICS_HANDLERS = [
++  'getChartPreferences',
++  'saveChartPreferences',
++];
++
++type Route = {
++  method: string;
++  path: string;
++  orgScoped: boolean;
++  callerScoped: boolean;
++};
+ 
+ function analyticsRoutes(): Route[] {
+   const proto = AnalyticsController.prototype as unknown as Record<
+@@ -88,6 +103,9 @@ function analyticsRoutes(): Route[] {
+       orgScoped: Boolean(
+         Reflect.getMetadata(ORG_SCOPED_ROUTE_KEY, handler as object),
+       ),
++      callerScoped: Boolean(
++        Reflect.getMetadata(CALLER_SCOPED_ROUTE_KEY, handler as object),
++      ),
+     }));
+ }
+ 
+@@ -157,4 +175,50 @@ describe('Analytics routes open to organization-restricted admins', () => {
+     expect(xpGoals).toBeDefined();
+     expect(takesTenantId(xpGoals!.method)).toBe(false);
+   });
++
++  it('opens exactly the pinned caller-scoped routes without an organization', () => {
++    const callerScoped = analyticsRoutes()
++      .filter((r) => r.callerScoped)
++      .map((r) => r.method)
++      .sort();
++
++    expect(callerScoped).toEqual([...CALLER_SCOPED_ANALYTICS_HANDLERS].sort());
++  });
++
++  it('never marks a route both org-scoped and caller-scoped', () => {
++    const both = analyticsRoutes()
++      .filter((r) => r.orgScoped && r.callerScoped)
++      .map((r) => r.path);
++
++    expect(both).toEqual([]);
++  });
++
++  /** Whether a handler reads anything from the query string or the path. */
++  function takesQueryOrPathParam(method: string): boolean {
++    const routeArgs: Record<string, unknown> =
++      Reflect.getMetadata(ROUTE_ARGS_METADATA, AnalyticsController, method) ??
++      {};
++    return Object.keys(routeArgs).some((key) =>
++      [RouteParamtypes.QUERY, RouteParamtypes.PARAM].includes(
++        Number(key.split(':')[0]),
++      ),
++    );
++  }
++
++  it('gives caller-scoped routes no query or path parameter to name someone else by', () => {
++    const named = analyticsRoutes()
++      .filter((r) => r.callerScoped && takesQueryOrPathParam(r.method))
++      .map((r) => r.method);
++
++    expect(named).toEqual([]);
++  });
++
++  it('can tell a route that takes a path parameter (the check above is live)', () => {
++    const learner = analyticsRoutes().find(
++      (r) => r.path === 'skill-growth/learners/:userId',
++    );
++
++    expect(learner).toBeDefined();
++    expect(takesQueryOrPathParam(learner!.method)).toBe(true);
++  });
+ });
+diff --git a/src/auth/decorators/caller-scoped-route.decorator.ts b/src/auth/decorators/caller-scoped-route.decorator.ts
+new file mode 100644
+index 0000000000..5e3229cd0d
+--- /dev/null
++++ b/src/auth/decorators/caller-scoped-route.decorator.ts
+@@ -0,0 +1,19 @@
++import { SetMetadata } from '@nestjs/common';
++
++export const CALLER_SCOPED_ROUTE_KEY = 'caller-scoped-route';
++
++/**
++ * Marks a route behind an `orgScopedRoutesOnly` feature toggle (Analytics) as
++ * one that reads or writes only the CALLER's own rows — a saved preference,
++ * say — so it carries no organization at all.
++ *
++ * An organization-restricted admin reaches such a toggle's routes only when
++ * they are marked (FeatureToggleGuard). @OrgScopedRoute is wrong for these:
++ * there is no organization to name, so they would answer 400 to every
++ * restricted admin. This marker lets them through without one.
++ *
++ * Mark a route only when its handler is keyed on the authenticated user's id
++ * and nothing else — never on an id the request supplies.
++ */
++export const CallerScopedRoute = () =>
++  SetMetadata(CALLER_SCOPED_ROUTE_KEY, true);
+diff --git a/src/auth/guards/feature-toggle.guard.ts b/src/auth/guards/feature-toggle.guard.ts
+index 1ba1a80b2d..f49eb9ec45 100644
+--- a/src/auth/guards/feature-toggle.guard.ts
++++ b/src/auth/guards/feature-toggle.guard.ts
+@@ -27,6 +27,7 @@ import {
+   ORG_SCOPED_ROUTE_KEY,
+   OrgScopedRouteOptions,
+ } from '../decorators/org-scoped-route.decorator';
++import { CALLER_SCOPED_ROUTE_KEY } from '../decorators/caller-scoped-route.decorator';
+ 
+ /**
+  * FeatureToggleGuard
+@@ -145,12 +146,24 @@ export class FeatureToggleGuard implements CanActivate {
+    * their allowlist. Naming none is refused rather than defaulted — the route
+    * would answer for every organization, and Express 5 re-parses the query on
+    * each read, so a guard cannot fill the gap in for the handler.
++   *
++   * A route marked @CallerScopedRoute touches only the caller's own rows, so
++   * it has no organization to name and passes as it is.
+    */
+   private async assertOrgScopedRoute(
+     context: ExecutionContext,
+     request: { query?: Record<string, unknown> },
+     userId: number,
+   ): Promise<void> {
++    if (
++      this.reflector.getAllAndOverride<boolean | undefined>(
++        CALLER_SCOPED_ROUTE_KEY,
++        [context.getHandler(), context.getClass()],
++      )
++    ) {
++      return;
++    }
++
+     const route = this.reflector.getAllAndOverride<
+       Required<OrgScopedRouteOptions> | undefined
+     >(ORG_SCOPED_ROUTE_KEY, [context.getHandler(), context.getClass()]);
+diff --git a/src/auth/guards/test/feature-toggle.guard.spec.ts b/src/auth/guards/test/feature-toggle.guard.spec.ts
+index 621a2bc087..f26c54d55a 100644
+--- a/src/auth/guards/test/feature-toggle.guard.spec.ts
++++ b/src/auth/guards/test/feature-toggle.guard.spec.ts
+@@ -9,6 +9,7 @@ import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-togg
+ import { PreferenceName } from 'src/common/constants/user.constants';
+ import { FEATURE_TOGGLE_KEY } from '../../decorators/feature-toggle.decorator';
+ import { ORG_SCOPED_ROUTE_KEY } from '../../decorators/org-scoped-route.decorator';
++import { CALLER_SCOPED_ROUTE_KEY } from '../../decorators/caller-scoped-route.decorator';
+ 
+ describe('FeatureToggleGuard', () => {
+   let guard: FeatureToggleGuard;
+@@ -188,7 +189,10 @@ describe('FeatureToggleGuard', () => {
+ 
+   describe('org-scoped routes only (Analytics, organization-restricted admins)', () => {
+     /** Route metadata by key, as the reflector would read it. */
+-    const routeWith = (orgScoped?: { queryParam: string }) =>
++    const routeWith = (
++      orgScoped?: { queryParam: string },
++      callerScoped?: boolean,
++    ) =>
+       reflector.getAllAndOverride.mockImplementation((key: string) => {
+         if (key === FEATURE_TOGGLE_KEY) {
+           return { featureKey: FeatureToggleKey.ANALYTICS };
+@@ -196,6 +200,9 @@ describe('FeatureToggleGuard', () => {
+         if (key === ORG_SCOPED_ROUTE_KEY) {
+           return orgScoped;
+         }
++        if (key === CALLER_SCOPED_ROUTE_KEY) {
++          return callerScoped;
++        }
+         return undefined;
+       });
+ 
+@@ -267,6 +274,23 @@ describe('FeatureToggleGuard', () => {
+       expect(tenantScopeService.assertTenantInScope).not.toHaveBeenCalled();
+     });
+ 
++    it("passes a caller-scoped route with no organization named — it holds only the caller's own rows", async () => {
++      routeWith(undefined, true);
++
++      await expect(
++        guard.canActivate(contextFor(platformAdmin, {})),
++      ).resolves.toBe(true);
++      expect(tenantScopeService.assertTenantInScope).not.toHaveBeenCalled();
++    });
++
++    it('still refuses an unmarked route when the caller-scoped marker is absent', async () => {
++      routeWith(undefined, false);
++
++      await expect(
++        guard.canActivate(contextFor(platformAdmin, {})),
++      ).rejects.toThrow(ForbiddenException);
++    });
++
+     it('leaves an unrestricted admin free on every route', async () => {
+       featureToggleService.isLimitedToOrgScopedRoutes.mockResolvedValue(false);
+       routeWith(undefined);

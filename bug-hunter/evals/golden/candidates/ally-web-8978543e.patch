@@ -1,0 +1,260 @@
+diff --git a/apps/ally-admin-dashboard/src/components/builder/BuildActivityFeed.tsx b/apps/ally-admin-dashboard/src/components/builder/BuildActivityFeed.tsx
+index 806fcec1b1..7080eb5bde 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/BuildActivityFeed.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/BuildActivityFeed.tsx
+@@ -53,6 +53,12 @@ interface BuildActivityFeedProps {
+    * feed rather than as a banner over it — see {@link FailureRow}.
+    */
+   failure?: { title: string; detail?: string | null } | null;
++  /**
++   * True until this run's events have been fetched once. Without it the feed
++   * said "Waiting for the first update…" over a run that already had hundreds
++   * of events, for as long as the first fetch took.
++   */
++  isLoading?: boolean;
+ }
+ 
+ /**
+@@ -309,6 +315,7 @@ const pairToolResults = (events: BuilderBuildEvent[]): Map<string, BuilderBuildE
+ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
+   events,
+   isLive,
++  isLoading = false,
+   failure,
+ }) => {
+   const strings = en.builder.build;
+@@ -673,7 +680,13 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
+       >
+         {visible.length === 0 && !failure ? (
+           <p className="mt-8 text-center text-sm text-typography-500">
+-            {isLive ? strings.feedStarting : strings.feedEmpty}
++            {isLoading
++              ? strings.feedLoading
++              : events.length > 0
++                ? strings.feedWorking(events.length)
++                : isLive
++                  ? strings.feedStarting
++                  : strings.feedEmpty}
+           </p>
+         ) : (
+           <div className="flex flex-col gap-2">
+diff --git a/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx b/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx
+index 885ec8ac97..1bc919c670 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/BuildView.tsx
+@@ -66,6 +66,9 @@ export const BuildView: React.FC<BuildViewProps> = ({
+   const [eventsByRun, setEventsByRun] = useState<Record<string, BuilderBuildEvent[]>>({});
+   const lastSeqByRunRef = useRef<Record<string, number>>({});
+   const backfilledRunsRef = useRef<Set<string>>(new Set());
++  // Runs whose events have been fetched at least once, failed fetches
++  // included — so the feed can tell "loading" from "nothing yet".
++  const [loadedRuns, setLoadedRuns] = useState<Set<string>>(() => new Set());
+ 
+   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+   // True until the reader picks an older run on purpose — selection then
+@@ -231,6 +234,8 @@ export const BuildView: React.FC<BuildViewProps> = ({
+         // The next tick (for the live run) or the next selection (for a
+         // historical one) tries again; a transient fetch failure isn't worth
+         // telling anyone about.
++      } finally {
++        setLoadedRuns(previous => (previous.has(runId) ? previous : new Set(previous).add(runId)));
+       }
+     },
+     [fetchEvents, appendEvents],
+@@ -477,6 +482,7 @@ export const BuildView: React.FC<BuildViewProps> = ({
+       <BuildActivityFeed
+         events={displayedEvents}
+         isLive={isLive && isViewingLive}
++        isLoading={!!selectedRunId && !loadedRuns.has(selectedRunId)}
+         failure={
+           failureTitle
+             ? {
+diff --git a/apps/ally-admin-dashboard/src/components/builder/RunHistoryRail.tsx b/apps/ally-admin-dashboard/src/components/builder/RunHistoryRail.tsx
+index fbe267d1aa..8ab8dddc60 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/RunHistoryRail.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/RunHistoryRail.tsx
+@@ -80,7 +80,9 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
+                   {strings.runLabel(run.sequence, run.mode)}
+                 </span>
+                 <Tag type={BUILDER_RUN_STATUS_TAG_TYPE[run.status]} size="sm" className="shrink-0">
+-                  {strings.runStatusLabels[run.status] ?? run.status}
++                  {run.status === "QUEUED" && run.githubRunUrl
++                    ? strings.runStatusLabels.STARTING
++                    : (strings.runStatusLabels[run.status] ?? run.status)}
+                 </Tag>
+               </div>
+               {!quiet && (
+diff --git a/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildActivityFeed.empty.test.tsx b/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildActivityFeed.empty.test.tsx
+new file mode 100644
+index 0000000000..75b584a288
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/components/builder/__tests__/BuildActivityFeed.empty.test.tsx
+@@ -0,0 +1,62 @@
++import { render, screen } from "@testing-library/react";
++import { describe, expect, it, vi } from "vitest";
++
++import type { BuilderBuildEvent } from "@types";
++
++// @constants reads off the @components barrel at module-eval time (see the
++// BugHunter tests), so the barrel is stubbed rather than loaded for real.
++vi.mock("@components", () => ({ cellTypes: {} }));
++
++vi.mock("react-markdown", () => ({
++  default: ({ children }: { children: string }) => <div>{children}</div>,
++}));
++vi.mock("remark-gfm", () => ({ default: () => undefined }));
++
++vi.mock("@ally-ui-mono/ui-shared", () => ({
++  Button: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
++  Tag: ({ children }: any) => <span>{children}</span>,
++  Tile: ({ children, className }: any) => <div className={className}>{children}</div>,
++}));
++
++// eslint-disable-next-line import/first
++import { BuildActivityFeed } from "../BuildActivityFeed";
++
++/**
++ * What an empty-looking feed says. It used to say "Waiting for the first
++ * update…" over a run that already had hundreds of events, for as long as the
++ * first fetch took — which reads as a build that never started.
++ */
++
++const hidden = (type: string, seq: number): BuilderBuildEvent =>
++  ({
++    id: `event-${seq}`,
++    runId: "run-1",
++    sessionId: "session-1",
++    seq,
++    stage: null,
++    type,
++    payload: {},
++    createdAt: new Date().toISOString(),
++  }) as unknown as BuilderBuildEvent;
++
++describe("BuildActivityFeed empty states", () => {
++  it("says it is loading until the run's events have been fetched", () => {
++    render(<BuildActivityFeed events={[]} isLive isLoading />);
++    expect(screen.getByText("Loading this run's activity…")).toBeInTheDocument();
++  });
++
++  it("says the agent is working when only unshown events have arrived", () => {
++    render(<BuildActivityFeed events={[hidden("tool_result", 1), hidden("todo", 2)]} isLive />);
++    expect(screen.getByText(/Working — 2 steps so far/)).toBeInTheDocument();
++  });
++
++  it("says the runner is starting when a live run has nothing yet", () => {
++    render(<BuildActivityFeed events={[]} isLive />);
++    expect(screen.getByText(/The runner is starting/)).toBeInTheDocument();
++  });
++
++  it("says nothing was recorded for a finished run with no events", () => {
++    render(<BuildActivityFeed events={[]} isLive={false} />);
++    expect(screen.getByText("Nothing recorded for this run.")).toBeInTheDocument();
++  });
++});
+diff --git a/apps/ally-admin-dashboard/src/components/builder/__tests__/RunHistoryRail.test.tsx b/apps/ally-admin-dashboard/src/components/builder/__tests__/RunHistoryRail.test.tsx
+new file mode 100644
+index 0000000000..109143da59
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/components/builder/__tests__/RunHistoryRail.test.tsx
+@@ -0,0 +1,74 @@
++import { render, screen } from "@testing-library/react";
++import { describe, expect, it, vi } from "vitest";
++
++import type { BuilderBuildRun } from "@types";
++
++// @constants reads off the @components barrel at module-eval time (see the
++// BugHunter tests), so the barrel is stubbed rather than loaded for real.
++vi.mock("@components", () => ({ cellTypes: {} }));
++
++vi.mock("@ally-ui-mono/ui-shared", () => ({
++  Tag: ({ children }: any) => <span>{children}</span>,
++}));
++
++vi.mock("../CollapsibleSection", () => ({
++  CollapsibleSection: ({ children }: any) => <div>{children}</div>,
++}));
++
++// eslint-disable-next-line import/first
++import { RunHistoryRail } from "../RunHistoryRail";
++
++const run = (overrides: Partial<BuilderBuildRun>): BuilderBuildRun =>
++  ({
++    id: `run-${overrides.sequence}`,
++    sessionId: "session-1",
++    mode: "build",
++    status: "SUCCEEDED",
++    model: "gemini-2.5-pro",
++    branchSlug: "x",
++    branches: null,
++    githubRunUrl: null,
++    createdAt: new Date().toISOString(),
++    startedAt: null,
++    completedAt: null,
++    cost: null,
++    costUsd: null,
++    ...overrides,
++  }) as unknown as BuilderBuildRun;
++
++/**
++ * A run stays QUEUED on our side until its first event arrives, which can be a
++ * minute after GitHub has already started it. Once GitHub has it, "Queued"
++ * reads as stuck.
++ */
++describe("RunHistoryRail status", () => {
++  it("says Starting once GitHub has accepted a queued run", () => {
++    render(
++      <RunHistoryRail
++        runs={[
++          run({ sequence: 1 }),
++          run({
++            sequence: 2,
++            status: "QUEUED",
++            githubRunUrl: "https://github.com/x/actions/runs/1",
++          }),
++        ]}
++        selectedRunId={null}
++        onSelect={() => undefined}
++      />,
++    );
++    expect(screen.getByText("Starting")).toBeInTheDocument();
++    expect(screen.queryByText("Queued")).not.toBeInTheDocument();
++  });
++
++  it("says Queued while GitHub has not picked it up", () => {
++    render(
++      <RunHistoryRail
++        runs={[run({ sequence: 1 }), run({ sequence: 2, status: "QUEUED" })]}
++        selectedRunId={null}
++        onSelect={() => undefined}
++      />,
++    );
++    expect(screen.getByText("Queued")).toBeInTheDocument();
++  });
++});
+diff --git a/apps/ally-admin-dashboard/src/constants/en.ts b/apps/ally-admin-dashboard/src/constants/en.ts
+index c0c996bb94..669c5cdaaf 100644
+--- a/apps/ally-admin-dashboard/src/constants/en.ts
++++ b/apps/ally-admin-dashboard/src/constants/en.ts
+@@ -3770,7 +3770,10 @@ export const en = {
+       e2eEvidence: "End-to-end evidence",
+       e2eSkipped: (reason: string) => `Skipped the end-to-end check — ${reason}`,
+       jumpToLive: "Jump to live",
+-      feedStarting: "Waiting for the first update…",
++      feedStarting: "The runner is starting. The first update usually arrives within a minute.",
++      feedLoading: "Loading this run's activity…",
++      feedWorking: (count: number) =>
++        `Working — ${count} ${count === 1 ? "step" : "steps"} so far, none with anything to show yet.`,
+       feedEmpty: "Nothing recorded for this run.",
+       runLabel: (sequence: number, mode: string) =>
+         mode === "resume"
+@@ -3799,6 +3802,9 @@ export const en = {
+       runLiveBadge: "Live",
+       runStatusLabels: {
+         QUEUED: "Queued",
++        // QUEUED on our side, but GitHub has accepted the run: it stays QUEUED
++        // until its first event arrives, which can take a minute.
++        STARTING: "Starting",
+         RUNNING: "Running",
+         SUCCEEDED: "Succeeded",
+         FAILED: "Failed",

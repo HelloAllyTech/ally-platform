@@ -1,0 +1,186 @@
+diff --git a/apps/ally-helpline-dashboard/src/assets/icons/index.ts b/apps/ally-helpline-dashboard/src/assets/icons/index.ts
+index 137da5822b..6756f95df5 100644
+--- a/apps/ally-helpline-dashboard/src/assets/icons/index.ts
++++ b/apps/ally-helpline-dashboard/src/assets/icons/index.ts
+@@ -58,9 +58,11 @@ import EndSessionIllustration from "./end-session-illustration.svg?react";
+ import Enhance from "./enhance.svg?react";
+ import ErrorIcon from "./error-icon.svg?react";
+ import ExistingCall from "./existing-call.svg?react";
++import Eye from "./eye.svg?react";
+ import FileUpload from "./file-upload.svg?react";
+ import Flow from "./flow.svg?react";
+ import Focus from "./focus.svg?react";
++import Hide from "./hide.svg?react";
+ import HomeworkRecommended from "./homework-recommended.svg?react";
+ import InDoubt from "./in-doubt.svg?react";
+ import InfoIcon from "./info-icon.svg?react";
+@@ -280,4 +282,6 @@ export {
+   ChatBubble,
+   InfoIcon,
+   Comment,
++  Hide,
++  Eye,
+ };
+diff --git a/apps/ally-helpline-dashboard/src/components/achievement-item/AchievementItem.tsx b/apps/ally-helpline-dashboard/src/components/achievement-item/AchievementItem.tsx
+index d9916743fb..9183e561e8 100644
+--- a/apps/ally-helpline-dashboard/src/components/achievement-item/AchievementItem.tsx
++++ b/apps/ally-helpline-dashboard/src/components/achievement-item/AchievementItem.tsx
+@@ -26,7 +26,8 @@ export const AchievementItem: FC<{
+             src={achievement?.imageUrl}
+             alt={achievement?.name}
+             className="rounded-lg object-cover w-full h-full bg-neutral-100"
+-            fallbackClassName="rounded-lg text-typography-600 bg-neutral-100 flex items-center justify-center w-full h-full"
++            fallbackClassName="rounded-lg text-sm text-typography-600 bg-neutral-100 flex items-center justify-center w-full h-full"
++            fallbackText="Badge"
+           />
+         </div>
+       );
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index d58eb35904..f898eacc0a 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -12,7 +12,7 @@ import {
+   useLazyGetCommentRepliesQuery,
+   useEditCommentMutation,
+ } from "@api";
+-import { ArrowUp, MoreVertIcon, Smiley, Delete, Edit } from "@assets";
++import { ArrowUp, MoreVertIcon, Smiley, Delete, Edit, Hide, Eye } from "@assets";
+ import { Button, CustomMenu, ReactionSelector, MenuItem } from "@components";
+ import { RootState } from "@store";
+ import { ReactionsType, CommentItem } from "@types";
+@@ -316,7 +316,7 @@ const CommentCard = ({
+       items.push({
+         label: comment?.hidden ? "Unhide" : "Hide",
+         className: "text-typography-800",
+-        icon: <Edit width={16} height={16} />,
++        icon: comment?.hidden ? <Eye width={16} height={16} /> : <Hide width={16} height={16} />,
+         onClick: () => handleToggleVisibility(!comment?.hidden),
+       });
+     }
+@@ -332,7 +332,7 @@ const CommentCard = ({
+       });
+     }
+ 
+-    if (isMyComment && !isUpdateExpired) {
++    if (isMyComment) {
+       items.push({
+         label: "Delete",
+         className: "text-red-500",
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+index b5aea49dfa..7ece24b29a 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+@@ -653,17 +653,6 @@ describe("CommentCard Component", () => {
+       expect(deleteCommentUnwrap).toHaveBeenCalledTimes(1);
+     });
+ 
+-    it("should not show delete option for own comment after 10 mins", async () => {
+-      const myComment = {
+-        ...mockComment,
+-        createdBy: { ...mockComment.createdBy, id: 999 },
+-        createdAt: new Date(Date.now() - 11 * 60 * 1000).toISOString(), // 11 mins ago
+-      };
+-      renderWithProvider(<CommentCard comment={myComment} />);
+-      expect(screen.queryByLabelText("Comment options")).not.toBeInTheDocument();
+-      expect(screen.queryByText("Delete")).not.toBeInTheDocument();
+-    });
+-
+     it("should call toggleCommentVisibility when hide is clicked by feed owner", async () => {
+       const commentToHide = { ...mockComment, hidden: false };
+       // Render with a different user ID in store to ensure isMyComment is false
+diff --git a/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx b/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx
+index fc3e2dba50..6100587751 100644
+--- a/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx
+@@ -1,14 +1,15 @@
+-import { FC, useState } from "react";
++import { FC, useMemo, useState } from "react";
+ 
+ import { CustomImage } from "@ally-ui-mono/ui-shared";
+ import { ReviewTranscript } from "@assets";
++import { ReactionsModal } from "@components";
++import { useUser } from "@hooks";
+ import { getFormattedTimeFromDuration } from "@utils";
+ 
+ import CommentsSection from "./CommentsSection";
+ import EmojiStack from "./EmojiStack";
+ import { FeedCardProps } from "./types";
+ import { formatDateTime, formatRelativeTime } from "./utils";
+-import ReactionsModal from "../reaction-modal/ReactionModal";
+ 
+ const FeedCard: FC<FeedCardProps> = ({
+   id,
+@@ -23,6 +24,8 @@ const FeedCard: FC<FeedCardProps> = ({
+   onCommentsClick,
+   duration,
+ }) => {
++  const { user: currentDetails } = useUser();
++
+   const [isCommentsExpanded, setIsCommentsExpanded] = useState(false);
+   const [isReactionsModalOpen, setIsReactionsModalOpen] = useState(false);
+ 
+@@ -56,6 +59,13 @@ const FeedCard: FC<FeedCardProps> = ({
+     return <div className="w-full h-[0.5px] bg-[#D2D2D2]" />;
+   };
+ 
++  const userImage = useMemo(() => {
++    if (user.id === currentDetails?.id) {
++      return currentDetails?.profileImageUrl;
++    }
++    return user?.profileImage;
++  }, [user, currentDetails]);
++
+   const headerSection = () => {
+     return (
+       <div className="flex items-center justify-between">
+@@ -64,7 +74,7 @@ const FeedCard: FC<FeedCardProps> = ({
+             className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden ${!user?.profileImage ? "border border-border-light" : ""} flex items-center justify-center flex-shrink-0`}
+           >
+             <CustomImage
+-              src={user.profileImage}
++              src={userImage}
+               alt={user?.name ?? ""}
+               fallbackText={user?.name?.slice(0, 1)?.toUpperCase() ?? "NA"}
+               className="w-full h-full object-cover"
+@@ -96,7 +106,9 @@ const FeedCard: FC<FeedCardProps> = ({
+           </span>
+           <span className="font-tertiary text-lg text-border-medium hidden sm:block">•</span>
+           <span className="font-primary text-xs sm:text-[13px] leading-4 text-black/60">
+-            Duration: {getFormattedTimeFromDuration(duration, "mm:ss")} Min
++            {duration < 60
++              ? `Duration: ${getFormattedTimeFromDuration(duration, "ss")} sec`
++              : `${getFormattedTimeFromDuration(duration, "mm:ss")} min`}
+           </span>
+         </div>
+ 
+diff --git a/apps/ally-helpline-dashboard/src/components/feed-card/types.ts b/apps/ally-helpline-dashboard/src/components/feed-card/types.ts
+index 44226caba8..24a292960d 100644
+--- a/apps/ally-helpline-dashboard/src/components/feed-card/types.ts
++++ b/apps/ally-helpline-dashboard/src/components/feed-card/types.ts
+@@ -10,6 +10,7 @@ export interface FeedScenario {
+ export interface FeedUser {
+   name: string;
+   profileImage?: string;
++  id: number;
+ }
+ 
+ export interface Reactions {
+diff --git a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+index 43478e23b0..808f2cb782 100644
+--- a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+@@ -304,10 +304,10 @@ export const ReviewDetails = () => {
+                 {getFormattedDateTime(reviewDetails?.scenario?.createdAt, "MMM dd, yyyy hh:mm a")}
+               </div>
+               <div className="w-1 h-1 bg-neutral-500 rounded-full mx-1" />
+-              <div>
+-                Duration:{" "}
+-                {getFormattedTimeFromDuration(reviewDetails?.scenarioSession?.duration, "mm:ss")}{" "}
+-                Min
++              <div className="font-primary text-xs sm:text-[13px] leading-4 text-black/60">
++                {reviewDetails?.scenarioSession?.duration < 60
++                  ? `Duration: ${getFormattedTimeFromDuration(reviewDetails?.scenarioSession?.duration, "ss")} sec`
++                  : `${getFormattedTimeFromDuration(reviewDetails?.scenarioSession?.duration, "mm:ss")} min`}
+               </div>
+             </div>
+           </div>

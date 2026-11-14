@@ -1,0 +1,51 @@
+diff --git a/apps/ally-admin-dashboard/src/components/character-interview/__tests__/voiceShortlists.test.ts b/apps/ally-admin-dashboard/src/components/character-interview/__tests__/voiceShortlists.test.ts
+index 530e178339..dfc24d5257 100644
+--- a/apps/ally-admin-dashboard/src/components/character-interview/__tests__/voiceShortlists.test.ts
++++ b/apps/ally-admin-dashboard/src/components/character-interview/__tests__/voiceShortlists.test.ts
+@@ -26,6 +26,7 @@ const question = (id: string, optionIds: string[], extra: Record<string, unknown
+         description: `${optionId} reason`,
+       })),
+     },
++    answeredWith: "answered",
+     ...extra,
+   }) as never;
+ 
+@@ -43,6 +44,18 @@ describe("collectVoiceShortlists", () => {
+     expect(shortlists[0].options.map(o => o.id)).toEqual(["en-a", "en-b"]);
+   });
+ 
++  it("leaves out the live unanswered question, whose card already plays its voices", () => {
++    const shortlists = collectVoiceShortlists(
++      [
++        question("q1", ["en-a", "en-b"]),
++        question("q2", ["mr-a", "mr-b"], { answeredWith: undefined }),
++      ],
++      catalog,
++    );
++
++    expect(shortlists.map(s => s.languageId)).toEqual(["1"]);
++  });
++
+   it("keeps the shortlist available after the card was answered", () => {
+     // The point of the strip: the card locks, the options stay playable.
+     const [shortlist] = collectVoiceShortlists(
+diff --git a/apps/ally-admin-dashboard/src/components/character-interview/voiceShortlists.ts b/apps/ally-admin-dashboard/src/components/character-interview/voiceShortlists.ts
+index b13d58570d..798d52c1f0 100644
+--- a/apps/ally-admin-dashboard/src/components/character-interview/voiceShortlists.ts
++++ b/apps/ally-admin-dashboard/src/components/character-interview/voiceShortlists.ts
+@@ -56,9 +56,14 @@ export const collectVoiceShortlists = (
+ 
+   const byLanguage = new Map<string, VoiceShortlist>();
+ 
+-  for (const message of messages) {
++  const lastIndex = messages.length - 1;
++  for (const [index, message] of messages.entries()) {
+     const options = message.question?.options ?? [];
+     if (options.length === 0) continue;
++    // The newest unanswered question is still a live card with its own play
++    // buttons, so listing it here as well showed every voice twice.
++    const isLive = index === lastIndex && !message.answeredAnswer && !message.answeredWith;
++    if (isLive) continue;
+     if (!options.every(option => languageOfVoice.has(option.id))) continue;
+ 
+     const selectedId = message.answeredAnswer?.selectedOptionIds?.[0];

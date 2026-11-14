@@ -1,0 +1,27 @@
+# Models the platform already uses (ally-ai / ally-ai-learn config), so the API keys exist.
+# Override any role for evals: BUGHUNTER_MODEL_<ROLE>=provider:model (e.g. BUGHUNTER_MODEL_FIX=openai:gpt-5-mini).
+defaults: { temperature: 0, timeout_s: 120, max_retries: 2 }
+roles:
+  triage:      { provider: openai,       model: gpt-5-mini }
+  investigate: { provider: openai,       model: gpt-5 }
+  fix:         { provider: openai,       model: gpt-5 }
+  review:      { provider: google_genai, model: gemini-2.5-pro }   # different family on purpose
+  embeddings:  { provider: openai,       model: text-embedding-3-small }
+fallbacks:
+  investigate: [{ provider: google_genai, model: gemini-2.5-pro }]
+  fix:         [{ provider: google_genai, model: gemini-2.5-pro }]
+# Active prompt version per model node (prompts/<node>.<version>.md); evals compare versions.
+prompts:
+  triage: v3
+  investigate: v3
+  reproduce: v5
+  fix: v2
+  review: v4
+# USD per 1M tokens, from the providers' price pages (checked 2026-11-09; see
+# CHUNK-05-NOTES.md). Every role and fallback model must have a row: cost accounting is
+# code, and an unpriced model would make the per-run cost cap meaningless.
+prices:
+  openai:gpt-5:                    { input: 1.25, cached_input: 0.125, output: 10.00 }
+  openai:gpt-5-mini:               { input: 0.25, cached_input: 0.025, output: 2.00 }
+  google_genai:gemini-2.5-pro:     { input: 1.25, cached_input: 0.31,  output: 10.00 }
+  openai:text-embedding-3-small:   { input: 0.02, cached_input: 0.02,  output: 0.00 }

@@ -1,0 +1,193 @@
+diff --git a/apps/ally-admin-dashboard/src/components/simulation-list/SimulationList.tsx b/apps/ally-admin-dashboard/src/components/simulation-list/SimulationList.tsx
+index e863f49177..3742229762 100644
+--- a/apps/ally-admin-dashboard/src/components/simulation-list/SimulationList.tsx
++++ b/apps/ally-admin-dashboard/src/components/simulation-list/SimulationList.tsx
+@@ -97,11 +97,7 @@ export const SimulationList: React.FC<SimulationListProps> = ({
+   const isCreatorOrSuperAdmin = (simulation: Simulation) => {
+     if (isSuperAdmin) return true;
+     const createdBy = simulation.createdBy?.toLowerCase();
+-    return (
+-      createdBy === currentUser?.name?.toLowerCase() ||
+-      createdBy === String(currentUser?.id) ||
+-      createdBy === String(currentUser?.userId)
+-    );
++    return createdBy === String(currentUser?.id) || createdBy === String(currentUser?.userId);
+   };
+ 
+   // Define columns configuration
+diff --git a/apps/ally-admin-dashboard/src/components/simulation-list/__tests__/SimulationList.test.tsx b/apps/ally-admin-dashboard/src/components/simulation-list/__tests__/SimulationList.test.tsx
+index f5922580f7..7eaa2c08b3 100644
+--- a/apps/ally-admin-dashboard/src/components/simulation-list/__tests__/SimulationList.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/simulation-list/__tests__/SimulationList.test.tsx
+@@ -377,10 +377,10 @@ describe("SimulationList", () => {
+   });
+ 
+   describe("Action Visibility Restrictions", () => {
+-    const creatorUser = { name: "John Doe", id: 101, userId: 101 };
+-    const otherUser = { name: "Jane Smith", id: 102, userId: 102 };
+-    const superAdminUser = { name: "Super Admin", id: 1, userId: 1 };
+-    const simulation = { ...mockSimulations[0], createdBy: "John Doe" };
++    const creatorUser = { id: 101, userId: 101 };
++    const otherUser = { id: 102, userId: 102 };
++    const superAdminUser = { id: 1, userId: 1 };
++    const simulation = { ...mockSimulations[0], createdBy: "101" };
+ 
+     it("shows all actions for the creator", () => {
+       renderWithStore(
+diff --git a/apps/ally-admin-dashboard/src/pages/SimulationStudio/__tests__/SimulationStudio.test.tsx b/apps/ally-admin-dashboard/src/pages/SimulationStudio/__tests__/SimulationStudio.test.tsx
+index c4abff18c6..72d406a537 100644
+--- a/apps/ally-admin-dashboard/src/pages/SimulationStudio/__tests__/SimulationStudio.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/SimulationStudio/__tests__/SimulationStudio.test.tsx
+@@ -112,11 +112,7 @@ vi.mock("@components", async importOriginal => {
+       const isCreatorOrSuperAdmin = (simulation: any) => {
+         if (isSuperAdmin) return true;
+         const createdBy = simulation.createdBy?.toLowerCase();
+-        return (
+-          createdBy === currentUser?.name?.toLowerCase() ||
+-          createdBy === String(currentUser?.id) ||
+-          createdBy === String(currentUser?.userId)
+-        );
++        return createdBy === String(currentUser?.id) || createdBy === String(currentUser?.userId);
+       };
+ 
+       return (
+diff --git a/apps/ally-admin-dashboard/src/pages/UserManagement/UserManagement.tsx b/apps/ally-admin-dashboard/src/pages/UserManagement/UserManagement.tsx
+index bdc114f38d..ee0c23a164 100644
+--- a/apps/ally-admin-dashboard/src/pages/UserManagement/UserManagement.tsx
++++ b/apps/ally-admin-dashboard/src/pages/UserManagement/UserManagement.tsx
+@@ -111,6 +111,13 @@ export const UserManagement: FC = () => {
+     handleAddCredit,
+   } = useUserManagement(tenants);
+ 
++  const watchedRoles = userMethods.watch("roles") || [];
++
++  const isMultiTenantAdmin =
++    watchedRoles.includes(UserRole.MULTI_TENANT_ADMIN) ||
++    selectedUser?.role === UserRole.MULTI_TENANT_ADMIN ||
++    selectedUser?.roles?.includes(UserRole.MULTI_TENANT_ADMIN);
++
+   const TABS = [
+     { id: TabType.USERS, label: en.userManagement.users, count: usersCount },
+     { id: TabType.ORGANIZATIONS, label: en.userManagement.organizations, count: tenantsCount },
+@@ -196,9 +203,9 @@ export const UserManagement: FC = () => {
+             formMethods={userMethods}
+             handleClick={handleEditUser}
+             extraContent={
+-              selectedUser?.roles?.includes(UserRole.MULTI_TENANT_ADMIN) ? (
++              isMultiTenantAdmin ? (
+                 <AssignedOrganizations
+-                  userId={selectedUser.id}
++                  userId={selectedUser?.id as number}
+                   canEdit={canEditMultiTenantAdmins}
+                   allTenants={tenants}
+                 />
+@@ -216,6 +223,15 @@ export const UserManagement: FC = () => {
+             buttonName={en.userManagement.confirm}
+             formMethods={userMethods}
+             handleClick={handleChangeRole}
++            extraContent={
++              isMultiTenantAdmin ? (
++                <AssignedOrganizations
++                  userId={selectedUser?.id as number}
++                  canEdit={canEditMultiTenantAdmins}
++                  allTenants={tenants}
++                />
++              ) : undefined
++            }
+           />
+         );
+       case UserMenuOptions.MANAGE_CREDITS:
+@@ -341,6 +357,14 @@ export const UserManagement: FC = () => {
+               buttonName={en.userManagement.addUser}
+               formMethods={userMethods}
+               handleClick={handleAddUser}
++              extraContent={
++                isMultiTenantAdmin ? (
++                  <div className="text-sm text-typography-600 bg-background-secondary p-3 rounded-lg border border-border-light italic">
++                    {en.userManagement.noAssignedOrganizations}. Organizations can be assigned after
++                    the user is created.
++                  </div>
++                ) : undefined
++              }
+             />
+ 
+             <FilterDropdown<FilterValues>
+diff --git a/apps/ally-admin-dashboard/src/pages/UserManagement/__tests__/UserManagement.test.tsx b/apps/ally-admin-dashboard/src/pages/UserManagement/__tests__/UserManagement.test.tsx
+index 8e35a67fee..f78aca6216 100644
+--- a/apps/ally-admin-dashboard/src/pages/UserManagement/__tests__/UserManagement.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/UserManagement/__tests__/UserManagement.test.tsx
+@@ -705,5 +705,61 @@ describe("UserManagement", () => {
+       expect(screen.getByTestId("modal-extra-content")).toBeInTheDocument();
+       expect(screen.getByTestId("assigned-organizations")).toBeInTheDocument();
+     });
++
++    it("should show AssignedOrganizations reactively when role is changed in Change Role modal", () => {
++      vi.mocked(useSelector).mockReturnValue([Permissions.EDIT_MULTI_TENANT_ADMINS]);
++
++      vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue({
++        ...mockUserManagementHook,
++        selectedOption: "Change role",
++        selectedUser: mockUsers[0],
++        userMethods: {
++          ...mockUserManagementHook.userMethods,
++          watch: vi.fn().mockReturnValue(["MULTI_TENANT_ADMIN"]),
++        },
++        activeTab: TabType.USERS,
++      } as any);
++
++      renderUserManagement();
++
++      expect(screen.getByTestId("user-modal")).toBeInTheDocument();
++      expect(screen.getByTestId("modal-extra-content")).toBeInTheDocument();
++      expect(screen.getByTestId("assigned-organizations")).toBeInTheDocument();
++    });
++
++    it("should show assignment message for new MULTI_TENANT_ADMIN user", () => {
++      vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue({
++        ...mockUserManagementHook,
++        addUsermodalOpen: true,
++        userMethods: {
++          ...mockUserManagementHook.userMethods,
++          watch: vi.fn().mockReturnValue(["MULTI_TENANT_ADMIN"]),
++        },
++        activeTab: TabType.USERS,
++      } as any);
++
++      renderUserManagement();
++
++      expect(screen.getByTestId("user-modal")).toBeInTheDocument();
++      expect(screen.getByTestId("modal-extra-content")).toBeInTheDocument();
++      expect(
++        screen.getByText(/Organizations can be assigned after the user is created/i),
++      ).toBeInTheDocument();
++    });
++
++    it("should show AssignedOrganizations if user has MULTI_TENANT_ADMIN in role field", () => {
++      vi.mocked(useSelector).mockReturnValue([Permissions.EDIT_MULTI_TENANT_ADMINS]);
++
++      vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue({
++        ...mockUserManagementHook,
++        selectedOption: "Edit details",
++        selectedUser: { ...mockUsers[0], role: "MULTI_TENANT_ADMIN" },
++        activeTab: TabType.USERS,
++      } as any);
++
++      renderUserManagement();
++
++      expect(screen.getByTestId("assigned-organizations")).toBeInTheDocument();
++    });
+   });
+ });
+diff --git a/apps/ally-admin-dashboard/src/pages/UserManagement/useUserManagement.ts b/apps/ally-admin-dashboard/src/pages/UserManagement/useUserManagement.ts
+index 3452739482..48478b57ac 100644
+--- a/apps/ally-admin-dashboard/src/pages/UserManagement/useUserManagement.ts
++++ b/apps/ally-admin-dashboard/src/pages/UserManagement/useUserManagement.ts
+@@ -206,7 +206,7 @@ export function useUserManagement(tenants: Tenant[]) {
+       email: user.email,
+       externalId: user.externalId,
+       tenantId: user.tenantId,
+-      roles: user.roles || [],
++      roles: user.roles?.length ? user.roles : user.role ? [user.role] : [],
+     });
+   };
+ 

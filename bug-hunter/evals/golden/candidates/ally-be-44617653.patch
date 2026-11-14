@@ -1,0 +1,77 @@
+diff --git a/ally-be/src/scenario-character/service/character-interview-tools.service.ts b/ally-be/src/scenario-character/service/character-interview-tools.service.ts
+index eab26c21e..f7ee1c84e 100644
+--- a/ally-be/src/scenario-character/service/character-interview-tools.service.ts
++++ b/ally-be/src/scenario-character/service/character-interview-tools.service.ts
+@@ -412,6 +412,11 @@ export class CharacterInterviewToolsService {
+             'profession',
+             'currentLocation',
+             'characterProfileText',
++            // Required since models reliably satisfy schema `required` but
++            // routinely skipped these as optional, saving characters whose
++            // Language style and Dialect samples sections arrived empty.
++            'languageCharacteristics',
++            'linguisticStyleSamples',
+           ],
+         },
+       },
+@@ -848,6 +853,24 @@ export class CharacterInterviewToolsService {
+     if (linguisticStyleSamples.some((sample) => sample.length > 300)) {
+       errors.push('each linguistic style sample must be ≤300 chars');
+     }
++    // Presence, not per-language completeness: shape leniency above files
++    // whatever the model sent, but a draft with NO style or NO samples saves a
++    // character whose speech sections are empty and the actor plays generic.
++    // ok=false makes the agent fill them and retry rather than skip silently.
++    if (Object.keys(languageCharacteristics).length === 0) {
++      errors.push(
++        'languageCharacteristics is required — describe how the character ' +
++          'speaks each of their languages (dialect, register, code-mixing, ' +
++          'pace, verbal tics), keyed by the numeric languageId from get_voices',
++      );
++    }
++    if (linguisticStyleSamples.length === 0) {
++      errors.push(
++        'linguisticStyleSamples is required — write 6-12 sample utterances ' +
++          'per language, keyed by the numeric languageId, each in that ' +
++          "language's own script",
++      );
++    }
+ 
+     const knowledgeSources = (
+       Array.isArray(input?.knowledgeSources) ? input.knowledgeSources : []
+diff --git a/ally-be/src/scenario-character/service/test/character-interview-draft-shape.spec.ts b/ally-be/src/scenario-character/service/test/character-interview-draft-shape.spec.ts
+index 1379ed1da..aca18b2e0 100644
+--- a/ally-be/src/scenario-character/service/test/character-interview-draft-shape.spec.ts
++++ b/ally-be/src/scenario-character/service/test/character-interview-draft-shape.spec.ts
+@@ -65,6 +65,10 @@ describe('save_character_draft — per-language shapes', () => {
+     profession: 'Schoolteacher',
+     currentLocation: 'Pune',
+     characterProfileText: 'A 34-year-old schoolteacher in Pune.',
++    // Style and samples are mandatory now (characters were being saved with
++    // both sections empty); each shape test overrides the map it exercises.
++    languageCharacteristics: { '1': 'Measured, formal English.' },
++    linguisticStyleSamples: { '1': ['I am managing, thank you.'] },
+   };
+ 
+   const run = async (input: Record<string, any>) => {
+@@ -200,4 +204,20 @@ describe('save_character_draft — per-language shapes', () => {
+       'klingon',
+     ]);
+   });
++
++  it('rejects a draft with no language style, so the agent fills it and retries', async () => {
++    const { outcome } = await run({ languageCharacteristics: undefined });
++    expect(outcome.modelResult.ok).toBe(false);
++    expect(JSON.stringify(outcome.modelResult.errors)).toMatch(
++      /languageCharacteristics is required/,
++    );
++  });
++
++  it('rejects a draft with no dialect samples, so the agent fills them and retries', async () => {
++    const { outcome } = await run({ linguisticStyleSamples: {} });
++    expect(outcome.modelResult.ok).toBe(false);
++    expect(JSON.stringify(outcome.modelResult.errors)).toMatch(
++      /linguisticStyleSamples is required/,
++    );
++  });
+ });

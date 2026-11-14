@@ -1,0 +1,57 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/DeleteCallLogConfirmationDialog.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/DeleteCallLogConfirmationDialog.tsx
+index a80f3ef7ab..abc172898c 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/DeleteCallLogConfirmationDialog.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/DeleteCallLogConfirmationDialog.tsx
+@@ -1,6 +1,7 @@
+ import { FC } from "react";
+ 
+ import { useTranslation } from "react-i18next";
++import { toast } from "sonner";
+ 
+ import { useDeleteCallLogMutation } from "@api";
+ import { ConfirmationDialog } from "@components";
+@@ -16,8 +17,14 @@ const DeleteCallLogConfirmationDialog: FC<DeleteCallLogDialogDataProps> = ({
+ 
+   const onDeleteConfirm = async () => {
+     if (!chatId) return;
+-    await deleteCallLog(chatId);
+-    closeDialog(true);
++    try {
++      await deleteCallLog(chatId).unwrap();
++      closeDialog(true);
++    } catch (error) {
++      const errorMessage = `Failed to delete call log. ${error?.data?.message ?? ""}`;
++      toast.error(errorMessage);
++      closeDialog(false);
++    }
+   };
+ 
+   return (
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/DeleteCallLogConfirmationDialog.test.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/DeleteCallLogConfirmationDialog.test.tsx
+index c1d8d402e6..15a13f5197 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/DeleteCallLogConfirmationDialog.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/DeleteCallLogConfirmationDialog.test.tsx
+@@ -46,6 +46,7 @@ describe("DeleteCallLogConfirmationDialog", () => {
+ 
+   beforeEach(() => {
+     vi.clearAllMocks();
++    mockDeleteCallLog.mockReturnValue({ unwrap: () => Promise.resolve() });
+     vi.mocked(useDeleteCallLogMutation).mockReturnValue([
+       mockDeleteCallLog,
+       { isLoading: false },
+@@ -104,7 +105,6 @@ describe("DeleteCallLogConfirmationDialog", () => {
+   // --- Interaction Tests ---
+ 
+   it("should call deleteCallLog when delete button is clicked", async () => {
+-    mockDeleteCallLog.mockResolvedValue({});
+     render(<DeleteCallLogConfirmationDialog chatId={1} closeDialog={mockCloseDialog} />);
+ 
+     const deleteButton = screen.getByTestId("delete-button");
+@@ -116,7 +116,6 @@ describe("DeleteCallLogConfirmationDialog", () => {
+   });
+ 
+   it("should call closeDialog with true after successful delete", async () => {
+-    mockDeleteCallLog.mockResolvedValue({});
+     render(<DeleteCallLogConfirmationDialog chatId={1} closeDialog={mockCloseDialog} />);
+ 
+     const deleteButton = screen.getByTestId("delete-button");

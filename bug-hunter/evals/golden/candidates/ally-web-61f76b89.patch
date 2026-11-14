@@ -1,0 +1,43 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/app-tooltip/AppTooltip.tsx b/apps/ally-helpline-dashboard/src/components/app-tooltip/AppTooltip.tsx
+index ea0ee5524e..61f98e40f4 100644
+--- a/apps/ally-helpline-dashboard/src/components/app-tooltip/AppTooltip.tsx
++++ b/apps/ally-helpline-dashboard/src/components/app-tooltip/AppTooltip.tsx
+@@ -13,9 +13,12 @@ const AppTooltip: React.FC<AppTooltipProps> = ({ location, children }) => {
+   // Refresh the active-tooltip list so a superadmin toggling a tooltip off (or on)
+   // reaches users without a hard reload — otherwise the list is fetched once and
+   // cached for the whole session (this is a separate RTK cache from the admin app,
+-  // so the admin's own invalidation never reaches here).
++  // so the admin's own invalidation never reaches here). Bounded rather than `true`:
++  // this component wraps controls on nearly every routed page, so an unconditional
++  // force-refetch on mount re-hit a failing endpoint on every page navigation with
++  // no backoff (see PracticeStreakHeatmap for the same pattern).
+   const { data: tooltips = [], isLoading } = useGetActiveTooltipsQuery(undefined, {
+-    refetchOnMountOrArgChange: true,
++    refetchOnMountOrArgChange: 30,
+     refetchOnFocus: true,
+     refetchOnReconnect: true,
+   });
+diff --git a/apps/ally-helpline-dashboard/src/components/app-tooltip/__tests__/AppTooltip.test.tsx b/apps/ally-helpline-dashboard/src/components/app-tooltip/__tests__/AppTooltip.test.tsx
+index ee1bd3d086..b95d282d23 100644
+--- a/apps/ally-helpline-dashboard/src/components/app-tooltip/__tests__/AppTooltip.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/app-tooltip/__tests__/AppTooltip.test.tsx
+@@ -80,4 +80,19 @@ describe("AppTooltip", () => {
+ 
+     expect(await screen.findByText("Click on the login button to see more")).toBeInTheDocument();
+   });
++
++  it("does not force a refetch on every mount, so a failing endpoint isn't re-hit on every page navigation", () => {
++    render(
++      <AppTooltip location={TooltipLocation.LOGIN_BUTTON}>
++        <button>Click me</button>
++      </AppTooltip>,
++    );
++
++    const options = mockUseGetActiveTooltipsQuery.mock.calls[0]?.[1];
++    // `true` forces a brand-new network request on every single mount, even
++    // one that just failed moments ago — since AppTooltip wraps controls on
++    // nearly every routed page, ordinary navigation between pages retries a
++    // failing endpoint repeatedly with no backoff and no error surfaced.
++    expect(options?.refetchOnMountOrArgChange).not.toBe(true);
++  });
+ });

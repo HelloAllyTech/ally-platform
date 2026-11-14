@@ -1,0 +1,53 @@
+diff --git a/src/analytics/service/quality-sentiment-analytics.service.ts b/src/analytics/service/quality-sentiment-analytics.service.ts
+index 03c0b7f1cb..5fe39699cf 100644
+--- a/src/analytics/service/quality-sentiment-analytics.service.ts
++++ b/src/analytics/service/quality-sentiment-analytics.service.ts
+@@ -78,8 +78,7 @@ export class QualitySentimentAnalyticsService {
+   async getQualitySentiment(
+     query: QualitySentimentQueryDto,
+   ): Promise<QualitySentimentResponseDto> {
+-    const needsFloor =
+-      (query.range ?? 'all') === 'all' && !query.from && !query.to;
++    const needsFloor = (query.range ?? 'all') === 'all';
+     const window = resolveAnalyticsWindow(query, {
+       defaultRange: 'all',
+       defaultBucketFor,
+diff --git a/src/analytics/service/test/quality-sentiment-analytics.service.spec.ts b/src/analytics/service/test/quality-sentiment-analytics.service.spec.ts
+index 4eb0f025dd..d66d8e772e 100644
+--- a/src/analytics/service/test/quality-sentiment-analytics.service.spec.ts
++++ b/src/analytics/service/test/quality-sentiment-analytics.service.spec.ts
+@@ -26,6 +26,7 @@ const row = (
+ 
+ describe('QualitySentimentAnalyticsService', () => {
+   let service: QualitySentimentAnalyticsService;
++  let module: TestingModule;
+ 
+   let qualityIndexService: { getQualityIndexOverall: jest.Mock };
+ 
+@@ -67,7 +68,7 @@ describe('QualitySentimentAnalyticsService', () => {
+       }),
+     };
+ 
+-    const module: TestingModule = await Test.createTestingModule({
++    module = await Test.createTestingModule({
+       providers: [
+         QualitySentimentAnalyticsService,
+         {
+@@ -354,4 +355,17 @@ describe('QualitySentimentAnalyticsService', () => {
+       expect(result.correlation).toBeNull();
+     });
+   });
++
++  describe(`'all' time range queries`, () => {
++    it(`fetches the data floor when 'from' is also provided`, async () => {
++      await setup([]);
++      const repo = module.get(QualitySentimentAnalyticsRepository);
++      await service.getQualitySentiment({
++        range: 'all',
++        from: '2024-06-01',
++        to: '2024-06-12',
++      });
++      expect(repo.getDataFloor).toHaveBeenCalled();
++    });
++  });
+ });

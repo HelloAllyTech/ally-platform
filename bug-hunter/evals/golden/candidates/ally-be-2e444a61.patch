@@ -1,0 +1,82 @@
+diff --git a/scripts/builder/test/gate-verdict.test.mjs b/scripts/builder/test/gate-verdict.test.mjs
+index 2716777d3f..a90b1b2de2 100644
+--- a/scripts/builder/test/gate-verdict.test.mjs
++++ b/scripts/builder/test/gate-verdict.test.mjs
+@@ -227,6 +227,39 @@ test('names eslint findings', () => {
+   assert.ok(found[0].startsWith('src/foo.ts:12'));
+ });
+ 
++// The exact bytes a GitHub runner gets from vitest. Before colour codes were
++// stripped, this parsed to [], and ally-web's test check passed every build.
++const RED_FAIL = '\x1b[41m\x1b[1m FAIL \x1b[22m\x1b[49m';
++
++test('names vitest failures through colour codes', () => {
++  const found = parse(
++    `${RED_FAIL} |ally-admin-dashboard| src/a.test.tsx\x1b[2m > \x1b[22msuite\x1b[2m > \x1b[22mkeeps the value\n` +
++      '\x1b[31m   \x1b[31m×\x1b[31m suite > keeps the value\x1b[39m\x1b[32m 70\x1b[2mms\x1b[22m\x1b[39m\n',
++  );
++  assert.ok(found.includes('|ally-admin-dashboard| src/a.test.tsx > suite > keeps the value'));
++  // The duration would rename the failure on every run.
++  assert.ok(found.includes('suite > keeps the value'));
++});
++
++test('a vitest failure that also failed on master is carried over, a new one blocks', () => {
++  const baseline = parse(`${RED_FAIL} src/old.test.ts > suite > was already red\n`);
++  const current = parse(
++    `${RED_FAIL} src/old.test.ts > suite > was already red\n` +
++      `${RED_FAIL} src/new.test.tsx [ src/new.test.tsx ]\n`,
++  );
++  const { verdict, events } = verdictFor({
++    current: { checks: { test: { passed: false, failures: current } } },
++    baseline: { checks: { test: { passed: false, failures: baseline } } },
++  });
++  assert.equal(verdict, 'blocked');
++  assert.deepEqual(events[0].payload.newFailures, ['src/new.test.tsx [ src/new.test.tsx ]']);
++  assert.deepEqual(events[0].payload.preExistingFailures, ['src/old.test.ts > suite > was already red']);
++});
++
++test('names the failed project from nx group headers on a runner', () => {
++  assert.ok(parse('::group::❌ > nx run ally-helpline-dashboard:test\n').includes('ally-helpline-dashboard:test'));
++});
++
+ test('returns nothing rather than guessing on unfamiliar output', () => {
+   // A line we cannot attribute is better dropped than invented: a wrong
+   // failure identity makes a pre-existing failure look new.
+diff --git a/src/builder/constants/builder-repos.constants.ts b/src/builder/constants/builder-repos.constants.ts
+index dc01862cb3..71505d709e 100644
+--- a/src/builder/constants/builder-repos.constants.ts
++++ b/src/builder/constants/builder-repos.constants.ts
+@@ -84,14 +84,29 @@ export const BUILDER_REPOS: BuilderRepoDefinition[] = [
+     repo: 'ally-web',
+     description:
+       'Nx monorepo of the three frontends: admin dashboard, helpline and web. Shared libs under libs/.',
+-    test: 'npx nx run-many -t test --skip-nx-cache',
++    // vitest from the repo root, not `nx run-many`. vitest.workspace.ts covers
++    // the same three projects nx does (both admin and helpline dashboards, plus
++    // ui-shared, all `vitest run`), and running it from the root tags every
++    // failure `|project| file > case`. The gate's affected run below prints
++    // that same shape, and the baseline only excuses a failure whose name
++    // matches exactly.
++    test: 'npx vitest run',
+     // vitest directly, from the repo root. nx puts a cache and a project
+     // resolver between the agent and the one file it wants to run, and its
+     // `include` pattern then ignores the path it was given.
+     singleTest: 'npx vitest run',
+-    // No --skip-nx-cache here on purpose: between the baseline and the gate the
+-    // local Nx cache is exactly what we want to hit.
+-    affectedTest: 'npx nx affected -t test --base=origin/master',
++    // Only the specs that import what this branch changed (`vitest related`
++    // walks the module graph), not every spec in each touched project.
++    // `nx affected` ran whole projects: 5,631 admin plus 3,170 helpline tests,
++    // ~6 minutes per gate round, re-run in every remediation round of a build
++    // that changed two files. The related set for those two files was 96 spec
++    // files and finished in under 20s. Working tree vs origin/master, so
++    // uncommitted edits count. Deletions are dropped because related can't
++    // resolve a missing path. With no source changed there is nothing to relate.
++    affectedTest:
++      "files=$(git diff --name-only --diff-filter=d origin/master -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mts' '*.mjs'); " +
++      'if [ -z "$files" ]; then echo "No changed source files; no related specs to run."; ' +
++      'else npx vitest related --run --passWithNoTests $files; fi',
+     lint: 'npx nx run-many -t lint --skip-nx-cache',
+     typecheck: 'npx tsc -b --pretty false',
+     e2eCapable: true,

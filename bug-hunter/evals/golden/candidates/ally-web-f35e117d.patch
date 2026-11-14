@@ -1,0 +1,135 @@
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/AllyGuideTab.test.tsx b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/AllyGuideTab.test.tsx
+index 264a46b066..37b3566123 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/AllyGuideTab.test.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/AllyGuideTab.test.tsx
+@@ -232,7 +232,12 @@ describe("AllyGuideTab", () => {
+     h.weekly.mockReturnValue(
+       ok({
+         ...base,
+-        weeks: [week("2026-10-12"), week("2026-10-19", { voiceAdoption: rate(null, true) })],
++        weeks: [
++          week("2026-10-12"),
++          week("2026-10-19", {
++            voiceAdoption: { ...rate(null, true), count: 1, of: 2, learners: 2 },
++          }),
++        ],
+       }),
+     );
+     render(<AllyGuideTab {...filters} />);
+@@ -246,6 +251,27 @@ describe("AllyGuideTab", () => {
+     ).toBeInTheDocument();
+   });
+ 
++  it("says a chart is withheld, not empty, when every rate was withheld", () => {
++    const withheld = { ...rate(null, true), count: 1, of: 2, learners: 1 };
++    h.weekly.mockReturnValue(
++      ok({
++        ...base,
++        weeks: [
++          week("2026-10-12", { voiceAdoption: withheld }),
++          week("2026-10-19", { voiceAdoption: withheld }),
++        ],
++      }),
++    );
++    render(<AllyGuideTab {...filters} />);
++
++    // Voice adoption has nothing to draw, but there was activity behind it.
++    expect(screen.queryByText("No Ally activity in this window.")).toBeNull();
++    expect(
++      screen.getAllByText("Fewer than 5 learners, so the rate is withheld.", { selector: "*" })
++        .length,
++    ).toBeGreaterThan(0);
++  });
++
+   it("lists the courses with cost per learner, and the folded row by how many it folds", () => {
+     render(<AllyGuideTab {...filters} />);
+ 
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/allyGuideChart.test.ts b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/allyGuideChart.test.ts
+index 67943e33ff..50dd90f3ea 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/allyGuideChart.test.ts
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/allyGuideChart.test.ts
+@@ -113,12 +113,24 @@ describe("hasWithheld", () => {
+   it("is true when any chosen rate in any week was withheld", () => {
+     expect(
+       hasWithheld(
+-        [week("2026-10-12"), week("2026-10-19", { firstWinWithin5Min: rate(null, true) })],
++        [
++          week("2026-10-12"),
++          week("2026-10-19", {
++            firstWinWithin5Min: { ...rate(null, true), count: 2, of: 3, learners: 1 },
++          }),
++        ],
+         picks,
+       ),
+     ).toBe(true);
+   });
+ 
++  it("is false when the only suppressed rates had nothing behind them", () => {
++    // The server marks an empty week suppressed too; that is no activity, not a withheld rate.
++    expect(hasWithheld([week("2026-10-19", { firstWinWithin5Min: rate(null, true) })], picks)).toBe(
++      false,
++    );
++  });
++
+   it("ignores a withheld rate the chart does not plot", () => {
+     expect(hasWithheld([week("2026-10-12", { voiceAdoption: rate(null, true) })], picks)).toBe(
+       false,
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/allyGuideChart.ts b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/allyGuideChart.ts
+index 807eef0dfe..5992187e49 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/allyGuideChart.ts
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/allyGuideChart.ts
+@@ -38,7 +38,15 @@ export const valueSeries = (
+ export const hasWithheld = (
+   weeks: readonly AllyWeek[],
+   picks: readonly ((week: AllyWeek) => AllyRate)[],
+-): boolean => weeks.some(week => picks.some(pick => pick(week).suppressed));
++): boolean =>
++  // The server also marks an empty week suppressed; only a rate with something
++  // behind it was withheld.
++  weeks.some(week =>
++    picks.some(pick => {
++      const rate = pick(week);
++      return rate.suppressed && (rate.of > 0 || rate.learners > 0);
++    }),
++  );
+ 
+ /** Whether a series has anything to draw: at least one point that is not a gap. */
+ export const hasPoints = (series: readonly ChartDatum[]): boolean =>
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/tabs/AllyGuideTab.tsx b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/tabs/AllyGuideTab.tsx
+index c495064372..2c1051b783 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/tabs/AllyGuideTab.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/tabs/AllyGuideTab.tsx
+@@ -116,7 +116,8 @@ const LineCard = ({
+       onRetry={onRetry}
+       errorSubtitle={strings.states.loadFailed}
+       empty={!loading && !hasPoints(data)}
+-      emptyText={strings.states.empty}
++      // Activity whose every rate was withheld is not "no activity".
++      emptyText={withheldNote ?? strings.states.empty}
+     >
+       <LineChart data={data} options={opts} />
+     </ChartCard>
+@@ -325,7 +326,9 @@ export const AllyGuideTab = ({ query }: AnalyticsTabFilters) => {
+           !hasPoints(pairedSeries.thumbs) &&
+           !hasPoints(learningSeries)
+         }
+-        emptyText={strings.states.empty}
++        emptyText={
++          (summary.data?.learners ?? 0) > 0 ? strings.withheld(minGroup) : strings.states.empty
++        }
+         height="auto"
+       >
+         <div className="flex flex-col gap-4" data-testid="ally-paired">
+@@ -460,6 +463,12 @@ export const AllyGuideTab = ({ query }: AnalyticsTabFilters) => {
+           leftTitle={strings.items.axis}
+           percent={false}
+           legend={false}
++          // A figure, not a rate: the server withholds it below the group minimum.
++          withheldNote={
++            weeks.some(week => week.activeLearners > 0 && week.activeLearners < minGroup)
++              ? strings.withheld(minGroup)
++              : undefined
++          }
+         />
+         <LineCard
+           {...common}

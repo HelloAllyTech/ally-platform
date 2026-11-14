@@ -5,8 +5,8 @@
 #   1. oracle check  — prove each bug case: its oracle tests fail at the parent
 #                      commit and pass once the real fix's source diff is applied
 #                      (writes bug-hunter/evals/golden/oracle-status.json)
-#   2. baseline      — the "never finds anything" agent, in issue and sweep mode;
-#                      the numbers every later chunk is measured against
+#   2. evals         — an agent (baseline = never finds anything, or graph = the
+#                      real graph) in issue and sweep mode, under a hard cost cap
 #
 # Every case runs in a throwaway git worktree with the app's tests inside the
 # bug-hunter Docker sandbox (one case at a time; worktree removed after each).
@@ -14,7 +14,9 @@
 # excerpts, patches, result.json) are uploaded as workflow artifacts; nothing is
 # committed by this workflow. Locally, run single cases only (`make eval CASES=<id>`).
 #
-# No secrets: the baseline agent calls no model. Chunks 05+ add the model keys.
+# Secrets (repo): OPENAI_API_KEY, GEMINI_API_KEY (exported as GOOGLE_API_KEY, the name
+# langchain-google-genai reads), LANGSMITH_API_KEY (tracing in project ally-bug-hunter).
+# The baseline agent uses none of them; the graph agent needs the first two.
 
 name: Bug Hunter v2 evals
 
@@ -31,24 +33,123 @@ on:
         required: false
         default: "all"
         type: choice
-        options: [all, oracle, baseline]
+        options: [all, oracle, baseline, memory-check]
+      agent:
+        description: "Agent for the baseline steps: baseline (no model) or graph (chunk 05)"
+        required: false
+        default: "baseline"
+        type: choice
+        options: [baseline, graph]
+      modes:
+        description: "Which eval modes to run (comma-separated): issue, sweep"
+        required: false
+        default: "issue,sweep"
+        type: string
+      split:
+        description: "Case split: dev, or holdout (agent runs on holdout need milestone)"
+        required: false
+        default: "dev"
+        type: choice
+        options: [dev, holdout]
+      milestone:
+        description: "Milestone run: required to run an agent on the holdout split"
+        required: false
+        default: false
+        type: boolean
+      shards:
+        description: "Parallel shards per mode (cases balanced by expected time)"
+        required: false
+        default: "4"
+        type: string
+      max_cost_usd:
+        description: "Hard cost cap PER SHARD (default from limits.yaml: 10)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: bug-hunter-evals
+  group: bug-hunter-evals-${{ github.run_id }}
   cancel-in-progress: false
 
 defaults:
   run:
     working-directory: bug-hunter
 
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+  LANGSMITH_TRACING: "true"
+  LANGSMITH_PROJECT: ally-bug-hunter
+  # The key is an organisation-scoped service key; workspace-scoped calls (trace
+  # ingest) need the workspace id with it. An id, not a secret.
+  LANGSMITH_WORKSPACE_ID: 0c854988-4630-4eeb-84c4-ab532b3e578b
+  # The graph agent checkpoints into the Postgres service below (the real code path).
+  BUGHUNTER_EVAL_CHECKPOINT: postgres
+  # keep the runner's runs/artefacts/caches where the upload step expects them
+  BUGHUNTER_HOME: ${{ github.workspace }}/bug-hunter/runs
+  BUGHUNTER_CHECKPOINT_DB_URL: postgresql://bughunter:bughunter@localhost:5433/bughunter
+
 jobs:
-  evals:
-    name: Oracle check + baseline
+  plan:
+    # The matrix: only the requested modes, and N shards each. An oracle check runs
+    # in issue jobs only.
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    defaults:
+      run:
+        working-directory: .
+    outputs:
+      modes: ${{ steps.m.outputs.modes }}
+      shards: ${{ steps.m.outputs.shards }}
+    steps:
+      - id: m
+        run: |
+          modes='["issue"]'
+          if [ "$WHAT" != "oracle" ]; then
+            case "$MODES" in
+              *issue*sweep*|*sweep*issue*) modes='["issue","sweep"]' ;;
+              *sweep*) modes='["sweep"]' ;;
+            esac
+          fi
+          n="${SHARDS:-4}"
+          # chunk 07: the memory check is two passes in one process (one job)
+          if [ "$WHAT" = "memory-check" ]; then modes='["issue"]'; n=1; fi
+          echo "modes=$modes" >> "$GITHUB_OUTPUT"
+          echo "shards=[$(seq -s, 1 "$n")]" >> "$GITHUB_OUTPUT"
+        env:
+          WHAT: ${{ inputs.what }}
+          MODES: ${{ inputs.modes }}
+          SHARDS: ${{ inputs.shards }}
+
+  evals:
+    # One job per (mode, shard): a timeout or failure in one never loses the others.
+    # Each shard writes its report after every case.
+    name: "Evals (${{ matrix.mode }}, shard ${{ matrix.shard }})"
+    needs: plan
+    runs-on: ubuntu-latest
+    # GitHub's job maximum is 360; the eval step stops at 330 so the uploads still run
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: ${{ fromJSON(needs.plan.outputs.modes) }}
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    services:
+      postgres:
+        image: pgvector/pgvector:pg14
+        env:
+          POSTGRES_USER: bughunter
+          POSTGRES_PASSWORD: bughunter
+          POSTGRES_DB: bughunter
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bughunter -d bughunter"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      SHARD: ${{ matrix.shard }}/${{ inputs.shards || '4' }}
     steps:
       # The sandbox builds four images (~5 GB) and one dependency volume per
       # distinct lockfile across the cases' history (ally-web's is 1.3 GB each).
@@ -93,49 +194,61 @@ jobs:
           df -h /
           docker system df
           docker version --format 'docker {{.Server.Version}}'
+          touch "$RUNNER_TEMP/eval-start"
 
-      - name: Plan (distinct lockfiles per app)
+      - name: Plan (this shard's cases)
+        if: inputs.what != 'memory-check'
         run: |
-          poetry run bug-hunter eval run --dry-run ${CASES:+--cases "$CASES"}
+          poetry run bug-hunter eval run --dry-run --shard "$SHARD" --split "$SPLIT" ${CASES:+--cases "$CASES"}
         env:
           CASES: ${{ inputs.cases }}
+          SPLIT: ${{ inputs.split }}
 
       - name: Oracle check
-        if: inputs.what == 'all' || inputs.what == 'oracle'
+        if: matrix.mode == 'issue' && (inputs.what == 'all' || inputs.what == 'oracle')
+        timeout-minutes: 330
         run: |
-          poetry run bug-hunter eval run --oracle-check ${CASES:+--cases "$CASES"}
+          poetry run bug-hunter eval run --oracle-check --shard "$SHARD" --split "$SPLIT" ${CASES:+--cases "$CASES"}
         env:
           CASES: ${{ inputs.cases }}
+          SPLIT: ${{ inputs.split }}
 
-      - name: Baseline, issue mode
+      - name: "Eval, ${{ matrix.mode }} mode"
         if: always() && (inputs.what == 'all' || inputs.what == 'baseline')
+        timeout-minutes: 330
         run: |
-          poetry run bug-hunter eval run --agent baseline --mode issue ${CASES:+--cases "$CASES"}
+          poetry run bug-hunter eval run --agent "$AGENT" --mode "$MODE" --shard "$SHARD" --split "$SPLIT" ${MILESTONE:+--milestone} ${CASES:+--cases "$CASES"} ${MAX_COST:+--max-cost-usd "$MAX_COST"}
         env:
           CASES: ${{ inputs.cases }}
+          AGENT: ${{ inputs.agent }}
+          MODE: ${{ matrix.mode }}
+          MAX_COST: ${{ inputs.max_cost_usd }}
+          SPLIT: ${{ inputs.split }}
+          MILESTONE: ${{ inputs.milestone && 'yes' || '' }}
 
-      - name: Baseline, sweep mode
-        if: always() && (inputs.what == 'all' || inputs.what == 'baseline')
+      - name: Memory check (chunk 07, two passes, eval-scoped memory)
+        if: inputs.what == 'memory-check'
+        timeout-minutes: 330
         run: |
-          poetry run bug-hunter eval run --agent baseline --mode sweep ${CASES:+--cases "$CASES"}
+          poetry run bug-hunter eval memory-check ${MAX_COST:+--max-cost-usd "$MAX_COST"}
         env:
-          CASES: ${{ inputs.cases }}
+          MAX_COST: ${{ inputs.max_cost_usd }}
 
-      - name: Disk and Docker after
+      - name: Collect this shard's reports
         if: always()
         run: |
           df -h /
-          docker system df
-          poetry run bug-hunter cache size || true
+          mkdir -p eval-out
+          find evals/results -type f -newer "$RUNNER_TEMP/eval-start" -exec cp {} eval-out/ \;
+          cp evals/golden/oracle-status.json "eval-out/oracle-status-shard${{ matrix.shard }}.json" || true
+          ls -la eval-out
 
       - name: Upload reports and oracle status
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bug-hunter-eval-results-${{ github.run_number }}
-          path: |
-            bug-hunter/evals/results/
-            bug-hunter/evals/golden/oracle-status.json
+          name: bug-hunter-eval-results-${{ github.run_number }}-${{ matrix.mode }}-shard${{ matrix.shard }}
+          path: bug-hunter/eval-out/
           if-no-files-found: warn
           retention-days: 30
 
@@ -143,7 +256,64 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bug-hunter-run-artefacts-${{ github.run_number }}
+          name: bug-hunter-run-artefacts-${{ github.run_number }}-${{ matrix.mode }}-shard${{ matrix.shard }}
           path: bug-hunter/runs/artefacts/
           if-no-files-found: warn
           retention-days: 14
+
+  merge:
+    # One report per mode from the shard reports, even if a shard failed or timed out.
+    needs: [plan, evals]
+    if: always()
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: ${{ fromJSON(needs.plan.outputs.modes) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - name: Install bug-hunter
+        run: make install
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bug-hunter-eval-results-${{ github.run_number }}-${{ matrix.mode }}-shard*
+          path: bug-hunter/shards
+          merge-multiple: true
+      - name: Merge shard reports
+        run: |
+          ls -la shards || true
+          reports=$(ls shards/*-shard*of*.json 2>/dev/null | grep -v oracle-status || true)
+          mkdir -p merged
+          if [ -n "$reports" ]; then
+            poetry run bug-hunter eval merge $reports --out-dir merged --name "merged-${{ matrix.mode }}-${{ github.run_number }}"
+          fi
+          python3 - <<'PY'
+          import glob, json, os
+          # each shard's file is the committed status plus its own checks: keep the
+          # newest check per case
+          merged = {}
+          for path in sorted(glob.glob("shards/oracle-status-shard*.json")):
+              for case, entry in json.load(open(path)).items():
+                  if case not in merged or entry.get("checked_at", "") > merged[case].get("checked_at", ""):
+                      merged[case] = entry
+          if merged:
+              json.dump(merged, open("merged/oracle-status.json", "w"), indent=1, sort_keys=True)
+          PY
+          cat merged/*.md 2>/dev/null | head -80 || true
+      - name: Upload merged report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bug-hunter-eval-merged-${{ github.run_number }}-${{ matrix.mode }}
+          path: bug-hunter/merged/
+          if-no-files-found: warn
+          retention-days: 30

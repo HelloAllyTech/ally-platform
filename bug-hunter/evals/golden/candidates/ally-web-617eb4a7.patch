@@ -1,0 +1,129 @@
+diff --git a/apps/ally-admin-dashboard/src/hooks/__tests__/useRoadmapCopilotStream.test.tsx b/apps/ally-admin-dashboard/src/hooks/__tests__/useRoadmapCopilotStream.test.tsx
+index 99d80114eb..7c23494a18 100644
+--- a/apps/ally-admin-dashboard/src/hooks/__tests__/useRoadmapCopilotStream.test.tsx
++++ b/apps/ally-admin-dashboard/src/hooks/__tests__/useRoadmapCopilotStream.test.tsx
+@@ -1,4 +1,6 @@
+-import { act, renderHook } from "@testing-library/react";
++import { StrictMode, useEffect, useRef } from "react";
++
++import { act, render, renderHook, waitFor } from "@testing-library/react";
+ import { afterEach, describe, expect, it, vi } from "vitest";
+ 
+ import { parseCopilotSse, useRoadmapCopilotStream } from "@hooks/useRoadmapCopilotStream";
+@@ -104,6 +106,59 @@ describe("useRoadmapCopilotStream", () => {
+     });
+   });
+ 
++  it("shows its own copy, not a fetch-level message, when the connection fails", async () => {
++    vi.stubGlobal(
++      "fetch",
++      vi.fn().mockRejectedValue(new DOMException("signal is aborted without reason", "AbortError")),
++    );
++    const { result } = renderHook(() => useRoadmapCopilotStream());
++
++    await act(async () => {
++      await expect(result.current.runTurn({ messages: [], brief: null })).rejects.toThrow(
++        "That answer did not go through.",
++      );
++    });
++  });
++
++  /**
++   * The drawer fires its opening turn from a mount effect, guarded so it fires once. Under
++   * React's development double-mount the hook's cleanup used to abort that request, and the
++   * guard then (rightly) never fired it again — the drawer opened on "did not go through".
++   */
++  it("survives React's development double-mount without aborting a turn fired on mount", async () => {
++    let signal: AbortSignal | undefined;
++    vi.stubGlobal(
++      "fetch",
++      vi.fn((_url: string, init: RequestInit) => {
++        signal = init.signal ?? undefined;
++        return Promise.resolve(sseResponse([`event: turn\ndata: ${JSON.stringify(TURN)}\n\n`]));
++      }),
++    );
++    const outcomes: string[] = [];
++    const Opener = () => {
++      const { runTurn } = useRoadmapCopilotStream();
++      const opened = useRef(false);
++      useEffect(() => {
++        if (opened.current) return;
++        opened.current = true;
++        runTurn({ messages: [], brief: null }).then(
++          ({ turn }) => outcomes.push(turn.reply),
++          (error: Error) => outcomes.push(`failed: ${error.message}`),
++        );
++      }, [runTurn]);
++      return null;
++    };
++
++    render(
++      <StrictMode>
++        <Opener />
++      </StrictMode>,
++    );
++
++    await waitFor(() => expect(outcomes).toEqual(["Who is this for?"]));
++    expect(signal?.aborted).toBe(false);
++  });
++
+   it("omits a null brief from the request body", async () => {
+     const fetchMock = vi
+       .fn()
+diff --git a/apps/ally-admin-dashboard/src/hooks/useRoadmapCopilotStream.ts b/apps/ally-admin-dashboard/src/hooks/useRoadmapCopilotStream.ts
+index 0cabe4d2d2..2a4a8641ad 100644
+--- a/apps/ally-admin-dashboard/src/hooks/useRoadmapCopilotStream.ts
++++ b/apps/ally-admin-dashboard/src/hooks/useRoadmapCopilotStream.ts
+@@ -66,8 +66,24 @@ export const useRoadmapCopilotStream = () => {
+   const [activity, setActivity] = useState<RoadmapCopilotActivity[]>([]);
+   const [isThinking, setIsThinking] = useState(false);
+   const abortRef = useRef<AbortController | null>(null);
++  const mountedRef = useRef(false);
+ 
+-  useEffect(() => () => abortRef.current?.abort(), []);
++  /**
++   * Abort an in-flight turn when the drawer really unmounts — deferred one tick, because React's
++   * development double-mount runs this cleanup and then re-mounts immediately. Aborting
++   * synchronously killed the opening turn every time in development (the drawer fires it once,
++   * on mount, and its run-once guard rightly does not fire it again).
++   */
++  useEffect(() => {
++    mountedRef.current = true;
++    return () => {
++      mountedRef.current = false;
++      const inFlight = abortRef.current;
++      setTimeout(() => {
++        if (!mountedRef.current) inFlight?.abort();
++      }, 0);
++    };
++  }, []);
+ 
+   const fetchWithReauth = useCallback(
+     async (url: string, body: unknown, signal: AbortSignal): Promise<Response> => {
+@@ -162,6 +178,13 @@ export const useRoadmapCopilotStream = () => {
+         }
+         // The stream closed without a turn — a dropped connection, not an answer.
+         throw new Error(FAILED);
++      } catch (error) {
++        // A server `error` frame carries copy written for the admin; anything else (an abort, a
++        // dropped connection, a non-2xx) is a fetch-level message nobody should read.
++        if (error instanceof Error && error.name !== "AbortError" && error.name !== "TypeError") {
++          throw error;
++        }
++        throw new Error(FAILED);
+       } finally {
+         if (abortRef.current === controller) {
+           abortRef.current = null;
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ProductRoadmap.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ProductRoadmap.tsx
+index 78782adbdd..a2cb68180d 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ProductRoadmap.tsx
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ProductRoadmap.tsx
+@@ -910,7 +910,7 @@ export const ProductRoadmap: React.FC = () => {
+             <Tooltip label="Roadmap settings" align="bottom">
+               <button
+                 type="button"
+-                aria-label="Roadmap settings: product goals, strategy and ranking, merge, split"
++                aria-label="Roadmap settings: vision and strategy, product goals, strategy and ranking, merge, split"
+                 onClick={() => setIsSettingsOpen(true)}
+                 className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
+               >

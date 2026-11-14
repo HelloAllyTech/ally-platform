@@ -1,0 +1,122 @@
+diff --git a/src/user/dto/admin-tenant.dto.ts b/src/user/dto/admin-tenant.dto.ts
+index ad104ba722..17be7345c1 100644
+--- a/src/user/dto/admin-tenant.dto.ts
++++ b/src/user/dto/admin-tenant.dto.ts
+@@ -5,6 +5,8 @@ import {
+   ArrayNotEmpty,
+   IsInt,
+   IsPositive,
++  IsOptional,
++  IsBoolean,
+ } from 'class-validator';
+ import { Type } from 'class-transformer';
+ 
+@@ -48,4 +50,15 @@ export class RemoveAdminTenantsDto {
+   @ArrayNotEmpty()
+   @IsUUID('4', { each: true })
+   tenantIds!: string[];
++
++  @ApiProperty({
++    description:
++      'Required to remove an admin’s last organization: with none left, the ' +
++      'restriction is lifted and they see every organization.',
++    required: false,
++    default: false,
++  })
++  @IsOptional()
++  @IsBoolean()
++  liftRestriction?: boolean;
+ }
+diff --git a/src/user/service/admin-tenant.service.ts b/src/user/service/admin-tenant.service.ts
+index 311b5fdef2..114c081ddc 100644
+--- a/src/user/service/admin-tenant.service.ts
++++ b/src/user/service/admin-tenant.service.ts
+@@ -117,11 +117,16 @@ export class AdminTenantService {
+   }
+ 
+   /**
+-   * Removes one or more tenant mappings from a MULTI_TENANT_ADMIN user.
+-   * Super admin only.
++   * Removes one or more tenant mappings from an organization-restricted
++   * platform admin. Requires the allowlist-management toggle (controller).
++   *
++   * An empty allowlist means unrestricted, so removing the last mapping does
++   * not narrow the admin to nothing — it widens them to every organization.
++   * That has to be asked for in so many words (`liftRestriction`), never be
++   * the side effect of tidying up a list.
+    */
+   async removeTenants(dto: RemoveAdminTenantsDto): Promise<SuccessResponse> {
+-    const { userId, tenantIds } = dto;
++    const { userId, tenantIds, liftRestriction } = dto;
+ 
+     const mappings = await this.adminTenantRepository.findByUserIdAndTenantIds(
+       userId,
+@@ -134,6 +139,14 @@ export class AdminTenantService {
+       );
+     }
+ 
++    const remaining = await this.adminTenantRepository.findByUserId(userId);
++    if (remaining.length <= mappings.length && !liftRestriction) {
++      throw new BadRequestException(
++        'This is their last organization. Removing it lifts the restriction, ' +
++          'and they will see every organization — confirm with liftRestriction.',
++      );
++    }
++
+     await this.adminTenantRepository.softRemove(mappings);
+     this.logger.info(
+       `Removed ${mappings.length} tenant mapping(s) from admin user ${userId}`,
+diff --git a/src/user/service/test/admin-tenant.service.spec.ts b/src/user/service/test/admin-tenant.service.spec.ts
+index 641133919e..a5c4e68c40 100644
+--- a/src/user/service/test/admin-tenant.service.spec.ts
++++ b/src/user/service/test/admin-tenant.service.spec.ts
+@@ -180,6 +180,11 @@ describe('AdminTenantService', () => {
+       mockAdminTenantRepository.findByUserIdAndTenantIds.mockResolvedValue(
+         mappings,
+       );
++      // Another organization stays, so the admin remains restricted.
++      mockAdminTenantRepository.findByUserId.mockResolvedValue([
++        ...mappings,
++        { userId: 1, tenantId: 'tenant-2' },
++      ]);
+ 
+       const result = await service.removeTenants(dto);
+ 
+@@ -190,6 +195,37 @@ describe('AdminTenantService', () => {
+     });
+   });
+ 
++  describe('removeTenants — the last organization', () => {
++    const lastOrg = [{ userId: 1, tenantId: 'tenant-1' }];
++
++    beforeEach(() => {
++      mockAdminTenantRepository.findByUserIdAndTenantIds.mockResolvedValue(
++        lastOrg,
++      );
++      mockAdminTenantRepository.findByUserId.mockResolvedValue(lastOrg);
++    });
++
++    it('refuses to remove it without an explicit liftRestriction — that would widen them to every org', async () => {
++      await expect(
++        service.removeTenants({ userId: 1, tenantIds: ['tenant-1'] }),
++      ).rejects.toThrow(BadRequestException);
++      expect(mockAdminTenantRepository.softRemove).not.toHaveBeenCalled();
++    });
++
++    it('removes it when the caller asks to lift the restriction', async () => {
++      await expect(
++        service.removeTenants({
++          userId: 1,
++          tenantIds: ['tenant-1'],
++          liftRestriction: true,
++        }),
++      ).resolves.toEqual({ success: true });
++      expect(mockAdminTenantRepository.softRemove).toHaveBeenCalledWith(
++        lastOrg,
++      );
++    });
++  });
++
+   describe('getTenantsForAdmin', () => {
+     it('should throw NotFoundException if user not found', async () => {
+       mockUserRepository.findOne.mockResolvedValue(null);

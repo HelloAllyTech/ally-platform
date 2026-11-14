@@ -1,0 +1,55 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/search-resources/SearchResources.tsx b/apps/ally-helpline-dashboard/src/components/search-resources/SearchResources.tsx
+index 2424edf2d9..7b3b68adf2 100644
+--- a/apps/ally-helpline-dashboard/src/components/search-resources/SearchResources.tsx
++++ b/apps/ally-helpline-dashboard/src/components/search-resources/SearchResources.tsx
+@@ -33,7 +33,7 @@ const SearchResources: FC<SearchResourcesProps> = ({
+   useEffect(() => {
+     const initializeSearchWithQueryParams = async () => {
+       const urlParams = new URLSearchParams(window.location.search);
+-      const query = urlParams.get("q");
++      const query = urlParams.get("q") || "";
+       const category = urlParams.get("category");
+       if (!query && !category) {
+         return;
+diff --git a/apps/ally-helpline-dashboard/src/components/search-resources/__test__/SearchResources.test.tsx b/apps/ally-helpline-dashboard/src/components/search-resources/__test__/SearchResources.test.tsx
+index 313b1e95f3..4e987323e9 100644
+--- a/apps/ally-helpline-dashboard/src/components/search-resources/__test__/SearchResources.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/search-resources/__test__/SearchResources.test.tsx
+@@ -178,6 +178,37 @@ describe("SearchResources", () => {
+     });
+   });
+ 
++  test("should initialize with only a category from URL and not throw", async () => {
++    mockWindowLocation("?category=Docs");
++    const mockCountData = mockApiResponse(50, [mockResource("1")], { All: 50, Docs: 30 });
++    const mockFilteredData = mockApiResponse(30, [mockResource("10"), mockResource("11")]);
++
++    mockGetSearchResults
++      .mockResolvedValueOnce(mockCountData)
++      .mockResolvedValueOnce(mockFilteredData);
++
++    render(<SearchResources />);
++
++    await waitFor(() => {
++      expect(mockGetSearchResults).toHaveBeenCalledWith({
++        query: "",
++        limit: 10,
++        filters: undefined,
++      });
++      expect(mockGetSearchResults).toHaveBeenCalledWith({
++        query: "",
++        limit: 10,
++        filters: { category: "Docs" },
++      });
++
++      const props = getLastResourceSearchProps();
++      expect(props.searchQuery).toBe("");
++      expect(props.selectedCategory).toBe("Docs");
++      expect(props.resources.length).toBe(2);
++      expect(props.categoryCountList).toEqual({ All: 50, Docs: 30 });
++    });
++  });
++
+   test("should handle onSearch, update URL params, and fetch new results", async () => {
+     mockWindowLocation("?q=initial&category=OldCategory");
+     // Mock for initial load (will be called twice due to category)

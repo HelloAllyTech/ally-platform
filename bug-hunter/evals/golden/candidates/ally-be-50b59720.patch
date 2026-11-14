@@ -1,0 +1,100 @@
+diff --git a/ally-be/src/config/config.service.ts b/ally-be/src/config/config.service.ts
+index 8ce717e46..6dfe3d5eb 100644
+--- a/ally-be/src/config/config.service.ts
++++ b/ally-be/src/config/config.service.ts
+@@ -105,6 +105,10 @@ export class AppConfigService {
+    * - `digestTo` is who gets the daily email (comma-separated). Empty means no
+    *   email, even when enabled.
+    * - `digestHour` is the business-timezone (IST) hour it goes out.
++   * - `digestAllowed` is true only on the production database (`*_prd`). Env
++   *   files get copied between environments, and a staging copy that kept
++   *   `PRODUCT_UPDATES_DIGEST_TO` sent a second, differently-formatted digest
++   *   to the same people on 2026-11-05.
+    */
+   get productUpdates() {
+     const start = new Date(
+@@ -131,6 +135,7 @@ export class AppConfigService {
+         .map((address) => address.trim())
+         .filter(Boolean),
+       digestHour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 18,
++      digestAllowed: (this.database.database ?? '').endsWith('_prd'),
+     };
+   }
+ 
+diff --git a/ally-be/src/product-updates/service/product-update-digest.service.ts b/ally-be/src/product-updates/service/product-update-digest.service.ts
+index fc21a4639..33753df30 100644
+--- a/ally-be/src/product-updates/service/product-update-digest.service.ts
++++ b/ally-be/src/product-updates/service/product-update-digest.service.ts
+@@ -51,6 +51,7 @@ export type DigestOutcome =
+   | 'disabled'
+   | 'not-due'
+   | 'already-sent'
++  | 'not-production'
+   | 'nothing-to-report'
+   | 'sent'
+   | 'failed';
+@@ -89,10 +90,18 @@ export class ProductUpdateDigestService {
+ 
+   /** The hourly tick: sends once, in the configured business hour, if there is anything to report. */
+   async sendIfDue(now: Date = new Date()): Promise<DigestOutcome> {
+-    const { digestTo, digestHour } = this.configService.productUpdates;
++    const { digestTo, digestHour, digestAllowed } =
++      this.configService.productUpdates;
+     if (digestTo.length === 0) return 'disabled';
+     if (dayjs(now).tz(BUSINESS_TIMEZONE).hour() !== digestHour)
+       return 'not-due';
++    if (!digestAllowed) {
++      // After the hour check, so this is one line a day, not one an hour.
++      this.logger.warn(
++        '[PRODUCT-UPDATES] Digest skipped: PRODUCT_UPDATES_DIGEST_TO is set but this is not the production database (*_prd).',
++      );
++      return 'not-production';
++    }
+ 
+     const lockKey = `product-updates:digest:${toBusinessDateString(now)}`;
+     if (!(await this.redisService.acquireLock(lockKey, 20 * 60 * 60))) {
+diff --git a/ally-be/src/product-updates/service/test/product-update-digest.service.spec.ts b/ally-be/src/product-updates/service/test/product-update-digest.service.spec.ts
+index e718bd4a3..4dca6aa53 100644
+--- a/ally-be/src/product-updates/service/test/product-update-digest.service.spec.ts
++++ b/ally-be/src/product-updates/service/test/product-update-digest.service.spec.ts
+@@ -49,7 +49,11 @@ describe('ProductUpdateDigestService', () => {
+     set: jest.Mock;
+   };
+   let config: {
+-    productUpdates: { digestTo: string[]; digestHour: number };
++    productUpdates: {
++      digestTo: string[];
++      digestHour: number;
++      digestAllowed: boolean;
++    };
+     email: { sourceEmail: string };
+     adminBaseUrl: string;
+   };
+@@ -70,7 +74,11 @@ describe('ProductUpdateDigestService', () => {
+       set: jest.fn().mockResolvedValue(undefined),
+     };
+     config = {
+-      productUpdates: { digestTo: ['team@example.com'], digestHour: 18 },
++      productUpdates: {
++        digestTo: ['team@example.com'],
++        digestHour: 18,
++        digestAllowed: true,
++      },
+       email: { sourceEmail: 'no-reply@example.com' },
+       adminBaseUrl: 'https://admin.example.com/',
+     };
+@@ -128,6 +136,14 @@ describe('ProductUpdateDigestService', () => {
+     );
+   });
+ 
++  it('never sends from a database that is not production, and never takes the lock', async () => {
++    config.productUpdates.digestAllowed = false;
++
++    expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('not-production');
++    expect(redis.acquireLock).not.toHaveBeenCalled();
++    expect(sesService.sendEmail).not.toHaveBeenCalled();
++  });
++
+   it('does nothing without recipients, or outside its business hour', async () => {
+     config.productUpdates.digestTo = [];
+     expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('disabled');
