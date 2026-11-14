@@ -107,6 +107,7 @@ Branch `feat/agents-v2-fast-track`, commits tagged `[8a]`. Brief: `chunk-8a.md`.
 
 ## 6. Open, for later chunks
 
+- **16c (the assistant map, sprint 1): show a reply's steps in Try it** (decided 14 Nov). The run's trace already comes back in Try it's result (each search, list tool call and the `remember` step, counts only); Try it drops the live steps and "Why this answer?" shows only sources and timing. For example: "Looked up Slots: 3 found · Booked in Appointments · Would remember: prefers evenings". The full "Why?" for live chats in the Inbox needs an ally-be route (16b).
 - **16a recall** (search across past chats) and **8's nightly tidy** (merge, `confidence`) as planned.
 - **4a** shows `renderMemory`'s text as `/contacts/<id>/USER.md`.
 - **Carrying memory across channels** (a WhatsApp number and a verified email being one person) waits for 8's people work.
