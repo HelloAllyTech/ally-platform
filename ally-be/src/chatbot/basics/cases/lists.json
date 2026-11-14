@@ -9,12 +9,8 @@
         "expect": {
           "crisis": false,
           "handover": false,
-          "tools": [
-            "find_slots: ok"
-          ],
-          "cites": [
-            "^Slots · Thu"
-          ],
+          "tools": ["find_slots: ok"],
+          "cites": ["^Slots · Thu"],
           "mustNot": [
             "team will confirm",
             "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
@@ -35,9 +31,7 @@
         "user": "can I book Thursday at 11:00?",
         "expect": {
           "crisis": false,
-          "noTools": [
-            "create_appointments"
-          ],
+          "noTools": ["create_appointments"],
           "records": {
             "list": "appointments",
             "count": 0
@@ -54,12 +48,8 @@
         "user": "yes, please book it",
         "expect": {
           "crisis": false,
-          "tools": [
-            "create_appointments: ok"
-          ],
-          "cites": [
-            "^Appointments · Thu 19 Nov 2026, 11:00"
-          ],
+          "tools": ["create_appointments: ok"],
+          "cites": ["^Appointments · Thu 19 Nov 2026, 11:00"],
           "records": {
             "list": "appointments",
             "status": "booked",
@@ -96,15 +86,8 @@
         "user": "please book me Thursday at 12:00, I confirm",
         "expect": {
           "crisis": false,
-          "tools": [
-            "create_appointments: error unique_taken"
-          ],
-          "must": [
-            "taken|booked|not available|isn't available|gone"
-          ],
-          "cites": [
-            "^Slots · "
-          ],
+          "tools": ["create_appointments: error unique_taken"],
+          "must": ["taken|booked|not available|isn't available|gone"],
           "records": {
             "list": "appointments",
             "count": 0
@@ -143,9 +126,7 @@
       {
         "user": "actually, cancel my booking please",
         "expect": {
-          "tools": [
-            "update_appointments: ok"
-          ],
+          "tools": ["update_appointments: ok"],
           "mustNot": [
             "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
             "citations?:",
@@ -229,9 +210,7 @@
         "preview": true,
         "user": "yes, book it",
         "expect": {
-          "tools": [
-            "create_appointments: ok"
-          ],
+          "tools": ["create_appointments: ok"],
           "records": {
             "list": "appointments",
             "count": 0

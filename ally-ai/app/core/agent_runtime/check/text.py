@@ -175,7 +175,11 @@ def without_source_phrases(text: str) -> str:
     return re.sub(r"\s+([.,;!?।])", r"\1", text)
 
 
-_UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+#: A record id, or the start of one the model shortened ("id e596c793").
+_UUID = (
+    r"(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    r"|(?<=id )[0-9a-f]{6,12}\b|(?<=id: )[0-9a-f]{6,12}\b)"
+)
 # A list record's id as the model repeats it from a passage (chunk 6). Ids are for
 # the tools, never the person. A bracket that holds one goes whole ("(slot id: …,
 # appointment id: …)"); a label that starts a clause goes with its id ("Appointment
@@ -193,7 +197,9 @@ _LABELLED_ID = re.compile(
 # Talk about the records or citations themselves: "(see record)", "Citations: 1, 2",
 # and passage numbers written into the text ("[1]").
 _RECORD_TALK = re.compile(
-    r"\s*\((?:see\s+(?:the\s+)?records?|citations?:[^)]*)\)"
+    r"\s*\((?:(?:see\s+)?(?:the\s+)?(?:records?|passages?)\b[^)]*|see\s+\d[^)]*"
+    r"|citations?:[^)]*)\)"
+    r"|[;,.]?\s*\bsee\s+(?:records?\s*:?\s*)?\d+(?:\s*,\s*\d+)*(?=\s*[).;,!?]|\s*$)"
     r"|\s*\bcitations?:\s*\[?\d+(?:\s*,\s*\d+)*\]?\.?"
     r"|\s*\[\d+(?:\s*,\s*\d+)*\]",
     re.IGNORECASE,

@@ -433,6 +433,40 @@ class TestRecordIds:
             == "Booked at 12:00. Your appointment is confirmed."
         )
 
+    @pytest.mark.parametrize(
+        "text, expected",
+        [
+            (
+                "An open slot (50 min) (id e596c793). Book it?",
+                "An open slot (50 min). Book it?",
+            ),
+            (
+                "It's cancelled. (See record: 1) Anything else?",
+                "It's cancelled. Anything else?",
+            ),
+            (
+                "It's taken (slot id c8046d06. see 1). These are free:",
+                "It's taken. These are free:",
+            ),
+            (
+                "The slot was Thu, 12:00 (passage 1). Others:",
+                "The slot was Thu, 12:00. Others:",
+            ),
+            (
+                "Opening hours (see our website) are 9 to 5.",
+                "Opening hours (see our website) are 9 to 5.",
+            ),
+            (
+                "We have 2 rooms; see 3 options below.",
+                "We have 2 rooms; see 3 options below.",
+            ),
+        ],
+    )
+    def test_short_ids_and_see_record_go_and_ordinary_text_stays(self, text, expected):
+        from app.core.agent_runtime.check.text import without_record_ids
+
+        assert without_record_ids(text) == expected
+
     def test_lists_keep_their_lead_in_and_items(self):
         from app.core.agent_runtime.check.text import without_record_ids
 
