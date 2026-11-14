@@ -357,6 +357,39 @@ def checks(
     return ("fail" if problems else "pass"), problems
 
 
+def memory_checks(expect: Dict[str, Any], result: Dict[str, Any]) -> List[str]:
+    """Memory, light (chunk 8a): what the run asked to remember, and whether the reply
+    used what it was given. Each key is optional:
+    - remember_any: a write's text contains one of these;
+    - remember_none: no write's text contains any of these;
+    - remember_nothing: true, no writes at all;
+    - forgets: true, a `forget` write;
+    - reply_mentions: the reply contains one of these;
+    - reply_avoids: the reply contains none of these.
+    Substrings, case-insensitive."""
+    writes = result.get("memory_writes") or []
+    texts = [str(w.get("text") or "").lower() for w in writes]
+    answer = (result.get("answer") or "").lower()
+    problems: List[str] = []
+    want = [x.lower() for x in expect.get("remember_any") or []]
+    if want and not any(w in t for t in texts for w in want):
+        problems.append(f"didn't remember any of {want} (wrote {texts})")
+    for bad in (x.lower() for x in expect.get("remember_none") or []):
+        if any(bad in t for t in texts):
+            problems.append(f"remembered {bad!r}")
+    if expect.get("remember_nothing") and writes:
+        problems.append(f"remembered {len(writes)} line(s)")
+    if expect.get("forgets") and not any(w.get("op") == "forget" for w in writes):
+        problems.append("didn't forget")
+    mention = [x.lower() for x in expect.get("reply_mentions") or []]
+    if mention and not any(m in answer for m in mention):
+        problems.append(f"reply mentions none of {mention}")
+    for bad in (x.lower() for x in expect.get("reply_avoids") or []):
+        if bad in answer:
+            problems.append(f"reply mentions {bad!r}")
+    return problems
+
+
 def hard_fails(
     kind: str, result: Dict[str, Any], verdict: Optional[JudgeVerdict]
 ) -> List[str]:
@@ -489,6 +522,9 @@ def run(
             )
             if extra:
                 status, problems = "fail", problems + extra
+            remembered = memory_checks(turn["expect"], result)
+            if remembered:
+                status, problems = "fail", problems + remembered
             verdict = None
             if judge_model:
                 passages = found_passages(client, result)
