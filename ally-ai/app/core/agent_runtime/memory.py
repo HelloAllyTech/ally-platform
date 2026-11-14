@@ -71,6 +71,18 @@ def history_lead(bot: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def personal_context(bot: Mapping[str, Any]) -> str:
+    """What the run was given about the person, for the check (chunk 8a): their
+    memory lines, this chat's summary and their name. "" when none."""
+    memory = bot.get("memory") or {}
+    parts = [
+        (memory.get("lines") or "").strip(),
+        (bot.get("summary") or "").strip(),
+        (bot.get("person_name") or "").strip(),
+    ]
+    return "\n".join(p for p in parts if p)
+
+
 def _clean(op: Mapping[str, Any], mode: RememberMode) -> Optional[Dict[str, Any]]:
     kind = str(op.get("op") or "")
     text = " ".join(str(op.get("text") or "").split())

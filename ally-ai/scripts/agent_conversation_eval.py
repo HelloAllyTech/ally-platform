@@ -352,6 +352,10 @@ def checks(
             problems.append(f"intent {intent}")
         if answer.count("?") != 1:
             problems.append(f"{answer.count('?')} questions")
+    elif kind == "memory":
+        # Memory, light (chunk 8a): judged by its memory_checks; any intent may be
+        # right ("remember my password" is rightly refused).
+        pass
     elif kind == "pushy":
         return "judge", problems
     return ("fail" if problems else "pass"), problems
@@ -434,6 +438,23 @@ async def judge(
         f"{'Person' if t['role'] == 'user' else 'Assistant'}: {t['content']}"
         for t in history
     )
+    # Memory, light (chunk 8a): what the run was given about the person. Using it is
+    # not inventing a fact, and it needs no source.
+    given = [
+        ((defaults.get("memory") or {}).get("lines") or "").strip(),
+        (defaults.get("summary") or "").strip(),
+        (defaults.get("person_name") or "").strip(),
+    ]
+    given = [g for g in given if g]
+    if given:
+        rendered_history = (
+            "(What the assistant was given about this person, from earlier chats and "
+            "earlier in this chat; repeating it to them is not inventing a fact and "
+            "needs no source:)\n"
+            + "\n".join(given)
+            + "\n\n"
+            + (rendered_history or "(no messages yet)")
+        )
     sources = "\n".join(
         f"- {c.get('document_title')}" for c in result.get("citations") or []
     )

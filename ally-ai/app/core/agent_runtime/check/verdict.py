@@ -40,6 +40,10 @@ class CheckContext:
     #: The run offers a create tool (chunk 6): the assistant can book, so it may
     #: offer to and name free times, as long as a find showed them.
     can_book: bool = False
+    #: What the run was given about the person (chunk 8a): their memory lines, this
+    #: chat's summary and their name. A source for what they said about themselves,
+    #: never for the organisation.
+    personal: str = ""
 
 
 @dataclass

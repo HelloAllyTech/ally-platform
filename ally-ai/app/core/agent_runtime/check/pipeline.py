@@ -12,6 +12,7 @@ from app.core.agent_runtime.check.fixes import (
     cite_offered_times,
 )
 from app.core.agent_runtime.check.organisation import Organisation
+from app.core.agent_runtime.check.personal import about_the_person
 from app.core.agent_runtime.check.rejections import Rejection
 from app.core.agent_runtime.check.safety import (
     enforce_avoid_topics,
@@ -53,6 +54,7 @@ def check_reply(
     avoid_topics: Sequence[str] = (),
     purpose: Optional[str] = None,
     can_book: bool = False,
+    personal: str = "",
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -80,6 +82,7 @@ def check_reply(
         avoid_topics=tuple(avoid_topics),
         purpose=purpose,
         can_book=can_book,
+        personal=personal,
     )
     verdict = _read_draft(step, ctx)
     # A list's times are cited from the run's records before grounding (chunk 6).
@@ -147,6 +150,16 @@ def _relabel(
         verdict.intent, verdict.rejection = AgentIntent.DECLINE, Rejection.EMPTY
     elif not verdict.answer:
         verdict.intent, verdict.rejection = AgentIntent.DECLINE, Rejection.EMPTY
+    elif (
+        verdict.intent in (AgentIntent.ANSWER, AgentIntent.SMALLTALK)
+        and not step.get("citations")
+        and not about_organisation
+        and about_the_person(verdict.answer, ctx.personal)
+    ):
+        # "What time did I say suits me?" answered from what it was given about the
+        # person (chunk 8a): their own words, so no passage can cite it. Sent as a
+        # personal reply, uncited, like small talk.
+        verdict.intent, verdict.rejection = AgentIntent.SMALLTALK, None
     elif (
         verdict.intent == AgentIntent.ANSWER
         and not step.get("citations")

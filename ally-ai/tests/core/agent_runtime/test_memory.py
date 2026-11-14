@@ -309,3 +309,65 @@ class TestEndpoints:
                 json={"summary": "old", "messages": [{"role": "user", "content": "x"}]},
             )
         assert response.json() == {"summary": "", "failed": True}
+
+
+class TestAboutThePerson:
+    """A reply that only tells the person what they said about themselves may go out
+    uncited; anything about the organisation still needs a source (chunk 8a)."""
+
+    from app.core.agent_runtime.check.personal import about_the_person as check
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            "You said evenings suit you best.",
+            "You told me you prefer evenings.",
+            "Your team is called Lotus.",
+        ],
+    )
+    def test_their_own_words_pass(self, answer):
+        personal = LINES + "\nEarlier they said their team is called Lotus."
+        assert TestAboutThePerson.check(answer, personal)
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            "We offer evening sessions on Thursdays.",
+            "Our evening classes suit you best.",
+            "You can book evenings at 18:00.",
+            "Evenings are popular.",
+            "You can sign in at https://ally.example/evenings.",
+        ],
+    )
+    def test_claims_for_the_organisation_dont(self, answer):
+        assert not TestAboutThePerson.check(answer, LINES)
+
+    def test_nothing_given_means_nothing_passes(self):
+        assert not TestAboutThePerson.check("You said evenings suit you.", "")
+
+    @pytest.mark.asyncio
+    async def test_a_run_answers_from_memory_uncited(self, run):
+        llm = FakeLLM(reply("answer", "You said evenings suit you best."))
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            state = await run("What time did I say suits me best?", memory=MEMORY)
+        assert state["result"]["intent"] == "answer"
+        assert state["result"]["answer"] == "You said evenings suit you best."
+        assert len(llm.calls) == 1
+
+    @pytest.mark.parametrize("personal, intent", [(LINES, "answer"), ("", "decline")])
+    def test_the_check_needs_what_it_was_given(self, personal, intent):
+        from app.core.agent_runtime.check.pipeline import check_reply
+
+        result, _ = check_reply(
+            reply("answer", "You said evenings suit you best."),
+            {},
+            [],
+            turn_type="question",
+            language="en",
+            retrieval={},
+            general=False,
+            search_gate=None,
+            question="What time did I say suits me best?",
+            personal=personal,
+        )
+        assert result["intent"] == intent
