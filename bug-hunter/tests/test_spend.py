@@ -115,3 +115,52 @@ def test_ledger_day_rolls_over_at_midnight_ist(tmp_path, monkeypatch) -> None:
     assert spend.day_of("2026-11-10T18:40:00+00:00") == "2026-11-11"
     monkeypatch.setenv(spend.ENV_TZ, "UTC")
     assert spend.total_for("2026-11-10", path=ledger) == 3.0
+
+
+# --- chunk 08: the ledger in the bughunter database ---------------------------------
+
+
+class MemoryLedger:
+    def __init__(self):
+        self.rows = []
+
+    def entries(self):
+        return list(self.rows)
+
+    def append(self, entry):
+        self.rows.append(entry)
+
+
+def test_any_ledger_object_works_like_the_file() -> None:
+    from bug_hunter import spend
+
+    led = MemoryLedger()
+    spend.record(4.0, "daily", "sweep", path=led)
+    spend.record(2.5, "github", "eval", path=led)
+    assert spend.total_for(path=led) == 6.5
+    assert "$6.50 of the $15 daily cap" in spend.summary(path=led)
+    spend.record(9.0, "daily", path=led)
+    with pytest.raises(spend.SpendCapExceeded):
+        spend.check_cap(expected_usd=0.0, override=False, path=led)
+
+
+def test_db_backend_is_chosen_by_env_for_the_default_ledger(monkeypatch, tmp_path):
+    from bug_hunter import spend
+
+    made = []
+
+    class FakePg(MemoryLedger):
+        def __init__(self, url):
+            super().__init__()
+            made.append(url)
+
+    monkeypatch.setattr(spend, "PostgresLedger", FakePg)
+    monkeypatch.setenv("BUGHUNTER_CHECKPOINT_DB_URL", "postgresql://x@db/bughunter")
+    monkeypatch.setenv(spend.ENV_BACKEND, "db")
+    assert isinstance(spend.ledger(), FakePg) and made == [
+        "postgresql://x@db/bughunter"
+    ]
+    # an explicit file path (tests, local evals) is never redirected
+    assert isinstance(spend.ledger(tmp_path / "s.json"), spend.FileLedger)
+    monkeypatch.delenv(spend.ENV_BACKEND)
+    assert isinstance(spend.ledger(), spend.FileLedger)

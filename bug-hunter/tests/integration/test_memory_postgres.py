@@ -76,3 +76,15 @@ def test_verdicts_table_round_trip() -> None:
     store.mark_applied(saved.id)
     assert store.for_run(run_id)[0].applied_at is not None
     assert all(v.id != saved.id for v in store.unapplied())
+
+
+def test_spend_ledger_in_the_database() -> None:
+    from bug_hunter import spend
+    from bug_hunter.graph.approvals import PostgresApprovals
+
+    url = _db_or_skip()
+    assert "0003_spend.sql" in PostgresApprovals.migrate(url)
+    led = spend.PostgresLedger(url)
+    before = spend.total_for(path=led)
+    spend.record(0.0123, "it", "integration test", path=led)
+    assert spend.total_for(path=led) == pytest.approx(before + 0.0123)
