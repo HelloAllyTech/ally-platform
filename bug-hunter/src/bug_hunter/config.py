@@ -274,6 +274,10 @@ class ContextLimits(_Strict):
     chars_per_token_offline: int = Field(default=3, ge=1, le=4)
     repo_map_keep_commits: int = Field(default=2, ge=1)
     outline_first_min_lines: int = Field(default=800, ge=1)
+    # chunk 08: the signal's text enters prompts as a quoted data block with a random
+    # delimiter (issue text is untrusted). Off until the prompts that explain the
+    # block (triage.v4, investigate.v4, review.v5) are approved and activated.
+    quote_signals: bool = False
 
 
 class ArtefactLimits(_Strict):

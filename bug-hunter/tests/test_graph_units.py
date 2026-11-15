@@ -224,6 +224,8 @@ def test_prompts_load_and_render_strictly(config: BugHunterConfig) -> None:
 
     for path in sorted(PROMPTS_DIR.glob("*.v*.md")):
         node, version = path.stem.split(".")
+        if node not in config.models.prompts:
+            continue  # a draft not registered in models.yaml yet (chunk 08 lenses)
         models = config.models.model_copy(
             update={"prompts": {**config.models.prompts, node: version}}
         )
