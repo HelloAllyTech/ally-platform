@@ -69,7 +69,8 @@ def test_issue_signals_only_from_org_members_and_scrubbed() -> None:
     assert got["501"].app == "ally-web" and got["501"].reported_by == "staff"
     assert got["503"].app == "ally-ai-learn" and got["503"].reported_by == "user"
     assert "98765 43210" not in got["501"].summary
-    # 502: outsider opened and labelled (prompt-injection text never enters); 504: no app
+    # 502: outsider opened and labelled it (its injection text never enters)
+    # 504: no app
     assert any(m.startswith("#502: ignored (not opened or labelled") for m in ignored)
     assert any(m.startswith("#504: ignored (app unknown") for m in ignored)
     # 505 has no bug label, 506 is a PR: silently skipped
