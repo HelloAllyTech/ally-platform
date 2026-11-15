@@ -246,6 +246,21 @@ class SweepLimits(_Strict):
     max_prs_per_day: int = Field(default=3, ge=0)
 
 
+class SignalsConfig(_Strict):
+    """Chunk 08: per-source toggles (the kill switch for all of them is the
+    ``enabled`` flag in the bughunter database: ``bug-hunter pause|resume``)."""
+
+    ci_failures: bool = True
+    issues: bool = True
+    error_logs: bool = True
+    commit_sweep: bool = True
+    apps: list[str] = Field(default_factory=lambda: list(APP_NAMES))  # rollout
+    org: str = "HelloAllyTech"  # issue signals only from this org's members
+    issue_label: str = "bug"
+    reports_repo: str = "HelloAllyTech/bug-hunter-reports"  # private
+    log_spike_factor: float = Field(default=3.0, gt=1.0)  # today vs 7-day mean
+
+
 class ApprovalLimits(_Strict):
     expiry_days: int = Field(default=7, ge=1)
 
@@ -324,6 +339,7 @@ class LimitsConfig(_Strict):
     artefacts: ArtefactLimits = Field(default_factory=ArtefactLimits)
     evals: EvalLimits = Field(default_factory=EvalLimits)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    signals: SignalsConfig = Field(default_factory=SignalsConfig)
 
     @field_validator("nodes")
     @classmethod

@@ -12,6 +12,17 @@ run:
 sweep:
   max_runs_per_day: 5
   max_prs_per_day: 3
+# Chunk 08: signal sources (kill switch for all: `bug-hunter pause|resume`, in the DB).
+signals:
+  ci_failures: true
+  issues: true
+  error_logs: true
+  commit_sweep: true
+  apps: [ally-be, ally-web, ally-ai, ally-ai-learn, ally-mobile]   # rollout: dry-run -> [ally-be] -> all
+  org: HelloAllyTech          # issue signals only from issues opened or labelled `bug` by members
+  issue_label: bug
+  reports_repo: HelloAllyTech/bug-hunter-reports   # private; nothing about findings goes to ally-platform
+  log_spike_factor: 3.0       # an error signature counts as spiking at 3x its 7-day daily mean
 approval:
   expiry_days: 7
 # Pull requests (chunk 06). push is a CLI flag, never a default; auto_merge stays off until chunk 09.
