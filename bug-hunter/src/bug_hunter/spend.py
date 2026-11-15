@@ -136,8 +136,14 @@ def today() -> str:
     return datetime.now(ledger_tz()).date().isoformat()
 
 
-def record(usd: float, source: str, note: str = "", path: Where = SPEND_FILE) -> Entry:
-    now = datetime.now(timezone.utc)
+def record(
+    usd: float,
+    source: str,
+    note: str = "",
+    path: Where = SPEND_FILE,
+    at: datetime | None = None,
+) -> Entry:
+    now = (at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     entry = Entry(
         at=now.isoformat(timespec="seconds"),
         day=day_of(now.isoformat()),

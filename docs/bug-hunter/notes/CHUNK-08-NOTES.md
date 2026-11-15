@@ -31,3 +31,36 @@ runners in the public repo, so its logs and artifacts are public. On 2026-11-15 
 eval artifacts (14 runs) and the logs of all 16 eval runs were deleted, and artifact
 retention was set to 1 day. **Once the VM exists, evals move there and the evals
 workflow is removed from master** (and from the branch).
+
+## Built so far (offline, fixture tests)
+
+| Path | What |
+|---|---|
+| `src/bug_hunter/spend.py` | Ledger backends: file (default) or `bughunter.spend` (`BUGHUNTER_SPEND_BACKEND=db`, migration 0003); `record(at=…)` |
+| `src/bug_hunter/signals/base.py` | `Candidate`, source priority (CI, issues, logs, sweep) |
+| `src/bug_hunter/signals/state.py` | Cursors and the kill switch in `bughunter.signal_state` (migration 0004); `bug-hunter pause` / `unpause` (`resume` already resumes a paused run) |
+| `src/bug_hunter/signals/github.py`, `clients.py` | Read-only GitHub interface plus the HTTP reader (token from `BUGHUNTER_GITHUB_TOKEN`: the App's installation token on the VM), CloudWatch Logs Insights (boto3, VM only), git callables |
+| `src/bug_hunter/signals/ci_failures.py` | Failed `test-ally-*.yml` runs on master, one per workflow and commit, failing test names (Jest, Vitest, pytest, Flutter), scrubbed excerpt |
+| `src/bug_hunter/signals/issues.py` | `bug` label plus an org member as author or labeller (label event actor), scrubbed, app from an `app:` label or words; nothing posted back |
+| `src/bug_hunter/signals/error_logs.py` | Signature grouping, app-frame filter, new or spiking against a 7-day baseline, scrubbed example only |
+| `src/bug_hunter/signals/commit_sweep.py` | Commits since the last SHA per app; lens and falsifier interfaces (no model calls until the prompts are approved) |
+| `src/bug_hunter/signals/dispatcher.py` | Dedupe (batch plus already reported), rollout apps, priority, caps (runs per day, $15 ledger), kill switch, one failing source never stops the others, plan JSON and markdown, private reports |
+| `src/bug_hunter/reports/store.py` | `bughunter.reports` (migration 0005); `PrivateReportsRepo` refuses ally-platform and any non-private repo before posting |
+| `cli.py` | `bug-hunter daily` (dry run by default; `--live` refused until after the review), `pause`, `unpause` |
+| `prompts/lens_*.v1.md`, `falsifier.v1.md`, `triage.v4`, `investigate.v4`, `review.v5` | Drafts, not active; `context.quote_signals` off |
+
+Local smoke test (2026-11-15, local Postgres): migrations 0001–0005 applied. With no
+token, `bug-hunter daily` reports the GitHub sources as errors, the log source as
+unconfigured, and the sweep as having nothing new, and writes the plan to
+`~/.bug-hunter/daily/`.
+
+## Remaining for chunk 08
+
+- Activate the lens, falsifier and quoted-signal prompts (after review); the model-backed
+  `LensRunner` and `Falsifier`.
+- `start_run` for live runs (graph run per candidate, CI-failure repro reuse), approval
+  expiry job.
+- On the VM: systemd unit and timer (03:30 IST daily, 15-minute polls), the GitHub
+  App, read-only CloudWatch credentials, `log_groups`, then 3 days of dry runs.
+- The rollout plan (dry run, then ally-be only, then all apps) and the list of old
+  bug-hunter files to remove.

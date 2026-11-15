@@ -248,7 +248,7 @@ class SweepLimits(_Strict):
 
 class SignalsConfig(_Strict):
     """Chunk 08: per-source toggles (the kill switch for all of them is the
-    ``enabled`` flag in the bughunter database: ``bug-hunter pause|resume``)."""
+    ``enabled`` flag in the bughunter database: ``bug-hunter pause|unpause``)."""
 
     ci_failures: bool = True
     issues: bool = True
@@ -259,6 +259,9 @@ class SignalsConfig(_Strict):
     issue_label: str = "bug"
     reports_repo: str = "HelloAllyTech/bug-hunter-reports"  # private
     log_spike_factor: float = Field(default=3.0, gt=1.0)  # today vs 7-day mean
+    log_min_count: int = Field(default=5, ge=1)  # a spike needs at least this many
+    # CloudWatch log groups per app (read-only credentials on the VM); empty = skipped
+    log_groups: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class ApprovalLimits(_Strict):

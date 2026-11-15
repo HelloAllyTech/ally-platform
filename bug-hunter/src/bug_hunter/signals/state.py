@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any, Protocol
 
-ENABLED = "enabled"  # the kill switch: bug-hunter pause | resume
+ENABLED = "enabled"  # the kill switch: bug-hunter pause | unpause
 
 
 class SignalState(Protocol):

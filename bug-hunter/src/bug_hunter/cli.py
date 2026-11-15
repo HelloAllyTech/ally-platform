@@ -1362,3 +1362,134 @@ def memory_delete(record_id: Annotated[str, typer.Argument()]) -> None:
         typer.echo(f"no record {record_id}", err=True)
         raise typer.Exit(code=1)
     typer.echo(f"deleted {record_id}")
+
+
+# --- chunk 08: the daily service ----------------------------------------------------
+
+ENV_GITHUB_TOKEN = "BUGHUNTER_GITHUB_TOKEN"  # the App's installation token on the VM
+
+
+def daily_sources(config: BugHunterConfig, state, env=None):
+    """The signal sources as zero-argument callables (each may fail on its own)."""
+    import os as _os
+
+    from bug_hunter.signals import ci_failures, commit_sweep, error_logs, issues
+    from bug_hunter.signals.clients import (
+        CloudWatchLogs,
+        HttpGitHubReader,
+        git_changed_files,
+        git_commits,
+    )
+    from bug_hunter.tools.git import Git
+
+    env = _os.environ if env is None else env
+    sig = config.limits.signals
+    token = env.get(ENV_GITHUB_TOKEN, "")
+
+    def github():
+        if not token:
+            raise RuntimeError(
+                f"no GitHub token ({ENV_GITHUB_TOKEN}); the GitHub App is not set up"
+            )
+        return HttpGitHubReader(token)
+
+    def ci():
+        found, cursors = ci_failures.collect(github(), state, sig.apps)
+        return found, cursors, []
+
+    def iss():
+        return issues.collect(github(), state, sig.apps, sig.org, sig.issue_label)
+
+    def logs():
+        if not sig.log_groups:
+            return [], {}, ["error_logs: no log groups configured (limits.yaml)"]
+        found, updates = error_logs.collect(
+            CloudWatchLogs(),
+            state,
+            sig.log_groups,
+            sig.apps,
+            sig.log_spike_factor,
+            sig.log_min_count,
+        )
+        return found, updates, []
+
+    def sweep():
+        git = Git(config.repo_root)
+        app_paths = {a: config.app(a).path for a in sig.apps}
+        batches, cursor = commit_sweep.batches(
+            git_commits(git), git_changed_files(git), state, app_paths, sig.apps
+        )
+        notes = [
+            f"sweep: would review {b.app} over {len(b.commits)} commit(s), "
+            f"{len(b.files)} file(s) (lens prompts not active)"
+            for b in batches
+        ]
+        return commit_sweep.collect(batches, None, None), cursor, notes
+
+    return {"ci_failures": ci, "issues": iss, "error_logs": logs, "commit_sweep": sweep}
+
+
+@app.command("daily")
+def daily_cmd(
+    live: Annotated[
+        bool,
+        typer.Option(
+            "--live",
+            help="Start graph runs and file reports. Default: a dry run that writes "
+            "the plan and starts nothing.",
+        ),
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="The default; kept for clarity.")
+    ] = False,
+) -> None:
+    """The daily job (chunk 08): collect signals, dedupe, cap, and write the plan."""
+    from bug_hunter import spend
+    from bug_hunter.config import RUNS_DIR
+    from bug_hunter.graph.checkpointer import db_url
+    from bug_hunter.reports.store import PostgresReports
+    from bug_hunter.signals.dispatcher import run_daily
+    from bug_hunter.signals.state import PostgresState
+
+    config = _load_or_exit()
+    if live and dry_run:
+        typer.echo("give --live or --dry-run, not both", err=True)
+        raise typer.Exit(code=1)
+    if live:
+        typer.echo(
+            "refused: live daily runs are wired after the 3-day dry-run review on the "
+            "VM (chunk 08 rollout); run without --live",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    state = PostgresState(db_url())
+    plan = run_daily(
+        config,
+        state,
+        daily_sources(config, state),
+        PostgresReports(db_url()),
+        spend.ledger(),
+        dry_run=True,
+        out_dir=RUNS_DIR / "daily",
+    )
+    typer.echo(plan.markdown())
+
+
+@app.command("pause")
+def pause_cmd() -> None:
+    """Kill switch: the daily service starts nothing until `bug-hunter unpause`."""
+    from bug_hunter.graph.checkpointer import db_url
+    from bug_hunter.signals.state import ENABLED, PostgresState
+
+    PostgresState(db_url()).set(ENABLED, False)
+    typer.echo("bug hunter paused")
+
+
+@app.command("unpause")
+def unpause_cmd() -> None:
+    """Undo `bug-hunter pause` (`resume` is taken: it resumes a paused run)."""
+    from bug_hunter.graph.checkpointer import db_url
+    from bug_hunter.signals.state import ENABLED, PostgresState
+
+    PostgresState(db_url()).set(ENABLED, True)
+    typer.echo("bug hunter resumed")
