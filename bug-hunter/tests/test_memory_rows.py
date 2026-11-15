@@ -311,3 +311,95 @@ def test_learn_fingerprints_the_base_commit_not_the_fixed_worktree(
 
     bug.diagnosis, bug.fix_verdict = "correct", "needed_edits"
     assert bug_row(bug, reader(repo)) == "reuse"
+
+
+# wrong theories only rule out themselves ------------------------------------------
+
+
+def _wt_memory(repo):
+    memory = in_memory()
+    fb.apply_verdict(
+        memory,
+        fb_verdict("wrong", "the cause is zero-width spaces, not fullwidth brackets"),
+        snapshot(),
+        reader(repo),
+    )
+    return memory
+
+
+def _no_bug(reason):
+    return ai(
+        tool_calls=[
+            {"name": "report_no_bug", "args": {"reason": reason, "confidence": "high"}}
+        ]
+    )
+
+
+def _investigate(config, repo, tmp_path, memory, script):
+    deps = _deps(config, repo, tmp_path, [], output_mode="suggested_fix")
+    deps.memory = memory
+    deps.models["investigate"] = ScriptedChatModel(script=script)
+    state = initial_state(deps, SIGNAL).model_copy(
+        update={"app": "ally-be", "status": "triaged"}
+    )
+    return deps, make_investigate_node(deps)(state)
+
+
+THEORY_ONLY = "A human said this theory was wrong, so there is no bug here."
+
+
+def test_a_wrong_theory_alone_never_produces_no_bug(config, repo, tmp_path) -> None:
+    # no bug (theory only) -> bounced -> no bug (theory only) again -> escalated
+    deps, out = _investigate(
+        config,
+        repo,
+        tmp_path,
+        _wt_memory(repo),
+        [_no_bug(THEORY_ONLY), _no_bug(THEORY_ONLY)],
+    )
+    assert out["status"] == "escalated" and out["status"] != "closed_not_bug"
+    assert "only rules out that theory" in out["stop_reason"]
+    second_call = deps.models["investigate"].calls[1]
+    assert any("Investigate other explanations" in str(m.content) for m in second_call)
+
+
+def test_after_the_bounce_another_explanation_can_be_found(
+    config, repo, tmp_path
+) -> None:
+    finding = {
+        "name": "submit_finding",
+        "args": {
+            "title": "x strips the wrong characters",
+            "category": "logic",
+            "severity": "medium",
+            "suspected_files": ["src/x.ts"],
+            "evidence": ["src/x.ts:2 — returns 0"],
+            "hypothesis": "h2",
+            "root_cause": "src/x.ts:2",
+            "confidence": "medium",
+        },
+    }
+    _, out = _investigate(
+        config,
+        repo,
+        tmp_path,
+        _wt_memory(repo),
+        [_no_bug(THEORY_ONLY), ai(tool_calls=[finding])],
+    )
+    assert out["status"] == "investigating" and out["finding"].hypothesis == "h2"
+
+
+def test_no_bug_with_its_own_code_evidence_is_accepted(config, repo, tmp_path) -> None:
+    reason = (
+        "The fullwidth theory was ruled out, and src/x.ts:2 returns the configured "
+        "value as documented, so the reported output is expected."
+    )
+    _, out = _investigate(config, repo, tmp_path, _wt_memory(repo), [_no_bug(reason)])
+    assert out["status"] == "closed_not_bug"
+
+
+def test_without_a_recalled_wrong_theory_no_bug_is_unchanged(
+    config, repo, tmp_path
+) -> None:
+    _, out = _investigate(config, repo, tmp_path, in_memory(), [_no_bug(THEORY_ONLY)])
+    assert out["status"] == "closed_not_bug"

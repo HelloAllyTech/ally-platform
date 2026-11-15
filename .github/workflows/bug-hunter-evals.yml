@@ -250,7 +250,7 @@ jobs:
           name: bug-hunter-eval-results-${{ github.run_number }}-${{ matrix.mode }}-shard${{ matrix.shard }}
           path: bug-hunter/eval-out/
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 1
 
       - name: Upload per-run artefacts
         if: always()
@@ -259,7 +259,7 @@ jobs:
           name: bug-hunter-run-artefacts-${{ github.run_number }}-${{ matrix.mode }}-shard${{ matrix.shard }}
           path: bug-hunter/runs/artefacts/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 1
 
   merge:
     # One report per mode from the shard reports, even if a shard failed or timed out.
@@ -316,4 +316,4 @@ jobs:
           name: bug-hunter-eval-merged-${{ github.run_number }}-${{ matrix.mode }}
           path: bug-hunter/merged/
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 1

@@ -3,8 +3,10 @@ A tool loop over read-only tools; the finish tools carry the structured result."
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
+from langchain_core.messages import HumanMessage
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -73,6 +75,32 @@ def finish_tools() -> list[StructuredTool]:
             args_schema=ReportNoBug,
         ),
     ]
+
+
+WRONG_THEORY_BOUNCES = 1
+WRONG_THEORY_NUDGE = (
+    "A recalled WRONG THEORY only rules out that one explanation. It is not evidence "
+    "that the report is wrong, and it cannot be the reason for report_no_bug. The "
+    "user still reports the symptom. Investigate other explanations for it in the "
+    "code. Finish with submit_finding, or with report_no_bug only if the code shows "
+    "the reported behaviour is correct: cite the file:line you checked."
+)
+_CODE_REF = re.compile(r"[\w./-]+\.[A-Za-z]{1,5}:\d+")
+_THEORY_WORDS = re.compile(
+    r"(?i)\b(wrong theory|ruled out|a human said|previously (?:rejected|judged)|"
+    r"past (?:theory|diagnosis))\b|\bwt-[0-9a-z]+"
+)
+
+
+def rests_on_wrong_theory(reason: str, theory_lines: list[str]) -> bool:
+    """True when a no-bug reason leans on a recalled wrong theory and brings no code
+    evidence of its own (a ``path:line`` reference)."""
+    from bug_hunter.memory.store import overlap, words
+
+    refers = bool(_THEORY_WORDS.search(reason)) or any(
+        overlap(words(reason), words(line)) >= 0.2 for line in theory_lines
+    )
+    return refers and not _CODE_REF.search(reason)
 
 
 def make_investigate_node(deps: GraphDeps):
@@ -166,6 +194,50 @@ def make_investigate_node(deps: GraphDeps):
         out = run_loop(
             compiled, initial, config, deps.checkpointer, max_turns=loop.max_turns
         )
+        # a recalled wrong theory only rules that theory out: a "no bug" that rests
+        # on it alone goes back for other explanations (user, 2026-11-15)
+        theories = [line for line in recall if line.startswith("WRONG THEORY")]
+        bounces = 0
+        while (
+            theories
+            and (out.get("result") or {}).get("tool") == "report_no_bug"
+            and rests_on_wrong_theory(out["result"]["args"]["reason"], theories)
+        ):
+            if bounces >= WRONG_THEORY_BOUNCES:
+                budget = with_clock(out["budget_used"], state.started_at)
+                deps.scratchpad.append_note(
+                    "investigate: 'no bug' still rests only on a recalled wrong "
+                    "theory; escalating instead of closing"
+                )
+                return {
+                    "status": "escalated",
+                    "stop_reason": (
+                        "no other explanation found; a recalled wrong theory only "
+                        "rules out that theory, it is not evidence of no bug: "
+                        + out["result"]["args"]["reason"]
+                    )[:400],
+                    "budget_used": budget,
+                }
+            bounces += 1
+            deps.scratchpad.append_note(
+                "investigate: 'no bug' rested on a recalled wrong theory; "
+                "investigating other explanations"
+            )
+            out = run_loop(
+                compiled,
+                {
+                    **out,
+                    "messages": [
+                        *out["messages"],
+                        HumanMessage(content=WRONG_THEORY_NUDGE),
+                    ],
+                    "result": None,
+                    "loop_stop": None,
+                },
+                config,
+                deps.checkpointer,
+                max_turns=loop.max_turns,
+            )
         budget = with_clock(out["budget_used"], state.started_at)
         result = out.get("result")
         if result and result["tool"] == "submit_finding":

@@ -124,11 +124,11 @@ cases:
   introduced_by: 099de82c1f76fd6f6fb4d8baa5f44f6098fa80ca
   status: active
   split: dev
-  oracle_shape: false
+  oracle_shape: true
   escalate_acceptable: false
   human_fix_pass: {}
   human_fix_notes: {}
-  report_note: ''
+  report_note: 'oracle_shape: the oracle also tests the real fix''s new export normaliseTranslationTokens; a patch that strips zero-width characters inside the guard (e.g. memory-check run 20261114-185206) needs human review'
   dispute_note: ''
   tags: []
 - id: ally-be-adf36739
