@@ -25,7 +25,7 @@ from bug_hunter.graph.prompts import load_prompt
 from bug_hunter.graph.state import CATEGORIES, Budget
 from bug_hunter.graph.tools import outline_first_read_tools
 from bug_hunter.safety.phi import scrub_code
-from bug_hunter.signals.commit_sweep import LensFinding
+from bug_hunter.signals.commit_sweep import LensFinding, StopSweep
 
 DIFF_MAX_TOKENS = 6000
 NEIGHBOURHOOD_MAX_TOKENS = 4000
@@ -69,12 +69,68 @@ def _noop(**_: Any) -> str:
     return "ok"
 
 
+def sweep_deps(config, app: str, worktree, sha: str, diff: str, artefacts_dir):
+    """``GraphDeps`` over a sparse checkout: read tools, repo map, app context. No run,
+    no sandbox (the sweep only reads code)."""
+    from pathlib import Path
+
+    from bug_hunter.context.app_context import load_app_context
+    from bug_hunter.context.repo_map import build_map
+    from bug_hunter.context.scratchpad import Scratchpad
+    from bug_hunter.context.tokens import make_counter
+    from bug_hunter.tools.fs import Workspace
+
+    worktree = Path(worktree)
+    artefacts_dir = Path(artefacts_dir)
+    artefacts_dir.mkdir(parents=True, exist_ok=True)
+    app_root = worktree / config.app(app).path
+
+    def write_artefact(name: str, content: str) -> Path:
+        path = artefacts_dir / name
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    try:
+        repo_map, _ = build_map(config, app, root=worktree, commit=sha)
+    except Exception:  # noqa: BLE001 - help, not a requirement
+        repo_map = None
+    try:
+        app_context = load_app_context(config, app, sha, root=worktree)
+    except Exception:  # noqa: BLE001
+        app_context = None
+    return GraphDeps(
+        config=config,
+        run_id=f"sweep-{app}-{sha[:10]}",
+        app=app,
+        mode="sweep",
+        worktree=worktree,
+        app_root=app_root,
+        workspace=Workspace(worktree, config, app, app_root=app_root),
+        models={},
+        scratchpad=Scratchpad(artefacts_dir / f"scratchpad-{app}.md"),
+        write_artefact=write_artefact,
+        repo_map=repo_map,
+        app_context=app_context,
+        counter=make_counter(config.limits.context.chars_per_token_offline)[0],
+        diff=diff,
+        ref=sha,
+    )
+
+
 class ModelSweep:
     """Lens runner and falsifier for one app batch (implements both interfaces)."""
 
-    def __init__(self, deps: GraphDeps, diff: str):
+    def __init__(
+        self,
+        deps: GraphDeps,
+        diff: str,
+        spent_before: float = 0.0,
+        max_cost_usd: float | None = None,
+    ):
         self.deps = deps
         self.budget = Budget()
+        self.spent_before = spent_before
+        self.max_cost_usd = max_cost_usd
         self.diff = truncate_to_tokens(scrub_code(diff), DIFF_MAX_TOKENS, deps.counter)
         nb = ""
         if deps.repo_map is not None:
@@ -93,7 +149,18 @@ class ModelSweep:
 
     # --- LensRunner -------------------------------------------------------------
 
+    def _cap(self, what: str) -> None:
+        if self.max_cost_usd is None:
+            return
+        total = self.spent_before + self.budget.cost_usd
+        if total >= self.max_cost_usd:
+            raise StopSweep(
+                f"cost cap ${self.max_cost_usd:.2f} reached (${total:.2f}) "
+                f"before {what}"
+            )
+
     def run(self, lens: str, app: str, commits: list[str]) -> list[LensFinding]:
+        self._cap(f"lens {lens}")
         prompt = load_prompt(self.deps.config, f"lens_{lens}")
         system = prompt.render(
             context=self.context, app=app, neighbourhood=self.neighbourhood
@@ -126,6 +193,7 @@ class ModelSweep:
     # --- Falsifier --------------------------------------------------------------
 
     def check(self, app: str, finding: LensFinding) -> tuple[str, str, str]:
+        self._cap(f"falsifying '{finding.title[:60]}'")
         deps = self.deps
         prompt = load_prompt(deps.config, "falsifier")
         rendered = (

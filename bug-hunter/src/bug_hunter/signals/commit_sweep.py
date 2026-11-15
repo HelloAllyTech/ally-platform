@@ -49,6 +49,8 @@ class SweepBatch:
     findings: list[LensFinding] = field(default_factory=list)
     survived: list[LensFinding] = field(default_factory=list)
     dropped: list[LensFinding] = field(default_factory=list)  # past the falsify cap
+    verdicts: list[dict[str, Any]] = field(default_factory=list)  # every falsifier call
+    stopped: str = ""  # why this batch stopped early (cost cap, low disk)
 
 
 class LensRunner(Protocol):
@@ -59,6 +61,10 @@ class Falsifier(Protocol):
     def check(self, app: str, finding: LensFinding) -> tuple[str, str, str]:
         """(verdict survives|refuted, confidence medium|low, reason)."""
         ...
+
+
+class StopSweep(RuntimeError):
+    """Raised by a runner to stop the sweep cleanly (cost cap, low disk)."""
 
 
 # git access as plain callables, so tests pass recorded fixtures
@@ -113,11 +119,15 @@ def collect_with(
     out: list[Candidate] = []
     cost = 0.0
     for b in sweep:
-        with runner_for(b) as runner:
-            try:
-                out += collect([b], runner, runner)
-            finally:
-                cost += runner.budget.cost_usd
+        try:
+            with runner_for(b, cost) as runner:
+                try:
+                    out += collect([b], runner, runner)
+                finally:
+                    cost += runner.budget.cost_usd
+        except StopSweep as exc:  # cost cap or low disk: stop cleanly, keep results
+            b.stopped = str(exc)
+            break
     out.sort(key=lambda c: c.extra.get("rank", 0), reverse=True)
     out.sort(key=lambda c: not c.extra.get("human_only", False))
     return out, round(cost, 4)
@@ -146,6 +156,16 @@ def collect(
         b.dropped = [f for f in ordered if f not in checked]
         for f in checked:
             verdict, confidence, reason = falsifier.check(b.app, f)
+            b.verdicts.append(
+                {
+                    "lens": f.lens,
+                    "title": f.title,
+                    "safety": f.safety,
+                    "verdict": verdict,
+                    "confidence": confidence,
+                    "reason": reason,
+                }
+            )
             # a change that weakens safety always reaches a human, whatever the
             # falsifier said (user, 2026-11-15); everything else must survive
             if not f.safety and (verdict != "survives" or confidence != "medium"):

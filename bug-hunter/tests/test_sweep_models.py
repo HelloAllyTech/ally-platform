@@ -91,8 +91,8 @@ def test_safety_findings_go_to_a_human_even_when_refuted(
     batch = cs.SweepBatch(app="ally-be", commits=["d" * 40], files=["ally-be/src/x.ts"])
 
     @contextmanager
-    def runner_for(b):
-        yield ModelSweep(deps, DIFF)
+    def runner_for(b, spent_before=0.0):
+        yield ModelSweep(deps, DIFF, spent_before)
 
     cands, cost = cs.collect_with([batch], runner_for)
     (c,) = cands

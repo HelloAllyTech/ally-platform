@@ -1372,35 +1372,47 @@ ENV_GITHUB_TOKEN = "BUGHUNTER_GITHUB_TOKEN"  # the App's installation token on t
 SWEEP_EXPECTED_USD_PER_BATCH = 0.5  # 5 lenses + up to 3 falsifier loops, upper end
 
 
-def sweep_runner_for(config: BugHunterConfig):
-    """A context manager per app batch: a worktree at the batch's last commit, deps
-    for it, and the model-backed lenses and falsifier (paid)."""
+def sweep_runner_for(config: BugHunterConfig, wt, max_cost_usd: float | None):
+    """Per app batch: move the shared sparse worktree to the batch's last commit
+    (only the app folder and root files), build read-only deps, and yield the
+    model-backed lenses and falsifier (paid)."""
     from contextlib import contextmanager
 
-    from bug_hunter.graph.deps import GraphDeps
-    from bug_hunter.runs import Run
-    from bug_hunter.signals.sweep_models import ModelSweep
-    from bug_hunter.tools.git import Git
-
-    git = Git(config.repo_root)
+    from bug_hunter.config import RUNS_DIR
+    from bug_hunter.signals.commit_sweep import StopSweep
+    from bug_hunter.signals.sparse import LowDisk
+    from bug_hunter.signals.sweep_models import ModelSweep, sweep_deps
 
     @contextmanager
-    def runner_for(batch):
+    def runner_for(batch, spent_before: float = 0.0):
         app_path = config.app(batch.app).path
-        diff = git._git(
+        diff = wt.git._git(
             ["diff", f"{batch.commits[0]}^", batch.commits[-1], "--", app_path]
         ).stdout
-        with Run.start(config, batch.app, batch.commits[-1]) as run:
-            deps = GraphDeps.for_run(
-                config, run, batch.app, "sweep", diff=diff, ref=batch.commits[-1]
-            )
-            yield ModelSweep(deps, diff)
+        try:
+            root = wt.checkout(batch.commits[-1], app_path)
+        except LowDisk as exc:
+            raise StopSweep(str(exc)) from exc
+        deps = sweep_deps(
+            config,
+            batch.app,
+            root,
+            batch.commits[-1],
+            diff,
+            RUNS_DIR / "daily" / "sweep",
+        )
+        yield ModelSweep(deps, diff, spent_before, max_cost_usd)
 
     return runner_for
 
 
 def daily_sources(
-    config: BugHunterConfig, state, env=None, with_lenses=False, ledger=None
+    config: BugHunterConfig,
+    state,
+    env=None,
+    with_lenses=False,
+    ledger=None,
+    max_cost_usd: float | None = None,
 ):
     """The signal sources as zero-argument callables (each may fail on its own)."""
     import os as _os
@@ -1464,7 +1476,35 @@ def daily_sources(
             expected_usd=SWEEP_EXPECTED_USD_PER_BATCH * len(batches),
             path=ledger if ledger is not None else spend.SPEND_FILE,
         )
-        found, cost = commit_sweep.collect_with(batches, sweep_runner_for(config))
+        import json as _json
+
+        from bug_hunter.config import RUNS_DIR
+        from bug_hunter.signals.sparse import sparse_worktree
+
+        with sparse_worktree(git, RUNS_DIR / "sweep-worktrees") as wt:
+            found, cost = commit_sweep.collect_with(
+                batches, sweep_runner_for(config, wt, max_cost_usd)
+            )
+        record = RUNS_DIR / "daily" / "sweep-record.json"
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(
+            _json.dumps(
+                [
+                    {
+                        "app": b.app,
+                        "commits": b.commits,
+                        "files": len(b.files),
+                        "findings": [vars(f) for f in b.findings],
+                        "verdicts": b.verdicts,
+                        "dropped": [f.title for f in b.dropped],
+                        "stopped": b.stopped,
+                    }
+                    for b in batches
+                ],
+                indent=1,
+            )
+        )
+        notes += [f"sweep: {b.app} stopped: {b.stopped}" for b in batches if b.stopped]
         if cost:
             spend.record(
                 cost,
@@ -1499,6 +1539,10 @@ def daily_cmd(
             "dry run). Off by default.",
         ),
     ] = False,
+    max_cost_usd: Annotated[
+        float | None,
+        typer.Option(help="Stop the sweep's model calls once they cost this much."),
+    ] = None,
 ) -> None:
     """The daily job (chunk 08): collect signals, dedupe, cap, and write the plan."""
     from bug_hunter import spend
@@ -1524,7 +1568,13 @@ def daily_cmd(
     plan = run_daily(
         config,
         state,
-        daily_sources(config, state, with_lenses=with_lenses, ledger=ledger),
+        daily_sources(
+            config,
+            state,
+            with_lenses=with_lenses,
+            ledger=ledger,
+            max_cost_usd=max_cost_usd,
+        ),
         PostgresReports(db_url()),
         ledger,
         dry_run=True,
