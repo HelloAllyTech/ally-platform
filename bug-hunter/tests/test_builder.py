@@ -121,13 +121,45 @@ def test_strings_are_cut_at_line_boundaries(config: BugHunterConfig) -> None:
             "raw_summary": "\n".join(f"row {i}" for i in range(200)),
         }
     }
-    ctx = build_context(config, "triage", state, counter=COUNT, budget=300)
+    unquoted = config.model_copy(
+        update={
+            "limits": config.limits.model_copy(
+                update={
+                    "context": config.limits.context.model_copy(
+                        update={"quote_signals": False}
+                    )
+                }
+            )
+        }
+    )
+    ctx = build_context(unquoted, "triage", state, counter=COUNT, budget=300)
     summary = ctx.sections["signal"]
     assert "(truncated to fit budget)" in summary
     assert all(
         line.strip().startswith(("source", "ref", "raw_summary", "row ", "…"))
         for line in summary.splitlines()
     )
+
+
+def test_a_quoted_signal_stays_one_closed_block_when_truncated(
+    config: BugHunterConfig,
+) -> None:
+    assert config.limits.context.quote_signals is True
+    state = {
+        "signal": {
+            "source": "issue",
+            "ref": "1",
+            "raw_summary": "\n".join(f"row {i}" for i in range(200)),
+        }
+    }
+    summary = build_context(
+        config, "triage", state, counter=COUNT, budget=300
+    ).sections["signal"]
+    lines = summary.splitlines()
+    opens = [i for i, x in enumerate(lines) if x.startswith("<<<REPORT ")]
+    closes = [i for i, x in enumerate(lines) if x.endswith(">>>")]
+    assert len(opens) == 1 and len(closes) == 1 and closes[0] == len(lines) - 1
+    assert "(truncated to fit budget)" in summary and "row 0" in summary
 
 
 def test_budget_error_when_nothing_left(config: BugHunterConfig) -> None:

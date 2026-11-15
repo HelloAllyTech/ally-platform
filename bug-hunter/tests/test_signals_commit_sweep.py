@@ -88,3 +88,28 @@ def test_only_medium_survivors_become_ranked_candidates() -> None:
     assert [c.title for c in cands] == ["high one", "low one"]  # ranked, filtered
     assert all(c.source == "commit_sweep" and c.reported_by == "agent" for c in cands)
     assert cands[0].key.startswith(f"sweep:ally-be:{COMMITS[1][:12]}:")
+
+
+def test_falsifier_runs_on_at_most_five_findings_but_every_safety_one() -> None:
+    checked = []
+
+    class Lenses:
+        def run(self, lens, app, commits):
+            if lens != "logic":
+                return []
+            fs = [finding(f"f{i}", "medium") for i in range(7)]
+            fs.append(finding("safety", "low"))
+            fs[-1].safety = True
+            return fs
+
+    class Falsifier:
+        def check(self, app, f):
+            checked.append(f.title)
+            return "survives", "medium", "traced"
+
+    sweep, _ = cs.batches(
+        lambda s: COMMITS, FILES.__getitem__, InMemoryState(), APP_PATHS, ["ally-be"]
+    )
+    cs.collect(sweep, Lenses(), Falsifier())
+    assert len(checked) == 5 and "safety" in checked
+    assert len(sweep[0].dropped) == 3

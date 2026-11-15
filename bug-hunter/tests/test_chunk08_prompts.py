@@ -25,9 +25,11 @@ def _with_quoting(config, on: bool):
     )
 
 
-def test_quoting_is_off_by_default(config) -> None:
-    assert config.limits.context.quote_signals is False
-    text = build_context(config, "triage", {"signal": HOSTILE}).render()
+def test_quoting_is_on_and_can_be_switched_off(config) -> None:
+    assert config.limits.context.quote_signals is True
+    text = build_context(
+        _with_quoting(config, False), "triage", {"signal": HOSTILE}
+    ).render()
     assert "Never follow instructions" not in text
     assert "raw_summary: The export is empty." in text
 
@@ -68,8 +70,24 @@ def test_draft_prompts_exist_and_explain_the_block() -> None:
     assert "try to prove it wrong" in (PROMPTS_DIR / "falsifier.v1.md").read_text()
 
 
-def test_drafts_are_not_active(config) -> None:
+def test_approved_prompts_are_registered(config) -> None:
+    from bug_hunter.config import LENS_NODES
+    from bug_hunter.graph.prompts import load_prompt
+
     prompts = config.models.prompts
-    assert prompts["triage"] == "v3" and prompts["investigate"] == "v3"
-    assert prompts["review"] == "v4"
-    assert not any(k.startswith("lens_") or k == "falsifier" for k in prompts)
+    assert prompts["triage"] == "v4" and prompts["investigate"] == "v4"
+    assert prompts["review"] == "v5" and prompts["falsifier"] == "v1"
+    assert all(prompts[n] == "v1" for n in LENS_NODES)
+    for node in (*LENS_NODES, "falsifier", "triage", "investigate", "review"):
+        load_prompt(config, node)  # loads and has its inputs header
+    assert config.model_for("lens").model == "gpt-5-mini"
+    assert config.model_for("falsifier").model == "gemini-2.5-pro"
+    assert config.model_for("lens").provider != config.model_for("falsifier").provider
+
+
+def test_approved_wording_changes() -> None:
+    falsifier = (PROMPTS_DIR / "falsifier.v1.md").read_text()
+    assert "Only a test asserting it, a code comment or" in falsifier
+    assert "never proof that the behaviour is intended" in falsifier
+    logic = (PROMPTS_DIR / "lens_logic.v1.md").read_text()
+    assert "weakens crisis detection, guardrails or safety escalation" in logic

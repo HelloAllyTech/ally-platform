@@ -1369,7 +1369,39 @@ def memory_delete(record_id: Annotated[str, typer.Argument()]) -> None:
 ENV_GITHUB_TOKEN = "BUGHUNTER_GITHUB_TOKEN"  # the App's installation token on the VM
 
 
-def daily_sources(config: BugHunterConfig, state, env=None):
+SWEEP_EXPECTED_USD_PER_BATCH = 0.5  # 5 lenses + up to 3 falsifier loops, upper end
+
+
+def sweep_runner_for(config: BugHunterConfig):
+    """A context manager per app batch: a worktree at the batch's last commit, deps
+    for it, and the model-backed lenses and falsifier (paid)."""
+    from contextlib import contextmanager
+
+    from bug_hunter.graph.deps import GraphDeps
+    from bug_hunter.runs import Run
+    from bug_hunter.signals.sweep_models import ModelSweep
+    from bug_hunter.tools.git import Git
+
+    git = Git(config.repo_root)
+
+    @contextmanager
+    def runner_for(batch):
+        app_path = config.app(batch.app).path
+        diff = git._git(
+            ["diff", f"{batch.commits[0]}^", batch.commits[-1], "--", app_path]
+        ).stdout
+        with Run.start(config, batch.app, batch.commits[-1]) as run:
+            deps = GraphDeps.for_run(
+                config, run, batch.app, "sweep", diff=diff, ref=batch.commits[-1]
+            )
+            yield ModelSweep(deps, diff)
+
+    return runner_for
+
+
+def daily_sources(
+    config: BugHunterConfig, state, env=None, with_lenses=False, ledger=None
+):
     """The signal sources as zero-argument callables (each may fail on its own)."""
     import os as _os
 
@@ -1420,11 +1452,28 @@ def daily_sources(config: BugHunterConfig, state, env=None):
             git_commits(git), git_changed_files(git), state, app_paths, sig.apps
         )
         notes = [
-            f"sweep: would review {b.app} over {len(b.commits)} commit(s), "
-            f"{len(b.files)} file(s) (lens prompts not active)"
+            f"sweep: {b.app}: {len(b.commits)} commit(s), {len(b.files)} file(s)"
+            + ("" if with_lenses else " (lenses not run: --with-lenses is paid)")
             for b in batches
         ]
-        return commit_sweep.collect(batches, None, None), cursor, notes
+        if not with_lenses or not batches:
+            return [], cursor, notes
+        from bug_hunter import spend
+
+        spend.check_cap(
+            expected_usd=SWEEP_EXPECTED_USD_PER_BATCH * len(batches),
+            path=ledger if ledger is not None else spend.SPEND_FILE,
+        )
+        found, cost = commit_sweep.collect_with(batches, sweep_runner_for(config))
+        if cost:
+            spend.record(
+                cost,
+                "daily",
+                f"commit sweep lenses+falsifier, {len(batches)} batch(es)",
+                path=ledger if ledger is not None else spend.SPEND_FILE,
+            )
+        notes.append(f"sweep: lens and falsifier cost ${cost:.2f}")
+        return found, cursor, notes
 
     return {"ci_failures": ci, "issues": iss, "error_logs": logs, "commit_sweep": sweep}
 
@@ -1441,6 +1490,14 @@ def daily_cmd(
     ] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="The default; kept for clarity.")
+    ] = False,
+    with_lenses: Annotated[
+        bool,
+        typer.Option(
+            "--with-lenses",
+            help="Run the commit sweep's lens and falsifier models (paid, also in a "
+            "dry run). Off by default.",
+        ),
     ] = False,
 ) -> None:
     """The daily job (chunk 08): collect signals, dedupe, cap, and write the plan."""
@@ -1463,12 +1520,13 @@ def daily_cmd(
         )
         raise typer.Exit(code=1)
     state = PostgresState(db_url())
+    ledger = spend.ledger()
     plan = run_daily(
         config,
         state,
-        daily_sources(config, state),
+        daily_sources(config, state, with_lenses=with_lenses, ledger=ledger),
         PostgresReports(db_url()),
-        spend.ledger(),
+        ledger,
         dry_run=True,
         out_dir=RUNS_DIR / "daily",
     )

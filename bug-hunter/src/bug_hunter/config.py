@@ -26,7 +26,9 @@ from pydantic import (
 AppName = Literal["ally-be", "ally-web", "ally-ai", "ally-ai-learn", "ally-mobile"]
 APP_NAMES: tuple[str, ...] = AppName.__args__  # type: ignore[attr-defined]
 
-Role = Literal["triage", "investigate", "fix", "review", "embeddings"]
+Role = Literal[
+    "triage", "investigate", "fix", "review", "lens", "falsifier", "embeddings"
+]
 ROLES: tuple[str, ...] = Role.__args__  # type: ignore[attr-defined]
 CHAT_ROLES: tuple[str, ...] = tuple(r for r in ROLES if r != "embeddings")
 
@@ -160,7 +162,22 @@ class Price(_Strict):
     output: float = Field(ge=0)
 
 
-PROMPT_NODES: tuple[str, ...] = ("triage", "investigate", "reproduce", "fix", "review")
+LENS_NODES: tuple[str, ...] = (
+    "lens_logic",
+    "lens_error_handling_and_null",
+    "lens_security_and_data_exposure",
+    "lens_async_and_race",
+    "lens_api_contract",
+)
+PROMPT_NODES: tuple[str, ...] = (
+    "triage",
+    "investigate",
+    "reproduce",
+    "fix",
+    "review",
+    *LENS_NODES,
+    "falsifier",
+)
 
 
 class ModelsConfig(_Strict):

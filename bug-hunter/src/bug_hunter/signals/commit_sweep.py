@@ -24,6 +24,7 @@ LENSES = (
 )
 CURSOR = "commit_sweep:last_sha"
 SEVERITY = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+MAX_FALSIFY = 5  # falsifier loops per batch (cost cap); safety findings always go
 CONFIDENCE = {"high": 3, "medium": 2, "low": 1}
 
 
@@ -37,6 +38,7 @@ class LensFinding:
     evidence: list[str]
     hypothesis: str
     confidence: str
+    safety: bool = False  # weakens crisis detection / guardrails / escalation
 
 
 @dataclass
@@ -46,6 +48,7 @@ class SweepBatch:
     files: list[str]
     findings: list[LensFinding] = field(default_factory=list)
     survived: list[LensFinding] = field(default_factory=list)
+    dropped: list[LensFinding] = field(default_factory=list)  # past the falsify cap
 
 
 class LensRunner(Protocol):
@@ -98,10 +101,33 @@ def rank(f: LensFinding) -> int:
     return SEVERITY.get(f.severity, 1) * CONFIDENCE.get(f.confidence, 1)
 
 
+def collect_with(
+    sweep: list[SweepBatch],
+    runner_for: Callable[[SweepBatch], Any] | None,
+) -> tuple[list[Candidate], float]:
+    """Like ``collect``, with a model runner per batch: ``runner_for(batch)`` is a
+    context manager yielding an object that is both the ``LensRunner`` and the
+    ``Falsifier`` and has a ``budget`` (cost). Returns (candidates, cost in USD)."""
+    if runner_for is None:
+        return [], 0.0
+    out: list[Candidate] = []
+    cost = 0.0
+    for b in sweep:
+        with runner_for(b) as runner:
+            try:
+                out += collect([b], runner, runner)
+            finally:
+                cost += runner.budget.cost_usd
+    out.sort(key=lambda c: c.extra.get("rank", 0), reverse=True)
+    out.sort(key=lambda c: not c.extra.get("human_only", False))
+    return out, round(cost, 4)
+
+
 def collect(
     sweep: list[SweepBatch],
     lenses: LensRunner | None,
     falsifier: Falsifier | None,
+    max_falsify: int = MAX_FALSIFY,
 ) -> list[Candidate]:
     """Lens findings that survive the falsifier with at least medium confidence,
     ranked by severity x confidence. No runner (prompts not approved, dry run): no
@@ -112,9 +138,17 @@ def collect(
     for b in sweep:
         for lens in LENSES:
             b.findings.extend(lenses.run(lens, b.app, b.commits))
-        for f in b.findings:
+        ordered = sorted(b.findings, key=lambda f: (not f.safety, -rank(f)))
+        checked = [f for f in ordered if f.safety]
+        checked += [f for f in ordered if not f.safety][
+            : max(0, max_falsify - len(checked))
+        ]
+        b.dropped = [f for f in ordered if f not in checked]
+        for f in checked:
             verdict, confidence, reason = falsifier.check(b.app, f)
-            if verdict != "survives" or confidence != "medium":
+            # a change that weakens safety always reaches a human, whatever the
+            # falsifier said (user, 2026-11-15); everything else must survive
+            if not f.safety and (verdict != "survives" or confidence != "medium"):
                 continue
             b.survived.append(f)
             digest = hashlib.sha1(f"{f.title}|{'|'.join(f.files)}".encode()).hexdigest()
@@ -125,17 +159,30 @@ def collect(
                         source="commit_sweep",
                         app=b.app,
                         key=f"sweep:{b.app}:{b.commits[-1][:12]}:{digest[:10]}",
-                        title=f.title[:200],
+                        title=("[safety] " if f.safety else "") + f.title[:200],
                         summary=(
                             f"Commit sweep ({f.lens} lens) over {len(b.commits)} "
                             f"commit(s) up to {b.commits[-1][:12]}.\n{f.hypothesis}\n"
                             "Evidence:\n- " + "\n- ".join(f.evidence) + f"\n\n"
-                            f"Falsifier: survives ({confidence}): {reason}"
+                            f"Falsifier: {verdict} ({confidence}): {reason}"
+                            + (
+                                "\n\nSafety-related (crisis detection, guardrails or "
+                                "escalation): routed to a human, never fixed "
+                                "automatically."
+                                if f.safety
+                                else ""
+                            )
                         ),
                         ref=b.commits[-1],
                         reported_by="agent",
                         severity_hint=f.severity,
-                        extra={"lens": f.lens, "commits": b.commits, "rank": rank(f)},
+                        extra={
+                            "lens": f.lens,
+                            "commits": b.commits,
+                            "rank": rank(f),
+                            "human_only": f.safety,
+                            "falsifier": verdict,
+                        },
                     ),
                 )
             )

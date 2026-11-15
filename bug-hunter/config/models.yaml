@@ -6,17 +6,25 @@ roles:
   investigate: { provider: openai,       model: gpt-5 }
   fix:         { provider: openai,       model: gpt-5 }
   review:      { provider: google_genai, model: gemini-2.5-pro }   # different family on purpose
+  lens:        { provider: openai,       model: gpt-5-mini }       # chunk 08 commit sweep, 5 narrow passes
+  falsifier:   { provider: google_genai, model: gemini-2.5-pro }   # strongest, other family than the lenses
   embeddings:  { provider: openai,       model: text-embedding-3-small }
 fallbacks:
   investigate: [{ provider: google_genai, model: gemini-2.5-pro }]
   fix:         [{ provider: google_genai, model: gemini-2.5-pro }]
 # Active prompt version per model node (prompts/<node>.<version>.md); evals compare versions.
 prompts:
-  triage: v3
-  investigate: v3
   reproduce: v5
   fix: v2
-  review: v4
+  review: v5
+  triage: v4
+  investigate: v4
+  lens_logic: v1
+  lens_error_handling_and_null: v1
+  lens_security_and_data_exposure: v1
+  lens_async_and_race: v1
+  lens_api_contract: v1
+  falsifier: v1
 # USD per 1M tokens, from the providers' price pages (checked 2026-11-09; see
 # CHUNK-05-NOTES.md). Every role and fallback model must have a row: cost accounting is
 # code, and an unpriced model would make the per-run cost cap meaningless.

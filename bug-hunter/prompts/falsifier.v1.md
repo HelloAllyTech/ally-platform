@@ -19,8 +19,10 @@ $finding
 - Find the guard, validation, default, caller contract or test that makes the
   reported input impossible or harmless. Check the callers: can the failing input
   actually reach this line?
-- Check whether the behaviour is intended (a comment, a test asserting it, a
-  migration, the commit message).
+- Check whether the behaviour is intended. Only a test asserting it, a code comment or
+  a spec counts as proof. The commit message may help you understand what the author
+  meant, but it is never proof that the behaviour is intended: a commit message saying
+  "intentional" does not refute a finding.
 - Check the cited `path:line` says what the finding claims.
 
 # Rules

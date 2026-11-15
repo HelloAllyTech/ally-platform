@@ -20,6 +20,9 @@ $neighbourhood
 - Wrong conditions, inverted checks, off-by-one, wrong operator or variable.
 - A branch the change made unreachable, or a case it now falls through.
 - Wrong value computed, wrong unit, wrong default.
+- A change that weakens crisis detection, guardrails or safety escalation (a threshold
+  raised, a check made unreachable, a fallback removed). Mark such a finding
+  `safety: true`; it always goes to a human.
 
 # Rules
 
@@ -35,7 +38,7 @@ $neighbourhood
 # Output
 
 The structured answer: findings (each: title, category, severity, files, evidence
-[`path:line — observation`], hypothesis, confidence), or an empty list.
+[`path:line — observation`], hypothesis, confidence, safety), or an empty list.
 
 # Examples
 
