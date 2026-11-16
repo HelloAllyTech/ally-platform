@@ -70,6 +70,7 @@ const line = (over: Record<string, unknown> = {}) => ({
   section: "preferences",
   text: "prefers evenings",
   saidAt: "2026-11-12T10:00:00.000Z",
+  expiresAt: "2027-05-11T10:00:00.000Z",
   sourceKind: "person",
   sourceMessageId: "m1",
   sourceConversationId: "c1",
@@ -97,10 +98,24 @@ beforeEach(() => {
   h.memory.current = {
     on: true,
     name: "Rahul",
+    beforeChat: [{ label: "What are you looking for?", value: "Adult Therapy" }],
+    summary: "They asked about fees and booked Thursday 19:00.",
+    neverStore: ["Payment details", "Symptoms"],
     lines: [
       line(),
-      line({ id: "e2", section: "open_items", text: "waiting to hear about fees" }),
-      line({ id: "e3", section: "context", text: "comes with his mother", sourceKind: "owner" }),
+      line({
+        id: "e2",
+        section: "open_items",
+        text: "waiting to hear about fees",
+        expiresAt: null,
+      }),
+      line({
+        id: "e3",
+        section: "context",
+        text: "comes with his mother",
+        sourceKind: "owner",
+        sourceConversationId: "c0",
+      }),
     ],
   };
 });
@@ -109,14 +124,40 @@ describe("What your assistant remembers", () => {
   it("shows each line by section, open items first, with its date and source", () => {
     const open = panel();
     expect(screen.getByRole("heading", { name: "What your assistant remembers about Rahul" }));
-    const headings = screen.getAllByRole("heading", { level: 4 }).map(n => n.textContent);
-    expect(headings).toEqual(["Still open", "Preferences", "Context"]);
+    const headings = screen.getAllByRole("heading", { level: 5 }).map(n => n.textContent);
+    expect(headings).toEqual([
+      "What they told the page before the chat",
+      "Still open",
+      "Preferences",
+      "Context",
+    ]);
     expect(
       screen.getAllByTestId("memory-line").map(n => n.querySelector("p")?.textContent),
     ).toEqual(["waiting to hear about fees", "prefers evenings", "comes with his mother"]);
     expect(screen.getByText(/Changed by your team/)).toBeTruthy();
-    fireEvent.click(screen.getAllByRole("button", { name: "From their message on 12 Nov" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Said on 12 Nov in this chat" })[0]);
     expect(open).toHaveBeenCalledWith("c1", "m1");
+    expect(screen.getByRole("button", { name: "Said on 12 Nov in an earlier chat" })).toBeTruthy();
+  });
+
+  it("explains what it knows: name, the pre-chat, how long notes last, this chat, what it never keeps", () => {
+    panel();
+    expect(
+      screen.getByText(
+        "It uses these in later chats, so Rahul doesn't have to repeat themselves. You can change or forget any of it.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByTestId("memory-before-chat").textContent).toContain("Adult Therapy");
+    expect(screen.getAllByText(/Kept until 11 May/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Kept until forgotten/)).toBeTruthy();
+    expect(screen.getByText(t.sectionHints.preferences)).toBeTruthy();
+    expect(screen.getByTestId("memory-summary").textContent).toBe(
+      "They asked about fees and booked Thursday 19:00.",
+    );
+    expect(screen.getByText("Payment details")).toBeTruthy();
+    expect(screen.getByRole("link", { name: t.changeNever }).getAttribute("href")).toBe(
+      "/chatbots/b1?section=lists&tool=memory",
+    );
   });
 
   it("forgets a line", async () => {
@@ -176,17 +217,31 @@ describe("What your assistant remembers", () => {
   });
 
   it("with memory off says so, with the way to the switch", () => {
-    h.memory.current = { on: false, name: null, lines: [] };
+    h.memory.current = {
+      on: false,
+      name: null,
+      beforeChat: [],
+      summary: null,
+      neverStore: [],
+      lines: [],
+    };
     panel();
     expect(screen.getByTestId("memory-off").textContent).toContain(t.off);
     expect(screen.getByRole("link", { name: t.turnOn }).getAttribute("href")).toBe(
-      "/chatbots/b1?section=how",
+      "/chatbots/b1?section=lists&tool=memory",
     );
     expect(screen.getByRole("heading", { name: t.titleNoName })).toBeTruthy();
   });
 
   it("with memory on and nothing yet, says notes appear as they chat", () => {
-    h.memory.current = { on: true, name: null, lines: [] };
+    h.memory.current = {
+      on: true,
+      name: null,
+      beforeChat: [],
+      summary: null,
+      neverStore: ["Payment details"],
+      lines: [],
+    };
     panel();
     expect(screen.getByText(t.empty)).toBeTruthy();
     expect(screen.queryByRole("button", { name: t.forgetPerson })).toBeNull();

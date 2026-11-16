@@ -431,3 +431,59 @@
 .ally-memory__loading {
   min-height: 80px;
 }
+/* The fuller panel (chunk 8a): about them, notes with what they're for, this chat, never kept. */
+.ally-memory__intro {
+  margin: 0;
+  color: var(--ally-muted);
+}
+.ally-memory__block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ally-line);
+}
+.ally-memory__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.ally-memory .ally-memory__heading {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ally-ink-2);
+}
+.ally-memory__hint {
+  margin: 0;
+  color: var(--ally-muted);
+}
+.ally-memory__facts {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.ally-memory__facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 8px;
+}
+.ally-memory__facts dt {
+  color: var(--ally-muted);
+}
+.ally-memory__facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ally-memory__summary {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ally-memory__never {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

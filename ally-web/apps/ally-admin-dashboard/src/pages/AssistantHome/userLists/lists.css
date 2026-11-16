@@ -1077,3 +1077,68 @@
   font: 400 15px/1.4 var(--ally-font-ui);
   color: var(--ally-muted);
 }
+
+/* Tools (chunk 8a): the assistant's own tools as tabs, a list's heading and menu, its choices. */
+.ally-lists__tab--tool {
+  font-weight: 500;
+}
+.ally-tools__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ally-tools__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+}
+.ally-tools__card .ally-home__group-title,
+.ally-tools__choices .ally-home__group-title {
+  margin: 0;
+}
+.ally-tools__list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ally-tools__list-head .ally-heading {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.ally-tools__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+}
+.ally-tools__choices-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ally-tools__chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ally-tools__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--ally-accent-soft);
+  color: var(--ally-ink);
+  font-size: 0.9rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.ally-tools__choices .ally-small {
+  margin: 0;
+}

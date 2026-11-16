@@ -32,10 +32,12 @@ const errorOf = (failure: unknown): string => {
 const Line: React.FC<{
   chatbotId: string;
   line: MemoryLine;
+  /** Said in the chat open beside it. */
+  here: boolean;
   canEdit: boolean;
   onOpenSource: (line: MemoryLine) => void;
   onForgotten: () => void;
-}> = ({ chatbotId, line, canEdit, onOpenSource, onForgotten }) => {
+}> = ({ chatbotId, line, here, canEdit, onOpenSource, onForgotten }) => {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(line.text);
   const [error, setError] = useState<string | null>(null);
@@ -99,11 +101,15 @@ const Line: React.FC<{
       <p className="ally-small ally-memory__meta">
         {line.sourceMessageId ? (
           <button type="button" className="ally-link" onClick={() => onOpenSource(line)}>
-            {fill(t.from, { date: dayOf(line.saidAt) })}
+            {fill(here ? t.saidHere : t.saidEarlier, { date: dayOf(line.saidAt) })}
           </button>
         ) : (
           <span>{dayOf(line.saidAt)}</span>
         )}
+        <span>
+          {" · "}
+          {line.expiresAt ? fill(t.keptUntil, { date: dayOf(line.expiresAt) }) : t.keptForever}
+        </span>
         {line.sourceKind === "owner" && <span> · {t.byTeam}</span>}
       </p>
       {error && (
@@ -195,7 +201,11 @@ export const MemoryPanel: React.FC<{
   canEdit: boolean;
   onOpenSource: (conversationId: string, messageId: string) => void;
 }> = ({ chatbotId, contactId, conversationId, canEdit, onOpenSource }) => {
-  const { data, isLoading, isError, refetch } = useGetPersonMemoryQuery({ chatbotId, contactId });
+  const { data, isLoading, isError, refetch } = useGetPersonMemoryQuery({
+    chatbotId,
+    contactId,
+    conversationId,
+  });
   const [confirming, setConfirming] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -216,34 +226,97 @@ export const MemoryPanel: React.FC<{
         </button>
       </p>
     );
-  } else if (!data.on && !data.lines.length) {
-    body = (
-      <p className="ally-small" data-testid="memory-off">
-        {t.off} <Link to={`/chatbots/${chatbotId}?section=how`}>{t.turnOn}</Link>
-      </p>
-    );
-  } else if (!data.lines.length) {
-    body = <p className="ally-small">{t.empty}</p>;
   } else {
-    body = ORDER.filter(section => data.lines.some(l => l.section === section)).map(section => (
-      <div key={section} className="ally-memory__section">
-        <h4 className="ally-small ally-memory__heading">{t.sections[section]}</h4>
-        <ul className="ally-memory__lines">
-          {data.lines
-            .filter(l => l.section === section)
-            .map(line => (
-              <Line
-                key={line.id}
-                chatbotId={chatbotId}
-                line={line}
-                canEdit={canEdit}
-                onOpenSource={open}
-                onForgotten={() => setNotice(t.forgotten)}
-              />
-            ))}
-        </ul>
-      </div>
-    ));
+    const notes =
+      !data.on && !data.lines.length ? (
+        <p className="ally-small" data-testid="memory-off">
+          {t.off} <Link to={`/chatbots/${chatbotId}?section=lists&tool=memory`}>{t.turnOn}</Link>
+        </p>
+      ) : !data.lines.length ? (
+        <p className="ally-small">{t.empty}</p>
+      ) : (
+        ORDER.filter(section => data.lines.some(l => l.section === section)).map(section => (
+          <div key={section} className="ally-memory__section">
+            <h5 className="ally-memory__heading">{t.sections[section]}</h5>
+            <p className="ally-small ally-memory__hint">{t.sectionHints[section]}</p>
+            <ul className="ally-memory__lines">
+              {data.lines
+                .filter(l => l.section === section)
+                .map(line => (
+                  <Line
+                    key={line.id}
+                    chatbotId={chatbotId}
+                    line={line}
+                    here={line.sourceConversationId === conversationId}
+                    canEdit={canEdit}
+                    onOpenSource={open}
+                    onForgotten={() => setNotice(t.forgotten)}
+                  />
+                ))}
+            </ul>
+          </div>
+        ))
+      );
+    body = (
+      <>
+        {(data.on || data.lines.length > 0) && (
+          <p className="ally-small ally-memory__intro">
+            {data.name ? fill(t.intro, { name: data.name }) : t.introNoName}
+          </p>
+        )}
+        <section className="ally-memory__block" aria-label={t.about}>
+          <h4 className="ally-memory__title">{t.about}</h4>
+          <dl className="ally-memory__facts">
+            <div>
+              <dt className="ally-small">{t.name}</dt>
+              <dd>{data.name ?? <span className="ally-small">{t.noName}</span>}</dd>
+            </div>
+          </dl>
+          {data.beforeChat.length > 0 && (
+            <>
+              <h5 className="ally-memory__heading">{t.beforeChat}</h5>
+              <p className="ally-small ally-memory__hint">{t.beforeChatHint}</p>
+              <dl className="ally-memory__facts" data-testid="memory-before-chat">
+                {data.beforeChat.map(answer => (
+                  <div key={answer.label}>
+                    <dt className="ally-small">{answer.label}</dt>
+                    <dd>{answer.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          )}
+        </section>
+        <section className="ally-memory__block" aria-label={t.notes}>
+          <h4 className="ally-memory__title">{t.notes}</h4>
+          {notes}
+        </section>
+        {data.summary && (
+          <section className="ally-memory__block" aria-label={t.summary}>
+            <h4 className="ally-memory__title">{t.summary}</h4>
+            <p className="ally-small ally-memory__hint">{t.summaryHint}</p>
+            <p className="ally-body ally-memory__summary" data-testid="memory-summary">
+              {data.summary}
+            </p>
+          </section>
+        )}
+        {data.on && data.neverStore.length > 0 && (
+          <section className="ally-memory__block" aria-label={t.neverKeeps}>
+            <h4 className="ally-memory__title">{t.neverKeeps}</h4>
+            <ul className="ally-memory__never">
+              {data.neverStore.map(item => (
+                <li key={item} className="ally-badge ally-badge--muted">
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Link className="ally-small" to={`/chatbots/${chatbotId}?section=lists&tool=memory`}>
+              {t.changeNever}
+            </Link>
+          </section>
+        )}
+      </>
+    );
   }
 
   return (

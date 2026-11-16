@@ -53,6 +53,8 @@ export interface MemoryLine {
   text: string;
   /** When they last said it. */
   saidAt: string;
+  /** When it goes on its own; null: kept until forgotten. */
+  expiresAt: string | null;
   /** `owner`: changed by someone on the team. */
   sourceKind: "person" | "owner";
   sourceMessageId: string | null;
@@ -63,6 +65,12 @@ export interface PersonMemory {
   /** False: the assistant doesn't remember people between chats. */
   on: boolean;
   name: string | null;
+  /** The open chat's pre-chat answers the assistant reads (never phone or email). */
+  beforeChat: { label: string; value: string }[];
+  /** The open chat's rolling summary, when it has one. */
+  summary: string | null;
+  /** What it never keeps. */
+  neverStore: string[];
   lines: MemoryLine[];
 }
 
@@ -123,10 +131,14 @@ export const inboxApi = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.INBOX],
     }),
     // What the assistant remembers (chunk 8a). Tagged with the inbox, so a new reply refreshes it.
-    getPersonMemory: builder.query<PersonMemory, { chatbotId: string; contactId: string }>({
-      query: ({ chatbotId, contactId }) => ({
+    getPersonMemory: builder.query<
+      PersonMemory,
+      { chatbotId: string; contactId: string; conversationId?: string }
+    >({
+      query: ({ chatbotId, contactId, conversationId }) => ({
         url: ApiEndpoints.INBOX.MEMORY(chatbotId, contactId),
         method: HttpMethod.GET,
+        params: conversationId ? { conversationId } : undefined,
       }),
       providesTags: [TAG_TYPES.INBOX],
     }),

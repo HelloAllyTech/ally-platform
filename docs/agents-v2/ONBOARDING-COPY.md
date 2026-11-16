@@ -1102,6 +1102,28 @@ says when a save can't be made. More lines for the home's sections are added her
 - We couldn't load what your assistant remembers.
 - Try again
 
+**The Inbox panel, in more detail (8a, after Shehbaz's test):**
+
+- It uses these in later chats, so {name} doesn't have to repeat themselves. You can change or forget any of it.
+- It uses these in later chats, so they don't have to repeat themselves. You can change or forget any of it.
+- About them
+- Name
+- Not given yet
+- What they told the page before the chat
+- Your assistant reads this in every chat.
+- Notes it keeps
+- Things they're waiting on. Marked done when sorted, or dropped after 30 days.
+- How they like things. Used to suggest times and options.
+- Useful background about them.
+- Said on {date} in this chat
+- Said on {date} in an earlier chat
+- Kept until {date}
+- Kept until forgotten
+- This chat so far
+- Your assistant's own summary of the earlier messages, which it no longer reads word for word.
+- It never keeps:
+- Change this in How it works
+
 **When memory is off:**
 
 - Your assistant doesn't remember people between chats.
@@ -1110,3 +1132,67 @@ says when a save can't be made. More lines for the home's sections are added her
 **Try it:**
 
 - Would remember: {line}
+
+## 29. Tools (8a)
+
+*(Drafted 16 Nov at Shehbaz's request: the Lists section becomes Tools, everything the assistant can use. Its pages, its memory, a person on the team, and the owner's own lists, each a tab; a list's tab opens its table as before. The section's address stays `?section=lists`. On screen, "tool" and "list"; a list keeps its name as the owner gave it.)*
+
+**The section:**
+
+- Tools
+- Everything your assistant can use: your pages, its memory, your team, and your own lists.
+- Each tool is something your assistant can use. Your lists are tables you own: it looks things up in them and, if you let it, books and changes entries, always under your rules.
+- Your tools
+- Add a tool
+
+**Your pages:**
+
+- Your pages
+- {n} pages
+- Your assistant searches your pages to answer questions, and says where each answer came from.
+- Manage in What it knows
+
+**Memory:**
+
+- Memory
+- On
+- Off
+- See what it remembers in the Inbox
+
+**Hand over:**
+
+- Hand over
+- When someone asks for a person, your assistant tells them your team has been asked, and lets you know.
+- Change in Share
+
+**A list's menu:**
+
+- More for {list}
+- Rename
+- Delete list
+- Rename {list}
+- Name
+- Save
+- Cancel
+- Couldn't rename it. Try again.
+- Delete {list}?
+- It goes with its 1 entry. You can undo this.
+- It goes with its {n} entries. You can undo this.
+- You can undo this.
+- Keep
+- Couldn't delete it. Try again.
+- {list} deleted.
+- Appointments links to this list. Delete Appointments first, or remove that detail. *(from ally-be, with the linking list's name)*
+
+**A list's choices, always in view:**
+
+- Your {detail} choices
+- Your assistant offers these, and people choose from them.
+- Edit
+
+**How it works and the Inbox, after the move:**
+
+- Memory has moved to Tools.
+- Open Tools
+- Turn it on in Tools
+- Change this in Tools

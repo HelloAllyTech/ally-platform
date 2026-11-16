@@ -14,4 +14,6 @@ export const MEMORY = {
   remove: "Remove {item}",
   upTo: "Up to 20 of your own.",
   wouldRemember: "Would remember: {line}",
+  movedToTools: "Memory has moved to Tools.",
+  openTools: "Open Tools",
 } as const;

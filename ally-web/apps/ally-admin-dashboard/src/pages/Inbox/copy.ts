@@ -81,8 +81,32 @@ export const INBOX = {
     forgotPerson: "Your assistant has forgotten them.",
     loadFailed: "We couldn't load what your assistant remembers.",
     retry: "Try again",
+    intro:
+      "It uses these in later chats, so {name} doesn't have to repeat themselves. You can change or forget any of it.",
+    introNoName:
+      "It uses these in later chats, so they don't have to repeat themselves. You can change or forget any of it.",
+    about: "About them",
+    name: "Name",
+    noName: "Not given yet",
+    beforeChat: "What they told the page before the chat",
+    beforeChatHint: "Your assistant reads this in every chat.",
+    notes: "Notes it keeps",
+    sectionHints: {
+      open_items: "Things they're waiting on. Marked done when sorted, or dropped after 30 days.",
+      preferences: "How they like things. Used to suggest times and options.",
+      context: "Useful background about them.",
+    },
+    saidHere: "Said on {date} in this chat",
+    saidEarlier: "Said on {date} in an earlier chat",
+    keptUntil: "Kept until {date}",
+    keptForever: "Kept until forgotten",
+    summary: "This chat so far",
+    summaryHint:
+      "Your assistant's own summary of the earlier messages, which it no longer reads word for word.",
+    neverKeeps: "It never keeps:",
+    changeNever: "Change this in Tools",
     off: "Your assistant doesn't remember people between chats.",
-    turnOn: "Turn it on in How it works",
+    turnOn: "Turn it on in Tools",
   },
 } as const;
 

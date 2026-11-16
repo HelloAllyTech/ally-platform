@@ -113,12 +113,16 @@ const THREAD = {
 const MEMORY = {
   on: true,
   name: "Asha",
+  beforeChat: [{ label: "What are you looking for?", value: "Couples therapy" }],
+  summary: "She asked about couples sessions and their length.",
+  neverStore: ["Payment details", "Passwords and PINs", "ID numbers", "Symptoms"],
   lines: [
     {
       id: "e2",
       section: "open_items",
       text: "waiting to hear about weekend couples sessions",
       saidAt: at(8),
+      expiresAt: at(30),
       sourceKind: "person",
       sourceMessageId: "m3",
       sourceConversationId: CHAT,
@@ -128,6 +132,7 @@ const MEMORY = {
       section: "preferences",
       text: "prefers evenings",
       saidAt: at(6),
+      expiresAt: null,
       sourceKind: "person",
       sourceMessageId: "m1",
       sourceConversationId: CHAT,
@@ -137,6 +142,7 @@ const MEMORY = {
       section: "context",
       text: "comes with her partner",
       saidAt: at(6),
+      expiresAt: at(40),
       sourceKind: "owner",
       sourceMessageId: "m1",
       sourceConversationId: CHAT,

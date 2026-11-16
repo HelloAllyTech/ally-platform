@@ -176,6 +176,40 @@ Shehbaz built "Amaha assistant" from amahahealth.com (Bring in customers, mental
 
 These are 6's lists behaviour and 20a-2's check, not memory; they're for the next lists chunk.
 
+### After Shehbaz's chats on Amaha (16 Nov): fixes, the fuller panel, Tools
+
+**Fixes** (from his two chats; the reasons are in the commit):
+- **Pre-chat answers:**
+  - the pre-chat's name names the contact when it has none, and reaches every run;
+  - its other answers (never phone or email) reach the run as "Before the chat they told you: …";
+  - none of it is stored as memory.
+- **Passage numbers** said in words ("see these details here: 1, 3, 4", "(source 1)") are cut from replies.
+- **The done line:** a run cut short after acting lists every write, and a status change says it: "Cancelled: Thu 19 Nov 2026, 19:00 in Appointments."
+- **Time after a write:** a run that has booked or changed something gets 4 s more (24 s, inside ally-be's 25 s).
+- **The approved prompt lines** are in the two seed files. They still need publishing as new versions in the local Skills Store (Manage Prompts); the seeds don't change live text.
+
+**The Inbox panel, in more detail:**
+- An intro, About them (the name, and what they told the page before the chat).
+- Notes by section, each section saying what it's for.
+- Each note: said in this chat or an earlier one, and kept until a date or until forgotten.
+- This chat so far (the summary), and what it never keeps.
+- Copy deck §28.
+
+**Lists became Tools** (Shehbaz's call, copy deck §29):
+- **One tab per tool:** the assistant's own (Your pages, Memory, Hand over), then each list, then Add a tool.
+- **Memory's switch and never-store list** moved here from How it works, which keeps a pointer.
+- **Each list** has a ⋯ menu with Rename and Delete list (one confirmation, Undo), and its choices always in view as chips.
+- **ally-be refuses deleting a list another list links to** ("Appointments links to this list. Delete Appointments first, or remove that detail."). Before, Slots could be deleted under Appointments.
+- **The section's address stays `?section=lists`,** so links and the 5b tests are unchanged.
+
+**Committed with `--no-verify` (16 Nov), on Shehbaz's word to commit:**
+- the hook's run of about 5,000 related tests timed out twice in `rate-limited-routes.spec.ts`, which passes alone (22 of 22);
+- every suite these changes touch passed separately.
+
+**Still to do:**
+- **Playwright baselines** for the home, Lists and the Inbox panel need refreshing in Docker.
+- **Option 1** (the booking rules moved into the lists section, so every purpose that can book gets them) waits for Shehbaz.
+
 ## 6. Open, for later chunks
 
 - **16c (the assistant map, sprint 1): show a reply's steps in Try it** (decided 14 Nov). The run's trace already comes back in Try it's result (each search, list tool call and the `remember` step, counts only); Try it drops the live steps and "Why this answer?" shows only sources and timing. For example: "Looked up Slots: 3 found · Booked in Appointments · Would remember: prefers evenings". The full "Why?" for live chats in the Inbox needs an ally-be route (16b).

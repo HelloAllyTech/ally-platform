@@ -6,9 +6,53 @@
  * relation (Shehbaz, at the 5b plan).
  */
 export const USER_LISTS = {
-  title: "Lists",
-  subtitle: "Bookings, leads and orders your assistant can look up and keep.",
-  help: "Each list is a table you own. Your assistant can look things up in it and, if you let it, add and change entries, always under the rules you set here.",
+  // Chunk 8a (deck §29): the section is Tools; lists are some of its tools.
+  title: "Tools",
+  subtitle:
+    "Everything your assistant can use: your pages, its memory, your team, and your own lists.",
+  help: "Each tool is something your assistant can use. Your lists are tables you own: it looks things up in them and, if you let it, books and changes entries, always under your rules.",
+
+  tools: {
+    label: "Your tools",
+    add: "Add a tool",
+    pages: "Your pages",
+    pagesCount: "{n} pages",
+    pagesBody:
+      "Your assistant searches your pages to answer questions, and says where each answer came from.",
+    pagesManage: "Manage in What it knows",
+    memory: "Memory",
+    on: "On",
+    off: "Off",
+    memoryInbox: "See what it remembers in the Inbox",
+    handover: "Hand over",
+    handoverBody:
+      "When someone asks for a person, your assistant tells them your team has been asked, and lets you know.",
+    handoverChange: "Change in Share",
+  },
+
+  listMenu: {
+    more: "More for {list}",
+    rename: "Rename",
+    delete: "Delete list",
+    renameTitle: "Rename {list}",
+    name: "Name",
+    save: "Save",
+    cancel: "Cancel",
+    renameFailed: "Couldn't rename it. Try again.",
+    deleteTitle: "Delete {list}?",
+    deleteOne: "It goes with its 1 entry. You can undo this.",
+    deleteMany: "It goes with its {n} entries. You can undo this.",
+    deleteNone: "You can undo this.",
+    keep: "Keep",
+    deleteFailed: "Couldn't delete it. Try again.",
+    deleted: "{list} deleted.",
+  },
+
+  choices: {
+    title: "Your {detail} choices",
+    hint: "Your assistant offers these, and people choose from them.",
+    edit: "Edit",
+  },
 
   empty: {
     title: "Keep your bookings, leads and orders here",
@@ -22,7 +66,7 @@ export const USER_LISTS = {
   tabs: {
     label: "Your lists",
     add: "Add a list",
-    addTitle: "Add a list",
+    addTitle: "Add a tool",
   },
 
   blocks: {

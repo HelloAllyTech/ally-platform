@@ -30,7 +30,7 @@ export const HOME = {
   sections: {
     overview: "Overview",
     knows: "What it knows",
-    lists: "Lists",
+    lists: "Tools",
     personality: "Personality",
     safety: "Safety",
     how: "How it works",
@@ -42,7 +42,8 @@ export const HOME = {
   subtitles: {
     overview: "How your assistant is doing, and what needs you.",
     knows: "Everything your assistant answers from.",
-    lists: "Bookings, leads and orders your assistant can look up and keep.",
+    lists:
+      "Everything your assistant can use: your pages, its memory, your team, and your own lists.",
     personality: "How it introduces itself and how it talks.",
     safety: "Rules your assistant always follows.",
     how: "Everything your assistant follows, and the parts you can change.",

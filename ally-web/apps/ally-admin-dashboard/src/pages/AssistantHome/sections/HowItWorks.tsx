@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 
+import { Link } from "react-router-dom";
+
 import { useGetHowItWorksQuery } from "@api";
 import { Segmented } from "@components/v2";
 import type { HowItWorks, HowLayer } from "@types";
@@ -10,7 +12,6 @@ import { HOME, fill } from "../copy";
 import { Group, SectionHead, TextField } from "../fields";
 import { ListSkeleton } from "../ui/List";
 import { useHomeField } from "../useHomeField";
-import { MemorySettings } from "./MemorySettings";
 import { purposeLimit } from "../userLists/format";
 
 import type { SectionId } from "../sections";
@@ -216,8 +217,13 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
         ))}
       </ol>
 
-      {/* Remember people between chats (chunk 8a). */}
-      <MemorySettings botId={bot.id} home={home} canEdit={canEdit} />
+      {/* Memory's controls live in Tools now (chunk 8a); a pointer stays here. */}
+      {home.fields.memory && (
+        <p className="ally-small ally-how__moved" data-testid="how-memory-moved">
+          {HOME.memory.movedToTools}{" "}
+          <Link to={{ search: "?section=lists&tool=memory" }}>{HOME.memory.openTools}</Link>
+        </p>
+      )}
 
       <Group>
         <button
