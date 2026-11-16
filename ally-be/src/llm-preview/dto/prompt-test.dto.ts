@@ -13,13 +13,13 @@ import {
 export class PromptTestDto {
   @ApiProperty({ description: 'Catalog model to run the prompt on' })
   @IsUUID()
-  modelId: string;
+  modelId!: string;
 
   @ApiProperty({ description: 'The (possibly unsaved) prompt text' })
   @IsString()
   @MinLength(1)
   @MaxLength(30000)
-  promptText: string;
+  promptText!: string;
 
   @ApiPropertyOptional({ description: 'Sample user input or variable values' })
   @IsOptional()
