@@ -10027,6 +10027,11 @@ export const en = {
     },
     // v9 §3.3 / PRD §4: the success metrics.
     metrics: {
+      rangeCapNote: {
+        "12m":
+          "Success metrics cover the last 12 months. The operator numbers and judge agreement below cover the last 90 days, the most this view holds.",
+        all: "Success metrics show up to the last 12 months. The operator numbers and judge agreement below cover the last 90 days, the most this view holds.",
+      } as Record<string, string>,
       heading: "Metrics",
       help: "How the debrief is doing for learners in switched-on organisations, week by week. Each number is shown with how many debriefs it counts; below 20 it is marked as too few to read.",
       steering: {

@@ -1,6 +1,7 @@
 import React from "react";
 
 import { useGetDebriefAnalyticsQuery } from "@api";
+import { en } from "@constants";
 import { AnalyticsRange } from "@types";
 
 import { MetricsTab } from "../MetricsTab";
@@ -21,6 +22,11 @@ export const DebriefAnalytics: React.FC<{ range?: AnalyticsRange }> = ({ range =
   const q = useGetDebriefAnalyticsQuery({ days: DAYS[range] });
   return (
     <div className="flex flex-col gap-10">
+      {en.debriefs.metrics.rangeCapNote[range] && (
+        <p role="note" className="text-sm text-typography-600">
+          {en.debriefs.metrics.rangeCapNote[range]}
+        </p>
+      )}
       <ScoreSection />
       <MetricsTab range={range} />
       <ConsoleOverviewSection
