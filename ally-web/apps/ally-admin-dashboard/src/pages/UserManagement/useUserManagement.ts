@@ -36,7 +36,9 @@ import {
   UserListUser,
   UserRoles,
 } from "@types";
-import { getChipValue, getErrorMessage, parseEmailList } from "@utils";
+import { getChipValue, getErrorMessage, parseEmailList, validateEmail } from "@utils";
+
+import { MIN_LEARNER_CREDITS, resolveLearnerCreditLimit } from "./learnerCredits";
 
 export const USERS_PAGE_SIZE = 20;
 const IMPERSONATION_APP_URL = import.meta.env.VITE_IMPERSONATION_APP_URL;
@@ -299,7 +301,9 @@ export function useUserManagement(
         tenantId: data?.tenantId,
       };
       if (data?.roles?.includes(UserRole.LEARNER)) {
-        payload.simulationCreditLimit = Math.max(Number(data?.simulationCreditLimit || 0), 20);
+        const { limit, raised } = resolveLearnerCreditLimit(data?.simulationCreditLimit);
+        payload.simulationCreditLimit = limit;
+        if (raised) toast.info(en.userManagement.creditFloorRaised(MIN_LEARNER_CREDITS));
       }
       await addUserdata(payload).unwrap();
       setAddUserModalOpen(false);
@@ -336,13 +340,22 @@ export function useUserManagement(
         toast.error(en.userManagement.bulkAddUsersEmptyError);
         return;
       }
+      // The server accepts or rejects the whole batch, so catch malformed rows here and name
+      // them, instead of one generic failure for a list of fifty.
+      const badRows = emails.filter(email => !validateEmail(email));
+      if (badRows.length > 0) {
+        toast.error(en.userManagement.bulkAddUsersInvalidRows(badRows));
+        return;
+      }
+      const credit = data?.roles?.includes(UserRole.LEARNER)
+        ? resolveLearnerCreditLimit(data?.simulationCreditLimit)
+        : null;
+      if (credit?.raised) toast.info(en.userManagement.creditFloorRaised(MIN_LEARNER_CREDITS));
       const payload = {
         emails,
         roles: data?.roles,
         tenantId: data?.tenantId,
-        ...(data?.roles?.includes(UserRole.LEARNER)
-          ? { simulationCreditLimit: Math.max(Number(data?.simulationCreditLimit || 0), 20) }
-          : {}),
+        ...(credit ? { simulationCreditLimit: credit.limit } : {}),
       };
       const response = await bulkAddUsers(payload).unwrap();
       handleBulkAddClose();

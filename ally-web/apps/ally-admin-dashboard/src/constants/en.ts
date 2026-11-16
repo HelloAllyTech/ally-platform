@@ -964,6 +964,10 @@ export const en = {
     bulkAddUsersSuccess: (count: number) =>
       `${count} ${count === 1 ? "user" : "users"} added successfully`,
     bulkAddUsersFailed: "Failed to add users",
+    creditFloorRaised: (min: number) =>
+      `Learners always get at least ${min} credits, so the limit was set to ${min}.`,
+    bulkAddUsersInvalidRows: (rows: string[]) =>
+      `${rows.length} ${rows.length === 1 ? "row isn't a valid email" : "rows aren't valid emails"}, so nothing was added: ${rows.slice(0, 5).join(", ")}${rows.length > 5 ? ` and ${rows.length - 5} more` : ""}`,
     bulkAddUsersEmptyError: "Enter at least one email address",
     bulkAddUsersHint:
       "Users are created without a name — they'll be asked to complete their profile on first login.",
