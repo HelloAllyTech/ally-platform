@@ -2,7 +2,7 @@
 
 Read this file, then `spec.md`, then the current chunk brief, before any Bug Hunter v2 work.
 
-**Current chunk: 08 — `docs/bug-hunter/chunks/chunk-08.md`** (01–07 done: `notes/CHUNK-0N-NOTES.md`; chunk 07's first follow-up, recall defects, is open in its notes)
+**Current chunk: 09 — `docs/bug-hunter/chunks/chunk-09.md`** (01–07 done; 08 done except what waits on infra: `notes/CHUNK-08-NOTES.md`)
 
 ## What we are building
 

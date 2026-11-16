@@ -57,6 +57,15 @@ class InMemoryApprovals:
     def __init__(self) -> None:
         self.rows: dict[str, Approval] = {}
 
+    def expire(self, now: str | None = None) -> list[str]:
+        now = now or datetime.now(timezone.utc).isoformat(timespec="seconds")
+        out = []
+        for row in self.rows.values():
+            if row.status == "pending" and row.expires_at < now:
+                row.status = "expired"
+                out.append(row.id)
+        return out
+
     def create(self, approval: Approval) -> None:
         self.rows[approval.id] = approval
 
@@ -116,6 +125,17 @@ class PostgresApprovals:
             if row.get(key) is not None and not isinstance(row[key], str):
                 row[key] = row[key].isoformat(timespec="seconds")
         return Approval(**{k: row[k] for k in Approval.__dataclass_fields__})
+
+    def expire(self, now: str | None = None) -> list[str]:
+        """Pending approvals past their expiry (7 days) become ``expired``."""
+        rows = self.conn.execute(
+            """UPDATE bughunter.approvals SET status = 'expired'
+               WHERE status = 'pending'
+                 AND expires_at < COALESCE(%s::timestamptz, now())
+               RETURNING id""",
+            (now,),
+        ).fetchall()
+        return [r["id"] for r in rows]
 
     def decide(self, approval_id: str, decision: str, by: str, reason: str) -> Approval:
         self.conn.execute(

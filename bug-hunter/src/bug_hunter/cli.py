@@ -1556,6 +1556,13 @@ def daily_cmd(
         float | None,
         typer.Option(help="Stop the sweep's model calls once they cost this much."),
     ] = None,
+    sources: Annotated[
+        str | None,
+        typer.Option(
+            help="Only these sources, comma-separated (the 15-minute poll uses "
+            "ci_failures,issues). Default: all enabled in limits.yaml."
+        ),
+    ] = None,
 ) -> None:
     """The daily job (chunk 08): collect signals, dedupe, cap, and write the plan."""
     from bug_hunter import spend
@@ -1578,16 +1585,24 @@ def daily_cmd(
         raise typer.Exit(code=1)
     state = PostgresState(db_url())
     ledger = spend.ledger()
+    all_sources = daily_sources(
+        config,
+        state,
+        with_lenses=with_lenses,
+        ledger=ledger,
+        max_cost_usd=max_cost_usd,
+    )
+    if sources:
+        wanted = {x.strip() for x in sources.split(",") if x.strip()}
+        unknown = wanted - set(all_sources)
+        if unknown:
+            typer.echo(f"unknown sources: {', '.join(sorted(unknown))}", err=True)
+            raise typer.Exit(code=1)
+        all_sources = {k: v for k, v in all_sources.items() if k in wanted}
     plan = run_daily(
         config,
         state,
-        daily_sources(
-            config,
-            state,
-            with_lenses=with_lenses,
-            ledger=ledger,
-            max_cost_usd=max_cost_usd,
-        ),
+        all_sources,
         PostgresReports(db_url()),
         ledger,
         dry_run=True,
@@ -1614,3 +1629,20 @@ def unpause_cmd() -> None:
 
     PostgresState(db_url()).set(ENABLED, True)
     typer.echo("bug hunter resumed")
+
+
+approvals_app = typer.Typer(help="Approvals (pr mode): housekeeping.")
+app.add_typer(approvals_app, name="approvals")
+
+
+@approvals_app.command("expire")
+def approvals_expire() -> None:
+    """Mark pending approvals past their expiry date as expired (daily job)."""
+    from bug_hunter.graph.approvals import PostgresApprovals
+    from bug_hunter.graph.checkpointer import db_url
+
+    expired = PostgresApprovals(db_url()).expire()
+    typer.echo(
+        f"expired {len(expired)} approval(s)"
+        + (": " + ", ".join(expired) if expired else "")
+    )
