@@ -3,7 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { LoggerService } from '../../logger/logger.service';
 import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
-import { OwnerSettingsBaseline } from '../constants/debrief-owner-settings.constants';
+import { createHash } from 'crypto';
+import {
+  OwnerSettingsBaseline,
+  TEST_SETTING_KEYS,
+} from '../constants/debrief-owner-settings.constants';
+import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   BaselineFacts,
@@ -22,9 +27,11 @@ const REJUDGE_SAMPLE = 8;
  * — sessions a day by organisation and language, the spread of judge scores
  * and how much they move on re-judging, hard-fail rates and cost per run —
  * and proposes starting values for every threshold, with the reasoning beside
- * each, in the Console. A person accepts them; budget changes always need a
- * person. It re-runs monthly and flags settings that no longer fit, but never
- * changes a setting itself. In-app, on ally-be's own connection.
+ * each, in the Console. Debrief v2 (A10): the test settings (Settings ›
+ * Tests: how many sessions each test runs, the trial's confidence) are tuned
+ * from it by the PM agent as ordinary setting changes, with nobody's accept;
+ * the rollout rules and budgets stay proposals a person accepts. Monthly.
+ * In-app, on ally-be's own connection.
  */
 @Injectable()
 export class DebriefBaselineService implements OnModuleInit {
@@ -46,7 +53,8 @@ export class DebriefBaselineService implements OnModuleInit {
       try {
         const b = await this.run();
         const n = Object.keys(b.proposals ?? {}).length;
-        return `${n} value${n === 1 ? '' : 's'} proposed`;
+        const tuned = await this.tuneTests(b);
+        return `${n} value${n === 1 ? '' : 's'} proposed${tuned ? `, ${tuned} test setting${tuned === 1 ? '' : 's'} changed` : ''}`;
       } catch (e) {
         this.logger.error(`[debrief] baseline failed: ${(e as Error).message}`);
         throw e;
@@ -188,7 +196,89 @@ export class DebriefBaselineService implements OnModuleInit {
       sdOfDifference: Number(Math.sqrt(v).toFixed(3)),
     };
   }
+
+  /**
+   * v2 A10: apply the baseline's values for the test settings that differ
+   * from those in force, as one change (an `agent_lessons` row, kind
+   * `test_settings`, live at once, so Changes lists it and Undo now puts the
+   * old values back). Each setting records "PM agent", when, why and the
+   * change. Nothing while the PM agent is switched off. Returns how many
+   * settings changed.
+   */
+  async tuneTests(baseline: OwnerSettingsBaseline): Promise<number> {
+    const current = (await this.settings.get()) as unknown as Record<
+      string,
+      number | boolean | string
+    >;
+    if (!current.pmAgentEnabled) return 0;
+    const stored = (await this.settings.view()).changed as string[];
+    const picked = TEST_SETTING_KEYS.filter((k) => {
+      const p = baseline.proposals?.[k];
+      return !!p && p.value !== current[k];
+    });
+    if (!picked.length) return 0;
+    const settings: Record<
+      string,
+      { before: unknown; after: number | boolean | string; why: string }
+    > = {};
+    for (const k of picked) {
+      const p = baseline.proposals[k] as { value: number; reason: string };
+      settings[k] = {
+        // null: it was the default, and Undo puts the default back.
+        before: stored.includes(k) ? current[k] : null,
+        after: p.value,
+        why: p.reason,
+      };
+    }
+    const title = `Tests tuned to this month's debriefs: ${picked
+      .map((k) => `${TEST_WORDS[k] ?? k} ${current[k]} → ${settings[k].after}`)
+      .join(', ')}`.slice(0, 300);
+    const [row] = await this.dataSource.query(
+      `INSERT INTO agent_lessons
+         ("agentKey", kind, scope, status, text, change, evidence, "contentHash", "authorKind")
+       SELECT $1::varchar, 'policy', 'platform', 'active', $2::varchar, $3::jsonb, $4::jsonb,
+              $5::varchar, 'curator'
+        WHERE NOT EXISTS (SELECT 1 FROM agent_lessons
+                           WHERE "agentKey" = $1::varchar AND "contentHash" = $5::varchar)
+       RETURNING id`,
+      [
+        DEBRIEF_AGENT_KEY,
+        title,
+        JSON.stringify({ ideaKind: 'test_settings', settings }),
+        JSON.stringify({
+          why: 'The tests should match how many debriefs there are and how much scores move.',
+          baselineRanAt: baseline.ranAt,
+        }),
+        createHash('sha256')
+          .update(`test_settings:${baseline.ranAt}`)
+          .digest('hex'),
+      ],
+    );
+    if (!row) return 0;
+    for (const k of picked) {
+      await this.settings.update({ [k]: settings[k].after }, null, {
+        source: 'pm_agent',
+        why: settings[k].why,
+        changeId: row.id,
+      });
+    }
+    this.logger.info(
+      `[debrief] PM agent tuned ${picked.length} test setting(s): ${picked.join(', ')}`,
+    );
+    return picked.length;
+  }
 }
+
+/** The test settings in words, for a change's title. */
+const TEST_WORDS: Record<string, string> = {
+  quickTestCases: 'quick check sessions',
+  quickTestMinLift: 'quick check lift',
+  gateCases: 'pass test sessions',
+  gateRotationShare: 'pass test rotation',
+  sealedCases: 'monthly check sessions',
+  pairedMinComparisons: 'side-by-side sessions',
+  pairedConfidence: 'side-by-side confidence',
+};
 
 const num = (v: unknown): number | null =>
   v == null || !Number.isFinite(Number(v))

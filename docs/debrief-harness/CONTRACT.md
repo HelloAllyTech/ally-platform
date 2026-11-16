@@ -145,6 +145,14 @@ same change. No runtime flag stays behind.
 - ally-ai: the checkpointer reuses the Agents v2 runtime's checkpoint database (`AGENT_RUNTIME__CHECKPOINT_*`),
   with an in-memory fallback locally, exactly as that runtime does.
 
+### Autonomy by default (Debrief v2, 2026-11-16)
+The ladder no longer waits for a person except for the always-ask list (V2_AUTONOMY.md A1): a
+passed side-by-side trial starts the learner try-out, a passed try-out goes live, and a live change
+is watched for `watchDays` and undone when its cumulative score falls by more than `undoMargin`
+within one language and recipe, or a gate trips. ally-ai's PM agent may state a confidence on an
+idea as `evidence.confidence` (`'high' | 'low'` or `{level, why}`); ally-be reads it, and missing
+reads as high.
+
 ## 4. Local end-to-end checks (before deleting legacy)
 
 1. A real local session debriefed end to end through ally-be → graph → publish → judge; the Console run view

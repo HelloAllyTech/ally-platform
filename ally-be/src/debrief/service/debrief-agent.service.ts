@@ -1,3 +1,4 @@
+import { DebriefSlackService } from './debrief-slack.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -234,6 +235,8 @@ export class DebriefAgentService implements OnModuleInit {
     @Optional() private readonly trials?: DebriefTrialsService,
     /** Code releases on deploy: live unless they would undo a promoted change. */
     @Optional() private readonly releaseHistory?: DebriefReleasesService,
+    /** v2 K3: a debrief shown with a missed clear risk cue goes to the safety contact. */
+    @Optional() private readonly slack?: DebriefSlackService,
   ) {}
 
   /**
@@ -550,6 +553,7 @@ export class DebriefAgentService implements OnModuleInit {
             ),
           );
         void this.trials?.onPublished(run);
+        void this.slack?.missedRiskCue(run).catch(() => false);
       }
       done++;
       this.logger.info(
@@ -604,6 +608,7 @@ export class DebriefAgentService implements OnModuleInit {
             ),
           );
         void this.trials?.onPublished(run);
+        void this.slack?.missedRiskCue(run).catch(() => false);
       }
     } catch (e) {
       this.logger.error(
@@ -721,6 +726,7 @@ export class DebriefAgentService implements OnModuleInit {
         if (!run) continue;
         await this.publisher?.applyToSession(run);
         await this.notifier.ready(run);
+        void this.slack?.missedRiskCue(run).catch(() => false);
       } catch (e) {
         this.logger.warn(
           `[debrief] could not show held draft ${id}: ${(e as Error).message}`,
