@@ -3,13 +3,9 @@ import { useCallback, useEffect } from "react";
 import { useSelector } from "react-redux";
 
 import { ANALYTICS_EVENTS, ANALYTICS_PROPS, useAnalytics } from "@ally-ui-mono/ui-shared";
-import { UserRole } from "@constants";
 
-const PLATFORM_ROLES: string[] = [
-  UserRole.SUPER_ADMIN,
-  UserRole.SUPER_DUPER_ADMIN,
-  UserRole.MULTI_TENANT_ADMIN,
-];
+// String literals (not UserRole) so tests that mock @constants can still import @hooks.
+const PLATFORM_ROLES: string[] = ["SUPER_ADMIN", "SUPER_DUPER_ADMIN", "MULTI_TENANT_ADMIN"];
 
 /** "platform" for Ally-internal super tiers, "tenant" for everyone scoped to one org. */
 export const resolveTenantTier = (role?: string | null): "platform" | "tenant" =>

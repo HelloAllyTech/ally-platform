@@ -324,6 +324,9 @@ export const en = {
     pleaseWait: "Please wait while we verify your link",
     magicLinkExpired: "Invalid or Expired Link",
     redirectingToLogin: "Redirecting to login page...",
+    backToLogin: "Back to login",
+    magicLinkMissingToken:
+      "This sign-in link is incomplete. Open the link from your email again, or request a new one.",
     redirectingToDashboard: "Redirecting to dashboard...",
   },
   // Per-admin content toggles (Create Roleplays / Cases / Courses). A type whose
