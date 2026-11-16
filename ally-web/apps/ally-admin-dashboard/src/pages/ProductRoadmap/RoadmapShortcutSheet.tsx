@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-import { en } from "@constants";
+import { en } from "@constants/en";
 
 interface Shortcut {
   keys: string[];

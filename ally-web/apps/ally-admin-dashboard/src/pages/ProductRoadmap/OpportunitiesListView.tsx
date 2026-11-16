@@ -3,6 +3,7 @@ import React from "react";
 import { SkeletonText } from "@ally-ui-mono/ui-shared";
 import { Button, EmptyState } from "@components";
 import { ButtonVariant } from "@components/types";
+import { en } from "@constants/en";
 import {
   RoadmapVoteBudget,
   RoadmapFacets,
@@ -14,7 +15,7 @@ import {
   RoadmapTaxonomyItem,
 } from "@types";
 
-import { OpportunityListCard } from "./OpportunityListCard";
+import { OpportunityListCard, RowEditor } from "./OpportunityListCard";
 import { RoadmapFilterBar, hasActiveFilters } from "./RoadmapFilterBar";
 import { RoadmapLoadError } from "./RoadmapLoadError";
 import { useSetVotes } from "./useSetVotes";
@@ -63,6 +64,8 @@ interface OpportunitiesListViewProps {
   /** The keyboard cursor row, owned by the page so the shortcut layer and the rows agree. */
   cursorId?: string | null;
   onCursor?: (id: string) => void;
+  /** In-place editing for managers; absent means read-only rows. */
+  editor?: RowEditor;
   /** Left-hand slot on the control row — the Queue's sort picker. */
   leading?: React.ReactNode;
   /**
@@ -121,6 +124,7 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
   isInbox,
   cursorId = null,
   onCursor,
+  editor,
   leading,
   onLoadMore,
   layoutToggle,
@@ -220,6 +224,7 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
               // Tab lands on the cursor row, or the first row when there is no cursor yet.
               isTabStop={cursorId === null ? index === 0 : opportunity.id === cursorId}
               onCursor={() => onCursor?.(opportunity.id)}
+              editor={editor}
             />
           ))}
         </div>
@@ -236,6 +241,7 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
           {data ? `Showing ${rows.length} of ${total} opportunities` : null}
           {isFetching && !isLoading ? " · updating…" : null}
           {canManage ? " · you can manage stages and taxonomy" : null}
+          {rows.length > 0 ? ` · ${en.roadmapTriage.shortcutsHint}` : null}
         </div>
 
         {canLoadMore && (

@@ -21,6 +21,7 @@ import {
   useGetRoadmapOpportunitiesQuery,
   useGetRoadmapProductGoalsQuery,
   useGetPlanSettingsQuery,
+  useGetRoadmapEligibleOwnersQuery,
 } from "@api";
 import { Permissions } from "@constants";
 import { useUser } from "@hooks";
@@ -29,6 +30,7 @@ import {
   RoadmapBoardLayout,
   RoadmapBoardQuery,
   RoadmapIdeaDraft,
+  RoadmapOpportunity,
   RoadmapOpportunitiesQuery,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
@@ -48,11 +50,13 @@ import { OpportunitiesBoard } from "./OpportunitiesBoard";
 import { OpportunitiesListView } from "./OpportunitiesListView";
 import { OpportunityDrawer } from "./OpportunityDrawer";
 import { OpportunityInterviewDrawer } from "./OpportunityInterviewDrawer";
+import { RowEditor } from "./OpportunityListCard";
 import { LeadQueueTab } from "./plans/LeadQueueTab";
 import { MyPlansTab } from "./plans/MyPlansTab";
 import { PlanDrawer } from "./plans/PlanDrawer";
 import { SignalsTab } from "./plans/SignalsTab";
 import { QuickAddOpportunityModal } from "./QuickAddOpportunityModal";
+import { RejectReasonBar } from "./RejectReasonBar";
 import { ReportBugModal } from "./ReportBugModal";
 import { RoadmapSettingsDrawer } from "./RoadmapSettingsDrawer";
 import { RoadmapShortcutSheet } from "./RoadmapShortcutSheet";
@@ -61,6 +65,7 @@ import { SavedViewTabs } from "./SavedViewTabs";
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useProductRoadmapRealtime } from "./useProductRoadmapRealtime";
 import { useRoadmapShortcuts } from "./useRoadmapShortcuts";
+import { useRoadmapTriage } from "./useRoadmapTriage";
 import { useSavedViews } from "./useSavedViews";
 import {
   canFileIdeas,
@@ -74,6 +79,7 @@ import { EMPTY_ADVANCED_FILTERS, RoadmapAdvancedFilterValues } from "./utils/fil
 import { RoadmapEffortFilterValue } from "./utils/filterSelection";
 import { monthKeyOf, shiftMonthKey } from "./utils/monthBoard";
 import { expandStageFilter } from "./utils/stages";
+import { RejectReasonId, acceptTarget } from "./utils/triage";
 import { overlayUrlState, parseUrlState, writeUrlState } from "./utils/urlState";
 import {
   INBOX_VIEW_ID,
@@ -953,6 +959,14 @@ export const ProductRoadmap: React.FC = () => {
   // ── keyboard cursor ───────────────────────────────────────────────────────
   const [cursorId, setCursorId] = useState<string | null>(null);
   const [isShortcutSheetOpen, setIsShortcutSheetOpen] = useState(false);
+  /** The row a Reject is waiting on a reason for (see RejectReasonBar). */
+  const [rejecting, setRejecting] = useState<RoadmapOpportunity | null>(null);
+  const triage = useRoadmapTriage(user?.id);
+  // Only managers can edit, and only they need the owner list; skipping it spares everyone else
+  // a request they could not use.
+  const { data: eligibleOwners } = useGetRoadmapEligibleOwnersQuery(undefined, {
+    skip: !canManage,
+  });
   /** The rows j/k can walk: the table and the list share one query; the board has none. */
   const cursorRowIds = useMemo(
     () => (isOpportunitiesTab && !isBoard ? (data?.items ?? []).map(item => item.id) : []),
@@ -974,8 +988,53 @@ export const ProductRoadmap: React.FC = () => {
     !isQuickAddOpen &&
     !isReportBugOpen &&
     !isShortcutSheetOpen &&
+    !rejecting &&
     !isBreadthPanelOpen;
+  const rowById = (id: string) => data?.items.find(item => item.id === id);
+  /**
+   * After a decision the row usually leaves the list (an accepted Idea is no longer in the Inbox),
+   * so move the cursor to the neighbour first — the next row, or the previous at the end — or the
+   * next keypress would start from nothing and the reader would lose their place.
+   */
+  const advanceFrom = (id: string) => {
+    const index = cursorRowIds.indexOf(id);
+    setCursorId(cursorRowIds[index + 1] ?? cursorRowIds[index - 1] ?? null);
+  };
+  const acceptRow = async (row: RoadmapOpportunity) => {
+    if (!acceptTarget(row.stage)) return;
+    advanceFrom(row.id);
+    await triage.accept(row);
+  };
+  const rejectWithReason = async (reason?: RejectReasonId) => {
+    const row = rejecting;
+    setRejecting(null);
+    if (!row) return;
+    advanceFrom(row.id);
+    await triage.reject(row, reason);
+  };
+  /** Decisions exist only for managers; everyone else gets no decision keys and no buttons. */
+  const rowEditor: RowEditor | undefined = canManage
+    ? {
+        goals: (goals ?? []).map(goal => goal.name),
+        owners: (eligibleOwners ?? []).map(owner => ({
+          id: owner.id,
+          name: owner.name || owner.email,
+        })),
+        showOwnerNudge: isInboxView,
+        onSetEffort: (row, effort) => void triage.setField(row, { effort }, "effort"),
+        onSetGoal: (row, goal) => void triage.setField(row, { productGoal: goal }, "goal"),
+        onSetOwner: (row, ownerUserId) => void triage.setField(row, { ownerUserId }, "owner"),
+        onAccept: row => void acceptRow(row),
+        onReject: row => setRejecting(row),
+      }
+    : undefined;
   useRoadmapShortcuts(isKeyboardFree, {
+    onAccept: canManage ? id => void (rowById(id) && acceptRow(rowById(id)!)) : undefined,
+    onReject: canManage ? id => setRejecting(rowById(id) ?? null) : undefined,
+    onAssignToMe: canManage
+      ? id => void (rowById(id) && triage.assignToMe(rowById(id)!))
+      : undefined,
+    onUndo: canManage ? () => void triage.undoLast() : undefined,
     rowIds: cursorRowIds,
     cursorId,
     onCursor: setCursorId,
@@ -1486,6 +1545,7 @@ export const ProductRoadmap: React.FC = () => {
           onAddClick={() => setIsInterviewOpen(true)}
           cursorId={cursorId}
           onCursor={setCursorId}
+          editor={rowEditor}
           loaded={data?.items.length ?? 0}
           onLoadMore={() => setListLoaded(current => current + FEED_PAGE_SIZE)}
           layoutToggle={layoutToggle}
@@ -1559,7 +1619,15 @@ export const ProductRoadmap: React.FC = () => {
       )}
 
       {isShortcutSheetOpen && (
-        <RoadmapShortcutSheet canDecide={false} onClose={() => setIsShortcutSheetOpen(false)} />
+        <RoadmapShortcutSheet canDecide={canManage} onClose={() => setIsShortcutSheetOpen(false)} />
+      )}
+
+      {rejecting && (
+        <RejectReasonBar
+          code={rejecting.code}
+          onChoose={reason => void rejectWithReason(reason)}
+          onCancel={() => setRejecting(null)}
+        />
       )}
 
       {isReportBugOpen && <ReportBugModal onClose={() => setIsReportBugOpen(false)} />}

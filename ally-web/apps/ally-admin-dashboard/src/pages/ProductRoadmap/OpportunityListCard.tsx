@@ -1,8 +1,10 @@
 import React from "react";
 
-import { RoadmapVoteBudget, RoadmapOpportunity } from "@types";
+import { en } from "@constants/en";
+import { RoadmapVoteBudget, RoadmapOpportunity, RoadmapOpportunityEffort } from "@types";
 
 import { DirectorStarButton } from "./DirectorStarButton";
+import { InlineChipMenu } from "./InlineChipMenu";
 import { NewColleagueTag } from "./NewToYouChip";
 import { RankScore } from "./RankBreakdown";
 import { useScoreUnit } from "./useScoreUnit";
@@ -43,6 +45,23 @@ const GOAL_CHIP_STYLE = `${CHIP_BASE} bg-primary-50 text-primary-700`;
  */
 const EFFORT_CHIP_STYLE = `${CHIP_BASE} bg-purple-50 text-purple-700`;
 
+/**
+ * What a row needs in order to edit in place. Absent for a reader who cannot edit, in which case
+ * every chip below is plain text and there are no decision buttons — the controls are not merely
+ * disabled, they are not there.
+ */
+export interface RowEditor {
+  goals: string[];
+  owners: { id: number; name: string }[];
+  /** Inbox only: show a dashed "Owner?" chip on rows nobody owns. */
+  showOwnerNudge: boolean;
+  onSetEffort: (opportunity: RoadmapOpportunity, effort: RoadmapOpportunityEffort | null) => void;
+  onSetGoal: (opportunity: RoadmapOpportunity, goal: string) => void;
+  onSetOwner: (opportunity: RoadmapOpportunity, ownerUserId: number | null) => void;
+  onAccept: (opportunity: RoadmapOpportunity) => void;
+  onReject: (opportunity: RoadmapOpportunity) => void;
+}
+
 interface OpportunityListCardProps {
   opportunity: RoadmapOpportunity;
   /** Unfiltered max, so the priority bar keeps a stable scale across pages. */
@@ -66,6 +85,8 @@ interface OpportunityListCardProps {
   isTabStop?: boolean;
   /** Fired when the row takes focus, so the cursor follows a click or a Tab. */
   onCursor?: () => void;
+  /** In-place editing and decisions. See RowEditor. */
+  editor?: RowEditor;
 }
 
 /**
@@ -88,6 +109,7 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
   isCursor = false,
   isTabStop = false,
   onCursor,
+  editor,
 }) => {
   const { unit, enabled } = useScoreUnit();
   const isQueueCard = isQueue;
@@ -96,6 +118,12 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
   const rank = opportunity.queueRank;
   const [heading, ...rest] = opportunity.description.split("\n");
   const body = rest.join(" ").trim();
+  const effortChipStyle = opportunity.effort
+    ? EFFORT_CHIP_STYLE
+    : `${CHIP_BASE} border border-dashed border-border-light text-typography-secondary`;
+  // Accept applies to Ideas only; Reject to anything not already archived or shipped.
+  const canAccept = opportunity.stage === "new";
+  const canReject = opportunity.stage !== "archived" && opportunity.stage !== "released";
 
   return (
     <div
@@ -114,7 +142,7 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
           onOpen();
         }
       }}
-      className={`border-border-light bg-background-primary flex cursor-pointer items-start gap-3 border border-l-4 p-3 outline-none md:gap-4 md:p-4 ${
+      className={`group border-border-light bg-background-primary flex cursor-pointer items-start gap-3 border border-l-4 p-3 outline-none md:gap-4 md:p-4 ${
         isCursor ? "ring-primary-500 ring-2 ring-inset" : ""
       }`}
       // Inline, not a Tailwind class: the ramp is continuous, and Tailwind's JIT can only emit
@@ -197,7 +225,16 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
             owner, source and vote count, where a single chip among separators would be the odd
             one out instead.
           */}
-          {isQueueCard ? (
+          {isQueueCard && editor ? (
+            <InlineChipMenu
+              label={opportunity.productGoal}
+              tip={en.roadmapTriage.goalTip}
+              className={GOAL_CHIP_STYLE}
+              options={editor.goals.map(goal => ({ value: goal, label: goal }))}
+              selectedValue={opportunity.productGoal}
+              onSelect={goal => editor.onSetGoal(opportunity, goal)}
+            />
+          ) : isQueueCard ? (
             <span className={GOAL_CHIP_STYLE}>{opportunity.productGoal}</span>
           ) : (
             <span className="text-typography-secondary truncate">{opportunity.productGoal}</span>
@@ -210,21 +247,51 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
             line. An UNSIZED row gets a dashed "Size?" chip rather than silence: it is the one
             missing fact that changes the rank (unsized counts as 50), so absence has to be loud.
           */}
-          {isQueueCard && (
-            <span
-              className={
-                opportunity.effort
-                  ? EFFORT_CHIP_STYLE
-                  : `${CHIP_BASE} border border-dashed border-border-light text-typography-secondary`
-              }
-              title={
-                opportunity.effort
-                  ? `Effort ${EFFORT_LABEL[opportunity.effort]}`
-                  : "Not sized yet — it ranks as if it were a 50"
-              }
-            >
-              {opportunity.effort ? EFFORT_LABEL[opportunity.effort] : "Size?"}
-            </span>
+          {isQueueCard &&
+            (editor ? (
+              <InlineChipMenu
+                label={
+                  opportunity.effort ? EFFORT_LABEL[opportunity.effort] : en.roadmapTriage.sizeNudge
+                }
+                tip={
+                  opportunity.effort ? en.roadmapTriage.effortTip : en.roadmapTriage.sizeNudgeTip
+                }
+                className={effortChipStyle}
+                options={[
+                  ...Object.values(RoadmapOpportunityEffort).map(value => ({
+                    value,
+                    label: EFFORT_LABEL[value],
+                  })),
+                  { value: "", label: "Not sized" },
+                ]}
+                selectedValue={opportunity.effort ?? ""}
+                onSelect={value =>
+                  editor.onSetEffort(
+                    opportunity,
+                    (value || null) as RoadmapOpportunityEffort | null,
+                  )
+                }
+              />
+            ) : (
+              <span
+                className={effortChipStyle}
+                title={
+                  opportunity.effort
+                    ? `Effort ${EFFORT_LABEL[opportunity.effort]}`
+                    : "Not sized yet — it ranks as if it were a 50"
+                }
+              >
+                {opportunity.effort ? EFFORT_LABEL[opportunity.effort] : en.roadmapTriage.sizeNudge}
+              </span>
+            ))}
+          {isQueueCard && editor?.showOwnerNudge && !opportunity.owner && (
+            <InlineChipMenu
+              label={en.roadmapTriage.ownerNudge}
+              tip={en.roadmapTriage.ownerNudgeTip}
+              className={`${CHIP_BASE} border border-dashed border-border-light text-typography-secondary`}
+              options={editor.owners.map(owner => ({ value: String(owner.id), label: owner.name }))}
+              onSelect={value => editor.onSetOwner(opportunity, Number(value))}
+            />
           )}
           {isQueueCard && (
             <span className="text-typography-secondary tabular-nums">
@@ -267,6 +334,34 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
 
       {/* stopPropagation on BOTH events, matching the board card: click alone would still let a
           vote button pointerdown reach the row's own click handler first. */}
+      {editor && (canAccept || canReject) && (
+        // Hover or focus reveals them: buttons on every row would be noise on the rows you are
+        // not deciding about. Always in the DOM so Tab, `a` and `r` find them regardless.
+        <div
+          className="flex shrink-0 gap-1.5 opacity-0 focus-within:opacity-100 group-hover:opacity-100"
+          onClick={event => event.stopPropagation()}
+          onPointerDown={event => event.stopPropagation()}
+        >
+          {canAccept && (
+            <button
+              type="button"
+              onClick={() => editor.onAccept(opportunity)}
+              className="border-border-light hover:border-primary-500 text-typography-primary cursor-pointer border px-2 py-1 text-xs"
+            >
+              {en.roadmapTriage.peekAccept}
+            </button>
+          )}
+          {canReject && (
+            <button
+              type="button"
+              onClick={() => editor.onReject(opportunity)}
+              className="border-border-light hover:border-primary-500 text-typography-secondary cursor-pointer border px-2 py-1 text-xs"
+            >
+              {en.roadmapTriage.peekReject}
+            </button>
+          )}
+        </div>
+      )}
       <div
         className="shrink-0"
         onClick={event => event.stopPropagation()}
