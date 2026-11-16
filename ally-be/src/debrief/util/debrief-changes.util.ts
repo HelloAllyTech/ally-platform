@@ -57,6 +57,20 @@ export interface DebriefChange {
   basedOn: string;
   canUndo: boolean;
   canStop: boolean;
+  /** What kind of thing changes, for code that must tell (the advisor sees pinned rules only). */
+  kindKey:
+    | 'pinned_rule'
+    | 'prompt'
+    | 'setting'
+    | 'budget'
+    | 'model'
+    | 'code'
+    | 'agents'
+    | 'change';
+  /** The wording before and after, for a prompt or pinned-rule change. */
+  wording: { before: string; after: string } | null;
+  /** One short line for the list: when, and the first measure. */
+  summary: string;
 }
 
 /** What the mapping needs besides the idea. */
@@ -547,18 +561,21 @@ export function toDebriefChange(
   const e = idea.evidence ?? {};
   const langs = e.languages ?? idea.change?.languages ?? null;
   const releaseId = idea.releaseId ?? e.watch?.releaseId ?? null;
+  const kind = changeKindLabel(idea);
+  const when = changeWhen(idea, state);
+  const measures = changeMeasures(idea);
   return {
     id: idea.id,
     title: String(idea.text ?? idea.title ?? ''),
-    kind: changeKindLabel(idea),
+    kind,
     state,
     result: changeResult(idea, state, ctx, waitsBecause),
     why: changeWhy(idea),
-    when: changeWhen(idea, state),
+    when,
     waitsBecause,
     confidence: confidenceOf(e)?.level ?? null,
     languages: Array.isArray(langs) && langs.length ? langs.map(String) : null,
-    measures: changeMeasures(idea),
+    measures,
     steps: changeSteps(idea, ctx),
     basedOn: changeBasedOn(idea),
     canUndo:
@@ -566,7 +583,32 @@ export function toDebriefChange(
       (idea.change?.ideaKind === 'test_settings' ||
         (!!releaseId && releaseId === ctx.gaReleaseId)),
     canStop: state === 'trying' || state === 'testing',
+    kindKey: kindKeyOf(kind),
+    wording:
+      typeof idea.change?.find === 'string' &&
+      typeof idea.change?.replace === 'string'
+        ? { before: idea.change.find, after: idea.change.replace }
+        : null,
+    summary: [
+      when,
+      measures[0] ? `${measures[0].name} ${measures[0].value}` : '',
+    ]
+      .filter(Boolean)
+      .join(' · '),
   };
+}
+
+/** The kind label's first word, as a key. */
+export function kindKeyOf(kind: string): DebriefChange['kindKey'] {
+  const k = kind.toLowerCase();
+  if (k.startsWith('pinned rule')) return 'pinned_rule';
+  if (k.startsWith('prompt')) return 'prompt';
+  if (k.startsWith('setting')) return 'setting';
+  if (k.startsWith('budget')) return 'budget';
+  if (k.startsWith('model')) return 'model';
+  if (k.startsWith('code')) return 'code';
+  if (k.startsWith('agents')) return 'agents';
+  return 'change';
 }
 
 /** Languages in words, for a sentence. */

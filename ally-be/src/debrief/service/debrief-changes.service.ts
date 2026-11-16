@@ -139,7 +139,10 @@ export class DebriefChangesService implements OnModuleInit {
   }
 
   /** `GET home` (F1): the headline, what needs a person, this week. */
-  async home(now = new Date()): Promise<DebriefHomeV2> {
+  async home(
+    now = new Date(),
+    opts: { pinnedRulesOnly?: boolean } = {},
+  ): Promise<DebriefHomeV2> {
     const [score, ideas, ctx] = await Promise.all([
       this.score.view(14, now),
       this.ideas(),
@@ -150,7 +153,8 @@ export class DebriefChangesService implements OnModuleInit {
     const needsYou = changes.filter(
       ({ idea, c }) =>
         c.state === 'waits' &&
-        !['needs_code', 'defect'].includes(idea.change?.ideaKind),
+        !['needs_code', 'defect'].includes(idea.change?.ideaKind) &&
+        (!opts.pinnedRulesOnly || c.kindKey === 'pinned_rule'),
     );
     const weekAgo = now.getTime() - 7 * DAY_MS;
     const within = (v: unknown) =>

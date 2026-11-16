@@ -19,6 +19,7 @@ import {
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { DebriefConsoleAuditInterceptor } from '../interceptor/debrief-console-audit.interceptor';
 import { DebriefChangesService } from '../service/debrief-changes.service';
+import { DebriefConsoleViewService } from '../service/debrief-console-view.service';
 import { DebriefScoreService } from '../service/debrief-score.service';
 import { DebriefAct, DebriefRead } from '../util/debrief-console-roles.util';
 
@@ -46,6 +47,7 @@ export class DebriefChangesController {
   constructor(
     private readonly changes: DebriefChangesService,
     private readonly score: DebriefScoreService,
+    private readonly view: DebriefConsoleViewService,
   ) {}
 
   @Get('home')
@@ -54,8 +56,12 @@ export class DebriefChangesController {
     summary:
       'Home (v2): the score headline, changes that wait for a person (always-ask only) and this week',
   })
-  home() {
-    return this.changes.home();
+  async home(@Req() req: AuthedRequest) {
+    // The clinical advisor sees only the pinned-rule changes they decide (spec C5).
+    const can = (await this.view.viewer(req.user.id)).can;
+    return this.changes.home(new Date(), {
+      pinnedRulesOnly: !can.pmAgent,
+    });
   }
 
   @Get('changes')

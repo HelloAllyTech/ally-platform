@@ -1313,6 +1313,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
         judgeMean: overview.judge.mean,
         meetsTheBar: overview.judge.passRate,
         needsAPerson: Number(needs?.n ?? 0),
+        // v2: nothing is held; how many were shown below the bar (F9).
+        shownBelowBar: Number(overview.runs.belowBar ?? 0),
         costP50Usd: overview.costUsd.p50,
         costP90Usd: overview.costUsd.p90,
         spentThisMonthUsd: overview.budget.monthSpentUsd,

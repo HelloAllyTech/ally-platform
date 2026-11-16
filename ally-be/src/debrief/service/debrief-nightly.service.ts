@@ -426,7 +426,14 @@ export class DebriefNightlyService implements OnModuleInit {
       day: r.day,
       slice: r.slice,
       metrics: r.metrics ?? {},
-      alerts: Array.isArray(r.alerts) ? r.alerts : [],
+      // Where each finding went (v2: nobody watches this page; F7).
+      alerts: (Array.isArray(r.alerts) ? r.alerts : []).map((a) => ({
+        ...a,
+        routedTo:
+          a.code === 'judge_drift'
+            ? 'PM agent: scores since then are read with care until the judge is checked again'
+            : 'PM agent: read as evidence for its next changes',
+      })),
     }));
   }
 

@@ -223,6 +223,37 @@ describe('a change in the owner’s words (v2 Changes)', () => {
   });
 });
 
+describe('fields the v2 console needs', () => {
+  it('a pinned-rule change carries its key and its wording before and after', () => {
+    const c = toDebriefChange(
+      idea({
+        change: {
+          ideaKind: 'pinned_rule',
+          promptCode: 'debrief_safety_reader_system',
+          find: 'A risk cue is a direct statement.',
+          replace: 'A risk cue is a direct or indirect statement.',
+        },
+      }),
+      ctx,
+    );
+    expect(c.kindKey).toBe('pinned_rule');
+    expect(c.wording).toEqual({
+      before: 'A risk cue is a direct statement.',
+      after: 'A risk cue is a direct or indirect statement.',
+    });
+  });
+
+  it('other changes have no wording and a short summary line', () => {
+    const c = toDebriefChange(
+      idea({ change: { ideaKind: 'setting', settingKey: 'passScore' } }),
+      ctx,
+    );
+    expect(c.kindKey).toBe('setting');
+    expect(c.wording).toBeNull();
+    expect(typeof c.summary).toBe('string');
+  });
+});
+
 describe('approvals that wait (v2 A7)', () => {
   it('a passed trial with nothing on the always-ask list never expires', () => {
     const a = approvalState(
