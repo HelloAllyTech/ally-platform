@@ -4,8 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PostHog } from 'posthog-node';
 import { Repository } from 'typeorm';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { userDistinctId } from 'src/posthog/posthog.util';
+import { SESSION_BOOKMARK_ANALYTICS_EVENTS } from '../session-bookmark-analytics.constants';
 import {
   CreateSessionBookmarkDto,
   SessionBookmarkDto,
@@ -19,6 +22,7 @@ export class SessionBookmarksService {
   constructor(
     @InjectRepository(SessionBookmark)
     private readonly bookmarks: Repository<SessionBookmark>,
+    private readonly posthog: PostHog,
   ) {}
 
   async create(dto: CreateSessionBookmarkDto): Promise<SessionBookmarkDto> {
@@ -50,6 +54,20 @@ export class SessionBookmarksService {
         source: dto.source ?? 'web',
       }),
     );
+
+    try {
+      this.posthog.capture({
+        distinctId: userDistinctId(userId),
+        event: SESSION_BOOKMARK_ANALYTICS_EVENTS.CREATED,
+        properties: {
+          scenario_session_id: dto.sessionId,
+          source: dto.source ?? 'web',
+        },
+      });
+    } catch {
+      // Analytics must never make saving a learner's bookmark fail.
+    }
+
     return this.toDto(saved);
   }
 
