@@ -743,7 +743,7 @@ Defaults are the old ticks, so a deploy changes nothing (server clock UTC → In
 | Job (key) | On screen | Default | Allowed |
 |---|---|---|---|
 | `debrief-agent-drain` | Write waiting debriefs | every 5 min | 1 / 5 / 15 min, always on |
-| `debrief-stuck-sweep` | Rescue stuck debriefs | every 5 min | 1 / 5 / 15 min, always on |
+| `debrief-stuck-sweep` | Rescue stuck debriefs (resume, hand over, show held drafts, **retry a live run with no draft once**, **send the rest to today's debrief**; CONTRACT.md "The learner always gets a debrief") | every 5 min | 1 / 5 / 15 min, always on |
 | `debrief-console-alerts` | Console alerts | every 30 min | 1 / 15 / 30 / 60 min, always on |
 | `debrief-judge` (**new**: `DebriefRunJudgeService.drain(5)`) | Judge new debriefs | every 30 min | 15 / 30 / 60 min |
 | `debrief-cost-reconcile` | Reconcile costs | daily 05:35 | 1 min / hourly / 6 h / daily |
@@ -867,3 +867,19 @@ as failed.
 
 - **Verdicts by platform admins:** decided 2026-11-12: revoked. The platform groups no longer hold `review:admin:debriefs` (migration 1981900780000); clinical advisors get it from the `CLINICAL_ADVISOR` role, added person by person (1981900930000).
 - **Calibration routes:** all removed on 2026-11-12 with Score by hand (`GET /v1/analytics/debrief-quality/calibration/:id`, `POST sessions/:sessionId/score`). `debrief_human_ratings` stays as history; agreement is in `GET analytics` and `GET autonomy`, from the advisor's answers.
+
+## Runs a learner never waits on (2026-11-16)
+
+CONTRACT.md "The learner always gets a debrief". What the Console reads on a run:
+
+- `skipReason` gains `debrief_tab_off` (the roleplay's Debrief tab is off) and `provider_not_allowed` is now a
+  `skipped` run (no allowed provider had a priced model for a step), no longer one held for a person.
+- `workspace.retries` (a live run with no draft was run again from the start; at most 1),
+  `workspace.fallbackToToday {at, outcome: "today" | "not_available"}` (the learner got today's debrief, or
+  "not available" because today's debrief's provider is not allowed for the organisation),
+  `workspace.overCap` / `overCapSpend {spentUsd, capUsd}` (the run went past the month's cap on the floor),
+  `workspace.overCapNotice {day, at}` (the run whose notice told the owner that day),
+  `workspace.providerAllowlist.substitutedSteps {"<recipe>.<step>": model}`, `workspace.overCeiling` (ally-ai:
+  the writer was reserved past the ceiling), and `workspace.askAllyLimit {reason, at}` (Ask Ally answered with
+  its limit; the learner view's `askAlly` reads it).
+- The owner gets one in-app notice (`DEBRIEF_OWNER_ALERT`) and one Slack post a day while debriefs go past the cap.

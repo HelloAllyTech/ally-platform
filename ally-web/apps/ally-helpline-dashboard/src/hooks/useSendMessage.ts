@@ -12,6 +12,7 @@ import {
   finishStreaming,
   clearStreamSession,
   setError,
+  setReplyLimit,
   startStreaming,
   setStreamingCitations,
   replaceStreamingContent,
@@ -31,7 +32,11 @@ type StreamBroadcast =
   | { type: "done"; sessionId: string; content: string; citations: Citation[] }
   | { type: "commit"; sessionId: string; message: ChatMessagePayload }
   | { type: "finish"; sessionId: string }
-  | { type: "error"; sessionId: string; failedMessage: string };
+  | { type: "error"; sessionId: string; failedMessage: string }
+  | { type: "limit"; sessionId: string; limit: ReplyLimit };
+
+/** Ask Ally's limit on a `done` event: no more questions on this debrief, or for now. */
+export type ReplyLimit = "session" | "month";
 
 const streamChannel = new BroadcastChannel("chat_stream_sync");
 
@@ -82,6 +87,9 @@ streamChannel.addEventListener("message", (e: MessageEvent<StreamBroadcast>) => 
       dispatch(finishStreaming({ sessionId: msg.sessionId }));
       dispatch(setError({ sessionId: msg.sessionId, message: msg.failedMessage }));
       break;
+    case "limit":
+      dispatch(setReplyLimit({ sessionId: msg.sessionId, limit: msg.limit }));
+      break;
   }
 });
 
@@ -89,7 +97,7 @@ type ParsedSSE =
   | { type: "start" }
   | { type: "token"; text: string }
   | { type: "citations"; citations: Citation[] }
-  | { type: "done"; content: string; citations: Citation[] };
+  | { type: "done"; content: string; citations: Citation[]; limit?: ReplyLimit };
 
 const parseSSEData = (raw: string): ParsedSSE => {
   try {
@@ -118,6 +126,9 @@ const parseSSEData = (raw: string): ParsedSSE => {
         type: "done",
         content: parsed.content ?? "",
         citations: parsed.citations ?? [],
+        ...(parsed.limit === "session" || parsed.limit === "month"
+          ? { limit: parsed.limit as ReplyLimit }
+          : {}),
       };
     }
 
@@ -213,6 +224,11 @@ const handleSSEEvent = (sessionId: string, parsed: ParsedSSE) => {
         citations: parsed.citations,
       });
       commitAndFinish(sessionId);
+      // Ask Ally's limit: the reply box goes, the limit message stays.
+      if (parsed.limit) {
+        dispatch(setReplyLimit({ sessionId, limit: parsed.limit }));
+        broadcast({ type: "limit", sessionId, limit: parsed.limit });
+      }
       break;
   }
 };
@@ -338,6 +354,7 @@ export const useSendMessage = (sessionId: string, streamPath?: string) => {
   const streamingMessage: ChatMessagePayload | null = streamSession?.streamingMessage ?? null;
   const isStreaming = streamSession?.isStreaming ?? false;
   const error = historySession?.error ?? false;
+  const replyLimit = historySession?.replyLimit ?? null;
 
   const sendMessage = useCallback(
     (message: string) => {
@@ -352,5 +369,13 @@ export const useSendMessage = (sessionId: string, streamPath?: string) => {
     processStream(sessionId, lastFailed, true, streamPath);
   }, [sessionId, historySession?.lastFailedMessage, streamPath]);
 
-  return { messages, streamingMessage, isStreaming, error, sendMessage, retryLastMessage };
+  return {
+    messages,
+    streamingMessage,
+    isStreaming,
+    error,
+    replyLimit,
+    sendMessage,
+    retryLastMessage,
+  };
 };

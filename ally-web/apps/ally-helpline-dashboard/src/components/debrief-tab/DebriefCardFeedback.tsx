@@ -118,6 +118,18 @@ export const CardFlag: FC<{
       </p>
     );
   }
+  if (flag?.answer?.reply) {
+    // V2_AUTONOMY F1: Ally answered the flag; show what it said.
+    return (
+      <p
+        role="status"
+        data-testid="debrief-flag-answer"
+        className="font-primary text-xs text-typography-700"
+      >
+        {t("postSim.debriefCards.flag.allyReplied", { reply: flag.answer.reply })}
+      </p>
+    );
+  }
   if (flag) {
     return (
       <p

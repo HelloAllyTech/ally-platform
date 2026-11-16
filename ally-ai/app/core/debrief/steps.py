@@ -518,13 +518,21 @@ def _practice_instruction(options: Optional[List[Dict[str, Any]]]) -> List[str]:
     learner can open, which ally-be lists and checks again afterwards."""
     if not options:
         return ["PRACTICE OPTIONS: none. Set every scenario_id to null."]
-    return [
+    lines = [
         "PRACTICE OPTIONS: practice_options lists roleplays this learner can "
         "open, with the skills each one practises. Set practise_next.scenario_id, "
         "and scenario_id on a work_on_this card, to the id of the option that "
         "best practises that skill, or null when none fits. Never mention an id "
         "or a roleplay's title in the text."
     ]
+    if any((o or {}).get("course") for o in options):
+        lines.append(
+            "This session is part of a course: every option is a roleplay of "
+            "that course the learner has already reached (this_roleplay marks "
+            "the one they just did). Suggest practising within the course, "
+            "never anything outside it."
+        )
+    return lines
 
 
 async def write(

@@ -67,6 +67,8 @@ async def debrief_run(
         bundle=req.bundle,
         prompts={k: v for k, v in req.prompts.items() if v},
         ceiling_usd=req.ceiling_usd,
+        allow_over_ceiling=req.allow_over_ceiling,
+        attempt=req.attempt,
         prices=req.prices,
         session=req.session,
         transcript=req.transcript,

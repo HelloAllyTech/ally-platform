@@ -296,6 +296,31 @@ describe('DebriefReplyService (Ask Ally)', () => {
       expect(done.content).toBe(REPLY_LIMIT.month.hi);
     });
 
+    it('marks the limit on the run, so the learner view keeps the reply box closed', async () => {
+      const { svc, kept } = build({
+        settings: { maxRepliesPerSession: 3 },
+        priorReplies: 3,
+      });
+      await run(svc, 'question');
+      await new Promise((r) => setTimeout(r, 0));
+      const marks = (kept.mock.calls as any[][]).filter(([sql]) =>
+        String(sql).includes('askAllyLimit'),
+      );
+      expect(marks).toHaveLength(1);
+      expect(marks[0][1]).toEqual([expect.any(String), 'session']);
+    });
+
+    it('marks no limit on an ordinary reply', async () => {
+      const { svc, kept } = build({});
+      await run(svc, 'question');
+      await new Promise((r) => setTimeout(r, 0));
+      expect(
+        (kept.mock.calls as any[][]).some(([sql]) =>
+          String(sql).includes('askAllyLimit'),
+        ),
+      ).toBe(false);
+    });
+
     it('still answers a learner in crisis with the approved copy', async () => {
       const { svc } = build({ monthSpentUsd: 150 });
       const events = await run(svc, 'I want to kill myself');

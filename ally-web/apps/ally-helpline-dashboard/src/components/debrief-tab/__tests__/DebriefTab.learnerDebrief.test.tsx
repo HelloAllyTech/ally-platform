@@ -55,6 +55,10 @@ vi.mock("@api", () => ({
   LEARNER_DEBRIEF_POLL_MS: 3000,
   LEARNER_DEBRIEF_SLOW_POLL_MS: 30000,
   LEARNER_DEBRIEF_FAST_FOR_MS: 240000,
+  LEARNER_DEBRIEF_GIVE_UP_MS: 1_800_000,
+  LEARNER_DEBRIEF_FLAG_POLL_MS: 5000,
+  LEARNER_DEBRIEF_FLAG_POLL_FOR_MS: 120_000,
+  LEARNER_DEBRIEF_FLAG_UNDO_MS: 600_000,
 }));
 
 vi.mock("@assets", () => ({
@@ -63,6 +67,7 @@ vi.mock("@assets", () => ({
 }));
 
 const mockUseSendMessage = vi.hoisted(() => vi.fn());
+const mockReplyLimit = vi.hoisted(() => ({ value: null as "session" | "month" | null }));
 vi.mock("@hooks", () => ({
   useSendMessage: (...args: unknown[]) => {
     mockUseSendMessage(...args);
@@ -71,6 +76,7 @@ vi.mock("@hooks", () => ({
       streamingMessage: undefined,
       isStreaming: false,
       error: undefined,
+      replyLimit: mockReplyLimit.value,
       sendMessage: vi.fn(),
       retryLastMessage: vi.fn(),
     };
@@ -584,6 +590,97 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       expect(mockMutations.undo).toHaveBeenCalledWith({ sessionId: "s-1", flagId: "f1" });
     });
 
+    it("says why a removed card was removed: the review's note, else Ally's answer", () => {
+      ready({
+        corrections: [
+          { section: "work_on_this[0]", outcome: "removed", note: "Not in the session.", at: "" },
+          { section: "what_worked[0]", outcome: "removed", note: null, at: "" },
+        ],
+        feedback: {
+          helpful: null,
+          flags: [
+            {
+              id: "f1",
+              section: "what_worked[0]",
+              status: "removed",
+              canUndoUntil: null,
+              answer: { action: "removed", reply: "You're right, I misread it.", at: "" },
+            },
+          ],
+        },
+      });
+      renderTab();
+      const notes = within(screen.getByTestId("debrief-removed-note")).getAllByRole("listitem");
+      expect(notes).toHaveLength(2);
+      for (const n of notes) {
+        expect(n).toHaveTextContent("postSim.debriefCards.corrections.removedBecause");
+      }
+    });
+
+    it("shows Ally's answer to an open flag", () => {
+      ready({
+        feedback: {
+          helpful: null,
+          flags: [
+            {
+              id: "f1",
+              section: "what_worked[0]",
+              status: "open",
+              canUndoUntil: new Date(Date.now() + 60_000).toISOString(),
+              answer: { action: "kept", reply: "It is in turn 3.", at: "" },
+            },
+          ],
+        },
+      });
+      renderTab();
+      expect(screen.getByTestId("debrief-flag-answer")).toHaveTextContent(
+        "postSim.debriefCards.flag.allyReplied",
+      );
+    });
+
+    it("asks every 5 s while a flag Ally has not answered is open", () => {
+      ready({
+        feedback: {
+          helpful: null,
+          flags: [
+            {
+              id: "f1",
+              section: "what_worked[0]",
+              status: "open",
+              // Sent 30 s ago: the undo window ends 9.5 minutes from now.
+              canUndoUntil: new Date(Date.now() + 570_000).toISOString(),
+            },
+          ],
+        },
+      });
+      renderTab();
+      expect(mockLearnerDebriefQuery).toHaveBeenLastCalledWith(
+        "s-1",
+        expect.objectContaining({ pollingInterval: 5000 }),
+      );
+    });
+
+    it("stops asking once a flag is older than 2 minutes", () => {
+      ready({
+        feedback: {
+          helpful: null,
+          flags: [
+            {
+              id: "f1",
+              section: "what_worked[0]",
+              status: "open",
+              canUndoUntil: new Date(Date.now() + 300_000).toISOString(),
+            },
+          ],
+        },
+      });
+      renderTab();
+      expect(mockLearnerDebriefQuery).toHaveBeenLastCalledWith(
+        "s-1",
+        expect.objectContaining({ pollingInterval: 0 }),
+      );
+    });
+
     it("hides a removed card by its stored index and says a point was removed", () => {
       ready({
         corrections: [{ section: "work_on_this[0]", outcome: "removed", note: null, at: "" }],
@@ -791,7 +888,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       expect(screen.getByTestId("debrief-practise-next")).toBeInTheDocument();
     });
 
-    it("shows no button when no linked roleplay is available", () => {
+    it("offers the learner's roleplays when no linked roleplay is available, never text only", () => {
       mockLearnerDebriefQuery.mockReturnValue({
         data: { state: "ready", cards: withLinks, language: "en", practice: [] },
       });
@@ -799,6 +896,48 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
 
       expect(screen.queryByTestId("debrief-practise-next")).not.toBeInTheDocument();
       expect(screen.queryByTestId("debrief-practise-this")).not.toBeInTheDocument();
+      const card = screen.getByTestId("debrief-card-practise-next");
+      expect(within(card).getByTestId("debrief-practise-roleplays")).toHaveAttribute(
+        "href",
+        "/learn",
+      );
+    });
+
+    it("offers the roleplays list when the Writer linked no roleplay at all", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: { ...withLinks, practise_next: { ...withLinks.practise_next, scenario_id: null } },
+          language: "en",
+          practice: [{ id: 41, title: "Exam stress" }],
+        },
+      });
+      renderTab();
+      expect(screen.getByTestId("debrief-practise-roleplays")).toBeInTheDocument();
+    });
+
+    it("opens a course roleplay as its item in the course player when launched from the course", () => {
+      sessionStorage.setItem(
+        "activeTrackContext",
+        JSON.stringify({ trackId: "t-9", itemId: "i-1" }),
+      );
+      try {
+        mockLearnerDebriefQuery.mockReturnValue({
+          data: {
+            state: "ready",
+            cards: withLinks,
+            language: "en",
+            practice: [{ id: 41, title: "Exam stress", trackItemId: "i-41" }],
+          },
+        });
+        renderTab();
+        expect(screen.getByTestId("debrief-practise-next")).toHaveAttribute(
+          "href",
+          "/track/t-9/item/i-41",
+        );
+      } finally {
+        sessionStorage.removeItem("activeTrackContext");
+      }
     });
   });
 
@@ -925,6 +1064,61 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       vi.advanceTimersByTime(60_000);
       expect(mockMarkRead).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("DebriefTab — never an endless wait", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each(["working", "on_its_way", "taking_longer"])(
+    "shows today's debrief after 30 minutes %s, and stops asking",
+    state => {
+      vi.useFakeTimers();
+      mockLearnerDebriefQuery.mockReturnValue({ data: { state, steps: [] } });
+      renderTab();
+      expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(30 * 60_000 + 10);
+      });
+      expect(screen.getByTestId("supervisor-note")).toHaveTextContent(NOTE);
+      expect(mockLearnerDebriefQuery).toHaveBeenLastCalledWith(
+        "s-1",
+        expect.objectContaining({ pollingInterval: 0 }),
+      );
+    },
+  );
+});
+
+describe("DebriefTab — Ask Ally's limit", () => {
+  afterEach(() => {
+    mockReplyLimit.value = null;
+  });
+
+  const readyView = (extra: Record<string, unknown> = {}) =>
+    mockLearnerDebriefQuery.mockReturnValue({
+      data: { state: "ready", cards: CARDS, language: "en", practice: [], ...extra },
+    });
+
+  it("shows the reply box while Ask Ally takes questions", () => {
+    readyView({ askAlly: { open: true } });
+    renderTab();
+    expect(screen.getByTestId("reply-input")).toBeInTheDocument();
+  });
+
+  it("hides the reply box once the reply stream says the limit was reached", () => {
+    mockReplyLimit.value = "session";
+    readyView();
+    renderTab();
+    expect(screen.getByTestId("ask-ally")).toBeInTheDocument();
+    expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
+  });
+
+  it("keeps it hidden on reload when the server says Ask Ally is closed", () => {
+    readyView({ askAlly: { open: false, reason: "month" } });
+    renderTab();
+    expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
   });
 });
 

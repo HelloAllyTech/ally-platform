@@ -191,10 +191,24 @@ export class DebriefGatewayService {
     return { text: renderCards(body.cards) };
   }
 
-  /** Point ids, and "Practise next" kept only when it links a roleplay the learner was offered. */
-  finaliseCards(body: { cards: DebriefCards; offered?: number[] }) {
+  /**
+   * Point ids, and roleplay links kept only for roleplays the learner was
+   * offered; "Practise next" falls back to `fallback` (this same roleplay,
+   * else the first option) rather than losing its button.
+   */
+  finaliseCards(body: {
+    cards: DebriefCards;
+    offered?: number[];
+    fallback?: number | null;
+  }) {
     const offered = new Set((body.offered ?? []).map(Number));
-    return { cards: withPointIds(keepOfferedPractice(body.cards, offered)) };
+    const fallback =
+      body.fallback != null
+        ? Number(body.fallback)
+        : (body.offered?.[0] ?? null);
+    return {
+      cards: withPointIds(keepOfferedPractice(body.cards, offered, fallback)),
+    };
   }
 
   /**

@@ -4,11 +4,29 @@ import { useTranslation } from "react-i18next";
 
 import {
   LEARNER_DEBRIEF_FAST_FOR_MS,
+  LEARNER_DEBRIEF_FLAG_POLL_FOR_MS,
+  LEARNER_DEBRIEF_FLAG_POLL_MS,
+  LEARNER_DEBRIEF_FLAG_UNDO_MS,
+  LEARNER_DEBRIEF_GIVE_UP_MS,
   LEARNER_DEBRIEF_POLL_MS,
   LEARNER_DEBRIEF_SLOW_POLL_MS,
   useGetLearnerDebriefQuery,
 } from "@api";
 import { LearnerDebriefView } from "@types";
+
+/**
+ * Until when to keep asking after a flag: 2 minutes from the newest flag
+ * still open (its undo window started when it was sent), or 0.
+ */
+export const flagPollUntil = (view: LearnerDebriefView | undefined): number => {
+  let until = 0;
+  for (const flag of view?.feedback?.flags ?? []) {
+    if (flag.status !== "open" || flag.answer || !flag.canUndoUntil) continue;
+    const sentAt = new Date(flag.canUndoUntil).getTime() - LEARNER_DEBRIEF_FLAG_UNDO_MS;
+    until = Math.max(until, sentAt + LEARNER_DEBRIEF_FLAG_POLL_FOR_MS);
+  }
+  return until;
+};
 
 /**
  * Whether a failed request means "the debrief didn't load" (the learner gets
@@ -44,7 +62,10 @@ export interface LearnerDebriefResult {
  *
  * Polls every 3 s while the state is `working`, for up to 4 minutes, then
  * every 30 s; every 30 s while a person finishes one (`on_its_way`); and not
- * at all otherwise (v9 FR-33).
+ * at all otherwise (v9 FR-33). After 30 minutes of waiting it stops and the
+ * learner gets today's debrief instead (`null`): never an endless wait. After
+ * a flag, every 5 s for up to 2 minutes while it is open, so Ally's answer
+ * shows without a reload.
  */
 export const useLearnerDebrief = (
   sessionId: string | undefined,
@@ -53,15 +74,55 @@ export const useLearnerDebrief = (
   const [isWorking, setIsWorking] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [slow, setSlow] = useState(false);
+  const [gaveUp, setGaveUp] = useState(false);
+  const [flagPolling, setFlagPolling] = useState(false);
   const { data, error, refetch, isFetching } = useGetLearnerDebriefQuery(sessionId ?? "", {
     skip: skip || !sessionId,
-    pollingInterval:
-      isWorking && !slow
+    pollingInterval: gaveUp
+      ? 0
+      : isWorking && !slow
         ? LEARNER_DEBRIEF_POLL_MS
-        : isWorking || isWaiting
-          ? LEARNER_DEBRIEF_SLOW_POLL_MS
-          : 0,
+        : flagPolling
+          ? LEARNER_DEBRIEF_FLAG_POLL_MS
+          : isWorking || isWaiting
+            ? LEARNER_DEBRIEF_SLOW_POLL_MS
+            : 0,
   });
+
+  // A flag Ally has not answered yet: ask every 5 s until it does, for up
+  // to 2 minutes after it was sent.
+  const pollFlagsUntil = flagPollUntil(data);
+  useEffect(() => {
+    const left = pollFlagsUntil - Date.now();
+    if (left <= 0) {
+      setFlagPolling(false);
+      return undefined;
+    }
+    setFlagPolling(true);
+    const timer = setTimeout(() => setFlagPolling(false), left);
+    return () => clearTimeout(timer);
+  }, [pollFlagsUntil]);
+
+  // 30 minutes of waiting in all (working, on its way, taking longer): stop
+  // asking and show today's debrief. The clock starts at the first waiting
+  // answer and is not reset as the state moves between waiting states.
+  const waiting =
+    data?.state === "working" || data?.state === "on_its_way" || data?.state === "taking_longer";
+  const waitingSince = useRef<number | null>(null);
+  useEffect(() => {
+    if (!waiting) {
+      waitingSince.current = null;
+      return undefined;
+    }
+    waitingSince.current ??= Date.now();
+    const left = waitingSince.current + LEARNER_DEBRIEF_GIVE_UP_MS - Date.now();
+    if (left <= 0) {
+      setGaveUp(true);
+      return undefined;
+    }
+    const timer = setTimeout(() => setGaveUp(true), left);
+    return () => clearTimeout(timer);
+  }, [waiting]);
 
   // After four minutes of "working", ask less often.
   useEffect(() => {
@@ -119,6 +180,8 @@ export const useLearnerDebrief = (
   // RTK Query keeps the last good answer when a later poll fails, so only a
   // request that never succeeded reaches here without `data`.
   if (!data) return result(failed || loadFailed ? { state: "failed" } : null);
+  // Waited 30 minutes: today's debrief, not an endless wait.
+  if (gaveUp && waiting) return result(null);
   // FR-46: after an emergency stop the tab says "not available", never
   // today's debrief; otherwise the organisation simply isn't switched on.
   if (data.state === "not_available") return result(data.stopped ? data : null);

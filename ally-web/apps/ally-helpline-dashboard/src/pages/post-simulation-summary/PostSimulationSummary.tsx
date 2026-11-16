@@ -257,16 +257,20 @@ export const PostSimulationSummary: FC = () => {
     }
   }, [summaryData, isLoading, summary]);
 
+  // With no feedback tabs the learner goes back where they came from: the
+  // course, when the roleplay was played inside one, else the role-play list.
+  const noFeedbackExit = trackContext ? trackHomeRoute(trackContext) : ROUTES.LEARN;
+
   // Feedback-disabled flow: as soon as the scenario config loads, either prompt
-  // for the star rating (if not yet given) or go straight to the role-play list.
+  // for the star rating (if not yet given) or go straight back.
   useEffect(() => {
     if (!summary || feedbackEnabled) return;
     if (summary.hasFeedback) {
-      navigate(ROUTES.LEARN);
+      navigate(noFeedbackExit);
     } else {
       setFeedbackOpen(true);
     }
-  }, [summary, feedbackEnabled, navigate]);
+  }, [summary, feedbackEnabled, navigate, noFeedbackExit]);
 
   const handleCreateReview = async (status: string, note?: string) => {
     const normalizedNote = note?.trim() || null;
@@ -374,14 +378,14 @@ export const PostSimulationSummary: FC = () => {
   }
 
   // Feedback disabled: render only the star-rating dialog; submitting or
-  // dismissing it returns the learner to the role-play list.
+  // dismissing it returns the learner to the course or the role-play list.
   if (summary && !feedbackEnabled) {
     return (
       <div className="flex h-[100dvh] min-h-0 w-full flex-col items-center overflow-hidden bg-white">
         <FeedbackDialog
           open={feedbackOpen}
-          onClose={() => navigate(ROUTES.LEARN)}
-          onSubmitComplete={() => navigate(ROUTES.LEARN)}
+          onClose={() => navigate(noFeedbackExit)}
+          onSubmitComplete={() => navigate(noFeedbackExit)}
           id={sessionId ?? ""}
           sessionType={SessionType.SIMULATION}
           initialRating={summary?.sessionFeedback?.rating}

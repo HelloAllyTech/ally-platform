@@ -42,6 +42,12 @@ export interface DebriefSessionContext {
   inCase: boolean;
   /** False when the session recorded no language and `language` is only a default. */
   languageRecorded: boolean;
+  /**
+   * The roleplay's author switched its Debrief tab off
+   * (`scenarios.metadata.feedbackTabs.debrief === false`): no Debrief agent
+   * run, nothing to tell the learner.
+   */
+  debriefTabOff?: boolean;
 }
 
 /** One event the live detector watched for during the roleplay. */
@@ -83,6 +89,7 @@ export class DebriefContextRepository {
               s."scenarioId" AS scenario_id,
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
               s."caseSessionItemId" IS NOT NULL AS in_case,
+              COALESCE(sc.metadata->'feedbackTabs'->>'debrief', '') = 'false' AS debrief_tab_off,
               COALESCE((ti."completionCriteria"->>'assessmentMode')::boolean, false) AS assessment,
               -- PRD §6.1: a blank line (an empty transcription) is not a
               -- learner turn; the transcript the Writer reads skips it too.
@@ -123,6 +130,7 @@ export class DebriefContextRepository {
       assessment: r.assessment === true,
       inCase: r.in_case === true,
       languageRecorded: r.language_recorded === true,
+      debriefTabOff: r.debrief_tab_off === true,
     };
   }
 

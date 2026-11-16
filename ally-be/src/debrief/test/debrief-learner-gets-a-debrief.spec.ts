@@ -1,0 +1,458 @@
+import {
+  DebriefAgentService,
+  istDay,
+  retryPending,
+  withPractiseNextFallback,
+} from '../service/debrief-agent.service';
+import { keepOfferedPractice } from '../util/debrief-cards.util';
+import { DebriefPracticeService } from '../service/debrief-practice.service';
+import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
+import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../util/debrief-live.util';
+import {
+  modelTier,
+  substituteModel,
+} from '../util/debrief-provider-allowlist.util';
+import { todaysDebriefProvider } from '../util/debrief-todays-provider.util';
+import { DEBRIEF_MODELS } from '../constants/debrief-release.constants';
+
+/**
+ * Gopi, 2026-11-16: "as much as possible the learner should get the
+ * debrief; in the worst case fall back to the old debrief". What happens
+ * after a run returns: a retry, today's debrief, the owner told about the cap.
+ */
+function agent(opts: {
+  /** What the retry claim answers (rows claimed). */
+  claim?: boolean;
+  retried?: Record<string, unknown>;
+  providers?: Record<string, boolean>;
+  noticeTaken?: boolean;
+}) {
+  const sql: string[] = [];
+  const dataSource = {
+    query: jest.fn(async (q: string) => {
+      sql.push(q);
+      if (q.includes("'{retries}'")) return opts.claim ? [{ id: 'r1' }] : [];
+      if (q.includes('overCapNotice'))
+        return opts.noticeTaken ? [] : [{ id: 'r1' }];
+      if (q.includes('fallbackToToday')) return [{ id: 'r1' }];
+      return [];
+    }),
+  };
+  const runs = { findOne: jest.fn(async () => ({ id: 'r1' })) };
+  const runner = {
+    retry: jest.fn(async () => ({
+      id: 'r1',
+      mode: DebriefRunMode.LIVE,
+      scenarioSessionId: 's1',
+      tenantId: 't1',
+      workspace: { retries: 1 },
+      ...(opts.retried ?? {}),
+    })),
+  };
+  const judge = { judge: jest.fn(async () => undefined) };
+  const overrides = {
+    get: jest.fn(async () => ({
+      values: { live: true, ...(opts.providers ?? {}) },
+    })),
+  };
+  const notifier = {
+    ready: jest.fn(async () => undefined),
+    owner: jest.fn(async () => 1),
+  };
+  const slack = {
+    post: jest.fn(async () => true),
+    missedRiskCue: jest.fn(async () => false),
+  };
+  const events = { emit: jest.fn() };
+  const svc = new DebriefAgentService(
+    dataSource as any,
+    runs as any,
+    runner as any,
+    judge as any,
+    {} as any,
+    overrides as any,
+    { debriefAgentMode: 'shadow' } as any,
+    {} as any,
+    notifier as any,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    slack as any,
+    events as any,
+  );
+  const askedForToday = () =>
+    events.emit.mock.calls.filter(
+      ([name]) => name === DEBRIEF_FALLBACK_TO_TODAY_EVENT,
+    ).length;
+  return { svc, runner, notifier, slack, events, askedForToday, sql };
+}
+
+const noDraft = (o: Record<string, unknown> = {}) =>
+  ({
+    id: 'r1',
+    mode: DebriefRunMode.LIVE,
+    scenarioSessionId: 's1',
+    tenantId: 't1',
+    status: DebriefRunStatus.NEEDS_PERSON,
+    skipReason: 'safety_reader_failed',
+    cards: null,
+    workspace: {},
+    ...o,
+  }) as any;
+
+describe('after a live run returns', () => {
+  it('runs one with no draft again once, and publishes what the retry writes', async () => {
+    const { svc, runner, notifier, askedForToday } = agent({
+      claim: true,
+      retried: {
+        status: DebriefRunStatus.PUBLISHED,
+        cards: { opening: 'x' },
+        finishedAt: new Date(),
+      },
+    });
+    const out = await svc.afterRun(noDraft());
+    expect(runner.retry).toHaveBeenCalledTimes(1);
+    expect(out.status).toBe(DebriefRunStatus.PUBLISHED);
+    expect(notifier.ready).toHaveBeenCalled();
+    expect(askedForToday()).toBe(0);
+  });
+
+  it('sends the learner to today’s debrief when the retry has no draft either', async () => {
+    const { svc, runner, askedForToday } = agent({
+      claim: true,
+      retried: {
+        status: DebriefRunStatus.NEEDS_PERSON,
+        skipReason: 'safety_reader_failed',
+        cards: null,
+      },
+    });
+    const out = await svc.afterRun(noDraft());
+    // Retried once only: the retry's own retry count is spent.
+    expect(runner.retry).toHaveBeenCalledTimes(1);
+    expect(out.workspace.fallbackToToday).toMatchObject({ outcome: 'today' });
+    expect(askedForToday()).toBe(1);
+  });
+
+  it('a run whose provider has no model goes straight to today’s debrief', async () => {
+    const { svc, runner, askedForToday } = agent({});
+    await svc.afterRun(
+      noDraft({
+        status: DebriefRunStatus.SKIPPED,
+        skipReason: 'provider_not_allowed',
+      }),
+    );
+    expect(runner.retry).not.toHaveBeenCalled();
+    expect(askedForToday()).toBe(1);
+  });
+
+  it('never sends a provider-restricted learner to today’s debrief on a provider the organisation does not allow (FR-57)', async () => {
+    expect(todaysDebriefProvider()).toBe('openai');
+    const { svc, askedForToday } = agent({
+      providers: { 'providerAllowed.openai': false },
+    });
+    const run = noDraft({
+      status: DebriefRunStatus.SKIPPED,
+      skipReason: 'provider_not_allowed',
+    });
+    await svc.afterRun(run);
+    expect(askedForToday()).toBe(0);
+    expect(run.workspace.fallbackToToday).toMatchObject({
+      outcome: 'not_available',
+    });
+  });
+
+  it('a too-short session is not a missing debrief', async () => {
+    const { svc, askedForToday } = agent({});
+    await svc.afterRun(
+      noDraft({ status: DebriefRunStatus.SKIPPED, skipReason: 'too_short' }),
+    );
+    expect(askedForToday()).toBe(0);
+  });
+
+  it('knows which runs still have a retry due', () => {
+    expect(retryPending(noDraft())).toBe(true);
+    expect(retryPending(noDraft({ status: DebriefRunStatus.FAILED }))).toBe(
+      true,
+    );
+    expect(retryPending(noDraft({ workspace: { retries: 1 } }))).toBe(false);
+    expect(retryPending(noDraft({ skipReason: 'checks_failed' }))).toBe(false);
+    expect(retryPending(noDraft({ cards: { opening: 'x' } }))).toBe(false);
+    expect(retryPending(noDraft({ mode: DebriefRunMode.SHADOW }))).toBe(false);
+  });
+});
+
+describe('a debrief past the month’s budget', () => {
+  const overCap = () =>
+    noDraft({
+      status: DebriefRunStatus.PUBLISHED,
+      cards: { opening: 'x' },
+      workspace: {
+        overCap: true,
+        overCapSpend: { spentUsd: 52.3, capUsd: 50 },
+      },
+    });
+
+  it('tells the owner in the app and on Slack, with the amount', async () => {
+    const { svc, notifier, slack, sql } = agent({});
+    expect(await svc.notifyOverCap(overCap())).toBe(true);
+    expect(notifier.owner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringMatching(/\$50\.00.*\$52\.30/),
+      }),
+    );
+    expect(slack.post).toHaveBeenCalledWith(expect.stringMatching(/\$52\.30/));
+    expect(sql.find((q) => q.includes('overCapNotice'))).toBeDefined();
+  });
+
+  it('only once a day', async () => {
+    const { svc, notifier } = agent({ noticeTaken: true });
+    expect(await svc.notifyOverCap(overCap())).toBe(false);
+    expect(notifier.owner).not.toHaveBeenCalled();
+  });
+
+  it('says nothing for a run within budget', async () => {
+    const { svc, notifier } = agent({});
+    expect(
+      await svc.notifyOverCap(noDraft({ workspace: { overCap: false } })),
+    ).toBe(false);
+    expect(notifier.owner).not.toHaveBeenCalled();
+  });
+
+  it('counts days in IST', () => {
+    // 20:00 UTC on 16 Nov is 01:30 on 17 Nov in India.
+    expect(istDay(Date.UTC(2026, 10, 16, 20, 0))).toBe('2026-11-17');
+  });
+});
+
+describe('Practise next inside a course', () => {
+  const practice = (rows: unknown[], ownTip: string | null = 'tip-1') => {
+    const dataSource = {
+      query: jest.fn(async (q: string) => {
+        if (q.includes('WITH cur')) return rows;
+        if (q.includes('"trackItemProgressId" AS tip'))
+          return [{ tip: ownTip }];
+        if (q.includes('competencies')) return [];
+        return [];
+      }),
+    };
+    const scenarios = {
+      getScenariosV2: jest.fn(async () => ({
+        data: [{ id: 99, title: 'Library roleplay' }],
+      })),
+    };
+    return {
+      svc: new DebriefPracticeService(dataSource as any, scenarios as any),
+      scenarios,
+    };
+  };
+
+  it('offers only reached roleplays of the course, not-done first, this one always, never the library', async () => {
+    const { svc, scenarios } = practice([
+      {
+        id: 1,
+        title: 'Done earlier',
+        course: 'Basics',
+        done: true,
+        current: false,
+        track_item_id: 'i1',
+      },
+      {
+        id: 2,
+        title: 'Skipped earlier',
+        course: 'Basics',
+        done: false,
+        current: false,
+        track_item_id: 'i2',
+      },
+      {
+        id: 3,
+        title: 'This one',
+        course: 'Basics',
+        done: false,
+        current: true,
+        track_item_id: 'i3',
+      },
+    ]);
+    const options = await svc.optionsFor(7, 't1', 's1');
+    expect(options.map((o) => o.id)).toEqual([2, 3, 1]);
+    expect(options.every((o) => o.course === 'Basics')).toBe(true);
+    expect(options.find((o) => o.id === 3)?.this_roleplay).toBe(true);
+    expect(scenarios.getScenariosV2).not.toHaveBeenCalled();
+  });
+
+  it('never offers the library to a course session whose course lists nothing', async () => {
+    const { svc, scenarios } = practice([]);
+    expect(await svc.optionsFor(7, 't1', 's1')).toEqual([]);
+    expect(await svc.available(7, 't1', [99], 's1')).toEqual([]);
+    expect(scenarios.getScenariosV2).not.toHaveBeenCalled();
+  });
+
+  it('offers the library outside a course', async () => {
+    const { svc } = practice([], null);
+    expect((await svc.optionsFor(7, 't1', 's1')).map((o) => o.id)).toEqual([
+      99,
+    ]);
+  });
+
+  it('shows a practise button only for a roleplay of the course the learner reached', async () => {
+    const { svc } = practice([
+      {
+        id: 3,
+        title: 'This one',
+        course: 'Basics',
+        done: false,
+        current: true,
+        track_item_id: 'i3',
+      },
+    ]);
+    expect(await svc.available(7, 't1', [3, 99], 's1')).toEqual([
+      { id: 3, title: 'This one', trackItemId: 'i3' },
+    ]);
+  });
+
+  it('reads only items at or before this one, or completed ones', async () => {
+    const { svc } = practice([]);
+    await svc.course('s1');
+    const q = ((svc as any).dataSource.query as jest.Mock).mock.calls[0][0];
+    expect(q).toMatch(
+      /\(ts\."order", ti\."order"\) <= \(cur\.s_order, cur\.i_order\)/,
+    );
+    expect(q).toMatch(/p\.status = 'COMPLETED'/);
+  });
+});
+
+describe('a step with no model on an allowed provider (FR-57)', () => {
+  it('gets a priced model on an allowed provider, same tier first', () => {
+    expect(modelTier('gemini-2.5-flash')).toBe('fast');
+    expect(modelTier('gemini-2.5-pro')).toBe('strong');
+    expect(
+      substituteModel(
+        'gemini-2.5-flash',
+        ['gpt-4.1', 'gpt-4.1-mini', 'claude-sonnet-4-5', 'gemini-2.5-flash'],
+        ['openai'],
+      ),
+    ).toBe('gpt-4.1-mini');
+    expect(
+      substituteModel(
+        'gemini-2.5-pro',
+        ['gpt-4.1', 'gpt-4.1-mini'],
+        ['openai'],
+      ),
+    ).toBe('gpt-4.1');
+  });
+
+  it('never a provider the organisation does not allow, an unpriced model or the judge’s', () => {
+    expect(
+      substituteModel('gemini-2.5-flash', ['claude-sonnet-4-5'], ['openai']),
+    ).toBeNull();
+    expect(
+      substituteModel('gemini-2.5-flash', ['gpt-unknown-9'], ['openai']),
+    ).toBeNull();
+    expect(
+      substituteModel('gemini-2.5-flash', [DEBRIEF_MODELS.judge], ['gemini']),
+    ).toBeNull();
+  });
+});
+
+describe('"Practise this next" never loses its button', () => {
+  const cards = (scenario_id: number | null) =>
+    ({
+      opening: 'x',
+      what_worked: [],
+      work_on_this: [{ skill: 's', scenario_id: 99 }],
+      practise_next: { skill: 'Boundaries', reason: 'r', scenario_id },
+      skill_words: [],
+      reflective_question: 'q',
+    }) as any;
+
+  it('maps a missing or unoffered id to the fallback (this roleplay) when it is offered', () => {
+    const offered = new Set([3, 7]);
+    expect(
+      keepOfferedPractice(cards(null), offered, 3).practise_next?.scenario_id,
+    ).toBe(3);
+    expect(
+      keepOfferedPractice(cards(42), offered, 3).practise_next?.scenario_id,
+    ).toBe(3);
+    // A chosen, offered id stays; Work-on-this links get no fallback.
+    const kept = keepOfferedPractice(cards(7), offered, 3);
+    expect(kept.practise_next?.scenario_id).toBe(7);
+    expect(kept.work_on_this[0].scenario_id).toBeNull();
+    // A fallback that was not offered is never used.
+    expect(
+      keepOfferedPractice(cards(null), offered, 5).practise_next?.scenario_id,
+    ).toBeNull();
+  });
+
+  it('the learner view points an unopenable link at this same roleplay', () => {
+    const mapped = withPractiseNextFallback(cards(42), [{ id: 3 }], 3) as any;
+    expect(mapped.practise_next.scenario_id).toBe(3);
+    // Nothing the learner can open: left as is (the apps offer the list).
+    expect(
+      (withPractiseNextFallback(cards(42), [], 3) as any).practise_next
+        .scenario_id,
+    ).toBe(42);
+    // An openable link is kept.
+    expect(
+      (withPractiseNextFallback(cards(3), [{ id: 3 }, { id: 4 }], 4) as any)
+        .practise_next.scenario_id,
+    ).toBe(3);
+  });
+
+  it('the learner view serves the mapped link with its roleplay', async () => {
+    const dataSource = {
+      query: jest.fn(async (q: string) =>
+        q.includes('FROM scenario_sessions s WHERE s.id')
+          ? [
+              {
+                counselor_id: 7,
+                tenant_id: 't1',
+                status: 'ENDED',
+                ended_at: new Date(),
+                feedback: null,
+                learner_turns: 5,
+                debrief_tab_off: false,
+                scenario_id: 3,
+              },
+            ]
+          : [],
+      ),
+    };
+    const runs = {
+      find: jest.fn(async () => [
+        {
+          id: 'r1',
+          mode: 'live',
+          status: 'published',
+          cards: cards(null),
+          language: 'en',
+          steps: [],
+          workspace: {},
+        },
+      ]),
+    };
+    const practice = {
+      available: jest.fn(async (_u: number, _t: string, ids: number[]) =>
+        ids.includes(3)
+          ? [{ id: 3, title: 'This one', trackItemId: 'i3' }]
+          : [],
+      ),
+    };
+    const svc = new DebriefAgentService(
+      dataSource as any,
+      runs as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { get: jest.fn(async () => ({ values: { live: true } })) } as any,
+      { debriefAgentMode: 'shadow' } as any,
+      practice as any,
+      {} as any,
+    );
+    const view = await svc.learnerView('s1', 7);
+    expect((view.cards as any).practise_next.scenario_id).toBe(3);
+    expect(view.practice).toEqual([
+      { id: 3, title: 'This one', trackItemId: 'i3' },
+    ]);
+  });
+});
