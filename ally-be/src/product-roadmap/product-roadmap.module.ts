@@ -98,6 +98,7 @@ import { RoadmapOpportunityController } from './controller/roadmap-opportunity.c
 import { RoadmapGateway } from './gateway/roadmap.gateway';
 import { AwsModule } from 'src/aws/aws.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
+import { BugHunterApprovalsModule } from 'src/bug-hunter-approvals/bug-hunter-approvals.module';
 
 /**
  * Product Roadmap — the internal vote-based prioritisation board, rebuilt from the standalone
@@ -183,6 +184,11 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
      * checks a stored image really is one of our own uploads.
      */
     AwsModule,
+    /**
+     * BugHunterBoardService — a filed bug also enters Bug Hunter v2's queue (chunk 10).
+     * Safe to import: that module imports only AuditModule, nothing that reaches back here.
+     */
+    BugHunterApprovalsModule,
   ],
   controllers: [
     RoadmapOpportunityController,

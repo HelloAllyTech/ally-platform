@@ -189,6 +189,13 @@ export class BugHunterApprovalsService {
             [created.id, supersededIds],
           );
         }
+        // chunk 10: a verdict closes the bug on the board (Needs you -> Done)
+        await m.query(
+          `UPDATE bughunter.bugs
+              SET status = 'done', reason = $2, finished_at = now(), updated_at = now()
+            WHERE report_id = $1 AND status = 'needs_you'`,
+          [reportId, `verdict: ${dto.diagnosis} / ${dto.fix}`],
+        );
       });
     } catch (error: any) {
       if (error?.code === '23505') {

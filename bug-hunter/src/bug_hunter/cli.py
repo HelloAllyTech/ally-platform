@@ -1537,8 +1537,9 @@ def daily_cmd(
         bool,
         typer.Option(
             "--live",
-            help="Start graph runs and file reports. Default: a dry run that writes "
-            "the plan and starts nothing.",
+            help="Add the fresh candidates to the bug queue (bughunter.bugs); the "
+            "worker runs them according to the mode. Default: a dry run that writes "
+            "the plan and queues nothing.",
         ),
     ] = False,
     dry_run: Annotated[
@@ -1576,13 +1577,15 @@ def daily_cmd(
     if live and dry_run:
         typer.echo("give --live or --dry-run, not both", err=True)
         raise typer.Exit(code=1)
+    queue = None
     if live:
-        typer.echo(
-            "refused: live daily runs are wired after the 3-day dry-run review on the "
-            "VM (chunk 08 rollout); run without --live",
-            err=True,
-        )
-        raise typer.Exit(code=1)
+        from bug_hunter.queue.store import PostgresQueue, PostgresSettings
+
+        mode = PostgresSettings(db_url()).get().mode
+        if mode == "off":
+            typer.echo("mode is off: nothing collected (`bug-hunter mode manual`)")
+            return
+        queue = PostgresQueue(db_url())
     state = PostgresState(db_url())
     ledger = spend.ledger()
     all_sources = daily_sources(
@@ -1605,10 +1608,86 @@ def daily_cmd(
         all_sources,
         PostgresReports(db_url()),
         ledger,
-        dry_run=True,
+        dry_run=not live,
         out_dir=RUNS_DIR / "daily",
+        queue=queue,
     )
     typer.echo(plan.markdown())
+
+
+@app.command("mode")
+def mode_cmd(
+    mode: Annotated[
+        str | None,
+        typer.Argument(help="off | manual | autonomous; omit to show the current mode"),
+    ] = None,
+) -> None:
+    """The three modes (chunk 10). off: nothing is collected or run. manual: bugs are
+    collected; a run starts when an admin presses Start fix. autonomous: every bug
+    starts by itself, within the daily run limit and the $15/day cap."""
+    from bug_hunter.graph.checkpointer import db_url
+    from bug_hunter.queue.store import MODES, PostgresSettings
+
+    store = PostgresSettings(db_url())
+    if mode is None:
+        current = store.get()
+        typer.echo(f"mode: {current.mode} (daily run limit {current.daily_run_limit})")
+        return
+    if mode not in MODES:
+        typer.echo(f"mode must be one of {', '.join(MODES)}", err=True)
+        raise typer.Exit(code=1)
+    store.set_mode(mode)
+    typer.echo(f"mode: {mode}")
+
+
+@app.command("worker")
+def worker_cmd(
+    once: Annotated[
+        bool, typer.Option("--once", help="Take at most one bug, then exit.")
+    ] = False,
+    interval: Annotated[
+        float, typer.Option(help="Seconds between checks when there is nothing to do.")
+    ] = 30.0,
+) -> None:
+    """Run bugs from the queue according to the mode (chunk 10). Each run is a paid
+    graph run (about $0.50-0.80), capped by the daily run limit and $15/day."""
+    import contextlib
+
+    from bug_hunter import spend
+    from bug_hunter.graph.checkpointer import db_url
+    from bug_hunter.memory.store import open_memory
+    from bug_hunter.queue.store import PostgresQueue, PostgresSettings
+    from bug_hunter.queue.worker import work_loop, work_once
+    from bug_hunter.reports.store import PostgresReports
+    from bug_hunter.signals.runner import make_start_run, real_graph_run
+    from bug_hunter.signals.state import PostgresState
+
+    config = _load_or_exit()
+    url = db_url()
+    settings, queue = PostgresSettings(url), PostgresQueue(url)
+    reports, state, ledger = PostgresReports(url), PostgresState(url), spend.ledger()
+    with contextlib.ExitStack() as stack:
+        memory = stack.enter_context(open_memory(config))
+        start_run = make_start_run(config, real_graph_run, memory=memory)
+
+        def one():
+            return work_once(
+                config, settings, queue, reports, ledger, start_run, state=state
+            )
+
+        if once:
+            result = one()
+            typer.echo(
+                f"{result.action}"
+                + (f": bug {result.bug_id} -> {result.status}" if result.bug_id else "")
+                + (f" ({result.reason})" if result.reason else "")
+            )
+            return
+        typer.echo(f"worker started (checks every {interval:.0f}s; Ctrl-C stops it)")
+        try:
+            work_loop(one, interval_s=interval, log=typer.echo)
+        except KeyboardInterrupt:
+            typer.echo("worker stopped")
 
 
 @app.command("pause")

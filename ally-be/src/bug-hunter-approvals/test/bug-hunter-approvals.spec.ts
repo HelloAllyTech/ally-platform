@@ -25,6 +25,7 @@ import { BughunterDbService } from '../service/bughunter-db.service';
 class FakeBughunterDb {
   reports = new Map<number, any>();
   verdicts: any[] = [];
+  closedBugs: any[][] = [];
   failInsertWith: any = null;
 
   query = async (sql: string, params: any[] = []) => {
@@ -76,6 +77,10 @@ class FakeBughunterDb {
           v.superseded_by = params[0];
           v.superseded_at = new Date('2026-11-16T10:00:00Z');
         });
+      return [];
+    }
+    if (s.startsWith("UPDATE bughunter.bugs SET status = 'done'")) {
+      this.closedBugs.push(params);
       return [];
     }
     if (s.startsWith('SELECT id, diagnosis, fix, reason')) {
@@ -178,6 +183,8 @@ describe('BugHunterApprovalsService', () => {
         details: expect.objectContaining({ reportId: 1, verdictId: 1 }),
       }),
     );
+    // chunk 10: the verdict closes the bug on the board
+    expect(fake.closedBugs).toEqual([[1, 'verdict: not_a_bug / none']]);
   });
 
   it('an amendment becomes active and keeps the old row, linked, with an audit entry', async () => {
@@ -310,7 +317,17 @@ describe('verdict body validation', () => {
 });
 
 describe('BugHunterApprovalsController access', () => {
-  const handlers = ['list', 'detail', 'verdict', 'approve', 'reject'] as const;
+  const handlers = [
+    'list',
+    'detail',
+    'verdict',
+    'approve',
+    'reject',
+    'settings',
+    'setMode',
+    'bugs',
+    'start',
+  ] as const;
   const proto = BugHunterApprovalsController.prototype as any;
 
   it.each(handlers)('%s needs the BUG_HUNTER_V2_VERDICTS toggle', (name) => {
@@ -351,7 +368,7 @@ describe('BugHunterApprovalsController access', () => {
   );
 
   it('approve and reject stay switched off until pr mode', () => {
-    const controller = new BugHunterApprovalsController({} as any);
+    const controller = new BugHunterApprovalsController({} as any, {} as any);
     expect(() => controller.approve()).toThrow(ForbiddenException);
     expect(() => controller.reject()).toThrow(ForbiddenException);
   });

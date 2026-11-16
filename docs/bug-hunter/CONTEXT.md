@@ -2,7 +2,7 @@
 
 Read this file, then `spec.md`, then the current chunk brief, before any Bug Hunter v2 work.
 
-**Current chunk: 09 — `docs/bug-hunter/chunks/chunk-09.md`** (01–07 done; 08 done except what waits on infra: `notes/CHUNK-08-NOTES.md`)
+**Current chunk: 10 — `docs/bug-hunter/chunks/chunk-10.md`** (01–07 and 09 done; 08 done except what waits on infra: `notes/CHUNK-08-NOTES.md`; chunk 11 = fix quality, then finding quality, then cost)
 
 ## What we are building
 

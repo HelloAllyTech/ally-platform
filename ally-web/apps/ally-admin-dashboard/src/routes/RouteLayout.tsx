@@ -39,7 +39,7 @@ import {
   MobileReleases,
   BugHunter,
   BugHunterV2ReportDetail,
-  BugHunterV2Reports,
+  BugHunterV2Board,
   Builder,
   BuilderEval,
   BuilderKnowledge,
@@ -601,7 +601,7 @@ export const RouteLayout: React.FC = () => {
           path={ROUTES.BUG_HUNTER_V2}
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER_V2_VERDICTS}>
-              <BugHunterV2Reports />
+              <BugHunterV2Board />
             </PrivateLayout>
           }
         />

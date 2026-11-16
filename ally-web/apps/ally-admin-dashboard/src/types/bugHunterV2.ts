@@ -67,3 +67,47 @@ export interface BugHunterV2VerdictInput {
   fix: BugHunterV2FixVerdict;
   reason: string;
 }
+
+/** Chunk 10: the modes and the board (ally-be `bug-hunter-approvals` settings + bugs). */
+export type BugHunterV2Mode = "off" | "manual" | "autonomous";
+export type BugHunterV2Tab = "needs_you" | "failed" | "in_progress" | "backlog" | "done";
+export type BugHunterV2BugStatus =
+  | "backlog"
+  | "queued"
+  | "running"
+  | "needs_you"
+  | "failed"
+  | "done";
+
+export interface BugHunterV2Settings {
+  mode: BugHunterV2Mode;
+  dailyRunLimit: number;
+  startedToday: number;
+  updatedBy: number | null;
+  updatedAt: string | null;
+}
+
+export interface BugHunterV2Bug {
+  id: number;
+  source: string;
+  app: string | null;
+  title: string;
+  description: string;
+  status: BugHunterV2BugStatus;
+  reason: string | null;
+  reportId: number | null;
+  runId: string | null;
+  attempts: number;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface BugHunterV2Board {
+  tab: BugHunterV2Tab;
+  page: number;
+  pageSize: number;
+  total: number;
+  counts: Record<BugHunterV2Tab, number>;
+  items: BugHunterV2Bug[];
+}

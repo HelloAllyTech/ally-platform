@@ -183,14 +183,22 @@ def test_reports_never_go_to_a_public_repo() -> None:
         repo.post("t", "b", [])
 
 
-def test_daily_cli_refuses_live_and_sources_fail_soft_without_a_token(config) -> None:
+def test_daily_cli_live_collects_nothing_when_off_and_sources_fail_soft_without_a_token(
+    config, monkeypatch
+) -> None:
     from typer.testing import CliRunner
 
+    import bug_hunter.queue.store as queue_store
     from bug_hunter.cli import app, daily_sources
+    from bug_hunter.queue.store import InMemorySettings
     from bug_hunter.signals.state import InMemoryState
 
+    # chunk 10: --live queues into bughunter.bugs, and only when the mode is not off
+    monkeypatch.setattr(
+        queue_store, "PostgresSettings", lambda _url: InMemorySettings()
+    )
     result = CliRunner().invoke(app, ["daily", "--live"])
-    assert result.exit_code == 1 and "refused" in result.output
+    assert result.exit_code == 0 and "mode is off: nothing collected" in result.output
     srcs = daily_sources(config, InMemoryState(), env={})
     with pytest.raises(RuntimeError, match="GitHub App is not set up"):
         srcs["ci_failures"]()

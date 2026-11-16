@@ -30,6 +30,8 @@ poetry run bug-hunter run --commit <sha>                   # sweep mode: review 
 poetry run bug-hunter replay <run_id> [--resume]           # list checkpoints / continue a killed run
 poetry run bug-hunter resume <run_id> --approve|--reject --reason "…"   # answer a paused human_approval
 poetry run bug-hunter db migrate          # approvals table in the bughunter database
+poetry run bug-hunter mode [off|manual|autonomous]   # chunk 10: show or set the mode (also on the dashboard)
+poetry run bug-hunter worker [--once]     # run queued bugs by mode; each run is paid (~$0.50-0.80), 10/day + $15/day caps
 poetry run bug-hunter run … --push        # real push + draft PR: only with pr.output_mode: pr (default suggested_fix refuses; CONTEXT.md rule 8)
 make eval AGENT=graph CASES=<id>          # the real graph on one golden case (costs money)
 poetry run bug-hunter verdict <run_id> --diagnosis correct|wrong|not_a_bug --fix worked|needed_edits|wrong|none --reason "…"   # human verdict -> memory

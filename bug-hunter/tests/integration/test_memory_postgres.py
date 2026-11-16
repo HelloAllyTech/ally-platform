@@ -72,10 +72,13 @@ def test_verdicts_table_round_trip() -> None:
             decided_by="it",
         )
     )
-    assert saved.id and any(v.id == saved.id for v in store.unapplied())
-    store.mark_applied(saved.id)
-    assert store.for_run(run_id)[0].applied_at is not None
-    assert all(v.id != saved.id for v in store.unapplied())
+    try:
+        assert saved.id and any(v.id == saved.id for v in store.unapplied())
+        store.mark_applied(saved.id)
+        assert store.for_run(run_id)[0].applied_at is not None
+        assert all(v.id != saved.id for v in store.unapplied())
+    finally:
+        store.conn.execute("DELETE FROM bughunter.verdicts WHERE id = %s", (saved.id,))
 
 
 def test_spend_ledger_in_the_database() -> None:
@@ -86,8 +89,16 @@ def test_spend_ledger_in_the_database() -> None:
     assert "0003_spend.sql" in PostgresApprovals.migrate(url)
     led = spend.PostgresLedger(url)
     before = spend.total_for(path=led)
-    spend.record(0.0123, "it", "integration test", path=led)
-    assert spend.total_for(path=led) == pytest.approx(before + 0.0123)
+    note = f"integration test {uuid.uuid4().hex[:8]}"
+    try:
+        spend.record(0.0123, "it", note, path=led)
+        assert spend.total_for(path=led) == pytest.approx(before + 0.0123)
+    finally:
+        # never leave test spend in the real ledger: it counts against the daily cap
+        from bug_hunter.graph.checkpointer import connect
+
+        with connect(url, autocommit=True) as conn:
+            conn.execute("DELETE FROM bughunter.spend WHERE note = %s", (note,))
 
 
 def test_amended_verdicts_and_report_details_in_postgres() -> None:
@@ -129,8 +140,18 @@ def test_amended_verdicts_and_report_details_in_postgres() -> None:
             report_id=rep.id,
         )
 
-    a = store.add(verdict("not_a_bug", "none"))
-    b = store.add(verdict("correct", "worked"))
-    (old,) = store.superseded_by(b.id)
-    assert old.id == a.id and old.superseded_at is not None
-    assert [x.id for x in store.unapplied() if x.report_id == rep.id] == [b.id]
+    try:
+        a = store.add(verdict("not_a_bug", "none"))
+        b = store.add(verdict("correct", "worked"))
+        (old,) = store.superseded_by(b.id)
+        assert old.id == a.id and old.superseded_at is not None
+        assert [x.id for x in store.unapplied() if x.report_id == rep.id] == [b.id]
+    finally:
+        # the database is the developer's ally-be database: leave nothing behind
+        reports.conn.execute(
+            "DELETE FROM bughunter.verdicts WHERE report_id = %s", (rep.id,)
+        )
+        reports.conn.execute(
+            "DELETE FROM bughunter.bugs WHERE report_id = %s", (rep.id,)
+        )
+        reports.conn.execute("DELETE FROM bughunter.reports WHERE id = %s", (rep.id,))

@@ -719,6 +719,10 @@ export const ApiEndpoints = {
     REPORTS: "/v1/bug-hunter-approvals/reports",
     REPORT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}`,
     VERDICT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}/verdict`,
+    SETTINGS: "/v1/bug-hunter-approvals/settings",
+    MODE: "/v1/bug-hunter-approvals/settings/mode",
+    BUGS: "/v1/bug-hunter-approvals/bugs",
+    START: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/start`,
   },
   BUG_HUNTER: {
     SETTINGS: "/v1/bug-hunter/settings",

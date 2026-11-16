@@ -2720,6 +2720,77 @@ export const en = {
       superseded: "Replaced",
       by: "by admin",
     },
+    board: {
+      title: "Bug Hunter v2",
+      intro:
+        "Every bug, from any source, on one board. Reported bugs land here the moment someone files one. The mode decides whether Bug Hunter starts fixing on its own.",
+      modeLabel: "Mode",
+      modes: { off: "Off", manual: "Manual", autonomous: "Autonomous" },
+      modeHelp: {
+        off: "Nothing is collected and nothing runs. Bugs reported meanwhile wait in Backlog.",
+        manual:
+          "Bugs are collected into Backlog. A fix starts only when an admin presses Start fix.",
+        autonomous:
+          "Bug Hunter starts on every bug by itself, oldest first, within the daily run limit and the $15/day spend cap.",
+      },
+      modeTooltip:
+        "Fixes are suggestions in every mode: Bug Hunter writes a failing test and a patch for you to judge, and opens no pull requests yet.",
+      confirmAutonomous:
+        "Autonomous starts paid runs on its own (about $0.50–0.80 each, at most {limit} a day). Switch?",
+      confirm: "Switch",
+      cancel: "Cancel",
+      modeSaved: "Mode set to {mode}.",
+      modeError: "Could not change the mode.",
+      todayRuns: "{started} of {limit} runs started today",
+      tabs: {
+        needs_you: "Needs you",
+        failed: "Failed",
+        in_progress: "In progress",
+        backlog: "Backlog",
+        done: "Done",
+      },
+      empty: {
+        needs_you: "Nothing waiting for you.",
+        failed: "No failed runs.",
+        in_progress: "Nothing running.",
+        backlog: "The backlog is empty.",
+        done: "Nothing finished yet.",
+      },
+      columns: {
+        bug: "Bug",
+        source: "Source",
+        app: "App",
+        status: "Status",
+        age: "Reported",
+        action: "",
+      },
+      sources: {
+        reported: "Reported",
+        issue: "GitHub issue",
+        ci_failure: "CI failure",
+        error_log: "Production error",
+        commit_sweep: "Commit sweep",
+      },
+      statuses: {
+        backlog: "Backlog",
+        queued: "Queued",
+        running: "Running",
+        needs_you: "Needs you",
+        failed: "Failed",
+        done: "Done",
+      },
+      runningSince: "Running since {time}",
+      queuedHint: "Starts when the worker is free",
+      startFix: "Start fix",
+      retry: "Retry",
+      pickApp: "Pick the app",
+      pickAppHelp:
+        "The reporter didn't say which app this is in. Pick one so Bug Hunter knows where to look.",
+      startError: "Could not start this bug.",
+      offHint: "Mode is Off: queued bugs wait until you switch to Manual or Autonomous.",
+      openReport: "Open report",
+      noApp: "—",
+    },
   },
   bugHunter: {
     tabLabel: "Bug Hunter",

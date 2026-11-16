@@ -6,6 +6,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Put,
   Query,
   Req,
 } from '@nestjs/common';
@@ -17,8 +18,10 @@ import {
 } from '@nestjs/swagger';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { ListBugsQueryDto, StartBugDto, UpdateModeDto } from '../dto/board.dto';
 import { CreateVerdictDto, ListReportsQueryDto } from '../dto/verdict.dto';
 import { BugHunterApprovalsService } from '../service/bug-hunter-approvals.service';
+import { BugHunterBoardService } from '../service/bug-hunter-board.service';
 
 /**
  * Bug Hunter v2 (chunk 09): its suggested fixes and escalations, and the two-part
@@ -31,7 +34,46 @@ import { BugHunterApprovalsService } from '../service/bug-hunter-approvals.servi
 @ApiBearerAuth()
 @ApiSecurity('access-token')
 export class BugHunterApprovalsController {
-  constructor(private readonly service: BugHunterApprovalsService) {}
+  constructor(
+    private readonly service: BugHunterApprovalsService,
+    private readonly board: BugHunterBoardService,
+  ) {}
+
+  @Get('settings')
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  @ApiOperation({
+    summary: 'The mode (off / manual / autonomous) and daily limit',
+  })
+  settings() {
+    return this.board.settings();
+  }
+
+  @Put('settings/mode')
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  @ApiOperation({ summary: 'Switch the mode (audited)' })
+  setMode(@Body() dto: UpdateModeDto, @Req() req: any) {
+    return this.board.setMode(dto.mode, Number(req.user?.id));
+  }
+
+  @Get('bugs')
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  @ApiOperation({
+    summary: 'The board: one tab of bugs, with the count of every tab',
+  })
+  bugs(@Query() query: ListBugsQueryDto) {
+    return this.board.list(query);
+  }
+
+  @Post('bugs/:id/start')
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  @ApiOperation({ summary: 'Start fix (Backlog) or Retry (Failed): queue it' })
+  start(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: StartBugDto,
+    @Req() req: any,
+  ) {
+    return this.board.start(id, dto, Number(req.user?.id));
+  }
 
   @Get('reports')
   @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)

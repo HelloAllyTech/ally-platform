@@ -7,21 +7,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@constants";
 
 const api = vi.hoisted(() => ({
-  reportsQuery: vi.fn(),
   reportQuery: vi.fn(),
   record: vi.fn(),
+  settingsQuery: vi.fn(),
+  bugsQuery: vi.fn(),
+  setMode: vi.fn(),
+  start: vi.fn(),
 }));
 
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGetBugHunterV2ReportsQuery: (args: unknown) => api.reportsQuery(args),
+  useGetBugHunterV2SettingsQuery: () => api.settingsQuery(),
+  useGetBugHunterV2BugsQuery: (args: unknown) => api.bugsQuery(args),
+  useSetBugHunterV2ModeMutation: () => [api.setMode, { isLoading: false }],
+  useStartBugHunterV2BugMutation: () => [api.start, { isLoading: false }],
   useGetBugHunterV2ReportQuery: (id: unknown) => api.reportQuery(id),
   useRecordBugHunterV2VerdictMutation: () => [api.record, { isLoading: false }],
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { BugHunterV2ReportDetail } from "../BugHunterV2ReportDetail";
-import { BugHunterV2Reports } from "../BugHunterV2Reports";
+import { BugHunterV2Board } from "../BugHunterV2Board";
 import { VerdictForm } from "../VerdictForm";
 
 const strings = en.bugHunterV2;
@@ -53,33 +59,128 @@ const detail = (overrides = {}) => ({
 });
 
 beforeEach(() => {
-  api.reportsQuery.mockReset();
   api.reportQuery.mockReset();
+  api.settingsQuery.mockReset();
+  api.bugsQuery.mockReset();
+  api.setMode.mockReset();
+  api.start.mockReset();
+  api.setMode.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+  api.start.mockReturnValue({ unwrap: () => Promise.resolve({}) });
   api.record.mockReset();
   api.record.mockReturnValue({ unwrap: () => Promise.resolve({}) });
 });
 
-describe("Bug Hunter v2 reports list", () => {
-  it("asks for open reports first and switches filters", () => {
-    api.reportsQuery.mockReturnValue({ data: [], isLoading: false, isError: false });
-    render(
-      <MemoryRouter>
-        <BugHunterV2Reports />
-      </MemoryRouter>,
-    );
-    expect(api.reportsQuery).toHaveBeenLastCalledWith({ status: "open" });
-    expect(screen.getByText(strings.empty)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: strings.filters.judged }));
-    expect(api.reportsQuery).toHaveBeenLastCalledWith({ status: "judged" });
+const board = strings.board;
+const counts = (c = {}) => ({
+  needs_you: 0,
+  failed: 0,
+  in_progress: 0,
+  backlog: 0,
+  done: 0,
+  ...c,
+});
+const bugRow = (overrides = {}) => ({
+  id: 1,
+  source: "reported",
+  app: "ally-web",
+  title: "Save does nothing",
+  description: "",
+  status: "backlog",
+  reason: null,
+  reportId: null,
+  runId: null,
+  attempts: 0,
+  createdAt: "2026-11-16T09:00:00Z",
+  startedAt: null,
+  finishedAt: null,
+  ...overrides,
+});
+const settingsOf = (mode = "manual") => ({
+  data: { mode, dailyRunLimit: 10, startedToday: 2, updatedBy: null, updatedAt: null },
+});
+const renderBoard = () =>
+  render(
+    <MemoryRouter>
+      <BugHunterV2Board />
+    </MemoryRouter>,
+  );
+
+describe("Bug Hunter v2 board", () => {
+  it("shows the five tabs with counts, in the old Bug Hunter's order", () => {
+    api.settingsQuery.mockReturnValue(settingsOf());
+    api.bugsQuery.mockReturnValue({
+      data: { tab: "needs_you", counts: counts({ needs_you: 2, backlog: 5 }), items: [] },
+    });
+    renderBoard();
+    const tabs = screen.getAllByRole("tab").map(t => t.textContent);
+    expect(tabs).toEqual([
+      `${board.tabs.needs_you}2`,
+      `${board.tabs.failed}0`,
+      `${board.tabs.in_progress}0`,
+      `${board.tabs.backlog}5`,
+      `${board.tabs.done}0`,
+    ]);
+    fireEvent.click(screen.getByRole("tab", { name: new RegExp(board.tabs.backlog) }));
+    expect(api.bugsQuery).toHaveBeenLastCalledWith({ tab: "backlog" });
+  });
+
+  it("opens on the first tab with something in it", () => {
+    api.settingsQuery.mockReturnValue(settingsOf());
+    api.bugsQuery.mockReturnValue({
+      data: { tab: "needs_you", counts: counts({ in_progress: 1 }), items: [] },
+    });
+    renderBoard();
+    expect(api.bugsQuery).toHaveBeenLastCalledWith({ tab: "in_progress" });
+  });
+
+  it("switches mode, asking before Autonomous", () => {
+    api.settingsQuery.mockReturnValue(settingsOf("off"));
+    api.bugsQuery.mockReturnValue({ data: { tab: "needs_you", counts: counts(), items: [] } });
+    renderBoard();
+    expect(screen.getByText(board.modeHelp.off)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: board.modes.manual }));
+    expect(api.setMode).toHaveBeenCalledWith("manual");
+    fireEvent.click(screen.getByRole("radio", { name: board.modes.autonomous }));
+    expect(api.setMode).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: board.confirm }));
+    expect(api.setMode).toHaveBeenLastCalledWith("autonomous");
+  });
+
+  it("Start fix queues a backlog bug; Retry a failed one", () => {
+    api.settingsQuery.mockReturnValue(settingsOf());
+    api.bugsQuery.mockReturnValue({
+      data: {
+        tab: "backlog",
+        counts: counts({ backlog: 1, failed: 1 }),
+        items: [bugRow(), bugRow({ id: 2, status: "failed", reason: "sandbox died" })],
+      },
+    });
+    renderBoard();
+    fireEvent.click(screen.getByRole("button", { name: board.startFix }));
+    expect(api.start).toHaveBeenCalledWith({ id: 1, app: undefined });
+    expect(screen.getByText("sandbox died")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: board.retry }));
+    expect(api.start).toHaveBeenLastCalledWith({ id: 2, app: undefined });
+  });
+
+  it("a reported bug without an app needs one picked before Start fix", () => {
+    api.settingsQuery.mockReturnValue(settingsOf());
+    api.bugsQuery.mockReturnValue({
+      data: { tab: "backlog", counts: counts({ backlog: 1 }), items: [bugRow({ app: null })] },
+    });
+    renderBoard();
+    const button = screen.getByRole("button", { name: board.startFix });
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(board.pickApp), { target: { value: "ally-be" } });
+    fireEvent.click(button);
+    expect(api.start).toHaveBeenCalledWith({ id: 1, app: "ally-be" });
   });
 
   it("explains a missing Bug Hunter database instead of a generic error", () => {
-    api.reportsQuery.mockReturnValue({ isLoading: false, isError: true, error: { status: 503 } });
-    render(
-      <MemoryRouter>
-        <BugHunterV2Reports />
-      </MemoryRouter>,
-    );
+    api.settingsQuery.mockReturnValue({ isError: true, error: { status: 503 } });
+    api.bugsQuery.mockReturnValue({ isLoading: false, isError: true, error: { status: 503 } });
+    renderBoard();
     expect(screen.getByRole("alert")).toHaveTextContent(strings.unavailable);
   });
 });

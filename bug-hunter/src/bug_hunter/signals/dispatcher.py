@@ -13,12 +13,15 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from bug_hunter import spend
 from bug_hunter.config import BugHunterConfig
 from bug_hunter.reports.store import PrivateReportsRepo, Report, ReportStore
 from bug_hunter.signals.base import Candidate
+
+if TYPE_CHECKING:
+    from bug_hunter.queue.store import BugQueue
 from bug_hunter.signals.state import SignalState, is_enabled
 
 SEVERITY = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -53,6 +56,7 @@ class DailyPlan:
     day: str
     dry_run: bool
     paused: bool = False
+    queued: bool = False  # chunk 10: candidates went to bughunter.bugs, none ran here
     sources: dict[str, str] = field(default_factory=dict)
     selected: list[Candidate] = field(default_factory=list)
     skipped: list[tuple[str, str]] = field(default_factory=list)  # (key, reason)
@@ -66,6 +70,7 @@ class DailyPlan:
             "day": self.day,
             "dry_run": self.dry_run,
             "paused": self.paused,
+            "queued": self.queued,
             "sources": self.sources,
             "selected": [c.to_dict() for c in self.selected],
             "skipped": self.skipped,
@@ -90,7 +95,8 @@ class DailyPlan:
         lines += [f"- {k}: {v}" for k, v in self.sources.items()]
         lines += [
             "",
-            f"## {'Would run' if self.dry_run else 'Ran'} ({len(self.selected)})",
+            f"## {'Would run' if self.dry_run else 'Queued' if self.queued else 'Ran'}"
+            f" ({len(self.selected)})",
         ]
         for c in self.selected:
             out = self.outcomes.get(c.key)
@@ -117,7 +123,11 @@ def run_daily(
     dry_run: bool = True,
     out_dir: Path | None = None,
     now: datetime | None = None,
+    queue: "BugQueue | None" = None,
 ) -> DailyPlan:
+    """With ``queue`` (chunk 10) a live run only adds the fresh candidates to
+    ``bughunter.bugs``; the worker starts them according to the mode and applies the
+    caps. Without it, the chunk 08 behaviour: start runs here, within the caps."""
     now = now or datetime.now(timezone.utc)
     day = spend.day_of(now.isoformat())
     plan = DailyPlan(day=day, dry_run=dry_run)
@@ -146,6 +156,8 @@ def run_daily(
     for c in candidates:
         unique.setdefault(c.key, c)
     seen = reports.keys_seen(list(unique))
+    if queue is not None:
+        seen |= queue.keys_seen(list(unique))
     fresh = []
     for key, c in unique.items():
         if key in seen:
@@ -155,6 +167,19 @@ def run_daily(
         else:
             fresh.append(c)
     fresh.sort(key=lambda c: (c.priority, SEVERITY.get(c.severity_hint, 2)))
+    if queue is not None and not dry_run:
+        from bug_hunter.queue.store import Bug
+
+        plan.queued = True
+        for c in fresh:
+            if queue.add(Bug.from_candidate(c)):
+                plan.selected.append(c)
+            else:
+                plan.skipped.append((c.key, "already queued"))
+        for key, value in cursor_updates.items():
+            state.set(key, value)
+        _write(plan, out_dir)
+        return plan
     # caps: graph runs per day and the daily spend ledger
     today = reports.for_day(day)
     plan.runs_before = sum(1 for r in today if r.run_id)
