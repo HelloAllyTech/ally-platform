@@ -28,6 +28,7 @@ import {
 
 import { MonthLane } from "./MonthLane";
 import { RoadmapFilterBar, hasActiveFilters } from "./RoadmapFilterBar";
+import { RoadmapLoadError } from "./RoadmapLoadError";
 import { useSetVotes } from "./useSetVotes";
 import { RoadmapAdvancedFilterValues } from "./utils/filters";
 import { RoadmapEffortFilterValue } from "./utils/filterSelection";
@@ -53,6 +54,9 @@ interface MonthBoardProps {
   data?: RoadmapBoardResponse;
   isLoading: boolean;
   isFetching: boolean;
+  /** The fetch failed. Shown as an error with retry — never as an empty board. */
+  isError?: boolean;
+  onRetry?: () => void;
   budget?: RoadmapVoteBudget;
   goals: RoadmapTaxonomyItem[];
   facets?: RoadmapFacets;
@@ -107,6 +111,8 @@ export const MonthBoard: React.FC<MonthBoardProps> = props => {
     data,
     isLoading,
     isFetching,
+    isError,
+    onRetry,
     budget,
     goals,
     facets,
@@ -276,6 +282,8 @@ export const MonthBoard: React.FC<MonthBoardProps> = props => {
 
       {isLoading ? (
         <SkeletonText paragraph lineCount={8} />
+      ) : isError && !data ? (
+        <RoadmapLoadError what="the board" onRetry={() => onRetry?.()} isRetrying={isFetching} />
       ) : lanes.every(lane => lane.total === 0) ? (
         <EmptyState
           title={activeFilters || search ? "Nothing in these months" : "No opportunities yet"}

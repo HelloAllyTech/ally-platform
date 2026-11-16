@@ -16,6 +16,7 @@ import {
 
 import { OpportunityListCard } from "./OpportunityListCard";
 import { RoadmapFilterBar, hasActiveFilters } from "./RoadmapFilterBar";
+import { RoadmapLoadError } from "./RoadmapLoadError";
 import { useSetVotes } from "./useSetVotes";
 import { RoadmapAdvancedFilterValues } from "./utils/filters";
 import { RoadmapEffortFilterValue } from "./utils/filterSelection";
@@ -26,6 +27,9 @@ interface OpportunitiesListViewProps {
   data?: RoadmapOpportunitiesResponse;
   isLoading: boolean;
   isFetching: boolean;
+  /** The fetch failed. Shown as an error with retry — never as an empty list. */
+  isError?: boolean;
+  onRetry?: () => void;
   budget?: RoadmapVoteBudget;
   goals: RoadmapTaxonomyItem[];
   facets?: RoadmapFacets;
@@ -82,6 +86,8 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
   data,
   isLoading,
   isFetching,
+  isError,
+  onRetry,
   budget,
   goals,
   facets,
@@ -157,6 +163,19 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
 
       {isLoading ? (
         <SkeletonText paragraph lineCount={8} />
+      ) : isError && !data ? (
+        <RoadmapLoadError
+          what={isQueue ? "the queue" : "opportunities"}
+          onRetry={() => onRetry?.()}
+          isRetrying={isFetching}
+        />
+      ) : rows.length === 0 && isQueue && !activeFilters && !search ? (
+        // An empty queue is the goal state of triage, not a missing-data state — so no "file the
+        // first one" prompt.
+        <EmptyState
+          title="Nothing waiting"
+          subtitle="Every opportunity has been triaged. New ideas will show up here."
+        />
       ) : rows.length === 0 ? (
         // No page-vs-empty distinction to make any more: this view always starts from the top,
         // so "no rows" means no rows, not "you walked past the end".

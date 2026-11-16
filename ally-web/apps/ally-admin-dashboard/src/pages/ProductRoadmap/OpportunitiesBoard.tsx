@@ -25,7 +25,10 @@ import {
   RoadmapTaxonomyItem,
 } from "@types";
 
+import { DirectorStarButton } from "./DirectorStarButton";
 import { RoadmapFilterBar, hasActiveFilters } from "./RoadmapFilterBar";
+import { RoadmapLoadError } from "./RoadmapLoadError";
+import { RoadmapSortControl } from "./RoadmapSortControl";
 import { useScoreUnit } from "./useScoreUnit";
 import { useSetVotes } from "./useSetVotes";
 import { RoadmapAdvancedFilterValues } from "./utils/filters";
@@ -41,14 +44,55 @@ import {
   STAGE_STYLE,
   typeLabel,
 } from "./utils/stages";
-import { DirectorStarButton } from "./DirectorStarButton";
 import { VoteButton } from "./VoteButton";
+
+interface SortHeaderProps {
+  field: NonNullable<RoadmapOpportunitiesQuery["sortBy"]>;
+  sortBy: NonNullable<RoadmapOpportunitiesQuery["sortBy"]>;
+  order: "ASC" | "DESC";
+  onToggleSort: (field: NonNullable<RoadmapOpportunitiesQuery["sortBy"]>) => void;
+  children: React.ReactNode;
+  className?: string;
+}
+
+/**
+ * Defined at module level, not inside the board: declared in render it was a new component type
+ * every render, so React unmounted and remounted every header (and dropped focus) on each update.
+ */
+const SortHeader: React.FC<SortHeaderProps> = ({
+  field,
+  sortBy,
+  order,
+  onToggleSort,
+  children,
+  className,
+}) => (
+  <TableHeader className={className}>
+    <button
+      type="button"
+      onClick={() => onToggleSort(field)}
+      className="inline-flex items-center gap-1 hover:text-primary-500"
+    >
+      {children}
+      {sortBy === field &&
+        (order === "DESC" ? <SortDescending size={14} /> : <SortAscending size={14} />)}
+    </button>
+  </TableHeader>
+);
 
 interface OpportunitiesBoardProps {
   listArgs: RoadmapOpportunitiesQuery;
   data?: RoadmapOpportunitiesResponse;
   isLoading: boolean;
   isFetching: boolean;
+  /** The fetch failed. Shown as an error with retry — never as an empty list. */
+  isError?: boolean;
+  onRetry?: () => void;
+  /** Applies a whole ordering at once, from the sort control. */
+  onSortChange?: (
+    sortBy: NonNullable<RoadmapOpportunitiesQuery["sortBy"]>,
+    order: "ASC" | "DESC",
+  ) => void;
   budget?: RoadmapVoteBudget;
   goals: RoadmapTaxonomyItem[];
   facets?: RoadmapFacets;
@@ -107,6 +151,9 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
   data,
   isLoading,
   isFetching,
+  isError,
+  onRetry,
+  onSortChange,
   budget,
   goals,
   facets,
@@ -147,24 +194,6 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
   const { rangeStart, rangeEnd, page, totalPages, canPrev, canNext, prevOffset, nextOffset } =
     pageRange(offset, pageSize, total);
 
-  const SortHeader: React.FC<{
-    field: NonNullable<RoadmapOpportunitiesQuery["sortBy"]>;
-    children: React.ReactNode;
-    className?: string;
-  }> = ({ field, children, className }) => (
-    <TableHeader className={className}>
-      <button
-        type="button"
-        onClick={() => onToggleSort(field)}
-        className="inline-flex items-center gap-1 hover:text-primary-500"
-      >
-        {children}
-        {sortBy === field &&
-          (order === "DESC" ? <SortDescending size={14} /> : <SortAscending size={14} />)}
-      </button>
-    </TableHeader>
-  );
-
   const activeFilters = hasActiveFilters({
     typeFilter,
     stageFilter,
@@ -199,11 +228,22 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
         facets={facets}
         canVote={canVote}
         canManage={canManage}
+        leading={
+          onSortChange ? (
+            <RoadmapSortControl sortBy={sortBy} order={order} onChange={onSortChange} />
+          ) : undefined
+        }
         trailing={layoutToggle}
       />
 
       {isLoading ? (
         <SkeletonText paragraph lineCount={8} />
+      ) : isError && !data ? (
+        <RoadmapLoadError
+          what="opportunities"
+          onRetry={() => onRetry?.()}
+          isRetrying={isFetching}
+        />
       ) : rows.length === 0 ? (
         // `offset > 0` with no rows means the list shrank under us (a realtime delete, or a
         // merge) — that is a paging problem, not an empty board, so don't invite a new
@@ -238,18 +278,36 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
                     vote cast, so "Priority" hid what the number was and "Votes" beside it
                     read as the same thing again. The sort key stays `priority`: it is the API's
                     field name, not a label. */}
-                <SortHeader field="priority" className="w-32">
+                <SortHeader
+                  field="priority"
+                  sortBy={sortBy}
+                  order={order}
+                  onToggleSort={onToggleSort}
+                  className="w-32"
+                >
                   {unit === "points" ? "Points" : "Total votes"}
                 </SortHeader>
                 <TableHeader className="w-24">Your votes</TableHeader>
                 {/* A floor on phones only: the table scrolls sideways there, and without one the six
                     fixed-width columns squeeze the description to a word per line. */}
-                <SortHeader field="description" className="min-w-[14rem] md:min-w-0">
+                <SortHeader
+                  field="description"
+                  sortBy={sortBy}
+                  order={order}
+                  onToggleSort={onToggleSort}
+                  className="min-w-[14rem] md:min-w-0"
+                >
                   Opportunity
                 </SortHeader>
                 <TableHeader className="w-32">Stage</TableHeader>
                 <TableHeader className="w-32">Owner</TableHeader>
-                <SortHeader field="createdAt" className="w-28">
+                <SortHeader
+                  field="createdAt"
+                  sortBy={sortBy}
+                  order={order}
+                  onToggleSort={onToggleSort}
+                  className="w-28"
+                >
                   Filed
                 </SortHeader>
               </TableRow>

@@ -6,6 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { RoadmapVoteBudget, RoadmapOpportunity, RoadmapOpportunityType } from "@types";
 
+import { DirectorStarButton } from "./DirectorStarButton";
 import { NewColleagueTag } from "./NewToYouChip";
 import { useScoreUnit } from "./useScoreUnit";
 import { formatPoints } from "./utils/points";
@@ -17,7 +18,6 @@ import {
   stageStyle,
   typeLabel,
 } from "./utils/stages";
-import { DirectorStarButton } from "./DirectorStarButton";
 import { VoteButton } from "./VoteButton";
 
 interface MonthOpportunityCardProps {

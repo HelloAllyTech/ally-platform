@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 import { RoadmapOpportunitiesQuery } from "@types";
 
-import { QUEUE_SORTS, queueSortIdFor } from "./utils/queueSort";
+import { QUEUE_SORTS } from "./utils/queueSort";
 
 type SortBy = NonNullable<RoadmapOpportunitiesQuery["sortBy"]>;
 type Order = "ASC" | "DESC";
@@ -46,8 +46,11 @@ export const RoadmapSortControl: React.FC<RoadmapSortControlProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const currentId = queueSortIdFor(sortBy, order);
-  const currentLabel = QUEUE_SORTS.find(option => option.id === currentId)?.label ?? "";
+  // No fallback to "Top rank": on the table a header sort (opportunity, points) is a real ordering
+  // that none of these options names, and showing "Top rank first" over a list sorted by title
+  // would be a lie. "Custom" says "ordered by a column header" and checks nothing.
+  const currentId = QUEUE_SORTS.find(s => s.sortBy === sortBy && s.order === order)?.id;
+  const currentLabel = QUEUE_SORTS.find(option => option.id === currentId)?.label ?? "Column";
 
   /** Light-dismiss: outside click or Escape, the two exits every popover here already has. */
   useEffect(() => {
@@ -85,7 +88,7 @@ export const RoadmapSortControl: React.FC<RoadmapSortControlProps> = ({
       {isOpen && (
         <div
           role="menu"
-          aria-label="Sort the queue"
+          aria-label="Sort opportunities"
           className="border-border-light bg-white absolute left-0 top-full z-20 mt-1 flex w-56 flex-col border py-1 shadow-md"
         >
           {QUEUE_SORTS.map(option => {

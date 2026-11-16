@@ -2,6 +2,7 @@ import React from "react";
 
 import { RoadmapVoteBudget, RoadmapOpportunity } from "@types";
 
+import { DirectorStarButton } from "./DirectorStarButton";
 import { NewColleagueTag } from "./NewToYouChip";
 import { RankScore } from "./RankBreakdown";
 import { useScoreUnit } from "./useScoreUnit";
@@ -16,7 +17,6 @@ import {
   stageLabel,
   stageStyle,
 } from "./utils/stages";
-import { DirectorStarButton } from "./DirectorStarButton";
 import { VoteButton } from "./VoteButton";
 
 /**

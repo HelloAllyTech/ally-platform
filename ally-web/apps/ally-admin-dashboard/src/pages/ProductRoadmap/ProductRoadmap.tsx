@@ -57,6 +57,7 @@ import { ReportBugModal } from "./ReportBugModal";
 import { RoadmapSettingsDrawer } from "./RoadmapSettingsDrawer";
 import { RoadmapSortControl } from "./RoadmapSortControl";
 import { SavedViewTabs } from "./SavedViewTabs";
+import { useDebouncedValue } from "./useDebouncedValue";
 import { useProductRoadmapRealtime } from "./useProductRoadmapRealtime";
 import { useSavedViews } from "./useSavedViews";
 import {
@@ -92,6 +93,9 @@ const PAGE_SIZE = 50;
  * silently — 200 sits inside it and reaches the ceiling in two more presses.
  */
 const FEED_PAGE_SIZE = 200;
+
+/** How long typing must pause before the search reaches the server. */
+const SEARCH_DEBOUNCE_MS = 300;
 
 /**
  * Default month window: one back, four forward. Mirrors ROADMAP_BOARD_DEFAULTS in ally-be — the
@@ -339,9 +343,15 @@ export const ProductRoadmap: React.FC = () => {
    */
   const isList = layout === RoadmapBoardLayout.LIST;
 
+  /**
+   * The input shows `search` instantly; the QUERY waits for typing to pause. Without this every
+   * keystroke was a server ILIKE round trip and a flash of the loading skeleton.
+   */
+  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
+
   const listArgs = useMemo<RoadmapOpportunitiesQuery>(
     () => ({
-      search: search.trim() || undefined,
+      search: debouncedSearch.trim() || undefined,
       type: typeFilter.length ? typeFilter : undefined,
       stage: stageFilter.length ? stageFilter : undefined,
       source: sourceFilter.length ? sourceFilter : undefined,
@@ -366,7 +376,7 @@ export const ProductRoadmap: React.FC = () => {
       offset: isList ? 0 : offset,
     }),
     [
-      search,
+      debouncedSearch,
       typeFilter,
       stageFilter,
       sourceFilter,
@@ -403,16 +413,21 @@ export const ProductRoadmap: React.FC = () => {
 
   const isBoard = layout === RoadmapBoardLayout.BOARD;
 
-  const { data, isLoading, isFetching } = useGetRoadmapOpportunitiesQuery(listArgs, {
-    // Don't hold a subscription to the layout that isn't on screen: it would refetch the table on
-    // every socket invalidation while the user is looking at the board. Table and List share this
-    // one subscription — they are the same query, just rendered differently.
-    skip: isBoard,
-  });
+  const { data, isLoading, isFetching, isError, refetch } = useGetRoadmapOpportunitiesQuery(
+    listArgs,
+    {
+      // Don't hold a subscription to the layout that isn't on screen: it would refetch the table on
+      // every socket invalidation while the user is looking at the board. Table and List share this
+      // one subscription — they are the same query, just rendered differently.
+      skip: isBoard,
+    },
+  );
   const {
     data: boardData,
     isLoading: isBoardLoading,
     isFetching: isBoardFetching,
+    isError: isBoardError,
+    refetch: refetchBoard,
   } = useGetRoadmapBoardQuery(boardArgs, { skip: !isBoard });
 
   const boardCount = boardData ? boardData.lanes.reduce((sum, lane) => sum + lane.total, 0) : 0;
@@ -675,17 +690,15 @@ export const ProductRoadmap: React.FC = () => {
    * so filtering to one goal shows #3, #14, #57 — their standing in the queue — rather than
    * renumbering them 1, 2, 3 as though the filtered set were the queue.
    */
-  const queueToolbar = isQueueView ? (
-    <RoadmapSortControl
-      sortBy={sortBy}
-      order={order}
-      onChange={(nextSortBy, nextOrder) => {
-        setSortBy(nextSortBy);
-        setOrder(nextOrder);
-        resetPaging();
-      }}
-    />
-  ) : null;
+  const changeSort = (
+    nextSortBy: NonNullable<RoadmapOpportunitiesQuery["sortBy"]>,
+    nextOrder: "ASC" | "DESC",
+  ) => {
+    setSortBy(nextSortBy);
+    setOrder(nextOrder);
+    resetPaging();
+  };
+  const sortToolbar = <RoadmapSortControl sortBy={sortBy} order={order} onChange={changeSort} />;
 
   const groupByPicker = isBoard ? (
     /*
@@ -1175,6 +1188,8 @@ export const ProductRoadmap: React.FC = () => {
           data={boardData}
           isLoading={isBoardLoading}
           isFetching={isBoardFetching}
+          isError={isBoardError}
+          onRetry={() => refetchBoard()}
           budget={budget}
           goals={goals ?? []}
           facets={facets}
@@ -1216,6 +1231,8 @@ export const ProductRoadmap: React.FC = () => {
           data={data}
           isLoading={isLoading}
           isFetching={isFetching}
+          isError={isError}
+          onRetry={() => refetch()}
           budget={budget}
           goals={goals ?? []}
           facets={facets}
@@ -1238,6 +1255,7 @@ export const ProductRoadmap: React.FC = () => {
           sortBy={sortBy}
           order={order}
           onToggleSort={toggleSort}
+          onSortChange={changeSort}
           canVote={canVote}
           canManage={canManage}
           onOpenOpportunity={openOpportunity}
@@ -1257,12 +1275,14 @@ export const ProductRoadmap: React.FC = () => {
           // correct when the feed is ordered by date. That is the point of moving it to the
           // backend — a client-side position could only ever describe the current ordering.
           isQueue={isQueueView}
-          leading={queueToolbar}
+          leading={sortToolbar}
           showFilters
           listArgs={listArgs}
           data={data}
           isLoading={isLoading}
           isFetching={isFetching}
+          isError={isError}
+          onRetry={() => refetch()}
           budget={budget}
           goals={goals ?? []}
           facets={facets}
