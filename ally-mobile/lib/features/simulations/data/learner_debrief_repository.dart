@@ -639,8 +639,13 @@ class LearnerDebriefView {
     this.supervisor,
     this.pulse,
     this.stopped = false,
+    this.reason,
     this.askAlly,
   });
+
+  /// `reason` on a `not_available` answer: today's debrief runs on a
+  /// provider the organisation does not allow, so there is none to show.
+  static const providerNotAllowed = 'provider_not_allowed';
 
   /// `GET /debriefs/sessions/:id/supervisor` (v9 FR-26), as a read-only
   /// view: `ready` or `not_available` only, so it never polls; no distress,
@@ -692,7 +697,10 @@ class LearnerDebriefView {
             ),
       ],
       pulse: DebriefPulse.parse(json['pulse']),
-      stopped: json['stopped'] == true,
+      // A disallowed provider says "not available" too, even if `stopped`
+      // were missing: today's debrief will never come, so never a spinner.
+      stopped: json['stopped'] == true || json['reason'] == providerNotAllowed,
+      reason: _optStr(json['reason']),
       askAlly: DebriefAskAlly.parse(json['askAlly']),
     );
   }
@@ -729,8 +737,13 @@ class LearnerDebriefView {
   final DebriefPulse? pulse;
 
   /// `notAvailable` only: the organisation's debriefs were stopped (FR-46),
-  /// so the tab says "not available" instead of today's debrief.
+  /// or today's debrief runs on a provider it does not allow
+  /// ([providerNotAllowed]), so the tab says "not available" instead of
+  /// today's debrief.
   final bool stopped;
+
+  /// `notAvailable` only: why, when the server says ([providerNotAllowed]).
+  final String? reason;
 
   /// Ask Ally's state; null (an older server) means open.
   final DebriefAskAlly? askAlly;
@@ -760,6 +773,13 @@ class LearnerDebriefView {
   DebriefPracticeScenario? practiceFor(int? scenarioId) =>
       scenarioId == null ? null : practice.where((p) => p.id == scenarioId).firstOrNull;
 
+  /// "Practise this next": the card's roleplay when the learner can open
+  /// it, else this same roleplay ([thisRoleplay]) when it is on offer (the
+  /// server maps it so too, ally-be `withPractiseNextFallback`). Null when
+  /// nothing can be opened: the card then offers the roleplays list.
+  DebriefPracticeScenario? practiseNextFor(int? scenarioId, {int? thisRoleplay}) =>
+      practiceFor(scenarioId) ?? practiceFor(thisRoleplay);
+
   /// Whether this answer replaces today's debrief. False for `not_available`
   /// (unless [stopped]: then the tab says "not available") and for a `ready`
   /// answer with no cards (nothing to render).
@@ -782,6 +802,7 @@ class LearnerDebriefView {
     supervisor: supervisor,
     pulse: pulse ?? this.pulse,
     stopped: stopped,
+    reason: reason,
     askAlly: askAlly,
   );
 }

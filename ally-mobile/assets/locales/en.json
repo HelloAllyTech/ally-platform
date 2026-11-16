@@ -1288,7 +1288,8 @@
       "practise": {
         "next": "Practise this next",
         "this": "Practise this",
-        "label": "Practise this in the roleplay \"{{title}}\""
+        "label": "Practise this in the roleplay \"{{title}}\"",
+        "roleplays": "Open my roleplays"
       },
       "reply": {
         "placeholder": "Answer here, or ask Ally anything about this session…",

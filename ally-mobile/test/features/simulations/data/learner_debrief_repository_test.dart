@@ -293,6 +293,27 @@ void main() {
       expect(view.practiceFor(4)!.trackItemId, 'item-7');
       expect(view.practiceFor(5)!.trackItemId, isNull);
     });
+
+    test('"Practise this next" falls back to this same roleplay, else nothing', () {
+      final view = LearnerDebriefView.fromJson({
+        ...readyDebriefJson(),
+        'practice': [
+          {'id': 5, 'title': 'This one'},
+        ],
+      });
+      expect(view.practiseNextFor(99, thisRoleplay: 5)!.id, 5);
+      expect(view.practiseNextFor(null, thisRoleplay: 5)!.id, 5);
+      expect(view.practiseNextFor(99), isNull);
+      expect(view.practiseNextFor(99, thisRoleplay: 6), isNull);
+    });
+
+    test('not_available on a disallowed provider says "not available"', () {
+      final view = LearnerDebriefView.fromJson({'state': 'not_available', 'stopped': true, 'reason': 'provider_not_allowed'});
+      expect(view.reason, LearnerDebriefView.providerNotAllowed);
+      expect(view.isShowable, isTrue);
+      // Even without `stopped`.
+      expect(LearnerDebriefView.fromJson({'state': 'not_available', 'reason': 'provider_not_allowed'}).stopped, isTrue);
+    });
   });
 
   group('LearnerDebriefRepository', () {

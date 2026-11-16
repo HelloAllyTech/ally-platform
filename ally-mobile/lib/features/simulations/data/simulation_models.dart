@@ -514,6 +514,7 @@ class SimulationSummary {
 /// feedback screen reads).
 class SimulationSummaryScenario {
   SimulationSummaryScenario({
+    this.id,
     this.title,
     this.description,
     this.coverImageUrl,
@@ -528,6 +529,7 @@ class SimulationSummaryScenario {
     final metadata = json['metadata'] as Map<String, dynamic>?;
     final tabs = metadata?['feedbackTabs'] as Map<String, dynamic>?;
     return SimulationSummaryScenario(
+      id: (json['id'] as num?)?.toInt(),
       title: json['title'] as String?,
       description: json['description'] as String?,
       coverImageUrl: json['coverImageUrl'] as String?,
@@ -539,6 +541,8 @@ class SimulationSummaryScenario {
     );
   }
 
+  /// The roleplay's id, when the server sends it.
+  final int? id;
   final String? title;
   final String? description;
   final String? coverImageUrl;

@@ -32,9 +32,14 @@ class DebriefCards extends ConsumerStatefulWidget {
     this.readOnly = false,
     this.onSeeQuote,
     this.trackId,
+    this.thisRoleplay,
   });
 
   final LearnerDebriefController controller;
+
+  /// This session's roleplay: "Practise this next" falls back to it when
+  /// the card's own roleplay can't be opened.
+  final int? thisRoleplay;
 
   /// The course this session was played in: "Practise this" opens the
   /// roleplay inside it, so its Feedback returns to the course. Null for a
@@ -267,6 +272,7 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
             readThroughKey: _readThroughKey,
             replyThread: widget.replyThread,
             trackId: widget.trackId,
+            thisRoleplay: widget.thisRoleplay,
           ),
           _ => const SizedBox.shrink(),
         };
@@ -754,10 +760,12 @@ class _ReadyCards extends ConsumerWidget {
     required this.readThroughKey,
     this.replyThread,
     this.trackId,
+    this.thisRoleplay,
   });
 
   final DebriefCardsData cards;
   final String? trackId;
+  final int? thisRoleplay;
   final LearnerDebriefView view;
   final LearnerDebriefController controller;
   final DebriefReadAloud readAloud;
@@ -898,13 +906,18 @@ class _ReadyCards extends ConsumerWidget {
           children: [
             _Lead(practise.skill),
             _Body(practise.reason),
-            if (view.practiceFor(practise.scenarioId) case final scenario?)
+            if (view.practiseNextFor(practise.scenarioId, thisRoleplay: thisRoleplay) case final scenario?)
               _PractiseLink(
                 scenario: scenario,
                 trackId: trackId,
                 primary: true,
                 onOpen: () => controller.recordEvent(DebriefLearnerEvent.practiseNextClick),
-              ),
+              )
+            // Never the card without a way to practise: with no roleplay the
+            // learner can still open, their roleplays list. A supervisor
+            // reading someone else's debrief gets the text only.
+            else if (supervisor == null)
+              _RoleplaysLink(onOpen: () => controller.recordEvent(DebriefLearnerEvent.practiseNextClick)),
             flag('practise_next', practiseTitle),
           ],
         ),
@@ -1311,6 +1324,34 @@ class _PractiseLink extends ConsumerWidget {
         button: true,
         excludeSemantics: true,
         child: button,
+      ),
+    );
+  }
+}
+
+/// "Open my roleplays": the learner's roleplays list, for a "Practise this
+/// next" card with no roleplay they can open (web `debrief-practise-roleplays`).
+class _RoleplaysLink extends ConsumerWidget {
+  const _RoleplaysLink({this.onOpen});
+
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: FilledButton(
+        key: const Key('debrief-practise-roleplays'),
+        onPressed: () {
+          onOpen?.call();
+          context.push('/simulations');
+        },
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(64, 44),
+          backgroundColor: AppColors.primary,
+          textStyle: _leadStyle,
+        ),
+        child: Text(ref.t('postSim.debriefCards.practise.roleplays')),
       ),
     );
   }

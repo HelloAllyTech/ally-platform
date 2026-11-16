@@ -34,7 +34,9 @@ import 'supervisor_note.dart';
 /// (`GET /debriefs/sessions/:id/supervisor`, v9 FR-26): the same cards with
 /// no controls, the learner's flags and outcomes under each card, their
 /// "Was this helpful?" answer and their Ask Ally thread. A 403 or
-/// `not_available` keeps the note.
+/// `not_available` keeps the note. The reader's own session (the learner
+/// view answers `ready`) shows as their debrief instead, with its
+/// "Practise this next" button (web `ownReady`).
 class DebriefTab extends ConsumerStatefulWidget {
   const DebriefTab({
     super.key,
@@ -285,6 +287,7 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
         readOnly: widget.readOnly,
         onSeeQuote: widget.onSeeQuote,
         trackId: widget.trackId,
+        thisRoleplay: widget.summary?.scenario?.id,
       );
     }
     final note = widget.summary?.supervisorNote;

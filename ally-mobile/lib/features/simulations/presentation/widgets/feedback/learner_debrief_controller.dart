@@ -51,6 +51,16 @@ class LearnerDebriefController extends ChangeNotifier {
   /// learner's, and send nothing back (no read, opened or XP).
   final bool supervisor;
 
+  /// Roleplay Logs on the reader's own session: the learner view answered
+  /// `ready` (it answers only the session's own learner), so it shows as
+  /// their debrief, "Practise this next" included (web `DebriefTab`'s
+  /// `ownReady`). Still read-only: nothing is sent back.
+  bool _ownView = false;
+  bool get ownView => _ownView;
+
+  /// Which view [_fetch] reads: the supervisor's, unless [ownView].
+  bool get _readsSupervisor => supervisor && !_ownView;
+
   final LearnerDebriefRepository _repository;
   final String sessionId;
   final Duration pollInterval;
@@ -169,8 +179,8 @@ class LearnerDebriefController extends ChangeNotifier {
     if (_gaveUp) return;
     _pollTimer?.cancel();
     try {
-      final next = supervisor
-          ? await _repository.getSupervisorDebrief(sessionId)
+      final next = _readsSupervisor
+          ? await _ownOrSupervisor()
           : await _repository.getDebrief(sessionId);
       if (_disposed) return;
       _latest = next;
@@ -201,7 +211,7 @@ class LearnerDebriefController extends ChangeNotifier {
     }
     // A screen opened on a debrief whose flag is still waiting gets one
     // window too.
-    if (!_flagWindowStarted && !supervisor && (_latest?.hasOpenFlag ?? false)) {
+    if (!_flagWindowStarted && !_readsSupervisor && (_latest?.hasOpenFlag ?? false)) {
       _flagWindowStarted = true;
       _flagPollsLeft = _flagPollBudget;
     }
@@ -217,6 +227,24 @@ class LearnerDebriefController extends ChangeNotifier {
       default:
         break;
     }
+  }
+
+  /// Roleplay Logs: the reader's own debrief when the learner view has a
+  /// ready one, else the supervisor's view. Asked once: after an own view
+  /// is found, [_fetch] keeps reading the learner view.
+  Future<LearnerDebriefView> _ownOrSupervisor() async {
+    if (_latest == null) {
+      try {
+        final own = await _repository.getDebrief(sessionId);
+        if (own.state == LearnerDebriefState.ready && own.cards != null) {
+          _ownView = true;
+          return own;
+        }
+      } catch (_) {
+        // Not theirs (403/404) or a blip: the supervisor's view.
+      }
+    }
+    return _repository.getSupervisorDebrief(sessionId);
   }
 
   /// "Was this helpful?" — answering again changes it. Shows the pressed

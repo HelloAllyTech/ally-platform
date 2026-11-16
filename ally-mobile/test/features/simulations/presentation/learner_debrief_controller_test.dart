@@ -216,7 +216,9 @@ void main() {
     c.dispose();
   });
 
-  test('supervisor: reads the supervisor view only, and never marks read or opened', () async {
+  test('supervisor: someone else\'s session reads the supervisor view, and never marks read or opened', () async {
+    // The learner view answers only the session's own learner.
+    when(() => repo.getDebrief('s-1')).thenThrow(Exception('403'));
     when(() => repo.getSupervisorDebrief('s-1')).thenAnswer(
       (_) async => LearnerDebriefView.fromSupervisorJson({'state': 'ready', 'cards': readyDebriefJson()['cards']}),
     );
@@ -226,8 +228,23 @@ void main() {
     await c.markRead();
     await c.markOpened();
     c.recordEvent(DebriefLearnerEvent.waited);
-    verifyNever(() => repo.getDebrief(any()));
+    verify(() => repo.getDebrief('s-1')).called(1);
     verifyNever(() => repo.recordEvent(any(), any()));
+    verifyNever(() => repo.markRead(any()));
+    verifyNever(() => repo.markOpened(any()));
+    c.dispose();
+  });
+
+  test('supervisor: the reader\'s own session reads as their debrief, still sending nothing', () async {
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async => LearnerDebriefView.fromJson(readyDebriefJson()));
+    final c = LearnerDebriefController(repository: repo, sessionId: 's-1', supervisor: true);
+    await c.load();
+    expect(c.ownView, isTrue);
+    expect(c.view?.state, LearnerDebriefState.ready);
+    expect(c.view?.supervisor, isNull);
+    await c.markRead();
+    await c.markOpened();
+    verifyNever(() => repo.getSupervisorDebrief(any()));
     verifyNever(() => repo.markRead(any()));
     verifyNever(() => repo.markOpened(any()));
     c.dispose();
