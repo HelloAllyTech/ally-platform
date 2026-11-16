@@ -4,21 +4,28 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PostHog } from 'posthog-node';
 import { Repository } from 'typeorm';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { LoggerService } from 'src/logger/logger.service';
+import { userDistinctId } from 'src/posthog/posthog.util';
 import {
   CreateSessionBookmarkDto,
   SessionBookmarkDto,
 } from '../dto/create-session-bookmark.dto';
 import { SessionBookmark } from '../entity/session-bookmark.entity';
+import { SESSION_BOOKMARKS_ANALYTICS_EVENTS } from '../constants/session-bookmarks-analytics.constants';
 
 const MAX_BOOKMARKS_PER_USER = 200;
 
 @Injectable()
 export class SessionBookmarksService {
+  private readonly logger = LoggerService.getInstance(SessionBookmarksService.name);
+
   constructor(
     @InjectRepository(SessionBookmark)
     private readonly bookmarks: Repository<SessionBookmark>,
+    private readonly posthog: PostHog,
   ) {}
 
   async create(dto: CreateSessionBookmarkDto): Promise<SessionBookmarkDto> {
@@ -50,6 +57,7 @@ export class SessionBookmarksService {
         source: dto.source ?? 'web',
       }),
     );
+    this.captureSessionBookmarked(userId, saved.sessionId);
     return this.toDto(saved);
   }
 
@@ -68,6 +76,21 @@ export class SessionBookmarksService {
     const result = await this.bookmarks.delete({ id, userId });
     if (!result.affected)
       throw new NotFoundException('Saved session not found');
+  }
+
+  /** Analytics must never fail the request. */
+  private captureSessionBookmarked(userId: number, sessionId: string): void {
+    try {
+      this.posthog.capture({
+        distinctId: userDistinctId(userId),
+        event: SESSION_BOOKMARKS_ANALYTICS_EVENTS.CREATED,
+        properties: { session_id: sessionId },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to capture ${SESSION_BOOKMARKS_ANALYTICS_EVENTS.CREATED} in PostHog: ${error}`,
+      );
+    }
   }
 
   private toDto(row: SessionBookmark): SessionBookmarkDto {
