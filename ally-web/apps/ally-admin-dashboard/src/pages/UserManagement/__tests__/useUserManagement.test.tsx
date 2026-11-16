@@ -38,6 +38,7 @@ vi.mock("@api", async importOriginal => ({
   useGetRoleQuery: () => ({ data: allRoles }),
   // Stable references, like RTK Query's own cache entries: a fresh object per
   // render would retrigger the hook's sync effect forever.
+  useGetTenantsQuery: () => ({ data: undefined }),
   useGetUsersQuery: (params: unknown) => {
     getUsersQuery(params);
     return USERS_RESULT;

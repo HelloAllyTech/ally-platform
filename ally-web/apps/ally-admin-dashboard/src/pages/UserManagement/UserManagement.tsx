@@ -168,6 +168,7 @@ export const UserManagement: FC = () => {
     handleUserAddClick,
     handleAddCredit,
     includePlatformAdmins,
+    allTenants,
   } = useUserManagement(tenants, canListPlatformAdmins, canSeeUsersAndOrgs);
 
   const watchedRoles = userMethods.watch("roles") || [];
@@ -544,7 +545,10 @@ export const UserManagement: FC = () => {
                 {
                   id: "organizations",
                   label: FilterDropdownOptions.ORGANIZATION,
-                  options: tenants.map(org => ({ label: org.name, value: org.name })),
+                  // Every organisation, once each by name (the filter sends the matching ids).
+                  options: Array.from(new Set((allTenants ?? tenants).map(org => org.name)))
+                    .sort((a, b) => a.localeCompare(b))
+                    .map(name => ({ label: name, value: name })),
                 },
                 {
                   id: "statuses",

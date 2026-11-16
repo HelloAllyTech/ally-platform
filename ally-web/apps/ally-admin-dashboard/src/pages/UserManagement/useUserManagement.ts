@@ -7,6 +7,7 @@ import {
   useAddUserMutation,
   useBulkAddUsersMutation,
   useDeleteUserMutation,
+  useGetTenantsQuery,
   useGetUsersQuery,
   useEditUserMutation,
   useUpdateUserStatusMutation,
@@ -51,11 +52,22 @@ const IMPERSONATION_APP_URL = import.meta.env.VITE_IMPERSONATION_APP_URL;
  * Ally admins sub-tab, and ally-be refuses the users list — so the query is
  * skipped rather than left to 403 on mount.
  */
+/** One request that holds every organisation (the Organisations tab pages 100 at a time). */
+const ALL_TENANTS_LIMIT = 1000;
+
 export function useUserManagement(
-  tenants: Tenant[],
+  pagedTenants: Tenant[],
   canListPlatformAdmins = false,
   canListUsers = true,
 ) {
+  // The org filter and the "Add user" organisation picker need EVERY organisation, not just the
+  // 100 the Organisations tab has paged in so far; otherwise an org past the first page cannot be
+  // chosen. Falls back to the paged list until the full one arrives.
+  const { data: allTenantsPage } = useGetTenantsQuery(
+    { limit: ALL_TENANTS_LIMIT, sortBy: SORT_BY.CREATED_AT, sortOrder: SORT_ORDER.DESC },
+    { skip: !canListUsers },
+  );
+  const tenants: Tenant[] = allTenantsPage?.data?.length ? allTenantsPage.data : pagedTenants;
   const [search, setSearch] = useState<string>("");
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [addUsermodalOpen, setAddUserModalOpen] = useState<boolean>(false);
@@ -219,9 +231,10 @@ export function useUserManagement(
 
   const handleApplyFilters = (newFilters: FilterValues) => {
     setFilters(newFilters);
-    const organizationIds = newFilters.organizations
-      .map(name => tenants.find(tenant => tenant.name === name)?.id)
-      .filter((id): id is string => Boolean(id));
+    // Filter by id. Two organisations can share a name, so every match counts.
+    const organizationIds = newFilters.organizations.flatMap(name =>
+      tenants.filter(tenant => tenant.name === name).map(tenant => tenant.id),
+    );
     setTenantIdFilters(organizationIds);
   };
 
@@ -473,6 +486,7 @@ export function useUserManagement(
 
   return {
     // state
+    allTenants: tenants,
     search,
     setSearch,
     isFilterOpen,
