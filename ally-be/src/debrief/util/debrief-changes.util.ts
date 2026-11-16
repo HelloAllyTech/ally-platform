@@ -123,6 +123,9 @@ const STEP_NAMES: Record<string, string> = {
   [DEBRIEF_PROMPT_CODES.writer]: 'Writer',
   [DEBRIEF_PROMPT_CODES.reviser]: 'Reviser',
   [DEBRIEF_PROMPT_CODES.rubric]: 'Rubric',
+  [DEBRIEF_PROMPT_CODES.evaluator]: 'Evaluator',
+  [DEBRIEF_PROMPT_CODES.evaluatorFix]: 'Evaluator',
+  [DEBRIEF_PROMPT_CODES.plannerAgents]: 'Planner',
   [DEBRIEF_PROMPT_CODES.reply]: 'Ask Ally',
   [DEBRIEF_PROMPT_CODES.planner]: 'Planner',
   [DEBRIEF_PROMPT_CODES.protocolCheck]: 'Protocol check',
@@ -147,6 +150,7 @@ const PINNED = new Set([
   DEBRIEF_PROMPT_CODES.safetyReader,
   DEBRIEF_PROMPT_CODES.riskCueDefinition,
   DEBRIEF_PROMPT_CODES.rubric,
+  DEBRIEF_PROMPT_CODES.evaluator,
   'debrief_quality_judge_system',
 ]);
 

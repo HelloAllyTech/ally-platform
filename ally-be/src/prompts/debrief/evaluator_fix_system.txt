@@ -1,0 +1,3 @@
+CLEAR OR NOT. For each risk cue you list, say whether it is clear (see its field), judging the client's meaning in whatever language they spoke.
+
+FIX NOTES. After scoring, list what to change so the debrief would reach the PASS BAR or more on every dimension with no hard fail. One note per section that needs it, naming the section as FIX SECTIONS names them, and the concrete change. Leave the list empty when nothing needs to change.

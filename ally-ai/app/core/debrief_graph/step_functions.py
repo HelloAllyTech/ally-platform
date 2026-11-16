@@ -207,6 +207,9 @@ class InProcessSteps:
             scenario_session_id=session_id,
             history=body.get("history"),
             risk_cue_definition=body.get("risk_cue_definition"),
+            system=body.get("system_prompt"),
+            fix_system=body.get("fix_prompt"),
+            pass_score=body.get("pass_score") or 8,
         )
         if out is None:
             return None

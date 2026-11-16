@@ -1,3 +1,8 @@
+import {
+  ClinicalPatterns,
+  clinicalPatternsFor,
+  defaultClinicalLists,
+} from '../constants/debrief-clinical-lists.constants';
 import { createHash } from 'crypto';
 import { customCodesIn, withoutCustomCodes } from './debrief-competencies.util';
 /**
@@ -215,18 +220,32 @@ export function inLanguageScript(text: string, language: string): boolean {
   return inScript / letters >= 0.5;
 }
 
-const SCORE_RE =
-  /(\b\d{1,3}\s*(%|percent\b|\/\s*10\b|out of \d+))|\b(your|a) (score|rating|grade)\b|\bscored\b/i;
-
-const DIAGNOSIS_RE =
-  /\byou (are|seem|sound|might be|may be) (anxious|depressed|insecure|avoidant|narcissistic|codependent|traumati[sz]ed)\b|\byou (have|suffer from) (anxiety|depression|ptsd|adhd|a disorder)\b|\b(personality|attachment) (disorder|style)\b/i;
+/**
+ * A score in numbers: "70%", "7/10", "8 out of 10". Not a word, so it stays in
+ * code; the words (your score, a rating, scored) are the editable score list.
+ */
+const SCORE_NUMBER_RE = /\b\d{1,3}\s*(%|percent\b|\/\s*10\b|out of \d+)/i;
 
 /**
- * v9 C-12: clinical terms of art a lay counsellor was never taught. Skill
- * names are explained in "skill words", so they are not here.
+ * The editable clinical lists (Settings › Clinical lists) compiled for one
+ * language. The checks fall back to the defaults, which are exactly what they
+ * matched before the lists existed, when a caller passes none.
  */
-const JARGON_RE =
-  /\b(counter-?transference|transference|psycho-?education(al)?|cognitive distortions?|defen[cs]e mechanisms?|somati[sz]ation|therapeutic alliance|affective (state|response)|ego[- ]?(state|defen[cs]e)s?|dichotomous thinking|catastrophi[sz]ing)\b/i;
+const DEFAULT_PATTERNS = new Map<string, ClinicalPatterns>();
+export function defaultClinicalPatterns(language: string): ClinicalPatterns {
+  const key = String(language ?? 'en')
+    .slice(0, 2)
+    .toLowerCase();
+  let p = DEFAULT_PATTERNS.get(key);
+  if (!p) {
+    p = clinicalPatternsFor(defaultClinicalLists(), key);
+    DEFAULT_PATTERNS.set(key, p);
+  }
+  return p;
+}
+
+const mentionsScore = (text: string, p: ClinicalPatterns) =>
+  SCORE_NUMBER_RE.test(text) || !!p.score?.test(text);
 
 /**
  * v9 C-13: a turn the transcript did not catch — a placeholder such as
@@ -315,8 +334,11 @@ export function runDebriefChecks(input: {
   language: string;
   shortForm: boolean;
   hasProgress: boolean;
+  /** The clinical lists for this language; the defaults when absent. */
+  clinical?: ClinicalPatterns;
 }): DebriefCheckFailure[] {
   const { cards, transcript, safety, language, shortForm, hasProgress } = input;
+  const clinical = input.clinical ?? defaultClinicalPatterns(language);
   const fails: DebriefCheckFailure[] = [];
   const turns = new Map(transcript.map((t) => [t.turn_index, t]));
   const fail = (code: DebriefCheckCode, section: string, detail: string) =>
@@ -559,10 +581,10 @@ export function runDebriefChecks(input: {
     );
   }
   for (const t of texts) {
-    if (SCORE_RE.test(t.text)) {
+    if (mentionsScore(t.text, clinical)) {
       fail(DebriefCheckCode.SCORE_MENTIONED, t.section, 'mentions a score');
     }
-    if (DIAGNOSIS_RE.test(t.text)) {
+    if (clinical.diagnosis?.test(t.text)) {
       fail(
         DebriefCheckCode.DIAGNOSES_TRAINEE,
         t.section,
@@ -576,11 +598,11 @@ export function runDebriefChecks(input: {
         'mentions a turn number the learner cannot see',
       );
     }
-    if (t.ownWords && JARGON_RE.test(t.text)) {
+    if (t.ownWords && clinical.jargon?.test(t.text)) {
       fail(
         DebriefCheckCode.JARGON,
         t.section,
-        `uses "${t.text.match(JARGON_RE)![0]}"`,
+        `uses "${t.text.match(clinical.jargon!)![0]}"`,
       );
     }
     if (t.ownWords && t.text.includes('!')) {
@@ -942,13 +964,18 @@ export function replyWordCount(text: string): number {
 export function replyCheckFailures(
   reply: string,
   sources: string[],
+  clinical: ClinicalPatterns = defaultClinicalPatterns('en'),
 ): DebriefCheckCode[] {
   const fails: DebriefCheckCode[] = [];
   if (replyWordCount(reply) > REPLY_MAX_WORDS) {
     fails.push(DebriefCheckCode.REPLY_TOO_LONG);
   }
-  if (SCORE_RE.test(reply)) fails.push(DebriefCheckCode.SCORE_MENTIONED);
-  if (DIAGNOSIS_RE.test(reply)) fails.push(DebriefCheckCode.DIAGNOSES_TRAINEE);
+  if (mentionsScore(reply, clinical)) {
+    fails.push(DebriefCheckCode.SCORE_MENTIONED);
+  }
+  if (clinical.diagnosis?.test(reply)) {
+    fails.push(DebriefCheckCode.DIAGNOSES_TRAINEE);
+  }
   if (TURN_NUMBER_RE.test(reply)) fails.push(DebriefCheckCode.TURN_NUMBER);
   if (unmatchedQuotes(reply, sources).length) {
     fails.push(DebriefCheckCode.QUOTE_MISMATCH);

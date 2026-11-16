@@ -110,6 +110,8 @@ const GRAPH_PROMPT_CODES: readonly string[] = [
   DEBRIEF_PROMPT_CODES.writer,
   DEBRIEF_PROMPT_CODES.reviser,
   DEBRIEF_PROMPT_CODES.rubric,
+  DEBRIEF_PROMPT_CODES.evaluator,
+  DEBRIEF_PROMPT_CODES.evaluatorFix,
 ];
 
 /** An optional read that can never fail the run: any error gives the fallback. */

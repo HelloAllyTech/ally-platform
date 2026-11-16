@@ -1352,6 +1352,102 @@ export const DEBRIEF_RISK_CUE_DEFINITION = definePrompt(
   },
 );
 
+/** src/prompts/debrief/evaluator_system.txt */
+export const DEBRIEF_EVALUATOR_SYSTEM = definePrompt(
+  'debrief_evaluator_system',
+  {},
+  {
+    name: "Debrief Evaluator's instructions",
+    description:
+      "What the Evaluator inside a debrief run is told to do last, after the rubric, the risk cue definition, the transcript and the draft: list the risk cues, score the eight dimensions, list the hard fails. Its own code, separate from the independent judge's debrief_quality_judge_system, so a change to one never moves the other. Pinned: it decides whether a draft reaches learners.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/evaluator_fix_system.txt */
+export const DEBRIEF_EVALUATOR_FIX_SYSTEM = definePrompt(
+  'debrief_evaluator_fix_system',
+  {},
+  {
+    name: "Debrief Evaluator's fix notes",
+    description:
+      "After the Evaluator's instructions: say whether each risk cue is clear, and list what to change, section by section, so the draft reaches the PASS BAR. The code adds the PASS BAR (the release's passScore) and the FIX SECTIONS names the Reviser's critique is keyed by. Release-only.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/planner_agents.txt */
+export const DEBRIEF_PLANNER_AGENTS = definePrompt(
+  'debrief_planner_agents',
+  {},
+  {
+    name: 'Debrief planner: how each agent is described',
+    description:
+      "The wording the planner sees for each analysis agent it may choose (description, use_when, skip_when), one '## <agent id>' section each. The ids and every machine field (scopes, costs, requires) stay in ally-ai's manifests, which are also the fallback for an agent or field this text leaves out. Release-only.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_investigator_system.txt */
+export const DEBRIEF_PM_INVESTIGATOR_SYSTEM = definePrompt(
+  'debrief_pm_investigator_system',
+  {},
+  {
+    name: 'Debrief PM agent: investigator',
+    description:
+      "The PM agent's investigator subagent: investigates one problem with read-only tools and reports back. Sent with every PM agent run and conversation turn.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_reviewer_system.txt */
+export const DEBRIEF_PM_REVIEWER_SYSTEM = definePrompt(
+  'debrief_pm_reviewer_system',
+  {},
+  {
+    name: 'Debrief PM agent: reviewer',
+    description:
+      "The PM agent's reviewer subagent: reviews one proposed change before it is tried and answers supported / fits_everywhere / safe; code stores its verdict as the change's confidence. Pinned: it defines what a safe change is and what waits for a person.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_skill_builder_brief.txt */
+export const DEBRIEF_PM_SKILL_BUILDER_BRIEF = definePrompt(
+  'debrief_pm_skill_builder_brief',
+  {},
+  {
+    name: 'Debrief PM agent skill: Builder brief',
+    description:
+      "A PM agent skill (SKILL.md, with its frontmatter): how to write a brief for Builder. ally-ai writes it into the agent's read-only /skills/ before every run.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_skill_prompt_change.txt */
+export const DEBRIEF_PM_SKILL_PROMPT_CHANGE = definePrompt(
+  'debrief_pm_skill_prompt_change',
+  {},
+  {
+    name: 'Debrief PM agent skill: prompt change',
+    description:
+      "A PM agent skill (SKILL.md, with its frontmatter): how to write a prompt change as a find/replace. ally-ai writes it into the agent's read-only /skills/ before every run.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_skill_registry_agent.txt */
+export const DEBRIEF_PM_SKILL_REGISTRY_AGENT = definePrompt(
+  'debrief_pm_skill_registry_agent',
+  {},
+  {
+    name: 'Debrief PM agent skill: registry agent',
+    description:
+      "A PM agent skill (SKILL.md, with its frontmatter): how to propose a new analysis agent's manifest. ally-ai writes it into the agent's read-only /skills/ before every run.",
+    category: 'evaluation',
+  },
+);
+
 /** src/prompts/debrief/analyst_system.txt */
 export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
   'debrief_analyst_system',
@@ -1424,7 +1520,7 @@ export const DEBRIEF_PLANNER_SYSTEM = definePrompt(
   {
     name: 'Debrief planner',
     description:
-      "The orchestrated debrief's planner (challenger releases only): runs after the safety reader and the Analyst; from the session profile, a summary of the Analyst's evidence map (pivotal moments with their turns, skills observed / partial / missed, the AI client's faults: the Analyst's words, no quotes) and the registry agents' manifests, never the transcript, chooses which analysis agents run and says why the others don't; once more after a failed evaluation, with the Evaluator's critique. The step composes the profile, the evidence summary, the manifests and the limits around this text. Release-only.",
+      "The orchestrated debrief's planner (challenger releases only): runs after the safety reader and the Analyst; from the session profile, a summary of the Analyst's evidence map (pivotal moments with their turns, skills observed / partial / missed, the AI client's faults: the Analyst's words, no quotes) and the registry agents' manifests, never the transcript, chooses which analysis agents run and says why the others don't; once more after a failed evaluation, with the Evaluator's critique. The step composes the profile, the evidence summary, the manifests (worded by debrief_planner_agents) and the limits around this text; TOP-UP is a data line, its meaning is this text's. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },

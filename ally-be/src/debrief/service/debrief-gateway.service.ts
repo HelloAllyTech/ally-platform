@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { DebriefClinicalListsService } from './debrief-clinical-lists.service';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ContextRetrievalService } from '../../context-library/service/context-retrieval.service';
@@ -45,6 +46,8 @@ export class DebriefGatewayService {
     private readonly context: DebriefContextRepository,
     private readonly guidance: ContextRetrievalService,
     private readonly aggregates: DebriefAggregatesService,
+    /** Settings › Clinical lists; the checks use the defaults without it. */
+    @Optional() private readonly clinicalLists?: DebriefClinicalListsService,
   ) {}
 
   /** The session the run is for, as the orchestrator's data tools scope to it. */
@@ -181,6 +184,10 @@ export class DebriefGatewayService {
       language: body.language,
       shortForm: !!body.short_form,
       hasProgress: !!body.has_progress,
+      clinical:
+        (await this.clinicalLists
+          ?.patterns(body.language)
+          .catch(() => undefined)) ?? undefined,
     });
     return {
       failures,

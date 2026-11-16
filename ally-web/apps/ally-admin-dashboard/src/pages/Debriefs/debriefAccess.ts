@@ -42,6 +42,8 @@ export interface DebriefAccess {
   settings: boolean;
   /** Agent logs: every agent's exact input and reply (the Ally team only). */
   agentLogs: boolean;
+  /** Settings › Clinical lists: the clinical advisor and the owner. */
+  clinicalLists: boolean;
 }
 
 /** ally-be's `viewer` in the console's words. */
@@ -63,6 +65,7 @@ export const accessFromViewer = (viewer: DebriefViewer): DebriefAccess => ({
   emergencyStop: viewer.can.emergencyStop,
   settings: viewer.can.ownerSettings,
   agentLogs: !!viewer.can.agentLogs,
+  clinicalLists: !!viewer.can.clinicalLists,
 });
 
 /** The same rules from the user's permissions, for before a payload has said. */
@@ -90,6 +93,7 @@ export const debriefAccessFor = (permissions: string[] | undefined): DebriefAcce
     emergencyStop: team,
     settings: owner,
     agentLogs: allyTeam,
+    clinicalLists: advisor || owner,
   };
 };
 

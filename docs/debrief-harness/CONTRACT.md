@@ -422,6 +422,33 @@ trainees, "most trainees did better", "other learners", "compared with others", 
 average); "many find this moment hard" passes. The proposed prompt versions, with anchors for the live text, are
 in `docs/debrief-harness/proposals/2026-11-16-wording-to-prompts.json`.
 
+**Every Debrief prompt has a code (step 4, 2026-11-16).**
+
+- **Evaluator:** `debrief_evaluator_system` (pinned, guard) is what it is told last, its own code rather than the
+  judge's `debrief_quality_judge_system`: the judge is a measuring instrument labelled by a version in code, and
+  the Evaluator decides what learners read, so neither may move the other. `debrief_evaluator_fix_system` holds
+  CLEAR OR NOT and FIX NOTES; code adds `PASS BAR: <passScore>` (the release setting) and the `FIX SECTIONS:`
+  names the Reviser's critique is keyed by. The graph body carries `system_prompt`, `fix_prompt`, `pass_score`.
+- **Planner:** `debrief_planner_agents` holds each agent's `description` / `use_when` / `skip_when` as
+  `## <id>` sections; ally-ai merges them over the manifest's card (ids and machine fields stay in code; an
+  agent or field the text leaves out keeps the manifest's). The top-up is the data line `TOP-UP: given.`; its
+  meaning is `debrief_planner_system`'s TOP-UP paragraph.
+- **PM agent:** `debrief_pm_investigator_system`, `debrief_pm_reviewer_system` (pinned, guard) and one
+  `debrief_pm_skill_<name>` per skill (the whole SKILL.md). ally-be sends them as `prompts` on
+  `POST /pm-agent/runs` and merged into the conversation's `prompts`; ally-ai writes each skill into the
+  store namespace `debrief_pm_skills` before every run, and `/skills/` is a `StoreBackend` over it (read-only to
+  the agent, loaded by Deep Agents' own skills middleware). A missing text uses the packaged default.
+- **Flag answer:** "at most three short sentences" is `ally_ai_debrief_flag_answer_system`'s; `problem_with`
+  sends back a reply of more than three sentences (`REPLY_MAX_SENTENCES`).
+- **Ask Ally:** tool docstrings are short; when to use each tool is the reply prompt's TOOLS section ("never the
+  learner's own words" is still enforced by `clean_topic`). ally-be sends `THEIR ORGANISATION:` as a data label;
+  how to use it is the reply prompt's THEIR ORGANISATION paragraph.
+- **Clinical lists:** the score, diagnosis and jargon checks read word lists per language from
+  `debrief_owner_settings.clinicalLists` (`GET/PUT /debriefs/console/settings/clinical-lists`; edit: the clinical
+  advisor or the owner, `clinicalLists` action; audited as `DEBRIEF_SETTINGS_CHANGED`), with a one-minute cache
+  and the defaults when unreadable. English applies to every language. Entries are plain words or phrases,
+  escaped and matched case-insensitively at word boundaries; the numeric score shapes stay in code.
+
 ## 5. Ask Ally — `POST /api/v1/ask-ally/replies` (ally-ai)
 
 Added 2026-11-11 (spec §A10, §D2 step 4). Ask Ally answers a learner's reply under their published

@@ -36,11 +36,13 @@ import {
   DebriefCards,
   cardTexts,
   REPLY_MAX_WORDS,
+  defaultClinicalPatterns,
   replyCheckFailures,
   cardSkills,
   speakerRuns,
   unmatchedQuotes,
 } from '../util/debrief-cards.util';
+import { DebriefClinicalListsService } from './debrief-clinical-lists.service';
 import { AskAllyClient, AskAllyError, ReplyTrace } from './ask-ally.client';
 import { DebriefAgentService } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';
@@ -198,6 +200,8 @@ export class DebriefReplyService {
     private readonly tokens: DebriefRunTokenService,
     /** v9 §3.3: replies and reflective answers, for the experience metrics. */
     @Optional() private readonly learnerEvents?: DebriefLearnerEventsService,
+    /** Settings › Clinical lists; the defaults when absent or unreadable. */
+    @Optional() private readonly clinicalLists?: DebriefClinicalListsService,
   ) {}
 
   async stream(
@@ -365,7 +369,10 @@ export class DebriefReplyService {
 
     /** The finished reply: checked, distress-screened, then sent and saved. */
     const settle = async (full: string, distress: boolean) => {
-      const fails = replyCheckFailures(full, sources);
+      const clinical =
+        (await this.clinicalLists?.patterns(language).catch(() => null)) ??
+        defaultClinicalPatterns(language);
+      const fails = replyCheckFailures(full, sources, clinical);
       let content = fails.length ? CHECK_FALLBACK : full;
       if (fails.length) {
         this.logger.warn(
@@ -710,7 +717,8 @@ export class DebriefReplyService {
     }
     return org
       ? [
-          'THEIR ORGANISATION (use its wording when pointing them to their supervisor or its procedures):',
+          // Data: how to use it is the reply prompt's THEIR ORGANISATION.
+          'THEIR ORGANISATION:',
           org,
         ]
       : [];

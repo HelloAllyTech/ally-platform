@@ -1,3 +1,4 @@
+import { pmAgentPrompts } from './debrief-pm-agent-run.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -727,14 +728,31 @@ export class DebriefPmConversationService {
   }
 
   private async prompts(): Promise<Record<string, unknown> | null> {
+    let overrides: Record<string, unknown> | null = null;
     try {
       const { AiService } = await import('../../ai/service/ai.service');
       const ai = this.moduleRef.get(AiService, { strict: false });
-      return await ai.getPromptOverrides([PM_CONVERSATION_PROMPT_CODE]);
+      overrides = await ai.getPromptOverrides([PM_CONVERSATION_PROMPT_CODE]);
     } catch {
       // ally-ai falls back to its default instructions.
-      return null;
     }
+    // Its subagents and skills: the same live texts as the weekly run.
+    const own = await pmAgentPrompts({
+      promptText: async (code: string) => {
+        const [row] = await this.dataSource.query(
+          `SELECT pv.prompt FROM prompts p
+             JOIN prompts_versions pv
+               ON pv."promptId" = p.id AND pv.version = p."currentVersion"
+            WHERE p."promptCode" = $1
+            LIMIT 1`,
+          [code],
+        );
+        return row?.prompt ? String(row.prompt) : null;
+      },
+    }).catch(() => ({}));
+    return overrides || Object.keys(own).length
+      ? { ...(overrides ?? {}), ...own }
+      : null;
   }
 
   private async call(

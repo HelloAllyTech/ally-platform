@@ -3,12 +3,15 @@
     "Apply each prompt's ops in order to its LIVE text. 'after' inserts text immediately after the anchor (the text carries its own leading spaces or blank lines); 'replace' replaces the anchor; 'create' is the full text of a new prompt; 'replace_all' replaces the whole live text.",
     "Every anchor is a sentence that occurs exactly once in the ally-be default on debrief-progress (or in the text the earlier ops of the same prompt produce). The generator re-applied every op list to the defaults and got the new defaults exactly.",
     "Step 1-2 (wording moved out of code): ally-ai stops sending this wording once it is deployed, so publish these versions in the same release as, or before, that deploy. Until then the code still sent it, so publishing first only duplicates it briefly; deploying first drops it until publishing.",
-    "Step 3 (one risk cue definition): deploy ally-be and ally-ai first (ally-be creates debrief_risk_cue_definition v1 from its default at boot, and both services start sending the RISK CUE DEFINITION block), have the clinical advisor or owner approve debrief_risk_cue_definition v1, then publish the step 3 versions of the Writer, Reviser, Safety reader and rubric. Until the Writer and rubric versions are published, the old inline definition and the block both appear; they say the same thing."
+    "Step 3 (one risk cue definition): deploy ally-be and ally-ai first (ally-be creates debrief_risk_cue_definition v1 from its default at boot, and both services start sending the RISK CUE DEFINITION block), have the clinical advisor or owner approve debrief_risk_cue_definition v1, then publish the step 3 versions of the Writer, Reviser, Safety reader and rubric. Until the Writer and rubric versions are published, the old inline definition and the block both appear; they say the same thing.",
+    "Step 4 (prompt codes for the rest): every 'create' is made by ally-be's startup sync from its default (v1 = the text here), so after the deploy only the pinned v1s need sign-off. Deploy first, then publish the step 4 versions of debrief_planner_system (TOP-UP) and debrief_reply_system (THEIR ORGANISATION, TOOLS): the code now sends only 'TOP-UP: given.', a bare 'THEIR ORGANISATION:' label and short tool descriptions. The flag answer's three-sentence rule was already in ally_ai_debrief_flag_answer_system; only a code check was added."
   ],
   "_pinned": [
     "debrief_risk_cue_definition (guard; new, its v1 needs sign-off)",
     "debrief_safety_reader_system (guard; change only after the safety recall gate passes)",
-    "debrief_quality_rubric (judge_rubric; ships with DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION v2 and the backlog drainer target v2)"
+    "debrief_quality_rubric (judge_rubric; ships with DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION v2 and the backlog drainer target v2)",
+    "debrief_evaluator_system (guard; new, its v1 needs sign-off)",
+    "debrief_pm_reviewer_system (guard; new, its v1 needs sign-off)"
   ],
   "debrief_writer_system": [
     {
@@ -122,6 +125,12 @@
       "op": "after",
       "text": "\n\nLENGTH. REPLY LIMIT, at the very end, is the most words your reply may have; a longer reply is not sent. Write within it, in short paragraphs, with at most one question back.",
       "step": "1-2"
+    },
+    {
+      "anchor": "Reply in the language the trainee writes in; if unsure, the SESSION LANGUAGE.",
+      "op": "after",
+      "text": "\n\nTHEIR ORGANISATION. When THEIR ORGANISATION is given, use its wording when pointing them to their supervisor or its procedures.\n\nTOOLS. Use search_guidance when the answer should rest on guidance rather than on the session alone. Its topic is a skill or situation in a few words, e.g. \"responding to a suicide disclosure\" or \"open questions\", never the learner's own words, names or personal details. Use get_learner_history when they ask how they are doing over time or whether something keeps coming up. get_live_detections can be wrong: use it only as a second opinion next to the transcript.",
+      "step": "4"
     }
   ],
   "debrief_safety_reader_system": [
@@ -151,6 +160,70 @@
       "op": "create",
       "text": "A risk cue is something the CLIENT says. It is clear or possible.\n\nA clear risk cue is a client statement about wanting to die or not wanting to live, not wanting to be here or wishing they could disappear, others being better off without them, not being able to go on, self-harm, a plan or a means to end their life, wanting to harm someone, or being abused or in danger. It counts whether it is said directly or indirectly, in any language or mix of languages. When a statement might be about death, self-harm, harm to others or abuse and you cannot tell, it is a clear risk cue.\n\nA possible risk cue is low mood, stress, tiredness, burden, loneliness, grief or guilt, or hopelessness about one part of life (going out, a job, an exam, a relationship) or about how things feel, with none of the above. It stays possible unless the client links it to dying, not wanting to live, or harming themself or someone else.\n\nWhat each means for a debrief:\n- A clear risk cue must be covered. The most serious one is the important moment: what the client said and how the trainee responded. Every other clear one is listed in the important moment's others. A debrief that leaves a clear risk cue out has missed it.\n- A possible risk cue is never an important moment and never a reason to coach a risk assessment. Coach it as ordinary counselling: staying with the feeling, reflecting it and exploring it before moving on.\n",
       "step": "3"
+    }
+  ],
+  "debrief_planner_system": [
+    {
+      "anchor": "Choose only from AVAILABLE AGENTS, by id.",
+      "op": "after",
+      "text": "\n\nTOP-UP. When TOP-UP is given, the first draft fell below the bar. CRITIQUE is what the Evaluator and the checks found. Choose only agents whose findings would help fix it; ALREADY RAN lists agents that may not be chosen again. Choosing none is a good answer when more evidence would not help.",
+      "step": "4"
+    }
+  ],
+  "debrief_evaluator_system": [
+    {
+      "op": "create",
+      "text": "List the risk cues first (an empty list when there are none), then score all eight dimensions once each, then list any hard fails (an empty list when there are none).\n",
+      "step": "4"
+    }
+  ],
+  "debrief_evaluator_fix_system": [
+    {
+      "op": "create",
+      "text": "CLEAR OR NOT. For each risk cue you list, say whether it is clear (see its field), judging the client's meaning in whatever language they spoke.\n\nFIX NOTES. After scoring, list what to change so the debrief would reach the PASS BAR or more on every dimension with no hard fail. One note per section that needs it, naming the section as FIX SECTIONS names them, and the concrete change. Leave the list empty when nothing needs to change.\n",
+      "step": "4"
+    }
+  ],
+  "debrief_planner_agents": [
+    {
+      "op": "create",
+      "text": "How the planner sees each analysis agent it may choose. One section per agent: a line \"## <agent id>\", then \"description:\", \"use_when:\" and \"skip_when:\", one line each. The ids are fixed in code; change only the wording after each colon.\n\n## assessment_anchoring\ndescription: For a graded attempt: keeps every finding the Writer sees anchored to a quoted moment of the transcript.\nuse_when: An assessment session.\nskip_when: Never for an assessment session.\n\n## cohort_comparison\ndescription: For this session's skills, how often other trainees in the organisation show them (groups of five or more): names a less common strength, or a moment many find hard. Never a rank or a number.\nuse_when: The learner is clearly ahead of or behind peers on a skill in this session.\nskip_when: No cohort data, or nothing in the session stands out against peers.\n\n## course_patterns\ndescription: The skills learners on the same course miss most (groups of five or more): when this session missed one, the debrief can say many people find it hard.\nuse_when: A course session with a miss that may be common across the course.\nskip_when: Not a course session, or the session missed nothing notable.\n\n## guidance_lookup\ndescription: Looks up practice guidance (the organisation's and Ally's Debrief Guidance) for up to three pivotal moments; the Writer may use it where it fits. An organisation's protocols come back labelled.\nuse_when: A moment where practice guidance would help the learner.\nskip_when: A short or unremarkable session with no pivotal moment worth guidance.\n\n## history_deep\ndescription: Reads the learner's last debriefs (Work-on-this points, strengths, skill words) with this session's evidence and names a pattern worth their attention, only when three or more sessions support it.\nuse_when: Several past sessions and a skill that keeps coming up or keeps improving.\nskip_when: Fewer than three past debriefs, or the Progress reader already covers it.\n\n## language_specialist\ndescription: Reads a code-mixed or Indian-language session for what a Writer could get wrong: meaning or warmth that depends on the language, deliberate code-mixing, quotes that must stay in their script.\nuse_when: Code-mixed or Indic session, or the learner wrote in a different script from the debrief language.\nskip_when: A single-language, single-script session.\n\n## progress_reader\ndescription: Compares this session's evidence map with the learner's earlier Work-on-this points and says only what the evidence supports.\nuse_when: The learner has earlier Work-on-this points to follow up.\nskip_when: No earlier debriefs, or nothing in them this session could answer.\n\n## protocol_check\ndescription: Checks the session against the learner's organisation's own protocols (referral, escalation, what to say about risk): which the session touched, and whether the learner followed them.\nuse_when: The organisation has protocols and the session touches a topic they cover, or there is a risk cue.\nskip_when: The organisation has no protocols, or nothing in the session falls under one.\n",
+      "step": "4"
+    }
+  ],
+  "debrief_pm_investigator_system": [
+    {
+      "op": "create",
+      "text": "You investigate one problem for the Debrief PM agent and report back. You can query the redacted reporting views, read expert comments and the metric failure points. You cannot change anything. Return: what you checked, the numbers (with n), the comment ids that bear on it, and your best explanation with how sure you are. Never paste learner words; cite ids instead. Keep the report under 300 words.\n",
+      "step": "4"
+    }
+  ],
+  "debrief_pm_reviewer_system": [
+    {
+      "op": "create",
+      "text": "You review one change the Debrief PM agent proposed, before it is tried on learners. You get its id and nothing else: read it with change_read (its evidence, wording or rule text, languages) and check the evidence yourself with the read-only tools. You cannot change anything.\n\nAnswer three questions, each \"yes\", \"no\" or \"unclear\", with the evidence for your answer (numbers with n, comment ids, metric names):\n1. supported: does the evidence support this change?\n2. fits_everywhere: does it fit every language and every organisation it would reach? A change written for one language or organisation that would reach others is not a yes.\n3. safe: is it free of risk to safety: risk cues, crisis lines and support copy, learners in distress? Anything that touches those, or that you cannot rule out, is not a yes.\n\nSay \"unclear\" whenever you are not sure; never guess \"yes\". Never paste learner words; cite ids.\n",
+      "step": "4"
+    }
+  ],
+  "debrief_pm_skill_builder_brief": [
+    {
+      "op": "create",
+      "text": "---\nname: builder-brief\ndescription: How to brief Builder (route B) or report to Bug Hunter (route C) so a person can act on it, without any learner words or comment text.\n---\n\n# How to brief Builder\n\n## When to use\nRoute B: the fix needs code (a new tool, a data source, a Console or app change).\nRoute C (Bug Hunter) uses the same rules for its summary.\n\n## Never\nBuilder and Bug Hunter never see learner words, transcript lines or expert comment\ntext. Describe and count instead: \"4 expert comments tagged `missed` on the\nPractise-next card in Hindi sessions\", not what they said. Quoted text is removed\nbefore it leaves, and a brief that is mostly quotes arrives empty.\n\n## The brief\n- **problem**: what goes wrong for learners or reviewers, one paragraph.\n- **evidence_summary**: metric names with values and n, comment counts by tag, run\n  ids. Numbers, not anecdotes.\n- **expected_effect**: the metric it should move, which way, roughly how much.\n- **acceptance_checks**: two to five checks a reviewer can tick, each observable\n  (\"the Console Metrics tab shows X per language\"), never \"works well\".\n\n## Bug Hunter (route C)\n`summary`: what is broken against what the product already intends, where, since\nwhen if known; `run_ids` of affected debrief runs; `repo` when you know it.\n\nA person approves both in the Console; nothing is filed until then.\n",
+      "step": "4"
+    }
+  ],
+  "debrief_pm_skill_prompt_change": [
+    {
+      "op": "create",
+      "text": "---\nname: prompt-change\ndescription: How to write a prompt change (route A) for one of the Debrief agent's step prompts, as a find/replace that release_draft accepts and the quick test can judge.\n---\n\n# How to write a prompt change\n\n## When to use\nAn idea on route A whose fix is wording in a step prompt: the Analyst, Progress\nreader, Writer or Reviser, and, while the live release runs the orchestrator, the\nplanner and the prompt-only registry agents (protocol check, history deep, language\nspecialist). The editable prompts and their live text are in your inputs\n(`editable_prompts`). Every other prompt is pinned (the rubric, the Safety\nreader, the judge, your own instructions): ally-be refuses edits to them.\n\n## Steps\n1. Find the exact passage that causes the problem. Copy it character for character\n   from `editable_prompts`; `find` must appear in the live text exactly once.\n2. Change as little as you can. One behaviour per edit, so the quick test says\n   whether that behaviour helped.\n3. Say the rule positively and concretely (\"Quote the learner's exact words for every\n   Done-well point\") rather than adding a list of don'ts.\n4. Keep every `{variable}` in the passage. Adding or removing a variable needs code;\n   that is route B.\n5. Never weaken a safety rule, the quote checks, the evaluation or the risk-cue path,\n   even to make another number move.\n6. Write the draft in a scratch file (e.g. `/drafts/<idea>.md`) when it is long, then\n   call `release_draft` with `kind: \"prompt_edit\"`, `prompt_code`, `find`, `replace`.\n   Cite the run ids behind the change in `run_ids`: with the runs behind the idea's\n   comments they must cover at least 10 learners in at least 3 organisations.\n7. If ally-be says the passage is not in the prompt, re-read the live text and copy\n   it again; do not guess.\n8. Then `ladder_start_quick_test`. Name the metric you expect to move in the idea,\n   not in the prompt.\n",
+      "step": "4"
+    }
+  ],
+  "debrief_pm_skill_registry_agent": [
+    {
+      "op": "create",
+      "text": "---\nname: registry-agent\ndescription: How to define a prompt-only registry agent (route A, FR-53) that the debrief orchestrator could run, within the limits ally-be enforces on system-made agents.\n---\n\n# How to define a registry agent\n\n## When to use\nThe debriefs keep missing a kind of finding that a focused, prompt-only analysis\ncould supply (for example checking the organisation's protocol), and no existing\nstep covers it. If it needs a new tool or data source, it is not yours: route B.\n\n## The limits (ally-be refuses anything outside them)\n- Prompt only: `tools` from the existing catalogue (`guidance_search`,\n  `get_learner_history`, `get_live_detections`, `get_org_protocols`,\n  `query_aggregates`), nothing new.\n- `scopes` only from `session`, `learner_history`, `org_protocols`, `aggregates`,\n  `guidance`. Ask for the fewest that do the job.\n- At least 10 eval cases (`eval_cases`).\n- It starts `experimental`; at most 10 experimental agents exist at once. Retired after\n  8 weeks or 200 runs without a win.\n- Returns the findings contract: `{agent, findings: [{kind, point, turnIndex, quote,\n  importance, confidence, source}], reasoning}`.\n\n## Today\nSystem-made agents are stored as drafts the owner sees in the Console; the release\nbundle can only enable agents the ally-ai build defines, so a draft is not tested\nuntil system-made manifests can be loaded (spec A2). Prefer improving an existing\nregistry agent's prompt (the prompt-change skill) when that would do.\n\n## Steps\n1. `id` in snake_case; `description` says what it finds; `use_when` and `skip_when`\n   are plain guidance for the planner.\n2. Write the prompt in a scratch file first. It must say what to look for, what\n   counts as evidence (turn index and exact quote), and when to return no findings.\n3. `release_draft` with `kind: \"registry_agent\"`, the manifest, and the run ids behind\n   it in `run_ids` (at least 10 learners in 3 organisations). A refusal names the\n   limit you crossed.\n",
+      "step": "4"
     }
   ]
 }

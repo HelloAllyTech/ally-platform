@@ -321,18 +321,53 @@ agent or a source.\
 #: read them is their prompts' FINDINGS paragraph (Skills Store).
 _FINDINGS_GIVEN = "FINDINGS: given."
 
-EVALUATOR_FIX_INSTRUCTIONS = """\
+#: `debrief_evaluator_system` (pinned): what the Evaluator is told to do last,
+#: after the rubric, the transcript and the draft. Its own code, not the
+#: judge's `debrief_quality_judge_system`: the judge is a measuring instrument
+#: whose series is labelled by a version in code, and the Evaluator decides
+#: what learners read, so a change to one must never move the other.
+DEFAULT_EVALUATOR_SYSTEM = """\
+List the risk cues first (an empty list when there are none), then score all \
+eight dimensions once each, then list any hard fails (an empty list when there \
+are none).\
+"""
 
+#: `debrief_evaluator_fix_system`: whether each cue is clear, and the fix notes.
+DEFAULT_EVALUATOR_FIX_SYSTEM = """\
 CLEAR OR NOT. For each risk cue you list, say whether it is clear (see its \
 field), judging the client's meaning in whatever language they spoke.
 
-FIX NOTES. After scoring, list what to change so the debrief would reach 8 \
-or more on every dimension with no hard fail. One note per section that \
-needs it, naming the section (opening, important_moment, what_worked[0], \
-work_on_this[1], practise_next, skill_words, reflective_question, \
-progress_note) and the concrete change. Leave the list empty when nothing \
-needs to change.\
+FIX NOTES. After scoring, list what to change so the debrief would reach the \
+PASS BAR or more on every dimension with no hard fail. One note per section \
+that needs it, naming the section as FIX SECTIONS names them, and the \
+concrete change. Leave the list empty when nothing needs to change.\
 """
+
+#: Format: the section names the Reviser's critique is keyed by.
+FIX_SECTIONS = (
+    "FIX SECTIONS: opening, important_moment, what_worked[0], work_on_this[1], "
+    "practise_next, skill_words, reflective_question, progress_note."
+)
+
+
+def _pass_bar(pass_score: float) -> str:
+    """Data: the release's `passScore`, as people write it (8, not 8.0)."""
+    n = float(pass_score)
+    return f"PASS BAR: {int(n) if n.is_integer() else n}"
+
+
+def evaluator_fix_lines(fix_system: Optional[str] = None, pass_score: float = 8) -> str:
+    """The text after the judge prompt: the fix wording, then its data."""
+    return "\n".join(
+        [
+            "",
+            "",
+            (fix_system or "").strip() or DEFAULT_EVALUATOR_FIX_SYSTEM,
+            "",
+            _pass_bar(pass_score),
+            FIX_SECTIONS,
+        ]
+    )
 
 
 #: The script ally-be's language check expects for a session language
@@ -833,6 +868,9 @@ async def evaluate(
     scenario_session_id: Optional[str] = None,
     history: Optional[str] = None,
     risk_cue_definition: Optional[str] = None,
+    system: Optional[str] = None,
+    fix_system: Optional[str] = None,
+    pass_score: float = 8,
 ) -> Tuple[Optional[EvaluationOutput], str]:
     """Score a draft on the rubric, with fix notes per section.
 
@@ -850,10 +888,11 @@ async def evaluate(
         rubric=rubric,
         history=history,
         risk_cue_definition=risk_cue_definition,
+        instructions=(system or "").strip() or DEFAULT_EVALUATOR_SYSTEM,
     )
     output, meta = await _call(
         EvaluationOutputReasoned,
-        prompt + EVALUATOR_FIX_INSTRUCTIONS,
+        prompt + evaluator_fix_lines(fix_system, pass_score),
         LLMTask.DEBRIEF_EVALUATOR.value,
         model,
         scenario_session_id,
@@ -927,22 +966,29 @@ async def revise(
 # --- The orchestrator: planner and the prompt-only analysis agents (spec A5, A9) ---
 
 DEFAULT_PLANNER_SYSTEM = """\
-You plan the analysis behind one debrief of a mental-health training roleplay. \
-You do not see the transcript. The safety reader and the Analyst have already \
-read it. From the SESSION PROFILE, the EVIDENCE SUMMARY and the AVAILABLE \
-AGENTS, choose the agents whose findings would make THIS debrief better, and \
-say for every other available agent why it is not worth running here.
+You plan the analysis behind one debrief of a mental-health training \
+roleplay. You do not see the transcript. The safety reader and the Analyst \
+have already read it. From the SESSION PROFILE, the EVIDENCE SUMMARY and the \
+AVAILABLE AGENTS, choose the agents whose findings would make THIS debrief \
+better, and say for every other available agent why it is not worth running \
+here.
 
-The EVIDENCE SUMMARY is the Analyst's own account of the session: its pivotal \
-moments (what happened, at which turn), the skills the trainee showed, partly \
-showed or missed, and the AI client's faults. Use it to judge what a closer \
-look would add: a pivotal moment an organisation protocol covers, a missed \
-skill that keeps coming up in the learner's history, a moment whose meaning \
-depends on the language. The Writer already gets the Analyst's evidence map, \
-so never choose an agent only to repeat it.
+The EVIDENCE SUMMARY is the Analyst's own account of the session: its \
+pivotal moments (what happened, at which turn), the skills the trainee \
+showed, partly showed or missed, and the AI client's faults. Use it to judge \
+what a closer look would add: a pivotal moment an organisation protocol \
+covers, a missed skill that keeps coming up in the learner's history, a \
+moment whose meaning depends on the language. The Writer already gets the \
+Analyst's evidence map, so never choose an agent only to repeat it.
 
-Choose few: each agent costs time and money, and the learner is waiting. Read \
-each agent's use_when and skip_when. Choose only from AVAILABLE AGENTS, by id.\
+Choose few: each agent costs time and money, and the learner is waiting. \
+Read each agent's use_when and skip_when. Choose only from AVAILABLE AGENTS, \
+by id.
+
+TOP-UP. When TOP-UP is given, the first draft fell below the bar. CRITIQUE \
+is what the Evaluator and the checks found. Choose only agents whose \
+findings would help fix it; ALREADY RAN lists agents that may not be chosen \
+again. Choosing none is a good answer when more evidence would not help.\
 """
 
 DEFAULT_PROTOCOL_CHECK_SYSTEM = """\
@@ -1014,14 +1060,9 @@ async def plan_agents(
     lines = [system or DEFAULT_PLANNER_SYSTEM, ""]
     lines.append(f"Choose at most {max_agents} agents.")
     if critique is not None:
-        # Code-owned (D3): the one evidence top-up after a failed evaluation.
-        lines.append(
-            "TOP-UP: the first draft fell below the bar. CRITIQUE is what the "
-            "Evaluator and the checks found. Choose only agents whose findings "
-            "would help fix it; ALREADY RAN lists agents that may not be "
-            "chosen again. Choosing none is a good answer when more evidence "
-            "would not help."
-        )
+        # Data only (D3): this is the evidence top-up. What it means is the
+        # planner prompt's TOP-UP paragraph; code never offers an agent that ran.
+        lines.append("TOP-UP: given.")
     lines.append("")
     lines += _json_block("session_profile", profile)
     lines += _json_block("evidence_summary", evidence_summary or {})

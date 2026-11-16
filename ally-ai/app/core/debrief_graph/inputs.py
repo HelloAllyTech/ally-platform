@@ -160,6 +160,9 @@ def evaluator_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "language": ctx.language,
         "learner_level": ctx.sess("learner_level"),
         "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
+        "system_prompt": ctx.prompt(PROMPT_CODES["evaluator"]),
+        "fix_prompt": ctx.prompt(PROMPT_CODES["evaluator_fix"]),
+        "pass_score": ctx.setting("passScore", 8),
     }
 
 

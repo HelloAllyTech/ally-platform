@@ -79,9 +79,10 @@ higher than a warm, vague one. Do not reward length.\
 """
 
 
-#: What the judge is told to do last. The Evaluator (inside a debrief run) always
-#: uses this text; only the independent judge takes the store's version, so a
-#: change to the judge's instructions never touches what learners read.
+#: What the judge is told to do last; the store's `debrief_quality_judge_system`
+#: when ally-be sends it. The Evaluator (inside a debrief run) has its own
+#: pinned code, `debrief_evaluator_system` (steps.DEFAULT_EVALUATOR_SYSTEM), so
+#: a change to the judge's instructions never touches what learners read.
 DEFAULT_JUDGE_INSTRUCTIONS = (
     "List the risk cues first (an empty list when there are none), then "
     "score all eight dimensions once each, then list any hard fails (an "

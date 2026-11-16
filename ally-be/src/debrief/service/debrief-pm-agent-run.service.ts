@@ -16,6 +16,7 @@ import {
   DEBRIEF_AGENT_KEY,
   DEBRIEF_MODELS,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
+  DEBRIEF_PM_AGENT_PROMPT_CODES,
   DEBRIEF_PROMPT_CODES,
   DebriefRecipeKey,
   PM_AGENT_EDITABLE_PROMPTS,
@@ -58,6 +59,25 @@ export const ANSWER_RUN_TOOLS = [
 
 /** A run is minutes; past this ally-be stops waiting (the token lives 2 h). */
 export const PM_AGENT_RUN_TIMEOUT_MS = 45 * 60 * 1000;
+
+/**
+ * The PM agent's own live texts (its subagents and skills), by code; a code
+ * the store cannot answer is left out and ally-ai uses its default.
+ */
+export async function pmAgentPrompts(context: {
+  promptText(code: string, version: number | null): Promise<string | null>;
+}): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const code of DEBRIEF_PM_AGENT_PROMPT_CODES) {
+    try {
+      const text = await context.promptText(code, null);
+      if (text) out[code] = text;
+    } catch {
+      // ally-ai falls back to its default for this one.
+    }
+  }
+  return out;
+}
 
 /** `POST /api/v1/pm-agent/runs` (CONTRACT.md §7). */
 export interface PmAgentRunResponse {
@@ -254,6 +274,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
         DEBRIEF_PROMPT_CODES.pmAgent,
         null,
       ),
+      prompts: await pmAgentPrompts(this.context),
       inputs: { open_questions: questions, ideas },
       tools: [...ANSWER_RUN_TOOLS],
       agent_token: this.tokens.signAgent(agentRunId, ANSWER_RUN_TOOLS),
@@ -325,6 +346,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
         DEBRIEF_PROMPT_CODES.pmAgent,
         null,
       ),
+      prompts: await pmAgentPrompts(this.context),
       inputs,
       tools: [...WEEKLY_RUN_TOOLS],
       agent_token: this.tokens.signAgent(agentRunId, WEEKLY_RUN_TOOLS),

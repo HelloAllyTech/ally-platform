@@ -454,6 +454,11 @@ export function promptLabel(code: string): string {
     debrief_history_deep_system: 'History (deep)',
     debrief_language_specialist_system: 'Language specialist',
     debrief_quality_judge_system: 'Judge',
+    debrief_evaluator_system: "Evaluator's instructions",
+    debrief_evaluator_fix_system: "Evaluator's fix notes",
+    debrief_planner_agents: 'Planner agents',
+    debrief_pm_investigator_system: 'PM agent investigator',
+    debrief_pm_reviewer_system: 'PM agent reviewer',
   };
   if (known[code]) return known[code];
   const words = code

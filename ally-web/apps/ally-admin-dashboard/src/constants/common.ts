@@ -486,6 +486,7 @@ export const ApiEndpoints = {
     /** Settings › Schedules (engineering only). */
     SCHEDULES: "/v1/debriefs/console/schedules",
     SETTINGS_BASELINE: "/v1/debriefs/console/settings/baseline",
+    CLINICAL_LISTS: "/v1/debriefs/console/settings/clinical-lists",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
     PM_AGENT: "/v1/debriefs/console/pm-agent",
     PM_AGENT_ANALYSE: "/v1/debriefs/console/pm-agent/analyse",
