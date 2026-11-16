@@ -1,5 +1,6 @@
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
 import { SessionItemStatus } from 'src/common/type/common.type';
+import { numericColumn } from 'src/common/util/numeric-column.transformer';
 import {
   Column,
   DeleteDateColumn,
@@ -37,7 +38,7 @@ export class TrackItemProgress extends BaseWithoutTenantEntity {
   @Column({ type: 'timestamp', nullable: true })
   completedAt?: Date;
 
-  @Column({ type: 'numeric', nullable: true })
+  @Column({ type: 'numeric', nullable: true, transformer: numericColumn })
   score?: number;
 
   @Column({ type: 'int', default: 0 })
