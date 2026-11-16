@@ -269,39 +269,11 @@ describe("Debriefs home (v2, U1): answer first", () => {
     expect(scoreTrend(7.4, 7.8)).toBe("down 0.4");
   });
 
-  it("This week and the PM agent are accordions, closed by default", () => {
+  it("Home has no This week and no PM agent conversation: both live on the PM agent page", () => {
     renderAt();
-    const week = screen.getByTestId("home-this-week");
-    expect(week.tagName).toBe("DETAILS");
-    expect(week).not.toHaveAttribute("open");
-    expect(within(week).getByText(/^This week:/)).toHaveTextContent(
-      "This week: overall score 7.8 of 10, up 0.1 · 1 change went live, 1 was undone",
-    );
-    expect(within(week).getAllByTestId("home-week-change")[0]).toHaveTextContent(
-      "Shorter “Work on this” · live for everyone · score +0.3",
-    );
-    const pm = screen.getByTestId("home-pm-accordion");
-    expect(pm.tagName).toBe("DETAILS");
-    expect(pm).not.toHaveAttribute("open");
-    expect(pm).toHaveTextContent(
-      "PM agent · it wants your view on Safety reader: name indirect self-harm cues",
-    );
-    expect(within(pm).getByTestId("pm-looking-at")).toHaveTextContent("Debriefs home");
-  });
-
-  it("the home conversation sends about the Debriefs home", async () => {
-    renderAt();
-    const pm = screen.getByTestId("home-pm");
-    fireEvent.change(within(pm).getByLabelText("Message the PM agent"), {
-      target: { value: "Hindi debriefs feel too formal" },
-    });
-    fireEvent.click(within(pm).getByRole("button", { name: "Send" }));
-    await waitFor(() =>
-      expect(h.send).toHaveBeenCalledWith({
-        text: "Hindi debriefs feel too formal",
-        about: { kind: "page", id: "home", label: "Debriefs home" },
-      }),
-    );
+    expect(screen.queryByTestId("home-this-week")).toBeNull();
+    expect(screen.queryByTestId("home-pm-accordion")).toBeNull();
+    expect(screen.queryByTestId("home-pm")).toBeNull();
   });
 });
 

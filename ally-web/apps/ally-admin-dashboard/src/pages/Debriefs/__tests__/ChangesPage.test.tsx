@@ -197,6 +197,11 @@ describe("Changes (v2, U3)", () => {
     );
   });
 
+  it("This week sits under the headline: the score, its trend, what went live or was undone", () => {
+    renderAt();
+    expect(screen.getByTestId("changes-this-week")).toHaveTextContent(/^This week: /);
+  });
+
   it("groupOf: testing and not-yet-tested have their own groups; stopped and turned down with Undone", () => {
     expect(groupOf("testing")).toBe("testing");
     expect(groupOf("proposed")).toBe("proposed");

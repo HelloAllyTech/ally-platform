@@ -11,7 +11,7 @@ import {
 } from "@api";
 import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { en, ROUTES } from "@constants";
-import { ChangeState, DebriefHomeV2 } from "@types";
+import { DebriefHomeV2 } from "@types";
 
 import { languageLabel, recipeLabel } from "../consoleLabels";
 import { analyticsDebriefsPath, changesPath, settingsPath } from "../consoleRoutes";
@@ -23,8 +23,8 @@ import {
   MoreFiltersButton,
 } from "../consoleRows";
 import { useDebriefAccess } from "../debriefAccess";
-import { PmConversation } from "../pm/PmConversation";
 import { FILTER_KEYS, groupByDay, readHomeState, sessionsQuery } from "../queue";
+import { one } from "../scoreText";
 import { NeedsYouList } from "./NeedsYouList";
 import { SessionCard, SessionRow } from "./SessionCard";
 
@@ -81,8 +81,6 @@ const Filter: React.FC<{
 /** The undo margin the headline uses when the owner setting hasn't loaded (V2_AUTONOMY A4). */
 export const DEFAULT_UNDO_MARGIN = 0.3;
 
-const one = (n: number) => n.toFixed(1);
-
 /**
  * The headline (U1, review 2026-11-16): the score is named only when it moved by more than the
  * undo margin; otherwise "Debriefs are healthy this week, and …". The needs-you clause is bold.
@@ -104,27 +102,6 @@ export const homeHeadline = (
     },
     noScore: false,
   };
-};
-
-/** "steady", "up 0.3", "down 0.4": this week against last week, to one decimal. */
-export const scoreTrend = (score: number | null, last: number | null): string | null => {
-  const t = en.debriefs.v2.home;
-  if (score === null || last === null) return null;
-  const d = Math.round((score - last) * 10) / 10;
-  if (d === 0) return t.steady;
-  return d > 0 ? t.up(one(d)) : t.down(one(-d));
-};
-
-const STATE_DOT: Record<ChangeState, string> = {
-  waits: "bg-[#F1C21B]",
-  trying: "bg-primary-500",
-  testing: "bg-primary-500",
-  proposed: "bg-neutral-300",
-  building: "bg-[#8A3FFC]",
-  live: "bg-success-500",
-  undone: "bg-neutral-500",
-  stopped: "bg-neutral-500",
-  turned_down: "bg-neutral-500",
 };
 
 const Headline: React.FC<{ home: DebriefHomeV2; margin: number }> = ({ home, margin }) => {
@@ -169,54 +146,11 @@ const Headline: React.FC<{ home: DebriefHomeV2; margin: number }> = ({ home, mar
   );
 };
 
-const ThisWeek: React.FC<{ home: DebriefHomeV2 }> = ({ home }) => {
-  const t = en.debriefs.v2.home;
-  const w = home.thisWeek;
-  const trend = scoreTrend(w.score, home.headline.lastWeekScore);
-  return (
-    <details className="bg-neutral-50" data-testid="home-this-week">
-      <summary className="cursor-pointer px-[18px] py-3 text-sm text-typography-900">
-        {t.thisWeek(w.score === null ? null : one(w.score), trend, w.wentLive, w.undone)}
-      </summary>
-      <div className="flex flex-col gap-2 px-[18px] pb-3.5 text-sm">
-        {w.changes.length === 0 ? (
-          <p className="m-0 text-neutral-600">{t.noChanges}</p>
-        ) : (
-          w.changes.map(c => (
-            <Link
-              key={c.id}
-              to={changesPath(c.id)}
-              className="flex min-w-0 flex-nowrap items-center gap-2 text-typography-900 no-underline"
-              data-testid="home-week-change"
-            >
-              <span
-                aria-hidden="true"
-                className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[c.state] ?? "bg-neutral-500"}`}
-              />
-              <span className="min-w-0 truncate">
-                {[
-                  c.title,
-                  (en.debriefs.v2.changes.state[c.state] ?? c.state).toLowerCase(),
-                  c.result,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            </Link>
-          ))
-        )}
-        <div className="text-[13px]">
-          <Link to={changesPath()}>{t.allChanges}</Link> ·{" "}
-          <Link to={analyticsDebriefsPath()}>{t.whatMakesScore}</Link>
-        </div>
-      </div>
-    </details>
-  );
-};
+export { scoreTrend } from "../scoreText";
 
 /**
  * The Debriefs home (v2, U1): the headline sentence first; Needs you lists the waiting changes,
- * each opening on the PM agent page, where changes are decided (never here); "This week" and the PM agent conversation as accordions, closed; then every debrief by
+ * each opening on the PM agent page, where changes are decided (never here); then every debrief by
  * day. No review queue, no status pills: a debrief carries only "⚑ Flagged by the learner" and
  * its Quality score.
  */
@@ -433,31 +367,6 @@ export const DebriefsHome: React.FC = () => {
       {home.data && (
         <div className="flex flex-col gap-4">
           <NeedsYouList items={home.data.needsYou} advisor={!team} />
-          {team && <ThisWeek home={home.data} />}
-          {team && (
-            <details
-              id="pm"
-              className="rounded-sm border border-neutral-100"
-              data-testid="home-pm-accordion"
-            >
-              <summary className="cursor-pointer px-[18px] py-3 text-sm">
-                <b>{en.debriefs.v2.conversation.heading}</b> ·{" "}
-                {t.pmSummary(home.data.needsYou[0]?.title ?? null)}
-              </summary>
-              <PmConversation
-                testId="home-pm"
-                className="border-t border-neutral-100"
-                about={{ kind: "page", id: "home", label: t.lookingAt }}
-                placeholder={en.debriefs.v2.conversation.placeholderHome}
-                suggestions={en.debriefs.v2.conversation.suggestions.page}
-                headerAction={
-                  <Link to={changesPath()} className="text-[13px]">
-                    {t.openWithChanges}
-                  </Link>
-                }
-              />
-            </details>
-          )}
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button } from "@ally-ui-mono/ui-shared";
@@ -16,7 +17,9 @@ import { ChangeState, DebriefChange, PmAbout } from "@types";
 import { getErrorMessage } from "@utils";
 
 import { languageLabel } from "../consoleLabels";
+import { analyticsDebriefsPath } from "../consoleRoutes";
 import { DebriefAccess } from "../debriefAccess";
+import { one, scoreTrend } from "../scoreText";
 import { Wording, WholeRule } from "./ChangeText";
 import { DecisionButtons } from "./DecisionButtons";
 import { PmConversation } from "./PmConversation";
@@ -299,10 +302,27 @@ export const ChangesView: React.FC<{
   return (
     <div className="flex flex-col gap-5 px-8 py-6" data-testid="changes-view">
       {access.pmAgent && (
-        <p className="m-0 max-w-[980px] text-lg font-light" data-testid="changes-headline">
-          {headline.lead}
-          <b className="font-semibold">{headline.bold}</b>
-        </p>
+        <div className="flex flex-col gap-1.5">
+          <p className="m-0 max-w-[980px] text-lg font-light" data-testid="changes-headline">
+            {headline.lead}
+            <b className="font-semibold">{headline.bold}</b>
+          </p>
+          {/* This week (moved from Home): the overall score and what went live or was undone. */}
+          {home.data && (
+            <p
+              className="m-0 min-w-0 truncate text-sm text-neutral-700"
+              data-testid="changes-this-week"
+            >
+              {en.debriefs.v2.home.thisWeek(
+                home.data.thisWeek.score === null ? null : one(home.data.thisWeek.score),
+                scoreTrend(home.data.thisWeek.score, home.data.headline.lastWeekScore),
+                home.data.thisWeek.wentLive,
+                home.data.thisWeek.undone,
+              )}{" "}
+              · <Link to={analyticsDebriefsPath()}>{en.debriefs.v2.home.whatMakesScore}</Link>
+            </p>
+          )}
+        </div>
       )}
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[260px_minmax(0,1fr)_380px]">
         <aside aria-label={c.title} className="flex flex-col gap-4" data-testid="changes-list">

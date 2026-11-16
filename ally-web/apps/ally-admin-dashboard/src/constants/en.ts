@@ -9442,8 +9442,6 @@ export const en = {
             : `Needs you: ${n} changes the PM agent won’t make alone`,
         yourCall: "Your call",
         expand: (title: string) => `Open ${title}`,
-        whatChanges: "What changes",
-        whyItChanges: "Why",
         before: "Before",
         after: "After",
         wholeRule: (name: string) => `The whole ${name}`,
@@ -9452,8 +9450,6 @@ export const en = {
         ruleStale:
           "The rule has changed since this was proposed, so the passage no longer matches. Ask the PM agent to redo it.",
         evidence: "Evidence",
-        changeFailed: "Couldn't load this change.",
-        needsHint: (why: string) => `${why} Tell the PM agent below what you think.`.trim(),
         /** The clinical advisor's home: their pending decisions only. */
         advisorHeadline: (n: number) =>
           n === 0
@@ -9477,13 +9473,8 @@ export const en = {
         up: (by: string) => `up ${by}`,
         down: (by: string) => `down ${by}`,
         noChanges: "No changes this week.",
-        allChanges: "All changes",
         whatMakesScore: "What makes up the score",
-        pmSummary: (title: string | null) =>
-          title ? `it wants your view on ${title}` : "say what you think, or what you want done",
-        openWithChanges: "Open with changes",
         changes: "PM agent",
-        lookingAt: "Debriefs home",
         flagged: "⚑ Flagged by the learner",
         flaggedShort: "⚑ Flagged",
         loadFailed: "Couldn't load this week's summary.",
@@ -9503,7 +9494,6 @@ export const en = {
         aboutThisChange: "PM agent · about this change",
         replyLabel: "Reply to the PM agent about this change",
         replyPlaceholder: "Yes, no because…, or change it to…",
-        placeholderHome: "Your thoughts on anything here, or what you want done",
         placeholder: "Your thoughts, or what you want done",
         send: "Send",
         sending: "The PM agent is replying; this can take half a minute.",
