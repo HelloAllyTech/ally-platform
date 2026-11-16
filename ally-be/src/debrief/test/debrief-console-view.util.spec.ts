@@ -36,7 +36,7 @@ describe('session list filters', () => {
         cost: 'hit_ceiling',
         riskCue: 'true',
         language: 'hi',
-        limit: '999',
+        limit: '5000',
       }),
     ).toEqual({
       category: 'flagged',
@@ -45,7 +45,7 @@ describe('session list filters', () => {
       riskCue: true,
       language: 'hi',
       mode: 'production',
-      limit: 200,
+      limit: 1000,
       offset: 0,
     });
     expect(
