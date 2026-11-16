@@ -581,6 +581,39 @@ void main() {
       await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
       expect(find.text('SIMULATION_DETAILS:42'), findsOneWidget);
     });
+
+    testWidgets('a course session reads "Practise this again", with what to try, and opens this course item',
+        (tester) async {
+      final json = withPractice({'id': 42, 'title': 'Again', 'trackItemId': 'item-1'});
+      final cards = json['cards'] as Map<String, dynamic>;
+      stubDebrief({
+        ...json,
+        'cards': {
+          ...cards,
+          'practise_next': {
+            ...cards['practise_next'] as Map<String, dynamic>,
+            'try_next': ['Name her feeling.', 'Ask what helps.', 'Check she is safe.', 'Too many.'],
+          },
+        },
+      });
+      await h.pump(tester, trackId: 't1', trackItemId: 'item-1');
+      expect(find.text('Practise this again'), findsNWidgets(2)); // card title + button
+      expect(find.text('Practise this next'), findsNothing);
+      expect(find.byKey(const Key('debrief-practise-try')), findsOneWidget);
+      expect(find.text('Try the following:'), findsOneWidget);
+      expect(find.text('•  Name her feeling.'), findsOneWidget);
+      expect(find.text('•  Check she is safe.'), findsOneWidget);
+      expect(find.text('•  Too many.'), findsNothing);
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      expect(find.text('COURSE_ITEM:t1:item-1'), findsOneWidget);
+    });
+
+    testWidgets('outside a course the card stays "Practise this next" with no list', (tester) async {
+      stubDebrief(withPractice({'id': 42, 'title': 'Again'}));
+      await h.pump(tester);
+      expect(find.text('Practise this next'), findsNWidgets(2));
+      expect(find.byKey(const Key('debrief-practise-try')), findsNothing);
+    });
   });
 
   testWidgets('a failed flag keeps the form open and says so', (tester) async {

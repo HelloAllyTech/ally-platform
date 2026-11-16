@@ -820,7 +820,12 @@ class _ReadyCards extends ConsumerWidget {
     final momentTitle = ref.t(
       moment?.handledWell ?? false ? '$_k.importantMoment.titleHandledWell' : '$_k.importantMoment.title',
     );
-    final practiseTitle = ref.t('$_k.practiseNext');
+    // A course session (clinical review 2026-11-16): practise this same
+    // course item again, with what to try this time.
+    final practiseScenario =
+        practise == null ? null : view.practiseNextFor(practise.scenarioId, thisRoleplay: thisRoleplay);
+    final practiseAgain = practiseScenario?.trackItemId != null || (practise?.tryNext.isNotEmpty ?? false);
+    final practiseTitle = ref.t(practiseAgain ? '$_k.practiseAgain' : '$_k.practiseNext');
 
     final children = <Widget>[
       if (moment != null)
@@ -904,13 +909,23 @@ class _ReadyCards extends ConsumerWidget {
           title: practiseTitle,
           icon: Icon(Icons.eco_outlined, size: 20, color: AppColors.primary),
           children: [
-            _Lead(practise.skill),
+            if (practise.skill.isNotEmpty) _Lead(practise.skill),
             _Body(practise.reason),
-            if (view.practiseNextFor(practise.scenarioId, thisRoleplay: thisRoleplay) case final scenario?)
+            if (practise.tryNext.isNotEmpty)
+              Column(
+                key: const Key('debrief-practise-try'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Lead(ref.t('$_k.practise.tryFollowing')),
+                  for (final item in practise.tryNext) _Body('•  $item'),
+                ],
+              ),
+            if (practiseScenario case final scenario?)
               _PractiseLink(
                 scenario: scenario,
                 trackId: trackId,
                 primary: true,
+                again: practiseAgain,
                 onOpen: () => controller.recordEvent(DebriefLearnerEvent.practiseNextClick),
               )
             // Never the card without a way to practise: with no roleplay the
@@ -1265,10 +1280,13 @@ class _SupportLines extends StatelessWidget {
 /// trigger warnings come first. Only for a roleplay the server says the
 /// learner can still open.
 class _PractiseLink extends ConsumerWidget {
-  const _PractiseLink({required this.scenario, this.trackId, this.primary = false, this.onOpen});
+  const _PractiseLink({required this.scenario, this.trackId, this.primary = false, this.again = false, this.onOpen});
 
   final DebriefPracticeScenario scenario;
   final bool primary;
+
+  /// A course session's "Practise this again": opens this same course item.
+  final bool again;
 
   /// Inside a course: a suggestion that is a course item opens in the
   /// course player; any other roleplay keeps the course on its route, so
@@ -1294,7 +1312,7 @@ class _PractiseLink extends ConsumerWidget {
         context.push('/simulations/${scenario.id}');
       }
     }
-    final label = ref.t(primary ? '$_k.next' : '$_k.this');
+    final label = ref.t(again ? '$_k.again' : primary ? '$_k.next' : '$_k.this');
     final button = primary
         ? FilledButton(
             key: const Key('debrief-practise-next'),
