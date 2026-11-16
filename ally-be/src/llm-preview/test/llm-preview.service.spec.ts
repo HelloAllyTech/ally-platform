@@ -238,4 +238,74 @@ describe('LlmPreviewService — catalog model', () => {
       error: '404: model not found',
     });
   });
+
+  describe('previewPrompt', () => {
+    const catalog = [
+      { id: 'm1', label: 'GPT mini', provider: 'openai', model: 'gpt-4o-mini' },
+    ];
+
+    it('404s on a model that is not in the catalog', async () => {
+      const { service } = buildService(null, jest.fn(), catalog);
+      await expect(
+        service.previewPrompt({ modelId: 'nope', promptText: 'x' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('sends the edited text as system and the sample as the user turn, on the named model', async () => {
+      const { service, complete } = buildService(
+        null,
+        jest.fn().mockResolvedValue(completed('hello', 12, 3)),
+        catalog,
+      );
+      const result = await service.previewPrompt({
+        modelId: 'm1',
+        promptText: 'You are a coach.',
+        sampleInput: 'I feel stuck',
+      });
+      expect(complete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          system: 'You are a coach.',
+          prompt: 'I feel stuck',
+          maxTokens: 1024,
+        }),
+      );
+      expect(result).toMatchObject({
+        ok: true,
+        text: 'hello',
+        configName: 'GPT mini',
+      });
+    });
+
+    it('falls back to a neutral user turn when no sample is given', async () => {
+      const { service, complete } = buildService(
+        null,
+        jest.fn().mockResolvedValue(completed()),
+        catalog,
+      );
+      await service.previewPrompt({
+        modelId: 'm1',
+        promptText: 'p',
+        sampleInput: '  ',
+      });
+      expect(complete).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: 'Begin.' }),
+      );
+    });
+
+    it('returns a provider rejection as data', async () => {
+      const { service } = buildService(
+        null,
+        jest.fn().mockRejectedValue(new Error('model deprecated')),
+        catalog,
+      );
+      const result = await service.previewPrompt({
+        modelId: 'm1',
+        promptText: 'p',
+      });
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('deprecated');
+    });
+  });
 });
