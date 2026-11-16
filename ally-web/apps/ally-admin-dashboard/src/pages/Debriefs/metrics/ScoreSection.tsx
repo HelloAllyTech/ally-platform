@@ -115,14 +115,17 @@ export const ScoreSection: React.FC = () => {
           ? t.weightFlags(Math.round(m.weight * 100))
           : t.weight(Math.round(m.weight * 100)),
       value: m.display,
-      trend: m.trend,
+      // "no comparison yet" says nothing on a row; a dash, with the words on hover.
+      trend: /no comparison/i.test(m.trend) ? "—" : m.trend,
       tone: m.tone,
     })),
+    // A check reads as one sentence ("4 debriefs missed a clear risk cue this
+    // week"), with what it is underneath and OK / Tripped at the end.
     ...view.gates.map(g => ({
       key: g.key,
-      name: g.label,
-      role: t.gateRole[g.key] ?? "",
-      value: g.display,
+      name: g.display,
+      role: `${g.label} · ${t.gateRole[g.key] ?? ""}`,
+      value: "",
       trend: g.ok ? t.gateOk : t.gateTripped,
       tone: g.ok ? "up" : "down",
     })),
@@ -163,8 +166,16 @@ export const ScoreSection: React.FC = () => {
                 <div className="truncate text-sm font-medium">{r.name}</div>
                 <div className="truncate text-xs text-neutral-600">{r.role}</div>
               </div>
-              <span className="shrink-0 text-base font-semibold">{r.value}</span>
-              <span className={`w-16 shrink-0 text-right text-[13px] ${TONE[r.tone] ?? ""}`}>
+              <span
+                className="max-w-[45%] shrink-0 truncate text-base font-semibold"
+                title={r.value}
+              >
+                {r.value}
+              </span>
+              <span
+                className={`w-28 shrink-0 truncate whitespace-nowrap text-right text-[13px] ${TONE[r.tone] ?? ""}`}
+                title={r.trend}
+              >
                 {r.trend}
               </span>
             </div>

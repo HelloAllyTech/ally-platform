@@ -508,6 +508,9 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
         method: HttpMethod.GET,
         params: arg && arg.state ? { state: arg.state } : undefined,
       }),
+      // ally-be answers `{ changes: [...] }`; accept a bare list too.
+      transformResponse: (r: { changes?: DebriefChange[] } | DebriefChange[]) =>
+        Array.isArray(r) ? r : (r?.changes ?? []),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     getDebriefChange: builder.query<DebriefChange, string>({

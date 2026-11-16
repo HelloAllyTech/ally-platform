@@ -98,8 +98,9 @@ describe("Analytics › Debriefs › Overall score (v2, U5)", () => {
       "Quality score (judge)40% of the score7.9+0.1",
     );
     expect(screen.getByTestId("score-measure-flags")).toHaveTextContent("15% · lower is better");
+    // A check reads as one sentence, what it is underneath, then OK / Tripped.
     expect(screen.getByTestId("score-measure-risk")).toHaveTextContent(
-      "Never traded off · undoes a change0OK",
+      "0New missed clear risk cues · Never traded off · undoes a changeOK",
     );
     expect(screen.getByTestId("score-measure-cost")).toHaveTextContent("Tripped");
     const byLang = screen.getByTestId("score-by-language");

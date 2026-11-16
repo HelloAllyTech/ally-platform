@@ -191,15 +191,17 @@ const AskRow: React.FC<{
     data-locked={locked ? "true" : undefined}
     title={locked ? en.debriefs.v2.autonomy.lockedHelp : undefined}
   >
-    <Checkbox
-      id={id}
-      labelText={name}
-      hideLabel
-      checked={checked}
-      disabled={locked || disabled}
-      onChange={(_e: unknown, { checked: on }: { checked: boolean }) => onChange?.(on)}
-    />
-    <span className="flex min-w-0 flex-col">
+    <span className="w-8 shrink-0 grow-0">
+      <Checkbox
+        id={id}
+        labelText={name}
+        hideLabel
+        checked={checked}
+        disabled={locked || disabled}
+        onChange={(_e: unknown, { checked: on }: { checked: boolean }) => onChange?.(on)}
+      />
+    </span>
+    <span className="flex min-w-0 flex-1 flex-col text-left">
       <span className="text-sm font-medium">{name}</span>
       <span className="text-xs text-neutral-600">{why}</span>
     </span>
