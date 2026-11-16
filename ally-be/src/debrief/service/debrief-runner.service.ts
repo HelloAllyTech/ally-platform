@@ -955,6 +955,9 @@ export function sessionForGraph(
     scenario_id: s.scenarioId,
     scenario: s.scenario,
     expected_behaviours: s.expectedBehaviours,
+    helpful_behaviours: s.helpfulBehaviours ?? [],
+    unhelpful_behaviours: s.unhelpfulBehaviours ?? [],
+    competencies: s.competencies ?? [],
     assessment: s.assessment,
     in_case: s.inCase,
   };

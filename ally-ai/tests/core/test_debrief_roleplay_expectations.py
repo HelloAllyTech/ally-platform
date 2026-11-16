@@ -1,0 +1,114 @@
+"""The Analyst reads what the roleplay expects: its own behaviours, and
+competencies as labels with their behaviours; never a custom code (review
+2026-11-16)."""
+
+import pytest
+
+from app.core.debrief.safety_reader import TranscriptTurn
+from app.core.debrief.schemas import DebriefCards, EvidenceMap
+
+TRANSCRIPT = [
+    TranscriptTurn(turn_index=1, role="counselor", text="What brings you in?"),
+    TranscriptTurn(turn_index=2, role="client", text="Exams."),
+]
+
+
+@pytest.fixture
+def dispatch_returns(monkeypatch):
+    from app.core.llm import dispatch
+
+    calls = {}
+
+    def _set(output, model="gemini-2.5-pro"):
+        async def _fake(**kwargs):
+            calls.update(kwargs)
+            return output, {"provider": "gemini", "model": model}
+
+        monkeypatch.setattr(dispatch, "generate_structured", _fake)
+        return calls
+
+    return _set
+
+
+@pytest.mark.asyncio
+async def test_analyst_assesses_the_roleplay_behaviours(dispatch_returns):
+    from app.core.debrief.steps import analyse
+
+    calls = dispatch_returns(EvidenceMap())
+    await analyse(
+        TRANSCRIPT,
+        "en",
+        "gemini-2.5-pro",
+        expected_behaviours=["Empathy", "QPR"],
+        helpful_behaviours=["Asks open questions"],
+        unhelpful_behaviours=["Gives advice too early"],
+        competencies=[
+            {"name": "Empathy", "helpful": ["Reflects feelings"], "unhelpful": []},
+            {"name": "QPR", "helpful": [], "unhelpful": []},
+            # Never sent by ally-be, and dropped here if it were.
+            {"name": None, "helpful": ["x"], "unhelpful": []},
+        ],
+    )
+    prompt = calls["prompt"]
+    assert "ROLEPLAY EXPECTATIONS" in prompt
+    assert "did the counsellor show the helpful" in prompt
+    assert "never as if it had a definition" in prompt
+    assert "lower your confidence" in prompt
+    assert "Never write a code" in prompt
+    assert "<roleplay_expectations>" in prompt
+    assert "Gives advice too early" in prompt
+    assert '"name": null' not in prompt
+
+
+@pytest.mark.asyncio
+async def test_analyst_falls_back_to_foundational_skills_with_nothing(
+    dispatch_returns,
+):
+    from app.core.debrief.steps import DEFAULT_ANALYST_SYSTEM, analyse
+
+    calls = dispatch_returns(EvidenceMap())
+    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    assert "ROLEPLAY EXPECTATIONS" not in calls["prompt"]
+    assert "<roleplay_expectations>" not in calls["prompt"]
+    assert "Empathy, warmth and genuineness" in DEFAULT_ANALYST_SYSTEM
+
+
+@pytest.mark.asyncio
+async def test_writer_and_reviser_are_told_never_to_write_a_code(dispatch_returns):
+    from app.core.debrief.steps import revise, write
+
+    calls = dispatch_returns(DebriefCards(opening="x"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "Never write a code such as 478_custom_27" in calls["prompt"]
+    await revise({}, [], {}, TRANSCRIPT, "en", "gemini-3-flash-preview")
+    assert "Never write a code such as 478_custom_27" in calls["prompt"]
+
+
+def test_the_analyst_body_carries_the_expectations():
+    from app.core.debrief_graph import inputs
+
+    class Ctx:
+        transcript = []
+        language = "en"
+        session = {
+            "expected_behaviours": ["Empathy"],
+            "helpful_behaviours": ["Asks open questions"],
+            "unhelpful_behaviours": [],
+            "competencies": [{"name": "Empathy", "helpful": [], "unhelpful": []}],
+        }
+        inputs = {}
+
+        def sess(self, key, default=None):
+            return self.session.get(key, default)
+
+        def step_of(self, *_):
+            return None
+
+        def prompt(self, *_):
+            return None
+
+    body = inputs.analyst_body({"recipe_key": "standard"}, Ctx())
+    assert body["helpful_behaviours"] == ["Asks open questions"]
+    assert body["competencies"][0]["name"] == "Empathy"
+    keys = list(body)
+    assert keys.index("expected_behaviours") < keys.index("helpful_behaviours")

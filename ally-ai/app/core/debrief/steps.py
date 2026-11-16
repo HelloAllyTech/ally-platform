@@ -267,6 +267,43 @@ def _skill_label_line(language: str) -> List[str]:
     ]
 
 
+#: Code-owned (review 2026-11-16): a custom competency's name is a generated
+#: code that means nothing to a learner; ally-be never sends one, and its card
+#: check fails any that slips through.
+_NO_CODES = (
+    "Never write a code such as 478_custom_27 anywhere; name a skill by a "
+    "competency's name or by the behaviour itself."
+)
+
+#: At most this many "Try the following:" items (ally-be TRY_NEXT_MAX).
+TRY_NEXT_MAX = 3
+
+
+def _expectations_line(
+    helpful: List[str], unhelpful: List[str], competencies: List[Dict[str, Any]]
+) -> List[str]:
+    """Code-owned (review 2026-11-16, prod facts): the roleplay's own
+    behaviours are what it expects; competencies are labels with no
+    definition. Nothing when the roleplay lists neither, so the foundational
+    skills carry the analysis as before."""
+    if not (helpful or unhelpful or competencies):
+        return []
+    return [
+        "ROLEPLAY EXPECTATIONS: helpful_behaviours and unhelpful_behaviours "
+        "are what this roleplay expects of the counsellor. Assess each one "
+        "they had the opportunity for: did the counsellor show the helpful "
+        "ones, and avoid the unhelpful ones. competencies are labels, each "
+        "with its own helpful and unhelpful behaviours when it has any: "
+        "assess a competency through its behaviours, and use its name only to "
+        "group or name evidence, never as if it had a definition. A "
+        "competency with no behaviours you may interpret from its name in the "
+        "context of this roleplay; when you do, say so in the note and lower "
+        "your confidence. Name each behaviour item (skill) by its "
+        "competency's name when it belongs to one, otherwise by the behaviour "
+        "itself. " + _NO_CODES
+    ]
+
+
 def _transcript_block(transcript: List[TranscriptTurn]) -> List[str]:
     lines = ["<transcript>"]
     for t in transcript:
@@ -324,6 +361,9 @@ async def analyse(
     scenario_session_id: Optional[str] = None,
     live_detections: Optional[List[Dict[str, Any]]] = None,
     case_memory: Optional[str] = None,
+    helpful_behaviours: Optional[List[str]] = None,
+    unhelpful_behaviours: Optional[List[str]] = None,
+    competencies: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[Optional[EvidenceMap], str]:
     from app.core.llm_usage.tasks import LLMTask
 
@@ -344,6 +384,10 @@ async def analyse(
         "EMOTIONAL MOVEMENT: for every CLIENT turn, rate how the client feels "
         "at that turn from -5 (very distressed) to +5 (very positive)."
     )
+    helpful = [b for b in helpful_behaviours or [] if b]
+    unhelpful = [b for b in unhelpful_behaviours or [] if b]
+    named = [c for c in competencies or [] if isinstance(c, dict) and c.get("name")]
+    lines += _expectations_line(helpful, unhelpful, named)
     if case_memory:
         lines.append(
             "CASE: this session continues a case. Write case_memory_update: "
@@ -365,6 +409,15 @@ async def analyse(
     lines.append("")
     lines += _json_block("scenario", scenario or {})
     lines += _json_block("expected_behaviours", expected_behaviours or [])
+    if helpful or unhelpful or named:
+        lines += _json_block(
+            "roleplay_expectations",
+            {
+                "helpful_behaviours": helpful,
+                "unhelpful_behaviours": unhelpful,
+                "competencies": named,
+            },
+        )
     if live_detections:
         lines += _json_block("live_detections", live_detections)
     if case_memory:
@@ -515,9 +568,14 @@ async def read_progress_report(
 
 def _practice_instruction(options: Optional[List[Dict[str, Any]]]) -> List[str]:
     """Code-owned: "Practise this next" may only point to a roleplay this
-    learner can open, which ally-be lists and checks again afterwards."""
+    learner can open, which ally-be lists and checks again afterwards. Inside
+    a course the only option is this same roleplay: "Practise this again",
+    with what to try this time (clinical review 2026-11-16)."""
     if not options:
-        return ["PRACTICE OPTIONS: none. Set every scenario_id to null."]
+        return [
+            "PRACTICE OPTIONS: none. Set every scenario_id to null. Set "
+            "practise_next.try_next to null."
+        ]
     lines = [
         "PRACTICE OPTIONS: practice_options lists roleplays this learner can "
         "open, with the skills each one practises. Set practise_next.scenario_id, "
@@ -525,16 +583,35 @@ def _practice_instruction(options: Optional[List[Dict[str, Any]]]) -> List[str]:
         "best practises that skill, or null when none fits. Never mention an id "
         "or a roleplay's title in the text."
     ]
-    if any((o or {}).get("course") for o in options):
+    course = next(
+        (o for o in options if (o or {}).get("course") and o.get("this_roleplay")),
+        None,
+    )
+    if course is not None:
         lines.append(
-            "This session is part of a course. Options without outside_course "
-            "are roleplays of that course the learner has already reached "
-            "(this_roleplay marks the one they just did). Options with "
-            "outside_course are the learner's own roleplays outside the course; "
-            "they do not count towards it. Prefer a course roleplay; choose an "
-            "outside_course one only when it clearly practises the skill better."
+            "COURSE: this session is part of a course. The learner practises "
+            "this same roleplay again; never suggest another one. Set "
+            f"practise_next.scenario_id to {course.get('id')}. Fill "
+            "practise_next.try_next with up to 3 things the learner missed or "
+            "only partly did when they had the opportunity (evidence-map "
+            "behaviours with an opportunity and observation missed or partial), "
+            "the most important first. Each is one short sentence saying what "
+            "to try, in the SESSION LANGUAGE, with no quotes and no ids. When "
+            "there is nothing they missed, leave try_next empty."
         )
+    else:
+        lines[0] += " Set practise_next.try_next to null."
     return lines
+
+
+def _capped_try_next(cards: Optional[DebriefCards]) -> Optional[DebriefCards]:
+    """At most TRY_NEXT_MAX non-empty items; ally-be checks again."""
+    nxt = cards.practise_next if cards is not None else None
+    if nxt is not None and nxt.try_next is not None:
+        nxt.try_next = [t.strip() for t in nxt.try_next if t and t.strip()][
+            :TRY_NEXT_MAX
+        ]
+    return cards
 
 
 async def write(
@@ -579,6 +656,7 @@ async def write(
         "Never mention turn numbers in what you write; the quote is how the "
         "learner finds the moment."
     )
+    lines.append(_NO_CODES)
     cues = safety.get("risk_cues", [])
     cue_turns = sorted({c.get("turn_index") for c in cues if is_clear(c)})
     possible_turns = sorted(
@@ -672,7 +750,7 @@ async def write(
         model,
         scenario_session_id,
     )
-    return output, meta["model"]
+    return _capped_try_next(output), meta["model"]
 
 
 async def evaluate(
@@ -749,8 +827,10 @@ async def revise(
     # Code-owned: the roleplay a card points to is the learner's own list.
     lines.append(
         "Keep every scenario_id as it is in the draft; if you change a card's "
-        "skill, set its scenario_id to null."
+        "skill, set its scenario_id to null. Keep practise_next.try_next as "
+        "it is unless the critique names it."
     )
+    lines.append(_NO_CODES)
     lines.append("")
     lines += _json_block("draft", draft)
     lines += _json_block("critique", critique)
@@ -767,7 +847,7 @@ async def revise(
         model,
         scenario_session_id,
     )
-    return output, meta["model"]
+    return _capped_try_next(output), meta["model"]
 
 
 # --- The orchestrator: planner and the prompt-only analysis agents (spec A5, A9) ---

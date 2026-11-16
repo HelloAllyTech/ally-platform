@@ -129,7 +129,14 @@ export function renderSupervisorNote(
       .filter((c) => c.try_saying?.trim())
       .map((c) => `- ${quoted(c.try_saying)}`),
     ...(cards.practise_next
-      ? [line([cards.practise_next.skill + '.', cards.practise_next.reason])]
+      ? [
+          line([
+            cards.practise_next.skill + '.',
+            cards.practise_next.reason,
+            // A course session: "Try the following:" when practising it again.
+            ...(cards.practise_next.try_next ?? []),
+          ]),
+        ]
       : []),
   ];
 
@@ -234,7 +241,12 @@ export function memoryUpdateFromCards(cards: DebriefCards): {
   ];
   const trajectory = (cards.progress_note ?? cards.opening ?? '').trim();
   const next = cards.practise_next
-    ? `${cards.practise_next.skill}: ${cards.practise_next.reason}`.trim()
+    ? [
+        `${cards.practise_next.skill}: ${cards.practise_next.reason}`,
+        ...(cards.practise_next.try_next ?? []),
+      ]
+        .join(' ')
+        .trim()
     : (cards.work_on_this?.[0]?.try_saying ?? '').trim();
   if (!focus.length && !trajectory && !next) return null;
   return {

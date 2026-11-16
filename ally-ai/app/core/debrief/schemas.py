@@ -295,6 +295,14 @@ class PractiseNext(BaseModel):
         default=None,
         description="A roleplay from PRACTICE OPTIONS for this skill, or null.",
     )
+    try_next: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Only for a session in a course (see PRACTICE OPTIONS): at most 3 "
+            "short things to try when practising this roleplay again, the most "
+            "important first. Otherwise null."
+        ),
+    )
 
 
 class SkillWordItem(BaseModel):

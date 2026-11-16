@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { customCodesIn, withoutCustomCodes } from './debrief-competencies.util';
 /**
  * The cards a debrief is made of (the Writer's output), the rule checks every
  * draft must pass before it can be published, and the plain-text rendering
@@ -58,6 +59,12 @@ export interface DebriefCards {
     skill: string;
     reason: string;
     scenario_id?: number | null;
+    /**
+     * A session played in a course: "Try the following:", up to 3 short
+     * actions the learner missed or only partly did when they had the
+     * chance, most important first, in the session language.
+     */
+    try_next?: string[];
   } | null;
   skill_words: Array<{
     skill: string;
@@ -122,7 +129,15 @@ export enum DebriefCheckCode {
   DUPLICATE_POINT = 'duplicate_point',
   /** v9 C-4: the whole debrief before "Practise this next" is over its word budget. */
   TOTAL_TOO_LONG = 'total_too_long',
+  /**
+   * A custom competency's generated code (`478_custom_27`) in the cards: it
+   * means nothing to the learner (review 2026-11-16).
+   */
+  CUSTOM_CODE = 'custom_code',
 }
+
+/** At most this many "Try the following:" items on Practise this again. */
+export const TRY_NEXT_MAX = 3;
 
 /**
  * Recorded on the run and shown in the Console, but they neither block
@@ -247,7 +262,12 @@ export function cardTexts(
     // language the session was actually spoken in.
     push(`work_on_this[${i}]`, c.try_saying, false);
   });
-  if (cards.practise_next) push('practise_next', cards.practise_next.reason);
+  if (cards.practise_next) {
+    push('practise_next', cards.practise_next.reason);
+    (cards.practise_next.try_next ?? []).forEach((t) =>
+      push('practise_next', t),
+    );
+  }
   push('reflective_question', cards.reflective_question);
   push('progress_note', cards.progress_note);
   return out;
@@ -539,6 +559,50 @@ export function runDebriefChecks(input: {
       );
     }
   }
+  const tryNext = cards.practise_next?.try_next;
+  if (tryNext != null) {
+    if (!Array.isArray(tryNext) || tryNext.length > TRY_NEXT_MAX) {
+      fail(
+        DebriefCheckCode.STRUCTURE,
+        'practise_next',
+        `try_next has more than ${TRY_NEXT_MAX} items`,
+      );
+    }
+    (Array.isArray(tryNext) ? tryNext : []).forEach((t, i) => {
+      if (wordCount(t) > LEAD_MAX_WORDS) {
+        fail(
+          DebriefCheckCode.TOO_LONG,
+          'practise_next',
+          `try_next[${i}] is ${wordCount(t)} words`,
+        );
+      }
+    });
+  }
+  // A custom competency's code anywhere (a skill, a skill word, any text)
+  // is the Writer's to fix in revision; finaliseCards strips what is left.
+  const sections = (
+    [
+      ['opening', cards.opening],
+      ['important_moment', cards.important_moment],
+      ...worked.map((c, i) => [`what_worked[${i}]`, c]),
+      ...wot.map((c, i) => [`work_on_this[${i}]`, c]),
+      ['practise_next', cards.practise_next],
+      ['skill_words', cards.skill_words],
+      ['skill_labels', cards.skill_labels],
+      ['reflective_question', cards.reflective_question],
+      ['progress_note', cards.progress_note],
+    ] as Array<[string, unknown]>
+  ).filter(([, v]) => v != null);
+  for (const [section, value] of sections) {
+    const codes = customCodesIn(value);
+    if (codes.length) {
+      fail(
+        DebriefCheckCode.CUSTOM_CODE,
+        section,
+        `shows the code ${codes.join(', ')}; name the competency or its behaviour instead`,
+      );
+    }
+  }
   if (!hasProgress && cards.progress_note?.trim()) {
     fail(
       DebriefCheckCode.UNSUPPORTED_PROGRESS,
@@ -637,10 +701,16 @@ export function renderCards(cards: DebriefCards): string {
     lines.push('');
   }
   if (cards.practise_next) {
-    lines.push(
-      `Practise this next: ${cards.practise_next.skill}. ${cards.practise_next.reason}`,
-      '',
+    const tryNext = (cards.practise_next.try_next ?? []).filter((t) =>
+      t?.trim(),
     );
+    lines.push(
+      `${tryNext.length ? 'Practise this again' : 'Practise this next'}: ${cards.practise_next.skill}. ${cards.practise_next.reason}`,
+    );
+    if (tryNext.length) {
+      lines.push('Try the following:', ...tryNext.map((t) => `- ${t}`));
+    }
+    lines.push('');
   }
   if (cards.progress_note?.trim()) lines.push(cards.progress_note.trim(), '');
   if (cards.reflective_question?.trim()) {
@@ -682,6 +752,29 @@ export function keepOfferedPractice(
         }
       : cards.practise_next,
   };
+}
+
+/**
+ * The last resort before publishing: no custom competency code reaches a
+ * learner, even when the revisions did not remove it. A skill that is a code
+ * becomes the competency's first helpful behaviour when `resolved` knows it,
+ * else the field goes; a code inside a sentence is removed. `try_next` keeps
+ * at most TRY_NEXT_MAX non-empty items.
+ */
+export function publishableCards(
+  cards: DebriefCards,
+  resolved?: ReadonlyMap<string, string | null>,
+): DebriefCards {
+  const out = withoutCustomCodes(cards, resolved);
+  const next = out.practise_next;
+  if (next && next.try_next != null) {
+    const items = (Array.isArray(next.try_next) ? next.try_next : [])
+      .filter((t) => typeof t === 'string' && t.trim())
+      .map((t) => t.trim())
+      .slice(0, TRY_NEXT_MAX);
+    return { ...out, practise_next: { ...next, try_next: items } };
+  }
+  return out;
 }
 
 /**
