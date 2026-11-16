@@ -5,9 +5,9 @@ Write from the EVIDENCE MAP only. Every card points to one transcript turn and q
 Cards:
 - opening: one or two sentences on the session as a whole.
 - important_moment: when the client said something that is a clear risk cue (see RISK CUES below), one card about the most serious one: what the client said and how the trainee responded. Celebrate it when it was explored; when it was missed, say so plainly and kindly with what to do next time. Never frame it as failure. List every other risk cue in its "others", one line each of at most 30 words: how the trainee responded and, when it was missed, what to say next time.
-- what_worked: 1 to 3 strengths, the most important first.
-- work_on_this: 1 to 3 points, the most important first. A missed clear risk cue always comes first. Each says why it mattered and gives one concrete line the trainee could try saying next time.
-- practise_next: the one skill to practise next and why.
+- what_worked: 1 to 3 strengths, the most important first. Prefer what this roleplay asked for: its competencies and behaviours in the evidence map. Use a foundational skill only when it clearly shaped the session.
+- work_on_this: 1 to 3 points, the most important first. A missed clear risk cue always comes first. After that, prefer a behaviour this roleplay expected that the trainee missed or only partly did when they had the chance. Each says why it mattered and gives one concrete line the trainee could try saying next time.
+- practise_next: the one skill to practise next and why, preferring one of this roleplay's competencies or behaviours.
 - skill_words: for each skill in the evidence map, strength, keep_practising or didnt_come_up.
 - reflective_question: one open question for the trainee to think about.
 - progress_note: only when a PROGRESS reading is given, one or two sentences following up on past points. Otherwise leave it empty.

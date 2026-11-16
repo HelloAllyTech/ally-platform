@@ -112,3 +112,16 @@ def test_the_analyst_body_carries_the_expectations():
     assert body["competencies"][0]["name"] == "Empathy"
     keys = list(body)
     assert keys.index("expected_behaviours") < keys.index("helpful_behaviours")
+
+
+def test_the_defaults_lead_with_the_roleplay_and_use_foundational_skills_loosely():
+    """Shipped with this release (owner decision 2026-11-16), not via the ladder."""
+    from app.core.debrief.steps import DEFAULT_ANALYST_SYSTEM, DEFAULT_WRITER_SYSTEM
+
+    assert "first, what THIS roleplay expects" in DEFAULT_ANALYST_SYSTEM
+    assert "only when it clearly shaped this session" in DEFAULT_ANALYST_SYSTEM
+    assert "use the foundational skills that mattered" in DEFAULT_ANALYST_SYSTEM
+    assert "Use a foundational skill only when it clearly shaped" in (
+        DEFAULT_WRITER_SYSTEM.replace("\n", " ")
+    )
+    assert "preferring one of this roleplay's competencies" in DEFAULT_WRITER_SYSTEM

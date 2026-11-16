@@ -1,8 +1,27 @@
 # Proposal: competencies first, foundational skills loosely (2026-11-16)
 
-Status: **proposed, not live.** This goes through the PM agent's test ladder as a new version of two
-Skills Store prompts, `debrief_analyst_system` and `debrief_writer_system`. Nothing in code changes
-this emphasis by itself.
+Status: **ships with this release** (owner decision 2026-11-16: too few users for the PM agent's
+ladder). The "after" text below is now the default in Git: `ally-be/src/prompts/debrief/analyst_system.txt`,
+`ally-be/src/prompts/debrief/writer_system.txt` and `DEFAULT_ANALYST_SYSTEM` / `DEFAULT_WRITER_SYSTEM` in
+`ally-ai/app/core/debrief/steps.py`. This file stays as the before/after record.
+
+**A default in Git does not change what prod runs.** Prod runs whatever the GA debrief release names
+for each prompt code (`bundle.prompts`; `null` means the Skills Store's current version), and the
+prompt sync on deploy never changes an existing prompt's live version. To make prod use this text:
+
+1. Deploy the code first (ally-ai, then ally-be), so the `<roleplay_expectations>` block exists
+   before any text refers to it.
+2. A person pushes each text as a new Skills Store version (`node scripts/prompts/prompts.mjs pull
+   <code>`, apply the change below to the live text, then `push <code> --remote prod --note "..."`),
+   or uses **Save as new version** in the Skills Store. That makes a draft.
+3. A person **publishes** each draft in the Skills Store. The publish creates a debrief release that
+   pins the new version (`DebriefReleasesService.fromPublish`). It goes live at once, unless it would
+   undo a promoted PM-agent or person-proposed change to that prompt; in that case it stays a draft
+   to promote under Debrief > Releases.
+
+`make sync-prompts` is not the route: it pushes ally-ai's own prompts, and like every sync it never
+changes a live version. A fresh store (a new environment or a local clone) seeds version 1 from the
+Git defaults, so it starts on this text.
 
 ## Why
 

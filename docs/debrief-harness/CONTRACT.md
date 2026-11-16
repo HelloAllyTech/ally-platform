@@ -325,7 +325,10 @@ opportunity for (shown the helpful, avoided the unhelpful); a competency is a la
 assessed through its behaviours; one with no behaviours may be interpreted from its name, said in the note
 with lower confidence; name evidence by the competency's name or the behaviour itself; never output a code.
 With neither behaviours nor competencies there is no such line, and the foundational skills carry the
-analysis as before. No prompt variable changed, so no prompt contract change.
+analysis as before. No prompt variable changed. The default texts of `debrief_analyst_system` and
+`debrief_writer_system` now lead with the roleplay's competencies and behaviours and use a foundational skill
+only when it clearly shaped the session (`docs/debrief-harness/proposals/2026-11-16-competencies-first.md`
+has the before/after text and how it reaches prod: a published Skills Store version, which makes a release).
 
 **No custom competency code is ever shown.** Any card text or skill field matching `\b\d+_custom_\d+\b` is the
 `custom_code` check failure, which the Reviser must fix. As the last resort `finalise_cards`
