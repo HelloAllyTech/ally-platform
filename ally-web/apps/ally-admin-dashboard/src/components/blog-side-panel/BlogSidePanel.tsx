@@ -25,8 +25,8 @@ interface BlogSidePanelProps {
   selectedBlog: BlogPost | null;
   isOpen: boolean;
   onClose: () => void;
-  // Persist the post. `publish` decides the resulting status.
-  onSave: (values: BlogFormValues, publish: boolean) => Promise<void>;
+  // Persist the post. `publish` decides the resulting status; `keepEditing` leaves the panel open.
+  onSave: (values: BlogFormValues, publish: boolean, keepEditing?: boolean) => Promise<void>;
   isSaving?: boolean;
 }
 
@@ -201,12 +201,14 @@ export const BlogSidePanel: React.FC<BlogSidePanelProps> = ({
   }, [isDirty, onClose]);
 
   const handleSave = useCallback(
-    (publish: boolean) => {
+    (publish: boolean, keepEditing = false) => {
       if (!isValid) return;
-      void onSave(form, publish);
+      void onSave(form, publish, keepEditing);
     },
     [form, isValid, onSave],
   );
+
+  const isPublished = selectedBlog?.status === "PUBLISHED";
 
   if (!isOpen) return null;
 
@@ -406,23 +408,32 @@ export const BlogSidePanel: React.FC<BlogSidePanelProps> = ({
             />
           </Field>
 
-          <div className="flex flex-wrap gap-3 mt-6 pb-8 justify-end">
+          <div className="sticky bottom-0 z-10 flex flex-wrap gap-3 mt-6 py-4 justify-end border-t border-border-light bg-white">
             <Button variant={ButtonVariant.SECONDARY} onClick={handleClose} disabled={isSaving}>
               Cancel
             </Button>
             <Button
               variant={ButtonVariant.SECONDARY}
-              onClick={() => handleSave(false)}
+              onClick={() => handleSave(isPublished, true)}
               disabled={!isValid || isSaving || isUploading}
             >
-              Save as draft
+              Save and keep editing
+            </Button>
+            {/* A published post must never be unpublished by a button that says "Save". */}
+            <Button
+              variant={ButtonVariant.SECONDARY}
+              onClick={() => handleSave(false)}
+              disabled={!isValid || isSaving || isUploading}
+              title={isPublished ? "This takes the post off the public blog" : undefined}
+            >
+              {isPublished ? "Unpublish and save as draft" : "Save as draft"}
             </Button>
             <Button
               variant={ButtonVariant.PRIMARY}
               onClick={() => handleSave(true)}
               disabled={!isValid || isSaving || isUploading}
             >
-              {selectedBlog?.status === "PUBLISHED" ? "Update & keep published" : "Publish"}
+              {isPublished ? "Update & keep published" : "Publish"}
             </Button>
           </div>
         </div>
