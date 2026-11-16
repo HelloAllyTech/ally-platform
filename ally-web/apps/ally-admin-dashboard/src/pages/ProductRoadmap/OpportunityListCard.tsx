@@ -7,6 +7,7 @@ import { DirectorStarButton } from "./DirectorStarButton";
 import { InlineChipMenu } from "./InlineChipMenu";
 import { NewColleagueTag } from "./NewToYouChip";
 import { RankScore } from "./RankBreakdown";
+import { RankWhy } from "./RankWhy";
 import { useScoreUnit } from "./useScoreUnit";
 import { personName } from "./utils/people";
 import { formatPoints } from "./utils/points";
@@ -182,6 +183,7 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
               four factors that produced it — votes included — are one hover away, which is what
               keeps a blended number arguable rather than merely believed. */}
           <RankScore opportunity={opportunity} />
+          <RankWhy opportunity={opportunity} />
         </div>
       )}
 

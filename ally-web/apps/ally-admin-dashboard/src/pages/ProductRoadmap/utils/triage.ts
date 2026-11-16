@@ -48,3 +48,16 @@ export const inversePatch = (opportunity: RoadmapOpportunity, patch: TriagePatch
 /** Where a stage goes on Accept, or null when Accept does not apply (already past Idea). */
 export const acceptTarget = (stage: string): RoadmapOpportunityStage | null =>
   stage === RoadmapOpportunityStage.NEW ? RoadmapOpportunityStage.PRIORITISED : null;
+
+/**
+ * "today", "3 days ago", "5 weeks ago" — an opportunity's age at a glance. Whole units, rounded
+ * down: precision past a week is false comfort for a thing filed months ago.
+ */
+export const formatAge = (iso: string, now: Date = new Date()): string => {
+  const days = Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000);
+  if (!Number.isFinite(days) || days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
+  return `${Math.floor(days / 30)} months ago`;
+};

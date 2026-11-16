@@ -41,3 +41,17 @@ describe("acceptTarget", () => {
     expect(acceptTarget("archived")).toBeNull();
   });
 });
+
+import { formatAge } from "../utils/triage";
+
+describe("formatAge", () => {
+  const now = new Date("2026-11-16T12:00:00Z");
+  const ago = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
+  it("reads in whole, rounded-down units", () => {
+    expect(formatAge(ago(0), now)).toBe("today");
+    expect(formatAge(ago(1), now)).toBe("yesterday");
+    expect(formatAge(ago(5), now)).toBe("5 days ago");
+    expect(formatAge(ago(21), now)).toBe("3 weeks ago");
+    expect(formatAge(ago(95), now)).toBe("3 months ago");
+  });
+});
