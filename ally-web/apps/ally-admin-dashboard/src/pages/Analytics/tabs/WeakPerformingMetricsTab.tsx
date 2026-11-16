@@ -813,7 +813,7 @@ export const WeakPerformingMetricsTab: FC<AnalyticsTabFilters> = ({ query, langu
                   {(data?.worstScenarios ?? []).map(r => (
                     <TableRow key={`${r.scenarioId}-${r.language ?? "all"}`}>
                       <TableCell>
-                        <Link to={`${ROUTES.ROLEPLAY_SESSION_LOGS}?search=${r.scenarioId}`}>
+                        <Link to={`${ROUTES.ROLEPLAY_SESSION_LOGS}?scenarioId=${r.scenarioId}`}>
                           {r.title ? `${r.scenarioId} · ${r.title}` : r.scenarioId}
                         </Link>
                       </TableCell>
