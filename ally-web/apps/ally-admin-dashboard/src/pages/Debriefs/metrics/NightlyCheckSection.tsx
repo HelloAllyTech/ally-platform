@@ -104,7 +104,15 @@ export const NightlyCheckSection: React.FC = () => {
                     className="flex gap-3 border-l-4 border-red-600 bg-red-50 px-3 py-2 text-sm"
                   >
                     <span className="shrink-0 tabular-nums text-typography-700">{a.day}</span>
-                    <span className="min-w-0 text-typography-900">{a.detail}</span>
+                    <span className="min-w-0 flex-1 text-typography-900">{a.detail}</span>
+                    {a.routedTo && (
+                      <span
+                        className="min-w-0 shrink-0 text-typography-700"
+                        data-testid="nightly-routed"
+                      >
+                        {s.routedTo(a.routedTo)}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

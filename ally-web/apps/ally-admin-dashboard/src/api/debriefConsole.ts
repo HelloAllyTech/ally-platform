@@ -18,9 +18,6 @@ import {
   DebriefAnalyticsView,
   DebriefNightlyRow,
   DebriefAttention,
-  DebriefAutonomyKind,
-  DebriefAutonomyStep,
-  DebriefAutonomyValue,
   DebriefAutonomyView,
   DebriefOrgOverride,
   DebriefPinnedRulesView,
@@ -35,6 +32,13 @@ import {
   ExpertComment,
   ExpertCommentTag,
   NewExpertComment,
+  ChangeState,
+  DebriefChange,
+  DebriefHomeV2,
+  DebriefScoreView,
+  PmConversationPage,
+  PmConversationSend,
+  PmMessage,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
@@ -74,7 +78,7 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
     }),
     updateDebriefSettings: builder.mutation<
       unknown,
-      { changes: Record<string, number | boolean | null> }
+      { changes: Record<string, number | boolean | string | null> }
     >({
       query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.SETTINGS, method: HttpMethod.PUT, body }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
@@ -393,25 +397,6 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.AUTONOMY, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    setDebriefAutonomyMatrix: builder.mutation<
-      DebriefAutonomyView,
-      {
-        changes: Array<{
-          kind: DebriefAutonomyKind;
-          step: DebriefAutonomyStep;
-          value: DebriefAutonomyValue;
-        }>;
-        /** The owner confirmed a canary on its own before the judge-agreement gate. */
-        override?: boolean;
-      }
-    >({
-      query: body => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.AUTONOMY_MATRIX,
-        method: HttpMethod.PUT,
-        body,
-      }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
     setDebriefOrgAutonomy: builder.mutation<
       DebriefAutonomyView,
       {
@@ -512,10 +497,83 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    // v2 (docs/debrief-harness/V2_AUTONOMY.md, API contract).
+    getDebriefHome: builder.query<DebriefHomeV2, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.HOME, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefChanges: builder.query<DebriefChange[], { state?: ChangeState } | void>({
+      query: arg => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.CHANGES,
+        method: HttpMethod.GET,
+        params: arg && arg.state ? { state: arg.state } : undefined,
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefChange: builder.query<DebriefChange, string>({
+      query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.CHANGE(id), method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    undoDebriefChange: builder.mutation<DebriefChange, string>({
+      query: id => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.CHANGE_ACTION(id, "undo"),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    stopDebriefChange: builder.mutation<DebriefChange, string>({
+      query: id => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.CHANGE_ACTION(id, "stop"),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getPmConversation: builder.query<
+      PmConversationPage,
+      { before?: string; limit?: number } | void
+    >({
+      query: arg => {
+        const a = arg || {};
+        const params: Record<string, string | number> = { limit: a.limit ?? 50 };
+        if (a.before) params.before = a.before;
+        return {
+          url: ApiEndpoints.DEBRIEF_CONSOLE.PM_CONVERSATION,
+          method: HttpMethod.GET,
+          params,
+        };
+      },
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    // The reply may take 10–30 s; it can act (stop, undo, approve), so the whole console refreshes.
+    sendPmMessage: builder.mutation<{ messages: PmMessage[] }, PmConversationSend>({
+      query: body => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.PM_CONVERSATION,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefScore: builder.query<DebriefScoreView, { days?: number } | void>({
+      query: arg => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.SCORE,
+        method: HttpMethod.GET,
+        params: { days: (arg || {}).days ?? 56 },
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
   }),
 });
 
 export const {
+  useGetDebriefHomeQuery,
+  useGetDebriefChangesQuery,
+  useGetDebriefChangeQuery,
+  useUndoDebriefChangeMutation,
+  useStopDebriefChangeMutation,
+  useGetPmConversationQuery,
+  useLazyGetPmConversationQuery,
+  useSendPmMessageMutation,
+  useGetDebriefScoreQuery,
   useGetDebriefOverviewQuery,
   useGetDebriefMetricsQuery,
   useGetDebriefSettingsQuery,
@@ -557,7 +615,6 @@ export const {
   useProposePinnedRuleMutation,
   useGetDebriefPinnedRulesQuery,
   useGetDebriefAutonomyQuery,
-  useSetDebriefAutonomyMatrixMutation,
   useSetDebriefOrgAutonomyMutation,
   useSetDebriefBudgetsMutation,
   useEmergencyStopDebriefTenantMutation,

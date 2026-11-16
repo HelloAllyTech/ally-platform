@@ -109,14 +109,19 @@ export const sectionLabel = (path: string | null | undefined): string => {
 };
 
 /** An owner setting's value in words: yes/no, a share as a percentage, otherwise the number. */
-export const settingValueLabel = (spec: DebriefOwnerSettingSpec, v: number | boolean): string =>
-  typeof v === "boolean"
+export const settingValueLabel = (
+  spec: DebriefOwnerSettingSpec,
+  v: number | boolean | string,
+): string =>
+  typeof v === "string"
     ? v
-      ? en.debriefs.settings.yes
-      : en.debriefs.settings.no
-    : spec.kind === "share"
-      ? `${Math.round(v * 1000) / 10}%`
-      : String(v);
+    : typeof v === "boolean"
+      ? v
+        ? en.debriefs.settings.yes
+        : en.debriefs.settings.no
+      : spec.kind === "share"
+        ? `${Math.round(v * 1000) / 10}%`
+        : String(v);
 
 /**
  * A setting change the PM agent proposed (`settingKey`, `settingValue`), in words. The value

@@ -39,6 +39,15 @@ vi.mock("@api", async importOriginal => ({
   useScreenIdeaMutation: () => [vi.fn(), { isLoading: false }],
   useAskIdeaQuestionMutation: () => [vi.fn(), { isLoading: false }],
   useStartIdeaStepMutation: () => [vi.fn(), { isLoading: false }],
+  useGetDebriefMeQuery: () => ({ data: undefined }),
+  useGetDebriefChangesQuery: () => ({ data: [] }),
+  useGetDebriefChangeQuery: () => ({ data: undefined }),
+  useGetDebriefHomeQuery: () => ({ data: undefined }),
+  useUndoDebriefChangeMutation: () => [vi.fn(), { isLoading: false }],
+  useStopDebriefChangeMutation: () => [vi.fn(), { isLoading: false }],
+  useGetPmConversationQuery: () => ({ data: { messages: [], more: false } }),
+  useLazyGetPmConversationQuery: () => [vi.fn(), { isFetching: false }],
+  useSendPmMessageMutation: () => [vi.fn(), { isLoading: false }],
   useGetPmAgentReportsQuery: () => h.reports(),
   useGetPmAgentReportQuery: (arg: { kind: string; period: string }, opts?: { skip?: boolean }) =>
     opts?.skip ? { data: undefined } : h.report(arg),
@@ -240,13 +249,14 @@ beforeEach(() => {
   });
 });
 
-describe("PM agent › Reports", () => {
-  it("is a tab between Releases and Test sets", () => {
+describe("Changes › Reports", () => {
+  it("is a tab between Changes and Test sets, with no Run the PM agent now", () => {
     renderAt("?view=reports&kind=monthly&period=2026-10");
-    const tabs = within(screen.getByRole("navigation", { name: "PM agent" }))
+    const tabs = within(screen.getByRole("navigation", { name: "Changes" }))
       .getAllByRole("link")
       .map(a => a.textContent);
-    expect(tabs).toEqual(["Ideas", "Releases", "Reports", "Test sets"]);
+    expect(tabs).toEqual(["Changes", "Reports", "Test sets"]);
+    expect(screen.queryByRole("button", { name: "Run the PM agent now" })).toBeNull();
     expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("aria-current", "page");
   });
 
@@ -260,40 +270,45 @@ describe("PM agent › Reports", () => {
     expect(screen.getByTestId("pm-report-title")).toHaveClass("truncate");
     // The page header keeps one row at lg; below lg the actions take a second row on purpose.
     expect(screen.getByTestId("pm-header")).toHaveClass("min-[1056px]:flex-nowrap");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute("title", "PM agent");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute("title", "Changes");
     const changed = screen.getByTestId("pm-report-changed");
     expect(changed).toHaveTextContent("What changed this month");
     expect(changed).toHaveTextContent(
-      "Taken from the records of releases and ideas, not written by the PM agent.",
+      "Taken from the records of changes, not written by the PM agent.",
     );
+    // v2 tiles (ReportsV2): live on its own, waited for a person, undone, stopped, being built.
     expect(screen.getByTestId("pm-report-tile-live")).toHaveTextContent(
-      "Live for everyone2all approved by a person",
+      "Went live on its own0beat the release before",
     );
+    expect(screen.getByTestId("pm-report-tile-waited")).toHaveTextContent("Waited for a person2");
     expect(screen.getByTestId("pm-report-tile-reverted")).toHaveTextContent(
       "a learner try-out missed a risk cue",
     );
-    expect(screen.getByTestId("pm-report-tile-rejected")).toHaveTextContent("with reasons");
-    expect(screen.getByTestId("pm-report-tile-tests")).toHaveTextContent("Tests run149 passed");
-    expect(screen.getByTestId("pm-report-tile-builder")).toHaveTextContent("Sent to Builder1");
+    expect(screen.getByTestId("pm-report-tile-stopped")).toHaveTextContent(
+      "Stopped in testing5never reached learners",
+    );
+    expect(screen.getByTestId("pm-report-tile-builder")).toHaveTextContent(
+      "Being built1waits for an engineer to merge",
+    );
 
     const live = screen.getByTestId("pm-report-list-live");
-    expect(live).toHaveTextContent("Went live for everyone");
+    expect(live).toHaveTextContent("Went live");
     expect(live).toHaveTextContent("Approved by Tanuja · 6 Oct · still standing at 14 days");
     expect(live).toHaveTextContent("Approved by Gopi · 25 Oct · reverted on 28 Oct");
-    // An idea's row links to the idea; a release without one to the release.
+    // A change's row opens it in Changes; a release without one opens Changes.
     expect(within(live).getByRole("link", { name: "12345678" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent?idea=1234567890ab",
+      "/debriefs/pm-agent?change=1234567890ab",
     );
     expect(within(live).getByRole("link", { name: "v6" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent?view=releases&releaseId=r6",
+      "/debriefs/pm-agent",
     );
     expect(screen.getByTestId("pm-report-list-reverted")).toHaveTextContent(
-      "Reverted automatically · 22 Oct · a learner try-out missed a risk cue",
+      "Undone automatically · 22 Oct · a learner try-out missed a risk cue",
     );
     const rejected = screen.getByTestId("pm-report-list-rejected");
-    expect(rejected).toHaveTextContent("Rejected by Tanuja · “depends on the organisation”");
+    expect(rejected).toHaveTextContent("Turned down by Tanuja · “depends on the organisation”");
     expect(rejected).toHaveTextContent("Withdrawn by Asha");
     expect(screen.getByTestId("pm-report-budget")).toHaveTextContent(
       "$24.80 of $40.00 spent: tests $19.70, PM agent runs $5.10",
@@ -304,9 +319,9 @@ describe("PM agent › Reports", () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId("pm-report-review").querySelectorAll("p")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Download as PDF" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "All releases" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "All changes" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent?view=releases",
+      "/debriefs/pm-agent",
     );
   });
 
@@ -419,35 +434,5 @@ describe("PM agent › Reports", () => {
     h.report.mockReturnValue({ data: undefined, isError: true, error: { status: 500 }, refetch });
     renderAt("?view=reports&kind=monthly&period=2026-10");
     expect(screen.getByTestId("pm-report-error")).toBeInTheDocument();
-  });
-});
-
-describe("PM agent › Ideas: latest report", () => {
-  it("links the latest weekly report and the latest monthly review", () => {
-    renderAt("");
-    const line = screen.getByTestId("pm-latest-report");
-    // This week has no report yet, so the latest is the week of 2 Nov.
-    expect(line).toHaveTextContent("Latest report: Week of 2 Nov · October review");
-    expect(within(line).getByRole("link", { name: "Week of 2 Nov" })).toHaveAttribute(
-      "href",
-      "/debriefs/pm-agent?view=reports&kind=weekly&period=2026-11-02",
-    );
-    expect(within(line).getByRole("link", { name: "October review" })).toHaveAttribute(
-      "href",
-      "/debriefs/pm-agent?view=reports&kind=monthly&period=2026-10",
-    );
-  });
-
-  it("shows only what exists", () => {
-    h.reports.mockReturnValue(ok(LIST.filter(i => i.kind === "weekly")));
-    const { unmount } = renderAt("");
-    expect(screen.getByTestId("pm-latest-report")).toHaveTextContent(
-      "Latest report: Week of 2 Nov",
-    );
-    expect(screen.getByTestId("pm-latest-report")).not.toHaveTextContent("review");
-    unmount();
-    h.reports.mockReturnValue(ok([]));
-    renderAt("");
-    expect(screen.queryByTestId("pm-latest-report")).toBeNull();
   });
 });
