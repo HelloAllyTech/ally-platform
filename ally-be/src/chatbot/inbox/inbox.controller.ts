@@ -76,6 +76,11 @@ export class InboxQueryDto {
   before?: string;
 }
 
+export class MemoryQueryDto {
+  /** The chat open beside it: its pre-chat answers and summary come too. */
+  @ApiPropertyOptional() @IsOptional() @IsUUID() conversationId?: string;
+}
+
 export class MemoryLineDto {
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) text!: string;
 }
@@ -136,18 +141,23 @@ export class InboxController {
     summary:
       'What the assistant remembers about one person, with each line’s source',
     description:
-      '`on` is false when the assistant doesn’t remember people between chats. Lines are active ones, newest first; `sourceMessageId` and `sourceConversationId` point at the message each came from (null once it’s gone).',
+      '`on` is false when the assistant doesn’t remember people between chats. Lines are active ones, newest first; `sourceMessageId` and `sourceConversationId` point at the message each came from (null once it’s gone); `expiresAt` null means kept until forgotten. With `conversationId`, that chat’s pre-chat answers the assistant reads (`beforeChat`, never phone or email) and its rolling summary come too. `neverStore` is what it never keeps.',
   })
   async memoryOf(
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Param('contactId', ParseUUIDPipe) contactId: string,
+    @Query() query: MemoryQueryDto,
   ) {
     const chatbot = await this.personOf(
       chatbotId,
       contactId,
       ChatbotMemberRole.VIEWER,
     );
-    return this.memoryService().forInbox(chatbot, contactId);
+    return this.memoryService().forInbox(
+      chatbot,
+      contactId,
+      query.conversationId,
+    );
   }
 
   @Post('chatbots/:chatbotId/memory/:entryId/forget')

@@ -19,6 +19,7 @@ from typing import Any, Dict, Literal, Optional
 from langgraph.graph import END
 from langgraph.runtime import get_runtime
 
+from app.core.agent_runtime.budget import extend_after_write
 from app.core.agent_runtime.gateway import AgentRunContext
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import Tool, ToolContext, allowed_tools
@@ -72,6 +73,12 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             )
             records.append(json_safe(result.record))
             summary = result.summary
+            if result.record.get("ok") and result.record.get("list_kind") in (
+                "create",
+                "update",
+            ):
+                # Booked or changed: the reply that says so gets more time (8a).
+                extend_after_write(state.get("started_at"))
             # A list tool's records (chunk 6) join the run's passages, numbered
             # after them, citable; they are not searches.
             added = json_safe(result.passages)

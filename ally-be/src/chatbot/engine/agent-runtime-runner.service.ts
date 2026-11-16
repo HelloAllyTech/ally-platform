@@ -16,6 +16,7 @@ import { LoggerService } from '../../logger/logger.service';
 import { AgentRunTokenService } from '../agent-tools/agent-run-token.service';
 import {
   listDoneLine,
+  listStatusLine,
   parseListToolName,
   todayFor,
 } from '../agent-tools/list-tools';
@@ -87,16 +88,23 @@ export class AgentActedError extends Error {
   }
 }
 
-/** "Done: {record} in {list}." from a list write's stored result; undefined if it isn't one. */
-function doneLineOf(
+/**
+ * "Done: {record} in {list}." from a list write's stored result; undefined if it isn't one. A
+ * change that set a status says it ("Cancelled: … in Appointments.", chunk 8a), so a reply cut
+ * short after a reschedule doesn't read as if the old time were still booked.
+ */
+export function doneLineOf(
   result: Record<string, unknown> | null | undefined,
+  input?: Record<string, unknown> | null,
 ): string | undefined {
   const list = (result?.list as { name?: unknown } | undefined)?.name;
   const passages = result?.passages as { record_title?: unknown }[] | undefined;
   const title = passages?.[0]?.record_title;
-  return typeof list === 'string' && typeof title === 'string'
-    ? listDoneLine(title, list)
-    : undefined;
+  if (typeof list !== 'string' || typeof title !== 'string') return undefined;
+  const status = input?.status;
+  return typeof status === 'string' && status.trim()
+    ? listStatusLine(status, title, list)
+    : listDoneLine(title, list);
 }
 
 /** `/agent/run`'s debug-only list of every retrieved chunk; not stored on the message. */
@@ -348,7 +356,7 @@ export class AgentRuntimeRunner {
       const rows = (
         await this.toolRuns.find({
           where: { runId, status: ToolRunStatus.OK },
-          select: ['tool', 'step', 'result'],
+          select: ['tool', 'step', 'input', 'result'],
           order: { step: 'ASC' },
         })
       ).filter((row) => parseListToolName(row.tool)?.kind !== 'find');
@@ -356,8 +364,20 @@ export class AgentRuntimeRunner {
       if (rows.some((row) => row.tool === 'hand_over')) {
         return { tool: 'hand_over' };
       }
+      // Every write the run made, in order (chunk 8a): a reschedule is a cancel and a booking.
+      const lines = rows
+        .map((row) =>
+          doneLineOf(
+            row.result as Record<string, unknown> | null,
+            (row.input as Record<string, unknown> | null) ?? null,
+          ),
+        )
+        .filter((line): line is string => Boolean(line));
       const last = rows[rows.length - 1];
-      return { tool: last.tool, done: doneLineOf(last.result) };
+      return {
+        tool: last.tool,
+        done: lines.length ? lines.join(' ') : undefined,
+      };
     } catch (error) {
       this.logger.warn(
         `Could not read the run's tool calls: ${

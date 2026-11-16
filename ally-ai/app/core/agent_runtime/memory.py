@@ -59,16 +59,31 @@ def memory_section(
 
 
 def history_lead(bot: Mapping[str, Any]) -> str:
-    """What goes ahead of the last messages: the person's name and this chat's
-    rolling summary, each only when there is one. "" keeps the history as today."""
+    """What goes ahead of the last messages: the person's name, what they told the
+    page before the chat, and this chat's rolling summary, each only when there is
+    one. "" keeps the history as today."""
     lines: List[str] = []
     name = (bot.get("person_name") or "").strip()
     if name:
         lines.append(f"The person's name: {name}")
+    told = _before_chat(bot)
+    if told:
+        lines.append(f"Before the chat they told you: {told}")
     summary = (bot.get("summary") or "").strip()
     if summary:
         lines.append(f"Earlier in this chat (a summary): {summary}")
     return "\n".join(lines)
+
+
+def _before_chat(bot: Mapping[str, Any]) -> str:
+    """The pre-chat's answers as one line: "Looking for: Adult Therapy; …"."""
+    parts = []
+    for answer in bot.get("before_chat") or []:
+        label = (answer.get("label") or "").strip().rstrip("?:")
+        value = (answer.get("value") or "").strip()
+        if value:
+            parts.append(f"{label}: {value}")
+    return "; ".join(parts)
 
 
 def personal_context(bot: Mapping[str, Any]) -> str:
@@ -79,6 +94,7 @@ def personal_context(bot: Mapping[str, Any]) -> str:
         (memory.get("lines") or "").strip(),
         (bot.get("summary") or "").strip(),
         (bot.get("person_name") or "").strip(),
+        _before_chat(bot),
     ]
     return "\n".join(p for p in parts if p)
 

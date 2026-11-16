@@ -159,6 +159,10 @@ class AgentRuntimeSettings(BaseModel):
     # The memory check (ally-be waits 5 s and fails closed); the summary gets three
     # times this. Both run after the reply, never while someone waits (chunk 8a).
     MEMORY_CALL_TIMEOUT_SECONDS: float = Field(4.0, gt=0, le=30)
+    # Once a run has booked or changed something, its cap grows by this much (chunk
+    # 8a): a reschedule is a cancel, a booking and a reply. Kept inside ally-be's 25 s
+    # wait for one attempt.
+    RUN_WRITE_EXTRA_SECONDS: float = Field(4.0, ge=0, le=4.5)
     # Conversation messages the agent reads, most recent last.
     MAX_HISTORY_MESSAGES: int = Field(10, ge=0, le=50)
     # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and

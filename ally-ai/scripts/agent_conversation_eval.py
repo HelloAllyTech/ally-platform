@@ -85,6 +85,7 @@ AGENT_ONLY_FIELDS = (
     "memory",
     "summary",
     "person_name",
+    "before_chat",
 )
 LATENCY_BUDGET = 0.25
 OVERLAP_TARGET = 80.0

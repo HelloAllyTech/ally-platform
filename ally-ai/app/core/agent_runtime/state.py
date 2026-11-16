@@ -55,6 +55,7 @@ class BotConfig(TypedDict, total=False):
     memory: Dict[str, Any]  # {lines, never_store}
     summary: str
     person_name: str
+    before_chat: List[Dict[str, str]]  # [{label, value}], the pre-chat's answers
 
 
 class RunInput(TypedDict, total=False):

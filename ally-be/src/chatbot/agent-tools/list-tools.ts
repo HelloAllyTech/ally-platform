@@ -712,3 +712,16 @@ export function todayFor(now: Date, timeZone = DEFAULT_TIME_ZONE): string {
 /** Copy deck §26: what a reply says when a run fails after a list write was done. */
 export const listDoneLine = (recordTitle: string, list: string): string =>
   `Done: ${recordTitle} in ${list}.`;
+
+/**
+ * A change that set a status, said as that status (chunk 8a): "Cancelled: Thu 19 Nov 2026, 19:00
+ * in Appointments." The status as the list shows it: `_` as a space, a capital first letter.
+ */
+export const listStatusLine = (
+  status: string,
+  recordTitle: string,
+  list: string,
+): string => {
+  const said = status.replace(/_/g, ' ').trim();
+  return `${said.charAt(0).toUpperCase()}${said.slice(1)}: ${recordTitle} in ${list}.`;
+};

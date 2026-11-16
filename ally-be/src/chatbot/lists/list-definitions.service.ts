@@ -227,6 +227,19 @@ export class ListDefinitionsService {
   ): Promise<ListDefinitionView> {
     return this.dataSource.transaction(async (m) => {
       const list = await this.mustLoad(m, chatbotId, key, true);
+      // A list another live list links to can't go (chunk 8a): Appointments' slots would point at
+      // nothing, and booking would break.
+      const users = (await m.query(
+        `SELECT DISTINCT c.name FROM collections c
+           JOIN collection_fields f ON f.collection_id = c.id
+          WHERE c.chatbot_id = $1 AND c.deleted_at IS NULL AND c.id <> $2
+            AND f.archived_at IS NULL AND f.type = 'relation' AND f.options->>'to' = $3
+          ORDER BY c.name`,
+        [chatbotId, list.collection.id, list.collection.key],
+      )) as { name: string }[];
+      if (users.length) {
+        throw refuse.listInUse(users.map((u) => u.name).join(' and '));
+      }
       await m.update(
         Collection,
         { id: list.collection.id },

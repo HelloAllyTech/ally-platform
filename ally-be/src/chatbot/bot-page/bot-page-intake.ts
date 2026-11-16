@@ -124,3 +124,48 @@ export function validateIntake(
 export function intakeRequired(fields: PrechatField[]): boolean {
   return fields.some((f) => f.required);
 }
+
+/** At most this many pre-chat answers, each this long, go to a run (chunk 8a). */
+const BEFORE_CHAT_MAX = 6;
+const BEFORE_CHAT_CHARS = 120;
+
+/**
+ * The person's name from their pre-chat answers (chunk 8a): the first text question whose label
+ * says "name", as the lead alert reads it. Null when there's none.
+ */
+export function intakeName(
+  intake: Pick<StoredIntake, 'answers'> | null | undefined,
+): string | null {
+  const answer = (intake?.answers ?? []).find(
+    (a) => a.type === PrechatFieldType.TEXT && /name/i.test(a.label),
+  );
+  const name = answer?.value?.replace(/\s+/g, ' ').trim();
+  return name ? name.slice(0, 80) : null;
+}
+
+/**
+ * What they told the page before the chat, for the run (chunk 8a): the choice, date and text
+ * answers other than their name, as "label: value". Never their phone number, email or consents:
+ * the agent has no use for them. Not stored as memory; it's this chat's, like a message.
+ */
+export function beforeChat(
+  intake: Pick<StoredIntake, 'answers'> | null | undefined,
+): { label: string; value: string }[] {
+  const name = (intake?.answers ?? []).find(
+    (a) => a.type === PrechatFieldType.TEXT && /name/i.test(a.label),
+  );
+  return (intake?.answers ?? [])
+    .filter(
+      (a) =>
+        a !== name &&
+        (a.type === PrechatFieldType.TEXT ||
+          a.type === PrechatFieldType.CHOICE ||
+          a.type === PrechatFieldType.DATE) &&
+        a.value?.trim(),
+    )
+    .slice(0, BEFORE_CHAT_MAX)
+    .map((a) => ({
+      label: a.label.trim().slice(0, BEFORE_CHAT_CHARS),
+      value: a.value.replace(/\s+/g, ' ').trim().slice(0, BEFORE_CHAT_CHARS),
+    }));
+}

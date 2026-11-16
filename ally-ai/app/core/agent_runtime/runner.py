@@ -18,6 +18,7 @@ from uuid import uuid4
 
 from langgraph.graph.state import CompiledStateGraph
 
+from app.core.agent_runtime.budget import RUN_DEADLINE
 from app.core.agent_runtime.gateway import AgentGatewayClient
 from app.core.agent_runtime.graph import OnEvent, run_agent
 from app.core.agent_runtime.state import AgentState
@@ -102,7 +103,9 @@ async def execute(
         else None
     )
     try:
-        async with asyncio.timeout(settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS):
+        async with asyncio.timeout(settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS) as cap:
+            # A write extends the cap (chunk 8a, budget.extend_after_write).
+            RUN_DEADLINE.set(cap)
             state = await run_agent(
                 graph,
                 run_id=run_id,

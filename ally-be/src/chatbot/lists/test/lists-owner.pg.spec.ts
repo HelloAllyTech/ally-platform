@@ -215,6 +215,19 @@ describePg('Lists, the owner’s section (Postgres)', () => {
     });
   });
 
+  it("won't delete a list another list links to, until that one goes", async () => {
+    await owner.install(await chatbot(), 'appointments');
+    const refused = await refusal(definitions.deleteList(bot, 'slots'));
+    expect(refused).toMatchObject({
+      code: 'in_use',
+      message:
+        'Appointments links to this list. Delete Appointments first, or remove that detail.',
+    });
+    await definitions.deleteList(bot, 'appointments');
+    const deleted = await definitions.deleteList(bot, 'slots');
+    expect(deleted.deleted_at).toBeTruthy();
+  });
+
   describe('Repeat weekly until', () => {
     const NOW = new Date('2026-11-14T06:00:00Z'); // Saturday, 11:30 in India
     const week = {

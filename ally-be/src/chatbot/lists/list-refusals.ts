@@ -90,6 +90,9 @@ export const LIST_COPY = {
     n === 1
       ? `1 entry in ${lists} uses this. Cancel or move it first.`
       : `${n} entries in ${lists} use this. Cancel or move them first.`,
+  /** Chunk 8a: deleting a list another list links to (Slots, from Appointments). */
+  list_in_use: (lists: string) =>
+    `${lists} links to this list. Delete ${lists} first, or remove that detail.`,
 };
 
 export const refuse = {
@@ -125,6 +128,11 @@ export const refuse = {
     new ListRefusalException({
       code: 'limit_exceeded',
       message: LIST_COPY.limit_exceeded(limit),
+    }),
+  listInUse: (lists: string) =>
+    new ListRefusalException({
+      code: 'in_use',
+      message: LIST_COPY.list_in_use(lists),
     }),
   inUse: (n: number, lists: string, records: { id: string; title: string }[]) =>
     new ListRefusalException({

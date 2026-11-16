@@ -14,6 +14,11 @@ import { MemorySection, MemorySourceKind } from '../entity/memory-entry.entity';
 import { AgentRuntimeUsed } from '../enum/chatbot.enum';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import { renderMemory, type RenderableLine } from './memory-render';
+import {
+  beforeChat,
+  intakeName,
+  type StoredIntake,
+} from '../bot-page/bot-page-intake';
 import { memorySettingsOf } from './memory-settings';
 import { matchesNeverStore, neverStoreList } from './never-store';
 
@@ -41,7 +46,10 @@ const SECTIONS = new Set<string>(Object.values(MemorySection));
 
 /** What a run sends about the person, and the short ids it was shown. */
 export interface MemoryForRun {
-  fields: Pick<AgentRunRequest, 'memory' | 'summary' | 'person_name'>;
+  fields: Pick<
+    AgentRunRequest,
+    'memory' | 'summary' | 'person_name' | 'before_chat'
+  >;
   refs: Record<string, string>;
 }
 
@@ -63,11 +71,29 @@ export interface MemoryApplied {
   dropped: number;
 }
 
+/**
+ * What the Inbox shows beside a chat (chunk 8a): what the assistant knows about the person, and
+ * what it reads in this chat besides its notes, so an owner can see why it says what it says.
+ */
+export interface InboxMemory {
+  on: boolean;
+  name: string | null;
+  /** This chat's pre-chat answers the assistant reads (never phone or email). */
+  beforeChat: { label: string; value: string }[];
+  /** This chat's rolling summary, when it has one. */
+  summary: string | null;
+  /** What it never keeps: the pack's defaults, then the owner's own. */
+  neverStore: string[];
+  lines: InboxMemoryLine[];
+}
+
 export interface InboxMemoryLine {
   id: string;
   section: MemorySection;
   text: string;
   saidAt: string;
+  /** When it goes on its own; null: kept until forgotten. */
+  expiresAt: string | null;
   sourceKind: MemorySourceKind;
   sourceMessageId: string | null;
   sourceConversationId: string | null;
@@ -151,17 +177,22 @@ export class MemoryService {
     const settings = memorySettingsOf(chatbot);
     const known = Boolean(contactId && UUID.test(contactId));
     try {
-      const [summary, name, lines] = await Promise.all([
+      const [chat, stored, lines] = await Promise.all([
         UUID.test(conversationId)
-          ? this.summaryOf(chatbot.id, conversationId)
+          ? this.chatOf(chatbot.id, conversationId)
           : Promise.resolve(null),
         known ? this.nameOf(chatbot.id, contactId!) : Promise.resolve(null),
         settings.on && known
           ? this.activeLines(chatbot.id, contactId!)
           : Promise.resolve([] as RenderableLine[]),
       ]);
+      const summary = chat?.summary ?? null;
+      // Their name: the contact's, else the one they gave before the chat.
+      const name = stored ?? intakeName(chat?.intake);
+      const told = beforeChat(chat?.intake);
       const rendered = renderMemory(lines, { timeZone });
       const fields: MemoryForRun['fields'] = {};
+      if (told.length) fields.before_chat = told;
       if (settings.on) {
         fields.memory = {
           // Their name first, so "what do you know about me?" has it (chunk 8a).
@@ -184,15 +215,20 @@ export class MemoryService {
     }
   }
 
-  private async summaryOf(
+  /** This chat's rolling summary and its pre-chat answers. */
+  private async chatOf(
     chatbotId: string,
     conversationId: string,
-  ): Promise<string | null> {
+  ): Promise<{ summary: string | null; intake: StoredIntake | null }> {
     const [row] = (await this.dataSource.query(
-      `SELECT summary FROM chatbot_conversations WHERE id = $1 AND chatbot_id = $2`,
+      `SELECT summary, metadata->'intake' AS intake
+         FROM chatbot_conversations WHERE id = $1 AND chatbot_id = $2`,
       [conversationId, chatbotId],
-    )) as { summary: string | null }[];
-    return row?.summary?.trim() || null;
+    )) as { summary: string | null; intake: StoredIntake | null }[];
+    return {
+      summary: row?.summary?.trim() || null,
+      intake: row?.intake ?? null,
+    };
   }
 
   private async nameOf(
@@ -608,10 +644,11 @@ export class MemoryService {
   async forInbox(
     chatbot: Pick<Chatbot, 'id' | 'settings' | 'safetyPack'>,
     contactId: string,
-  ): Promise<{ on: boolean; name: string | null; lines: InboxMemoryLine[] }> {
+    conversationId?: string,
+  ): Promise<InboxMemory> {
     const rows = (await this.dataSource.query(
-      `SELECT e.id, e.section, e.text, e.said_at, e.source_kind, e.source_message_id,
-              m.conversation_id AS source_conversation_id
+      `SELECT e.id, e.section, e.text, e.said_at, e.expires_at, e.source_kind,
+              e.source_message_id, m.conversation_id AS source_conversation_id
          FROM memory_entries e
          LEFT JOIN chatbot_messages m ON m.id = e.source_message_id
         WHERE e.chatbot_id = $1 AND e.contact_id = $2 AND e.status = 'active'
@@ -623,18 +660,30 @@ export class MemoryService {
       section: MemorySection;
       text: string;
       said_at: Date;
+      expires_at: Date | null;
       source_kind: MemorySourceKind;
       source_message_id: string | null;
       source_conversation_id: string | null;
     }[];
+    const settings = memorySettingsOf(chatbot);
+    // This chat's pre-chat answers and summary: what the assistant also reads in it.
+    const chat =
+      conversationId && UUID.test(conversationId)
+        ? await this.chatOf(chatbot.id, conversationId)
+        : null;
+    const stored = await this.nameOf(chatbot.id, contactId);
     return {
-      on: memorySettingsOf(chatbot).on,
-      name: await this.nameOf(chatbot.id, contactId),
+      on: settings.on,
+      name: stored ?? intakeName(chat?.intake),
+      beforeChat: beforeChat(chat?.intake),
+      summary: chat?.summary ?? null,
+      neverStore: neverStoreList(chatbot.safetyPack, settings.neverStore),
       lines: rows.map((r) => ({
         id: r.id,
         section: r.section,
         text: r.text,
         saidAt: new Date(r.said_at).toISOString(),
+        expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
         sourceKind: r.source_kind,
         sourceMessageId: r.source_message_id,
         sourceConversationId: r.source_conversation_id,
@@ -710,6 +759,22 @@ export class MemoryService {
       [chatbotId, contactId],
     );
     return rows.length;
+  }
+
+  /** Give a contact a name, only if it has none (chunk 8a: the name given before the chat). */
+  async nameIfUnnamed(
+    chatbotId: string,
+    contactId: string,
+    name: string,
+  ): Promise<void> {
+    const clean = name.replace(/\s+/g, ' ').trim().slice(0, MAX_NAME_CHARS);
+    if (!clean) return;
+    await this.dataSource.query(
+      `UPDATE chatbot_contacts SET display_name = $3, "updatedAt" = now()
+        WHERE id = $1 AND chatbot_id = $2
+          AND (display_name IS NULL OR btrim(display_name) = '')`,
+      [contactId, chatbotId, clean],
+    );
   }
 
   /** Whether a contact is this bot's. */

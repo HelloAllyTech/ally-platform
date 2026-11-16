@@ -170,8 +170,20 @@ _SOURCE_PHRASE = re.compile(
 )
 
 
+# Passage numbers said in words (chunk 8a): "see these details here: 1, 3, 4",
+# "(source 1)", "sources 2 and 5". The numbers are the citation contract's, never
+# the person's; a real count ("details: 3 sessions") is kept, since a word follows.
+_PASSAGE_REF = re.compile(
+    r"\s*(?:[—–-]\s*)?\(?\s*(?:see\s+)?(?:(?:these|the|those)\s+)?"
+    r"(?:details|sources?|passages?|references?)(?:\s+here)?\s*:?\s*"
+    r"\d{1,2}(?:\s*(?:,|and|&|–|-)\s*\d{1,2})*\s*\)?(?!\s*[^\W\d_%₹$])",
+    re.IGNORECASE,
+)
+
+
 def without_source_phrases(text: str) -> str:
     text = _SOURCE_PHRASE.sub("", text or "")
+    text = _PASSAGE_REF.sub("", text)
     return re.sub(r"\s+([.,;!?।])", r"\1", text)
 
 

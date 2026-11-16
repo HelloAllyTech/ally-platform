@@ -554,6 +554,54 @@ describePg('Memory, light (Postgres)', () => {
     });
   });
 
+  describe('what they told the page before the chat', () => {
+    const intake = {
+      completedAt: '2026-11-16T06:28:00Z',
+      consents: [],
+      answers: [
+        { id: 'q1', type: 'text', label: 'Your name', value: 'Shehbaz' },
+        { id: 'q2', type: 'phone', label: 'Phone number', value: '9920805299' },
+        {
+          id: 'q3',
+          type: 'choice',
+          label: 'What are you looking for?',
+          value: 'Adult Therapy',
+        },
+      ],
+    };
+
+    it('gives the run their name and answers, never their phone, with memory off too', async () => {
+      const { contactId, conversationId } = await person();
+      await dataSource.query(
+        `UPDATE chatbot_conversations SET metadata = metadata || jsonb_build_object('intake', $2::jsonb) WHERE id = $1`,
+        [conversationId, JSON.stringify(intake)],
+      );
+      const run = await memory.forRun(
+        chatbot({ settings: {} }) as never,
+        contactId,
+        conversationId,
+      );
+      expect(run.fields).toEqual({
+        person_name: 'Shehbaz',
+        before_chat: [
+          { label: 'What are you looking for?', value: 'Adult Therapy' },
+        ],
+      });
+      expect(JSON.stringify(run.fields)).not.toContain('9920805299');
+    });
+
+    it('names the contact from it, only when it has no name', async () => {
+      const { contactId } = await person();
+      await memory.nameIfUnnamed(bot, contactId, 'Shehbaz');
+      await memory.nameIfUnnamed(bot, contactId, 'Someone Else');
+      const [row] = (await dataSource.query(
+        `SELECT display_name FROM chatbot_contacts WHERE id = $1`,
+        [contactId],
+      )) as { display_name: string }[];
+      expect(row.display_name).toBe('Shehbaz');
+    });
+  });
+
   describe('the run', () => {
     it('with memory off, no name and no summary sends nothing', async () => {
       const { contactId, conversationId } = await person();
@@ -625,6 +673,42 @@ describePg('Memory, light (Postgres)', () => {
         summary: null,
         upto: false,
       });
+    });
+
+    it("shows the Inbox the chat's pre-chat answers, its summary, expiry and what it never keeps", async () => {
+      const { contactId, conversationId } = await remembered();
+      await dataSource.query(
+        `UPDATE chatbot_conversations
+            SET metadata = metadata || jsonb_build_object('intake', $2::jsonb) WHERE id = $1`,
+        [
+          conversationId,
+          JSON.stringify({
+            completedAt: 'x',
+            consents: [],
+            answers: [
+              { id: 'q2', type: 'phone', label: 'Phone', value: '9920805299' },
+              {
+                id: 'q3',
+                type: 'choice',
+                label: 'Looking for',
+                value: 'Adult Therapy',
+              },
+            ],
+          }),
+        ],
+      );
+      const view = await memory.forInbox(
+        chatbot() as never,
+        contactId,
+        conversationId,
+      );
+      expect(view.beforeChat).toEqual([
+        { label: 'Looking for', value: 'Adult Therapy' },
+      ]);
+      expect(view.summary).toBe('They asked about fees.');
+      expect(view.lines[0].expiresAt).not.toBeNull();
+      expect(view.neverStore).toContain('Payment details');
+      expect(JSON.stringify(view)).not.toContain('9920805299');
     });
 
     it('a forgotten line is gone from the next run', async () => {

@@ -3,7 +3,9 @@ how much of the conversation the agent reads. Read by the agent and check nodes.
 
 from __future__ import annotations
 
+import asyncio
 import time
+from contextvars import ContextVar
 from typing import Any, Dict, List, Optional, Sequence
 
 from app.core.agent_runtime.check import Rejection
@@ -41,12 +43,51 @@ def over_time(state: AgentState) -> bool:
     )
 
 
+def wrote(state: AgentState) -> bool:
+    """Whether the run has booked or changed something in a list (chunk 8a)."""
+    return any(
+        call.get("ok") and call.get("list_kind") in ("create", "update")
+        for call in state.get("tool_calls") or []
+    )
+
+
+def run_cap(state: AgentState) -> float:
+    """The run's hard cap: RUN_TIMEOUT_SECONDS, and RUN_WRITE_EXTRA_SECONDS more once
+    it has written (chunk 8a)."""
+    extra = settings.AGENT_RUNTIME.RUN_WRITE_EXTRA_SECONDS if wrote(state) else 0.0
+    return settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS + extra
+
+
 def time_left(state: AgentState) -> float:
-    """Seconds before the run's hard cap (RUN_TIMEOUT_SECONDS)."""
+    """Seconds before the run's hard cap (`run_cap`)."""
     started = state.get("started_at")
     if not started:
-        return settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS
-    return settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS - (time.time() - started)
+        return run_cap(state)
+    return run_cap(state) - (time.time() - started)
+
+
+#: The run's `asyncio.timeout`, so a write can extend it (chunk 8a).
+RUN_DEADLINE: ContextVar[Optional[asyncio.Timeout]] = ContextVar(
+    "agent_run_deadline", default=None
+)
+
+
+def extend_after_write(started_at: Optional[float]) -> None:
+    """Move the run's hard cap to RUN_TIMEOUT + RUN_WRITE_EXTRA seconds after its
+    start, once it has written. Never shortens it."""
+    deadline = RUN_DEADLINE.get()
+    if deadline is None or started_at is None:
+        return
+    extra = settings.AGENT_RUNTIME.RUN_WRITE_EXTRA_SECONDS
+    if extra <= 0:
+        return
+    loop = asyncio.get_running_loop()
+    target = loop.time() + (
+        settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS + extra - (time.time() - started_at)
+    )
+    current = deadline.when()
+    if current is None or target > current:
+        deadline.reschedule(target)
 
 
 def can_send_back(state: AgentState, rejection: Rejection) -> bool:

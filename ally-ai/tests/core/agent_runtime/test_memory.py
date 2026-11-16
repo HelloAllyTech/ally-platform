@@ -416,3 +416,91 @@ class TestCrawledTitles:
             )
             >= 3
         )
+
+
+class TestBeforeChat:
+    """What they told the page before the chat reaches the run (chunk 8a)."""
+
+    BOT = make_bot(
+        person_name="Shehbaz",
+        before_chat=[{"label": "What are you looking for?", "value": "Adult Therapy"}],
+    )
+
+    def test_it_goes_ahead_of_the_history_with_the_name(self):
+        lead = memory.history_lead(self.BOT)
+        assert lead == (
+            "The person's name: Shehbaz\n"
+            "Before the chat they told you: What are you looking for: Adult Therapy"
+        )
+
+    def test_a_reply_about_it_is_about_the_person(self):
+        from app.core.agent_runtime.check.personal import about_the_person
+
+        personal = memory.personal_context(self.BOT)
+        assert about_the_person("You said you're looking for adult therapy.", personal)
+
+    def test_the_request_carries_it_only_when_sent(self):
+        assert "before_chat" not in AgentRunRequest(**BODY).to_bot()
+        bot = AgentRunRequest(
+            **BODY, before_chat=[{"label": "Looking for", "value": "Adult Therapy"}]
+        ).to_bot()
+        assert bot["before_chat"] == [
+            {"label": "Looking for", "value": "Adult Therapy"}
+        ]
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        (
+            "You can book with Amaha — see these details here: 1, 3, 4. Online?",
+            "You can book with Amaha. Online?",
+        ),
+        ("Monday at 15:00 — booked. (source 1)", "Monday at 15:00 — booked."),
+        ("The details: 3 sessions a week.", "The details: 3 sessions a week."),
+        ("We have 2 centres in Mumbai.", "We have 2 centres in Mumbai."),
+    ],
+)
+def test_passage_numbers_said_in_words_are_cut(text, expected):
+    from app.core.agent_runtime.check.text import without_source_phrases
+
+    assert without_source_phrases(text) == expected
+
+
+class TestMoreTimeAfterAWrite:
+    """A run that has booked or changed something gets 4 s more (chunk 8a): a
+    reschedule is a cancel, a booking and a reply."""
+
+    def test_the_cap_grows_only_after_a_write(self):
+        import time
+
+        from app.core.agent_runtime.budget import run_cap, time_left
+        from app.core.config import settings
+
+        base = settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS
+        extra = settings.AGENT_RUNTIME.RUN_WRITE_EXTRA_SECONDS
+        found = {"tool_calls": [{"ok": True, "list_kind": "find"}]}
+        booked = {"tool_calls": [{"ok": True, "list_kind": "create"}]}
+        refused = {"tool_calls": [{"ok": False, "list_kind": "create"}]}
+        assert run_cap(found) == base
+        assert run_cap(refused) == base
+        assert run_cap(booked) == base + extra
+        assert base + extra < 25  # inside ally-be's wait for one attempt
+        started = {"started_at": time.time() - 10, **booked}
+        assert base + extra - 11 < time_left(started) <= base + extra - 10
+
+    @pytest.mark.asyncio
+    async def test_a_write_moves_the_deadline_later_never_earlier(self):
+        import asyncio
+        import time
+
+        from app.core.agent_runtime.budget import RUN_DEADLINE, extend_after_write
+
+        async with asyncio.timeout(20) as cap:
+            RUN_DEADLINE.set(cap)
+            before = cap.when()
+            extend_after_write(time.time())
+            assert cap.when() > before
+            later = cap.when()
+            extend_after_write(time.time() - 100)  # would be earlier: ignored
+            assert cap.when() == later

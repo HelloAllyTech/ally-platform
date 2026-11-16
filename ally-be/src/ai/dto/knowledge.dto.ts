@@ -195,6 +195,11 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
   summary?: string;
   /** The person's name, when it's known (chunk 8a). At most 80 characters. */
   person_name?: string;
+  /**
+   * What they told the page before the chat (chunk 8a): its choice, date and text answers other
+   * than their name, never their phone or email. At most 6, each part 120 characters.
+   */
+  before_chat?: { label: string; value: string }[];
 }
 
 /** One memory write a run asks for (chunk 8a); ally-be checks and applies it after the reply. */

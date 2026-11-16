@@ -276,10 +276,10 @@ describe('the Inbox memory routes', () => {
 
   it('viewers read', async () => {
     const { c, memory } = controller(ChatbotMemberRole.VIEWER);
-    await expect(c.memoryOf(chatbot.id, contact)).resolves.toMatchObject({
+    await expect(c.memoryOf(chatbot.id, contact, {})).resolves.toMatchObject({
       on: true,
     });
-    expect(memory.forInbox).toHaveBeenCalledWith(chatbot, contact);
+    expect(memory.forInbox).toHaveBeenCalledWith(chatbot, contact, undefined);
   });
 
   it("viewers can't forget, edit or forget a person", async () => {
@@ -317,7 +317,7 @@ describe('the Inbox memory routes', () => {
 
   it("is a 404 for another bot's person, or a line that isn't there", async () => {
     const { c, memory } = controller(ChatbotMemberRole.OWNER, false);
-    await expect(c.memoryOf(chatbot.id, contact)).rejects.toBeInstanceOf(
+    await expect(c.memoryOf(chatbot.id, contact, {})).rejects.toBeInstanceOf(
       NotFoundException,
     );
     memory.forget.mockResolvedValue(false);
@@ -414,5 +414,31 @@ describe('the run carries memory both ways', () => {
       {},
     );
     expect(answered.agent).not.toHaveProperty('memory');
+  });
+});
+
+describe('the line sent when a run is cut short after acting', () => {
+  const { doneLineOf } = require('../../engine/agent-runtime-runner.service');
+  const result = (title: string) => ({
+    list: { name: 'Appointments' },
+    passages: [{ record_title: title }],
+  });
+
+  it('says what a booking did', () => {
+    expect(doneLineOf(result('Mon 23 Nov 2026, 10:00'), { slot: 's1' })).toBe(
+      'Done: Mon 23 Nov 2026, 10:00 in Appointments.',
+    );
+  });
+
+  it('says a cancellation is cancelled, not done', () => {
+    expect(
+      doneLineOf(result('Thu 19 Nov 2026, 19:00'), {
+        id: 'a1',
+        status: 'cancelled',
+      }),
+    ).toBe('Cancelled: Thu 19 Nov 2026, 19:00 in Appointments.');
+    expect(
+      doneLineOf(result('Thu 19 Nov 2026, 19:00'), { status: 'no_show' }),
+    ).toBe('No show: Thu 19 Nov 2026, 19:00 in Appointments.');
   });
 });

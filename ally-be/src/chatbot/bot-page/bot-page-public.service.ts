@@ -52,6 +52,7 @@ import {
 } from './bot-page-access.service';
 import {
   IntakeError,
+  intakeName,
   intakeRequired,
   StoredIntake,
   validateIntake,
@@ -478,6 +479,11 @@ export class BotPagePublicService {
       intake,
       ...sourceOf(ready, conversation),
     });
+    // The name they gave before the chat is the contact's, unless it has one (chunk 8a): the
+    // assistant then knows it and never asks again.
+    const name = intakeName(intake);
+    if (name)
+      await this.memory?.nameIfUnnamed(available.chatbot.id, contact!.id, name);
     return { intakeDone: true };
   }
 

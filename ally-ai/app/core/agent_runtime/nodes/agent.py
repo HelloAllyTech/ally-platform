@@ -14,6 +14,7 @@ from app.core.agent_runtime.budget import (
     REWRITE_RESERVE_SECONDS,
     is_search,
     recent,
+    run_cap,
     search_budget,
     searches,
     steps_left,
@@ -110,7 +111,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
                 searches=state.get("tool_calls") or [],
                 feedback=state.get("feedback_text"),
                 must_search=force,
-                timeout=_time_left(started_at),
+                timeout=_time_left(started_at, state),
             )
 
         try:
@@ -119,7 +120,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             # A step that doesn't fit the schema (forced to search but replied, or
             # a search with no query) would fail the run, and v1 would answer.
             # Asked once more, unforced, while there's time for it (chunk 20a-2).
-            if _time_left(started_at) < REWRITE_RESERVE_SECONDS:
+            if _time_left(started_at, state) < REWRITE_RESERVE_SECONDS:
                 raise
             step, meta = await step_once(False)
         # What the step asked to remember (chunk 8a): collected, returned with the
@@ -148,9 +149,10 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
     return agent
 
 
-def _time_left(started_at: float) -> float:
-    """Seconds left of the run's hard cap, for the model call (at least one)."""
-    deadline = started_at + settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS
+def _time_left(started_at: float, state: AgentState) -> float:
+    """Seconds left of the run's hard cap, for the model call (at least one). The cap
+    grows once the run has written (chunk 8a, budget.run_cap)."""
+    deadline = started_at + run_cap(state)
     return max(deadline - time.time(), 1.0)
 
 

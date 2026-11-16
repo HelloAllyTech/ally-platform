@@ -740,7 +740,7 @@ says when a save can't be made. More lines for the home's sections are added her
 
 **`{limit}` (5a):** 50 lists · 100 fields · 200,000 entries · 32 KB per entry · 5,000 rows a file · 5 MB a file · 20 rules.
 
-**When a run fails after a list write (6):** Done: {record title} in {list}. *(Sent instead of the bot's fallback wording when the assistant booked or changed something and then couldn't finish its reply; the record's title as the list shows it, the list's name as the owner wrote it.)*
+**When a run fails after a list write (6):** Done: {record title} in {list}. *(8a: one line per write, in order; a change that set a status says it instead: "{Status}: {record title} in {list}.", e.g. "Cancelled: Thu 19 Nov 2026, 19:00 in Appointments.")* *(Sent instead of the bot's fallback wording when the assistant booked or changed something and then couldn't finish its reply; the record's title as the list shows it, the list's name as the owner wrote it.)*
 
 **Added in 5b (ally-be, in the engine):**
 

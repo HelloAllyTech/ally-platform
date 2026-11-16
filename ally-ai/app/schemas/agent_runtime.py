@@ -64,6 +64,13 @@ class AgentMemory(BaseModel):
     never_store: List[str] = Field(default_factory=list, max_length=60)
 
 
+class BeforeChatAnswer(BaseModel):
+    """One pre-chat answer (chunk 8a)."""
+
+    label: str = Field(..., max_length=120)
+    value: str = Field(..., max_length=120)
+
+
 class AgentRunRequest(KnowledgeAnswerRequest):
     conversation_id: str = Field(
         ...,
@@ -128,6 +135,14 @@ class AgentRunRequest(KnowledgeAnswerRequest):
     person_name: Optional[str] = Field(
         None, max_length=80, description="The person's name, when it is known."
     )
+    before_chat: List["BeforeChatAnswer"] = Field(
+        default_factory=list,
+        max_length=6,
+        description=(
+            "What they told the page before the chat (chunk 8a): its answers other "
+            "than their name and contact details."
+        ),
+    )
 
     def to_bot(self) -> BotConfig:
         """The `bot` block of the run's state. It names the gateway's tools but
@@ -177,6 +192,8 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             bot["summary"] = self.summary.strip()
         if self.person_name and self.person_name.strip():
             bot["person_name"] = self.person_name.strip()
+        if self.before_chat:
+            bot["before_chat"] = [a.model_dump() for a in self.before_chat]
         return bot
 
     @field_validator("knowledge_topics")
