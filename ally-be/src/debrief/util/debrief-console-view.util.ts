@@ -69,7 +69,7 @@ export function parseSessionFilters(
       : str('riskCue') === 'false'
         ? false
         : undefined;
-  const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 200);
+  const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 1000);
   const offset = Math.max(Number(q.offset) || 0, 0);
   const tenantId = str('tenantId');
   const language = str('language');

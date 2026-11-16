@@ -398,7 +398,7 @@ describe("all debriefs by day", () => {
     expect(cards[0]).toHaveTextContent("Quality score6.4");
     expect(cards[0]).not.toHaveTextContent("Cost");
     expect(screen.getByTestId("home-list")).toHaveTextContent("Today");
-    expect(h.sessions).toHaveBeenLastCalledWith({ category: "all" });
+    expect(h.sessions).toHaveBeenLastCalledWith({ category: "all", limit: 50 });
   });
 
   it("j / k move the selection and Enter opens it", () => {
@@ -452,11 +452,12 @@ describe("rows never wrap", () => {
       category: "all",
       language: "hi",
       cost: "hit_ceiling",
+      limit: 50,
     });
     fireEvent.click(
       within(screen.getByTestId("home-chips")).getByRole("button", { name: "Clear all" }),
     );
-    expect(h.sessions).toHaveBeenLastCalledWith({ category: "all" });
+    expect(h.sessions).toHaveBeenLastCalledWith({ category: "all", limit: 50 });
   });
 
   it("opens More filters on demand when nothing behind it is set", () => {
@@ -505,5 +506,17 @@ describe("old links", () => {
     });
     renderAt();
     expect(screen.getByText(/can't open the Debriefs console/)).toBeInTheDocument();
+  });
+
+  it("says how many it shows of how many, and loads 50 more on request", () => {
+    const many = Array.from({ length: 50 }, (_, i) => item({ runId: `r${i}` }));
+    const p = page(many);
+    p.data.counts.all = 120;
+    h.sessions.mockReturnValue(p);
+    renderAt();
+    const more = screen.getByTestId("home-paging");
+    expect(more).toHaveTextContent("Showing 50 of 120 debriefs");
+    fireEvent.click(within(more).getByRole("button", { name: "Show 50 more" }));
+    expect(h.sessions).toHaveBeenLastCalledWith({ category: "all", limit: 100 });
   });
 });

@@ -254,10 +254,22 @@ export const DebriefsHome: React.FC = () => {
   const rawMargin = settings.data?.values.undoMargin;
   const margin = typeof rawMargin === "number" ? rawMargin : DEFAULT_UNDO_MARGIN;
   const { filters, list } = readHomeState(params, ["all"], "all");
-  const sessions = useGetDebriefSessionsQuery(sessionsQuery("all", filters), {
-    refetchOnMountOrArgChange: true,
-    pollingInterval: polling ? 15_000 : 0,
-  });
+  // Pages of 50: the list says how many it shows of how many, and loads more on request, so
+  // older debriefs are never silently cut off.
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const filterKey = JSON.stringify(filters);
+  const [limitFor, setLimitFor] = useState(filterKey);
+  if (limitFor !== filterKey) {
+    setLimitFor(filterKey);
+    setLimit(PAGE_SIZE);
+  }
+  const sessions = useGetDebriefSessionsQuery(
+    { ...sessionsQuery("all", filters), limit },
+    {
+      refetchOnMountOrArgChange: true,
+      pollingInterval: polling ? 15_000 : 0,
+    },
+  );
   const page = sessions.data;
   const access = useDebriefAccess(page?.viewer);
   // The Ally team and the owner run the PM agent; the clinical advisor only answers the pinned-rule
@@ -631,6 +643,30 @@ export const DebriefsHome: React.FC = () => {
           ))}
         </div>
       )}
+      {page && shown.length > 0 && (
+        <div
+          className="flex flex-nowrap items-center gap-4 text-sm text-neutral-700"
+          data-testid="home-paging"
+        >
+          <span className="shrink-0">{h.showing(shown.length, page.counts.all)}</span>
+          {shown.length < page.counts.all &&
+            (limit < MAX_LIMIT ? (
+              <button
+                type="button"
+                className="shrink-0 font-semibold text-primary-500"
+                disabled={sessions.isFetching}
+                onClick={() => setLimit(l => Math.min(l + PAGE_SIZE, MAX_LIMIT))}
+              >
+                {h.showMore(Math.min(PAGE_SIZE, page.counts.all - shown.length))}
+              </button>
+            ) : (
+              <span className="min-w-0 truncate">{h.narrowFilters}</span>
+            ))}
+        </div>
+      )}
     </div>
   );
 };
+
+const PAGE_SIZE = 50;
+const MAX_LIMIT = 1000;

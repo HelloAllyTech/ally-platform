@@ -10492,6 +10492,9 @@ export const en = {
       inOrder: "In order of urgency",
       today: "Today",
       yesterday: "Yesterday",
+      showing: (n: number, total: number) => `Showing ${n} of ${total} debriefs`,
+      showMore: (n: number) => `Show ${n} more`,
+      narrowFilters: "Narrow the filters to see older debriefs.",
       loadFailed: "the debriefs",
       empty: {
         needs: {

@@ -99,11 +99,18 @@ export class DebriefChangesService implements OnModuleInit {
 
   private async ideas(): Promise<IdeaRow[]> {
     const rows: IdeaRow[] = await this.dataSource.query(
+      // Every open or live change, however old (one that waits for a person
+      // must never drop off), plus the most recent closed ones.
       `SELECT id, status, text, change, evidence, "createdAt", "updatedAt", "releaseId"
          FROM agent_lessons
         WHERE "agentKey" = $1
-        ORDER BY "updatedAt" DESC
-        LIMIT $2`,
+          AND (status IN ('proposed', 'approved', 'active')
+               OR id IN (SELECT id FROM agent_lessons
+                          WHERE "agentKey" = $1
+                            AND status NOT IN ('proposed', 'approved', 'active')
+                          ORDER BY "updatedAt" DESC
+                          LIMIT $2))
+        ORDER BY "updatedAt" DESC`,
       [DEBRIEF_AGENT_KEY, CHANGES_LIMIT],
     );
     return rows.filter(isChange);
