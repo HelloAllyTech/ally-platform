@@ -168,12 +168,12 @@ const practicePath = (scenario: { id: number; trackItemId?: string }) => {
  * roleplay the server says the learner can still open.
  */
 const PractiseLink: FC<{
-  scenario: { id: number; title: string; trackItemId?: string };
+  scenario: { id: number; title: string; trackItemId?: string; outsideCourse?: boolean };
   primary?: boolean;
   onClick?: () => void;
 }> = ({ scenario, primary, onClick }) => {
   const { t } = useTranslation();
-  return (
+  const link = (
     <Link
       to={practicePath(scenario)}
       onClick={onClick}
@@ -187,6 +187,20 @@ const PractiseLink: FC<{
     >
       {primary ? t("postSim.debriefCards.practise.next") : t("postSim.debriefCards.practise.this")}
     </Link>
+  );
+  // In a course, Practise this next says when its roleplay is outside the course:
+  // it won't count towards the course.
+  if (!scenario.outsideCourse || !primary) return link;
+  return (
+    <div className="flex flex-col gap-1">
+      {link}
+      <p
+        className="font-primary text-xs text-typography-600"
+        data-testid="debrief-practise-outside"
+      >
+        {t("postSim.debriefCards.practise.outsideCourse")}
+      </p>
+    </div>
   );
 };
 

@@ -230,6 +230,9 @@ describe('Practise next inside a course', () => {
     const dataSource = {
       query: jest.fn(async (q: string) => {
         if (q.includes('WITH cur')) return rows;
+        // Every roleplay of the course: 1–3 reached, 4 a later item.
+        if (q.includes('DISTINCT ti."scenarioId"'))
+          return [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
         if (q.includes('"trackItemProgressId" AS tip'))
           return [{ tip: ownTip }];
         if (q.includes('competencies')) return [];
@@ -238,7 +241,11 @@ describe('Practise next inside a course', () => {
     };
     const scenarios = {
       getScenariosV2: jest.fn(async () => ({
-        data: [{ id: 99, title: 'Library roleplay' }],
+        data: [
+          { id: 99, title: 'Library roleplay' },
+          // A later course item that is also in the learner's own list.
+          { id: 4, title: 'Later in the course' },
+        ],
       })),
     };
     return {
@@ -247,7 +254,7 @@ describe('Practise next inside a course', () => {
     };
   };
 
-  it('offers only reached roleplays of the course, not-done first, this one always, never the library', async () => {
+  it("offers reached course roleplays first (not-done, this one, done), then the learner's own outside the course, never a later course item", async () => {
     const { svc, scenarios } = practice([
       {
         id: 1,
@@ -275,13 +282,15 @@ describe('Practise next inside a course', () => {
       },
     ]);
     const options = await svc.optionsFor(7, 't1', 's1');
-    expect(options.map((o) => o.id)).toEqual([2, 3, 1]);
+    expect(options.map((o) => o.id)).toEqual([2, 3, 1, 99]);
     expect(options.every((o) => o.course === 'Basics')).toBe(true);
     expect(options.find((o) => o.id === 3)?.this_roleplay).toBe(true);
-    expect(scenarios.getScenariosV2).not.toHaveBeenCalled();
+    expect(options.find((o) => o.id === 99)?.outside_course).toBe(true);
+    expect(options.filter((o) => o.outside_course)).toHaveLength(1);
+    expect(scenarios.getScenariosV2).toHaveBeenCalled();
   });
 
-  it('never offers the library to a course session whose course lists nothing', async () => {
+  it('offers nothing when the course cannot be read, rather than risk a spoiler', async () => {
     const { svc, scenarios } = practice([]);
     expect(await svc.optionsFor(7, 't1', 's1')).toEqual([]);
     expect(await svc.available(7, 't1', [99], 's1')).toEqual([]);
@@ -291,11 +300,11 @@ describe('Practise next inside a course', () => {
   it('offers the library outside a course', async () => {
     const { svc } = practice([], null);
     expect((await svc.optionsFor(7, 't1', 's1')).map((o) => o.id)).toEqual([
-      99,
+      99, 4,
     ]);
   });
 
-  it('shows a practise button only for a roleplay of the course the learner reached', async () => {
+  it('shows a practise button for a reached course roleplay or one outside the course, never a later course item', async () => {
     const { svc } = practice([
       {
         id: 3,
@@ -306,8 +315,9 @@ describe('Practise next inside a course', () => {
         track_item_id: 'i3',
       },
     ]);
-    expect(await svc.available(7, 't1', [3, 99], 's1')).toEqual([
+    expect(await svc.available(7, 't1', [3, 4, 99], 's1')).toEqual([
       { id: 3, title: 'This one', trackItemId: 'i3' },
+      { id: 99, title: 'Library roleplay', outsideCourse: true },
     ]);
   });
 

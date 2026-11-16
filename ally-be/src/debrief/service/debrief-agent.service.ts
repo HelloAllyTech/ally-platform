@@ -188,7 +188,13 @@ export interface LearnerDebriefView {
    * course, only that course's roleplays the learner has reached, each with
    * the course item (`trackItemId`) the apps open in the course player.
    */
-  practice?: Array<{ id: number; title: string; trackItemId?: string }>;
+  /** `outsideCourse`: a course session's suggestion from outside the course. */
+  practice?: Array<{
+    id: number;
+    title: string;
+    trackItemId?: string;
+    outsideCourse?: boolean;
+  }>;
   /**
    * `not_available` only: the tab says "A debrief isn't available for this
    * session" instead of showing today's debrief — the organisation's

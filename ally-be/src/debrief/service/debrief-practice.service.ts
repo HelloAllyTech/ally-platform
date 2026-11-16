@@ -10,12 +10,17 @@ export interface PracticeOption {
   title: string;
   skills: string[];
   /**
-   * The session is part of a course: every option is a roleplay of that
-   * course (named here, for the Writer), never one from outside it.
+   * The session is part of a course (named here, for the Writer). Set on
+   * every option of a course session.
    */
   course?: string;
   /** In a course: this is the roleplay the learner just did. */
   this_roleplay?: boolean;
+  /**
+   * In a course: a roleplay from the learner's own list outside the course.
+   * It does not count towards the course.
+   */
+  outside_course?: boolean;
 }
 
 /** A roleplay of the session's course the learner has reached. */
@@ -33,7 +38,14 @@ export interface CourseRoleplay {
 /** The session's course and the roleplays in it the learner may be sent to. */
 export interface SessionCourse {
   title: string;
+  /** The course could not be read: offer nothing rather than risk a spoiler. */
+  unreadable?: boolean;
   roleplays: CourseRoleplay[];
+  /**
+   * Every roleplay in the course, reached or not: never offered from the
+   * learner's own list, so a later item is never spoiled (review 2026-11-16).
+   */
+  allIds: number[];
 }
 
 /** The most options the Writer is shown; enough to choose, cheap to read. */
@@ -60,9 +72,11 @@ export class DebriefPracticeService {
 
   /**
    * The learner's roleplays with the skills each practises, for the Writer.
-   * A session played inside a course is offered only that course's
-   * roleplays the learner has already reached (see `course`), never the
-   * library's.
+   * A session played inside a course is offered that course's roleplays the
+   * learner has already reached first (see `course`), then roleplays from
+   * the learner's own list that are not in the course at all (marked
+   * `outside_course`). A course roleplay they have not reached is never
+   * offered, from either list (review 2026-11-16: the middle option).
    */
   async optionsFor(
     userId: number | null,
@@ -71,14 +85,32 @@ export class DebriefPracticeService {
   ): Promise<PracticeOption[]> {
     const course = sessionId ? await this.course(sessionId) : null;
     if (course) {
-      const skills = await this.skillsOf(course.roleplays.map((r) => r.id));
-      return course.roleplays.slice(0, MAX_OPTIONS).map((r) => ({
+      const outside = course.unreadable
+        ? []
+        : (await this.listed(userId, tenantId)).filter(
+            (s) => !course.allIds.includes(s.id),
+          );
+      const skills = await this.skillsOf([
+        ...course.roleplays.map((r) => r.id),
+        ...outside.map((s) => s.id),
+      ]);
+      const inCourse: PracticeOption[] = course.roleplays.map((r) => ({
         id: r.id,
         title: r.title,
         skills: skills.get(r.id) ?? [],
         course: course.title,
         ...(r.current ? { this_roleplay: true } : {}),
       }));
+      const fromList: PracticeOption[] = outside
+        .map((s) => ({
+          id: s.id,
+          title: s.title,
+          skills: skills.get(s.id) ?? [],
+          course: course.title,
+          outside_course: true,
+        }))
+        .sort((a, b) => b.skills.length - a.skills.length);
+      return [...inCourse, ...fromList].slice(0, MAX_OPTIONS);
     }
     const listed = await this.listed(userId, tenantId);
     if (!listed.length) return [];
@@ -144,7 +176,9 @@ export class DebriefPracticeService {
           `SELECT "trackItemProgressId" AS tip FROM scenario_sessions WHERE id = $1`,
           [sessionId],
         );
-        return own?.tip ? { title: '', roleplays: [] } : null;
+        return own?.tip
+          ? { title: '', roleplays: [], allIds: [], unreadable: true }
+          : null;
       }
       const seen = new Map<number, CourseRoleplay>();
       for (const r of rows) {
@@ -165,13 +199,26 @@ export class DebriefPracticeService {
       }
       const rank = (r: CourseRoleplay) => (r.current ? 1 : r.done ? 2 : 0);
       const roleplays = [...seen.values()].sort((a, b) => rank(a) - rank(b));
-      return { title: rows[0].course ?? '', roleplays };
+      const all: Array<{ id: number }> = await this.dataSource.query(
+        `SELECT DISTINCT ti."scenarioId" AS id
+           FROM scenario_sessions s
+           JOIN track_item_progress tip ON tip.id = s."trackItemProgressId"
+           JOIN track_items cur ON cur.id = tip."trackItemId"
+           JOIN track_items ti ON ti."trackId" = cur."trackId"
+          WHERE s.id = $1 AND ti."scenarioId" IS NOT NULL`,
+        [sessionId],
+      );
+      return {
+        title: rows[0].course ?? '',
+        roleplays,
+        allIds: (all ?? []).map((r) => Number(r.id)),
+      };
     } catch (e) {
       // Unreadable: offer nothing rather than risk the wrong roleplays.
       this.logger.warn(
         `[debrief] course practice options unavailable: ${(e as Error).message}`,
       );
-      return { title: '', roleplays: [] };
+      return { title: '', roleplays: [], allIds: [], unreadable: true };
     }
   }
 
@@ -199,15 +246,31 @@ export class DebriefPracticeService {
     tenantId: string,
     ids: number[],
     sessionId?: string | null,
-  ): Promise<Array<{ id: number; title: string; trackItemId?: string }>> {
+  ): Promise<
+    Array<{
+      id: number;
+      title: string;
+      trackItemId?: string;
+      outsideCourse?: boolean;
+    }>
+  > {
     if (!ids.length) return [];
     const wanted = new Set(ids);
-    // Inside a course, only the course's roleplays the learner has reached.
+    // Inside a course: the course's roleplays the learner has reached, and
+    // their own roleplays outside the course; never a course item not reached.
     const course = sessionId ? await this.course(sessionId) : null;
     if (course) {
-      return course.roleplays
+      const reached = course.roleplays
         .filter((r) => wanted.has(r.id))
         .map(({ id, title, trackItemId }) => ({ id, title, trackItemId }));
+      if (course.unreadable) return reached;
+      const outside = (await this.listed(userId, tenantId)).filter(
+        (s) => wanted.has(s.id) && !course.allIds.includes(s.id),
+      );
+      return [
+        ...reached,
+        ...outside.map((s) => ({ ...s, outsideCourse: true })),
+      ];
     }
     return (await this.listed(userId, tenantId)).filter((s) =>
       wanted.has(s.id),

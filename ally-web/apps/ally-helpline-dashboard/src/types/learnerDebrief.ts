@@ -152,7 +152,8 @@ export interface LearnerDebriefView {
    * Roleplays the cards link to that the learner can still open. Inside a
    * course only that course's roleplays, each with its course item.
    */
-  practice?: Array<{ id: number; title: string; trackItemId?: string }>;
+  /** `outsideCourse`: in a course, a roleplay outside it (it won't count towards it). */
+  practice?: Array<{ id: number; title: string; trackItemId?: string; outsideCourse?: boolean }>;
   /** Present only on a debrief picked for the pulse, with the answers so far. */
   pulse?: DebriefPulse | null;
   /**

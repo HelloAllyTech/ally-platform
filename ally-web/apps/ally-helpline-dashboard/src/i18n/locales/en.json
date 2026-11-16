@@ -919,7 +919,8 @@
         "next": "Practise this next",
         "this": "Practise this",
         "label": "Practise this in the roleplay \"{{title}}\"",
-        "roleplays": "Open my roleplays"
+        "roleplays": "Open my roleplays",
+        "outsideCourse": "Outside this course: it won't count towards it."
       },
       "reply": {
         "placeholder": "Answer here, or ask Ally anything about this session…"

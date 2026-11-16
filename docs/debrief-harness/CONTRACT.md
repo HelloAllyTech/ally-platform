@@ -46,7 +46,7 @@ stored result.
     "past_work_on_this": [ ... ],    // progress reader input
     "cohort": { ... } | null,
     "case_memory": { ... } | null,
-    "practice_options": [ { "id": 41, "title": "...", "skills": [...], "course": "Basics", "this_roleplay": true } ]   // course/this_roleplay only for a session played inside a course
+    "practice_options": [ { "id": 41, "title": "...", "skills": [...], "course": "Basics", "this_roleplay": true } ]   // course/this_roleplay/outside_course only for a session played inside a course
   },
   "run_token": "<JWT signed by ally-be>",
   "gateway_url": "https://<ally-be>/api/v1/internal/debrief"
@@ -291,11 +291,15 @@ today's debrief when it is not written yet. `ready` carries `askAlly {open, reas
 answered with its limit (`workspace.askAllyLimit {reason, at}`, written by the reply service; a `month` limit
 reopens when the IST month turns). `practice[]` items carry `trackItemId` inside a course.
 
-**Practise next inside a course.** For a session with `trackItemProgressId`, `DebriefPracticeService` offers
-only that course's roleplays the learner has reached — items at or before this one (section order, item order)
-or completed ones, plus this one — not-done first, then this one, then done ones; never a later item, never the
-library (an unreadable course offers nothing). Each option carries `course` and, for this one, `this_roleplay`;
-the Writer's practice instruction says to stay within the course.
+**Practise next inside a course** (revised 2026-11-16: the middle option). For a session with
+`trackItemProgressId`, `DebriefPracticeService` offers that course's roleplays the learner has reached first —
+items at or before this one (section order, item order) or completed ones, plus this one; not-done first, then
+this one, then done ones — then the learner's own roleplays that are not in the course at all, marked
+`outside_course`. A course roleplay not reached yet is never offered, from either list, so nothing is spoiled; an
+unreadable course offers nothing. Every option carries `course`; this one `this_roleplay`. The Writer prefers a
+course roleplay and picks an `outside_course` one only when it clearly practises the skill better. In the
+learner view, `practice[]` items outside the course carry `outsideCourse: true`, and the card says it won't count
+towards the course.
 
 **"Practise this next" always has a button.** The graph sends `finalise_cards` a `fallback` (the option marked
 `this_roleplay`, else the session's own roleplay when offered, else the first option); ally-be's

@@ -527,10 +527,12 @@ def _practice_instruction(options: Optional[List[Dict[str, Any]]]) -> List[str]:
     ]
     if any((o or {}).get("course") for o in options):
         lines.append(
-            "This session is part of a course: every option is a roleplay of "
-            "that course the learner has already reached (this_roleplay marks "
-            "the one they just did). Suggest practising within the course, "
-            "never anything outside it."
+            "This session is part of a course. Options without outside_course "
+            "are roleplays of that course the learner has already reached "
+            "(this_roleplay marks the one they just did). Options with "
+            "outside_course are the learner's own roleplays outside the course; "
+            "they do not count towards it. Prefer a course roleplay; choose an "
+            "outside_course one only when it clearly practises the skill better."
         )
     return lines
 

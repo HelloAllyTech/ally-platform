@@ -939,6 +939,35 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
         sessionStorage.removeItem("activeTrackContext");
       }
     });
+
+    it("a suggestion outside the course opens its own page and says it won't count", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: withLinks,
+          language: "en",
+          practice: [{ id: 41, title: "Exam stress", outsideCourse: true }],
+        },
+      });
+      renderTab();
+      expect(screen.getByTestId("debrief-practise-next")).toHaveAttribute("href", "/scenario/41");
+      expect(screen.getByTestId("debrief-practise-outside")).toHaveTextContent(
+        "postSim.debriefCards.practise.outsideCourse",
+      );
+    });
+
+    it("a course roleplay has no outside-the-course note", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: withLinks,
+          language: "en",
+          practice: [{ id: 41, title: "Exam stress", trackItemId: "i-41" }],
+        },
+      });
+      renderTab();
+      expect(screen.queryByTestId("debrief-practise-outside")).not.toBeInTheDocument();
+    });
   });
 
   describe("read-aloud", () => {
