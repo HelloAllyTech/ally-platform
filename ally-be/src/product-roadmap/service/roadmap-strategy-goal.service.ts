@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { RoadmapStrategyGoal } from '../entity/roadmap-strategy-goal.entity';
 import { RoadmapRankWeights } from '../entity/roadmap-rank-weights.entity';
@@ -171,7 +172,11 @@ export class RoadmapStrategyGoalService {
     patch: Partial<
       Pick<
         RoadmapRankWeights,
-        'votesWeight' | 'votersWeight' | 'effortWeight' | 'goalImpactWeight'
+        | 'votesWeight'
+        | 'votersWeight'
+        | 'effortWeight'
+        | 'goalImpactWeight'
+        | 'starWeight'
       >
     >,
   ): Promise<RoadmapRankWeights> {
@@ -182,7 +187,8 @@ export class RoadmapStrategyGoalService {
       next.votesWeight +
       next.votersWeight +
       next.effortWeight +
-      next.goalImpactWeight;
+      next.goalImpactWeight +
+      next.starWeight;
     if (total <= 0) {
       throw new BadRequestException(
         'At least one factor must have a weight above zero, or there is nothing to rank by.',
@@ -192,6 +198,52 @@ export class RoadmapStrategyGoalService {
     const saved = await this.weightsRepository.save(next);
     this.invalidate(userId);
     return saved;
+  }
+
+  // ── prod director ──────────────────────────────────────────────────────────
+
+  /** Platform admins who can be picked, plus the current pick. */
+  async getProdDirector(): Promise<{
+    userId: number | null;
+    candidates: { id: number; name: string; email: string }[];
+  }> {
+    const [weights, candidates] = await Promise.all([
+      this.weightsRepository.getWeights(),
+      this.weightsRepository.findPlatformAdmins(),
+    ]);
+    return { userId: weights.prodDirectorUserId ?? null, candidates };
+  }
+
+  /**
+   * Pick the Prod Director (null clears). Must be a platform admin. Existing stars are left
+   * alone — they are priority calls on opportunities, and the board re-sorts nothing here
+   * because no star changed; the new director simply sees and can flip them.
+   */
+  async setProdDirector(
+    actorId: number,
+    userId: number | null,
+  ): Promise<{ userId: number | null }> {
+    if (userId !== null) {
+      const admins = await this.weightsRepository.findPlatformAdmins();
+      if (!admins.some((a) => a.id === userId)) {
+        throw new UnprocessableEntityException(
+          'The Prod Director must be a platform admin.',
+        );
+      }
+    }
+    const current = await this.weightsRepository.getWeights();
+    await this.weightsRepository.save({
+      ...current,
+      prodDirectorUserId: userId,
+    });
+    this.invalidate(actorId);
+    return { userId };
+  }
+
+  /** True when `userId` is the configured Prod Director. */
+  async isProdDirector(userId: number): Promise<boolean> {
+    const w = await this.weightsRepository.getWeights();
+    return w.prodDirectorUserId != null && w.prodDirectorUserId === userId;
   }
 
   /**
@@ -211,6 +263,7 @@ export class RoadmapStrategyGoalService {
         votersWeight: weights.votersWeight,
         effortWeight: weights.effortWeight,
         goalImpactWeight: weights.goalImpactWeight,
+        starWeight: weights.starWeight,
       },
       bases,
     };
@@ -220,7 +273,7 @@ export class RoadmapStrategyGoalService {
    * A board-wide invalidation rather than a per-row delta: a goal or weight change reorders an
    * unbounded number of cards this service never sees.
    */
-  private invalidate(userId: number): void {
+  invalidate(userId: number): void {
     this.notifications.emit({
       kind: 'ROADMAP_INVALIDATED',
       actorId: userId,

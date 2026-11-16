@@ -33,6 +33,7 @@ import {
   RoadmapOpportunityStage,
   RoadmapStrategyGoal,
   RoadmapStrategyGoalsResponse,
+  RoadmapProdDirector,
   RoadmapRankWeights,
   RoadmapGoalImpactVerdict,
   RoadmapBulkAssessResult,
@@ -697,6 +698,40 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       ],
     }),
 
+    getRoadmapProdDirector: builder.query<RoadmapProdDirector, void>({
+      query: () => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.PROD_DIRECTOR,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PRODUCT_ROADMAP_RANK_WEIGHTS],
+    }),
+
+    setRoadmapProdDirector: builder.mutation<{ userId: number | null }, { userId: number | null }>({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.PROD_DIRECTOR,
+        method: HttpMethod.PUT,
+        body,
+      }),
+      // The director's own cards gain or lose the star icon, so the list refetches.
+      invalidatesTags: [
+        TAG_TYPES.PRODUCT_ROADMAP_RANK_WEIGHTS,
+        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: "LIST" },
+      ],
+    }),
+
+    setRoadmapDirectorStar: builder.mutation<RoadmapOpportunity, { id: string; starred: boolean }>({
+      query: ({ id, starred }) => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.OPPORTUNITY_DIRECTOR_STAR(id),
+        method: HttpMethod.PUT,
+        body: { starred },
+      }),
+      // A star re-ranks the whole queue, not just this card.
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id },
+        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: "LIST" },
+      ],
+    }),
+
     getRoadmapGoalImpact: builder.query<RoadmapGoalImpactVerdict[], string>({
       query: id => ({
         url: ApiEndpoints.PRODUCT_ROADMAP.OPPORTUNITY_GOAL_IMPACT(id),
@@ -1024,6 +1059,9 @@ export const {
   useDeleteRoadmapStrategyGoalMutation,
   useGetRoadmapRankWeightsQuery,
   useUpdateRoadmapRankWeightsMutation,
+  useGetRoadmapProdDirectorQuery,
+  useSetRoadmapProdDirectorMutation,
+  useSetRoadmapDirectorStarMutation,
   useGetRoadmapOpportunityBriefQuery,
   useGetRoadmapStrategyContextQuery,
   useUpdateRoadmapStrategyContextMutation,

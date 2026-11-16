@@ -148,6 +148,13 @@ export class OpportunityResponseDto {
   @ApiProperty() voterCount!: number;
 
   /** Strategy goals this was judged to positively move. */
+  /**
+   * The Prod Director's star. NON-NULL ONLY FOR THE DIRECTOR: every other viewer gets null, so
+   * the icon is invisible to them. The star still moves their rank — only the flag is hidden.
+   */
+  @ApiProperty({ nullable: true })
+  directorStarred!: boolean | null;
+
   @ApiProperty() goalsHelped!: number;
 
   /**

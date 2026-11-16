@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { RoadmapStrategyGoalService } from '../roadmap-strategy-goal.service';
 import { ROADMAP_RANK } from '../../constants/product-roadmap.constants';
 
@@ -29,9 +33,14 @@ describe('RoadmapStrategyGoalService', () => {
         votersWeight: 3,
         effortWeight: 1,
         goalImpactWeight: 3,
+        starWeight: 3,
+        prodDirectorUserId: 5,
         ...(overrides.weights ?? {}),
       }),
       save: jest.fn(async (x: unknown) => x),
+      findPlatformAdmins: jest
+        .fn()
+        .mockResolvedValue([{ id: 5, name: 'Dir', email: 'd@x.io' }]),
       getRankBases: jest
         .fn()
         .mockResolvedValue({ maxScore: 10, maxVoters: 3, totalGoals: 4 }),
@@ -101,6 +110,7 @@ describe('RoadmapStrategyGoalService', () => {
         votersWeight: 0,
         effortWeight: 0,
         goalImpactWeight: 0,
+        starWeight: 0,
       },
     });
 
@@ -123,5 +133,36 @@ describe('RoadmapStrategyGoalService', () => {
         goalImpactWeight: 3,
       }),
     );
+  });
+
+  describe('prod director', () => {
+    it('rejects a director who is not a platform admin', async () => {
+      const { service } = buildService({});
+      await expect(service.setProdDirector(ACTOR, 99)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('saves a platform admin and clears with null', async () => {
+      const { service } = buildService({});
+      await expect(service.setProdDirector(ACTOR, 5)).resolves.toEqual({
+        userId: 5,
+      });
+      await expect(service.setProdDirector(ACTOR, null)).resolves.toEqual({
+        userId: null,
+      });
+    });
+
+    it('isProdDirector is true only for the configured user', async () => {
+      const { service } = buildService({});
+      expect(await service.isProdDirector(5)).toBe(true);
+      expect(await service.isProdDirector(6)).toBe(false);
+    });
+
+    it('feeds starWeight into the rank context', async () => {
+      const { service } = buildService({});
+      const ctx = await service.getRankContext();
+      expect(ctx.weights.starWeight).toBe(3);
+    });
   });
 });

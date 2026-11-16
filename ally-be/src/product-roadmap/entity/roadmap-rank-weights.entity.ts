@@ -46,4 +46,18 @@ export class RoadmapRankWeights extends BaseWithoutTenantEntity {
   /** Share of strategy goals the LLM judged this opportunity positively moves. */
   @Column({ type: 'int', default: 3 })
   goalImpactWeight!: number;
+
+  /**
+   * The Prod Director's star as a fifth factor: a starred opportunity scores 100 here, an
+   * unstarred one 0. Default 3, level with votes, breadth and goal impact.
+   */
+  @Column({ type: 'int', default: 3 })
+  starWeight!: number;
+
+  /**
+   * The platform admin acting as internal prod director — the only user who sees or can flip the
+   * star. Null = nobody, and the star factor contributes nothing. Stars persist if this changes.
+   */
+  @Column({ type: 'int', nullable: true })
+  prodDirectorUserId!: number | null;
 }

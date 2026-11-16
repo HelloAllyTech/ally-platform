@@ -2,19 +2,21 @@ import React, { useState } from "react";
 
 import { toast } from "sonner";
 
-import { SkeletonText, TextInput } from "@ally-ui-mono/ui-shared";
+import { CarbonDropdown, SkeletonText, TextInput } from "@ally-ui-mono/ui-shared";
 import {
   useAssessMissingRoadmapGoalImpactMutation,
   useCreateRoadmapStrategyGoalMutation,
   useDeleteRoadmapStrategyGoalMutation,
+  useGetRoadmapProdDirectorQuery,
   useGetRoadmapRankWeightsQuery,
+  useSetRoadmapProdDirectorMutation,
   useGetRoadmapStrategyGoalsQuery,
   useRenameRoadmapStrategyGoalMutation,
   useUpdateRoadmapRankWeightsMutation,
 } from "@api";
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
-import { RoadmapRankWeights, RoadmapStrategyGoal } from "@types";
+import { RoadmapRankFactorKey, RoadmapStrategyGoal } from "@types";
 
 /**
  * The four factors, in the order they appear in the weights editor.
@@ -24,7 +26,7 @@ import { RoadmapRankWeights, RoadmapStrategyGoal } from "@types";
  * factor where a high weight has a well-known failure mode.
  */
 const FACTORS: {
-  key: keyof RoadmapRankWeights;
+  key: RoadmapRankFactorKey;
   label: string;
   hint: string;
 }[] = [
@@ -47,6 +49,11 @@ const FACTORS: {
     key: "goalImpactWeight",
     label: "Strategy goal coverage",
     hint: "Share of strategy goals it advances, assessed by AI. Raise to follow the strategy over the vote.",
+  },
+  {
+    key: "starWeight",
+    label: "Prod Director star",
+    hint: "Critical-priority star set by the Prod Director. Raise to make a star lift an opportunity further up the queue.",
   },
 ];
 
@@ -82,6 +89,20 @@ export const StrategyRankingManager: React.FC = () => {
   const [renameGoal] = useRenameRoadmapStrategyGoalMutation();
   const [deleteGoal] = useDeleteRoadmapStrategyGoalMutation();
   const [updateWeights] = useUpdateRoadmapRankWeightsMutation();
+  const { data: director } = useGetRoadmapProdDirectorQuery();
+  const [setDirector] = useSetRoadmapProdDirectorMutation();
+  // Carbon's Dropdown is object-driven: the selected item must be one of `items`.
+  const directorItems = [
+    { value: "", label: "No Prod Director" },
+    ...(director?.candidates ?? []).map(c => ({ value: String(c.id), label: c.name || c.email })),
+  ];
+  const onPickDirector = async (value: string) => {
+    try {
+      await setDirector({ userId: value === "" ? null : Number(value) }).unwrap();
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not set the Prod Director."));
+    }
+  };
   const [assessMissing, { isLoading: isAssessing }] = useAssessMissingRoadmapGoalImpactMutation();
 
   const [newName, setNewName] = useState("");
@@ -94,12 +115,12 @@ export const StrategyRankingManager: React.FC = () => {
    * box is controlled: without it, rejecting an out-of-range value would have nothing to show
    * back except the last-saved number, silently erasing what was just typed.
    */
-  const [weightDrafts, setWeightDrafts] = useState<
-    Partial<Record<keyof RoadmapRankWeights, string>>
-  >({});
+  const [weightDrafts, setWeightDrafts] = useState<Partial<Record<RoadmapRankFactorKey, string>>>(
+    {},
+  );
   /** Keys currently showing the invalid state, so the box and its error text stay in sync. */
   const [invalidWeightKeys, setInvalidWeightKeys] = useState<
-    Partial<Record<keyof RoadmapRankWeights, boolean>>
+    Partial<Record<RoadmapRankFactorKey, boolean>>
   >({});
 
   const goals = data?.goals ?? [];
@@ -177,7 +198,7 @@ export const StrategyRankingManager: React.FC = () => {
    * in the board behind the modal, so a confirmation step would only add latency to something
    * an admin is going to nudge several times in a row.
    */
-  const commitWeight = async (key: keyof RoadmapRankWeights, raw: string) => {
+  const commitWeight = async (key: RoadmapRankFactorKey, raw: string) => {
     const value = Number(raw);
     if (raw.trim() === "" || !Number.isInteger(value) || value < 0 || value > 10) {
       setInvalidWeightKeys(prev => ({ ...prev, [key]: true }));
@@ -198,7 +219,11 @@ export const StrategyRankingManager: React.FC = () => {
   };
 
   const weightTotal = weights
-    ? weights.votesWeight + weights.votersWeight + weights.effortWeight + weights.goalImpactWeight
+    ? weights.votesWeight +
+      weights.votersWeight +
+      weights.effortWeight +
+      weights.goalImpactWeight +
+      weights.starWeight
     : 0;
 
   return (
@@ -360,10 +385,30 @@ export const StrategyRankingManager: React.FC = () => {
         <div>
           <h3 className="text-typography-primary text-base">Ranking weights</h3>
           <p className="text-typography-secondary mt-1 text-sm">
-            Relative, not percentages — 3/3/1/3 means votes, admins backing and strategy each count
-            three times as much as effort. Changing these re-sorts the board immediately and never
-            re-runs the AI.
+            Relative, not percentages — 3/3/1/3/3 means votes, admins backing, strategy and the
+            director's star each count three times as much as effort. Changing these re-sorts the
+            board immediately and never re-runs the AI.
           </p>
+        </div>
+
+        {/* One person only. Only they see the star icon on opportunities; stars persist if this
+            changes. */}
+        <div>
+          <CarbonDropdown
+            id="prod-director"
+            titleText="Prod Director"
+            label="Choose a platform admin"
+            helperText="Only this person sees the star on each opportunity and can mark it critical priority."
+            items={directorItems}
+            itemToString={item => item?.label ?? ""}
+            selectedItem={
+              directorItems.find(item => item.value === String(director?.userId ?? "")) ??
+              directorItems[0]
+            }
+            onChange={({ selectedItem }) => {
+              if (selectedItem) void onPickDirector(selectedItem.value);
+            }}
+          />
         </div>
 
         {isWeightsLoading || !weights ? (
