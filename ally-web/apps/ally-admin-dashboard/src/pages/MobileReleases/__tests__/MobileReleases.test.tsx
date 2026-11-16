@@ -42,7 +42,9 @@ vi.mock("@utils", () => ({
 vi.mock("../tabs/AndroidReleasesTab", () => ({ AndroidReleasesTab: () => null }));
 vi.mock("../tabs/IosTestflightTab", () => ({ IosTestflightTab: () => null }));
 vi.mock("../tabs/AppStoreSubmissionsTab", () => ({ AppStoreSubmissionsTab: () => null }));
-vi.mock("../tabs/ReleaseHistoryTab", () => ({ ReleaseHistoryTab: () => null }));
+vi.mock("../tabs/ReleaseHistoryTab", () => ({
+  ReleaseHistoryTab: () => <div data-testid="history-tab" />,
+}));
 
 // Pulls in @icons/@assets dependencies irrelevant to the overview panel this test covers.
 vi.mock("../components/NextCheckPanel", () => ({ NextCheckPanel: () => null }));
@@ -159,7 +161,6 @@ describe("MobileReleases page — Android pipeline panel gating", () => {
       </MemoryRouter>,
     );
 
-    // Only the Release History tab carries this intro line.
-    expect(screen.getByText(/Every run of every release workflow/)).toBeInTheDocument();
+    expect(screen.getByTestId("history-tab")).toBeInTheDocument();
   });
 });
