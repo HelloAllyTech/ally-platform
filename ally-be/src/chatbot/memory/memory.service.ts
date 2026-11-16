@@ -164,7 +164,10 @@ export class MemoryService {
       const fields: MemoryForRun['fields'] = {};
       if (settings.on) {
         fields.memory = {
-          lines: rendered.text,
+          // Their name first, so "what do you know about me?" has it (chunk 8a).
+          lines: [name ? `Name: ${name}` : '', rendered.text]
+            .filter(Boolean)
+            .join('\n'),
           never_store: neverStoreList(chatbot.safetyPack, settings.neverStore),
         };
       }

@@ -28,6 +28,56 @@ _GENERIC_NAME_WORDS = {
     "for",
     "guide",
     "docs",
+    # Everyday words that crawled page titles are full of ("About Amaha", "Contact
+    # Us", "Find Best Therapists"): never a name, so "what do you know about me?" is
+    # not a question about the organisation (chunk 8a). The full title still counts.
+    "about",
+    "contact",
+    "contacts",
+    "join",
+    "explore",
+    "find",
+    "best",
+    "top",
+    "trusted",
+    "expert",
+    "experts",
+    "online",
+    "near",
+    "home",
+    "our",
+    "your",
+    "you",
+    "with",
+    "service",
+    "services",
+    "care",
+    "health",
+    "mental",
+    "resources",
+    "insights",
+    "community",
+    "treatment",
+    "treatments",
+    "programs",
+    "programmes",
+    "centre",
+    "center",
+    "centres",
+    "centers",
+    "clinic",
+    "hospital",
+    "book",
+    "booking",
+    "learn",
+    "more",
+    "why",
+    "how",
+    "what",
+    "who",
+    "new",
+    "free",
+    "quit",
 }
 
 
@@ -48,14 +98,21 @@ class Organisation:
         ("Getting Access and Signing In" by "access" or "signing"): a topic list
         when three or more."""
         lowered = (text or "").lower()
-        return sum(
-            1
-            for topic in self.topics
-            if any(
-                re.search(rf"\b{re.escape(word)}", lowered)
+        # A topic counts only for a word no topic counted before it: crawled titles
+        # repeat words ("Psychiatry" in three of them), and one word repeated is
+        # not a list (chunk 8a).
+        claimed: set = set()
+        count = 0
+        for topic in self.topics:
+            hits = {
+                word
                 for word in _topic_words(topic)
-            )
-        )
+                if re.search(rf"\b{re.escape(word)}", lowered)
+            }
+            if hits - claimed:
+                count += 1
+                claimed |= hits
+        return count
 
     def named_in(self, text: str) -> bool:
         if not self.terms or not text:

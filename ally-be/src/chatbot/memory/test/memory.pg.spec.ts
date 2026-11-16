@@ -523,6 +523,24 @@ describePg('Memory, light (Postgres)', () => {
       expect(await nameOf(contactId)).toBe(null);
     });
 
+    it("heads the person's lines in the memory section when memory is on", async () => {
+      const { contactId, conversationId } = await person();
+      await turn(conversationId, "I'm Rahul, evenings please");
+      await after(conversationId, [
+        { op: 'name', text: 'Rahul' },
+        add('prefers evenings'),
+      ]);
+      const run = await memory.forRun(
+        chatbot() as never,
+        contactId,
+        conversationId,
+      );
+      expect(run.fields.memory?.lines).toMatch(
+        /^Name: Rahul\nPreferences:\n- m1 /,
+      );
+      expect(run.fields.person_name).toBe('Rahul');
+    });
+
     it('reaches the next run', async () => {
       const { contactId, conversationId } = await person();
       await turn(conversationId, "I'm Rahul");

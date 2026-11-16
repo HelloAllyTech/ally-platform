@@ -371,3 +371,48 @@ class TestAboutThePerson:
             personal=personal,
         )
         assert result["intent"] == intent
+
+
+class TestCrawledTitles:
+    """Two misfires found testing on a crawled site (Amaha, chunk 8a): "About Amaha"
+    made "about" a name of the organisation, and "Psychiatry" in three page titles
+    made a booking confirmation look like a list of topics."""
+
+    TITLES = [
+        "About Amaha",
+        "Contact Us for Help & Support",
+        "Find Expert Online Therapy & Psychiatry Support | Amaha",
+        "Trusted Psychiatry Services by Reputed Doctors near you",
+        "Psychiatry - Amaha",
+        "Quit Tobacco Addiction",
+        "Couples Counselling - Amaha",
+    ]
+
+    def org(self):
+        from app.core.agent_runtime.check.organisation import organisation_of
+
+        return organisation_of(
+            {
+                "persona": {"display_name": "Amaha assistant"},
+                "knowledge_topics": self.TITLES,
+            }
+        )
+
+    def test_everyday_title_words_are_not_the_organisation(self):
+        org = self.org()
+        assert not org.named_in("what do you know about me?")
+        assert not org.named_in("How do I contact you?")
+        assert org.named_in("Does Amaha offer couples therapy?")
+
+    def test_one_word_in_several_titles_is_not_a_list(self):
+        org = self.org()
+        confirmation = (
+            "Your psychiatry appointment is booked for Mon 16 Nov 2026 at 15:00."
+        )
+        assert org.topics_named_in(confirmation) == 1
+        assert (
+            org.topics_named_in(
+                "I can help with psychiatry, couples counselling or tobacco addiction."
+            )
+            >= 3
+        )
