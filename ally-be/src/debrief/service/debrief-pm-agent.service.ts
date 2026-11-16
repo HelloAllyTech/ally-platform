@@ -77,6 +77,7 @@ import {
   builderDelivery,
   BuilderPullRequestDelivery,
 } from '../util/debrief-builder-progress.util';
+import { bundleDiff, withPinnedPrompts } from '../util/debrief-releases.util';
 import { DEBRIEF_PM_AGENT_REQUESTER } from '../../builder/util/builder-requesters.registry';
 import {
   DebriefTestSet,
@@ -928,6 +929,22 @@ export class DebriefPmAgentService
     userId: number,
     note?: string,
   ): Promise<{ releaseId: string; version: number; stage: 'promoted' }> {
+    // The draft was made from the release live when it was proposed. If the
+    // live release has moved since (a deploy, a promotion), putting the draft
+    // live would also undo those changes: only a draft that still differs
+    // from the live release in budgets alone may go live on this button.
+    const draft = await this.releases.getById(idea.change.releaseId);
+    const { bundle: live } = await this.gaBundle();
+    const draftBundle = withPinnedPrompts(
+      draft.bundle as unknown as DebriefBundle,
+      (draft as { changeSet?: { pinnedPrompts?: Record<string, number> } })
+        .changeSet?.pinnedPrompts,
+    );
+    if (!bundleDiff(live, draftBundle).budgetOnly) {
+      throw new ConflictException(
+        'The live release has changed since this budget change was proposed, so putting it live would undo other changes. Reject it and make the budget change again in Settings › Budgets.',
+      );
+    }
     const released = await this.releases.makeGa(
       idea.change.releaseId,
       userId,
