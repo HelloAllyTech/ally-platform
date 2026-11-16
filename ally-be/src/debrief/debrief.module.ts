@@ -16,6 +16,10 @@ import { AgentHarnessModule } from '../llm-agent/harness/agent-harness.module';
 import { LearnModule } from '../learn/learn.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { DebriefConsoleController } from './controller/debrief-console.controller';
+import { DebriefChangesController } from './controller/debrief-changes.controller';
+import { DebriefChangesService } from './service/debrief-changes.service';
+import { DebriefScoreService } from './service/debrief-score.service';
+import { DebriefSlackService } from './service/debrief-slack.service';
 import { DebriefLearnerController } from './controller/debrief-learner.controller';
 import { DebriefGatewayController } from './controller/debrief-gateway.controller';
 import { DebriefReviewController } from './controller/debrief-review.controller';
@@ -131,6 +135,8 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
   ],
   controllers: [
     DebriefConsoleController,
+    // Debrief v2: Home, Changes (Undo now, Stop now) and the cumulative score.
+    DebriefChangesController,
     DebriefLearnerController,
     // The gateway tools ally-ai's debrief graph and Ask Ally call back (run token only).
     DebriefGatewayController,
@@ -143,6 +149,10 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
   ],
   providers: [
     DebriefAdvisorsService,
+    // Debrief v2: the cumulative score, Changes and the watch, Slack posts.
+    DebriefScoreService,
+    DebriefChangesService,
+    DebriefSlackService,
     // Ask Ally's agent in ally-ai (CONTRACT.md §5).
     AskAllyClient,
     DebriefContextRepository,

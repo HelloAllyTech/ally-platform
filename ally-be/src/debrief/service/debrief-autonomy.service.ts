@@ -19,7 +19,6 @@ import {
   AutonomyStep,
   CHANGE_KINDS,
   ChangeKind,
-  CONFIGURABLE_KINDS,
   changeKindOf,
   effectivePolicy,
   JUDGE_DRIFT_SOURCE,
@@ -39,28 +38,14 @@ import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import type { AgreementView } from './debrief-agreement.service';
 
 /**
- * What the PM agent may do alone (PRD §12; plan §11.7). Quick checks, pass
- * tests and side-by-side trials always run on their own (learners never see
- * them); the owner sets only the learner try-out (canary) per kind of change.
- * Per-organisation overrides only tighten. "auto" on the try-out needs an
- * eligible kind (κ gate and a clean track record); it re-locks to "ask" on
- * its own after 2 try-out reverts in 4 weeks, a failed sealed baseline,
- * judge drift or agreement below 0.6, with the reason recorded.
- * `pmAgentEnabled` stays the master switch. Live for everyone, Builder
- * hand-offs and bug reports always wait for a person: they are not steps here.
+ * What the PM agent may do alone (PRD §12; plan §11.7). Debrief v2 (A3,
+ * A6): every step runs on its own, the learner try-out included, and a
+ * passed try-out goes live by itself (DebriefPmAgentService.advance). What
+ * waits for a person is the always-ask list (debrief-always-ask.util.ts).
+ * Judge agreement (κ), reverts, the sealed baseline and drift are shown as
+ * information and no longer re-lock anything. Per-organisation overrides
+ * still only tighten; `pmAgentEnabled` stays the master switch.
  */
-/** The kinds and steps in the owner's words (Settings › What the PM agent may do alone). */
-const KIND_WORDS: Record<ChangeKind, string> = {
-  settings: 'Settings (not budgets)',
-  prompts: 'Prompts, agents and default plans',
-  pinned_rules: 'Pinned rules',
-};
-const STEP_WORDS: Record<AutonomyStep, string> = {
-  quick_test: 'Quick check',
-  gate_test: 'Pass test',
-  paired_trial: 'Side-by-side trial',
-  canary: 'Try on learners',
-};
 
 @Injectable()
 export class DebriefAutonomyService implements OnModuleInit {
@@ -242,75 +227,12 @@ export class DebriefAutonomyService implements OnModuleInit {
    * its own (κ ≥ 0.6, clean record): an invitation, never switched on here.
    */
   async refreshRelocks(facts?: AutonomyFacts): Promise<AutonomyPolicy> {
-    const f = facts ?? (await this.facts());
-    const policy = await this.policy();
-    let changed = false;
-    const relocked: Array<{
-      kind: ChangeKind;
-      steps: AutonomyStep[];
-      reason: string;
-    }> = [];
-    const nowEligible: ChangeKind[] = [];
-    for (const kind of CONFIGURABLE_KINDS) {
-      const record = relockReason(kind, f);
-      // The κ re-lock leaves an owner's override be (they chose it knowingly);
-      // reverts, a failed baseline and drift re-lock everything regardless.
-      const relock =
-        policy.matrix[kind].canary === 'auto' &&
-        (!!record || (!f.gate.met && !policy.overrides?.[kind]));
-      const steps: AutonomyStep[] = relock ? ['canary'] : [];
-      const reason = record ?? 'agreement fell below 0.6';
-      if (steps.length) {
-        for (const s of steps) policy.matrix[kind][s] = 'ask';
-        if (steps.includes('canary') && policy.overrides?.[kind]) {
-          policy.overrides = { ...policy.overrides };
-          delete policy.overrides[kind];
-        }
-        policy.relocks.push({
-          kind,
-          at: new Date().toISOString(),
-          reason,
-          steps,
-          by: 'system',
-        });
-        relocked.push({ kind, steps, reason });
-        changed = true;
-        this.logger.warn(`[debrief] autonomy: ${kind} re-locked: ${reason}`);
-      }
-      const eligible = kindEligibility(kind, f, 'canary').eligible;
-      const before = policy.canaryEligible?.[kind];
-      if (before !== eligible) {
-        policy.canaryEligible = {
-          ...(policy.canaryEligible ?? {}),
-          [kind]: eligible,
-        };
-        changed = true;
-        // Told only on a change to eligible (not on the first check after deploy).
-        if (
-          eligible &&
-          before === false &&
-          policy.matrix[kind].canary !== 'auto'
-        ) {
-          nowEligible.push(kind);
-        }
-      }
-    }
-    if (changed) await this.save(policy);
-    for (const r of relocked) {
-      await this.notifyOwner({
-        title: `${KIND_WORDS[r.kind]}: back to asks first`,
-        body: `The system set ${r.steps.map((s) => `"${STEP_WORDS[s]}"`).join(', ')} back to "Asks first": ${r.reason}. Switching it back on is up to you in Debrief settings.`,
-        data: { settings: 'autonomy', kind: r.kind },
-      });
-    }
-    for (const kind of nowEligible) {
-      await this.notifyOwner({
-        title: `Learner try-outs can now run on their own for ${KIND_WORDS[kind].toLowerCase()}`,
-        body: `The quality score now agrees with the clinical advisor, so "Try on learners" can run on its own for ${KIND_WORDS[kind].toLowerCase()}. Switch it on? It stays "Asks first" until you change it in Debrief settings.`,
-        data: { settings: 'autonomy', kind },
-      });
-    }
-    return policy;
+    // Debrief v2 (A6): judge agreement (κ), reverts, the baseline and drift
+    // are information only. Nothing is re-locked and nobody is asked to switch
+    // anything on: every step runs on its own, and what waits for a person is
+    // the always-ask list. The facts are still read (the view shows them).
+    if (!facts) await this.facts();
+    return this.policy();
   }
 
   private async notifyOwner(alert: {

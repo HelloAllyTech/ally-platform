@@ -37,59 +37,69 @@ must be built, tested and ticked before release.
 ## Checklist
 
 ### Score (point 5)
-- [ ] S1 Cumulative score per run and per slice (week × language × recipe × release):
+- [x] S1 Cumulative score per run and per slice (week × language × recipe × release):
       Quality score (judge overall/10) 40%, pass rate 25%, learner helpful rate 20%,
       card flag rate (lower is better) 15%. Weights are owner settings.
-- [ ] S2 Two gates, never traded off: no new missed **clear** risk cue; cost per session within
+- [x] S2 Two gates, never traded off: no new missed **clear** risk cue; cost per session within
       the session budget.
-- [ ] S3 `GET metrics/score`: current, previous, by week (with change markers), measures with
+- [x] S3 `GET metrics/score`: current, previous, by week (with change markers), measures with
       weight / value / trend, gates, by language.
 
 ### Autonomy (points 7–9)
-- [ ] A1 "Always asks a person" owner setting: Safety reader text, crisis lines and support copy,
+- [x] A1 "Always asks a person" owner setting: Safety reader text, crisis lines and support copy,
       pinned rules (rubric, judge and Evaluator instructions), budget increases (all locked on);
       low-confidence changes (on by default, switchable); new models or providers (off by
       default). Model changes within budget never wait; an organisation's provider allowlist is
       always applied.
-- [ ] A2 The PM agent states a confidence (high / low) and why on every change; low waits when
+- [x] A2 The PM agent states a confidence (high / low) and why on every change; low waits when
       A1 says so.
-- [ ] A3 Every other change runs the ladder on its own: tests → tried on a share of learners →
+- [x] A3 Every other change runs the ladder on its own: tests → tried on a share of learners →
       live for everyone, with no person step. The canary starts and promotes itself.
-- [ ] A4 Rollout settings: share while tried (10%), debriefs and days before going live (40, 3),
+- [x] A4 Rollout settings: share while tried (10%), debriefs and days before going live (40, 3),
       undo margin (0.3 score), watch period (14 days).
-- [ ] A5 Watch after going live: undo automatically (roll back to the release before) when the
+- [x] A5 Watch after going live: undo automatically (roll back to the release before) when the
       score falls by more than the margin against the release before, within the same
       language and recipe and with enough debriefs, or when a gate trips. Post to Slack.
-- [ ] A6 Judge agreement (κ) is information only: no longer a gate or a re-lock.
-- [ ] A7 Approvals for always-ask kinds wait (no 14-day auto-expiry needed for anything else).
-- [ ] A8 Builder and Bug Hunter hand-offs start on their own; a Builder pull request still needs
+- [x] A6 Judge agreement (κ) is information only: no longer a gate or a re-lock.
+- [x] A7 Approvals for always-ask kinds wait (no 14-day auto-expiry needed for anything else).
+- [x] A8 Builder and Bug Hunter hand-offs start on their own; a Builder pull request still needs
       an engineer to merge ("Being built"). Delivery then runs the ladder.
-- [ ] A9 Per-language scope: a change can be held, undone or retried for one language
+- [x] A9 Per-language scope: a change can be held, undone or retried for one language
       (release pinned per language).
-- [ ] A10 Test settings (Settings › Tests) are tuned by the PM agent as ordinary setting
+- [x] A10 Test settings (Settings › Tests) are tuned by the PM agent as ordinary setting
       changes; a person no longer accepts proposals.
 - [ ] A11 "Live for everyone" per organisation (Settings › Organisations) stays a person's switch.
 
 ### Slack (points 8, safety)
-- [ ] K1 Owner settings: Slack channel for drops and undos; named safety contact.
-- [ ] K2 Post when a change is undone, when a measure falls past its limit, and a weekly
+- [x] K1 Owner settings: Slack channel for drops and undos; named safety contact.
+- [x] K2 Post when a change is undone, when a measure falls past its limit, and a weekly
       summary of what changed.
-- [ ] K3 Safety posts: debrief shown with a missed clear risk cue; learner distress in Ask Ally.
+- [x] K3 Safety posts: debrief shown with a missed clear risk cue; learner distress in Ask Ally.
 
 ### PM agent conversation (intervening)
-- [ ] C1 One thread per console (shared), stored in ally-be; each message notes what it was
+- [x] C1 One thread per console (shared), stored in ally-be; each message notes what it was
       about (a change, a session, a page).
-- [ ] C2 `POST pm-agent/conversation` runs the PM agent in ally-ai with the message, the context
+- [x] C2 `POST pm-agent/conversation` runs the PM agent in ally-ai with the message, the context
       and tools; it replies and acts: approve or turn down an always-ask change (after an
       explicit yes), stop, undo, retry (optionally for one language), hold a language, pause a
       kind of change until a date, propose a change, explain with evidence.
-- [ ] C3 Each agent message carries the action it took (`done` / `awaiting_yes`).
+- [x] C3 Each agent message carries the action it took (`done` / `awaiting_yes`).
+- [x] C4 Permissions as today (`DEBRIEF_ACTIONS`): the Ally team and the owner read and post; the
+      clinical advisor sees and posts only about pinned-rule changes. A "yes" to a pinned-rule
+      change needs the advisor or the owner; to a budget increase, the owner. Otherwise the agent
+      does not act, says who can, and notifies them. Every message shows its author.
+- [ ] C5 A "Needs you" item is dealt with on Home: it expands in place to what changes, why, the
+      wording before and after, the evidence, and the PM agent conversation scoped to that change.
+      The clinical advisor has no Changes / PM agent button: they get a notification that opens
+      Home with that item expanded, and their Needs you shows only pinned-rule changes.
+      (Backend built: the notification links `/debriefs?change=<id>`, and
+      `GET pm-agent/conversation?about=<id>` scopes the thread; the Home UI is U1.)
 
 ### Learner flags (point 7)
-- [ ] F1 The Debrief agent answers every learner flag within a minute: re-reads the roleplay,
+- [x] F1 The Debrief agent answers every learner flag within a minute: re-reads the roleplay,
       keeps / corrects / removes the card, and tells the learner why. Card versions are kept.
-- [ ] F2 Every answer, correction and replaced Ask Ally reply goes to the PM agent as evidence.
-- [ ] F3 A person may still change a card ("Change it") and comment; that also goes to the
+- [x] F2 Every answer, correction and replaced Ask Ally reply goes to the PM agent as evidence.
+- [x] F3 A person may still change a card ("Change it") and comment; that also goes to the
       PM agent.
 
 ### Console UI (canvas row F)
@@ -112,6 +122,29 @@ must be built, tested and ticked before release.
 ### Already released today
 - Session budget covering Ask Ally (be-v1.197.0); nothing held (ai-v1.42.0, be-v1.198.0);
   held drafts shown by the stuck sweep; missed-risk-cue runs urgent (to be replaced by K3).
+
+### How the backend core was built (S, A1/A3–A7/A10, K)
+- Score: `ally-be/src/debrief/util/debrief-score.util.ts` (per run, per slice, gates, the undo decision) and
+  `ally-be/src/debrief/service/debrief-score.service.ts` (`GET metrics/score`). Live debriefs only; a missed clear risk
+  cue is `workspace.decision.reviewReason = 'missed_risk_cue'`; session cost is the run plus
+  `askAllySpentUsd`, against the live release's `sessionBudgetUsd` (90th percentile). The score is
+  0–10, so `undoMargin` 0.3 is in score points. The old steering weights stay for the old metrics
+  page; the score reads `scoreWeight*`.
+- Always ask: `ally-be/src/debrief/util/debrief-always-ask.util.ts`. The ladder waits once, before a change reaches
+  learners (`evidence.ask`); the person's yes is `evidence.approval`, after which the try-out and
+  going live run by themselves. Confidence is read from `evidence.confidence` (`'low'`/`'high'` or
+  `{level, why}`); missing reads as high.
+- Ladder: `DebriefPmAgentService.advance` (trial passed → try-out or live; try-out passed → live),
+  called by `decideTrial`, `watchCanaries` and the `debrief-change-watch` job. Going live writes
+  `evidence.watch = {status, releaseId, previousReleaseId, liveAt, until, last}`.
+- Watch and undo: `DebriefChangesService.watch` (`debrief-change-watch`, hourly): same language
+  and recipe, at least 30 debriefs each side (`UNDO_MIN_RUNS`), against the release before over the
+  `watchDays` before going live; a tripped gate undoes at once. Undo writes `evidence.undo`, sets
+  the idea `retired` and posts to Slack.
+- Slack: `ally-be/src/debrief/service/debrief-slack.service.ts`; the weekly summary is `debrief-weekly-summary`
+  (Monday 07:30 IST). No bot token or no channel: nothing is posted.
+- Not filled: `languages` is `evidence.languages` when A9 writes it, else null; `confidence` is
+  null until A2 writes it.
 
 ## API contract (ally-be, under `v1/debriefs/console`)
 

@@ -30,8 +30,9 @@ import {
   DebriefViewer,
 } from '../util/debrief-console-roles.util';
 import { changeKindOf } from '../util/debrief-console-view.util';
+import { alwaysAsk } from '../util/debrief-always-ask.util';
+import { DebriefChangesService } from './debrief-changes.service';
 import {
-  alwaysAskReasons,
   changeName,
   conversationAccess,
   isExplicitYes,
@@ -148,6 +149,8 @@ export class DebriefPmConversationService {
     private readonly ownerSettings: DebriefSettingsService,
     private readonly releases: AgentReleaseService,
     private readonly moduleRef: ModuleRef,
+    /** The console's Undo now and Stop now (the backend core). */
+    private readonly changes: DebriefChangesService,
     @Optional() private readonly notifier?: DebriefNotifier,
   ) {}
 
@@ -664,7 +667,8 @@ export class DebriefPmConversationService {
       kind: changeKindOf(idea.change) ?? idea.change?.ideaKind ?? null,
       route: idea.change?.route ?? null,
       confidence: e.confidence ?? null,
-      always_asks_because: alwaysAskReasons(idea, settings),
+      always_asks_because:
+        alwaysAsk(idea, settings as any)?.waitsBecause ?? null,
       hypothesis: e.hypothesis ?? null,
       expected_effect: e.expectedEffect ?? null,
       evidence: e.evidence ?? e.problem?.summary ?? null,
@@ -684,7 +688,7 @@ export class DebriefPmConversationService {
           }
         : null,
       stopped: e.stopped ?? null,
-      undone: e.undone ?? null,
+      undone: e.undo ?? e.undone ?? null,
       forecast: e.forecast ?? null,
       rejected_because: e.rejection?.reason ?? null,
       conversation: (e.conversation ?? []).slice(-10),
@@ -971,7 +975,7 @@ export class DebriefPmConversationService {
     let label: string;
     switch (tool) {
       case 'change_stop':
-        label = await this.stop(idea, by, reason);
+        label = await this.stop(idea, by!, reason);
         break;
       case 'change_undo':
         label = await this.undo(idea, languages, by, reason);
@@ -987,7 +991,7 @@ export class DebriefPmConversationService {
           string,
           unknown
         >;
-        if (alwaysAskReasons(idea, settings).length) {
+        if (alwaysAsk(idea, settings as any)) {
           return this.makePlan(
             person,
             tool,
@@ -1010,54 +1014,28 @@ export class DebriefPmConversationService {
 
   // --- what the actions do ---------------------------------------------------------------
 
-  /** Stop a change being tried: its checks, trial or learner try-out. */
+  /**
+   * Stop a change being tried: the console's Stop now
+   * (DebriefChangesService.stop), as the person who asked.
+   */
   async stop(
     idea: Record<string, any>,
-    by: number | null,
+    by: number,
     reason: string | null,
   ): Promise<string> {
-    const e = idea.evidence ?? {};
-    const running = (r: any) => r && ['running', 'waiting'].includes(r.status);
-    const rungs = (['screen', 'gate', 'trial', 'canary'] as const).filter((k) =>
-      running(e[k]),
-    );
-    if (!rungs.length || idea.status !== 'proposed') {
-      refuse(`${changeName(idea)} is not being tried`);
-    }
-    if (rungs.includes('canary')) {
-      await this.releases
-        .stopCanary(
-          DEBRIEF_AGENT_KEY,
-          by,
-          false,
-          reason ?? 'Stopped from the PM agent conversation',
-        )
-        .catch((err) => {
-          // Already ended by its watcher: the evidence below still records the stop.
-          this.logger.warn(
-            `[pm-conversation] stop canary: ${(err as Error).message}`,
-          );
-        });
-    }
-    const at = new Date().toISOString();
-    for (const k of rungs) {
-      await this.pm.writeEvidence(idea.id, k, {
-        ...e[k],
-        status: 'stopped',
-        stoppedAt: at,
-      });
-    }
-    await this.pm.writeEvidence(idea.id, 'stopped', { at, by, reason, rungs });
-    await this.dataSource.query(
-      `UPDATE agent_lessons SET status = 'rejected', "decidedBy" = $2, "decidedAt" = now(),
-              "updatedAt" = now() WHERE id = $1`,
-      [idea.id, by],
-    );
+    await this.changes.stop(idea.id, by, reason);
     return `Stopped trying ${changeName(idea)}`;
   }
 
   /** The release a change replaced when it went live (what undo goes back to). */
-  private async releaseBefore(releaseId: string): Promise<string | null> {
+  private async releaseBefore(
+    idea: Record<string, any>,
+  ): Promise<string | null> {
+    // The watch the core starts when a change goes live names it.
+    const watched = idea.evidence?.watch?.previousReleaseId;
+    if (watched) return watched;
+    const releaseId = idea.releaseId ?? idea.evidence?.watch?.releaseId;
+    if (!releaseId) return null;
     const [row] = await this.dataSource.query(
       `SELECT detail->>'fromReleaseId' AS id FROM agent_release_audit
         WHERE "agentKey" = $1 AND "releaseId" = $2 AND action = $3
@@ -1095,58 +1073,38 @@ export class DebriefPmConversationService {
       }
       return `Undid ${changeName(idea)} for ${lifted.join(', ')}`;
     }
-    if (idea.status !== 'active' || !idea.releaseId) {
-      refuse(`${changeName(idea)} is not live`);
+    if (!languages) {
+      // For everyone: the console's Undo now (DebriefChangesService.undo).
+      await this.changes.undo(idea.id, by, reason);
+      await this.holds.lift(idea.id, null, by);
+      return `Undid ${changeName(idea)} for everyone`;
     }
-    const before = await this.releaseBefore(idea.releaseId);
+    if (idea.status !== 'active') refuse(`${changeName(idea)} is not live`);
+    const before = await this.releaseBefore(idea);
     if (!before) refuse('there is no release before this change to go back to');
     const ga = await this.releases.getGa(DEBRIEF_AGENT_KEY);
-    if (ga?.id !== idea.releaseId) {
+    if (ga?.id !== (idea.releaseId ?? idea.evidence?.watch?.releaseId)) {
       refuse(
-        `later changes went live on top of ${changeName(idea)}; going back would undo them too. Undo the later ones first`,
+        `later changes went live on top of ${changeName(idea)}; going back for one language would undo them too. Undo the later ones first`,
       );
     }
-    const at = new Date().toISOString();
-    if (languages) {
-      for (const language of languages) {
-        await this.holds.pin({
-          language,
-          releaseId: before!,
-          ideaId: idea.id,
-          reason: 'undone',
-          by,
-          note: reason,
-        });
-      }
-      await this.pm.writeEvidence(idea.id, 'undone', {
-        at,
+    for (const language of languages) {
+      await this.holds.pin({
+        language,
+        releaseId: before!,
+        ideaId: idea.id,
+        reason: 'undone',
         by,
-        reason,
-        languages,
+        note: reason,
       });
-      return `Undid ${changeName(idea)} for ${languages.join(', ')}`;
     }
-    await this.releases.makeGa(
-      before!,
-      by,
-      AgentReleaseAuditAction.ROLLED_BACK,
-      reason ?? `Undone from the PM agent conversation: ${idea.text}`,
-    );
-    await this.holds.lift(idea.id, null, by);
     await this.pm.writeEvidence(idea.id, 'undone', {
-      at,
+      at: new Date().toISOString(),
       by,
       reason,
-      languages: null,
+      languages,
     });
-    await this.retire(idea.id);
-    await this.notifier?.owner({
-      title: 'Debriefs: a change was undone',
-      body: `${changeName(idea)} was undone from the PM agent conversation${reason ? `: ${reason}` : ''}.`,
-      data: { ideaId: idea.id },
-      excludeUserId: by ?? undefined,
-    });
-    return `Undid ${changeName(idea)} for everyone`;
+    return `Undid ${changeName(idea)} for ${languages.join(', ')}`;
   }
 
   private async retire(ideaId: string): Promise<void> {
@@ -1168,8 +1126,8 @@ export class DebriefPmConversationService {
     reason: string | null,
   ): Promise<string> {
     let releaseId: string | null = null;
-    if (idea.status === 'active' && idea.releaseId) {
-      releaseId = await this.releaseBefore(idea.releaseId);
+    if (idea.status === 'active') {
+      releaseId = await this.releaseBefore(idea);
     } else if (idea.status === 'proposed') {
       releaseId = (await this.releases.getGa(DEBRIEF_AGENT_KEY))?.id ?? null;
     }
@@ -1217,6 +1175,7 @@ export class DebriefPmConversationService {
     if (
       !e.stopped &&
       !e.undone &&
+      !e.undo &&
       !['rejected', 'retired'].includes(idea.status)
     ) {
       refuse(
@@ -1233,7 +1192,7 @@ export class DebriefPmConversationService {
     await this.dataSource.query(
       `UPDATE agent_lessons
           SET status = 'proposed', "releaseId" = NULL, change = $2::jsonb,
-              evidence = (evidence - 'screen' - 'gate' - 'trial' - 'canary' - 'stopped' - 'undone' - 'rejection'),
+              evidence = (evidence - 'screen' - 'gate' - 'trial' - 'canary' - 'stopped' - 'undone' - 'undo' - 'watch' - 'ask' - 'approval' - 'rejection'),
               "decidedBy" = NULL, "decidedAt" = NULL, "updatedAt" = now()
         WHERE id = $1`,
       [idea.id, JSON.stringify(change)],
@@ -1244,7 +1203,7 @@ export class DebriefPmConversationService {
       languages,
       before: {
         stopped: e.stopped ?? null,
-        undone: e.undone ?? null,
+        undone: e.undone ?? e.undo ?? null,
         rejection: e.rejection ?? null,
       },
     });

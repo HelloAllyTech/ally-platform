@@ -576,6 +576,76 @@ returns zeros, not 404.
   that month's production ceilings (past settings aren't kept). Builder hand-offs are not paid from
   the learning budget, so they are not in it.
 
+## Debrief v2: Home, Changes and the score (2026-11-16)
+
+The contract is in `docs/debrief-harness/V2_AUTONOMY.md` (API contract); routes are in
+`DebriefChangesController`, same base path, guards and audit as the rest.
+
+- `GET home` → `DebriefHomeV2`. `needsYou` lists only changes waiting on the always-ask list
+  (never a hand-off). `thisWeek` is the last 7 days; `headline.score` is this week's cumulative score.
+- `GET changes?state=` → `{ changes: DebriefChange[] }`, newest activity first (the latest 300
+  ideas; questions for a person are not changes). `GET changes/:id` → `DebriefChange`.
+- `POST changes/:id/undo {reason?}` (`releases` action) → `DebriefChange`. Only a live change whose
+  release is still the live one (409 otherwise); the release before comes back for everyone. A
+  test-settings change gets its old values back.
+- `POST changes/:id/stop {reason?}` (`releases` action) → `DebriefChange`. Only while it is
+  `trying` or `testing`: the try-out ends (no emergency move), its trial takes no more sessions,
+  and a check already running finishes but nothing starts after it. The idea is `retired` with
+  `evidence.stopped`; `GET pm-agent` shows `closedReason: 'stopped'`.
+- `GET metrics/score?days=56` → `DebriefScoreView`. `current`/`previous` are the last 7 days and
+  the 7 before; `byWeek` weeks start on Monday; `markers` come from `evidence.watch.liveAt` and
+  `evidence.undo.at`.
+- `GET settings` adds `lastChanges: {key: {lastChangedBy, lastChangedById, lastChangedAt, why,
+  changeId}}` and the new keys (`scoreWeight*`, `undoMargin`, `watchDays`, `askLowConfidence`,
+  `askModels`, `slackChannel`, `safetyContact`; spec kind `text` for the last two, one line).
+  `canaryMinRuns` now defaults to 40.
+- Changed behaviour: `PUT autonomy/matrix` refuses every cell (400: the always-ask list replaces
+  it); `GET autonomy` shows every kind eligible, with κ and re-lock facts as information; no
+  re-locks or "can now run on its own" notifications. Approvals expire only for pinned rules,
+  budget changes and always-ask waits (`approval.expiresAt` is null otherwise). A passed
+  side-by-side trial starts the try-out by itself, and a passed try-out goes live by itself.
+- Schedules: `debrief-change-watch` (hourly; 1 / 15 / 30 / 60 min) and `debrief-weekly-summary`
+  (weekly Mon 07:30; 1 min / weekly). The admin's `en.ts` needs their names.
+
+## PM agent conversation (Debrief v2 C1–C5, 2026-11-16)
+
+One shared thread (`debrief_pm_messages`), `DebriefPmConversationService`. Types are the contract's
+`PmMessage` / `PmAbout` (V2_AUTONOMY.md); every message has `author` (the person's name; null for
+the agent).
+
+- `GET pm-agent/conversation?before=<messageId>&limit=50&about=<changeId>` (read) →
+  `{ messages: PmMessage[]; more: boolean }`, the newest page oldest first. `about` narrows it to the
+  messages about that change (Home's expanded Needs you item). The clinical advisor (no `pmAgent`,
+  has `approvePinnedRule`) sees only messages about pinned-rule changes; anyone else 403.
+- `POST pm-agent/conversation { text (≤ 4000), about?: { kind: change|session|page, id?, label } }`
+  (`comment` action at the route; the service checks the rest) → `{ messages: [the person's, the
+  agent's reply] }`, 10–30 s. The advisor may post only with `about` a pinned-rule change (403
+  otherwise, "Open the change from Home"). The agent's `action` is the turn's last action as the
+  gateway recorded it: `awaiting_yes` (a plan to repeat back), `done`, or `failed` (a refusal or a
+  missing permission).
+- Approve / turn down never act at once: the reply repeats the plan and asks for "yes"; the same
+  person's next message, an explicit yes (`isExplicitYes`), carries it out as them. Pinned rules
+  (and the Safety reader) need `approvePinnedRule`, a budget increase `ownerSettings`, everything
+  else `pmAgent`. Without it the agent does not act, answers "Only the clinical advisor or the owner
+  can approve this; I've asked them." and notifies those people in-app (a pinned rule:
+  `DebriefNotifier.pinnedRuleDeciders`, link `/debriefs?change=<id>`; a budget: the owner).
+- Stop / undo call the Changes buttons' own code (`DebriefChangesService.stop` / `undo`) as the
+  person who asked. Undo or hold for named languages, retry for named languages, and pauses are the
+  conversation's own (V2_AUTONOMY A9; `debrief_change_holds`).
+- Each action is logged on the person's message (`actions`), on the change
+  (`evidence.conversation`: who, their words, what was done) and in `agent_lesson_audit`
+  (`step: conversation_<tool>`, `personWords`). Each turn costs at most min(`pmAgentRunCapUsd`,
+  $0.25, learning budget left); with the learning budget spent the agent says so without calling
+  a model.
+- A pinned-rule proposal now notifies the clinical advisors and the owner (was: the owner only),
+  with the Home link.
+
+Learner flags (V2_AUTONOMY F1): `GET sessions/runs/:runId` → each flag gains
+`answer: { action: 'kept'|'corrected'|'removed'; reply; at } | null`. The learner's
+`GET /v1/debriefs/sessions/:id` flags carry the same `answer`; the reply is also the card's outcome
+note. A flag the agent answered is no longer open (`resolvedBy` null); a learner can no longer undo
+it. A person may still Change it (`runs/:id/correct`) or decide an escalated flag.
+
 ## What the PM agent may do alone
 
 ### `GET autonomy`
@@ -631,7 +701,7 @@ reports always wait for a person.
 
 ## Notifications (FR-54, spec C3)
 
-These are in-app notifications only: the bell (`/v1/notifications`), with no Slack or external channel.
+These are in-app notifications. Since Debrief v2 the owner's Slack channel (`slackChannel`) also gets undos, try-outs taken back, nightly-check measures past their limit and a weekly summary; safety posts (a debrief shown with a missed clear risk cue, a learner's distress in Ask Ally) name `safetyContact`, once per debrief.
 
 | Event | Who | `type` |
 |---|---|---|
@@ -770,6 +840,14 @@ as failed.
   Feature access → "Debriefs — Schedules").
 - **Deploy ally-ai before ally-be**: the gate's safety-recall rule calls ally-ai's
   `POST /debrief/safety-recall`; an ally-be that reaches an older ally-ai fails every gate closed.
+
+- **Migration `1981901650000-CreateDebriefPmConversation`** (the conversation, language pins and
+  pauses, `debrief_run_feedback.answer`) runs with the deploy. **Deploy ally-ai before ally-be**: the
+  conversation calls `POST /pm-agent/conversation` and flag answers `POST /debrief/flag-answers`.
+- **Skills Store**: `ally_ai_debrief_pm_conversation_system` and `ally_ai_debrief_flag_answer_system`
+  are created from ally-ai's defaults by `make sync-prompts`; edit them there. The PM agent's
+  `idea_propose` now requires `confidence {level, why}`: the live `debrief_improver_system` need not
+  change (the tool schema asks for it).
 
 ## Not built, or defaulted (product decisions)
 

@@ -2,7 +2,6 @@ import { ForbiddenException } from '@nestjs/common';
 import { DebriefPmConversationService } from '../service/debrief-pm-conversation.service';
 import { debriefCan } from '../util/debrief-console-roles.util';
 import {
-  alwaysAskReasons,
   conversationAccess,
   isExplicitYes,
   requiredAction,
@@ -146,11 +145,21 @@ function build(opts: {
   const view = {
     viewer: jest.fn(async (id: number) => viewer(id, opts.perms[id] ?? [])),
   };
-  const ownerSettings = { get: jest.fn(async () => ({ pmAgentRunCapUsd: 2 })) };
+  const ownerSettings = {
+    get: jest.fn(async () => ({
+      pmAgentRunCapUsd: 2,
+      askLowConfidence: true,
+      askModels: false,
+    })),
+  };
   const releases = {
     getGa: jest.fn(async () => ({ id: 'rel-new' })),
     makeGa: jest.fn(async () => ({ id: 'rel-old', version: 4 })),
     stopCanary: jest.fn(async () => ({})),
+  };
+  const changes = {
+    undo: jest.fn(async () => ({})),
+    stop: jest.fn(async () => ({})),
   };
   const notifier = {
     pinnedRuleDeciders: jest.fn(async () => 2),
@@ -167,6 +176,7 @@ function build(opts: {
     ownerSettings as any,
     releases as any,
     {} as any,
+    changes as any,
     notifier as any,
   );
   const actions = () =>
@@ -180,6 +190,7 @@ function build(opts: {
     pm,
     holds,
     releases,
+    changes,
     notifier,
     queries,
     qbCalls,
@@ -217,29 +228,6 @@ describe('PM agent conversation: rules', () => {
     ]) {
       expect(isExplicitYes(no)).toBe(false);
     }
-  });
-
-  it('names why a change always asks', () => {
-    expect(alwaysAskReasons(ideas[PINNED])).toEqual([
-      'It changes the Safety reader.',
-    ]);
-    expect(alwaysAskReasons(ideas[BUDGET])).toEqual(['It raises a budget.']);
-    expect(alwaysAskReasons(ideas[PROMPT])).toEqual([
-      'The PM agent is not sure it helps (low confidence).',
-    ]);
-    // Low confidence can be switched off; new models are off by default.
-    expect(
-      alwaysAskReasons(ideas[PROMPT], { askLowConfidence: false }),
-    ).toEqual([]);
-    expect(
-      alwaysAskReasons({ change: { ideaKind: 'model', model: 'x' } }),
-    ).toEqual([]);
-    expect(
-      alwaysAskReasons(
-        { change: { ideaKind: 'model', model: 'x' } },
-        { askModels: true },
-      ),
-    ).toEqual(['It brings in a new model or provider.']);
   });
 
   it('keeps today’s permissions', () => {
@@ -462,19 +450,15 @@ describe('PM agent conversation: approvals wait for a yes, from someone allowed'
 });
 
 describe('PM agent conversation: actions that act at once', () => {
-  it('undo goes back to the release before, for everyone', async () => {
+  it('undo for everyone is the console’s Undo now', async () => {
     const t = build({
       person: { authorUserId: 1, text: 'Undo the warmer openings' },
       perms: { 1: TEAM },
     });
     const out = await t.svc.callTool('change_undo', CLAIMS, { idea_id: LIVE });
     expect(out).toMatchObject({ ok: true });
-    expect(t.releases.makeGa).toHaveBeenCalledWith(
-      'rel-old',
-      1,
-      'rolled_back',
-      expect.any(String),
-    );
+    // The console's Undo now, as the person who asked.
+    expect(t.changes.undo).toHaveBeenCalledWith(LIVE, 1, null);
     expect(t.actions().pop()).toMatchObject({ status: 'done', ideaId: LIVE });
   });
 
@@ -516,6 +500,23 @@ describe('PM agent conversation: actions that act at once', () => {
     });
     expect(out).toMatchObject({ status: 'awaiting_yes' });
     expect(t.pm.screen).not.toHaveBeenCalled();
+  });
+
+  it('stop is the console’s Stop now', async () => {
+    const t = build({
+      person: { authorUserId: 1, text: 'Stop the Tamil change' },
+      perms: { 1: TEAM },
+    });
+    const out = await t.svc.callTool('change_stop', CLAIMS, {
+      idea_id: PROMPT,
+      reason: 'Tamil learners are confused',
+    });
+    expect(out).toMatchObject({ ok: true });
+    expect(t.changes.stop).toHaveBeenCalledWith(
+      PROMPT,
+      1,
+      'Tamil learners are confused',
+    );
   });
 
   it('a turn token that names no person message acts on nothing', async () => {

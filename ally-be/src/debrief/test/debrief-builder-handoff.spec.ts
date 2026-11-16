@@ -35,7 +35,7 @@ const idea = (over: Record<string, any> = {}) => ({
 
 /** A PM agent service with only what approveHandoff reaches. */
 function pmService(builder: any, decisions: any) {
-  const query = jest.fn(async () => []);
+  const query = jest.fn<Promise<any>, [string, any[]?]>(async () => []);
   const moduleRef = {
     get: jest.fn((cls: { name: string }) =>
       cls.name === 'BuilderSessionService' ? builder : decisions,
