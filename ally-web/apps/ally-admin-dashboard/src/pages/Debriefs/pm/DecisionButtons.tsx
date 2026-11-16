@@ -72,7 +72,8 @@ export const DecisionButtons: React.FC<{
         k === "signOff" || k === "pinned"
           ? approveRule({ id: change.id }).unwrap()
           : approve({ id: change.id }).unwrap(),
-      k === "signOff" ? t.signedOff : t.approved,
+      // A pinned rule goes live on its sign-off; other changes are tested first.
+      k === "signOff" ? t.signedOff : k === "pinned" ? t.approvedLive : t.approved,
     );
   const onTurnDown = () =>
     run(

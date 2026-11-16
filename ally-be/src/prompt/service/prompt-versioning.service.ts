@@ -224,6 +224,12 @@ export class PromptVersioningService {
        * skip the pinned-editor check.
        */
       trustedImport?: boolean;
+      /**
+       * Set only by the Debrief console when the clinical advisor or the
+       * owner approves a pinned debrief rule (it checks their permission):
+       * that sign-off is the gate the pinned-editor list stands for.
+       */
+      signedOffPinnedRule?: boolean;
     } = {},
   ): Promise<PromoteResult> {
     const result = await this.dataSource.transaction(async (manager) => {
@@ -277,7 +283,7 @@ export class PromptVersioningService {
         this.assertPinnedChangeConfirmed(
           prompt.promptCode,
           options.confirmPinnedChange,
-          options.trustedImport,
+          options.trustedImport || options.signedOffPinnedRule,
         );
       }
 

@@ -9529,6 +9529,7 @@ export const en = {
         reasonLabel: "Why (the PM agent reads this)",
         reasonPlaceholder: "One line is enough",
         approved: "Approved. It goes through its tests and tries next.",
+        approvedLive: "Approved. It is live for everyone now.",
         signedOff: "Signed off.",
         turnedDown: "Turned down. The PM agent has your reason.",
         failed: "That didn't go through. Try again.",
