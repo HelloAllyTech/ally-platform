@@ -200,7 +200,7 @@ Run on 16 Nov, on the branch with master merged (Debrief v2 included). Every com
 
 **Known failures, all on master as well:**
 - `prettier --check` flags 78 files in ally-web, none of them in this PR.
-- `npm run test:e2e` in ally-be has no config (`test/jest-e2e.json` doesn't exist on master either), and no workflow runs it.
+- `npm run test:e2e` in ally-be has no config (`test/jest-e2e.json` doesn't exist on master either), and no workflow runs it. <!-- docs-path-lint: ignore -->
 - `rate-limited-routes.spec.ts` once failed under the commit hook's run of ~7,000 related tests (a 401 and a 404). Alone it passes 22/22, three times, and it passed in the full run and on the hook's retry.
 
 **Migrations, up and down:**
