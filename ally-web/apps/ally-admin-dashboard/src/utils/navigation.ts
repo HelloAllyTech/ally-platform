@@ -12,179 +12,216 @@ import {
 
 import { hasFeature } from "./permissions";
 
+/** The sidebar's sections, in display order. Item membership is `NavigationItem.section`. */
+export const NAV_SECTION_IDS = [
+  "create",
+  "people",
+  "insights",
+  "ai-languages",
+  "product",
+  "settings-logs",
+] as const;
+export type NavSectionId = (typeof NAV_SECTION_IDS)[number];
+
+const getNavSectionLabels = (): Record<NavSectionId, string> => ({
+  create: en.nav.sections.create,
+  people: en.nav.sections.people,
+  insights: en.nav.sections.insights,
+  "ai-languages": en.nav.sections.aiLanguages,
+  product: en.nav.sections.product,
+  "settings-logs": en.nav.sections.settingsLogs,
+});
+
+/** Where the Analytics page opens its Conversation Drift tab (see ANALYTICS_TAB_PARAM). */
+export const CONVERSATION_DRIFT_PATH = `${ROUTES.ANALYTICS}?tab=drift`;
+
 /**
- * Builds the full set of admin navigation tabs in their default order. Built
- * lazily (not at module-eval time) to avoid reading `@constants` exports before
- * they are initialized under circular imports. Permission/role gating is applied
- * by `deriveNavigationItems`; the user's personalized order by `applySavedOrder`.
+ * Builds the full set of admin navigation tabs in their default order: the sections in order,
+ * each section's tabs in order. Built lazily (not at module-eval time) to avoid reading
+ * `@constants` exports before they are initialized under circular imports. Permission/role
+ * gating is applied by `deriveNavigationItems`; the user's personalized order by
+ * `applySavedOrder`.
  */
-const buildNavigationItems = (): NavigationItem[] => [
-  {
-    id: SIDEBAR_ITEMS.SIMULATION_STUDIO,
-    label: en.simulation.rolePlays,
-    path: ROUTES.SIMULATION_STUDIO,
-  },
-  {
-    id: SIDEBAR_ITEMS.EVENTS,
-    label: en.simulation.events,
-    path: ROUTES.MANAGE_EVENTS,
-  },
-  {
-    id: SIDEBAR_ITEMS.CHARACTER_LIBRARY,
-    label: "Characters",
-    path: ROUTES.CHARACTER_LIBRARY,
-  },
-  {
-    id: SIDEBAR_ITEMS.COMPONENT_LIBRARY,
-    label: "Component Library",
-    path: ROUTES.COMPONENT_LIBRARY,
-  },
-  {
-    id: SIDEBAR_ITEMS.SCENARIO_VOICES,
-    label: en.simulation.voices,
-    path: ROUTES.MANAGE_SCENARIO_VOICES,
-  },
-  {
-    id: SIDEBAR_ITEMS.STT_CONFIGS,
-    label: "Speech Recognition",
-    path: ROUTES.MANAGE_STT_CONFIGS,
-  },
-  {
-    id: SIDEBAR_ITEMS.LLM_MODEL_CATALOG,
-    label: "Language Model",
-    path: ROUTES.MANAGE_LLM_MODEL_CATALOG,
-  },
-  {
-    id: SIDEBAR_ITEMS.AI_TASKS,
-    label: "AI Tasks",
-    path: ROUTES.AI_TASKS,
-  },
-  {
-    id: SIDEBAR_ITEMS.SCENARIO_LANGUAGES,
-    label: en.simulation.languages,
-    path: ROUTES.MANAGE_SCENARIO_LANGUAGES,
-  },
-  {
-    id: SIDEBAR_ITEMS.PROMPTS,
-    label: en.simulation.prompts,
-    path: ROUTES.MANAGE_PROMPTS,
-  },
-  {
-    id: SIDEBAR_ITEMS.MANAGE_GUARDRAILS,
-    label: en.simulation.guardrails,
-    path: ROUTES.MANAGE_GUARDRAILS,
-  },
-  {
-    id: SIDEBAR_ITEMS.TRANSLATIONS,
-    label: "Translations",
-    path: ROUTES.MANAGE_TRANSLATIONS,
-  },
-  {
-    id: SIDEBAR_ITEMS.TOOLTIPS,
-    label: "Tooltips",
-    path: ROUTES.MANAGE_TOOLTIPS,
-  },
-  {
-    id: SIDEBAR_ITEMS.BLOG,
-    label: "Blog",
-    path: ROUTES.BLOG,
-  },
-  {
-    id: SIDEBAR_ITEMS.PRODUCT_UPDATES,
-    label: en.productUpdates.title,
-    path: ROUTES.PRODUCT_UPDATES,
-  },
-  {
-    id: SIDEBAR_ITEMS.PRODUCT_ROADMAP,
-    label: "Product Roadmap",
-    path: ROUTES.PRODUCT_ROADMAP,
-  },
-  {
-    id: SIDEBAR_ITEMS.USERS,
-    label: en.userManagement.users,
-    path: ROUTES.USER_MANAGEMENT,
-  },
-  {
-    id: SIDEBAR_ITEMS.USER_BADGES,
-    label: en.userManagement.badges,
-    path: ROUTES.USER_BADGES,
-  },
-  {
-    id: SIDEBAR_ITEMS.ANALYTICS,
-    label: "Analytics",
-    path: ROUTES.ANALYTICS,
-  },
-  {
-    id: SIDEBAR_ITEMS.DEBRIEFS,
-    label: "Debriefs",
-    path: ROUTES.DEBRIEFS,
-  },
-  {
-    id: SIDEBAR_ITEMS.AGENT_TEST_CASES,
-    label: "Agent Test Cases",
-    path: ROUTES.AGENT_TEST_CASES,
-  },
-  {
-    id: SIDEBAR_ITEMS.COMPETENCIES,
-    label: "Competencies",
-    path: ROUTES.COMPETENCIES,
-  },
-  {
-    id: SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS,
-    label: "Roleplay Session Logs",
-    path: ROUTES.ROLEPLAY_SESSION_LOGS,
-  },
-  {
-    id: SIDEBAR_ITEMS.AI_LAB,
-    label: en.aiLab.title,
-    path: ROUTES.AI_LAB,
-  },
-  {
-    id: SIDEBAR_ITEMS.SETTINGS,
-    label: "Settings",
-    path: ROUTES.SETTINGS,
-  },
-  {
-    id: SIDEBAR_ITEMS.LOGS,
-    label: "Logs",
-    path: ROUTES.LOGS,
-  },
-  {
-    id: SIDEBAR_ITEMS.MOBILE_RELEASES,
-    label: "Mobile Releases",
-    path: ROUTES.MOBILE_RELEASES,
-  },
-  {
-    id: SIDEBAR_ITEMS.BUG_HUNTER,
-    label: en.bugHunter.tabLabel,
-    path: ROUTES.BUG_HUNTER,
-  },
-  {
-    id: SIDEBAR_ITEMS.BUILDER,
-    label: en.builder.tabLabel,
-    path: ROUTES.BUILDER,
-  },
-  {
-    id: SIDEBAR_ITEMS.COURSE_COPILOT,
-    label: en.courseCopilot.tabLabel,
-    path: ROUTES.COURSE_COPILOT,
-  },
-  {
-    id: SIDEBAR_ITEMS.ALLY_GUIDE,
-    label: en.allyConsole.navLabel,
-    path: ROUTES.ALLY_CONSOLE,
-  },
-  {
-    id: SIDEBAR_ITEMS.CONTEXT_LIBRARY,
-    label: en.contextLibrary.navLabel,
-    path: ROUTES.CONTEXT_LIBRARY,
-  },
-  {
-    id: SIDEBAR_ITEMS.WHATSAPP_BOT,
-    label: en.whatsappBot.navLabel,
-    path: ROUTES.WHATSAPP_BOT,
-  },
-];
+const buildNavigationItems = (): NavigationItem[] => {
+  const { items: l } = en.nav;
+  const S = SIDEBAR_ITEMS;
+  return [
+    // Create
+    {
+      id: S.SIMULATION_STUDIO,
+      label: l.rolePlays,
+      path: ROUTES.SIMULATION_STUDIO,
+      section: "create",
+    },
+    { id: S.EVENTS, label: l.events, path: ROUTES.MANAGE_EVENTS, section: "create" },
+    {
+      id: S.CHARACTER_LIBRARY,
+      label: l.characters,
+      path: ROUTES.CHARACTER_LIBRARY,
+      section: "create",
+    },
+    {
+      id: S.COMPONENT_LIBRARY,
+      label: l.componentLibrary,
+      path: ROUTES.COMPONENT_LIBRARY,
+      section: "create",
+    },
+    { id: S.COMPETENCIES, label: l.competencies, path: ROUTES.COMPETENCIES, section: "create" },
+    {
+      id: S.COURSE_COPILOT,
+      label: l.courseCopilot,
+      path: ROUTES.COURSE_COPILOT,
+      section: "create",
+    },
+    { id: S.BLOG, label: l.blog, path: ROUTES.BLOG, section: "create" },
+    {
+      id: S.PRODUCT_UPDATES,
+      label: l.productUpdates,
+      path: ROUTES.PRODUCT_UPDATES,
+      section: "create",
+    },
+    // People
+    { id: S.USERS, label: l.users, path: ROUTES.USER_MANAGEMENT, section: "people" },
+    { id: S.USER_BADGES, label: l.badges, path: ROUTES.USER_BADGES, section: "people" },
+    { id: S.DEBRIEFS, label: l.debriefs, path: ROUTES.DEBRIEFS, section: "people" },
+    {
+      id: S.ROLEPLAY_SESSION_LOGS,
+      label: l.roleplayLogs,
+      path: ROUTES.ROLEPLAY_SESSION_LOGS,
+      section: "people",
+    },
+    // Insights
+    { id: S.ANALYTICS, label: l.analytics, path: ROUTES.ANALYTICS, section: "insights" },
+    {
+      id: S.CONVERSATION_DRIFT,
+      label: l.conversationDrift,
+      path: CONVERSATION_DRIFT_PATH,
+      section: "insights",
+    },
+    // AI & Languages
+    { id: S.PROMPTS, label: l.prompts, path: ROUTES.MANAGE_PROMPTS, section: "ai-languages" },
+    {
+      id: S.MANAGE_GUARDRAILS,
+      label: l.guardrails,
+      path: ROUTES.MANAGE_GUARDRAILS,
+      section: "ai-languages",
+    },
+    // TODO(admin-ux/providers): these three collapse into one "Providers" item once that page lands.
+    {
+      id: S.STT_CONFIGS,
+      label: l.speechRecognition,
+      path: ROUTES.MANAGE_STT_CONFIGS,
+      section: "ai-languages",
+    },
+    {
+      id: S.LLM_MODEL_CATALOG,
+      label: l.languageModels,
+      path: ROUTES.MANAGE_LLM_MODEL_CATALOG,
+      section: "ai-languages",
+    },
+    {
+      id: S.SCENARIO_VOICES,
+      label: l.voices,
+      path: ROUTES.MANAGE_SCENARIO_VOICES,
+      section: "ai-languages",
+    },
+    { id: S.AI_TASKS, label: l.aiTasks, path: ROUTES.AI_TASKS, section: "ai-languages" },
+    {
+      id: S.SCENARIO_LANGUAGES,
+      label: l.languages,
+      path: ROUTES.MANAGE_SCENARIO_LANGUAGES,
+      section: "ai-languages",
+    },
+    {
+      id: S.TRANSLATIONS,
+      label: l.translations,
+      path: ROUTES.MANAGE_TRANSLATIONS,
+      section: "ai-languages",
+    },
+    { id: S.TOOLTIPS, label: l.tooltips, path: ROUTES.MANAGE_TOOLTIPS, section: "ai-languages" },
+    {
+      id: S.AGENT_TEST_CASES,
+      label: l.agentTestCases,
+      path: ROUTES.AGENT_TEST_CASES,
+      section: "ai-languages",
+    },
+    { id: S.AI_LAB, label: l.aiLab, path: ROUTES.AI_LAB, section: "ai-languages" },
+    // Product
+    { id: S.PRODUCT_ROADMAP, label: l.roadmap, path: ROUTES.PRODUCT_ROADMAP, section: "product" },
+    { id: S.BUG_HUNTER, label: l.bugHunter, path: ROUTES.BUG_HUNTER, section: "product" },
+    { id: S.BUILDER, label: l.builder, path: ROUTES.BUILDER, section: "product" },
+    {
+      id: S.MOBILE_RELEASES,
+      label: l.mobileReleases,
+      path: ROUTES.MOBILE_RELEASES,
+      section: "product",
+    },
+    {
+      id: S.CONTEXT_LIBRARY,
+      label: l.contextLibrary,
+      path: ROUTES.CONTEXT_LIBRARY,
+      section: "product",
+    },
+    // The inbox lives inside this page (its Inbox tab); its unread count badges this item.
+    { id: S.WHATSAPP_BOT, label: l.aiChatbots, path: ROUTES.WHATSAPP_BOT, section: "product" },
+    { id: S.ALLY_GUIDE, label: l.allyConsole, path: ROUTES.ALLY_CONSOLE, section: "product" },
+    // Settings & Logs
+    { id: S.SETTINGS, label: l.settings, path: ROUTES.SETTINGS, section: "settings-logs" },
+    { id: S.LOGS, label: l.logs, path: ROUTES.LOGS, section: "settings-logs" },
+  ];
+};
+
+export interface NavSection {
+  id: NavSectionId;
+  label: string;
+  items: NavigationItem[];
+}
+
+/**
+ * Splits a flat, already-ordered list of visible tabs into the sidebar's sections. Sections come
+ * out in their fixed order, each keeping the relative order its tabs had in `items` (so the user's
+ * saved order still decides the order inside a section), and empty sections are dropped. Never
+ * hides a tab: one with an unknown or missing section lands in the last section.
+ */
+export const groupNavigationItems = (items: NavigationItem[]): NavSection[] => {
+  const labels = getNavSectionLabels();
+  const last = NAV_SECTION_IDS[NAV_SECTION_IDS.length - 1];
+  const buckets = new Map<NavSectionId, NavigationItem[]>(NAV_SECTION_IDS.map(id => [id, []]));
+  items.forEach(item => {
+    const id = (NAV_SECTION_IDS as readonly string[]).includes(item.section ?? "")
+      ? (item.section as NavSectionId)
+      : last;
+    buckets.get(id)!.push(item);
+  });
+  return NAV_SECTION_IDS.filter(id => buckets.get(id)!.length > 0).map(id => ({
+    id,
+    label: labels[id],
+    items: buckets.get(id)!,
+  }));
+};
+
+/** The inverse of `groupNavigationItems`: the order the sidebar displays, top to bottom. */
+export const flattenNavSections = (sections: NavSection[]): NavigationItem[] =>
+  sections.flatMap(section => section.items);
+
+/**
+ * Whether `pathname` (+ `search`) is on `item`. Conversation Drift is a tab of the Analytics page
+ * (`?tab=drift`), so the two items split that one path between them.
+ */
+export const isNavItemActive = (item: NavigationItem, pathname: string, search = ""): boolean => {
+  const base = item.path.split("?")[0];
+  if (item.id === SIDEBAR_ITEMS.CONVERSATION_DRIFT) {
+    return pathname === base && new URLSearchParams(search).get("tab") === "drift";
+  }
+  if (item.id === SIDEBAR_ITEMS.ANALYTICS) {
+    return pathname === base && new URLSearchParams(search).get("tab") !== "drift";
+  }
+  if (item.id === SIDEBAR_ITEMS.SIMULATION_STUDIO) {
+    return pathname.startsWith(base) || pathname.startsWith(ROUTES.CREATE_SIMULATION);
+  }
+  // Segment-aware: "/ally" must not light up for "/allyfoo", "/builder" does for "/builder/:id".
+  return pathname === base || pathname.startsWith(`${base}/`);
+};
 
 /**
  * Returns `items` reordered to follow `savedOrder` (a list of item ids).
@@ -266,6 +303,10 @@ export const deriveNavigationItems = ({
         permissions!.includes(orgGate.permission),
       );
     }
+
+    // Conversation Drift is a tab of Analytics: it follows that toggle.
+    if (item.id === SIDEBAR_ITEMS.CONVERSATION_DRIFT)
+      return hasFeature(features, FeatureToggleKey.ANALYTICS);
 
     switch (item.id) {
       // Permission-gated tabs require permissions to be loaded; until then

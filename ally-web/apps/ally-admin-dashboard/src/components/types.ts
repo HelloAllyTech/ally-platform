@@ -219,6 +219,8 @@ export interface NavigationItem {
   id: string;
   label: string;
   path: string;
+  /** Sidebar section (a `NavSectionId`); a tab without one lands in the last section. */
+  section?: string;
   icon?: React.ReactNode;
 }
 
