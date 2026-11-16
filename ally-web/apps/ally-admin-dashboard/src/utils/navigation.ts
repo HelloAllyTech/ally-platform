@@ -33,7 +33,9 @@ const getNavSectionLabels = (): Record<NavSectionId, string> => ({
 });
 
 /** Where the Analytics page opens its Conversation Drift tab (see ANALYTICS_TAB_PARAM). */
-export const CONVERSATION_DRIFT_PATH = `${ROUTES.ANALYTICS}?tab=drift`;
+// A function, not a constant: `ROUTES` must not be read while this module loads (circular imports,
+// suites that mock `@constants`).
+export const getConversationDriftPath = (): string => `${ROUTES.ANALYTICS}?tab=drift`;
 
 /**
  * Builds the full set of admin navigation tabs in their default order: the sections in order,
@@ -95,7 +97,7 @@ const buildNavigationItems = (): NavigationItem[] => {
     {
       id: S.CONVERSATION_DRIFT,
       label: l.conversationDrift,
-      path: CONVERSATION_DRIFT_PATH,
+      path: getConversationDriftPath(),
       section: "insights",
     },
     // AI & Languages
