@@ -16,6 +16,7 @@ import {
   stageLabel,
   stageStyle,
 } from "./utils/stages";
+import { DirectorStarButton } from "./DirectorStarButton";
 import { VoteButton } from "./VoteButton";
 
 /**
@@ -250,6 +251,13 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
 
       {/* stopPropagation on BOTH events, matching the board card: click alone would still let a
           vote button pointerdown reach the row's own click handler first. */}
+      <div
+        className="shrink-0"
+        onClick={event => event.stopPropagation()}
+        onPointerDown={event => event.stopPropagation()}
+      >
+        <DirectorStarButton opportunity={opportunity} />
+      </div>
       {budget && (
         <div
           className="shrink-0"

@@ -174,6 +174,11 @@ export interface RoadmapOpportunity {
    */
   compositeScore: number;
   /**
+   * The Prod Director's star. NON-NULL ONLY FOR THE DIRECTOR — null for everyone else, which is
+   * what keeps the icon invisible to them. The star still lifts their rank.
+   */
+  directorStarred?: boolean | null;
+  /**
    * DISTINCT admins backing this, across all periods. BREADTH, where priorityScore is
    * INTENSITY — one admin spending 40 votes and forty spending one each are the same total and
    * very different signals. Everyone who can vote is already a platform admin, so a distinct
@@ -403,12 +408,29 @@ export interface RoadmapStrategyGoalsResponse {
   needingAssessment: number;
 }
 
-/** The four composite-rank factor weights. Normalised to sum 1 server-side. */
+/** The five composite-rank factor weights. Normalised to sum 1 server-side. */
 export interface RoadmapRankWeights {
   votesWeight: number;
   votersWeight: number;
   effortWeight: number;
   goalImpactWeight: number;
+  /** The Prod Director's star as a factor: starred scores 100, unstarred 0. */
+  starWeight: number;
+  /** The platform admin acting as Prod Director, or null. */
+  prodDirectorUserId?: number | null;
+}
+
+export type RoadmapRankFactorKey =
+  | "votesWeight"
+  | "votersWeight"
+  | "effortWeight"
+  | "goalImpactWeight"
+  | "starWeight";
+
+export interface RoadmapProdDirector {
+  userId: number | null;
+  /** Every platform admin — the only people who can be picked. */
+  candidates: { id: number; name: string; email: string }[];
 }
 
 /** One stored verdict, for the drawer breakdown. Machine-derived and read-only by design. */

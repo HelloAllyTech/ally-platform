@@ -57,6 +57,10 @@ vi.mock("@hooks", () => ({ useUser: () => ({ features: [] }) }));
 vi.mock("@utils", () => ({ hasFeature: () => false }));
 
 const mutation = vi.hoisted(() => () => [vi.fn(), { isLoading: false }]);
+vi.mock("../DirectorStarButton", () => ({
+  DirectorStarButton: () => null,
+}));
+
 vi.mock("@api", () => ({
   useGetRoadmapBreadthQuery: () => ({ data: undefined }),
   useGetRoadmapOpportunityQuery: () => ({

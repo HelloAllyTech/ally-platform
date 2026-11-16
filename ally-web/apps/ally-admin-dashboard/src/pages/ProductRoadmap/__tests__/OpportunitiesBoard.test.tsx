@@ -18,6 +18,10 @@ vi.mock("../useSetVotes", () => ({
   useSetVotes: () => vi.fn(),
 }));
 
+vi.mock("../DirectorStarButton", () => ({
+  DirectorStarButton: () => null,
+}));
+
 vi.mock("../VoteButton", () => ({
   VoteButton: () => null,
 }));

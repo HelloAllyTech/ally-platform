@@ -16,6 +16,10 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   Tooltip: ({ children }: any) => <>{children}</>,
 }));
 
+vi.mock("../DirectorStarButton", () => ({
+  DirectorStarButton: () => null,
+}));
+
 vi.mock("../VoteButton", () => ({
   VoteButton: () => null,
 }));
