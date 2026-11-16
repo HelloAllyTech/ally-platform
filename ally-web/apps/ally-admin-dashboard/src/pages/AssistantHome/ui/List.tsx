@@ -1,6 +1,7 @@
 import React, { useId, useState } from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 /**
  * The home's list pattern (chunk 20d-2): one row per entry with its words on the left and its
@@ -109,7 +110,12 @@ export const AddRow: React.FC<{
         }}
       />
       {extra}
-      <Button onClick={() => void add()} disabled={disabled || !value.trim() || busy}>
+      <Button
+        variant={ButtonVariant.TERTIARY}
+        type="button"
+        onClick={() => void add()}
+        disabled={disabled || !value.trim() || busy}
+      >
         {addLabel}
       </Button>
     </div>
@@ -127,10 +133,10 @@ export const InlineConfirm: React.FC<{
   <div className="ally-inline-confirm" role="group" aria-label={question}>
     <p className="ally-small">{question}</p>
     <div className="ally-btn-row">
-      <Button className="ally-btn--danger" onClick={onConfirm}>
+      <Button variant={ButtonVariant.DESTRUCTIVE} type="button" onClick={onConfirm}>
         {confirmLabel}
       </Button>
-      <Button variant="ghost" onClick={onCancel}>
+      <Button variant={ButtonVariant.TEXT} type="button" onClick={onCancel}>
         {cancelLabel}
       </Button>
     </div>

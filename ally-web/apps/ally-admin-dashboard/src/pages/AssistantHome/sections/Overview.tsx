@@ -3,7 +3,9 @@ import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useGetHomeNumbersQuery, useSetChatbotStatusMutation } from "@api";
-import { Button, Segmented } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { Segmented } from "@components/v2";
 import { ROUTES } from "@constants";
 import { BotPageView, ChatbotStatus } from "@types";
 
@@ -66,7 +68,8 @@ export const OverviewSection: React.FC<
           </p>
           {canEdit && (
             <Button
-              variant={live ? "secondary" : "primary"}
+              variant={live ? ButtonVariant.TERTIARY : ButtonVariant.PRIMARY}
+              type="button"
               disabled={statusState.isLoading}
               onClick={() =>
                 void setStatus({
@@ -99,8 +102,16 @@ export const OverviewSection: React.FC<
                 {page.link}
               </a>
               <div className="ally-btn-row">
-                <Button onClick={() => void copyToClipboard(page.link)}>{t.copy}</Button>
-                <Button onClick={downloadQr}>{t.qr}</Button>
+                <Button
+                  variant={ButtonVariant.TERTIARY}
+                  type="button"
+                  onClick={() => void copyToClipboard(page.link)}
+                >
+                  {t.copy}
+                </Button>
+                <Button variant={ButtonVariant.TERTIARY} type="button" onClick={downloadQr}>
+                  {t.qr}
+                </Button>
               </div>
             </div>
           </div>

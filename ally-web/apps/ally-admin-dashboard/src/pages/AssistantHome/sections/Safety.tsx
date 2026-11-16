@@ -1,7 +1,9 @@
 import React, { useId, useState } from "react";
 
 import { useChangeOwnRuleMutation } from "@api";
-import { Button, SafetyCard } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { SafetyCard } from "@components/v2";
 import type { RuleChange, SafetyRule } from "@types";
 
 import { COPY, fill } from "../../Onboarding/copy";
@@ -52,10 +54,12 @@ const OwnRule: React.FC<{
               if (event.key === "Escape") setEditing(false);
             }}
           />
-          <Button type="submit" variant="primary" disabled={busy || !value.trim()}>
+          <Button variant={ButtonVariant.PRIMARY} type="submit" disabled={busy || !value.trim()}>
             {COPY.learned.save}
           </Button>
-          <Button onClick={() => setEditing(false)}>{COPY.learned.cancel}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => setEditing(false)}>
+            {COPY.learned.cancel}
+          </Button>
         </form>
       ) : (
         <>
@@ -183,7 +187,11 @@ export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit }) =>
               maxLength={200}
               onChange={event => setDraft(event.target.value)}
             />
-            <Button type="submit" disabled={state.isLoading || !draft.trim()}>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="submit"
+              disabled={state.isLoading || !draft.trim()}
+            >
               {t.addRule}
             </Button>
           </form>

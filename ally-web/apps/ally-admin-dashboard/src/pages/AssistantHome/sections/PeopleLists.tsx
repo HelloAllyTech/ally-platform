@@ -1,7 +1,8 @@
 import React, { useId, useState } from "react";
 
 import { useBindConnectorMutation, useCheckWaNumberMutation } from "@api";
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 import { ChatbotMemberRole, WaBusinessNumberStatus } from "@types";
 import type { Chatbot, HomeTeamMember, WaBusinessNumber } from "@types";
 
@@ -111,17 +112,28 @@ export const WhatsAppNumbers: React.FC<{ bot: Chatbot; canManage: boolean }> = (
                   ) : (
                     <>
                       {number.status === WaBusinessNumberStatus.AWAITING_WEBHOOK ? (
-                        <Button className="ally-btn--sm" onClick={() => setConnecting(true)}>
+                        <Button
+                          variant={ButtonVariant.TERTIARY}
+                          size="sm"
+                          type="button"
+                          onClick={() => setConnecting(true)}
+                        >
                           {t.numbers.finish}
                         </Button>
                       ) : (
-                        <Button className="ally-btn--sm" onClick={() => void runCheck(number)}>
+                        <Button
+                          variant={ButtonVariant.TERTIARY}
+                          size="sm"
+                          type="button"
+                          onClick={() => void runCheck(number)}
+                        >
                           {t.numbers.check}
                         </Button>
                       )}
                       <Button
-                        variant="ghost"
-                        className="ally-btn--sm"
+                        variant={ButtonVariant.TEXT}
+                        size="sm"
+                        type="button"
                         disabled={moving}
                         onClick={() => setStopping(number.id)}
                       >
@@ -141,7 +153,13 @@ export const WhatsAppNumbers: React.FC<{ bot: Chatbot; canManage: boolean }> = (
       )}
       {canManage && (
         <div>
-          <Button onClick={() => setConnecting(true)}>{t.numbers.connect}</Button>
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            type="button"
+            onClick={() => setConnecting(true)}
+          >
+            {t.numbers.connect}
+          </Button>
         </div>
       )}
       <ListError error={error} />
@@ -149,7 +167,13 @@ export const WhatsAppNumbers: React.FC<{ bot: Chatbot; canManage: boolean }> = (
         <Sheet label={t.numbers.connectTitle} onClose={() => setConnecting(false)}>
           <header className="ally-sheet__head">
             <h2 className="ally-heading">{t.numbers.connectTitle}</h2>
-            <Button onClick={() => setConnecting(false)}>{t.documents.close}</Button>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              onClick={() => setConnecting(false)}
+            >
+              {t.documents.close}
+            </Button>
           </header>
           {/* Meta's steps are still the classic flow, inside the v2 sheet (a redraw is a follow-up). */}
           <div className="ally-home__classic">

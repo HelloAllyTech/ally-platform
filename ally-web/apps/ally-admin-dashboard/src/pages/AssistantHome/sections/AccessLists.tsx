@@ -1,6 +1,7 @@
 import React, { useId, useState } from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 import { ChatbotAccessMode } from "@types";
 import type { BotPageAccess, HomeListEntry } from "@types";
 
@@ -57,6 +58,8 @@ const AddMany: React.FC<{
       </div>
       <div>
         <Button
+          variant={ButtonVariant.TERTIARY}
+          type="button"
           disabled={disabled || !linesOf(text).length}
           onClick={() => void onAdd(linesOf(text)).then(ok => ok && setText(""))}
         >
@@ -142,6 +145,8 @@ export const PageAccessList: React.FC<{
       {canEdit && kind === "organisation" && yours && !hasYours && (
         <div>
           <Button
+            variant={ButtonVariant.TERTIARY}
+            type="button"
             disabled={list.saving}
             onClick={() =>
               void list.change(
@@ -284,6 +289,8 @@ export const WhatsAppAudience: React.FC<{
                   !list.items.some(entry => entry.value === list.yourOrganisation!.id) && (
                     <div>
                       <Button
+                        variant={ButtonVariant.TERTIARY}
+                        type="button"
                         disabled={list.saving}
                         onClick={() =>
                           void list.change(

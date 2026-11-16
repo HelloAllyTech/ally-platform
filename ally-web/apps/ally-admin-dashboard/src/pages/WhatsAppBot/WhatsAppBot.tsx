@@ -4,7 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useGetArchivedChatbotsQuery, useGetChatbotsQuery } from "@api";
 import { EmptyState } from "@components";
-import { Button as V2Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 import { en, ROUTES } from "@constants";
 import { Chatbot, ChatbotMemberRole, ChatbotStatus } from "@types";
 
@@ -81,9 +82,13 @@ export const WhatsAppBot: React.FC = () => {
           <p className="ally-small">{en.whatsappBot.subtitle}</p>
         </div>
         {/* Onboarding is the only way to make an assistant (chunk 20d). */}
-        <V2Button variant="primary" onClick={() => navigate(ROUTES.CHATBOT_NEW)}>
+        <Button
+          variant={ButtonVariant.PRIMARY}
+          type="button"
+          onClick={() => navigate(ROUTES.CHATBOT_NEW)}
+        >
           {ONBOARDING_COPY.newAssistant}
-        </V2Button>
+        </Button>
       </header>
       {tabItems.length > 1 && (
         <div className="ally-list-page__tabs" role="tablist" data-testid="tabs">
