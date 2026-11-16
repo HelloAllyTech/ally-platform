@@ -55,10 +55,12 @@ import { SignalsTab } from "./plans/SignalsTab";
 import { QuickAddOpportunityModal } from "./QuickAddOpportunityModal";
 import { ReportBugModal } from "./ReportBugModal";
 import { RoadmapSettingsDrawer } from "./RoadmapSettingsDrawer";
+import { RoadmapShortcutSheet } from "./RoadmapShortcutSheet";
 import { RoadmapSortControl } from "./RoadmapSortControl";
 import { SavedViewTabs } from "./SavedViewTabs";
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useProductRoadmapRealtime } from "./useProductRoadmapRealtime";
+import { useRoadmapShortcuts } from "./useRoadmapShortcuts";
 import { useSavedViews } from "./useSavedViews";
 import {
   canFileIdeas,
@@ -948,6 +950,43 @@ export const ProductRoadmap: React.FC = () => {
     resetPaging();
   };
 
+  // ── keyboard cursor ───────────────────────────────────────────────────────
+  const [cursorId, setCursorId] = useState<string | null>(null);
+  const [isShortcutSheetOpen, setIsShortcutSheetOpen] = useState(false);
+  /** The rows j/k can walk: the table and the list share one query; the board has none. */
+  const cursorRowIds = useMemo(
+    () => (isOpportunitiesTab && !isBoard ? (data?.items ?? []).map(item => item.id) : []),
+    [isOpportunitiesTab, isBoard, data],
+  );
+  // A cursor on a row that left the list (accepted, filtered away) would leave the keys with
+  // nothing to act on and no visible ring, so it falls back to "no cursor".
+  useEffect(() => {
+    if (cursorId && !cursorRowIds.includes(cursorId)) setCursorId(null);
+  }, [cursorId, cursorRowIds]);
+  /** Anything modal over the page owns the keyboard, and so does a tab with no list. */
+  const isKeyboardFree =
+    isOpportunitiesTab &&
+    !isBoard &&
+    !openOpportunityId &&
+    !openBuilderSessionId &&
+    !isSettingsOpen &&
+    !isInterviewOpen &&
+    !isQuickAddOpen &&
+    !isReportBugOpen &&
+    !isShortcutSheetOpen &&
+    !isBreadthPanelOpen;
+  useRoadmapShortcuts(isKeyboardFree, {
+    rowIds: cursorRowIds,
+    cursorId,
+    onCursor: setCursorId,
+    onOpen: id => openOpportunity(id),
+    onSearch: () =>
+      document
+        .querySelector<HTMLInputElement>('input[placeholder="Search opportunities"]')
+        ?.focus(),
+    onHelp: () => setIsShortcutSheetOpen(true),
+  });
+
   return (
     <div className="flex flex-col gap-4 md:p-6">
       {/* The title row carries the vote balance inline. It used to spend four lines on a bordered
@@ -1396,6 +1435,8 @@ export const ProductRoadmap: React.FC = () => {
           canManage={canManage}
           onOpenOpportunity={openOpportunity}
           onAddClick={() => setIsInterviewOpen(true)}
+          cursorId={cursorId}
+          onCursor={setCursorId}
           offset={offset}
           pageSize={PAGE_SIZE}
           layoutToggle={layoutToggle}
@@ -1443,6 +1484,8 @@ export const ProductRoadmap: React.FC = () => {
           canManage={canManage}
           onOpenOpportunity={openOpportunity}
           onAddClick={() => setIsInterviewOpen(true)}
+          cursorId={cursorId}
+          onCursor={setCursorId}
           loaded={data?.items.length ?? 0}
           onLoadMore={() => setListLoaded(current => current + FEED_PAGE_SIZE)}
           layoutToggle={layoutToggle}
@@ -1513,6 +1556,10 @@ export const ProductRoadmap: React.FC = () => {
             openOpportunity(id);
           }}
         />
+      )}
+
+      {isShortcutSheetOpen && (
+        <RoadmapShortcutSheet canDecide={false} onClose={() => setIsShortcutSheetOpen(false)} />
       )}
 
       {isReportBugOpen && <ReportBugModal onClose={() => setIsReportBugOpen(false)} />}

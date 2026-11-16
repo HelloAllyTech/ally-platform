@@ -60,6 +60,9 @@ interface OpportunitiesListViewProps {
   isQueue?: boolean;
   /** The Inbox, a pipeline view whose empty state is "inbox zero" rather than "queue empty". */
   isInbox?: boolean;
+  /** The keyboard cursor row, owned by the page so the shortcut layer and the rows agree. */
+  cursorId?: string | null;
+  onCursor?: (id: string) => void;
   /** Left-hand slot on the control row — the Queue's sort picker. */
   leading?: React.ReactNode;
   /**
@@ -116,6 +119,8 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
   showFilters,
   isQueue,
   isInbox,
+  cursorId = null,
+  onCursor,
   leading,
   onLoadMore,
   layoutToggle,
@@ -199,7 +204,7 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {rows.map(opportunity => (
+          {rows.map((opportunity, index) => (
             <OpportunityListCard
               key={opportunity.id}
               opportunity={opportunity}
@@ -211,6 +216,10 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
               canVote={canVote}
               onSetVotes={allocate}
               onOpen={() => onOpenOpportunity(opportunity.id)}
+              isCursor={opportunity.id === cursorId}
+              // Tab lands on the cursor row, or the first row when there is no cursor yet.
+              isTabStop={cursorId === null ? index === 0 : opportunity.id === cursorId}
+              onCursor={() => onCursor?.(opportunity.id)}
             />
           ))}
         </div>

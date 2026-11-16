@@ -60,6 +60,12 @@ interface OpportunityListCardProps {
   canVote: boolean;
   onSetVotes: (opportunityId: string, next: number, previous: number) => void;
   onOpen: () => void;
+  /** The keyboard cursor is on this row — draws the ring. See useRoadmapShortcuts. */
+  isCursor?: boolean;
+  /** Whether this row is the one Tab lands on (roving tabindex: exactly one row is). */
+  isTabStop?: boolean;
+  /** Fired when the row takes focus, so the cursor follows a click or a Tab. */
+  onCursor?: () => void;
 }
 
 /**
@@ -79,6 +85,9 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
   canVote,
   onSetVotes,
   onOpen,
+  isCursor = false,
+  isTabStop = false,
+  onCursor,
 }) => {
   const { unit, enabled } = useScoreUnit();
   const isQueueCard = isQueue;
@@ -91,7 +100,23 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
   return (
     <div
       onClick={onOpen}
-      className="border-border-light bg-background-primary flex cursor-pointer items-start gap-3 border border-l-4 p-3 md:gap-4 md:p-4"
+      // A focusable row: j/k move the cursor, Enter opens. Roving tabindex, so Tab visits the
+      // list once rather than stopping on every one of up to 200 cards.
+      data-roadmap-row={opportunity.id}
+      tabIndex={isTabStop || isCursor ? 0 : -1}
+      aria-current={isCursor ? "true" : undefined}
+      onFocus={event => {
+        if (event.target === event.currentTarget) onCursor?.();
+      }}
+      onKeyDown={event => {
+        if (event.target === event.currentTarget && event.key === "Enter") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`border-border-light bg-background-primary flex cursor-pointer items-start gap-3 border border-l-4 p-3 outline-none md:gap-4 md:p-4 ${
+        isCursor ? "ring-primary-500 ring-2 ring-inset" : ""
+      }`}
       // Inline, not a Tailwind class: the ramp is continuous, and Tailwind's JIT can only emit
       // classes it can see as literals at build time. `border-l-4` sets the width; only the
       // colour is dynamic.

@@ -121,6 +121,9 @@ interface OpportunitiesBoardProps {
   canManage: boolean;
   onOpenOpportunity: (id: string) => void;
   onAddClick: () => void;
+  /** The keyboard cursor row, owned by the page. See useRoadmapShortcuts. */
+  cursorId?: string | null;
+  onCursor?: (id: string) => void;
   /** False on the Queue view, whose filters are its definition. Threaded to RoadmapFilterBar. */
   showFilters?: boolean;
   /** Offset pagination. `offset` is the same value carried in `listArgs`. */
@@ -180,6 +183,8 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
   canManage,
   onOpenOpportunity,
   onAddClick,
+  cursorId = null,
+  onCursor,
   showFilters,
   offset,
   pageSize,
@@ -317,7 +322,26 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
                 <TableRow
                   key={opportunity.id}
                   onClick={() => onOpenOpportunity(opportunity.id)}
-                  className="cursor-pointer"
+                  data-roadmap-row={opportunity.id}
+                  tabIndex={
+                    opportunity.id === cursorId ||
+                    (cursorId === null && opportunity.id === rows[0]?.id)
+                      ? 0
+                      : -1
+                  }
+                  aria-current={opportunity.id === cursorId ? "true" : undefined}
+                  onFocus={(event: React.FocusEvent) => {
+                    if (event.target === event.currentTarget) onCursor?.(opportunity.id);
+                  }}
+                  onKeyDown={(event: React.KeyboardEvent) => {
+                    if (event.target === event.currentTarget && event.key === "Enter") {
+                      event.preventDefault();
+                      onOpenOpportunity(opportunity.id);
+                    }
+                  }}
+                  className={`cursor-pointer outline-none ${
+                    opportunity.id === cursorId ? "ring-primary-500 ring-2 ring-inset" : ""
+                  }`}
                 >
                   {/* Number only — no bar. The rows are already sorted by priority, so a bar
                       restated the ordering the reader is looking straight at, and it cost a
