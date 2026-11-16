@@ -235,10 +235,18 @@ export const PINNED_RULE_PROMPTS: ReadonlyArray<{
 }> = [
   { code: DEBRIEF_PROMPT_CODES.safetyReader, label: 'Safety rules' },
   {
+    code: DEBRIEF_PROMPT_CODES.riskCueDefinition,
+    label: 'Risk cue definition (clear or possible)',
+  },
+  {
     code: DEBRIEF_PROMPT_CODES.rubric,
     label: 'Rubric (the Evaluator and the judge score by it)',
   },
   { code: 'debrief_quality_judge_system', label: "Judge's instructions" },
+  {
+    code: DEBRIEF_PROMPT_CODES.evaluator,
+    label: "Evaluator's instructions (whether a draft reaches learners)",
+  },
 ];
 export const PINNED_RULE_CODES: ReadonlySet<string> = new Set(
   PINNED_RULE_PROMPTS.map((p) => p.code),

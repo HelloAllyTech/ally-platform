@@ -27,6 +27,7 @@ async def judge_debrief(
     scenario_session_id: Optional[str] = None,
     history: Optional[str] = None,
     instructions: Optional[str] = None,
+    risk_cue_definition: Optional[str] = None,
 ) -> Tuple[Optional[DebriefQualityOutput], str]:
     """Score one debrief against its transcript.
 
@@ -52,6 +53,7 @@ async def judge_debrief(
         rubric=rubric,
         history=history,
         instructions=instructions,
+        risk_cue_definition=risk_cue_definition,
     )
 
     from app.core.llm.dispatch import PROVIDER_GEMINI, generate_structured
@@ -90,10 +92,14 @@ async def judge_debrief(
         )
         return None, meta["model"]
 
-    return _enforce_missed_risk_cue(output), meta["model"]
+    # v2: only a missed CLEAR cue is the hard fail; a missed possible one
+    # is the MISSED FEELINGS rule's, scored under practice_alignment.
+    return _enforce_missed_risk_cue(output, clear_only=True), meta["model"]
 
 
-def _enforce_missed_risk_cue(output: DebriefQualityOutput) -> DebriefQualityOutput:
+def _enforce_missed_risk_cue(
+    output: DebriefQualityOutput, clear_only: bool = False
+) -> DebriefQualityOutput:
     """A risk cue the debrief leaves out IS the missed_risk_cue hard fail.
 
     The model lists the risk cues and whether the debrief addresses each one;
@@ -101,7 +107,23 @@ def _enforce_missed_risk_cue(output: DebriefQualityOutput) -> DebriefQualityOutp
     model to also remember to raise it. Before this, a debrief that simply
     omitted the moment scored as if nothing had happened.
     """
-    missed = [c for c in output.risk_cues if not c.addressed_by_debrief]
+    missed = [
+        c
+        for c in output.risk_cues
+        if not c.addressed_by_debrief and (c.clear or not clear_only)
+    ]
+    if clear_only and not missed:
+        # The judge (v2): a hard fail it raised only for possible cues
+        # is not one by the rubric.
+        possible = {
+            c.turn_index
+            for c in output.risk_cues
+            if not c.clear and not c.addressed_by_debrief
+        }
+        if possible:
+            output.hard_fails = [
+                h for h in output.hard_fails if h.code != "missed_risk_cue"
+            ]
     if missed and not any(h.code == "missed_risk_cue" for h in output.hard_fails):
         first = missed[0]
         output.hard_fails.append(

@@ -46,7 +46,8 @@ def test_prompt_marks_speakers_and_wraps_data():
     assert "[turn 2] CLIENT: There's no point any more." in p
     assert "[turn 1] COUNSELLOR: How are you?" in p
     assert "<transcript>" in p and "SESSION LANGUAGE: hi" in p
-    assert build_prompt(TRANSCRIPT, "en", system="LIVE").startswith("LIVE")
+    live = "LIVE {{risk_cue_definition}} {{transcript}}"
+    assert build_prompt(TRANSCRIPT, "en", system=live).startswith("LIVE")
 
 
 @pytest.mark.asyncio

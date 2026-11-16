@@ -440,6 +440,7 @@ export const RECIPE_LABELS: Record<string, string> = {
 export function promptLabel(code: string): string {
   const known: Record<string, string> = {
     debrief_safety_reader_system: 'Safety reader',
+    debrief_risk_cue_definition: 'Risk cue definition',
     debrief_analyst_system: 'Analyst',
     debrief_progress_reader_system: 'Progress reader',
     debrief_progress_system: 'Progress agent',
@@ -453,6 +454,11 @@ export function promptLabel(code: string): string {
     debrief_history_deep_system: 'History (deep)',
     debrief_language_specialist_system: 'Language specialist',
     debrief_quality_judge_system: 'Judge',
+    debrief_evaluator_system: "Evaluator's instructions",
+    debrief_evaluator_fix_system: "Evaluator's fix notes",
+    debrief_planner_agents: 'Planner agents',
+    debrief_pm_investigator_system: 'PM agent investigator',
+    debrief_pm_reviewer_system: 'PM agent reviewer',
   };
   if (known[code]) return known[code];
   const words = code

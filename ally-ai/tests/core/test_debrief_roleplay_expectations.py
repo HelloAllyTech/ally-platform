@@ -50,7 +50,7 @@ async def test_analyst_assesses_the_roleplay_behaviours(dispatch_returns):
         ],
     )
     prompt = calls["prompt"]
-    assert "ROLEPLAY EXPECTATIONS" in prompt
+    assert prompt.count("<roleplay_expectations>") == 1
     assert "did the counsellor show the helpful" in prompt
     assert "never as if it had a definition" in prompt
     assert "lower your confidence" in prompt
@@ -68,7 +68,7 @@ async def test_analyst_falls_back_to_foundational_skills_with_nothing(
 
     calls = dispatch_returns(EvidenceMap())
     await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
-    assert "ROLEPLAY EXPECTATIONS" not in calls["prompt"]
+    assert "(ROLEPLAY EXPECTATIONS):\nnone" in calls["prompt"]
     assert "<roleplay_expectations>" not in calls["prompt"]
     assert "Empathy, warmth and genuineness" in DEFAULT_ANALYST_SYSTEM
 
@@ -130,10 +130,8 @@ def test_the_defaults_lead_with_the_roleplay_and_use_foundational_skills_loosely
 def test_an_unhelpful_behaviour_is_named_by_what_to_do_instead():
     """Review 2026-11-16: "Interrupts client" became a learner's card heading.
     The wording lives in the Analyst prompt (Skills Store), not in code."""
-    from app.core.debrief.steps import DEFAULT_ANALYST_SYSTEM, _expectations_line
+    from app.core.debrief.steps import DEFAULT_ANALYST_SYSTEM
 
     assert "Name an unhelpful behaviour by what to do instead" in DEFAULT_ANALYST_SYSTEM
     assert "observed when the" in DEFAULT_ANALYST_SYSTEM
-    assert "what to do instead" not in " ".join(
-        _expectations_line([], ["Interrupts client"], [])
-    )
+    assert DEFAULT_ANALYST_SYSTEM.count("what to do instead") == 1

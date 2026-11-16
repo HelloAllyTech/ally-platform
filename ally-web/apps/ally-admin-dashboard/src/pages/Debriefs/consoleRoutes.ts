@@ -42,6 +42,7 @@ export type SettingsSection =
   | "autonomy"
   | "weights"
   | "pinned"
+  | "clinical"
   | "progress"
   | "schedules"
   | "guidance";

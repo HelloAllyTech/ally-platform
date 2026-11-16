@@ -49,14 +49,12 @@ async def _call(runtime: ToolRuntime[ReplyRun], name: str, body: Dict[str, Any])
 
 @tool
 async def search_guidance(topic: str, runtime: ToolRuntime[ReplyRun]) -> str:
-    """Look up practice guidance the learner's organisation uses, for a
-    counselling skill or situation the learner is asking about. Use it when the
-    answer should rest on guidance rather than on the session alone.
+    """Look up the practice guidance the learner's organisation uses on a
+    counselling skill or situation. When to use it is the reply prompt's TOOLS
+    section.
 
     Args:
-        topic: The skill or situation in a few words, e.g. "responding to a
-            suicide disclosure" or "open questions". Never the learner's own
-            words, names or personal details.
+        topic: A skill or situation in a few words.
     """
     clean = clean_topic(topic)
     if not clean:
@@ -81,8 +79,7 @@ async def search_guidance(topic: str, runtime: ToolRuntime[ReplyRun]) -> str:
 @tool
 async def get_learner_history(runtime: ToolRuntime[ReplyRun]) -> str:
     """The learner's earlier "Work on this" points from past debriefs, newest
-    first. Use it when they ask how they are doing over time or whether
-    something keeps coming up."""
+    first."""
     res = await _call(runtime, "get_learner_history", {"limit": HISTORY_POINTS})
     points = res.get("points") or []
     if not points:
@@ -97,8 +94,7 @@ async def get_learner_history(runtime: ToolRuntime[ReplyRun]) -> str:
 @tool
 async def get_live_detections(runtime: ToolRuntime[ReplyRun]) -> str:
     """What the live detector recorded during this roleplay for each behaviour
-    the scenario watches for. It can be wrong; use it only as a second opinion
-    next to the transcript."""
+    the scenario watches for."""
     res = await _call(runtime, "get_live_detections", {})
     detections = res.get("detections") or []
     if not detections:

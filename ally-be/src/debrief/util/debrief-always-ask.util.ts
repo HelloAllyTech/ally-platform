@@ -90,7 +90,10 @@ export function alwaysAsk(
   const change = idea.change ?? {};
   const evidence = idea.evidence ?? {};
   const codes = promptCodes(change, evidence);
-  if (codes.includes(DEBRIEF_PROMPT_CODES.safetyReader)) {
+  if (
+    codes.includes(DEBRIEF_PROMPT_CODES.safetyReader) ||
+    codes.includes(DEBRIEF_PROMPT_CODES.riskCueDefinition)
+  ) {
     return {
       kind: 'safety_reader',
       locked: true,

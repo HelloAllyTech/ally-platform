@@ -1304,7 +1304,15 @@ export const FEEDBACK_GROUNDEDNESS_RUBRIC = definePrompt(
 /** src/prompts/debrief_quality/rubric.txt */
 export const DEBRIEF_QUALITY_RUBRIC = definePrompt(
   'debrief_quality_rubric',
-  {},
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    trainee_level: 'optional',
+    transcript: 'required',
+    guidance: 'optional',
+    trainee_history: 'optional',
+    debrief: 'required',
+  },
   {
     name: 'Debrief Quality Judge Rubric',
     description:
@@ -1330,24 +1338,149 @@ export const DEBRIEF_QUALITY_JUDGE_SYSTEM = definePrompt(
 /** src/prompts/debrief/safety_reader_system.txt */
 export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
   'debrief_safety_reader_system',
-  {},
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief Safety Reader',
     description:
-      "The debrief agent's mandatory safety step: finds the client's risk cues (and how the learner responded) and the learner's own distress. The step composes the transcript around this text. Pinned: change it only after the safety recall gate passes.",
+      "The debrief agent's mandatory safety step: finds the client's risk cues (and how the learner responded) and the learner's own distress. The step composes the transcript around this text, with the RISK CUE DEFINITION block; each cue also carries its strength (clear or possible). Pinned: change it only after the safety recall gate passes.",
     category: 'evaluation',
     output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/risk_cue_definition.txt */
+export const DEBRIEF_RISK_CUE_DEFINITION = definePrompt(
+  'debrief_risk_cue_definition',
+  {},
+  {
+    name: 'Debrief risk cue definition',
+    description:
+      'The one definition of a clear and a possible client risk cue, and what each means for a debrief. ally-ai adds it as a RISK CUE DEFINITION block to every Debrief call that judges risk cues: the Safety reader, the Writer, the Reviser, the Evaluator and the independent debrief-quality judge. Pinned: a change is approved by the clinical advisor or the owner.',
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/evaluator_system.txt */
+export const DEBRIEF_EVALUATOR_SYSTEM = definePrompt(
+  'debrief_evaluator_system',
+  {},
+  {
+    name: "Debrief Evaluator's instructions",
+    description:
+      "What the Evaluator inside a debrief run is told to do last, after the rubric, the risk cue definition, the transcript and the draft: list the risk cues, score the eight dimensions, list the hard fails. Its own code, separate from the independent judge's debrief_quality_judge_system, so a change to one never moves the other. Pinned: it decides whether a draft reaches learners.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/evaluator_fix_system.txt */
+export const DEBRIEF_EVALUATOR_FIX_SYSTEM = definePrompt(
+  'debrief_evaluator_fix_system',
+  {
+    pass_bar: 'required',
+    fix_sections: 'required',
+  },
+  {
+    name: "Debrief Evaluator's fix notes",
+    description:
+      "After the Evaluator's instructions: say whether each risk cue is clear, and list what to change, section by section, so the draft reaches the PASS BAR. The code adds the PASS BAR (the release's passScore) and the FIX SECTIONS names the Reviser's critique is keyed by. Release-only.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/planner_agents.txt */
+export const DEBRIEF_PLANNER_AGENTS = definePrompt(
+  'debrief_planner_agents',
+  {},
+  {
+    name: 'Debrief planner: how each agent is described',
+    description:
+      "The wording the planner sees for each analysis agent it may choose (description, use_when, skip_when), one '## <agent id>' section each. The ids and every machine field (scopes, costs, requires) stay in ally-ai's manifests, which are also the fallback for an agent or field this text leaves out. Release-only.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_investigator_system.txt */
+export const DEBRIEF_PM_INVESTIGATOR_SYSTEM = definePrompt(
+  'debrief_pm_investigator_system',
+  {},
+  {
+    name: 'Debrief PM agent: investigator',
+    description:
+      "The PM agent's investigator subagent: investigates one problem with read-only tools and reports back. Sent with every PM agent run and conversation turn.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_reviewer_system.txt */
+export const DEBRIEF_PM_REVIEWER_SYSTEM = definePrompt(
+  'debrief_pm_reviewer_system',
+  {},
+  {
+    name: 'Debrief PM agent: reviewer',
+    description:
+      "The PM agent's reviewer subagent: reviews one proposed change before it is tried and answers supported / fits_everywhere / safe; code stores its verdict as the change's confidence. Pinned: it defines what a safe change is and what waits for a person.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_skill_builder_brief.txt */
+export const DEBRIEF_PM_SKILL_BUILDER_BRIEF = definePrompt(
+  'debrief_pm_skill_builder_brief',
+  {},
+  {
+    name: 'Debrief PM agent skill: Builder brief',
+    description:
+      "A PM agent skill (SKILL.md, with its frontmatter): how to write a brief for Builder. ally-ai writes it into the agent's read-only /skills/ before every run.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_skill_prompt_change.txt */
+export const DEBRIEF_PM_SKILL_PROMPT_CHANGE = definePrompt(
+  'debrief_pm_skill_prompt_change',
+  {},
+  {
+    name: 'Debrief PM agent skill: prompt change',
+    description:
+      "A PM agent skill (SKILL.md, with its frontmatter): how to write a prompt change as a find/replace. ally-ai writes it into the agent's read-only /skills/ before every run.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_skill_registry_agent.txt */
+export const DEBRIEF_PM_SKILL_REGISTRY_AGENT = definePrompt(
+  'debrief_pm_skill_registry_agent',
+  {},
+  {
+    name: 'Debrief PM agent skill: registry agent',
+    description:
+      "A PM agent skill (SKILL.md, with its frontmatter): how to propose a new analysis agent's manifest. ally-ai writes it into the agent's read-only /skills/ before every run.",
+    category: 'evaluation',
   },
 );
 
 /** src/prompts/debrief/analyst_system.txt */
 export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
   'debrief_analyst_system',
-  {},
+  {
+    session_language: 'optional',
+    trainee_level: 'optional',
+    checked_rules: 'optional',
+    scenario: 'optional',
+    expected_behaviours: 'optional',
+    roleplay_expectations: 'optional',
+    live_detections: 'optional',
+    case_memory: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief Analyst',
     description:
-      "The debrief agent's Analyst: builds the evidence map (each behaviour's opportunity, observed/partial/missed, confidence, importance and exact quote; pivotal moments; emotional arc; AI faults), leading with what the roleplay expects (its own helpful and unhelpful behaviours and its competencies) and adding a foundational helping skill only when it clearly shaped the session. The step composes the transcript, scenario, expected behaviours and the roleplay's expectations around this text. Release-only: a new version reaches learners through an approved release.",
+      "The debrief agent's Analyst: builds the evidence map (each behaviour's opportunity, observed/partial/missed, confidence, importance and exact quote; pivotal moments; emotional arc; AI faults), leading with what the roleplay expects (its own helpful and unhelpful behaviours and its competencies) and adding a foundational helping skill only when it clearly shaped the session. The step composes the transcript, scenario, expected behaviours and the roleplay's expectations around this text, with data lines only (ROLEPLAY EXPECTATIONS, CASE, LIVE DETECTIONS); how to read them is this text's wording. Release-only: a new version reaches learners through an approved release.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1356,11 +1489,14 @@ export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
 /** src/prompts/debrief/progress_reader_system.txt */
 export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
   'debrief_progress_reader_system',
-  {},
+  {
+    evidence_map: 'required',
+    past_points: 'optional',
+  },
   {
     name: 'Debrief Progress Reader',
     description:
-      "The debrief agent's Progress reader: compares the latest evidence map with the learner's past Work-on-this points and says only what the evidence supports. Release-only.",
+      "The debrief agent's Progress reader: compares the latest evidence map with the learner's past Work-on-this points and says only what the evidence supports, and how to use what the learner and experts said about past points. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1369,11 +1505,19 @@ export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
 /** src/prompts/debrief/progress_system.txt */
 export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
   'debrief_progress_system',
-  {},
+  {
+    session_language: 'optional',
+    card_due: 'optional',
+    skill_keys: 'optional',
+    checked_rules: 'optional',
+    this_session_evidence: 'required',
+    this_session_by_skill: 'optional',
+    learner_profile: 'required',
+  },
   {
     name: 'Debrief Progress Agent',
     description:
-      "The debrief agent's Progress agent: reads this session's evidence map with the learner's progress profile (past sessions' Analyst observations, past points and their review verdicts, the last progress report, the learner's own words, Foundational Skills levels) and proposes up to 3 skill trends, follow-ups on past points and one focus. Code vetoes any trend the record contradicts. Release-only.",
+      "The debrief agent's Progress agent: reads this session's evidence map with the learner's progress profile (past sessions' Analyst observations, past points and their review verdicts, the last progress report, the learner's own words, Foundational Skills levels) and proposes up to 3 skill trends, follow-ups on past points and one focus. This text says how to use what people said about past points. Code vetoes any trend the record contradicts. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1382,11 +1526,32 @@ export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
 /** src/prompts/debrief/writer_system.txt */
 export const DEBRIEF_WRITER_SYSTEM = definePrompt(
   'debrief_writer_system',
-  {},
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    trainee_level: 'optional',
+    organisation_tone: 'optional',
+    learner_distress: 'optional',
+    checked_rules: 'optional',
+    risk_cue_turns: 'required',
+    possible_risk_cue_turns: 'optional',
+    missed_feelings_turns: 'optional',
+    course_scenario_id: 'optional',
+    mixed_evidence: 'optional',
+    case_memory: 'optional',
+    evidence_map: 'optional',
+    safety_reading: 'required',
+    practice_options: 'optional',
+    guidance: 'optional',
+    progress: 'optional',
+    cohort: 'optional',
+    findings: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief Writer',
     description:
-      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress, preferring the roleplay's own competencies and behaviours over the foundational skills. Every client risk cue is covered: the most serious by the important moment, each other one in its `others`. Never sees the rubric. Release-only.",
+      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress, preferring the roleplay's own competencies and behaviours over the foundational skills. Every client risk cue is covered: the most serious by the important moment, each other one in its `others`. Never sees the rubric. The code adds only data lines (risk-cue turns, MISSED FEELINGS, COURSE, CASE, MIXED EVIDENCE, COHORT, FINDINGS), format lines and checked safety lines; the wording for each is in this text. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1395,11 +1560,21 @@ export const DEBRIEF_WRITER_SYSTEM = definePrompt(
 /** src/prompts/debrief/reviser_system.txt */
 export const DEBRIEF_REVISER_SYSTEM = definePrompt(
   'debrief_reviser_system',
-  {},
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    risk_cue_turns: 'required',
+    checked_rules: 'optional',
+    draft: 'optional',
+    critique: 'optional',
+    findings: 'optional',
+    evidence_map: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief Reviser',
     description:
-      "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged, adding any uncovered risk cue to the important moment's `others`. Release-only.",
+      "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged, adding any uncovered risk cue to the important moment's `others`. How to use FINDINGS is in this text. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1408,11 +1583,19 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
 /** src/prompts/debrief/planner_system.txt */
 export const DEBRIEF_PLANNER_SYSTEM = definePrompt(
   'debrief_planner_system',
-  {},
+  {
+    max_agents: 'required',
+    top_up: 'optional',
+    session_profile: 'optional',
+    evidence_summary: 'optional',
+    available_agents: 'required',
+    critique: 'optional',
+    already_ran: 'optional',
+  },
   {
     name: 'Debrief planner',
     description:
-      "The orchestrated debrief's planner (challenger releases only): runs after the safety reader and the Analyst; from the session profile, a summary of the Analyst's evidence map (pivotal moments with their turns, skills observed / partial / missed, the AI client's faults: the Analyst's words, no quotes) and the registry agents' manifests, never the transcript, chooses which analysis agents run and says why the others don't; once more after a failed evaluation, with the Evaluator's critique. The step composes the profile, the evidence summary, the manifests and the limits around this text. Release-only.",
+      "The orchestrated debrief's planner (challenger releases only): runs after the safety reader and the Analyst; from the session profile, a summary of the Analyst's evidence map (pivotal moments with their turns, skills observed / partial / missed, the AI client's faults: the Analyst's words, no quotes) and the registry agents' manifests, never the transcript, chooses which analysis agents run and says why the others don't; once more after a failed evaluation, with the Evaluator's critique. The step composes the profile, the evidence summary, the manifests (worded by debrief_planner_agents) and the limits around this text; TOP-UP is a data line, its meaning is this text's. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1421,7 +1604,13 @@ export const DEBRIEF_PLANNER_SYSTEM = definePrompt(
 /** src/prompts/debrief/protocol_check_system.txt */
 export const DEBRIEF_PROTOCOL_CHECK_SYSTEM = definePrompt(
   'debrief_protocol_check_system',
-  {},
+  {
+    session_language: 'optional',
+    findings_rules: 'required',
+    focus_turns: 'optional',
+    data: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief protocol check',
     description:
@@ -1434,7 +1623,13 @@ export const DEBRIEF_PROTOCOL_CHECK_SYSTEM = definePrompt(
 /** src/prompts/debrief/history_deep_system.txt */
 export const DEBRIEF_HISTORY_DEEP_SYSTEM = definePrompt(
   'debrief_history_deep_system',
-  {},
+  {
+    session_language: 'optional',
+    findings_rules: 'required',
+    focus_turns: 'optional',
+    data: 'optional',
+    transcript: 'optional',
+  },
   {
     name: 'Debrief history (deep)',
     description:
@@ -1447,7 +1642,13 @@ export const DEBRIEF_HISTORY_DEEP_SYSTEM = definePrompt(
 /** src/prompts/debrief/language_specialist_system.txt */
 export const DEBRIEF_LANGUAGE_SPECIALIST_SYSTEM = definePrompt(
   'debrief_language_specialist_system',
-  {},
+  {
+    session_language: 'optional',
+    findings_rules: 'required',
+    focus_turns: 'optional',
+    data: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief language specialist',
     description:
@@ -1460,11 +1661,17 @@ export const DEBRIEF_LANGUAGE_SPECIALIST_SYSTEM = definePrompt(
 /** src/prompts/debrief/reply_system.txt */
 export const DEBRIEF_REPLY_SYSTEM = definePrompt(
   'debrief_reply_system',
-  {},
+  {
+    session_language: 'optional',
+    debrief: 'required',
+    transcript: 'required',
+    organisation: 'optional',
+    reply_word_limit: 'required',
+  },
   {
     name: 'Ask Ally (debrief reply)',
     description:
-      "The Debrief agent in conversation mode: answers the learner's replies under the reflective question from the published debrief and the transcript. Streamed, one short answer per message, checked by code afterwards (no score, no diagnosis, quotes must match). Release-only.",
+      "The Debrief agent in conversation mode: answers the learner's replies under the reflective question from the published debrief and the transcript. Streamed, one short answer per message, checked by code afterwards (no score, no diagnosis, quotes must match, at most the REPLY LIMIT the code sends last). Release-only.",
     category: 'evaluation',
   },
 );

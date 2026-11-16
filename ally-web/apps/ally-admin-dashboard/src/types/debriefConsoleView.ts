@@ -32,7 +32,18 @@ export type DebriefCanAction =
   | "switchOrgOn"
   | "emergencyStop"
   | "agentLogs"
-  | "ownerSettings";
+  | "ownerSettings"
+  | "clinicalLists";
+
+export type DebriefClinicalListKind = "jargon" | "diagnosis" | "score";
+
+/** Settings › Clinical lists: the words behind three checks, by kind and language. */
+export interface DebriefClinicalListsView {
+  kinds: Array<{ kind: DebriefClinicalListKind; label: string }>;
+  languages: string[];
+  lists: Record<DebriefClinicalListKind, Record<string, string[]>>;
+  defaults: Record<DebriefClinicalListKind, Record<string, string[]>>;
+}
 
 export interface DebriefViewer {
   roles: {

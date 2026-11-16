@@ -52,6 +52,7 @@ import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
 import { DebriefPublishService } from './service/debrief-publish.service';
 import { DebriefSettingsService } from './service/debrief-settings.service';
+import { DebriefClinicalListsService } from './service/debrief-clinical-lists.service';
 import { DebriefBaselineService } from './service/debrief-baseline.service';
 import { DebriefReportingService } from './service/debrief-reporting.service';
 import { DebriefTrialsService } from './service/debrief-trials.service';
@@ -183,6 +184,8 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     DebriefReplyService,
     DebriefPublishService,
     DebriefSettingsService,
+    // Settings › Clinical lists: the words behind three checks.
+    DebriefClinicalListsService,
     DebriefBaselineService,
     DebriefReportingService,
     DebriefTrialsService,

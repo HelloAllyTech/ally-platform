@@ -42,6 +42,15 @@ import { Type } from 'class-transformer';
 import { DEBRIEF_APPROVED_PROVIDERS } from '../constants/debrief-release.constants';
 import { DebriefAct, DebriefRead } from '../util/debrief-console-roles.util';
 import {
+  CLINICAL_ENTRY_MAX_CHARS,
+  CLINICAL_LIST_KINDS,
+  CLINICAL_LIST_LANGUAGES,
+  CLINICAL_LIST_MAX_ENTRIES,
+  ClinicalListKind,
+  ClinicalListLanguage,
+} from '../constants/debrief-clinical-lists.constants';
+import { DebriefClinicalListsService } from '../service/debrief-clinical-lists.service';
+import {
   AUTONOMY_STEPS,
   CHANGE_KINDS,
   parseSessionFilters,
@@ -205,6 +214,29 @@ class SettingsChangeDto {
   })
   @IsObject()
   changes!: Record<string, number | boolean | null>;
+}
+
+class ClinicalListChangeDto {
+  @ApiProperty({ enum: CLINICAL_LIST_KINDS })
+  @IsIn([...CLINICAL_LIST_KINDS])
+  kind!: ClinicalListKind;
+
+  @ApiProperty({ enum: CLINICAL_LIST_LANGUAGES })
+  @IsIn([...CLINICAL_LIST_LANGUAGES])
+  language!: ClinicalListLanguage;
+
+  @ApiProperty({
+    type: [String],
+    nullable: true,
+    description:
+      'Plain words or phrases, matched case-insensitively at word boundaries; null restores the default',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(CLINICAL_LIST_MAX_ENTRIES)
+  @IsString({ each: true })
+  @MaxLength(CLINICAL_ENTRY_MAX_CHARS, { each: true })
+  entries!: string[] | null;
 }
 
 class AcceptBaselineDto {
@@ -581,6 +613,7 @@ export class DebriefConsoleController {
     private readonly testSets: DebriefTestSetsService,
     private readonly feedback: DebriefFeedbackService,
     private readonly settings: DebriefSettingsService,
+    private readonly clinicalLists: DebriefClinicalListsService,
     private readonly metrics: DebriefMetricsService,
     private readonly baseline: DebriefBaselineService,
     private readonly view: DebriefConsoleViewService,
@@ -745,6 +778,34 @@ export class DebriefConsoleController {
   @ApiOperation({ summary: 'Change owner settings (audited)' })
   updateSettings(@Req() req: AuthedRequest, @Body() body: SettingsChangeDto) {
     return this.settings.update(body.changes, req.user.id);
+  }
+
+  @Get('settings/clinical-lists')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'Clinical lists: the words behind the score, diagnosis and jargon checks, per language',
+  })
+  clinicalListsView() {
+    return this.clinicalLists.view();
+  }
+
+  @Put('settings/clinical-lists')
+  @DebriefAct('clinicalLists')
+  @ApiOperation({
+    summary:
+      "Replace one language's clinical list (the clinical advisor or the owner; audited)",
+  })
+  updateClinicalList(
+    @Req() req: AuthedRequest,
+    @Body() body: ClinicalListChangeDto,
+  ) {
+    return this.clinicalLists.update(
+      body.kind,
+      body.language,
+      body.entries ?? null,
+      req.user.id,
+    );
   }
 
   @Post('settings/accept')

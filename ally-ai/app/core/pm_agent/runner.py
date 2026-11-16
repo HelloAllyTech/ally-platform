@@ -16,7 +16,7 @@ from langgraph.store.base import BaseStore
 from langsmith.run_helpers import tracing_context
 
 from app.core.debrief_graph.gateway import Gateway, HttpGateway
-from app.core.pm_agent.agent import build_pm_agent, seed_memory
+from app.core.pm_agent.agent import build_pm_agent, seed_memory, seed_skills
 from app.core.pm_agent.ledger import RunLedger
 from app.core.pm_agent.middleware import _text
 from app.core.pm_agent.models import build_models
@@ -83,6 +83,7 @@ async def run_pm_agent(
             store=store,
             checkpointer=checkpointer,
             gateway=gw,
+            prompts=req.prompts,
         )
         config = {
             "configurable": {"thread_id": f"pm-agent:{req.agent_run_id}"},
@@ -90,6 +91,7 @@ async def run_pm_agent(
             "run_name": "debrief_pm_agent",
         }
         await seed_memory(store)
+        await seed_skills(store, req.prompts)
         snapshot = await agent.aget_state(config) if checkpointer else None
         started = bool(snapshot and snapshot.values)
         graph_input = (

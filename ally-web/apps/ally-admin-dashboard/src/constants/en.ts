@@ -10179,6 +10179,8 @@ export const en = {
           jargon: "Uses a term the learner wasn't taught",
           duplicate_point: "Makes the same point twice",
           custom_code: "Shows a custom competency's code",
+          compares_learner: "Compares the learner with others",
+          reply_too_long: "Ask Ally reply over its word limit",
         } as Record<string, string>,
         plannerFallback: {
           planner_failed: "Planner failed or returned a bad plan",
@@ -11363,10 +11365,37 @@ export const en = {
         autonomy: "Autonomy",
         weights: "Score",
         pinned: "Pinned rules",
+        clinical: "Clinical lists",
         progress: "Progress",
         schedules: "Schedules",
         guidance: "Guidance",
       } as Record<string, string>,
+      clinicalHelp:
+        "Words the checks look for in every debrief and Ask Ally reply. English applies to every language.",
+      clinical: {
+        lists: "Lists",
+        language: "Language",
+        languages: {
+          en: "English",
+          hi: "Hindi",
+          ta: "Tamil",
+          kn: "Kannada",
+          mr: "Marathi",
+          ml: "Malayalam",
+        } as Record<string, string>,
+        count: (n: number) => `${n} ${n === 1 ? "word" : "words"}`,
+        empty: "No words for this language yet.",
+        add: "Add",
+        addLabel: "Word or phrase",
+        remove: (w: string) => `Remove ${w}`,
+        save: "Save",
+        saved: "Saved. The checks use it within a minute.",
+        saveFailed: "Couldn't save the list. Try again.",
+        restore: "Restore defaults",
+        loading: "Loading lists…",
+        loadFailed: "Couldn't load the lists. Reload to try again.",
+        viewOnly: "Only the clinical advisor or the owner can change these.",
+      },
       schedulesHelp:
         "The jobs the Debrief agent and the PM agent run on their own. Times are India time. Jobs that keep debriefs flowing can’t be switched off and only allow a safe range. To test, set a job to run often (every 1 min where offered) and set it back after. The PM agent page keeps its own “Run the PM agent now”.",
       schedules: {
@@ -11908,6 +11937,7 @@ export const en = {
       // ally-be debrief-release.constants DEBRIEF prompt codes.
       promptNames: {
         debrief_safety_reader_system: "Safety reader's prompt",
+        debrief_risk_cue_definition: "Risk cue definition",
         debrief_analyst_system: "Analyst's prompt",
         debrief_progress_reader_system: "Progress reader's prompt",
         debrief_writer_system: "Writer's prompt",

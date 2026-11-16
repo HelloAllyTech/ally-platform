@@ -199,6 +199,8 @@ export const DEBRIEF_MAX_AGENTS_PER_PLAN = 10;
 
 export const DEBRIEF_PROMPT_CODES = {
   safetyReader: 'debrief_safety_reader_system',
+  /** Pinned: the one definition of a clear and a possible risk cue. */
+  riskCueDefinition: 'debrief_risk_cue_definition',
   analyst: 'debrief_analyst_system',
   progressReader: 'debrief_progress_reader_system',
   /** The progress agent (learner progress over past sessions); its step key stays `progress_reader`. */
@@ -206,9 +208,17 @@ export const DEBRIEF_PROMPT_CODES = {
   writer: 'debrief_writer_system',
   reviser: 'debrief_reviser_system',
   rubric: 'debrief_quality_rubric',
+  /** Pinned: what the Evaluator is told to do last (its own code, not the judge's). */
+  evaluator: 'debrief_evaluator_system',
+  evaluatorFix: 'debrief_evaluator_fix_system',
   pmAgent: 'debrief_improver_system',
   reply: 'debrief_reply_system',
   planner: 'debrief_planner_system',
+  /** How each analysis agent is described to the planner. */
+  plannerAgents: 'debrief_planner_agents',
+  pmInvestigator: 'debrief_pm_investigator_system',
+  /** Pinned: what a safe change is. */
+  pmReviewer: 'debrief_pm_reviewer_system',
   protocolCheck: 'debrief_protocol_check_system',
   historyDeep: 'debrief_history_deep_system',
   languageSpecialist: 'debrief_language_specialist_system',
@@ -217,6 +227,7 @@ export const DEBRIEF_PROMPT_CODES = {
 /** The orchestrator's prompts, sent to ally-ai only when a release turns it on. */
 export const DEBRIEF_ORCHESTRATOR_PROMPT_CODES: readonly string[] = [
   DEBRIEF_PROMPT_CODES.planner,
+  DEBRIEF_PROMPT_CODES.plannerAgents,
   DEBRIEF_PROMPT_CODES.protocolCheck,
   DEBRIEF_PROMPT_CODES.historyDeep,
   DEBRIEF_PROMPT_CODES.languageSpecialist,
@@ -710,3 +721,15 @@ export function validateDebriefBundle(
   }
   return problems;
 }
+
+/**
+ * The PM agent's own Skills Store texts, sent with every run and conversation
+ * turn (`prompts`): its subagents and its skills (each skill's SKILL.md).
+ */
+export const DEBRIEF_PM_AGENT_PROMPT_CODES: readonly string[] = [
+  DEBRIEF_PROMPT_CODES.pmInvestigator,
+  DEBRIEF_PROMPT_CODES.pmReviewer,
+  'debrief_pm_skill_builder_brief',
+  'debrief_pm_skill_prompt_change',
+  'debrief_pm_skill_registry_agent',
+];

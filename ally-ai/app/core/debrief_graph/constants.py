@@ -48,6 +48,11 @@ PROMPT_CODES = {
     "writer": "debrief_writer_system",
     "reviser": "debrief_reviser_system",
     "rubric": "debrief_quality_rubric",
+    # The Evaluator's own closing instructions (pinned) and fix notes.
+    "evaluator": "debrief_evaluator_system",
+    "evaluator_fix": "debrief_evaluator_fix_system",
+    # Pinned: the one definition of a clear and a possible risk cue.
+    "risk_cue_definition": "debrief_risk_cue_definition",
 }
 
 

@@ -37,9 +37,11 @@ CLEAR_CATEGORIES = frozenset(
 )
 
 # A hopelessness cue whose own words point at death, not being around,
-# self-harm, a means or a plan is clear. English, Hindi (Devanagari) and
-# romanised Hindi; first-person or wish forms, so a grieving client's "my
-# father died" stays possible.
+# self-harm, a means or a plan is clear. English, Hindi, Tamil, Kannada,
+# Marathi and Malayalam, in their own scripts and romanised; first-person or
+# wish forms, so a grieving client's "my father died" stays possible. The
+# list only ever raises a cue: the Safety reader's own clear or possible, by
+# the RISK CUE DEFINITION, is the main signal.
 _CLEAR_WORDS = re.compile(
     "|".join(
         [
@@ -82,6 +84,62 @@ _CLEAR_WORDS = re.compile(
             r"\bjeena\s*nahi|\bjeene\s*ka\s*man\s*nahi",
             r"\b(?:na|naa)\s*rahu",
             r"\b(?:zeher|zehar|jahar|phanda|fansi|faansi|pankh[ea])\b",
+            # Tamil, native script (2026-11-16; for native review). Wish and
+            # first-person forms only: "செத்துட்டார்" / "இறந்துட்டார்"
+            # (he died) stay possible. விஷம் (poison) is not a prefix of
+            # விஷயம் (a matter).
+            r"சாகணும்|சாக\s*வேண்டும்|சாகப்\s*போறேன்|சாகலாம்",
+            r"செத்துப்\s*போகணும்|செத்துடணும்|செத்துடலாம்",
+            r"தற்கொலை",
+            r"வாழ\s*(?:விருப்பம்\s*இல்ல|பிடிக்கல|வேண்டாம்)",
+            r"வாழ்ந்து\s*என்ன\s*(?:பயன்|பிரயோஜனம்)",
+            r"உயிரை\s*(?:மாய்த்து|விட)",
+            r"என்னை(?:யே)?\s*(?:நானே\s*)?கொல்ல",
+            r"விஷம்|பூச்சி\s*மருந்து|தூக்கு\s*போட|தூக்கில்\s*தொங்க",
+            # Tamil, romanised
+            r"\b(?:saaganum|saganum|saaga\s*poren|saga\s*poren|saagalaam)\b",
+            r"\b(?:sethu\s*poganum|sethudanum|sethudalaam|sethudalam)\b",
+            r"\b(?:tharkolai|thatkolai|tarkolai)\b",
+            r"\b(?:vaazha|vazha)\s*(?:pidikkala|viruppam\s*illa|vendaam)",
+            r"\b(?:thookku|thooku)\s*poda",
+            # Kannada, native script. "ಸತ್ತು ಹೋದರು" (they died) stays
+            # possible; ವಿಷ alone is the start of ವಿಷಯ (a matter), so poison
+            # counts only with "drink".
+            r"ಸಾಯಬೇಕು|ಸಾಯ್ಬೇಕು|ಸಾಯ್ತೀನಿ|ಸತ್ತು\s*ಹೋಗಬೇಕು|ಸತ್ತರೆ\s*ಒಳ್ಳೆಯದು",
+            r"ಆತ್ಮಹತ್ಯೆ",
+            r"ಬದುಕ(?:ೋಕೆ|ಲು)\s*ಇಷ್ಟ\s*ಇಲ್ಲ|ಬದುಕಲು\s*ಇಷ್ಟವಿಲ್ಲ|ಬದುಕಿ\s*ಏನು\s*ಪ್ರಯೋಜನ",
+            r"ವಿಷ\s*ಕುಡಿ|ನೇಣು",
+            # Kannada, romanised
+            r"\b(?:saayabeku|saaybeku|sayabeku|saaytini|sattu\s*hogabeku)\b",
+            r"\b(?:aatmahatye|atmahatye)\b",
+            r"\bbaduk(?:oke|alu)\s*ishta\s*illa",
+            r"\bvisha\s*kudi",
+            # Marathi, Devanagari (the Hindi entries above also apply:
+            # आत्महत्या, मरणे). "वारले" / "मेला" (died) stay possible; विष
+            # alone is the start of विषय (a subject), so poison counts only
+            # with "drink" or "take".
+            r"मरावं|मरावसं|मरावंसं|मरायचं|मरून\s*जाव",
+            r"जगायचं\s*नाही|जगावंसं\s*वाटत\s*नाही|जगण्यात\s*(?:काही\s*)?अर्थ\s*नाही",
+            r"जीव\s*द्याय|स्वतःला\s*संपव|संपवून\s*टाक",
+            r"विष\s*(?:प्या|पिऊ|घे|खा)|गळफास|फास\s*(?:लाव|घे)",
+            # Marathi, romanised
+            r"\b(?:maravasa|maravsa|maraycha|marayche)\b",
+            r"\bjagaych?a?\s*nahi",
+            r"\b(?:jeev|jiv)\s*dyaych",
+            r"\b(?:galphas|galfas)\b",
+            # Malayalam, native script. "മരിച്ചു" (died) stays possible;
+            # വിഷം (poison) is not a prefix of വിഷമം (sadness).
+            r"ചാകണം|മരിക്കണം|മരിച്ചാൽ\s*മതി|ചത്താൽ\s*മതി|മരിക്കാൻ\s*തോന്നു",
+            r"ആത്മഹത്യ",
+            r"ജീവിക്കണ്ട|ജീവിക്കാൻ\s*ആഗ്രഹമില്ല|ജീവിച്ചിട്ട്\s*കാര്യമില്ല",
+            r"വിഷം|തൂങ്ങി\s*മരിക്ക",
+            # Malayalam, romanised: "vishamam" (sadness) never matches \bvisham\b.
+            r"\b(?:chaakanam|chakanam|marikkanam|marichaal\s*mathi)\b",
+            r"\b(?:aathmahathya|athmahathya)\b",
+            r"\b(?:jeevikkanda|jeevikanda)\b",
+            r"\bthoongi\s*marikk",
+            # Poison, romanised (Tamil and Malayalam)
+            r"\bvisham\b",
         ]
     ),
     re.IGNORECASE,
@@ -89,7 +147,16 @@ _CLEAR_WORDS = re.compile(
 
 
 def cue_strength(cue: Dict[str, Any]) -> str:
-    """``clear`` or ``possible`` for one Safety reader cue."""
+    """``clear`` or ``possible`` for one Safety reader cue.
+
+    Clear when ANY signal says so (2026-11-16): the reader judged it clear by
+    the RISK CUE DEFINITION; its category is a clear one; or the word list
+    matches its quote. Nothing here lowers a cue: a reader's ``possible`` on
+    a clear category or with clear words stays clear, and a cue the reader
+    gave no strength is read as before (hopelessness without clear words is
+    possible)."""
+    if cue.get("strength") == CLEAR:
+        return CLEAR
     if cue.get("category") in CLEAR_CATEGORIES:
         return CLEAR
     if cue.get("category") != "hopelessness":
@@ -99,7 +166,8 @@ def cue_strength(cue: Dict[str, Any]) -> str:
 
 
 def with_strength(cues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """The cues, each with its ``strength``; the reader's fields are untouched."""
+    """The cues, each with its final ``strength`` (the reader's own answer is
+    one of the signals); every other field the reader returned is untouched."""
     return [{**c, "strength": cue_strength(c)} for c in cues]
 
 

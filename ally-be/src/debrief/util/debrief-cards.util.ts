@@ -1,3 +1,8 @@
+import {
+  ClinicalPatterns,
+  clinicalPatternsFor,
+  defaultClinicalLists,
+} from '../constants/debrief-clinical-lists.constants';
 import { createHash } from 'crypto';
 import { customCodesIn, withoutCustomCodes } from './debrief-competencies.util';
 /**
@@ -134,6 +139,14 @@ export enum DebriefCheckCode {
    * means nothing to the learner (review 2026-11-16).
    */
   CUSTOM_CODE = 'custom_code',
+  /**
+   * The card compares the learner with other trainees: a share, a rank, "most
+   * trainees did better" (v9 NFR-7). The Writer prompt's COHORT rule says a
+   * moment may only be one many find hard; this is the check behind it.
+   */
+  COMPARES_LEARNER = 'compares_learner',
+  /** An Ask Ally reply over `REPLY_MAX_WORDS`. */
+  REPLY_TOO_LONG = 'reply_too_long',
 }
 
 /** At most this many "Try the following:" items on Practise this again. */
@@ -207,18 +220,32 @@ export function inLanguageScript(text: string, language: string): boolean {
   return inScript / letters >= 0.5;
 }
 
-const SCORE_RE =
-  /(\b\d{1,3}\s*(%|percent\b|\/\s*10\b|out of \d+))|\b(your|a) (score|rating|grade)\b|\bscored\b/i;
-
-const DIAGNOSIS_RE =
-  /\byou (are|seem|sound|might be|may be) (anxious|depressed|insecure|avoidant|narcissistic|codependent|traumati[sz]ed)\b|\byou (have|suffer from) (anxiety|depression|ptsd|adhd|a disorder)\b|\b(personality|attachment) (disorder|style)\b/i;
+/**
+ * A score in numbers: "70%", "7/10", "8 out of 10". Not a word, so it stays in
+ * code; the words (your score, a rating, scored) are the editable score list.
+ */
+const SCORE_NUMBER_RE = /\b\d{1,3}\s*(%|percent\b|\/\s*10\b|out of \d+)/i;
 
 /**
- * v9 C-12: clinical terms of art a lay counsellor was never taught. Skill
- * names are explained in "skill words", so they are not here.
+ * The editable clinical lists (Settings › Clinical lists) compiled for one
+ * language. The checks fall back to the defaults, which are exactly what they
+ * matched before the lists existed, when a caller passes none.
  */
-const JARGON_RE =
-  /\b(counter-?transference|transference|psycho-?education(al)?|cognitive distortions?|defen[cs]e mechanisms?|somati[sz]ation|therapeutic alliance|affective (state|response)|ego[- ]?(state|defen[cs]e)s?|dichotomous thinking|catastrophi[sz]ing)\b/i;
+const DEFAULT_PATTERNS = new Map<string, ClinicalPatterns>();
+export function defaultClinicalPatterns(language: string): ClinicalPatterns {
+  const key = String(language ?? 'en')
+    .slice(0, 2)
+    .toLowerCase();
+  let p = DEFAULT_PATTERNS.get(key);
+  if (!p) {
+    p = clinicalPatternsFor(defaultClinicalLists(), key);
+    DEFAULT_PATTERNS.set(key, p);
+  }
+  return p;
+}
+
+const mentionsScore = (text: string, p: ClinicalPatterns) =>
+  SCORE_NUMBER_RE.test(text) || !!p.score?.test(text);
 
 /**
  * v9 C-13: a turn the transcript did not catch — a placeholder such as
@@ -228,6 +255,33 @@ export function isTranscriptGap(text: string): boolean {
   const t = (text ?? '').trim();
   return !/[\p{L}\p{N}]/u.test(t) || /^[[(<{][^\])>}]{0,40}[\])>}]$/u.test(t);
 }
+
+/**
+ * A card that compares the learner with other trainees (v9 NFR-7, 2026-11-16).
+ * Narrow on purpose: "many trainees find this moment hard" and "a strength
+ * that is less common" pass; a share of others, a rank, "most trainees did
+ * better", "other learners", "compared with others", "top/bottom" fail.
+ * English only: the patterns are word-bounded English phrases.
+ */
+const PEERS =
+  '(?:trainees|learners|counsel+ors|peers|participants|students|classmates|helpers)';
+const COMPARISON_RE = new RegExp(
+  [
+    // a share of the others: "70% of trainees", "half of the learners"
+    `\\b(?:\\d{1,3}\\s*(?:%|percent|per cent)|half|a third|a quarter)\\s+of\\s+(?:the\\s+|your\\s+)?(?:other\\s+)?(?:${PEERS}|others|people|your group|the group)\\b`,
+    // "most trainees did better", "many learners handled it better"
+    `\\b(?:most|many|some|all|other)\\s+(?:other\\s+)?${PEERS}\\s+(?:\\w+\\s+){0,2}(?:better|worse)\\b`,
+    // "better than most", "than other trainees", "than your peers"
+    `\\bthan\\s+(?:most|many|the rest|everyone else|anyone else|(?:the\\s+)?average|(?:the\\s+)?others\\b|other\\s+${PEERS}|your\\s+(?:peers|group|cohort|batch|classmates))`,
+    `\\bother\\s+${PEERS}\\b`,
+    `\\b(?:compared|in comparison)\\s+(?:with|to)\\s+(?:the\\s+)?(?:others|other\\s+\\w+|most|everyone|the rest|${PEERS}|your\\s+(?:peers|group|cohort|batch|classmates)|the\\s+(?:group|cohort))\\b`,
+    `\\b(?:ranked|ranking|your rank)\\b`,
+    `\\b(?:in|among)\\s+the\\s+(?:top|bottom|best|weakest|strongest)\\b`,
+    `\\b(?:top|bottom)\\s+(?:\\d+|few|half|quarter|third|tenth|five|ten)\\b`,
+    `\\b(?:above|below)\\s+(?:the\\s+)?average\\b`,
+  ].join('|'),
+  'i',
+);
 
 /** Learners never see turn numbers; quotes are what point at the moment. */
 const TURN_NUMBER_RE = /\b(turns?|टर्न|ಟರ್ನ್|டர்ன்)\s*\d+/i;
@@ -280,8 +334,11 @@ export function runDebriefChecks(input: {
   language: string;
   shortForm: boolean;
   hasProgress: boolean;
+  /** The clinical lists for this language; the defaults when absent. */
+  clinical?: ClinicalPatterns;
 }): DebriefCheckFailure[] {
   const { cards, transcript, safety, language, shortForm, hasProgress } = input;
+  const clinical = input.clinical ?? defaultClinicalPatterns(language);
   const fails: DebriefCheckFailure[] = [];
   const turns = new Map(transcript.map((t) => [t.turn_index, t]));
   const fail = (code: DebriefCheckCode, section: string, detail: string) =>
@@ -524,10 +581,10 @@ export function runDebriefChecks(input: {
     );
   }
   for (const t of texts) {
-    if (SCORE_RE.test(t.text)) {
+    if (mentionsScore(t.text, clinical)) {
       fail(DebriefCheckCode.SCORE_MENTIONED, t.section, 'mentions a score');
     }
-    if (DIAGNOSIS_RE.test(t.text)) {
+    if (clinical.diagnosis?.test(t.text)) {
       fail(
         DebriefCheckCode.DIAGNOSES_TRAINEE,
         t.section,
@@ -541,15 +598,22 @@ export function runDebriefChecks(input: {
         'mentions a turn number the learner cannot see',
       );
     }
-    if (t.ownWords && JARGON_RE.test(t.text)) {
+    if (t.ownWords && clinical.jargon?.test(t.text)) {
       fail(
         DebriefCheckCode.JARGON,
         t.section,
-        `uses "${t.text.match(JARGON_RE)![0]}"`,
+        `uses "${t.text.match(clinical.jargon!)![0]}"`,
       );
     }
     if (t.ownWords && t.text.includes('!')) {
       fail(DebriefCheckCode.EXCLAMATION, t.section, 'uses an exclamation mark');
+    }
+    if (t.ownWords && COMPARISON_RE.test(t.text)) {
+      fail(
+        DebriefCheckCode.COMPARES_LEARNER,
+        t.section,
+        `compares the learner with others ("${t.text.match(COMPARISON_RE)![0]}")`,
+      );
     }
     if (!hasProgress && PROGRESS_CLAIM_RE.test(t.text)) {
       fail(
@@ -862,13 +926,56 @@ export function speakerRuns(transcript: TranscriptTurn[]): string[] {
   return out;
 }
 
+/**
+ * Ask Ally's word cap (2026-11-02: replies drifted to about 190 words). The
+ * reply prompt says how to write short; the code sends the cap last and fails
+ * a reply over it.
+ */
+export const REPLY_MAX_WORDS = 120;
+
+/**
+ * Scripts written without spaces between words, and how many characters make
+ * a word in each, on the low side so a reply is never failed for words it
+ * does not have: Chinese words average about 1.5 to 2 characters and
+ * Japanese mixes kanji and kana at a similar rate (2 per word); Thai, Lao,
+ * Khmer and Myanmar words run to about 4 to 6 letters (4 per word). Every
+ * script Ally's sessions use today (Latin, Devanagari, Tamil, Kannada,
+ * Malayalam) separates words with spaces and never reaches this.
+ */
+const NO_SPACE_SCRIPTS: Array<[RegExp, number]> = [
+  [/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu, 2],
+  [/[\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/gu, 4],
+];
+
+/** Words in a reply: whitespace-separated tokens, plus the no-space scripts' characters converted to words. */
+export function replyWordCount(text: string): number {
+  let rest = text ?? '';
+  let words = 0;
+  for (const [re, perWord] of NO_SPACE_SCRIPTS) {
+    const chars = (rest.match(re) ?? []).length;
+    if (chars) {
+      words += Math.ceil(chars / perWord);
+      rest = rest.replace(re, ' ');
+    }
+  }
+  return words + wordCount(rest);
+}
+
 export function replyCheckFailures(
   reply: string,
   sources: string[],
+  clinical: ClinicalPatterns = defaultClinicalPatterns('en'),
 ): DebriefCheckCode[] {
   const fails: DebriefCheckCode[] = [];
-  if (SCORE_RE.test(reply)) fails.push(DebriefCheckCode.SCORE_MENTIONED);
-  if (DIAGNOSIS_RE.test(reply)) fails.push(DebriefCheckCode.DIAGNOSES_TRAINEE);
+  if (replyWordCount(reply) > REPLY_MAX_WORDS) {
+    fails.push(DebriefCheckCode.REPLY_TOO_LONG);
+  }
+  if (mentionsScore(reply, clinical)) {
+    fails.push(DebriefCheckCode.SCORE_MENTIONED);
+  }
+  if (clinical.diagnosis?.test(reply)) {
+    fails.push(DebriefCheckCode.DIAGNOSES_TRAINEE);
+  }
   if (TURN_NUMBER_RE.test(reply)) fails.push(DebriefCheckCode.TURN_NUMBER);
   if (unmatchedQuotes(reply, sources).length) {
     fails.push(DebriefCheckCode.QUOTE_MISMATCH);

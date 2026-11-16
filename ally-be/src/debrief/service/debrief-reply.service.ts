@@ -6,8 +6,16 @@ import { Repository } from 'typeorm';
 import { SseMessageEvent } from '../../ai-chat/service/ai-chat.service';
 import { LlmProviderFactory } from '../../ai-chat/provider/llm-provider.factory';
 import { LlmUsageService } from '../../analytics/service/llm-usage.service';
-import { DEBRIEF_REFLECTION_CHECK_SYSTEM } from '../../prompt/contracts/prompt-contracts';
-import { renderPrompt } from '../../prompt/contracts/define-prompt';
+import {
+  DEBRIEF_REFLECTION_CHECK_SYSTEM,
+  DEBRIEF_REPLY_SYSTEM,
+} from '../../prompt/contracts/prompt-contracts';
+import {
+  PromptInputs,
+  renderPrompt,
+  toStoreContract,
+} from '../../prompt/contracts/define-prompt';
+import { placeholdersIn } from '../../prompt/util/prompt-contract.util';
 import { matchFirstPersonRisk } from '../../common/safety/first-person-risk.matcher';
 import { GuideCrisisService } from '../../guide/safety/guide-crisis.service';
 import { ScenarioSessionChat } from '../../learn/entity/scenario-session-chat.entity';
@@ -35,11 +43,14 @@ import { modelPrices } from '../util/debrief-budget.util';
 import {
   DebriefCards,
   cardTexts,
+  REPLY_MAX_WORDS,
+  defaultClinicalPatterns,
   replyCheckFailures,
   cardSkills,
   speakerRuns,
   unmatchedQuotes,
 } from '../util/debrief-cards.util';
+import { DebriefClinicalListsService } from './debrief-clinical-lists.service';
 import { AskAllyClient, AskAllyError, ReplyTrace } from './ask-ally.client';
 import { DebriefAgentService } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';
@@ -161,12 +172,36 @@ const CARD_SECTION_NAMES = [
 ];
 
 /**
- * The prompt's own length rule, said again after the debrief, transcript and
- * context it is followed by: from the top of a long prompt the model drifted
- * (a 190-word reply in the prod end-to-end check, 2 Nov 2026).
+ * The word cap, sent last, after the debrief, transcript and context: from the
+ * top of a long prompt the model drifted (a 190-word reply in the prod
+ * end-to-end check, 2 Nov 2026). Data only: how to write short is the reply
+ * prompt's LENGTH section (Skills Store), and `replyCheckFailures` fails a
+ * reply over the cap.
  */
-export const REPLY_LENGTH_REMINDER =
-  'Now write your reply: at most 120 words, in short paragraphs, with at most one question back.';
+export const REPLY_LENGTH_REMINDER = `REPLY LIMIT: ${REPLY_MAX_WORDS} words.`;
+
+/**
+ * The reply's system text: the live `debrief_reply_system` with its
+ * `{{name}}` placeholders filled (step 5). Throws, naming the prompt and the
+ * variables, when the live text lacks one the contract requires.
+ */
+export function renderReplySystem(
+  template: string,
+  inputs: PromptInputs<typeof DEBRIEF_REPLY_SYSTEM>,
+): string {
+  const used = new Set(placeholdersIn(template));
+  const missing = (toStoreContract(DEBRIEF_REPLY_SYSTEM).required ?? []).filter(
+    (v) => !used.has(v),
+  );
+  if (missing.length) {
+    throw new Error(
+      `prompt ${DEBRIEF_REPLY_SYSTEM.code} is missing required variable(s) ${missing
+        .map((v) => `{{${v}}}`)
+        .join(', ')}`,
+    );
+  }
+  return renderPrompt(DEBRIEF_REPLY_SYSTEM, template, inputs);
+}
 
 /** The organisation's wording must arrive within this, or is left out. */
 const ORG_WORDING_MS = 1200;
@@ -196,6 +231,8 @@ export class DebriefReplyService {
     private readonly tokens: DebriefRunTokenService,
     /** v9 §3.3: replies and reflective answers, for the experience metrics. */
     @Optional() private readonly learnerEvents?: DebriefLearnerEventsService,
+    /** Settings › Clinical lists; the defaults when absent or unreadable. */
+    @Optional() private readonly clinicalLists?: DebriefClinicalListsService,
   ) {}
 
   async stream(
@@ -343,18 +380,27 @@ export class DebriefReplyService {
       ...CARD_SECTION_NAMES,
     ];
 
-    const systemPrompt = [
-      system,
-      '',
-      `SESSION LANGUAGE: ${language}`,
-      'DEBRIEF:',
-      JSON.stringify(run.cards),
-      'TRANSCRIPT:',
-      ...transcript.map((t) => `${t.role}: ${t.text}`),
-      ...org,
-      '',
-      REPLY_LENGTH_REMINDER,
-    ].join('\n');
+    let systemPrompt: string;
+    try {
+      systemPrompt = renderReplySystem(system, {
+        session_language: language,
+        debrief: JSON.stringify(run.cards),
+        transcript: transcript.map((t) => `${t.role}: ${t.text}`).join('\n'),
+        organisation: org[1] ?? 'none',
+        reply_word_limit: REPLY_MAX_WORDS,
+      });
+    } catch (e) {
+      // The live reply prompt lacks a variable the code requires (step 5):
+      // loud, naming the code and the variable; the learner gets "try again".
+      this.logger.error(
+        `[debrief] Ask Ally for run ${run.id}: ${(e as Error).message}`,
+      );
+      setTimeout(() => {
+        subject.next(event({ type: 'error', error: REPLY_FAILED }));
+        subject.complete();
+      }, 0);
+      return subject.pipe(startWith(event({ type: 'start' })));
+    }
     // Both names: the web reads `text`, the phones read `content`.
     const token = (text: string) => {
       if (firstWordsMs == null) firstWordsMs = Date.now() - startedAt;
@@ -363,7 +409,10 @@ export class DebriefReplyService {
 
     /** The finished reply: checked, distress-screened, then sent and saved. */
     const settle = async (full: string, distress: boolean) => {
-      const fails = replyCheckFailures(full, sources);
+      const clinical =
+        (await this.clinicalLists?.patterns(language).catch(() => null)) ??
+        defaultClinicalPatterns(language);
+      const fails = replyCheckFailures(full, sources, clinical);
       let content = fails.length ? CHECK_FALLBACK : full;
       if (fails.length) {
         this.logger.warn(
@@ -708,7 +757,8 @@ export class DebriefReplyService {
     }
     return org
       ? [
-          'THEIR ORGANISATION (use its wording when pointing them to their supervisor or its procedures):',
+          // Data: how to use it is the reply prompt's THEIR ORGANISATION.
+          'THEIR ORGANISATION:',
           org,
         ]
       : [];

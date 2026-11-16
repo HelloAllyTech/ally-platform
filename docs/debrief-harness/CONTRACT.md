@@ -319,8 +319,9 @@ ally-be sends the roleplay's own SHOULD_DO / SHOULD_NOT_DO behaviours (`scenario
 same ones today's debrief reads) as `helpful_behaviours` / `unhelpful_behaviours`, adds each custom
 competency's HELPFUL / UNHELPFUL behaviours to them without duplicates (never its code), and sends named
 competencies in `competencies` as labels with their own behaviours when they have any. `expected_behaviours`
-keeps only the named competencies (cohort stats and other name readers). The Analyst gets a code-owned
-ROLEPLAY EXPECTATIONS line and a `<roleplay_expectations>` block: assess each behaviour the counsellor had the
+keeps only the named competencies (cohort stats and other name readers). The Analyst gets the data line
+`ROLEPLAY EXPECTATIONS: given.`, the no-codes line and a `<roleplay_expectations>` block; its prompt's ROLEPLAY
+EXPECTATIONS paragraph (moved there 2026-11-16) says: assess each behaviour the counsellor had the
 opportunity for (shown the helpful, avoided the unhelpful); a competency is a label for grouping or naming,
 assessed through its behaviours; one with no behaviours may be interpreted from its name, said in the note
 with lower confidence; name evidence by the competency's name or the behaviour itself; never output a code.
@@ -362,7 +363,21 @@ category or with clear words; the Evaluator listed it and did not answer `clear:
 of the meaning, in any language); or the word list in `cue_strength.py` matches its quote. Otherwise it is
 **possible**. No signal can lower another's clear (`turn_is_clear`).
 
-- **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; the independent judge's schema is unchanged).
+**One definition (2026-11-16).** What clear and possible mean lives in one pinned Skills Store prompt,
+`debrief_risk_cue_definition` (guard; default `ally-be/src/prompts/debrief/risk_cue_definition.txt`, fallback
+`app/core/debrief/risk_cue_definition.py`). ally-be sends its live text in the run's `prompts` (it is in the
+graph's prompt codes, so a release can pin it) and to `POST /debrief-quality/judge` as `risk_cue_definition`.
+ally-ai adds it once, as a `RISK CUE DEFINITION:` block, to the Safety reader, the Writer, the Reviser, the
+Evaluator and the independent judge; the Writer's RISK CUES section, the rubric and the `clear` field's
+description point to it instead of repeating it. The Safety reader also returns `strength` per cue, by the
+definition, with recall unchanged ("when unsure, INCLUDE"; unsure strength is clear). The final strength
+(`cue_strength`) is clear when the reader says clear, the category is a clear one, or the word list matches
+(English, Hindi, Tamil, Kannada, Marathi, Malayalam; the list only raises). A cue the reader gave no strength
+reads as before. The judge (`DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION` v2) lists cues with `clear` and hard-fails
+`missed_risk_cue` only for a missed clear one; the Evaluator keeps listing every missed cue for
+`split_missed_cues`. Ask Ally's distress read uses ally-ai's default definition.
+
+- **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; since 2026-11-16 the judge's `RiskCue` carries it too).
   A missed clear cue is the `missed_risk_cue` hard fail. A missed possible cue
   drops that hard fail; the run publishes as `below_bar` and is sent to review.
 - **No debrief is held (2026-11-16):** when the best draft fails the bar for any reason (a blocking check, no score,
@@ -376,6 +391,83 @@ of the meaning, in any language); or the word list in `cue_strength.py` matches 
 - **Skill labels:** a debrief not in English carries `cards.skill_labels: [{skill, label}]`, written by the
   Writer and Reviser. `skill` stays as the evidence map names it (progress and metrics match on it); the
   learner and supervisor views and Listen show the label (`withSkillLabels` in ally-be).
+
+### Wording in prompts, data in code (2026-11-16)
+
+**Rule: wording and policy live in the prompt text (the Skills Store); code adds only data lines, format lines
+it parses, and safety lines a code check enforces.** A clinical lead changes how debriefs coach by publishing a
+prompt version, never by a code change. The data lines ally-ai adds after each step's live prompt, and the
+prompt section that says what to do with each:
+
+| Step | Data line (code) | Wording (prompt section) |
+|---|---|---|
+| Writer | `POSSIBLE RISK CUES: turns 5, 7.` | `debrief_writer_system` POSSIBLE RISK CUES |
+| Writer | `MISSED FEELINGS: turns 5.` | MISSED FEELINGS |
+| Writer | `COURSE: this session is part of a course; set practise_next.scenario_id to <id>; try_next applies, at most 3 items.` | PRACTISE THIS AGAIN (outside a course `try_next` is null) |
+| Writer | `CASE: this session continues a case.` + `CASE MEMORY:` block | CASE |
+| Writer | `MIXED EVIDENCE: <skill>; <skill>.` (behaviours whose `detector_agreement` is `disagrees`) | MIXED EVIDENCE |
+| Writer | `COHORT: given.` + `<cohort>` | COHORT |
+| Writer, Reviser | `FINDINGS: given.` + `<findings>` | the FINDINGS paragraph |
+| Analyst | `ROLEPLAY EXPECTATIONS: given.` + the no-codes line + `<roleplay_expectations>` | `debrief_analyst_system` ROLEPLAY EXPECTATIONS |
+| Analyst | `CASE: this session continues a case. Write case_memory_update: …` (format) + `CASE MEMORY:` | CASE (about the client only, never the trainee) |
+| Analyst | `LIVE DETECTIONS: given. For each behaviour it lists, set detector_agreement.` + `<live_detections>` | LIVE DETECTIONS |
+| Progress reader | `<past_work_on_this_points>` (with `learner_note`, `ally_decision`, `ally_reason`, `source`) | `debrief_progress_reader_system` HOW TO USE WHAT PEOPLE SAID ABOUT EARLIER DEBRIEFS |
+| Progress agent | `<learner_profile>.past_points` (same fields) | `debrief_progress_system` WHAT PEOPLE SAID ABOUT PAST POINTS |
+| Ask Ally | `REPLY LIMIT: 120 words.` (last line) | `debrief_reply_system` LENGTH |
+
+Since step 5 (below) these data lines are filled into the prompts' `{{placeholders}}` rather than appended; `given` markers became the blocks themselves, and an absent value reads `none`.
+
+Code-kept safety lines are unchanged: `RISK CUES TO COVER: turns …` with `drop_possible_important_moment`, the
+no-codes line (`custom_code` check), no turn numbers, the try_next cap (`TRY_NEXT_MAX`), SCRIPT and SKILL LABELS.
+A new blocking card check, `compares_learner`, fails card text that compares the learner with others (a share of
+trainees, "most trainees did better", "other learners", "compared with others", ranks, top/bottom, above/below
+average); "many find this moment hard" passes. The proposed prompt versions, with anchors for the live text, are
+in `docs/debrief-harness/proposals/2026-11-16-wording-to-prompts.json`.
+
+**Every Debrief prompt has a code (step 4, 2026-11-16).**
+
+- **Evaluator:** `debrief_evaluator_system` (pinned, guard) is what it is told last, its own code rather than the
+  judge's `debrief_quality_judge_system`: the judge is a measuring instrument labelled by a version in code, and
+  the Evaluator decides what learners read, so neither may move the other. `debrief_evaluator_fix_system` holds
+  CLEAR OR NOT and FIX NOTES; code adds `PASS BAR: <passScore>` (the release setting) and the `FIX SECTIONS:`
+  names the Reviser's critique is keyed by. The graph body carries `system_prompt`, `fix_prompt`, `pass_score`.
+- **Planner:** `debrief_planner_agents` holds each agent's `description` / `use_when` / `skip_when` as
+  `## <id>` sections; ally-ai merges them over the manifest's card (ids and machine fields stay in code; an
+  agent or field the text leaves out keeps the manifest's). The top-up is the data line `TOP-UP: given.`; its
+  meaning is `debrief_planner_system`'s TOP-UP paragraph.
+- **PM agent:** `debrief_pm_investigator_system`, `debrief_pm_reviewer_system` (pinned, guard) and one
+  `debrief_pm_skill_<name>` per skill (the whole SKILL.md). ally-be sends them as `prompts` on
+  `POST /pm-agent/runs` and merged into the conversation's `prompts`; ally-ai writes each skill into the
+  store namespace `debrief_pm_skills` before every run, and `/skills/` is a `StoreBackend` over it (read-only to
+  the agent, loaded by Deep Agents' own skills middleware). A missing text uses the packaged default.
+- **Flag answer:** "at most three short sentences" is `ally_ai_debrief_flag_answer_system`'s; `problem_with`
+  sends back a reply of more than three sentences (`REPLY_MAX_SENTENCES`).
+- **Ask Ally:** tool docstrings are short; when to use each tool is the reply prompt's TOOLS section ("never the
+  learner's own words" is still enforced by `clean_topic`). ally-be sends `THEIR ORGANISATION:` as a data label;
+  how to use it is the reply prompt's THEIR ORGANISATION paragraph.
+- **Clinical lists:** the score, diagnosis and jargon checks read word lists per language from
+  `debrief_owner_settings.clinicalLists` (`GET/PUT /debriefs/console/settings/clinical-lists`; edit: the clinical
+  advisor or the owner, `clinicalLists` action; audited as `DEBRIEF_SETTINGS_CHANGED`), with a one-minute cache
+  and the defaults when unreadable. English applies to every language. Entries are plain words or phrases,
+  escaped and matched case-insensitively at word boundaries; the numeric score shapes stay in code.
+
+**Placeholders (step 5, 2026-11-16).** The Debrief prompts that get runtime data carry ally-be's `{{name}}`
+placeholders at the end of their text (the fixed wording first, so the prefix stays cacheable): the Safety
+reader, Analyst, Progress reader, Progress agent, Writer, Reviser, the rubric (Evaluator and judge),
+`debrief_evaluator_fix_system`, the planner, the three registry agents and Ask Ally's reply. Each contract in
+`prompt-contracts.ts` declares every variable; the required ones are `{{transcript}}` wherever the model reads
+it, `{{risk_cue_definition}}` wherever it is injected, `{{risk_cue_turns}}` for the Writer and the Reviser (the
+Reviser now gets it too), `{{safety_reading}}` for the Writer, `{{debrief}}` for the rubric and the reply,
+`{{reply_word_limit}}` for the reply (the template's last line), `{{pass_bar}}`/`{{fix_sections}}` for the fix
+notes. The Skills Store refuses a version missing one (422 `SKILLS_STORE_CONTRACT_VIOLATION`). ally-ai fills them
+with `ally-ai/app/core/debrief/render.py` (one pass, values never re-scanned, literal braces need no escaping; ally-ai's
+`load_and_format` uses `str.format` and cannot read `{{name}}`); ally-be fills the reply with `renderPrompt`. An
+absent value renders as `none` (small values and blocks the prompt names) or empty (the planner's top-up blocks).
+Format and safety lines the code checks are one variable, `{{checked_rules}}` (`{{findings_rules}}` for the
+registry agents). **No backward compatibility:** a live text missing a required variable fails the step with an
+error naming the prompt code and the variable (`PromptVariableMissing` → `StepError` 500; Ask Ally answers
+"try again"); the run's retry and the fallback to today's debrief handle it. The flag answer and the PM
+conversation append no data to their system text and are unchanged.
 
 ## 5. Ask Ally — `POST /api/v1/ask-ally/replies` (ally-ai)
 
@@ -398,7 +490,7 @@ Auth: the service `X-API-Key`. Request:
   "reply": { "provider": "gemini | openai | anthropic", "model": "gemini-2.5-flash", "maxTokens": 900,
              "budgetUsd": 0.05, "maxTurns": 4 },                 // the release bundle's `reply`; the two limits optional
   "prices": { "<reply model>": { "input_per_m": 0.3, "output_per_m": 2.5 } },   // unpriced = the reply never runs
-  "system": "...",                      // built by ally-be: live reply prompt, debrief, transcript, org wording, length rule
+  "system": "...",                      // built by ally-be: live reply prompt, debrief, transcript, org wording, then `REPLY LIMIT: 120 words.` last
   "history": [ { "role": "user | assistant", "content": "..." } ],             // the thread's last 10, oldest first
   "message": "the learner's new message",
   "run_token": "<JWT, scope reply>",
@@ -437,6 +529,10 @@ Limits and behaviour:
   words; `stoppedBy` says which. `ModelCallLimitMiddleware` is a backstop that is never reached.
 - **Budget:** `budgetUsd` (default and ceiling $0.05), from each pass's token usage and `prices`.
 - **Session budget (ally-be, 2026-11-16):** one session's debrief run and all its Ask Ally replies share `settings.sessionBudgetUsd` (default $1.00; the run's ceiling is clamped to it). ally-be sends each reply `budgetUsd` = the smallest of the release's reply budget, $0.05, what the session has left and what the month's cap has left, and keeps the session's running total on `workspace.askAllySpentUsd` (the month's spend counts it too). With under $0.01 left, `settings.maxRepliesPerSession` replies already given (default 20), or the month's cap spent, ally-be calls no model: the learner gets `REPLY_LIMIT` in the debrief's language on a `done` event carrying `limit: "session" | "month"`. The crisis screen still answers first.
+- **Length (2026-11-16):** the system text ends with the data line `REPLY LIMIT: 120 words.` (`REPLY_MAX_WORDS`);
+  how to write short is the reply prompt's LENGTH section. ally-be's `replyCheckFailures` fails a reply over the
+  cap (`reply_too_long`: whitespace-separated words; Han/Kana at 2 characters a word and Thai/Lao/Khmer/Myanmar at
+  4, scripts written without spaces) and replaces it like any other failed reply check.
 - **Tools:** each must answer within 1.5 s; a failed or slow tool is told to the model as "This is unavailable right
   now. Answer from the debrief and the session." (`ToolErrorMiddleware`) and recorded `ok: false`. `search_guidance`
   calls `guidance_search` with one topic `{situation: <topic, at most 10 words>}` and `per_moment: 3`;

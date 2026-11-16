@@ -355,20 +355,9 @@ class FixNote(BaseModel):
 
 
 class EvaluatorRiskCue(JudgeRiskCue):
-    """The judge's risk cue, plus whether it is a clear one. Only the
-    Evaluator answers this; the independent judge's schema is unchanged."""
-
-    clear: bool = Field(
-        default=True,
-        description=(
-            "True when the client's words, in any language, say or point to "
-            "wanting to die, not wanting to live or be here, ending their "
-            "life, self-harm, a plan or a means, harming someone else, or "
-            "being abused or in danger; also when you cannot tell. False for "
-            "low mood, stress, tiredness, burden, loneliness, grief or guilt "
-            "that does not point to any of these."
-        ),
-    )
+    """The judge's risk cue, with whether it is clear. Both read the RISK CUE
+    DEFINITION block (2026-11-16): the field's description points to it, so
+    the definition lives in one pinned prompt, not here."""
 
 
 class EvaluationOutput(BaseModel):

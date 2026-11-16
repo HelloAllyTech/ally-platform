@@ -112,11 +112,12 @@ const GROUNDEDNESS_TARGET = {
 /**
  * Debrief quality is the baseline the new debrief system is measured against,
  * so it reaches back over the same window as the other roleplay families and
- * then keeps new debriefs scored as they arrive.
+ * then keeps new debriefs scored as they arrive. v2 (2026-11-16): the
+ * rubric reads the risk cue definition; only a missed clear cue hard-fails.
  */
 const DEBRIEF_QUALITY_TARGET = {
   judgeModel: 'gemini-2.5-pro',
-  judgePromptVersion: 'v1',
+  judgePromptVersion: 'v2',
 };
 
 /**

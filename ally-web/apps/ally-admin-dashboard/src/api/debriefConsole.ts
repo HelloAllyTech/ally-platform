@@ -5,6 +5,8 @@ import {
   DebriefMetricsFilter,
   DebriefMetricsView,
   DebriefSettingsView,
+  DebriefClinicalListKind,
+  DebriefClinicalListsView,
   DebriefCardCorrection,
   DebriefModels,
   DebriefOverview,
@@ -81,6 +83,21 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       { changes: Record<string, number | boolean | string | null> }
     >({
       query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.SETTINGS, method: HttpMethod.PUT, body }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefClinicalLists: builder.query<DebriefClinicalListsView, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.CLINICAL_LISTS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    updateDebriefClinicalList: builder.mutation<
+      DebriefClinicalListsView,
+      { kind: DebriefClinicalListKind; language: string; entries: string[] | null }
+    >({
+      query: body => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.CLINICAL_LISTS,
+        method: HttpMethod.PUT,
+        body,
+      }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     acceptDebriefBaseline: builder.mutation<unknown, { keys: string[] }>({
@@ -637,6 +654,8 @@ export const {
   useRejectPinnedRuleMutation,
   useProposePinnedRuleMutation,
   useGetDebriefPinnedRulesQuery,
+  useGetDebriefClinicalListsQuery,
+  useUpdateDebriefClinicalListMutation,
   useGetDebriefAutonomyQuery,
   useSetDebriefOrgAutonomyMutation,
   useSetDebriefBudgetsMutation,

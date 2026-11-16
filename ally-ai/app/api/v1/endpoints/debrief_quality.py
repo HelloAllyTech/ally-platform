@@ -42,6 +42,9 @@ class DebriefQualityRequest(BaseModel):
     # The judge's instructions from the Skills Store
     # (`debrief_quality_judge_system`); the code's text when absent.
     judge_instructions: Optional[str] = None
+    # The pinned risk cue definition (`debrief_risk_cue_definition`); the
+    # code's default when absent.
+    risk_cue_definition: Optional[str] = None
     # Attribution only: carried onto the call's llm_usage row.
     scenario_session_id: Optional[str] = None
 
@@ -106,6 +109,7 @@ async def judge(req: DebriefQualityRequest) -> DebriefQualityResponse:
                 history=req.history,
                 rubric=req.rubric,
                 instructions=req.judge_instructions,
+                risk_cue_definition=req.risk_cue_definition,
                 scenario_session_id=req.scenario_session_id,
             )
     except Exception as exc:  # noqa: BLE001 - surface as 500, keep caller decoupled

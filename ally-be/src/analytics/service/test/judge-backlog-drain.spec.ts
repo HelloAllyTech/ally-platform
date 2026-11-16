@@ -191,7 +191,7 @@ describe('JudgeBacklogDrainService', () => {
     expect(language.startBackfill).not.toHaveBeenCalled();
   });
 
-  it('scores debriefs under the pinned v1 rubric, in bounded chunks', async () => {
+  it('scores debriefs under the pinned v2 rubric, in bounded chunks', async () => {
     const { service, debriefQuality, debriefQualityRepo } = build();
     await tick(service);
 
@@ -199,14 +199,14 @@ describe('JudgeBacklogDrainService', () => {
       expect.objectContaining({
         unjudgedForVersion: {
           judgeModel: 'gemini-2.5-pro',
-          judgePromptVersion: 'v1',
+          judgePromptVersion: 'v2',
         },
         honourAttemptLedger: true,
       }),
     );
     expect(debriefQuality.startBackfill).toHaveBeenCalledWith(
       150,
-      { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v1' },
+      { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v2' },
       undefined,
       80,
       { honourAttemptLedger: true },

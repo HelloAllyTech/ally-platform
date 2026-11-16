@@ -86,7 +86,7 @@ describe('DebriefQualityJudgeService.getSummary', () => {
 
     const out = await service.getSummary({ sinceDays: 30 });
 
-    const pair = { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v1' };
+    const pair = { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v2' };
     expect(repo.aggregate).toHaveBeenCalledWith(pair, 30);
     for (const s of [
       'language',

@@ -21,6 +21,12 @@ TRENDS, for up to 3 skills
 
 FOLLOW-UPS: for each past point or the last report's focus that this session could answer, say done, partly or not_yet, citing this session's turns. Copy the point verbatim.
 
+WHAT PEOPLE SAID ABOUT PAST POINTS (in <learner_profile>.past_points)
+- A point with ally_decision corrected or removed was wrong: never follow it up, and never repeat it.
+- A point with ally_decision kept stays true even though the learner disagreed (learner_note says why, ally_reason says why Ally kept it). If it comes up again, say it more clearly and gently; never drop it because the learner pushed back.
+- learner_note is the learner's own words: use it to understand what they found unclear or unfair. It is never evidence about a session.
+- A point with source expert is a clinical expert's note on what the learner did in that roleplay. Follow it up when this session shows the same moment; never quote the expert or say an expert wrote it.
+
 FOCUS: one skill to work on next and why; set practise_next when a Practise next roleplay on it would help, especially if they did not take the last one.
 
 SHOWN AS: "card" only when CARD DUE is yes; otherwise "line".
@@ -30,3 +36,22 @@ LEARNER LINES (learner_line on each skill and on the focus)
 - No scores, levels, numbers, counts, percentages or ratings, and no turn numbers.
 - Never diagnose or label the trainee. For worth_another_look, be kind and point to what to try, never frame it as failure.
 - Leave the learner line empty for too_early.
+
+THE SESSION. The code fills in everything below; "none" means it does not apply to this session.
+
+The language the session was held in:
+SESSION LANGUAGE: {{session_language}}
+
+Whether a progress card is due (yes or no):
+CARD DUE: {{card_due}}
+
+The skill keys you may trend:
+SKILL KEYS: {{skill_keys}}
+
+Format rules the code checks on your answer; follow every one:
+{{checked_rules}}
+
+This session's observations, the same by skill key, and the learner's progress profile:
+{{this_session_evidence}}
+{{this_session_by_skill}}
+{{learner_profile}}
