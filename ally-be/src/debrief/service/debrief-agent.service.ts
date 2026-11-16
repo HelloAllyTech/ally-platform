@@ -272,9 +272,10 @@ export class DebriefAgentService implements OnModuleInit {
       async () => {
         const resumed = await this.resumeStuckRuns();
         const handed = await this.sweepStuckRuns();
-        return resumed + handed === 0
+        const shown = await this.showHeldDrafts();
+        return resumed + handed + shown === 0
           ? 'none stuck'
-          : `${resumed} resumed, ${handed} handed to a person`;
+          : `${resumed} resumed, ${handed} handed to a person, ${shown} held draft(s) shown`;
       },
     );
     scheduledTaskRegistry.registerConfigurable('debrief-judge', async () => {
@@ -680,6 +681,54 @@ export class DebriefAgentService implements OnModuleInit {
           `[debrief] resuming run ${id} failed: ${(e as Error).message}`,
         );
       }
+    }
+    return rows.length;
+  }
+
+  /**
+   * No debrief is held (Gopi, 2026-11-16): a live run waiting for a person
+   * that already has a draft is shown as it is — below the bar, still in the
+   * review queue — and the learner is told it is ready. Runs held before the
+   * graph stopped holding drafts, and any that reach `needs_person` with cards
+   * another way, are picked up here. Returns how many were shown.
+   */
+  async showHeldDrafts(): Promise<number> {
+    const res = await this.dataSource.query(
+      `UPDATE debrief_runs
+          SET status = $1,
+              "skipReason" = NULL,
+              workspace = jsonb_set(
+                coalesce(workspace, '{}'::jsonb), '{decision,reviewReason}',
+                to_jsonb(coalesce(workspace->'decision'->>'reviewReason',
+                  CASE WHEN "skipReason" = 'checks_failed' THEN 'checks_failed'
+                       WHEN coalesce(workspace->'judge'->'hardFails', '[]'::jsonb) @> '[{"code":"missed_risk_cue"}]'
+                         OR coalesce(workspace->'decision'->>'why', '') ILIKE '%risk cue%' THEN 'missed_risk_cue'
+                       ELSE 'not_evaluated' END)),
+                true),
+              "updatedAt" = now()
+        WHERE mode = 'live' AND status = $2 AND cards IS NOT NULL
+          AND NOT (coalesce(workspace, '{}'::jsonb) ? 'review')
+          AND coalesce(workspace, '{}'::jsonb) ? 'decision'
+        RETURNING id`,
+      [DebriefRunStatus.BELOW_BAR, DebriefRunStatus.NEEDS_PERSON],
+    );
+    const rows: Array<{ id: string }> = Array.isArray(res?.[0])
+      ? res[0]
+      : (res ?? []);
+    for (const { id } of rows) {
+      try {
+        const run = await this.runs.findOne({ where: { id } });
+        if (!run) continue;
+        await this.publisher?.applyToSession(run);
+        await this.notifier.ready(run);
+      } catch (e) {
+        this.logger.warn(
+          `[debrief] could not show held draft ${id}: ${(e as Error).message}`,
+        );
+      }
+    }
+    if (rows.length) {
+      this.logger.warn(`[debrief] showed ${rows.length} held draft(s)`);
     }
     return rows.length;
   }
