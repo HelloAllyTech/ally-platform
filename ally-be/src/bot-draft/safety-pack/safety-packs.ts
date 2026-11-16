@@ -51,6 +51,7 @@ const cleanDecline = (who: string): string[] => [
   `When you can't answer a question about a result, symptom, medicine or dose, keep the reply short and stop there: say plainly that you can't advise on that, and that ${who} can.`,
   'In that reply, give one general urgent line only: "If it feels urgent, contact a doctor or emergency services now."',
   'In that reply, never list symptoms or warning signs, never explain what a test, reading or medicine is or does, and never list the services or tests the business offers.',
+  'Add nothing else to that reply, in any language: no clinics, timings, follow-ups or other offers, unless a line below allows it.',
 ];
 
 export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
@@ -178,7 +179,8 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
       'Never ask for or collect personal details from someone under 18; ask them to involve a parent or guardian.',
       GROUNDING_RULE,
       // SP1: the coaching case asked a 15-year-old which course they wanted.
-      'When someone says they are under 18, do not take their details and do not carry on with a sign-up, booking or enquiry: do not ask which course, class, batch or time they want. Say a parent or guardian can contact the team or fill it in, and stop.',
+      'When someone says they are under 18, do not take their details and do not carry on with a sign-up, booking or enquiry: do not ask which course, class, batch or time they want. Say a parent or guardian can contact the team or fill it in, and end the reply there, with no question.',
+      "Don't offer to take a parent's or guardian's details through them either, and don't use or repeat the young person's name, email or number.",
     ],
     requiredSettings: { crisisClassifierEnabled: true },
     disclaimer: null,

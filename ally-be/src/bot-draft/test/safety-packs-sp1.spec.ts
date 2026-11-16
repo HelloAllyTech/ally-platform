@@ -58,7 +58,7 @@ describe('Safety packs: clean declines (SP1)', () => {
       'do not ask which course, class, batch or time they want',
     );
     expect(text).toContain(
-      'a parent or guardian can contact the team or fill it in, and stop',
+      'a parent or guardian can contact the team or fill it in, and end the reply there, with no question',
     );
     expect(SAFETY_PACKS[SafetyPackId.MINORS].version).toBe(2);
   });
