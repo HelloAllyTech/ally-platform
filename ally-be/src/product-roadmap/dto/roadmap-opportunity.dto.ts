@@ -152,7 +152,10 @@ export class RoadmapOpportunityFiltersDto {
   @IsString({ each: true })
   productGoal?: string[];
 
-  @ApiPropertyOptional({ description: 'Owner NAMES (not ids)', isArray: true })
+  @ApiPropertyOptional({
+    description: "Owner NAMES (not ids), or 'unassigned' for rows nobody owns",
+    isArray: true,
+  })
   @IsOptional()
   @Transform(toArray)
   @IsArray()
@@ -178,6 +181,16 @@ export class RoadmapOpportunityFiltersDto {
   @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   newToMe?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Only opportunities that still need a triage decision: nobody owns them, or nobody has ' +
+      'sized them. Powers the Inbox count.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  needsTriage?: boolean;
 
   @ApiPropertyOptional() @IsOptional() @IsISO8601() dateFrom?: string;
   @ApiPropertyOptional() @IsOptional() @IsISO8601() dateTo?: string;
@@ -224,6 +237,7 @@ export class ListOpportunitiesQueryDto extends RoadmapOpportunityFiltersDto {
     'myVotes',
     'description',
     'plannedMonth',
+    'triage',
   ])
   sortBy?:
     | 'composite'
@@ -233,7 +247,8 @@ export class ListOpportunitiesQueryDto extends RoadmapOpportunityFiltersDto {
     | 'releasedAt'
     | 'myVotes'
     | 'description'
-    | 'plannedMonth';
+    | 'plannedMonth'
+    | 'triage';
 
   @ApiPropertyOptional({ enum: ['ASC', 'DESC'], default: 'DESC' })
   @IsOptional()
