@@ -406,6 +406,31 @@ describe("PM agent › Ideas", () => {
     );
   });
 
+  it("a budgets-only change waiting for the owner can be put live", async () => {
+    h.pmAgent.mockReturnValue(
+      state([
+        {
+          ...IDEA,
+          title: "Settings: monthlyCapUsd",
+          change: { ideaKind: "release", releaseId: "r8", budgetOnly: true },
+          evidence: {},
+          approval: { wait: "promote_budget", since: "2026-11-16T00:00:00Z" },
+          can: { approve: true, reject: true, tryIt: false, askQuestion: true, startStep: false },
+        },
+      ]),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Put live for everyone" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Put live for everyone" }),
+    );
+    await waitFor(() =>
+      expect(h.decide).toHaveBeenCalledWith(
+        expect.objectContaining({ id: IDEA.id, decision: "approve" }),
+      ),
+    );
+  });
+
   it("an idea that needs code can only be rejected", () => {
     h.pmAgent.mockReturnValue(
       state([

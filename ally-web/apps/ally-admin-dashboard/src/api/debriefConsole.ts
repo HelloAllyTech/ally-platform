@@ -426,7 +426,7 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     setDebriefBudgets: builder.mutation<
-      { ideaId?: string; releaseId: string; version: number; changed?: string[] },
+      { ideaId?: string; releaseId: string; version: number; budgetOnly?: boolean; live?: boolean },
       { runCeilingUsd?: number; monthlyCapUsd?: number; note?: string }
     >({
       query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.BUDGETS, method: HttpMethod.PUT, body }),

@@ -505,7 +505,7 @@ describe("Debrief settings page: who can change what", () => {
     fireEvent.click(
       within(screen.getByTestId("budget-runCeilingUsd")).getByRole("button", { name: "Change" }),
     );
-    expect(screen.getByRole("dialog")).toHaveTextContent("it is proposed as a change");
+    expect(screen.getByRole("dialog")).toHaveTextContent("goes live as soon as you confirm");
     fireEvent.click(tab("tests"));
     expect(screen.getAllByRole("button", { name: "Save changes" }).length).toBeGreaterThan(0);
   });

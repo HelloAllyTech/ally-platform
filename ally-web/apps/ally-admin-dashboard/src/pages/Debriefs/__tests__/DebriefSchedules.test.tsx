@@ -251,6 +251,9 @@ describe("Settings › Schedules: engineering only", () => {
 
 describe("Schedules table", () => {
   it("names each job, never its id; locked jobs are always on; last and next run", () => {
+    // The next run (Mon 16 Nov) reads as a day name only while it is in the future.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-12T00:00:00Z"));
     render(<SchedulesSection />);
     const rows = screen.getAllByTestId("schedule-row");
     expect(rows).toHaveLength(3);
@@ -269,6 +272,7 @@ describe("Schedules table", () => {
     expect(within(rows[2]).getByText("Mon 07:30")).toBeInTheDocument();
     expect(within(rows[2]).getByText("16 Nov 07:30")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /run now/i })).toBeNull();
+    vi.useRealTimers();
   });
 
   it("a job that calls no model saves a frequency change at once", async () => {

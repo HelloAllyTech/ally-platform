@@ -184,7 +184,11 @@ export const IdeaCard: React.FC<{
     startStep: false,
   };
   const wait = idea.approval?.wait;
-  const canPromote = access.pmAgent && (wait === "promote" || next === "promote");
+  // A budgets-only change goes live on the owner's word (can.approve is the owner's).
+  const canPromote =
+    wait === "promote_budget"
+      ? can.approve
+      : access.pmAgent && (wait === "promote" || next === "promote");
   const statusLabel =
     pinned && idea.closedReason === "withdrawn"
       ? pr.withdrawnStatus

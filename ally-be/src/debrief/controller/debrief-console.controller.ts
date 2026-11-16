@@ -1297,16 +1297,14 @@ export class DebriefConsoleController {
   @DebriefAct('ownerSettings')
   @ApiOperation({
     summary:
-      'Owner: change the run ceiling and the monthly cap (a new live release from the current one; undo with Roll back)',
+      'Owner: change the run ceiling and the monthly cap. Budgets alone go live on this confirm, as a new release (undo with Roll back); the evaluator bar is proposed and climbs the ladder.',
   })
-  budgets(@Req() req: AuthedRequest, @Body() body: BudgetsDto) {
+  async budgets(@Req() req: AuthedRequest, @Body() body: BudgetsDto) {
     const settings: Record<string, number> = {};
     if (body.runCeilingUsd != null) settings.runCeilingUsd = body.runCeilingUsd;
     if (body.monthlyCapUsd != null) settings.monthlyCapUsd = body.monthlyCapUsd;
     if (body.passScore != null) settings.passScore = body.passScore;
-    // A proposed change carrying a draft: budgets alone go live when the
-    // owner approves it; the evaluator bar climbs the ladder.
-    return this.releaseHistory.proposeChange(
+    const proposed = await this.releaseHistory.proposeChange(
       {
         title: `Settings: ${Object.keys(settings).join(', ')}`,
         why: body.note ?? null,
@@ -1314,6 +1312,12 @@ export class DebriefConsoleController {
       },
       req.user.id,
     );
+    // v9: a budget change needs a person's confirmation, the owner's, and the
+    // owner just gave it. Budgets alone go live now, still as a release with
+    // its idea and audit, so Roll back undoes them.
+    if (!proposed.budgetOnly) return { ...proposed, live: false };
+    await this.pmAgent.approve(proposed.ideaId, req.user.id, body.note);
+    return { ...proposed, live: true };
   }
 
   @Post('tenants/:tenantId/emergency-stop')

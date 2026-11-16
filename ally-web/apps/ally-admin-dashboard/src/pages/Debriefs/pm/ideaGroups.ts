@@ -14,6 +14,8 @@ export const stage = (idea: PmAgentIdeaRow): "canary" | "promote" | "handoff" | 
   if (HANDOFF_KINDS.has(idea.change.ideaKind)) {
     return idea.evidence.handoff?.status === "waiting" ? "handoff" : null;
   }
+  // A budgets-only change has no trial or canary: approving puts it live.
+  if (idea.approval?.wait === "promote_budget") return "promote";
   if (idea.evidence.canary?.status === "passed") return "promote";
   if (idea.evidence.canary?.status === "running") return null;
   return idea.evidence.trial?.status === "passed" ? "canary" : null;

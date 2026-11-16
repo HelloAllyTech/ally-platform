@@ -398,9 +398,8 @@ A passed canary that was never promoted is stopped. `approve` on an expired item
   - Agents need a release with the orchestrator.
   - Models must be gemini or openai.
 - `PATCH pm-agent/ideas/:id/draft` takes the same body and changes the draft until its tests start (409 after that).
-- These routes now create a proposed change instead of a live release:
-  - `PUT budgets {runCeilingUsd?, monthlyCapUsd?, passScore?, note?}` (owner).
-  - `POST releases/orchestrator-challenger`, which adds `ideaId` to its response.
+- `PUT budgets {runCeilingUsd?, monthlyCapUsd?, passScore?, note?}` (owner) also creates a change with its idea and release. Budgets alone (no `passScore`) go live on that call, because the owner's confirm is the person's confirmation v9 asks for; the response carries `live: true`. A change with `passScore` stays proposed (`live: false`) and climbs the ladder. Changed 2026-11-16.
+- `POST releases/orchestrator-challenger` creates a proposed change instead of a live release, and adds `ideaId` to its response.
 
 ### Pinned rules
 The three pinned rules are the Safety rules (`debrief_safety_reader_system`), the Rubric
@@ -651,7 +650,7 @@ until the console shows `/v1/notifications` (frontend).
 ## Settings
 
 - `GET settings` (unchanged). It includes `pmAgentEnabled` (`pmAgentStartsQuickTests` was removed on 2026-11-12). Learning share is `learningSkimPct`, and the steering weights are `steeringWeightJudge`, `steeringWeightPractise` and `steeringWeightThumbs`. Change them with `PUT settings` (owner).
-- `PUT budgets` creates a proposed change (see "Propose a change").
+- `PUT budgets` puts budgets live at once as a new release (Roll back undoes it); with `passScore` it is a proposed change (see "Propose a change").
 - `POST tenants/:tenantId/emergency-stop {reason}` (Ally team or owner) returns `{tenantId, live:false, learnersSee:'not_available', reason}`. Switching on (`PUT tenants/:id/live {live:true}`) is owner-only and still requires a support line outside India.
 
 ## Schedules (engineering only)

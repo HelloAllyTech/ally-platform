@@ -11192,9 +11192,8 @@ export const en = {
         change: "Change",
         changeTitle: (name: string) => `Change ${name}?`,
         releaseBody:
-          "This lives in the release, so it is proposed as a change: a budgets-only change goes live when you approve it under the PM agent's Ideas. Roll back undoes it.",
-        releaseMade: (v: number) =>
-          `Proposed as release v${v}. Approve it under the PM agent's Ideas.`,
+          "This goes live as soon as you confirm, as a new release. Roll back undoes it.",
+        releaseMade: (v: number) => `Live as release v${v}.`,
       },
       autonomy: {
         columns: {
