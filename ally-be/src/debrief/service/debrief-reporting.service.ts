@@ -96,7 +96,8 @@ export class DebriefReportingService {
   async library(days: number): Promise<Record<string, unknown>> {
     const d = Math.max(1, Math.min(120, Math.round(days)));
     const window = `created_at >= now() - interval '${d} days'`;
-    const prod = `mode IN ('shadow','live')`;
+    // What people read about is what learners got: live runs only.
+    const prod = `mode = 'live'`;
     const named: Record<string, string> = {
       byLanguageAndRecipe: `
         SELECT language, recipe, count(*) AS runs,

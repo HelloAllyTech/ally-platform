@@ -306,7 +306,7 @@ export class DebriefContextRepository {
             AND s."counselorId" IS NOT NULL
             AND s."counselorId" IS DISTINCT FROM $3
             AND r."scenarioSessionId" <> $4
-            AND r.mode IN ('shadow','live')
+            AND r.mode = 'live'
             AND r.status IN ('published','below_bar')
             AND r."createdAt" > now() - interval '90 days'
           ORDER BY s."counselorId", r."createdAt" DESC
@@ -401,11 +401,11 @@ export class DebriefContextRepository {
             JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
            WHERE s."counselorId" = $2 AND s.tenant_id IS NOT DISTINCT FROM $1::text
              AND r."scenarioSessionId" <> $3
-             AND r.mode IN ('shadow','live') AND r.status IN ('published','below_bar')) AS past_debriefs,
+             AND r.mode = 'live' AND r.status IN ('published','below_bar')) AS past_debriefs,
          (SELECT count(DISTINCT s."counselorId")::int FROM debrief_runs r
             JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
            WHERE s.tenant_id = $1::text AND s."counselorId" IS DISTINCT FROM $2
-             AND r.mode IN ('shadow','live') AND r.status IN ('published','below_bar')
+             AND r.mode = 'live' AND r.status IN ('published','below_bar')
              AND r."createdAt" > now() - interval '90 days') AS peers,
          (SELECT ti."trackId" IS NOT NULL FROM scenario_sessions s
             LEFT JOIN track_item_progress tip ON tip.id = s."trackItemProgressId"
@@ -486,7 +486,7 @@ export class DebriefContextRepository {
         WHERE s."counselorId" = $1
           AND s.tenant_id IS NOT DISTINCT FROM $2
           AND r."scenarioSessionId" <> $3
-          AND r.mode IN ('shadow','live')
+          AND r.mode = 'live'
           AND r.status IN ('published','below_bar')
         ORDER BY r."createdAt" DESC
         LIMIT $4`,
@@ -528,7 +528,7 @@ export class DebriefContextRepository {
         WHERE s."counselorId" = $1
           AND s.tenant_id IS NOT DISTINCT FROM $2
           AND r."scenarioSessionId" <> $3
-          AND r.mode IN ('shadow','live')
+          AND r.mode = 'live'
           AND r.status IN ('published','below_bar')
         ORDER BY r."createdAt" DESC
         LIMIT $4`,
@@ -583,7 +583,7 @@ export class DebriefContextRepository {
               AND s.tenant_id IS NOT DISTINCT FROM $2
               AND r."scenarioSessionId" <> $3
               AND s."createdAt" <= (SELECT at FROM this)
-              AND r.mode IN ('shadow','live')
+              AND r.mode = 'live'
               AND r.status IN ('published','below_bar')
             ORDER BY r."scenarioSessionId", (r.mode = 'live') DESC, r."createdAt" DESC
          ),
@@ -621,7 +621,7 @@ export class DebriefContextRepository {
                            AND s2."scenarioId" = pn.id AND s2.id <> $3
                            AND s2."createdAt" > w."createdAt"
                            AND s2."createdAt" <= (SELECT at FROM this)
-                           AND r2.mode IN ('shadow','live')
+                           AND r2.mode = 'live'
                            AND r2.status IN ('published','below_bar')) AS pn_published
            FROM win w
            LEFT JOIN scenarios sc ON sc.id = w."scenarioId"
@@ -678,7 +678,7 @@ export class DebriefContextRepository {
              JOIN debrief_runs r ON r.id = p.run_id
             WHERE p.counselor_id = $1 AND p.tenant_id IS NOT DISTINCT FROM $2
               AND p.scenario_session_id <> $3
-              AND r.mode IN ('shadow','live')
+              AND r.mode = 'live'
               AND r.status IN ('published','below_bar')
             ORDER BY p.created_at DESC LIMIT 1`,
           [counselorId, tenantId, beforeSessionId],

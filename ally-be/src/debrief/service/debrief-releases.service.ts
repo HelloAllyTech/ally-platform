@@ -630,7 +630,7 @@ export class DebriefReleasesService implements OnModuleInit {
               percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM "finishedAt" - "startedAt"))
                 FILTER (WHERE status <> 'skipped' AND "finishedAt" IS NOT NULL) AS secs_p50
          FROM debrief_runs
-        WHERE mode IN ('shadow','live') AND "releaseId" = $1
+        WHERE mode = 'live' AND "releaseId" = $1
           AND "createdAt" >= $2 AND ($3::timestamp IS NULL OR "createdAt" < $3::timestamp)`,
       [releaseId, from, to],
     );
@@ -815,7 +815,7 @@ export class DebriefReleasesService implements OnModuleInit {
     }> = await this.dataSource.query(
       `WITH r AS (
            SELECT id, steps FROM debrief_runs
-            WHERE "releaseId" = $1 AND mode IN ('shadow','live') AND status <> 'skipped')
+            WHERE "releaseId" = $1 AND mode = 'live' AND status <> 'skipped')
          SELECT s->>'step' AS step, (SELECT count(*) FROM r)::int AS runs,
                 count(DISTINCT r.id) FILTER (WHERE s->>'status' = 'done')::int AS done,
                 COALESCE(sum((s->>'estimatedUsd')::float), 0)::float AS usd
