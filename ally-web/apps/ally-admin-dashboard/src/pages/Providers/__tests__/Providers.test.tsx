@@ -31,7 +31,7 @@ describe("Providers", () => {
     expect(screen.getByText("VoicesPane")).toBeInTheDocument();
   });
   it("infers the tab from a legacy path", () => {
-    renderAt("/manage/llm-model-catalog", ALL);
+    renderAt("/manage-llm-model-catalog", ALL);
     expect(screen.getByText("LlmPane")).toBeInTheDocument();
   });
   it("hides tabs the admin has no feature for", () => {

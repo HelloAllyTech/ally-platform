@@ -25,19 +25,19 @@ const TABS = [
     id: ProvidersTab.SPEECH,
     label: providersCopy.tabs.speech,
     feature: FeatureToggleKey.MANAGE_STT_CONFIGS,
-    legacyPath: "stt-configs",
+    legacyPath: "manage-stt-configs",
   },
   {
     id: ProvidersTab.MODELS,
     label: providersCopy.tabs.models,
     feature: FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG,
-    legacyPath: "llm-model-catalog",
+    legacyPath: "manage-llm-model-catalog",
   },
   {
     id: ProvidersTab.VOICES,
     label: providersCopy.tabs.voices,
     feature: FeatureToggleKey.SCENARIO_VOICES,
-    legacyPath: "scenario-voices",
+    legacyPath: "manage-scenario-voices",
   },
 ];
 
