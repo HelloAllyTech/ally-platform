@@ -1366,6 +1366,19 @@ export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/debrief/progress_system.txt */
+export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
+  'debrief_progress_system',
+  {},
+  {
+    name: 'Debrief Progress Agent',
+    description:
+      "The debrief agent's Progress agent: reads this session's evidence map with the learner's progress profile (past sessions' Analyst observations, past points and their review verdicts, the last progress report, the learner's own words, Foundational Skills levels) and proposes up to 3 skill trends, follow-ups on past points and one focus. Code vetoes any trend the record contradicts. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/debrief/writer_system.txt */
 export const DEBRIEF_WRITER_SYSTEM = definePrompt(
   'debrief_writer_system',

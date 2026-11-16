@@ -21,7 +21,7 @@ text people read changed. In the admin and in ally-be's reasons, notifications a
 `quick_test` → Quick check, `gate_test` → Pass test, `paired_trial` → Side-by-side trial, `canary` →
 Try on learners / learner try-out, promote → Live for everyone / put live for everyone, the open and
 gate test sets → Practice sessions and Test sessions, κ → Agreement. On the Debriefs list and the
-session review: the judge → Independent check, the Evaluator → Ally's own check, and a run in a
+session review: the judge → Quality score, the Evaluator → draft score, and a run in a
 trial reads "Version vN · In a trial: the current version". A person's pinned-rule proposal is
 titled "<rule name>: <why>" (e.g. "Safety rules: …"); the closed groups are "Rejected or
 withdrawn" and "Live for everyone".
@@ -55,6 +55,7 @@ rather than disable it.
 | `releases` | yes | no | yes | `releases/orchestrator-challenger`, `releases/:id/rollback`, `releases/:id/promote-waiting`, `releases/:id/dismiss-waiting`, `sessions/:sessionId/run` |
 | `switchOrgOn` | no | no | yes | `tenants/:id/live` with `live: true` (403 for the Ally team), `tenants/:id/region` |
 | `emergencyStop` | yes | no | yes | `tenants/:id/live` with `live: false`, `tenants/:id/emergency-stop` |
+| `agentLogs` | yes | no | no (unless also on the team) | `runs/:runId/logs` (GET: a read, but team-only because it holds the whole transcript and every prompt) |
 | `ownerSettings` | no | no | yes | `settings` (PUT), `settings/accept`, `settings/baseline`, `budgets`, `autonomy/matrix`, `autonomy/orgs/:id` |
 
 The clinical advisor's routes (verdict, comments, escalated flags,
@@ -206,6 +207,61 @@ The decision buttons map to these routes:
 | correct (no flag) | `POST runs/:id/correct` |
 | verdict | expert-review `PUT runs/:id/verdict` |
 
+## Agent logs (Ally team only)
+
+### `GET runs/:runId/logs`
+
+The exact input every agent of the run was sent and its full reply, in order: for debugging an
+agent and improving it later. Gated by `can.agentLogs` (`system:access`); a clinical advisor gets
+**403**. Stored in `debrief_run_logs` (ally-be `DATA_SCHEMA.md`), deleted with the run and so with
+the session.
+
+```json
+{
+  "runId": "…",
+  "loggedFrom": "2026-11-14",
+  "run": { "sessionId": "…", "scenarioTitle": "Exam stress, first call", "status": "published",
+           "recipeKey": "standard", "releaseVersion": 5, "language": "en",
+           "costUsd": 0.09, "seconds": 134 },
+  "entries": [
+    { "seq": 1, "kind": "code", "step": "plan", "round": null, "startedAt": "…",
+      "model": null, "fallbackModel": null, "prompt": null,
+      "input": { "learnerTurns": 8, "ceilingUsd": 0.5, "orchestratorEnabled": false, … },
+      "output": { "recipe": "standard", "why": "…", "next": ["safety_reader", "analyst"] },
+      "tokensIn": null, "tokensOut": null, "costUsd": null, "ms": 1, "retries": 0,
+      "error": null, "attention": false },
+    { "seq": 5, "kind": "model", "step": "writer", "round": 0,
+      "model": "gemini-2.5-pro", "fallbackModel": null,
+      "prompt": { "code": "debrief_writer_system", "version": 3,
+                  "href": "/manage-prompts?prompt=debrief_writer_system&version=3", "inlined": true },
+      "input": "{{system_prompt}}\n\nSESSION LANGUAGE: en\n…<transcript>…",
+      "output": { "cards": { … }, "reasoning": "…" },
+      "tokensIn": 5320, "tokensOut": 690, "costUsd": 0.018, "ms": 15012, "retries": 0,
+      "error": null, "attention": false }
+  ],
+  "prompts": { "debrief_writer_system@3": "<the version's text>" }
+}
+```
+
+- **`kind: model`**: one entry per model call, each attempt its own (`retries` = attempts before
+  it; a failed attempt has `error` and no `output`). `input` is the message exactly as sent, with
+  the Skills Store prompt replaced by `{{system_prompt}}`; put `prompts["code@version"]` back in
+  its place to get the exact text. `model` is the model the step asked for first; `fallbackModel`
+  the backup or fallback that ran instead. A step whose prompt had no live text sent the code's
+  default whole (`prompt.version` null, no marker). A run that replaced a prompt for itself (a
+  replay's challenger) keeps that text inline and names no prompt.
+- **`kind: code`**: a deciding code step's real inputs and results: `plan` (the recipe and why,
+  the ceiling, whether the orchestrated path is on), `profile`, `dispatch` (each wave: the
+  accepted plan with each agent's estimated cost and what was dropped, then what was applied,
+  sent and skipped), `top_up`, code and data agents, `guidance_lookup`, `checks`, `score_draft`,
+  `decide`.
+- **`step: judge`**: the quality score, logged later, on the judge's schedule, against the
+  same run.
+- **`attention`**: a failed check, a draft below the bar, a decision other than published, an
+  error, a dispatch that dropped or skipped an agent.
+- Runs from before this release have no entries: `entries` is empty and `loggedFrom` is the day the
+  first entry was stored (null until any run has one).
+
 ## Correct in place (PRD §6.7)
 
 - **With a flag:** `POST flags/:id/resolve` takes `{ outcome: 'corrected', note, correction: { lead?, body?, why?, try_saying?, reason? } }` (unchanged). `note` is required: it is the "what changed" line the learner reads. The response now adds `version`.
@@ -276,7 +332,7 @@ outside test organisations, while fewer than 10 sampled ones wait. Stored in
 ordinary reviews count too.
 
 In the admin these read in plain words (2026-11-12): "Agreement" for κ (κ only in a tooltip),
-"Independent check caught 3 of 4 problems you found", and "Not measurable yet: every answer is the
+"Quality score caught 3 of 4 problems you found", and "Not measurable yet: every answer is the
 same" for an undefined κ.
 
 ## PM agent: ideas (like pull requests) and approvals (plan §11.7)
@@ -339,12 +395,11 @@ A passed canary that was never promoted is stopped. `approve` on an expired item
   It returns `{ ideaId, releaseId, version, budgetOnly, diff: BundleDiff }`. The draft is copied from the live release with these changes and checked like every release. The live release is never edited.
   - Fixed steps (safety reader, writer, checks, evaluator) and the judge cannot be turned off. The judge's model is pinned.
   - Turning the Reviser off sets revision rounds to 0.
-  - Agents need a release with the orchestrator.
+  - Agents need a release with the orchestrator (on by default since 2026-11-16).
   - Models must be gemini or openai.
 - `PATCH pm-agent/ideas/:id/draft` takes the same body and changes the draft until its tests start (409 after that).
-- These routes now create a proposed change instead of a live release:
-  - `PUT budgets {runCeilingUsd?, monthlyCapUsd?, passScore?, note?}` (owner).
-  - `POST releases/orchestrator-challenger`, which adds `ideaId` to its response.
+- `PUT budgets {runCeilingUsd?, monthlyCapUsd?, passScore?, note?}` (owner) also creates a change with its idea and release. Budgets alone (no `passScore`) go live on that call, because the owner's confirm is the person's confirmation v9 asks for; the response carries `live: true`. A change with `passScore` stays proposed (`live: false`) and climbs the ladder. Changed 2026-11-16.
+- `POST releases/orchestrator-challenger` creates a proposed change instead of a live release, and adds `ideaId` to its response.
 
 ### Pinned rules
 The three pinned rules are the Safety rules (`debrief_safety_reader_system`), the Rubric
@@ -595,7 +650,7 @@ until the console shows `/v1/notifications` (frontend).
 ## Settings
 
 - `GET settings` (unchanged). It includes `pmAgentEnabled` (`pmAgentStartsQuickTests` was removed on 2026-11-12). Learning share is `learningSkimPct`, and the steering weights are `steeringWeightJudge`, `steeringWeightPractise` and `steeringWeightThumbs`. Change them with `PUT settings` (owner).
-- `PUT budgets` creates a proposed change (see "Propose a change").
+- `PUT budgets` puts budgets live at once as a new release (Roll back undoes it); with `passScore` it is a proposed change (see "Propose a change").
 - `POST tenants/:tenantId/emergency-stop {reason}` (Ally team or owner) returns `{tenantId, live:false, learnersSee:'not_available', reason}`. Switching on (`PUT tenants/:id/live {live:true}`) is owner-only and still requires a support line outside India.
 
 ## Schedules (engineering only)

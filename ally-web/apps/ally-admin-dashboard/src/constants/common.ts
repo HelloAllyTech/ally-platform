@@ -299,6 +299,16 @@ export const ApiEndpoints = {
     ASSIGN: "/v1/platform-admins",
     REMOVE: (userId: number) => `/v1/platform-admins/${userId}`,
   },
+  // User Management › Debrief access: the Clinical advisor and Debrief owner roles (gated by
+  // admin_user_management, like Ally admins).
+  CLINICAL_ADVISORS: {
+    LIST: "/v1/clinical-advisors",
+    SEARCH: "/v1/clinical-advisors/search",
+    ADD: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    REMOVE: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    // The Debrief owner role, on the same page and gate.
+    OWNER: (userId: number) => `/v1/clinical-advisors/${userId}/owner`,
+  },
   SUPER_DUPER_ADMINS: {
     LIST: "/v1/super-duper-admins",
     ELIGIBLE: "/v1/super-duper-admins/eligible",
@@ -467,6 +477,7 @@ export const ApiEndpoints = {
     OVERVIEW: "/v1/debriefs/console/overview",
     SETTINGS: "/v1/debriefs/console/settings",
     METRICS: "/v1/debriefs/console/metrics",
+    NIGHTLY: "/v1/debriefs/console/metrics/nightly",
     SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
     /** Settings › Schedules (engineering only). */
     SCHEDULES: "/v1/debriefs/console/schedules",
@@ -496,6 +507,7 @@ export const ApiEndpoints = {
     ME: "/v1/debriefs/console/me",
     SESSIONS: "/v1/debriefs/console/sessions",
     SESSION: (runId: string) => `/v1/debriefs/console/sessions/runs/${runId}`,
+    RUN_LOGS: (runId: string) => `/v1/debriefs/console/runs/${runId}/logs`,
     ATTENTION: "/v1/debriefs/console/attention",
     ANALYTICS: "/v1/debriefs/console/analytics",
     CORRECT_RUN: (runId: string) => `/v1/debriefs/console/runs/${runId}/correct`,
@@ -1163,6 +1175,7 @@ export const ROUTES = {
   AI_TASKS: "/ai-tasks",
   DEBRIEFS: "/debriefs",
   DEBRIEF_SESSION: (runId: string) => `/debriefs/sessions/${runId}`,
+  DEBRIEF_SESSION_LOGS: (runId: string) => `/debriefs/sessions/${runId}/logs`,
   DEBRIEFS_PM_AGENT: "/debriefs/pm-agent",
   DEBRIEFS_SETTINGS: "/debriefs/settings",
   MANAGE_SCENARIO_LANGUAGES: "/manage-scenario-languages",
@@ -1384,6 +1397,7 @@ export const TAG_TYPES = {
   FEATURE_TOGGLE_REGISTRY: "featureToggleRegistry",
   USER_FEATURE_TOGGLES: "userFeatureToggles",
   PLATFORM_ADMINS: "platformAdmins",
+  CLINICAL_ADVISORS: "clinicalAdvisors",
   // Product Roadmap. NOTE: every one of these must ALSO be listed in baseApi.ts's
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",

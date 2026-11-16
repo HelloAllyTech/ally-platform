@@ -67,6 +67,14 @@ export function periodBounds(
   return { from: new Date(from), to: new Date(from + 7 * DAY_MS) };
 }
 
+/** The start (an instant) of the India-time month `n` months before `at`'s. */
+export function istMonthsBack(n: number, at: Date = new Date()): Date {
+  const i = toIst(at);
+  return new Date(
+    Date.UTC(i.getUTCFullYear(), i.getUTCMonth() - n, 1) - IST_OFFSET_MS,
+  );
+}
+
 /** The IST month an instant falls in, `YYYY-MM`. */
 export function monthOf(at: Date): string {
   const i = toIst(at);

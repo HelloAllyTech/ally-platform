@@ -63,3 +63,35 @@ class TestEndpoint:
 
         res = TestClient(app).post("/api/v1/debrief/runs", json={})
         assert res.status_code in (401, 403)
+
+
+class TestResponseModelKeepsTheContract:
+    """Every field the graph's result carries must survive the API's response
+    model: FastAPI drops undeclared keys silently (the progress reading once
+    never reached ally-be this way)."""
+
+    def test_every_result_key_is_a_response_field(self):
+        from types import SimpleNamespace
+
+        from app.core.debrief_graph.result import build_result
+        from app.core.debrief_graph.schemas import DebriefRunResponse
+
+        progress = {
+            "report": {"skills": [], "followups": [], "focus": None},
+            "vetoes": [{"skill": "empathy", "veto": "too_few_sessions"}],
+            "shown_as": "line",
+            "model": "m",
+            "window_session_ids": [],
+            "analyst_versions": [2],
+        }
+        state = {
+            "outcome": {"status": "published"},
+            "progress_result": progress,
+        }
+        ctx = SimpleNamespace(language="en", resumed=False, inputs={})
+        out = build_result(state, ctx)
+
+        dumped = DebriefRunResponse(**out).model_dump()
+        missing = set(out) - set(DebriefRunResponse.model_fields)
+        assert not missing, f"undeclared response fields: {missing}"
+        assert dumped["progress"] == progress

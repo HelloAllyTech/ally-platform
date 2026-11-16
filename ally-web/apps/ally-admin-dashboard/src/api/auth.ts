@@ -31,6 +31,7 @@ import {
   SetUserFeatureTogglesBody,
   GetPlatformAdminsResponse,
   AssignPlatformAdminBody,
+  ClinicalAdvisorPerson,
 } from "@types";
 
 export const authAPI = baseAPI.injectEndpoints({
@@ -285,6 +286,51 @@ export const authAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.PLATFORM_ADMINS, TAG_TYPES.USERS],
     }),
+
+    /** Clinical advisors: who reviews debriefs from every organisation. */
+    listClinicalAdvisors: builder.query<ClinicalAdvisorPerson[], void>({
+      query: () => ({ url: ApiEndpoints.CLINICAL_ADVISORS.LIST }),
+      providesTags: [TAG_TYPES.CLINICAL_ADVISORS],
+    }),
+
+    /** People by name or email (at least 3 characters), with their roles. */
+    searchClinicalAdvisorCandidates: builder.query<ClinicalAdvisorPerson[], string>({
+      query: q => ({ url: ApiEndpoints.CLINICAL_ADVISORS.SEARCH, params: { q } }),
+      providesTags: [TAG_TYPES.CLINICAL_ADVISORS],
+    }),
+
+    addClinicalAdvisor: builder.mutation<ClinicalAdvisorPerson, number>({
+      query: userId => ({
+        url: ApiEndpoints.CLINICAL_ADVISORS.ADD(userId),
+        method: HttpMethod.PUT,
+      }),
+      invalidatesTags: [TAG_TYPES.CLINICAL_ADVISORS, TAG_TYPES.USERS],
+    }),
+
+    removeClinicalAdvisor: builder.mutation<ClinicalAdvisorPerson, number>({
+      query: userId => ({
+        url: ApiEndpoints.CLINICAL_ADVISORS.REMOVE(userId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.CLINICAL_ADVISORS, TAG_TYPES.USERS],
+    }),
+
+    /** The Debrief owner role (settings, releases, PM agent), on the same page. */
+    addDebriefOwner: builder.mutation<ClinicalAdvisorPerson, number>({
+      query: userId => ({
+        url: ApiEndpoints.CLINICAL_ADVISORS.OWNER(userId),
+        method: HttpMethod.PUT,
+      }),
+      invalidatesTags: [TAG_TYPES.CLINICAL_ADVISORS, TAG_TYPES.USERS],
+    }),
+
+    removeDebriefOwner: builder.mutation<ClinicalAdvisorPerson, number>({
+      query: userId => ({
+        url: ApiEndpoints.CLINICAL_ADVISORS.OWNER(userId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.CLINICAL_ADVISORS, TAG_TYPES.USERS],
+    }),
   }),
 });
 
@@ -315,4 +361,10 @@ export const {
   useListEligiblePlatformAdminsQuery,
   useAssignPlatformAdminMutation,
   useRemovePlatformAdminMutation,
+  useListClinicalAdvisorsQuery,
+  useSearchClinicalAdvisorCandidatesQuery,
+  useAddClinicalAdvisorMutation,
+  useRemoveClinicalAdvisorMutation,
+  useAddDebriefOwnerMutation,
+  useRemoveDebriefOwnerMutation,
 } = authAPI;

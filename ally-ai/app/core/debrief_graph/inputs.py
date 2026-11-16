@@ -74,7 +74,31 @@ def analyst_body(state: State, ctx: Ctx) -> Dict[str, Any]:
     }
 
 
+def progress_profile(ctx: Ctx) -> Optional[Dict[str, Any]]:
+    """The learner's progress profile when it has history (PROGRESS_CONTRACT §1)."""
+    from app.core.debrief_graph.progress import profile_of
+
+    return profile_of(ctx.inputs)
+
+
+def progress_agent_body(state: State, ctx: Ctx) -> Dict[str, Any]:
+    """The progress agent: this session's evidence map and the profile, never
+    the transcript."""
+    from app.core.debrief_graph.progress import agent_input
+
+    profile = progress_profile(ctx) or {}
+    evidence = state.get("evidence") or {}
+    return {
+        "evidence": evidence,
+        "profile": profile,
+        "this_session": agent_input(profile, evidence),
+        "language": ctx.language,
+        "system_prompt": ctx.prompt(PROMPT_CODES["progress"]),
+    }
+
+
 def progress_body(state: State, ctx: Ctx) -> Dict[str, Any]:
+    """The orchestrated path's Progress reader (registry agent)."""
     return {
         "evidence": state.get("evidence") or {},
         "past_points": past_points(ctx),

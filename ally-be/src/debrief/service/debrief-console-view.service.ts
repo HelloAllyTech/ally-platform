@@ -1,3 +1,7 @@
+import {
+  progressConsoleView,
+  ProgressResultRow,
+} from '../util/debrief-progress.util';
 import { DebriefRunStepRecord } from '../entity/debrief-run.entity';
 import {
   ForbiddenException,
@@ -262,6 +266,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
                r."createdAt", r.tenant_id AS "tenantId", t.name AS "tenantName",
                sc.title AS "scenarioTitle", s."scenarioId" AS "scenarioId",
                (r.workspace ? 'review') AS reviewed,
+               (r.workspace->'nightly'->'reasons') AS nightly_reasons,
                EXISTS (SELECT 1 FROM debrief_agreement_samples ags WHERE ags."runId" = r.id) AS agreement_sample,
                EXISTS (SELECT 1 FROM debrief_reviews dv WHERE dv."runId" = r.id) AS has_verdict,
                (r.workspace ? 'escalation' AND NOT (r.workspace ? 'review')) AS run_escalated,
@@ -289,7 +294,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
                  WHEN b.mode = 'live' AND b.any_open THEN 1
                  WHEN b.mode = 'live' AND NOT b.reviewed
                       AND (b.status IN ('needs_person','below_bar','failed')
-                           OR (b.status = 'published' AND b.judge_below)) THEN 2
+                           OR (b.status = 'published' AND b.judge_below)
+                           OR b.nightly_reasons IS NOT NULL) THEN 2
                  ELSE 3
                END AS rank,
                (b.mode = 'live' AND (b.escalated_flag OR b.run_escalated)) AS escalated
@@ -469,6 +475,10 @@ export class DebriefConsoleViewService implements OnModuleInit {
       flagged: !!r.flagged,
       flagCount: Number(r.flag_count ?? 0),
       importantMomentFlagged: !!r.important_flagged,
+      /** "From the nightly check": why it sent this debrief to a person. */
+      nightlyReasons: Array.isArray(r.nightly_reasons)
+        ? (r.nightly_reasons as string[])
+        : null,
       escalated: !!r.escalated,
       riskCue: !!r.hasRiskCue,
       learnerDistress: !!r.learnerDistress,
@@ -598,6 +608,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
       thread,
       queue,
       ownerSettings,
+      progressRows,
     ] = await Promise.all([
       this.reviews.reviewTranscript(run).catch(() => []),
       this.dataSource.query(
@@ -620,6 +631,19 @@ export class DebriefConsoleViewService implements OnModuleInit {
         : Promise.resolve([] as Array<Record<string, any>>),
       this.queueIds(viewer),
       this.settings.get(),
+      // Learner progress: this run's reading after the vetoes. Unreadable
+      // (no table yet) reads as none.
+      Promise.resolve()
+        .then(
+          () =>
+            this.dataSource.query(
+              `SELECT shown_as, window_session_ids, skills, followups, focus, vetoes, created_at
+             FROM debrief_progress_results WHERE run_id = $1
+            ORDER BY created_at DESC LIMIT 1`,
+              [run.id],
+            ) as Promise<ProgressResultRow[]>,
+        )
+        .catch(() => [] as ProgressResultRow[]),
     ]);
     const cards = run.cards as DebriefCards | null;
     const ws = run.workspace ?? {};
@@ -825,6 +849,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
           ? ws.history.sessions.length
           : null,
       },
+      progress: progressConsoleView(progressRows?.[0]),
       howItWasMade: {
         recipe: run.recipeKey ?? null,
         releaseVersion: run.releaseVersion ?? null,

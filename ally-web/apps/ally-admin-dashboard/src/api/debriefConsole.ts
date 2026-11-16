@@ -1,5 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  AgentLogsView,
   AnswerBuilderDecisionRequest,
   DebriefMetricsFilter,
   DebriefMetricsView,
@@ -15,6 +16,7 @@ import {
   PmAgentBuilderAnswerer,
   PmAgentBuilderProgress,
   DebriefAnalyticsView,
+  DebriefNightlyRow,
   DebriefAttention,
   DebriefAutonomyKind,
   DebriefAutonomyStep,
@@ -263,6 +265,10 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.SESSION(id), method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    getDebriefRunLogs: builder.query<AgentLogsView, string>({
+      query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.RUN_LOGS(id), method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     getDebriefAttention: builder.query<DebriefAttention, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.ATTENTION, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
@@ -421,7 +427,7 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     setDebriefBudgets: builder.mutation<
-      { ideaId?: string; releaseId: string; version: number; changed?: string[] },
+      { ideaId?: string; releaseId: string; version: number; budgetOnly?: boolean; live?: boolean },
       { runCeilingUsd?: number; monthlyCapUsd?: number; note?: string }
     >({
       query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.BUDGETS, method: HttpMethod.PUT, body }),
@@ -482,6 +488,14 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    getDebriefNightly: builder.query<DebriefNightlyRow[], { days?: number }>({
+      query: ({ days }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.NIGHTLY,
+        method: HttpMethod.GET,
+        params: days ? { days } : undefined,
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     getDebriefAnalytics: builder.query<DebriefAnalyticsView, { days?: number }>({
       query: ({ days }) => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.ANALYTICS,
@@ -527,6 +541,7 @@ export const {
   useGetDebriefMeQuery,
   useGetDebriefSessionsQuery,
   useGetDebriefSessionQuery,
+  useGetDebriefRunLogsQuery,
   useGetDebriefAttentionQuery,
   useCorrectDebriefRunMutation,
   useAddDebriefCommentMutation,
@@ -555,4 +570,5 @@ export const {
   usePromoteWaitingReleaseMutation,
   useDismissWaitingReleaseMutation,
   useGetDebriefAnalyticsQuery,
+  useGetDebriefNightlyQuery,
 } = debriefConsoleAPI;

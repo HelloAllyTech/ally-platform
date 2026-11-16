@@ -141,6 +141,7 @@ def prompt_agent(
         summarise=findings_summary,
         fetch=fetch,
         findings=lambda s, c, r: r.get("findings") or [],
+        prompt_code=prompt_code,
     )
     return registry_step(agent, base)
 

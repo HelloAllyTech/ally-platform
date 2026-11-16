@@ -24,6 +24,7 @@ import { getErrorMessage } from "@utils";
 
 import { codeWords, modelLabels, promptName, recipeLabel, stepName } from "../consoleLabels";
 import { pmAgentPath, settingsPath } from "../consoleRoutes";
+import { TruncatedTitle } from "../consoleRows";
 import { score } from "../consoleTable";
 import { ConsoleTag } from "../consoleUi";
 import { EvidenceBlock, EvidenceStat, RungState } from "./EvidenceBlock";
@@ -179,24 +180,32 @@ const Detail: React.FC<{ id: string; canAct: boolean }> = ({ id, canAct }) => {
       className="flex min-w-0 max-w-[860px] flex-[999_1_560px] flex-col gap-5"
       data-testid="release-detail"
     >
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-[22px] font-semibold">
-          {releaseVersionLabel(d.version)} · {d.title}
-        </h2>
+      {/* One row: the title truncates (full text in its tooltip), one status tag, Roll back. When
+          it went live moves to the line below, which may wrap. */}
+      <div className="flex flex-nowrap items-center gap-3" data-testid="release-header">
+        <TruncatedTitle
+          as="h2"
+          text={`${releaseVersionLabel(d.version)} · ${d.title}`}
+          className="text-[22px] font-semibold"
+          testId="release-title"
+        />
         <ConsoleTag tone={live ? "success" : "neutral"}>
           {live ? s.live : d.retired?.reason === "rolled_back" ? p.rolledBack : p.retiredTag}
         </ConsoleTag>
-        <span className="text-[13px] text-neutral-600">
-          {live ? p.since(day(d.wentLiveAt)) : p.liveFromTo(day(d.wentLiveAt), day(d.retired?.at))}
-        </span>
-        <div className="flex-1" />
+        <div className="min-w-0 flex-1" />
         {(d.can?.rollBack ?? (canAct && !live)) && (
-          <Button kind="tertiary" size="sm" onClick={() => setConfirming(true)}>
-            {p.rollBack}
-          </Button>
+          <div className="shrink-0">
+            <Button kind="tertiary" size="sm" onClick={() => setConfirming(true)}>
+              {p.rollBack}
+            </Button>
+          </div>
         )}
       </div>
       <div className="text-[13px] text-neutral-600" data-testid="release-source">
+        <span data-testid="release-when">
+          {live ? p.since(day(d.wentLiveAt)) : p.liveFromTo(day(d.wentLiveAt), day(d.retired?.at))}
+        </span>
+        {" · "}
         {originText(d)}
         {d.retired
           ? ` · ${

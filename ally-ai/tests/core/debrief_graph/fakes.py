@@ -233,6 +233,95 @@ SESSION = {
     "in_case": False,
 }
 
+
+def obs(run_id, date, observation, version=2, turn=3, corrected=False, opp=True):
+    return {
+        "run_id": run_id,
+        "date": date,
+        "opportunity": opp,
+        "observation": observation,
+        "confidence": "high",
+        "turn_index": turn,
+        "analyst_version": version,
+        "corrected": corrected,
+    }
+
+
+#: PROGRESS_CONTRACT §1: three earlier sessions, empathy rising.
+PROGRESS_PROFILE = {
+    "settings": {
+        "window": 6,
+        "cardEvery": 5,
+        "useFhs": True,
+        "showWorseToLearners": False,
+    },
+    "session_number": 5,
+    "card_due": True,
+    "sessions": [
+        {
+            "session_id": f"s-{i}",
+            "run_id": f"r-{i}",
+            "date": f"2026-11-0{i}",
+            "scenario": {"title": "Exam stress", "difficulty": "easy", "risk": False},
+            "analyst_version": 2,
+            "practise_next": None,
+        }
+        for i in (3, 2, 1)
+    ],
+    "skills": {
+        "empathy": [
+            obs("r-1", "2026-11-01", "missed"),
+            obs("r-2", "2026-11-02", "partial"),
+            obs("r-3", "2026-11-03", "observed"),
+        ],
+        "other": [obs("r-1", "2026-11-01", "observed")],
+    },
+    "past_points": [
+        {
+            "run_id": "r-3",
+            "date": "2026-11-03",
+            "skill": "Empathy, warmth and genuineness",
+            "point": "Name the feeling you hear.",
+            "verdict": "agreed",
+            "learner_flag": None,
+        }
+    ],
+    "last_report": None,
+    "learner_voice": [],
+    "fhs": None,
+}
+
+#: What the progress agent proposes by default (before the vetoes).
+PROGRESS_REPORT = {
+    "skills": [
+        {
+            "skill": "empathy",
+            "trend": "more_consistent",
+            "why": "Missed, then partial, then observed twice.",
+            "evidence": [
+                {"run_id": "r-1", "turn_index": 3},
+                {"run_id": "this", "turn_index": 5},
+            ],
+            "fhs": "absent",
+            "learner_line": "You named the client's feelings more often lately.",
+        }
+    ],
+    "followups": [
+        {
+            "point": "Name the feeling you hear.",
+            "status": "done",
+            "evidence": [{"run_id": "this", "turn_index": 5}],
+        }
+    ],
+    "focus": {
+        "skill": "harm",
+        "why": "Risk was not explored.",
+        "learner_line": "Next time, ask gently about safety.",
+        "practise_next": True,
+    },
+    "shown_as": "card",
+}
+
 CONTEXT = {
     "live_detections": [{"behaviour": "open questions", "detected": True, "times": 1}],
     "past_work_on_this": [
@@ -243,6 +332,7 @@ CONTEXT = {
     "practice_options": [
         {"id": 41, "title": "Exam stress", "skills": ["exploring risk"]}
     ],
+    "progress_profile": PROGRESS_PROFILE,
 }
 
 
@@ -287,6 +377,10 @@ class FakeSteps:
                     "items": [{"skill": "pacing", "trend": "too_early", "evidence": ""}]
                 },
                 "reasoning": "",
+            },
+            "progress-agent": {
+                "report": PROGRESS_REPORT,
+                "reasoning": "Empathy rose across the window.",
             },
             "writer": {"cards": CARDS, "reasoning": "Led with risk."},
             "evaluator": {"evaluation": evaluation(9), "reasoning": "Good."},

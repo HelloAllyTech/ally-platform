@@ -733,6 +733,91 @@ export const en = {
       "At times, the bot may be unresponsive, or have unusual lag times. We are always working to improve the experience!",
     startSession: "Start Session",
   },
+  debriefAccess: {
+    title: "Debrief access",
+    intro:
+      "People who review or run debriefs across every organisation. Clinical advisors review debriefs and receive escalations; the Debrief owner manages debrief settings, releases and the PM agent. Adding a role gives only that access; everything else a person holds stays as it is.",
+    loadFailed: "Couldn't load who has debrief access",
+    loadFailedHelp: "Reload the page to try again.",
+    none: "No one has debrief access yet",
+    noneHelp: "Use “Add a person” to give someone a debrief role.",
+    columns: {
+      name: "Name",
+      email: "Email",
+      organisation: "Organisation",
+      debriefRoles: "Debrief roles",
+      roles: "Other roles",
+    },
+    roleLabels: { advisor: "Clinical advisor", owner: "Debrief owner" },
+    noDebriefRole: "None",
+    noOtherRoles: "None",
+    moreRoles: (n: number) => `+${n}`,
+    moreActions: "More actions",
+    makeAdvisor: "Make clinical advisor",
+    removeAdvisor: "Remove clinical advisor",
+    makeOwner: "Make Debrief owner",
+    removeOwner: "Remove Debrief owner",
+    fix: "Fix access",
+    addPerson: "Add a person",
+    addAs: "Add…",
+    addAsAdvisor: "Add as clinical advisor",
+    addAsOwner: "Add as Debrief owner",
+    searchLabel: "Find a person by name or email",
+    searchPlaceholder: "Type at least 3 letters",
+    searching: "Searching…",
+    noMatches: "No one matches.",
+    searchFailed: "Couldn't search. Try again.",
+    hasBoth: "Has both debrief roles",
+    needsConsole: "Needs the debrief console access",
+    needsRole: "Has console access but no debrief role",
+    confirm: {
+      addAdvisorTitle: "Add a clinical advisor?",
+      addAdvisor: (name: string, roles: string) =>
+        roles
+          ? `Make ${name} a clinical advisor? They keep their current roles: ${roles}.`
+          : `Make ${name} a clinical advisor?`,
+      addAdvisorLabel: "Make clinical advisor",
+      removeAdvisorTitle: "Remove a clinical advisor?",
+      removeAdvisor: (name: string) =>
+        `Remove ${name} as a clinical advisor? They keep their other roles.`,
+      removeAdvisorLabel: "Remove clinical advisor",
+      addOwnerTitle: "Make the Debrief owner?",
+      addOwner: (name: string, roles: string) =>
+        roles
+          ? `Make ${name} the Debrief owner? They keep their current roles: ${roles}.`
+          : `Make ${name} the Debrief owner?`,
+      addOwnerLabel: "Make Debrief owner",
+      removeOwnerTitle: "Remove the Debrief owner?",
+      removeOwner: (name: string) =>
+        `Remove Debrief owner from ${name}? They keep their other roles.`,
+      removeOwnerLabel: "Remove Debrief owner",
+    },
+    cancel: "Cancel",
+    done: {
+      addAdvisor: (name: string) => `${name} is now a clinical advisor`,
+      removeAdvisor: (name: string) => `${name} is no longer a clinical advisor`,
+      addOwner: (name: string) => `${name} is now the Debrief owner`,
+      removeOwner: (name: string) => `${name} is no longer the Debrief owner`,
+    },
+    failed: {
+      add: "Couldn't add the role",
+      remove: "Couldn't remove the role",
+    },
+    roleNames: {
+      CLINICAL_ADVISOR: "Clinical advisor",
+      DEBRIEF_OWNER: "Debrief owner",
+      SUPER_DUPER_ADMIN: "Platform owner",
+      SUPER_ADMIN: "Super admin",
+      MULTI_TENANT_ADMIN: "Multi-organisation admin",
+      ADMIN: "Admin",
+      COUNSELOR: "Counsellor",
+      LEARNER: "Learner",
+      SIMULATION_REVIEWER: "Simulation reviewer",
+      SCRIBE_REVIEWER: "Scribe reviewer",
+      EVALUATOR: "Evaluator",
+      CLIENT: "Client",
+    } as Record<string, string>,
+  },
   superAdmins: {
     title: "Ally admins",
     subtitle:
@@ -8295,6 +8380,11 @@ export const en = {
     failedToDeleteTemplate: "Failed to delete template(s)",
     deleteTemplate: "Delete template",
     deleteTemplateConfirmation: "Are you sure you want to delete this template?",
+    unsavedChanges: "Unsaved changes",
+    unsavedChangesDescription:
+      "You have unsaved changes to this template. Close without saving and lose them?",
+    closeAnyway: "Close without saving",
+    keepEditing: "Keep editing",
   },
   productUpdates: {
     title: "Product updates",
@@ -9326,6 +9416,16 @@ export const en = {
     noAccess:
       "Your account can't open the Debriefs console. It needs the Analytics toggle and the Ally team, clinical advisor or owner permission. Ask a platform admin.",
     title: "Debriefs",
+    /** Shared words for rows of controls that overflow instead of wrapping (2026-11-13). */
+    rows: {
+      moreActions: "More actions",
+      moreFilters: "More filters",
+      moreFiltersCount: (n: number) => `More filters, ${n} active`,
+      activeFilters: "Active filters",
+      remove: (what: string) => `Remove ${what}`,
+      clearAll: "Clear all",
+      keyboard: "Keyboard shortcuts",
+    },
     intro:
       "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the PM agent is changing, and which organisations have it.",
     // Expert review (debrief orchestrator spec Part B): clinical experts comment on exact lines.
@@ -9427,9 +9527,9 @@ export const en = {
         saved: "Verdict saved",
         failed: "Couldn't save the verdict",
         pick: "Choose Good or Needs work.",
-        judge: (score: string) => `Independent check: ${score}`,
-        agentCheck: (score: string) => `Ally's own check: ${score}`,
-        hiddenNote: "The independent check's score and other verdicts show after you submit.",
+        judge: (score: string) => `Quality score: ${score}`,
+        agentCheck: (score: string) => `Draft score: ${score}`,
+        hiddenNote: "The quality score, the draft score and other verdicts show after you submit.",
         others: (n: number) =>
           n === 0
             ? "No one else has reviewed it."
@@ -9495,6 +9595,7 @@ export const en = {
         budget: "Learning budget",
         metrics: "Metrics",
         agent: "The PM agent",
+        progress: "Learner progress",
       } as Record<string, string>,
       names: {
         runCeilingUsd: "Run ceiling ($)",
@@ -9521,6 +9622,18 @@ export const en = {
         flagReviewSlaHours: "Hours to review a learner's flag",
         pmAgentEnabled: "PM agent runs",
         pmAgentRunCapUsd: "Most one PM agent run may spend ($)",
+        progressOn: "Learner progress",
+        progressCardEvery: "Show the progress card every … sessions",
+        progressWindow: "Sessions to look back over",
+        progressUseFhs: "Use Foundational Skills levels as a cross-check",
+        progressShowWorseToLearners: "Tell learners when a skill needs another look",
+        nightlyLengthCreepShare: "Nightly check: debriefs longer than before by",
+        nightlySamenessMax: "Nightly check: alert when debriefs read alike above",
+        nightlySpecificityDrop: "Nightly check: alert when specificity falls by (points)",
+        nightlyGapMax:
+          "Nightly check: alert when the draft score is above the quality score by (points)",
+        judgeDriftMax: "Judge drift that re-locks autonomy (points)",
+        judgeAnchorSize: "Debriefs scored again each week for the quality score",
       } as Record<string, string>,
       columns: {
         setting: "Setting",
@@ -9532,6 +9645,7 @@ export const en = {
       budgetTag: "Budget",
       misfit: "No longer fits",
       noProposal: "—",
+      noneYet: "These settings aren't available yet.",
       accept: "Accept",
       acceptAll: "Accept every proposed value that isn't a budget",
       save: "Save changes",
@@ -10018,10 +10132,17 @@ export const en = {
         "Picked at random this week so agreement isn't built only from debriefs someone chose to open. Review it as usual and answer the questions under your verdict.",
       untitled: (id: string) => `Roleplay ${id}`,
       columns: {
-        judge: "Independent check",
-        evaluator: "Ally’s own check",
+        judge: "Quality score",
+        evaluator: "Draft score",
         cost: "Cost",
         time: "Time",
+      },
+      // The two debrief scores, explained wherever they are shown.
+      scoreHelp: {
+        judge:
+          "Scored after publishing by a separate AI reviewer that never sees how the debrief was written. Below 8 goes to review.",
+        evaluator:
+          "Scored before publishing, to decide whether the debrief is good enough to go out or needs another revision.",
       },
       layoutLabel: "Layout",
       layout: { cards: "Cards", list: "List" },
@@ -10059,7 +10180,7 @@ export const en = {
         "Most urgent first: important-moment flags, then other flags, then debriefs below the bar.",
       /**
        * The same note for a viewer blind to the checks (the clinical advisor): no hint of the
-       * independent check's result before their verdict. True to the order ally-be sends them.
+       * quality score before their verdict. True to the order ally-be sends them.
        */
       queueNoteBlind: {
         needs: "Most urgent first: important-moment flags, then other flags, then held debriefs.",
@@ -10085,7 +10206,7 @@ export const en = {
         },
         below: {
           title: "Nothing below the bar",
-          message: "Debriefs the independent check scored under the bar appear here.",
+          message: "Debriefs with a quality score under the bar appear here.",
         },
         published: {
           title: "Nothing published yet",
@@ -10145,6 +10266,80 @@ export const en = {
             : `${n} Skills Store or code releases are waiting: each would undo a change a person put live.`,
       },
     },
+    // Agent logs (B3): every agent's exact input and full reply for one run. Ally team only.
+    agentLogs: {
+      title: "Agent logs",
+      back: "Back to the session",
+      loadFailed: "the agent logs",
+      noAccess: "Agent logs are for the Ally team only.",
+      search: "Search the log (words, turn numbers, codes)",
+      searchLabel: "Search the log",
+      show: "Show",
+      readable: "Readable",
+      raw: "Raw JSON",
+      note: "Ally team only · contains the full transcript · deleted with the session",
+      origin: {
+        fixed: "Fixed",
+        planned: "Planned",
+        top_up: "Top-up",
+        unknown: "Source unknown",
+      } as Record<string, string>,
+      originHelp: {
+        fixed: "A step the code always runs",
+        planned: "An agent the planner chose for this session",
+        top_up: "Extra evidence after a failed evaluation",
+        unknown: "Logged before sources were recorded",
+      } as Record<string, string>,
+      why: (reason: string) => `Why: ${reason}`,
+      source: "Source",
+      allSources: "All sources",
+      summary: {
+        run: (id: string) => `run ${id}`,
+        version: (v: string) => `version ${v}`,
+        entries: (n: number) => `${n} ${n === 1 ? "entry" : "entries"}`,
+        seconds: (s: number) => (s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`),
+      },
+      empty: "No agent logs for this run",
+      loggedFrom: (date: string) => `Full agent logs are kept for runs from ${date}.`,
+      loggedFromUnknown: "Full agent logs are kept for runs from this release on.",
+      noMatch: (q: string) => `No entry mentions "${q}".`,
+      matches: (n: number) => `${n} ${n === 1 ? "entry matches" : "entries match"}`,
+      done: "Done",
+      attention: "Needs attention",
+      failed: "Failed",
+      code: "Code",
+      backup: (model: string) => `backup ${model} ran`,
+      round: (n: number) => `round ${n}`,
+      retry: (n: number) => (n === 1 ? "retried once" : `retry ${n}`),
+      noRetries: "no retries",
+      tokens: (i: string, o: string) => `${i} in / ${o} out tokens`,
+      prompt: "Prompt",
+      systemPrompt: "System prompt",
+      showPrompt: "Show",
+      hidePrompt: "Hide",
+      promptVersion: (name: string, v: number | null) => (v == null ? name : `${name} v${v}`),
+      promptMissing: "This version's text could not be loaded.",
+      copy: "Copy",
+      copied: "Copied",
+      copyFailed: "Could not copy",
+      sent: "Sent",
+      reply: "Reply",
+      given: "Given",
+      result: "Result",
+      noReply: "No reply",
+      error: "Error",
+      names: {
+        plan: "Plan",
+        profile: "Session profile",
+        planner: "Planner",
+        dispatch: "Dispatch",
+        top_up: "Top-up",
+        score_draft: "Scoring",
+        decide: "Decision",
+        evaluator: "Draft score",
+        judge: "Quality score",
+      } as Record<string, string>,
+    },
     // One session's page (redesign 2026-11-12): the roleplay beside the debrief, and the review.
     session: {
       turn: (n: number) => `Turn ${n}`,
@@ -10160,8 +10355,14 @@ export const en = {
       noCards: "No debrief was written for this session",
       position: (i: number, n: number, where: string) => `${i} of ${n} in ${where}`,
       theQueue: "the queue",
-      previous: "Previous · k",
-      next: "Next · j",
+      queue: "Queue",
+      queuePosition: (i: number, n: number) => `${i} of ${n}`,
+      previous: "Previous in the queue",
+      next: "Next in the queue",
+      previousHint: "Previous in the queue (keyboard: K)",
+      nextHint: "Next in the queue (keyboard: J)",
+      agentLogs: "Agent logs",
+      moreTags: (n: number) => `+${n}`,
       review: "Review",
       reviewedButton: (what: string) => `Reviewed · ${what}`,
       reviewed: {
@@ -10179,8 +10380,8 @@ export const en = {
         organisation: "Organisation",
         recipe: "Recipe",
         language: "Language",
-        judge: "Independent check",
-        evaluator: "Ally’s own check",
+        judge: "Quality score",
+        evaluator: "Draft score",
         cost: "Cost",
         time: "Time",
         release: "Version",
@@ -10198,9 +10399,87 @@ export const en = {
       },
       tabs: {
         debrief: "The debrief",
-        how: "How it was made",
         ask: "Ask Ally",
         askCount: (n: number) => `Ask Ally · ${n}`,
+        progress: "Progress",
+      },
+      /** The Progress tab: how this learner's skills moved across their recent sessions. */
+      progress: {
+        heading: "Progress across sessions",
+        intro: (n: number | null) =>
+          n == null
+            ? "How this learner's skills moved across their recent debriefed sessions."
+            : `How this learner's skills moved across their last ${n} debriefed sessions, this one included.`,
+        shownAs: {
+          line: "The learner saw this as a line in the debrief.",
+          card: "The learner saw this as the progress card.",
+        } as Record<string, string>,
+        none: "No progress reading for this session",
+        noneFirst:
+          "This was the learner's first debriefed session, so there was nothing to compare with.",
+        noneHelp:
+          "A reading is made when learner progress is on and the learner has earlier published debriefs.",
+        skills: "Skills",
+        trend: {
+          more_consistent: "Getting more consistent",
+          about_the_same: "About the same",
+          worth_another_look: "Worth another look",
+          too_early: "Too early to tell",
+        } as Record<string, string>,
+        why: "Why:",
+        evidence: "Evidence:",
+        thisTurn: (n: number) => `Turn ${n}`,
+        pastRun: (n: number | null) =>
+          n != null ? `Earlier session, turn ${n}` : "Earlier session",
+        pastRunHint: "Open that session",
+        thisTurnHint: "Show this turn in the roleplay",
+        crossCheck: "Foundational Skills levels:",
+        crossCheckValue: {
+          agrees: "Agree",
+          disagrees: "Disagree",
+          absent: "No levels",
+        } as Record<string, string>,
+        learnerSaw: "The learner saw:",
+        notShown: "Not shown to the learner",
+        hiddenWorse:
+          "Not shown to the learner: learners aren't told when a skill needs another look (Debrief settings › Progress).",
+        heldBack: {
+          too_few_sessions: "Held back: fewer than 3 sessions gave a chance to show this skill",
+          contradicted_by_analyst: "Held back: the session observations don't support this trend",
+          contradicted_by_fhs: "Held back: the Foundational Skills levels went the other way",
+          version_straddle: "Held back: the evidence spans two versions of the Analyst",
+          corrected_evidence: "Held back: it rested on a point a clinical advisor corrected",
+          other_skill: "Held back: not one of the 14 foundational skills",
+        } as Record<string, string>,
+        heldBackOther: "Held back",
+        followups: "Follow-ups from earlier debriefs",
+        followupStatus: {
+          done: "Done",
+          partly: "Partly",
+          not_yet: "Not yet",
+        } as Record<string, string>,
+        noFollowups: "No earlier points to follow up.",
+        focus: "Focus for next time",
+        practiseNext: "Linked to Practise this next",
+        noSkills: "No skill had enough to say this time.",
+        made: (when: string) => `Read ${when}`,
+        skillNames: {
+          verbal: "Verbal communication",
+          confidentiality: "Explain and promote confidentiality",
+          rapport: "Rapport-building and self-disclosure",
+          feelings: "Exploration and normalisation of feelings",
+          empathy: "Empathy, warmth and genuineness",
+          harm: "Assessment of harm and developing a response plan",
+          functioning: "Connect to social functioning and impact on life",
+          explanation: "Explore the client's explanation for the problem",
+          family: "Involvement of family and significant others",
+          goals: "Collaborative goal-setting",
+          hope: "Promote realistic hope for change",
+          coping: "Incorporate coping mechanisms and prior solutions",
+          psychoeducation: "Psychoeducation with local terminology",
+          feedback: "Elicitation of feedback",
+          other: "Another skill",
+        } as Record<string, string>,
       },
       kinds: {
         importantMoment: "An important moment",
@@ -10235,31 +10514,6 @@ export const en = {
           `The learner will see: “Updated on ${date} after a review by the Ally team: ${note}”`,
         previewEmpty: "…",
         save: (version: number) => `Save as version ${version}`,
-      },
-      how: {
-        guidanceCodes: "Debrief Guidance entries used",
-        skillHeading: "Learner's skill estimate",
-        skillOnlyHere: "Shown only here, never to the learner",
-        skillFrom: (n: number) =>
-          `From ${n} past ${n === 1 ? "session" : "sessions"} · used by the Progress reader and the Writer`,
-        noSkill: "No skill estimate was recorded for this run.",
-        words: {
-          strength: "A strength",
-          keep_practising: "Keep practising",
-          didnt_come_up: "Didn't come up",
-        } as Record<string, string>,
-        trends: {
-          more_consistent: "More consistent than before",
-          about_the_same: "About the same as before",
-          too_early: "Too early to tell",
-        } as Record<string, string>,
-        level: (l: string) => `learner level: ${l}`,
-        asWritten: "ran as written",
-        release: (v: number) => `version v${v}`,
-        reasoning: "Its reasoning",
-        code: "Code",
-        stepOk: "Done",
-        stepNotOk: "Failed or skipped",
       },
       ask: {
         none: "The learner hasn't asked Ally anything",
@@ -10320,8 +10574,7 @@ export const en = {
         turns: (a: number, b: number) => `turns ${a}–${b} in the roleplay`,
         flaggedCard: "the flagged card",
         theirNote: "their note",
-        judgeReasons: (n: number) =>
-          `the independent check’s ${n} ${n === 1 ? "reason" : "reasons"}`,
+        judgeReasons: (n: number) => `the quality score’s ${n} ${n === 1 ? "reason" : "reasons"}`,
         urgent: (w: string) => `Urgent · ${w}.`,
         flag: (w: string) => `Learner flag · ${w}.`,
         held: (w: string) => `Held · ${w}.`,
@@ -10331,17 +10584,17 @@ export const en = {
         escalated: (w: string) => `Escalated to you · ${w}.`,
         flagBody: (card: string, reason: string) => `The learner flagged “${card}”: “${reason}”.`,
         heldBody: (judge: string) =>
-          `The independent check scored it ${judge}; the learner sees “on its way” until you decide.`,
+          `Quality score ${judge}; the learner sees “on its way” until you decide.`,
         distressBody:
           "The learner stepped out in distress. They have their debrief with the support lines; check on them.",
         belowBarBody: (judge: string) =>
-          `Already published; the independent check scored it ${judge}, below the bar.`,
+          `Already published; quality score ${judge}, below the bar.`,
         escalatedAsk: "The Ally team asks for your view.",
         escalatedNote: (by: string, note: string) => `${by} asks: “${note}”`,
         theTeam: "The Ally team",
         distressAskAlly: "The learner showed distress in Ask Ally after reading the debrief.",
         theCard: "the card",
-        judgeReasonsLink: "the independent check’s reasons",
+        judgeReasonsLink: "the quality score’s reasons",
         askAlly: "the Ask Ally conversation",
         escalate: "Escalate to clinical advisor",
         giveVerdict: "Give your verdict",
@@ -10354,13 +10607,12 @@ export const en = {
         theyAdded: (note: string) => `They added: “${note}”`,
         keepRemoveHelp:
           "Keep and Remove ask for a reason the learner reads. Correct edits the card in place.",
-        held: (judge: string, w: string) =>
-          `Held · the independent check scored it ${judge}, below the bar · ${w}`,
+        held: (judge: string, w: string) => `Held · quality score ${judge}, below the bar · ${w}`,
         heldHelp: "The learner sees “on its way” until you decide.",
         distress: (w: string) => `Learner distress · ${w}`,
         belowBar: (judge: string, w: string) =>
-          `Published, then the independent check scored it below the bar (${judge}) · ${w}`,
-        whyHeld: "Why the independent check held it",
+          `Published, then the quality score came in below the bar (${judge}) · ${w}`,
+        whyHeld: "Why the quality score held it",
         escalate: "Escalate to clinical advisor · e",
         comments: "Comments",
         commentHint: "Select words in the roleplay or the debrief to add one.",
@@ -10390,7 +10642,8 @@ export const en = {
       beingTested: (n: number) => `${n} being tested`,
       learningBudget: "Learning budget",
       ofThisMonth: (budget: string) => `of ${budget} this month`,
-      actsAlone: "What it may change without asking a person (hover for why):",
+      actsAlone: "Changes without asking a person:",
+      actsAloneHint: "What the PM agent may change without asking a person. Hover a chip for why.",
       openClosed: "Open or closed",
       open: "Open",
       closed: "Closed",
@@ -10791,6 +11044,7 @@ export const en = {
         autonomy: "Autonomy",
         weights: "Steering",
         pinned: "Pinned rules",
+        progress: "Progress",
         schedules: "Schedules",
         guidance: "Guidance",
       } as Record<string, string>,
@@ -10843,6 +11097,14 @@ export const en = {
           "debrief-agreement-sample": {
             name: "Agreement sample",
             what: "Puts a few judged debriefs, picked at random, in the clinical advisor's queue",
+          },
+          "debrief-nightly-check": {
+            name: "Nightly check",
+            what: "Measures yesterday’s debriefs against the days before and sends some to a person",
+          },
+          "debrief-judge-anchor": {
+            name: "Judge drift",
+            what: "Scores a fixed set of debriefs again for the quality score, to catch drift (learning budget)",
           },
           "debrief-pm-agent-forecasts": {
             name: "Check forecasts",
@@ -10933,6 +11195,8 @@ export const en = {
       budgetHelp:
         "Every change asks you to confirm. The PM agent can never change a budget. Spend and burn rate are in Analytics › Debriefs.",
       testsHelp: "How much an idea must prove at each step before it reaches learners.",
+      progressHelp:
+        "How the Debrief agent reads a learner's progress across their recent sessions, and what learners are shown.",
       weightsHelp:
         "How the weekly steering score weighs each signal, and how soon a learner's flag should be reviewed.",
       pinnedHelp:
@@ -10963,9 +11227,8 @@ export const en = {
         change: "Change",
         changeTitle: (name: string) => `Change ${name}?`,
         releaseBody:
-          "This lives in the release, so it is proposed as a change: a budgets-only change goes live when you approve it under the PM agent's Ideas. Roll back undoes it.",
-        releaseMade: (v: number) =>
-          `Proposed as release v${v}. Approve it under the PM agent's Ideas.`,
+          "This goes live as soon as you confirm, as a new release. Roll back undoes it.",
+        releaseMade: (v: number) => `Live as release v${v}.`,
       },
       autonomy: {
         columns: {
@@ -10990,7 +11253,7 @@ export const en = {
         autoNeedsAgreement: "On its own (override: asks to confirm)",
         overrideTitle: "Let learner try-outs run on their own?",
         overrideBody: (kind: string) =>
-          `The independent check hasn't been shown to agree with the clinical advisor yet. Learner try-outs for ${kind} will reach learners without approval.`,
+          `The quality score hasn't been shown to agree with the clinical advisor yet. Learner try-outs for ${kind} will reach learners without approval.`,
         overrideSafety:
           "The safety nets stay: a try-out that misses a risk cue is taken back on its own, and the system still sets it back to asks first after reverts or a failed baseline, and tells you.",
         overrideConfirm: "Let them run",
@@ -11006,7 +11269,7 @@ export const en = {
           },
           {
             lead: "Try on learners:",
-            text: "asks first until the independent check agrees with the clinical advisor’s reviews (agreement 0.6 or more on every measure). Then you’re told it can run on its own, and you switch it on here. It never switches itself on. You can also switch it on earlier; you’ll be asked to confirm and the override is recorded.",
+            text: "asks first until the quality score agrees with the clinical advisor’s reviews (agreement 0.6 or more on every measure). Then you’re told it can run on its own, and you switch it on here. It never switches itself on. You can also switch it on earlier; you’ll be asked to confirm and the override is recorded.",
           },
           {
             lead: "Taken back automatically:",
@@ -11028,7 +11291,8 @@ export const en = {
         eligibleNo: "Not yet",
         loading: "Loading…",
         loadFailed: "Couldn't load what the PM agent may do alone.",
-        driftFrom: "Judge drift: measured from Release 2.",
+        driftFrom:
+          "Judge drift: not measured yet. A fixed set of debriefs is scored again for the quality score each week.",
         drift: "Judge drift found: everything asks first.",
         noDrift: "No judge drift.",
         baselineFailed: "The monthly baseline failed: everything asks first.",
@@ -11053,7 +11317,7 @@ export const en = {
         orgLive: "Live",
         orgNotLive: "Not switched on yet · no trials or try-outs",
         orgStopped: "Stopped · no trials or try-outs",
-        // Agreement between the independent check and the clinical advisor's yes/no answers.
+        // Agreement between the quality score and the clinical advisor's yes/no answers.
         agreement: {
           heading: "Judge agreement with the clinical advisor",
           source: (sampled: number) =>
@@ -11070,11 +11334,11 @@ export const en = {
           caught: (caught: number, of: number) =>
             of === 0
               ? "No problems found yet"
-              : `Independent check caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
+              : `The quality score caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
           caughtHelp:
-            "Of the debriefs the clinical advisor answered No to, how many the independent check also marked No.",
+            "Of the debriefs the clinical advisor answered No to, how many the quality score also marked No.",
           undefinedHelp:
-            "The advisor and the independent check have only ever given the same answer, so agreement can't be worked out yet (Cohen's κ is undefined).",
+            "The advisor and the quality score have only ever given the same answer, so agreement can't be worked out yet (Cohen's κ is undefined).",
           footer: (min: number) =>
             `Line at 0.6. Each measure needs ${min} reviews and agreement of at least 0.6. If any drops below, learner try-outs go back to asking a person.`,
         },
@@ -11464,6 +11728,8 @@ export const en = {
           guidance: "Marked done",
         } as Record<string, string>,
       },
+      delivered: (when: string, tags: string, until: string) =>
+        `Reached production ${when}${tags ? ` (${tags})` : ""}. Measuring whether it helped until ${until}.`,
       forecast: (metric: string, before: string, after: string, moved: string) =>
         `${metric}: ${before} before, ${after} after — ${moved}`,
       forecastMoved: {
@@ -11622,14 +11888,59 @@ export const en = {
       providersAtLeastOne: "Allow at least one provider. To stop its debriefs, use Emergency stop.",
       providersConfirm: "Save providers",
     },
-    // Analytics › Debriefs › Judge agreement: the independent check against the clinical
+    // Analytics › Debriefs › Judge agreement: the quality score against the clinical
     // advisor's yes/no answers under their verdicts (hand scoring removed 2026-11-12).
+    nightly: {
+      heading: "Nightly check",
+      help: "Each night, yesterday's debriefs are measured against the two weeks before. Alerts mean something drifted. Words are counted and lines compared the same way in every language; vagueness is the quality score's specificity part.",
+      slice: "Show",
+      all: "All debriefs",
+      language: (code: string) => `Language: ${code}`,
+      recipe: (key: string) => `Recipe: ${key}`,
+      alertsHeading: "Alerts in the last 2 weeks",
+      noAlerts: "No alerts in the last 2 weeks.",
+      empty: "No nightly check has run yet. It runs every night (Settings › Schedules).",
+      charts: {
+        words: "Words per debrief",
+        wordsHelp:
+          "Median and the longest 10%. Rising week on week means debriefs are getting longer.",
+        p50: "Median",
+        p90: "Longest 10%",
+        sameness: "How alike debriefs read",
+        samenessHelp:
+          "0 to 1: how close each debrief's lead lines come to another learner's. Rising means debriefs read the same for everyone.",
+        specificity: "Specificity (quality score)",
+        specificityHelp:
+          "The quality score's part for how specific the evidence is, 0 to 10. Falling means debriefs are getting vaguer.",
+        gap: "Draft score above quality score",
+        gapHelp:
+          "Points, on average. A growing gap means the draft score is getting easier than the quality score.",
+        drift: "Judge drift",
+        driftHelp:
+          "Each week the same debriefs are scored again for the quality score. The line is how far its scores moved; beyond the limit, autonomy re-locks.",
+        limit: "Limit",
+      },
+      dataQuality: (
+        runs: number,
+        noLanguage: number,
+        unjudged: number,
+        stuck: number,
+        failed: number,
+      ) =>
+        `Yesterday: ${runs} debriefs; ${noLanguage} without a language, ${unjudged} without a quality score yet, ${stuck} stuck, ${failed} failed.`,
+      reasons: {
+        judge_human_disagree: "A clinician and the quality score disagree",
+        thumbs_down_comment: "Learner said not helpful, with a comment",
+        risk_cue_disagree: "Risk cue: the checks disagree",
+      } as Record<string, string>,
+      fromNightly: "From the nightly check",
+    },
     calibration: {
       sectionHeading: "Judge agreement",
       noAgreement:
         "The clinical advisor hasn't answered the questions under a verdict yet, so there's no agreement to show.",
       sectionHelp:
-        "How closely the independent check agrees with the clinical advisor's yes/no answers under each verdict. Decides what the PM agent may do alone: learner try-outs can run on their own only once every measure reaches 0.6.",
+        "How closely the quality score agrees with the clinical advisor's yes/no answers under each verdict. Decides what the PM agent may do alone: learner try-outs can run on their own only once every measure reaches 0.6.",
       agreementFailed: "agreement",
       kpis: {
         rated: "Reviews with answers",
@@ -11641,24 +11952,24 @@ export const en = {
         sampleValue: (week: number, waiting: number) => `${week} this week · ${waiting} waiting`,
         gate: "Learner try-outs on their own",
         gateHelp:
-          "Allowed only while the independent check agrees with the clinical advisor on accuracy, evidence and missed risk cues.",
+          "Allowed only while the quality score agrees with the clinical advisor on accuracy, evidence and missed risk cues.",
         met: "Allowed",
         notMet: "Needs approval",
       },
       gateHeading: "What the PM agent's freedom depends on",
       gateAbout: "About agreement",
       gateHelp: (min: number) =>
-        `Agreement is Cohen's κ between the clinical advisor's answer and the independent check's on the same debrief: 1 is perfect, 0 is chance. Each measure needs ${min} reviews and 0.6 or more.`,
+        `Agreement is Cohen's κ between the clinical advisor's answer and the quality score's on the same debrief: 1 is perfect, 0 is chance. Each measure needs ${min} reviews and 0.6 or more.`,
       chartAxis: "Bar: agreement beyond chance, 0 to 1. Dark rule: the 0.6 each measure needs",
       chartCaption:
-        "Agreement between the independent check and the clinical advisor, beyond what chance alone would give.",
+        "Agreement between the quality score and the clinical advisor, beyond what chance alone would give.",
       kappaWords: (k: string, words: string) => `${k}, ${words.toLowerCase()}`,
       notYet: (n: number, min: number) => `Not measured yet: ${n} of ${min} reviews`,
       reviews: (n: number, min: number) => (n < min ? `${n} of ${min}` : String(n)),
       caught: (caught: number, of: number) =>
         of === 0
           ? "No problems found yet"
-          : `Independent check caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
+          : `The quality score caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
       states: {
         not_enough: "Not measured yet",
         undefined: "Not measurable yet: every answer is the same",

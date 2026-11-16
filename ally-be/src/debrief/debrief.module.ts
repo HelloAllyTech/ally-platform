@@ -26,6 +26,8 @@ import { DebriefReviewComment } from './entity/debrief-review-comment.entity';
 import { DebriefReviewService } from './service/debrief-review.service';
 import { DebriefFeedback } from './entity/debrief-feedback.entity';
 import { DebriefRun } from './entity/debrief-run.entity';
+import { DebriefRunLog } from './entity/debrief-run-log.entity';
+import { DebriefProgressResult } from './entity/debrief-progress-result.entity';
 import { DebriefAgentService } from './service/debrief-agent.service';
 import { AskAllyClient } from './service/ask-ally.client';
 import { DebriefConsoleService } from './service/debrief-console.service';
@@ -40,6 +42,7 @@ import { DebriefPmAgentRunService } from './service/debrief-pm-agent-run.service
 import { DebriefBuilderRequesterService } from './service/debrief-builder-requester.service';
 import { DebriefPmAgentToolsService } from './service/debrief-pm-agent-tools.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
+import { DebriefNightlyService } from './service/debrief-nightly.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
@@ -62,8 +65,12 @@ import { DebriefLearnerEventsService } from './service/debrief-learner-events.se
 import { DebriefMetricsService } from './service/debrief-metrics.service';
 import { DebriefConsoleAuditInterceptor } from './interceptor/debrief-console-audit.interceptor';
 import { DebriefRunJudgeService } from './service/debrief-run-judge.service';
+import { DebriefRunLogsService } from './service/debrief-run-logs.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
+
+import { DebriefAdvisorsController } from './controller/debrief-advisors.controller';
+import { DebriefAdvisorsService } from './service/debrief-advisors.service';
 
 /**
  * The Debrief agent and its PM agent (plan: ally-debriefs-plan.md). Runs on
@@ -77,6 +84,10 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
   imports: [
     TypeOrmModule.forFeature([
       DebriefRun,
+      // The Agent logs: every agent's exact input and full reply, per run.
+      DebriefRunLog,
+      // Learner progress: each run's progress reading after the vetoes.
+      DebriefProgressResult,
       DebriefFeedback,
       DebriefOwnerSettings,
       DebriefProbeResult,
@@ -118,8 +129,11 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefReviewController,
     // Settings › Schedules: engineering only (the debrief_schedules toggle).
     DebriefSchedulesController,
+    // User Management › Clinical advisors (gated like Ally admins).
+    DebriefAdvisorsController,
   ],
   providers: [
+    DebriefAdvisorsService,
     // Ask Ally's agent in ally-ai (CONTRACT.md §5).
     AskAllyClient,
     DebriefContextRepository,
@@ -129,6 +143,7 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefAggregatesService,
     DebriefRunnerService,
     DebriefRunJudgeService,
+    DebriefRunLogsService,
     DebriefAgentService,
     DebriefTestSetsService,
     DebriefPmAgentService,
@@ -161,6 +176,7 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefConsoleAuditInterceptor,
     DebriefAudioService,
     DebriefNotifier,
+    DebriefNightlyService,
     DebriefReviewService,
     GuideCrisisService,
     // Runs the debrief / PM agent jobs when their stored schedule says.

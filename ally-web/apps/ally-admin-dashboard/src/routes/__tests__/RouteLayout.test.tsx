@@ -70,6 +70,7 @@ vi.mock("@pages", () => ({
   AgentTestCases: () => <div>AgentTestCasesPage</div>,
   DebriefConsole: () => <div>DebriefConsolePage</div>,
   DebriefSessionPage: () => <div>DebriefSessionPage</div>,
+  AgentLogsPage: () => <div>AgentLogsPage</div>,
   PmAgentPage: () => <div>PmAgentPage</div>,
   DebriefSettingsPage: () => <div>DebriefSettingsPage</div>,
   Competencies: () => <div>CompetenciesPage</div>,
@@ -221,6 +222,13 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.COURSE_COPILOT_SESSION("abc-123"));
     render(<RouteLayout />);
     expect(screen.getByText("CourseCopilotSessionPage")).toBeInTheDocument();
+  });
+
+  it("renders a run's Agent logs at /debriefs/sessions/:runId/logs, not the session route", () => {
+    window.history.pushState({}, "", ROUTES.DEBRIEF_SESSION_LOGS("r1"));
+    render(<RouteLayout />);
+    expect(screen.getByText("AgentLogsPage")).toBeInTheDocument();
+    expect(screen.queryByText("DebriefSessionPage")).not.toBeInTheDocument();
   });
 
   // CONSOLE_API "Roles": the Analytics toggle or the clinical advisor's toggle opens the console,

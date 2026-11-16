@@ -64,6 +64,8 @@ import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefPmAgentService } from '../service/debrief-pm-agent.service';
 import { DebriefPmAgentRunService } from '../service/debrief-pm-agent-run.service';
 import { DebriefPmReportsService } from '../service/debrief-pm-reports.service';
+import { DebriefNightlyService } from '../service/debrief-nightly.service';
+import { DebriefRunLogsService } from '../service/debrief-run-logs.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
@@ -540,6 +542,8 @@ export class DebriefConsoleController {
     private readonly releaseHistory: DebriefReleasesService,
     private readonly pmReports: DebriefPmReportsService,
     private readonly builderRequester: DebriefBuilderRequesterService,
+    private readonly agentLogs: DebriefRunLogsService,
+    private readonly nightly: DebriefNightlyService,
   ) {}
 
   /** Release settings (budgets, the evaluator bar) are the owner's. */
@@ -653,6 +657,16 @@ export class DebriefConsoleController {
     return this.console.overview(
       Number.isInteger(d) && d > 0 && d <= 90 ? d : 7,
     );
+  }
+
+  @Get('metrics/nightly')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      "The nightly check (v9 FR-49): each day's measures overall, by language and by recipe, the alerts, and the weekly judge-drift readings",
+  })
+  nightlyView(@Query('days') days?: string) {
+    return this.nightly.days(days ? Number(days) || 56 : 56);
   }
 
   @Get('metrics')
@@ -1029,6 +1043,16 @@ export class DebriefConsoleController {
     return this.view.session(id, await this.view.viewer(req.user.id));
   }
 
+  @Get('runs/:runId/logs')
+  @DebriefAct('agentLogs')
+  @ApiOperation({
+    summary:
+      'Agent logs: the exact input every agent was sent and its full reply, in order (Ally team only). Runs from before logs were kept answer an empty list with `loggedFrom`',
+  })
+  agentLogsOf(@Param('runId', ParseUUIDPipe) runId: string) {
+    return this.agentLogs.view(runId);
+  }
+
   @Get('attention')
   @DebriefRead()
   @ApiOperation({
@@ -1285,16 +1309,14 @@ export class DebriefConsoleController {
   @DebriefAct('ownerSettings')
   @ApiOperation({
     summary:
-      'Owner: change the run ceiling and the monthly cap (a new live release from the current one; undo with Roll back)',
+      'Owner: change the run ceiling and the monthly cap. Budgets alone go live on this confirm, as a new release (undo with Roll back); the evaluator bar is proposed and climbs the ladder.',
   })
-  budgets(@Req() req: AuthedRequest, @Body() body: BudgetsDto) {
+  async budgets(@Req() req: AuthedRequest, @Body() body: BudgetsDto) {
     const settings: Record<string, number> = {};
     if (body.runCeilingUsd != null) settings.runCeilingUsd = body.runCeilingUsd;
     if (body.monthlyCapUsd != null) settings.monthlyCapUsd = body.monthlyCapUsd;
     if (body.passScore != null) settings.passScore = body.passScore;
-    // A proposed change carrying a draft: budgets alone go live when the
-    // owner approves it; the evaluator bar climbs the ladder.
-    return this.releaseHistory.proposeChange(
+    const proposed = await this.releaseHistory.proposeChange(
       {
         title: `Settings: ${Object.keys(settings).join(', ')}`,
         why: body.note ?? null,
@@ -1302,6 +1324,12 @@ export class DebriefConsoleController {
       },
       req.user.id,
     );
+    // v9: a budget change needs a person's confirmation, the owner's, and the
+    // owner just gave it. Budgets alone go live now, still as a release with
+    // its idea and audit, so Roll back undoes them.
+    if (!proposed.budgetOnly) return { ...proposed, live: false };
+    await this.pmAgent.approve(proposed.ideaId, req.user.id, body.note);
+    return { ...proposed, live: true };
   }
 
   @Post('tenants/:tenantId/emergency-stop')

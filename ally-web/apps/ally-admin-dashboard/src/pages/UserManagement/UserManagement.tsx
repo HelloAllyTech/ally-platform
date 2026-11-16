@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Tabs } from "@ally-ui-mono/ui-shared";
-import { useListPlatformAdminsQuery } from "@api";
+import { useListClinicalAdvisorsQuery, useListPlatformAdminsQuery } from "@api";
 import {
   ListToolbar,
   FilterDropdown,
@@ -49,6 +49,7 @@ import { formatCapitalizedEnum, hasFeature } from "@utils";
 import { PhoneMappingsTab } from "./PhoneMappings";
 import { useOrganizationManagement } from "./useOrganizationManagement";
 import { useUserManagement } from "./useUserManagement";
+import { DebriefAccess } from "../DebriefAccess/DebriefAccess";
 import { SuperAdmins } from "../SuperAdmins/SuperAdmins";
 
 const formatDate = (isoDate: string) =>
@@ -84,17 +85,26 @@ export const UserManagement: FC = () => {
     skip: !canManagePlatformAdmins,
   });
   const superAdminTierCount = platformAdminsForCount?.count ?? 0;
+  // Same for the Debrief access tab: one shared cache entry with the tab itself.
+  const { data: debriefAccessForCount } = useListClinicalAdvisorsQuery(undefined, {
+    skip: !canManagePlatformAdmins,
+  });
+  const debriefAccessCount = debriefAccessForCount?.length ?? 0;
 
   // The Users toggle switches off the Users and Organizations sub-tabs. The
   // page itself stays reachable to an admin with Admin User Management, for
   // the Ally admins list, so that is where they land instead.
   const canSeeUsersAndOrgs = hasFeature(features, FeatureToggleKey.USERS);
   const fallbackTab = canSeeUsersAndOrgs ? TabType.USERS : TabType.SUPER_ADMINS;
-  const requestedTab = (searchParams.get("tab") as TabType) || fallbackTab;
-  // The Ally admins tab is gated; a deep link to it from anyone else falls
-  // back to Users (the backing endpoints would 403 anyway).
+  const tabParam = searchParams.get("tab") as TabType | null;
+  // The Debrief access tab was "Clinical advisors": its old id still opens it.
+  const requestedTab =
+    (tabParam === TabType.CLINICAL_ADVISORS ? TabType.DEBRIEF_ACCESS : tabParam) || fallbackTab;
+  // The Ally admins and Debrief access tabs are gated; a deep link to either
+  // from anyone else falls back to Users (the backing endpoints would 403 anyway).
   const activeTab =
-    (requestedTab === TabType.SUPER_ADMINS && !canManagePlatformAdmins) ||
+    ((requestedTab === TabType.SUPER_ADMINS || requestedTab === TabType.DEBRIEF_ACCESS) &&
+      !canManagePlatformAdmins) ||
     (requestedTab === TabType.PHONE_MAPPINGS && !canManagePhoneMappings) ||
     ((requestedTab === TabType.USERS || requestedTab === TabType.ORGANIZATIONS) &&
       !canSeeUsersAndOrgs)
@@ -199,7 +209,14 @@ export const UserManagement: FC = () => {
         ]
       : []),
     ...(canManagePlatformAdmins
-      ? [{ id: TabType.SUPER_ADMINS, label: en.superAdmins.title, count: superAdminTierCount }]
+      ? [
+          { id: TabType.SUPER_ADMINS, label: en.superAdmins.title, count: superAdminTierCount },
+          {
+            id: TabType.DEBRIEF_ACCESS,
+            label: en.debriefAccess.title,
+            count: debriefAccessCount,
+          },
+        ]
       : []),
     ...(canManagePhoneMappings
       ? [{ id: TabType.PHONE_MAPPINGS, label: en.whatsappBot.phoneMappings.tabLabel }]
@@ -625,6 +642,8 @@ export const UserManagement: FC = () => {
         );
       case TabType.SUPER_ADMINS:
         return canManagePlatformAdmins ? <SuperAdmins /> : null;
+      case TabType.DEBRIEF_ACCESS:
+        return canManagePlatformAdmins ? <DebriefAccess /> : null;
       case TabType.PHONE_MAPPINGS:
         return canManagePhoneMappings ? <PhoneMappingsTab /> : null;
     }

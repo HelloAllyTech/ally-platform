@@ -28,7 +28,8 @@ export type SettingsGroup =
   | "sealed"
   | "budget"
   | "metrics"
-  | "agent";
+  | "agent"
+  | "progress";
 
 type Value = number | boolean;
 
@@ -120,6 +121,14 @@ export const SettingsGroups: React.FC<{
 
   const proposals = view.baseline?.proposals ?? {};
   const inGroups = (k: string) => (GROUPS as string[]).includes(view.spec[k]?.group);
+  const anyShown = Object.keys(view.spec).some(inGroups);
+  if (!anyShown) {
+    return (
+      <p className="text-sm text-typography-700" data-testid={testId ?? "debrief-settings-tab"}>
+        {s.noneYet}
+      </p>
+    );
+  }
   const acceptable = Object.keys(proposals).filter(
     k => inGroups(k) && !view.spec[k]?.budget && proposals[k].value !== view.values[k],
   );

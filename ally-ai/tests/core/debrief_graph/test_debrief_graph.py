@@ -8,6 +8,7 @@ import pytest
 from app.core.debrief_graph import circuit, constants
 from app.core.debrief_graph.gateway import GatewayError
 from tests.core.debrief_graph.fakes import (
+    CARDS,
     PRICES,
     SESSION,
     FakeGateway,
@@ -114,7 +115,8 @@ class TestStandardRun:
         assert analyst["reasoning"] == "Weighed the turns."
         assert analyst["inputs"][-1] == "the live detector’s record (1 of 1 detected)"
         assert by_step["progress_reader"]["why"] == (
-            "This learner has 1 earlier Work-on-this point to follow up."
+            "Reads how this learner’s skills are changing across their last "
+            "3 sessions and this one."
         )
         assert by_step["guidance_lookup"]["note"] == "2 lookup(s), 2 passage(s)"
         # PRD §14: each passage's Guidance code, for the Console's run view.
@@ -151,7 +153,9 @@ class TestStandardRun:
             "decision",
         ]:
             assert key in ws, key
-        assert ws["history"] == "2026-10-20 · pacing: Let the client finish."
+        assert ws["history"] == (
+            "2026-11-03 · Empathy, warmth and genuineness: Name the feeling you hear."
+        )
         assert ws["decision"]["status"] == "published"
         assert ws["decision"]["why"] == (
             "Published round 0: it passed every check and scored 9.0 with no hard "
@@ -319,6 +323,103 @@ class TestEndings:
         assert result["status"] == "needs_person"
         assert result["skip_reason"] == "not_evaluated_or_risk"
         assert result["evaluator_overall"] == 4.0
+
+
+class TestPossibleMissedCue:
+    """A missed cue holds the debrief only when it is clear (cue_strength):
+    one every signal reads as possible publishes and goes to review."""
+
+    def _read(self, steps, quote, category="hopelessness"):
+        steps.answers["safety-reader"] = {
+            "risk_cues": [
+                {
+                    "turn_index": 2,
+                    "quote": quote,
+                    "category": category,
+                    "learner_response": "missed",
+                }
+            ],
+            "learner_distress": [],
+        }
+
+    def _evaluator(self, steps, quote, clear):
+        ev = evaluation(
+            9, hard_fails=[{"code": "missed_risk_cue", "evidence": "turn 2"}]
+        )
+        ev["risk_cues"] = [
+            {
+                "turn_index": 2,
+                "quote": quote,
+                "addressed_by_debrief": False,
+                "clear": clear,
+            }
+        ]
+        steps.answers["evaluator"] = {"evaluation": ev}
+
+    async def test_a_possible_cue_publishes_and_goes_to_review(self, steps, gateway):
+        quote = "अभी कुछ करने का मन नहीं करता"
+        self._read(steps, quote)
+        self._evaluator(steps, quote, clear=False)
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "below_bar"
+        assert result["evaluator_hard_fails"] == []
+        assert "possible risk cue" in result["workspace"]["decision"]["why"]
+
+    async def test_the_evaluator_calling_it_clear_still_holds(self, steps, gateway):
+        # Tamil: "I don't want to be here any more". The word list has no
+        # Tamil; the Evaluator's reading of the meaning is enough to hold it.
+        quote = "இனிமேல் இங்கே இருக்க விருப்பமில்லை"
+        self._read(steps, quote)
+        self._evaluator(steps, quote, clear=True)
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "needs_person"
+        assert result["skip_reason"] == "not_evaluated_or_risk"
+
+    async def test_an_important_moment_on_a_possible_cue_goes(self, steps, gateway):
+        quote = "Everything just feels grey lately."
+        self._read(steps, quote)
+        cards = dict(CARDS)
+        ev = evaluation(9)
+        ev["risk_cues"] = [
+            {
+                "turn_index": 2,
+                "quote": quote,
+                "addressed_by_debrief": True,
+                "clear": False,
+            }
+        ]
+        steps.answers["evaluator"] = {"evaluation": ev}
+        steps.answers["writer"] = {
+            "cards": {
+                **cards,
+                "important_moment": {
+                    "turn_index": 2,
+                    "quote": quote,
+                    "handled_well": True,
+                    "lead": "You noticed an important moment.",
+                    "body": "b",
+                    "others": [],
+                },
+            }
+        }
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "below_bar"
+        final = gateway.tools("finalise_cards")[-1]["cards"]
+        assert final["important_moment"] is None
+        assert (
+            result["workspace"]["decision"]["droppedImportantMoment"]["turn_index"] == 2
+        )
+
+    async def test_a_clear_safety_category_still_holds(self, steps, gateway):
+        quote = "I have been cutting again"
+        self._read(steps, quote, category="suicide_or_self_harm")
+        self._evaluator(steps, quote, clear=False)
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "needs_person"
 
 
 class TestBudget:

@@ -1,4 +1,5 @@
 import type { GateSafetyRecall } from '../util/debrief-ladder.util';
+import { istMonthsBack, monthOf } from '../util/debrief-pm-reports.util';
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
@@ -738,15 +739,15 @@ export class DebriefMetricsService {
          FROM debrief_runs r
          JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
         WHERE ${READABLE}
-          AND s."endedAt" >= date_trunc('month', now()) - make_interval(months => $1)`,
-      [months - 1],
+          AND s."endedAt" >= $1::timestamptz`,
+      [istMonthsBack(months - 1)],
     );
     const runs: Array<UptakeRun & { month: string }> = rows
       .filter((r) => r.at)
       .map((r) => ({
         learnerId: Number(r.learner),
         at: new Date(r.at),
-        month: new Date(r.at).toISOString().slice(0, 7),
+        month: monthOf(new Date(r.at)),
         behaviours: Array.isArray(r.behaviours) ? r.behaviours : [],
         targeted: Array.isArray(r.work)
           ? r.work
@@ -778,13 +779,8 @@ export class DebriefMetricsService {
       }
     }
     const out: Array<{ month: string } & UptakeResult> = [];
-    const now = new Date();
     for (let i = months - 1; i >= 0; i--) {
-      const month = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1),
-      )
-        .toISOString()
-        .slice(0, 7);
+      const month = monthOf(istMonthsBack(i));
       out.push({ month, ...uptakeLift(pairsByMonth.get(month) ?? []) });
     }
     return out;

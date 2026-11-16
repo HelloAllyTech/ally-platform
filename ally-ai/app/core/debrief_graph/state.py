@@ -25,6 +25,9 @@ def deepest(left: Optional[int], right: Optional[int]) -> int:
 class DebriefState(TypedDict, total=False):
     #: DebriefRunStepRecord dicts, in the order they happened.
     steps: Annotated[List[Dict[str, Any]], operator.add]
+    #: The Agent logs (agent_logs.py): every model call's exact input and full
+    #: reply, and every deciding code step's inputs and results.
+    logs: Annotated[List[Dict[str, Any]], operator.add]
     #: What the run stores on `debrief_runs.workspace`.
     workspace: Annotated[Dict[str, Any], merge]
     #: Each model step's answer (wire shape) by `path#round`; None = failed.
@@ -39,7 +42,11 @@ class DebriefState(TypedDict, total=False):
     learner_distress: bool
     safety: Dict[str, Any]
     evidence: Dict[str, Any]
+    #: The Writer's `progress` (the old ProgressReading shape).
     progress: Optional[Dict[str, Any]]
+    #: The progress agent's run: `response.progress` (post-veto report, vetoes,
+    #: shown_as, model, window_session_ids, analyst_versions); None = not run.
+    progress_result: Optional[Dict[str, Any]]
     history: Optional[str]
     passages: List[Dict[str, str]]  # {title, text}, what the Writer reads
 

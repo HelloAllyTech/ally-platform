@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { AuditLogService } from '../../audit/service/audit-log.service';
 import { LoggerService } from '../../logger/logger.service';
+import { readJudgeDrifted } from './debrief-nightly.service';
 import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
 import { DebriefOwnerSettings } from '../entity/debrief-owner-settings.entity';
 import {
@@ -134,13 +135,15 @@ export class DebriefAutonomyService implements OnModuleInit {
   // --- The facts eligibility and re-locks read ---------------------------------
 
   async facts(): Promise<AutonomyFacts> {
-    const [gate, reverts, baseline] = await Promise.all([
+    const [gate, reverts, baseline, judgeDrift] = await Promise.all([
       this.gate(),
       this.reverts(),
       this.failedBaseline(),
+      // The nightly check's weekly re-score of the anchor set; null when no
+      // recent reading exists (never blocks then).
+      readJudgeDrifted(this.dataSource).catch(() => null),
     ]);
-    // No judge-drift signal exists yet; reported as not measured.
-    return { gate, reverts, failedBaseline: baseline, judgeDrift: null };
+    return { gate, reverts, failedBaseline: baseline, judgeDrift };
   }
 
   /**
@@ -289,7 +292,7 @@ export class DebriefAutonomyService implements OnModuleInit {
     for (const kind of nowEligible) {
       await this.notifyOwner({
         title: `Learner try-outs can now run on their own for ${KIND_WORDS[kind].toLowerCase()}`,
-        body: `The independent check now agrees with the clinical advisor, so "Try on learners" can run on its own for ${KIND_WORDS[kind].toLowerCase()}. Switch it on? It stays "Asks first" until you change it in Debrief settings.`,
+        body: `The quality score now agrees with the clinical advisor, so "Try on learners" can run on its own for ${KIND_WORDS[kind].toLowerCase()}. Switch it on? It stays "Asks first" until you change it in Debrief settings.`,
         data: { settings: 'autonomy', kind },
       });
     }

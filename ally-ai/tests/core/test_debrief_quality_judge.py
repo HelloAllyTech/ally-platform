@@ -269,3 +269,38 @@ class TestEndpoint:
         assert calls["prompt"].endswith("LIVE INSTRUCTIONS")
         # Same text, same series: the version label does not move.
         assert r.json()["judge_prompt_version"] == "v1"
+
+
+class TestAgentLog:
+    """The independent check is logged against the run (ally-be stores it):
+    the exact message with the judge's instructions named, and the reply."""
+
+    @pytest.mark.asyncio
+    async def test_the_response_carries_the_call(self):
+        from unittest.mock import patch
+
+        from app.api.v1.endpoints import debrief_quality as ep
+        from app.core.llm import dispatch
+
+        async def gemini(**kw):
+            dispatch._emit_usage("gemini", kw["model"], "t", (40, 9, 49))
+            return _output()
+
+        with (
+            patch.object(dispatch.settings.GEMINI, "API_KEY", "g"),
+            patch.dict(dispatch._GENERATORS, {"gemini": gemini}),
+        ):
+            res = await ep.judge(
+                ep.DebriefQualityRequest(
+                    transcript=TRANSCRIPT,
+                    debrief="You listened.",
+                    judge_instructions="JUDGE INSTRUCTIONS",
+                )
+            )
+        assert res.log is not None
+        assert "{{system_prompt}}" in res.log["input"]
+        assert "JUDGE INSTRUCTIONS" not in res.log["input"]
+        assert "<debrief>\nYou listened.\n</debrief>" in res.log["input"]
+        assert res.log["prompt_inlined"] is True
+        assert len(res.log["output"]["dimensions"]) == 8
+        assert (res.log["tokens_in"], res.log["tokens_out"]) == (40, 9)

@@ -184,7 +184,11 @@ export const IdeaCard: React.FC<{
     startStep: false,
   };
   const wait = idea.approval?.wait;
-  const canPromote = access.pmAgent && (wait === "promote" || next === "promote");
+  // A budgets-only change goes live on the owner's word (can.approve is the owner's).
+  const canPromote =
+    wait === "promote_budget"
+      ? can.approve
+      : access.pmAgent && (wait === "promote" || next === "promote");
   const statusLabel =
     pinned && idea.closedReason === "withdrawn"
       ? pr.withdrawnStatus
@@ -333,6 +337,20 @@ export const IdeaCard: React.FC<{
             {liveVersion != null ? ` · ${p.draft.rest(liveVersion)}` : ""}
           </div>
         </div>
+      )}
+      {idea.evidence.delivery && !idea.evidence.forecast?.checkedAt && (
+        <p className="text-sm text-typography-700" data-testid="idea-delivery">
+          {s.delivered(
+            new Date(idea.evidence.delivery.at).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+            }),
+            idea.evidence.delivery.releaseTags.join(", "),
+            new Date(
+              new Date(idea.evidence.delivery.at).getTime() + 14 * 86_400_000,
+            ).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+          )}
+        </p>
       )}
       {idea.evidence.forecast?.checkedAt && (
         <p className="text-sm" data-testid="idea-forecast">

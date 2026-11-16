@@ -9,12 +9,13 @@ from app.core.debrief.schemas import (
     BehaviourEvidence,
     DebriefCards,
     EvaluationOutput,
+    EvaluatorRiskCue,
     EvidenceMap,
     PivotalMoment,
     ProgressItem,
     ProgressReading,
 )
-from app.core.debrief_quality.schemas import DimensionScore, RiskCue
+from app.core.debrief_quality.schemas import DimensionScore
 
 TRANSCRIPT = [
     TranscriptTurn(turn_index=1, role="counselor", text="What brings you in?"),
@@ -141,7 +142,7 @@ async def test_evaluator_raises_missed_risk_cue_from_its_cue_list(dispatch_retur
     calls = dispatch_returns(
         EvaluationOutput(
             risk_cues=[
-                RiskCue(
+                EvaluatorRiskCue(
                     turn_index=2,
                     quote="I don't want to be here.",
                     addressed_by_debrief=False,

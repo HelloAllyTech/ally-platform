@@ -50,6 +50,7 @@ function build() {
     releases as any,
     {} as any,
     {} as any,
+    {} as any,
   );
   jest.spyOn(runner, 'modelCatalog').mockResolvedValue(undefined as any);
   return {

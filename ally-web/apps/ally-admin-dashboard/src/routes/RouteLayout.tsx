@@ -53,6 +53,7 @@ import {
   Competencies,
   DebriefConsole,
   DebriefSessionPage,
+  AgentLogsPage,
   PmAgentPage,
   DebriefSettingsPage,
   RoleplaySessionLogs,
@@ -781,6 +782,14 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
               <DebriefSessionPage />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.DEBRIEF_SESSION_LOGS(":runId")}
+          element={
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+              <AgentLogsPage />
             </PrivateLayout>
           }
         />

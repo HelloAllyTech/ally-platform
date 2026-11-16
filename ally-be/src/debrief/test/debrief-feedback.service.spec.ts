@@ -90,6 +90,30 @@ describe('debrief feedback', () => {
     expect(sectionText(cards, 'nonsense')).toBeNull();
   });
 
+  it('reads the progress card focus first, then each skill line', () => {
+    const withCard = {
+      ...cards,
+      progress_card: {
+        sessions: 5,
+        skills: [
+          { skill: 'empathy', trend: 'more_consistent', line: 'Skill line.' },
+          { skill: 'listening', trend: 'about_the_same', line: '' },
+        ],
+        focus: { skill: 'empathy', line: 'Focus line.' },
+      },
+    } as any;
+    expect(sectionText(withCard, 'progress_card')).toBe(
+      'Focus line. Skill line.',
+    );
+    expect(sectionText(cards, 'progress_card')).toBeNull();
+    expect(
+      sectionText(
+        { ...cards, progress_card: { sessions: 5, skills: [] } } as any,
+        'progress_card',
+      ),
+    ).toBeNull();
+  });
+
   it('only the learner who did the session can flag it', async () => {
     await expect(
       build({ owner: 9 }).svc.flag('s', 7, {

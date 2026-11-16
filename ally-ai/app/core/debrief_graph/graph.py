@@ -4,7 +4,8 @@
                   └→ analyst ───────┴→ after_reading
     plan ─(no budget for the safety reader)→ finish
     after_reading ─(no safety reading)→ finish
-                  ├→ progress_reader → guidance_lookup
+                  ├→ progress_reader → guidance_lookup   (the progress agent;
+                  │     its vetoes run in code as it finishes, progress_vetoes.py)
                   └→ guidance_lookup → prepare_writer ─(no budget)→ finish
                                                       └→ writer ─(failed twice)→ finish
                                                                 └→ checks
@@ -14,6 +15,13 @@
                │                                         └(deadline / budget)→ decide
                │                                    reviser ─(failed twice)→ decide
                └(meets the bar or no rounds left)→ decide → finish → END
+                                         (finish attaches cards.progress_card)
+
+`progress_reader` runs only when the request's `progress_profile` has earlier
+sessions (otherwise it is skipped with "no history"). The node keeps the
+bundle's step key but runs the progress agent (`debrief_progress_system`); its
+code vetoes turn a claim the record contradicts into "too early", and the
+Writer reads the vetoed report in the old ProgressReading shape.
 
 The loop ends: every pass through `revise_gate` that reaches the reviser adds a
 round, and `score_draft` stops at the recipe's `maxRevisionRounds`.
@@ -24,7 +32,9 @@ graph runs the orchestrated middle instead of the recipe's readers (see
 (the Analyst is in the floor, decided 2026-11-11), then after_reading → profile
 → planner (reads the profile and a summary of the evidence map) → dispatch
 ─Send→ agent_<id> … → dispatch → prepare_writer, and one top-up after the first
-failed evaluation. With it off, none of those nodes is ever reached.
+failed evaluation. With it off, none of those nodes is ever reached. The
+orchestrated path does not run the progress agent yet: its `progress_reader`
+registry agent is still the old Progress reader.
 """
 
 from __future__ import annotations
@@ -52,7 +62,8 @@ def build_graph(checkpointer: Optional[BaseCheckpointSaver]) -> CompiledStateGra
     g.add_node("safety_reader", **make_model_step(model_steps.SAFETY_READER))
     g.add_node("analyst", **make_model_step(model_steps.ANALYST))
     g.add_node("after_reading", nodes.after_reading)
-    g.add_node("progress_reader", **make_model_step(model_steps.PROGRESS_READER))
+    # The release's `progress_reader` step now runs the progress agent.
+    g.add_node("progress_reader", **make_model_step(model_steps.PROGRESS_AGENT))
     g.add_node("guidance_lookup", nodes.guidance_lookup)
     g.add_node("prepare_writer", nodes.prepare_writer)
     g.add_node("writer", **make_model_step(model_steps.WRITER))

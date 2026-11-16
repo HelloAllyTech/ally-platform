@@ -963,6 +963,18 @@
         "didnt_come_up": "आज यह नहीं आया"
       },
       "progressNote": "आपकी प्रगति",
+      "progressCard": {
+        "title": "आपके पिछले {{n}} सेशन",
+        "focus": "अगले सेशन के लिए एक फ़ोकस",
+        "showMore": "और देखें",
+        "showLess": "कम देखें",
+        "trends": {
+          "more_consistent": "पहले से ज़्यादा नियमित",
+          "about_the_same": "लगभग पहले जैसा",
+          "worth_another_look": "एक बार फिर देखने लायक",
+          "too_early": "अभी कहना जल्दी होगा"
+        }
+      },
       "reflectiveQuestion": "सोचने के लिए एक सवाल",
       "working": {
         "title": "Ally आपकी डीब्रीफ़ लिख रहा है",

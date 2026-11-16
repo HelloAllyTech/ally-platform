@@ -929,7 +929,7 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_AI,
     trigger: 'Standard runs for a learner with past debriefs',
     detail:
-      "Compares the session's evidence with the learner's past Work-on-this points; says only what the evidence supports.",
+      "The progress agent (prompt debrief_progress_system): reads the session's evidence with the learner's progress profile and proposes up to 3 skill trends, follow-ups and a focus; code vetoes any trend the record contradicts. Older releases run the Progress reader's comparison with past Work-on-this points.",
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',

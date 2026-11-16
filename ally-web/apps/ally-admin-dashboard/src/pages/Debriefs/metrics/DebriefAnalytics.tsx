@@ -6,6 +6,7 @@ import { AnalyticsRange } from "@types";
 import { MetricsTab } from "../MetricsTab";
 import { ConsoleOverviewSection } from "./ConsoleOverviewSection";
 import { JudgeAgreementSection } from "./JudgeAgreementSection";
+import { NightlyCheckSection } from "./NightlyCheckSection";
 
 /** ally-be's `analytics` takes 1–90 days; the page's longer ranges read the last 90. */
 const DAYS: Record<AnalyticsRange, number> = { "30d": 30, "90d": 90, "12m": 90, all: 90 };
@@ -32,6 +33,7 @@ export const DebriefAnalytics: React.FC<{ range?: AnalyticsRange }> = ({ range =
         error={q.isError ? q.error : null}
         onRetry={() => void q.refetch()}
       />
+      <NightlyCheckSection />
     </div>
   );
 };

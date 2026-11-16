@@ -33,8 +33,8 @@ import {
 import { GuideSupportLine } from '../../guide/entity/guide-org-profile.entity';
 import { resolveSupportLines } from '../../guide/safety/fixed-responses';
 import {
-  ScenarioSessionLeaderboardEndedEventParams,
-  ScenarioSessionLeaderboardEvent,
+  ScenarioSessionCompletedEventParams,
+  ScenarioSessionCompletionEvent,
 } from '../../learn/type/scenario-session-leaderboard-event.type';
 import {
   DebriefRunArm,
@@ -565,11 +565,11 @@ export class DebriefAgentService implements OnModuleInit {
    * drain (which waits for sessions to settle). Shadow runs keep to the drain:
    * nobody is waiting for them.
    */
-  @OnEvent(ScenarioSessionLeaderboardEvent.SCENARIO_SESSION_ENDED, {
+  @OnEvent(ScenarioSessionCompletionEvent.SCENARIO_SESSION_COMPLETED, {
     async: true,
   })
   async onSessionEnded(
-    event: ScenarioSessionLeaderboardEndedEventParams,
+    event: ScenarioSessionCompletedEventParams,
   ): Promise<void> {
     if (this.config.debriefAgentMode === 'off') return;
     if (

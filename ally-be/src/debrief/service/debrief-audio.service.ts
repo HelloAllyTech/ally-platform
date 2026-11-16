@@ -11,7 +11,7 @@ import { LlmTask } from '../../learn/enum/llm-task.enum';
 import { SarvamTTSProvider } from '../../voice-preview/providers/sarvam-tts.provider';
 import { DebriefFeedback } from '../entity/debrief-feedback.entity';
 import { DebriefFeedbackStatus } from '../enum/debrief-run.enum';
-import { DebriefCards } from '../util/debrief-cards.util';
+import { DebriefCards, withSkillLabels } from '../util/debrief-cards.util';
 import {
   DebriefFeedbackService,
   sectionText,
@@ -142,7 +142,10 @@ export class DebriefAudioService implements OnModuleInit {
     });
     const text = removed
       ? null
-      : sectionText(run.cards as unknown as DebriefCards, section);
+      : sectionText(
+          withSkillLabels(run.cards as unknown as DebriefCards),
+          section,
+        );
     if (!text) throw new NotFoundException('There is no such card to read');
 
     const bucket = this.config.s3.audioBucket as string;

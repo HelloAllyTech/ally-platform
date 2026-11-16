@@ -180,10 +180,20 @@ const page = (hash = "") =>
   );
 
 describe("Settings › Schedules: engineering only", () => {
-  it("has no More item or section without the debrief_schedules toggle", () => {
+  it("has no Schedules item or section without the debrief_schedules toggle", () => {
     page();
     expect(screen.queryByRole("link", { name: s.columns.job })).toBeNull();
-    expect(screen.queryByRole("button", { name: en.debriefs.settingsPage.more })).toBeNull();
+    // More holds only the tabs that overflow below lg (it is hidden at lg and up): no Schedules.
+    fireEvent.click(screen.getByRole("button", { name: en.debriefs.settingsPage.more }));
+    expect(
+      within(screen.getByRole("menu"))
+        .getAllByRole("menuitem")
+        .map(i => i.textContent),
+    ).toEqual([
+      en.debriefs.settingsPage.nav.weights,
+      en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.progress,
+    ]);
     expect(screen.queryByText(en.debriefs.settingsPage.nav.schedules)).toBeNull();
     expect(screen.queryByTestId("schedules-table")).toBeNull();
   });
@@ -204,7 +214,12 @@ describe("Settings › Schedules: engineering only", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map(i => i.textContent),
-    ).toEqual([en.debriefs.settingsPage.nav.schedules]);
+    ).toEqual([
+      en.debriefs.settingsPage.nav.weights,
+      en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.progress,
+      en.debriefs.settingsPage.nav.schedules,
+    ]);
     fireEvent.click(
       within(menu).getByRole("menuitem", { name: en.debriefs.settingsPage.nav.schedules }),
     );
@@ -225,12 +240,20 @@ describe("Settings › Schedules: engineering only", () => {
     page();
     fireEvent.click(screen.getByRole("button", { name: en.debriefs.settingsPage.more }));
     const items = within(screen.getByRole("menu")).getAllByRole("menuitem");
-    expect(items.map(i => i.textContent)).toEqual([en.debriefs.settingsPage.guidanceLink]);
+    expect(items.map(i => i.textContent)).toEqual([
+      en.debriefs.settingsPage.nav.weights,
+      en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.progress,
+      en.debriefs.settingsPage.guidanceLink,
+    ]);
   });
 });
 
 describe("Schedules table", () => {
   it("names each job, never its id; locked jobs are always on; last and next run", () => {
+    // The next run (Mon 16 Nov) reads as a day name only while it is in the future.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-12T00:00:00Z"));
     render(<SchedulesSection />);
     const rows = screen.getAllByTestId("schedule-row");
     expect(rows).toHaveLength(3);
@@ -249,6 +272,7 @@ describe("Schedules table", () => {
     expect(within(rows[2]).getByText("Mon 07:30")).toBeInTheDocument();
     expect(within(rows[2]).getByText("16 Nov 07:30")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /run now/i })).toBeNull();
+    vi.useRealTimers();
   });
 
   it("a job that calls no model saves a frequency change at once", async () => {

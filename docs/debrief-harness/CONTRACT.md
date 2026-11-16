@@ -235,6 +235,32 @@ Recorded by the ally-be build (2026-11-10).
 23. **Rule checks stay in ally-be** (`run_checks` tool), per D11: rules on data stay with the data; the graph
     can't skip them because every draft goes through the `checks` node.
 
+### Where an Agent log entry came from (2026-11-16)
+
+Every entry in the run response's `logs` carries `origin`, set by ally-ai where the entry is written
+(`agent_logs.origin_of`, from the run's own plan, never from the step's name): `fixed` for steps the code
+always runs (and for the default plan's steps when the planner is off or failed), `planned` for an agent the
+planner chose, with `planReason` (the planner's reason), and `top_up` for the evidence top-up and the agents
+it chose. ally-be stores both (`debrief_run_logs.origin`, `plan_reason`, migration 1981901400000), tags the
+quality score `fixed`, and leaves entries from before as null (shown as "Source unknown").
+
+### Clear and possible risk cues (2026-11-16)
+
+A client turn is a **clear** risk cue when any signal says so: the Safety reader filed it under a clear
+category or with clear words; the Evaluator listed it and did not answer `clear: false` (its own reading
+of the meaning, in any language); or the word list in `cue_strength.py` matches its quote. Otherwise it is
+**possible**. No signal can lower another's clear (`turn_is_clear`).
+
+- **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; the independent judge's schema is unchanged).
+  A missed clear cue is the `missed_risk_cue` hard fail and holds the debrief, as before. A missed possible cue
+  drops that hard fail; the run publishes as `below_bar` and is sent to review.
+- **Important moment:** once the Evaluator has read the draft, a card whose moments are all possible is taken
+  out before `finalise_cards`; the run publishes as `below_bar` (review).
+- `workspace.decision` carries `droppedImportantMoment` and `possibleMissedCues` for the reviewer.
+- **Skill labels:** a debrief not in English carries `cards.skill_labels: [{skill, label}]`, written by the
+  Writer and Reviser. `skill` stays as the evidence map names it (progress and metrics match on it); the
+  learner and supervisor views and Listen show the label (`withSkillLabels` in ally-be).
+
 ## 5. Ask Ally — `POST /api/v1/ask-ally/replies` (ally-ai)
 
 Added 2026-11-11 (spec §A10, §D2 step 4). Ask Ally answers a learner's reply under their published
@@ -331,7 +357,13 @@ path it raised the flag 5 times on the old path and 7 on the new — the same re
 variance rather than a difference between the paths.
 
 
-## 6. The orchestrator (challenger releases only; spec Part A, D2 steps 7–8)
+## 6. The orchestrator (on by default since 2026-11-16; spec Part A, D2 steps 7–8)
+
+On by default from 2026-11-16 (Gopi): `DEBRIEF_SEED_BUNDLE` carries `DEBRIEF_ORCHESTRATOR_DEFAULT`
+(`enabled: true`) and the orchestrator prompts, so the deploy makes a code release with it on (three-way
+merge over the live release; no conflict while the live release has no orchestrator block). Releases made
+before then, and any release a person makes with it off, still run the fixed recipes. The challenger route
+below stays for trying an orchestrator variant against the live release.
 
 **Flag:** `bundle.orchestrator.enabled` (`true` = orchestrated; absent or `false` = today's fixed recipe, unchanged).
 The seed bundle never carries the block (a changed seed is promoted to GA at boot), and every release made before

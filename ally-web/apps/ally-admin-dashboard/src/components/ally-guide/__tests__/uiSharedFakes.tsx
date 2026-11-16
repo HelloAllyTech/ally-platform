@@ -222,6 +222,14 @@ export const uiSharedFakes = {
   TableHeader: passthrough("th"),
   TableCell: passthrough("td"),
   Tooltip: ({ children, label }: any) => <span data-tooltip={label}>{children}</span>,
+  DismissibleTag: ({ text, title, onClose, ...rest }: any) => (
+    <span data-testid={rest["data-testid"]}>
+      {text}
+      <button type="button" aria-label={title} onClick={onClose}>
+        ×
+      </button>
+    </span>
+  ),
   SidePanel: ({ open, title, onClose, closeLabel, children }: any) =>
     open ? (
       <aside role="dialog" aria-label="Side panel">

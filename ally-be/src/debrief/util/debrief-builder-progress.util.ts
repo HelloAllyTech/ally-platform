@@ -57,3 +57,62 @@ export const BUILDER_ANSWERS_PER_SESSION = 20;
 
 /** One answer never spends more than this from the learning budget. */
 export const BUILDER_ANSWER_CAP_USD = 0.1;
+
+/** One of a Builder session's pull requests, as delivery reads it. */
+export interface BuilderPullRequestDelivery {
+  repo: string;
+  prNumber: number;
+  merged: boolean;
+  state: string | null;
+  mergedAt: Date | string | null;
+  releaseState: string | null;
+  releasedAt: Date | string | null;
+  releaseTag: string | null;
+}
+
+export interface BuilderDelivery {
+  /** When the last of the merged changes reached production. */
+  at: string;
+  releaseTags: string[];
+  pullRequests: Array<{ repo: string; number: number }>;
+}
+
+/**
+ * A Builder idea's change is delivered when every pull request of its session
+ * is closed or merged, at least one merged, and each merged one reached
+ * production: Builder's `released`, or `skipped` for a repo with no release
+ * pipeline (then the merge is the nearest time we know). Null while any is
+ * still open, releasing, or failed or unhealthy after release — a person has
+ * to act on those, and nothing is measured until they do.
+ */
+export function builderDelivery(
+  prs: BuilderPullRequestDelivery[],
+): BuilderDelivery | null {
+  const open = prs.filter((p) => !p.merged && (p.state ?? 'open') === 'open');
+  const merged = prs.filter((p) => p.merged);
+  if (open.length || !merged.length) return null;
+  if (
+    merged.some(
+      (p) => p.releaseState !== 'released' && p.releaseState !== 'skipped',
+    )
+  ) {
+    return null;
+  }
+  const times = merged
+    .map((p) =>
+      new Date(
+        (p.releaseState === 'released' ? p.releasedAt : null) ??
+          p.mergedAt ??
+          0,
+      ).getTime(),
+    )
+    .filter((t) => t > 0);
+  if (!times.length) return null;
+  return {
+    at: new Date(Math.max(...times)).toISOString(),
+    releaseTags: merged
+      .map((p) => p.releaseTag)
+      .filter((t): t is string => !!t),
+    pullRequests: merged.map((p) => ({ repo: p.repo, number: p.prNumber })),
+  };
+}

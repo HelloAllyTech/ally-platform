@@ -347,7 +347,15 @@ describe("Debrief settings page: who can change what", () => {
       within(nav)
         .getAllByRole("link")
         .map(l => l.textContent),
-    ).toEqual(["Organisations", "Budgets", "Tests", "Autonomy", "Steering", "Pinned rules"]);
+    ).toEqual([
+      "Organisations",
+      "Budgets",
+      "Tests",
+      "Autonomy",
+      "Steering",
+      "Pinned rules",
+      "Progress",
+    ]);
     expect(nav.className).toContain("sticky");
     expect(tab("orgs")).toHaveAttribute("aria-current", "page");
     expect(shown()).toEqual(["settings-section-orgs"]);
@@ -378,6 +386,7 @@ describe("Debrief settings page: who can change what", () => {
     ["#autonomy", "autonomy"],
     ["#weights", "weights"],
     ["#pinned", "pinned"],
+    ["#progress", "progress"],
     ["#orgs", "orgs"],
   ])("a %s link opens that tab", (hash, id) => {
     h.permissions = [];
@@ -410,6 +419,22 @@ describe("Debrief settings page: who can change what", () => {
     );
     expect(where).toBe("/debriefs/settings#pinned");
     expect(shown()).toEqual(["settings-section-pinned"]);
+  });
+
+  it("never wraps: the owner note truncates with its full text on hover, the last tabs overflow into More below lg", () => {
+    h.permissions = [];
+    renderPage();
+    const note = screen.getByTestId("settings-owner-note");
+    expect(note).toHaveAttribute("title", "Only the owner can change these.");
+    expect(note).toHaveClass("truncate");
+    expect(screen.getByTestId("settings-tabs")).toHaveClass("flex-nowrap");
+    // Steering, Pinned rules and Progress are tabs at lg and up, More items below it.
+    for (const id of ["weights", "pinned", "progress"])
+      expect(tab(id)).toHaveClass("hidden", "min-[1056px]:inline");
+    expect(tab("orgs")).not.toHaveClass("hidden");
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Steering" }));
+    expect(where).toBe("/debriefs/settings#weights");
   });
 
   it("is read-only for someone who isn't the owner, and says who can change it", () => {
@@ -480,9 +505,96 @@ describe("Debrief settings page: who can change what", () => {
     fireEvent.click(
       within(screen.getByTestId("budget-runCeilingUsd")).getByRole("button", { name: "Change" }),
     );
-    expect(screen.getByRole("dialog")).toHaveTextContent("it is proposed as a change");
+    expect(screen.getByRole("dialog")).toHaveTextContent("goes live as soon as you confirm");
     fireEvent.click(tab("tests"));
     expect(screen.getAllByRole("button", { name: "Save changes" }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Settings › Progress", () => {
+  const PROGRESS_VIEW = {
+    ...VIEW,
+    values: {
+      ...VIEW.values,
+      progressOn: true,
+      progressCardEvery: 5,
+      progressWindow: 6,
+      progressUseFhs: true,
+      progressShowWorseToLearners: false,
+    },
+    defaults: {
+      ...VIEW.defaults,
+      progressOn: true,
+      progressCardEvery: 5,
+      progressWindow: 6,
+      progressUseFhs: true,
+      progressShowWorseToLearners: false,
+    },
+    spec: {
+      ...VIEW.spec,
+      progressOn: { default: true, kind: "bool", group: "progress" },
+      progressCardEvery: { default: 5, kind: "int", min: 1, max: 20, group: "progress" },
+      progressWindow: { default: 6, kind: "int", min: 3, max: 12, group: "progress" },
+      progressUseFhs: { default: true, kind: "bool", group: "progress" },
+      progressShowWorseToLearners: { default: false, kind: "bool", group: "progress" },
+    },
+    baseline: null,
+  };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.settings.mockReturnValue({ data: PROGRESS_VIEW, isError: false, refetch: vi.fn() });
+    h.overview.mockReturnValue({ data: OVERVIEW, isError: false, refetch: vi.fn() });
+    h.tenants.mockReturnValue({ data: TENANTS, isError: false, refetch: vi.fn() });
+    h.update.mockReturnValue(resolves());
+  });
+  const renderAt = () =>
+    render(
+      <MemoryRouter initialEntries={["/debriefs/settings#progress"]}>
+        <Routes>
+          <Route path="/debriefs/settings" element={<DebriefSettingsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it("lists the five progress settings in plain words, and only those", () => {
+    h.permissions = [];
+    renderAt();
+    const section = screen.getByTestId("settings-section-progress");
+    expect(within(section).getByRole("heading", { level: 2 })).toHaveTextContent("Progress");
+    const table = within(section).getByTestId("settings-table-progress");
+    for (const label of [
+      "Learner progress",
+      "Show the progress card every … sessions",
+      "Sessions to look back over",
+      "Use Foundational Skills levels as a cross-check",
+      "Tell learners when a skill needs another look",
+    ])
+      expect(table).toHaveTextContent(label);
+    expect(within(table).queryByText(/progressOn|FHS/)).toBeNull();
+    expect(table).not.toHaveTextContent("Sessions in the pass test");
+    // Read only for anyone but the owner.
+    expect(within(section).queryByRole("button", { name: "Save changes" })).toBeNull();
+    expect(screen.getByTestId("setting-value-progressShowWorseToLearners")).toHaveTextContent("No");
+  });
+
+  it("lets the owner change one and saves only that change", async () => {
+    h.permissions = ["manage:admin:debrief-settings"];
+    renderAt();
+    const row = screen.getByTestId("setting-progressShowWorseToLearners");
+    fireEvent.click(within(row).getByRole("switch"));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(h.update).toHaveBeenCalledWith({ changes: { progressShowWorseToLearners: true } }),
+    );
+  });
+
+  it("says so when ally-be doesn't send the progress settings yet", () => {
+    h.permissions = ["manage:admin:debrief-settings"];
+    h.settings.mockReturnValue({ data: VIEW, isError: false, refetch: vi.fn() });
+    renderAt();
+    expect(screen.getByTestId("progress-settings")).toHaveTextContent(
+      "These settings aren't available yet.",
+    );
   });
 });
 
@@ -604,10 +716,10 @@ describe("What the PM agent may do alone", () => {
     expect(panel).toHaveTextContent("Judge agreement with the clinical advisor");
     expect(panel).toHaveTextContent("random sample: 3 this week");
     expect(screen.getByTestId("agreement-row-accuracy")).toHaveTextContent(
-      "AccuracyNot measured yet37 of 50 reviews · Independent check caught 3 of 4 problems you found",
+      "AccuracyNot measured yet37 of 50 reviews · The quality score caught 3 of 4 problems you found",
     );
     expect(screen.getByTestId("agreement-row-evidence_specificity")).toHaveTextContent(
-      "EvidenceMetAgreement 0.71 · 52 reviews · Independent check caught 6 of 7 problems you found",
+      "EvidenceMetAgreement 0.71 · 52 reviews · The quality score caught 6 of 7 problems you found",
     );
     expect(screen.getByTestId("agreement-row-missed_risk_cue")).toHaveTextContent(
       "Missed risk cueNot measurable yet: every answer is the sameAgreement — · 60 reviews · No problems found yet",
@@ -647,7 +759,7 @@ describe("What the PM agent may do alone", () => {
     expect(intro).toHaveTextContent("The system only tightens, never loosens.");
     expect(intro).toHaveTextContent("Live for everyone: always a person approves");
     expect(within(intro).getByRole("link", { name: "Pinned rules" })).toBeInTheDocument();
-    expect(screen.getByTestId("autonomy-facts")).toHaveTextContent("measured from Release 2");
+    expect(screen.getByTestId("autonomy-facts")).toHaveTextContent("Judge drift: not measured yet");
     // Someone who isn't the owner sees the same dropdown, disabled.
     expect(
       within(screen.getByTestId("autonomy-settings-canary")).getByRole("combobox"),
@@ -730,7 +842,7 @@ describe("What the PM agent may do alone", () => {
       );
       expect(h.setMatrix).not.toHaveBeenCalled();
       expect(screen.getByTestId("autonomy-override-body")).toHaveTextContent(
-        "The independent check hasn't been shown to agree with the clinical advisor yet. Learner try-outs for prompts, agents and default plans will reach learners without approval.",
+        "The quality score hasn't been shown to agree with the clinical advisor yet. Learner try-outs for prompts, agents and default plans will reach learners without approval.",
       );
       fireEvent.click(screen.getByRole("button", { name: "Let them run" }));
       await waitFor(() =>

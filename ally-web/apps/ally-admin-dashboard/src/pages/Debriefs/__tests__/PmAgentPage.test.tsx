@@ -406,6 +406,31 @@ describe("PM agent › Ideas", () => {
     );
   });
 
+  it("a budgets-only change waiting for the owner can be put live", async () => {
+    h.pmAgent.mockReturnValue(
+      state([
+        {
+          ...IDEA,
+          title: "Settings: monthlyCapUsd",
+          change: { ideaKind: "release", releaseId: "r8", budgetOnly: true },
+          evidence: {},
+          approval: { wait: "promote_budget", since: "2026-11-16T00:00:00Z" },
+          can: { approve: true, reject: true, tryIt: false, askQuestion: true, startStep: false },
+        },
+      ]),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Put live for everyone" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Put live for everyone" }),
+    );
+    await waitFor(() =>
+      expect(h.decide).toHaveBeenCalledWith(
+        expect.objectContaining({ id: IDEA.id, decision: "approve" }),
+      ),
+    );
+  });
+
   it("an idea that needs code can only be rejected", () => {
     h.pmAgent.mockReturnValue(
       state([
@@ -994,6 +1019,14 @@ describe("PM agent › Ideas", () => {
     expect(chips.querySelectorAll("[data-state=asks_first]")[1]).toHaveAttribute(
       "title",
       "Not yet: agreement below 0.6 (Evidence 0.52).",
+    ); // One row at lg: the label truncates first, its full words on hover; no inline "hover" hint.
+    expect(chips).toHaveClass("min-[1056px]:flex-nowrap");
+    const label = screen.getByTestId("autonomy-label");
+    expect(label).toHaveClass("truncate");
+    expect(label).toHaveTextContent("Changes without asking a person:");
+    expect(label).toHaveAttribute(
+      "title",
+      "What the PM agent may change without asking a person. Hover a chip for why.",
     );
   });
 
@@ -1049,7 +1082,17 @@ describe("PM agent › Ideas", () => {
     fireEvent.click(within(screen.getByTestId("idea-group-promoted")).getByRole("button"));
     fireEvent.click(screen.getByRole("button", { name: "Became release v2" }));
     expect(h.detail).toHaveBeenCalledWith("r2");
-    expect(screen.getByTestId("release-detail")).toBeInTheDocument();
+    expect(screen.getByTestId("release-detail")).toBeInTheDocument(); // The release title stays on one line: it truncates, with the full text on hover.
+    expect(screen.getByTestId("release-header")).toHaveClass("flex-nowrap");
+    const title = screen.getByTestId("release-title");
+    expect(title.tagName).toBe("H2");
+    expect(title).toHaveClass("truncate");
+    expect(title).toHaveAttribute("title", title.textContent);
+    expect(title.textContent).toMatch(/^v2 · /);
+    // When it went live moves to the line below the header.
+    expect(screen.getByTestId("release-source")).toContainElement(
+      screen.getByTestId("release-when"),
+    );
   });
 
   it("a handed-on idea is Handed on, tagged With Builder, never Live for everyone", () => {

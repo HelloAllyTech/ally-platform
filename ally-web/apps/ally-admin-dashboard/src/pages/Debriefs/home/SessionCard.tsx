@@ -51,6 +51,15 @@ const Tags: React.FC<{ item: SessionItem; short?: boolean }> = ({ item, short })
           <ConsoleTag tone="info">{h.agreementSampleTag}</ConsoleTag>
         </span>
       )}
+      {item.nightlyReasons && item.nightlyReasons.length > 0 && (
+        <span
+          title={item.nightlyReasons.map(r => en.debriefs.nightly.reasons[r] ?? r).join(" · ")}
+          className="inline-flex"
+          data-testid="nightly-tag"
+        >
+          <ConsoleTag tone="info">{en.debriefs.nightly.fromNightly}</ConsoleTag>
+        </span>
+      )}
     </>
   );
 };
@@ -102,15 +111,16 @@ export const SessionCard: React.FC<{
         </div>
         <div className="text-[13px] text-neutral-600">{metaLine(item)}</div>
       </div>
-      <div className="grid grid-cols-4 gap-2 border-t border-neutral-100 pt-3">
+      <div className="grid grid-cols-3 gap-2 border-t border-neutral-100 pt-3">
         {[
-          [h.columns.judge, score(item.judgeOverall), judgeClass(item)],
-          [h.columns.evaluator, score(item.evaluatorOverall), ""],
-          [h.columns.cost, usd(item.costUsd), ""],
-          [h.columns.time, secs(item.seconds), ""],
-        ].map(([label, value, cls]) => (
+          [h.columns.judge, score(item.judgeOverall), judgeClass(item), h.scoreHelp.judge],
+          [h.columns.cost, usd(item.costUsd), "", undefined],
+          [h.columns.time, secs(item.seconds), "", undefined],
+        ].map(([label, value, cls, help]) => (
           <div key={label}>
-            <div className="text-xs text-neutral-600">{label}</div>
+            <div className="text-xs text-neutral-600" title={help}>
+              {label}
+            </div>
             <div className={`text-base font-semibold ${cls}`}>{value}</div>
           </div>
         ))}
@@ -131,7 +141,7 @@ export const SessionRow: React.FC<{
     data-run={item.runId}
     data-selected={selected ? "true" : undefined}
     className={[
-      "grid min-w-[980px] grid-cols-[220px_minmax(220px,2fr)_minmax(160px,1.2fr)_70px_70px_70px_60px_100px] items-center gap-3 border-b border-neutral-100 px-5 py-3.5 text-typography-900 no-underline",
+      "grid min-w-[900px] grid-cols-[220px_minmax(220px,2fr)_minmax(160px,1.2fr)_70px_70px_60px_100px] items-center gap-3 border-b border-neutral-100 px-5 py-3.5 text-typography-900 no-underline",
       selected ? "outline outline-2 -outline-offset-2 outline-primary-500" : "",
     ].join(" ")}
   >
@@ -150,8 +160,12 @@ export const SessionRow: React.FC<{
     <div className="text-sm text-neutral-700">
       {item.tenantName ?? "—"} · {en.debriefs.mode[item.mode] ?? ""}
     </div>
-    <div className={`text-sm font-semibold ${judgeClass(item)}`}>{score(item.judgeOverall)}</div>
-    <div className="text-sm">{score(item.evaluatorOverall)}</div>
+    <div
+      className={`text-sm font-semibold ${judgeClass(item)}`}
+      title={`${en.debriefs.home.columns.judge}: ${en.debriefs.home.scoreHelp.judge}`}
+    >
+      {score(item.judgeOverall)}
+    </div>
     <div className="text-sm">{usd(item.costUsd)}</div>
     <div className="text-sm">{secs(item.seconds)}</div>
     <div className="flex items-center justify-end gap-2 text-[13px] text-neutral-600">

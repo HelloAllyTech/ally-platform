@@ -26,7 +26,7 @@ card the Writer may still make, never a cue.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 CLEAR = "clear"
 POSSIBLE = "possible"
@@ -106,3 +106,82 @@ def with_strength(cues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def is_clear(cue: Dict[str, Any]) -> bool:
     """A cue with no strength (an older run, another caller) counts as clear."""
     return cue.get("strength") != POSSIBLE
+
+
+def quote_names_clear_risk(quote: str) -> bool:
+    """The word list on its own: a quote that names death, self-harm, a means
+    or a plan in a language the list covers. It only ever raises a cue to
+    clear; a language it does not cover gets no help from it, never a lower
+    strength."""
+    return bool(_CLEAR_WORDS.search(str(quote or "")))
+
+
+def turn_is_clear(
+    turn: Any,
+    quote: str,
+    evaluator_cues: List[Dict[str, Any]],
+    safety_cues: List[Dict[str, Any]],
+) -> bool:
+    """Is this client turn a clear risk cue? Yes when ANY signal says so:
+    the word list on its quote; the Safety reader, which filed the turn under
+    a clear category or with clear words; or the Evaluator, which listed the
+    turn as a risk cue and did not answer ``clear: false`` (its answer is a
+    reading of the meaning, in whatever language). Only when every signal
+    reads it as ordinary low mood, burden, grief or guilt is it possible.
+    No signal can lower another's clear."""
+    if quote_names_clear_risk(quote):
+        return True
+    if any(is_clear(c) for c in safety_cues or [] if c.get("turn_index") == turn):
+        return True
+    return any(
+        c.get("clear", True) is not False
+        for c in evaluator_cues or []
+        if c.get("turn_index") == turn
+    )
+
+
+def split_missed_cues(
+    evaluator_cues: List[Dict[str, Any]],
+    safety_cues: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """The Evaluator's cues the debrief did not address, as (clear, possible)
+    by ``turn_is_clear``. A clear one holds the debrief for a person, exactly
+    as before; a possible one is published and sent to review."""
+    clear: List[Dict[str, Any]] = []
+    possible: List[Dict[str, Any]] = []
+    for cue in evaluator_cues or []:
+        if cue.get("addressed_by_debrief"):
+            continue
+        if turn_is_clear(
+            cue.get("turn_index"), cue.get("quote") or "", [cue], safety_cues
+        ):
+            clear.append(cue)
+        else:
+            possible.append(cue)
+    return clear, possible
+
+
+def drop_possible_important_moment(
+    cards: Dict[str, Any],
+    evaluator_cues: List[Dict[str, Any]],
+    safety_cues: List[Dict[str, Any]],
+) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+    """An important-moment card is for a clear risk cue. When the card's own
+    moment and every other moment on it are possible by ``turn_is_clear``,
+    the card goes and the moment is returned for review; otherwise the cards
+    are unchanged. Call it only once the Evaluator has read the draft."""
+    im = (cards or {}).get("important_moment")
+    if not im:
+        return cards, None
+    moments = [im] + list(im.get("others") or [])
+    if any(
+        turn_is_clear(
+            m.get("turn_index"), m.get("quote") or "", evaluator_cues, safety_cues
+        )
+        for m in moments
+    ):
+        return cards, None
+    return {**cards, "important_moment": None}, {
+        "turn_index": im.get("turn_index"),
+        "quote": im.get("quote"),
+    }

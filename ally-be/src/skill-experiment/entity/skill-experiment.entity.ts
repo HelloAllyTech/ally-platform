@@ -1,4 +1,5 @@
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
+import { numericColumn } from 'src/common/util/numeric-column.transformer';
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import {
   SkillExperimentPauseReason,
@@ -9,12 +10,7 @@ import {
   SkillOutputShape,
 } from '../type/skill-experiment.type';
 
-/** Postgres returns `numeric` as a string; read it back as a number. */
-export const numericColumn = {
-  to: (value?: number | null) => value ?? null,
-  from: (value?: string | null) =>
-    value === null || value === undefined ? null : parseFloat(value),
-};
+export { numericColumn };
 
 /**
  * The auto-improve loop for one System Skill (`prompts` row). One row per

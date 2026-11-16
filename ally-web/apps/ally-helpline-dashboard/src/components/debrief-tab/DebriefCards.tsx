@@ -41,6 +41,7 @@ import {
 
 import { CardFlag, DebriefHelpful, DebriefPulseCard } from "./DebriefCardFeedback";
 import { DebriefExplainer } from "./DebriefExplainer";
+import { DebriefProgressCard, parseProgressCard } from "./DebriefProgressCard";
 import {
   ListenAllBar,
   ListenButton,
@@ -240,6 +241,8 @@ export const readableSections = (view: LearnerDebriefView): string[] => {
     ...cards.work_on_this.map((_, i) => `work_on_this[${i}]`),
     cards.practise_next ? "practise_next" : null,
     cards.reflective_question ? "reflective_question" : null,
+    // Last, as it sits below the debrief.
+    parseProgressCard(cards.progress_card) ? "progress_card" : null,
   ].filter((x): x is string => !!x && !removed.has(x));
 };
 
@@ -291,6 +294,7 @@ const ReadyCards: FC<{
     .map((item, index) => ({ item, index }))
     .filter(({ index }) => !removed.has(`work_on_this[${index}]`));
   const practise = removed.has("practise_next") ? null : cards.practise_next;
+  const progressCard = removed.has("progress_card") ? null : parseProgressCard(cards.progress_card);
 
   const momentTitle = moment?.handled_well
     ? t("postSim.debriefCards.importantMoment.titleHandledWell")
@@ -518,6 +522,16 @@ const ReadyCards: FC<{
           <DebriefHelpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
           {view.pulse && <DebriefPulseCard sessionId={sessionId} pulse={view.pulse} />}
         </>
+      )}
+      {/* Progress contract §4: below the debrief, only when the card is due. */}
+      {progressCard && (
+        <DebriefProgressCard
+          card={progressCard}
+          controls={flagControl(
+            "progress_card",
+            t("postSim.debriefCards.progressCard.title", { n: progressCard.sessions }),
+          )}
+        />
       )}
     </div>
   );

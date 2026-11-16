@@ -1315,6 +1315,34 @@
         "didnt_come_up": "Didn't come up today"
       },
       "progressNote": "Your progress",
+      "progressCard": {
+        "title": "Your last {{n}} sessions",
+        "focus": "One focus for your next sessions",
+        "showMore": "Show more",
+        "showLess": "Show less",
+        "trends": {
+          "more_consistent": "Getting more consistent",
+          "about_the_same": "About the same",
+          "worth_another_look": "Worth another look",
+          "too_early": "Too early to tell"
+        },
+        "skills": {
+          "rapport": "Build rapport",
+          "confidentiality": "Explain confidentiality",
+          "feelings": "Explore feelings",
+          "empathy": "Show empathy",
+          "harm": "Ask about safety",
+          "functioning": "Daily life",
+          "explanation": "Their explanation",
+          "family": "Trusted people",
+          "goals": "Set goals together",
+          "hope": "Realistic hope",
+          "coping": "Coping",
+          "psychoeducation": "Explain simply",
+          "feedback": "Ask for feedback",
+          "verbal": "Clear wording"
+        }
+      },
       "reflectiveQuestion": "One question to think about",
       "working": {
         "title": "Ally is writing your debrief",

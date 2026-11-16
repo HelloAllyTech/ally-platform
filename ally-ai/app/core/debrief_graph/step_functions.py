@@ -27,6 +27,7 @@ from app.core.debrief.schemas import (
     EvidenceMap,
     PlannerOutput,
     ProgressReading,
+    ProgressReport,
     reasoning_of,
 )
 from app.utils.logger import get_logger
@@ -140,6 +141,24 @@ class InProcessSteps:
         return {
             "model": ran,
             "progress": _dump(ProgressReading, out),
+            "reasoning": reasoning_of(out),
+        }
+
+    async def _progress_agent(self, body, model, session_id):
+        out, ran = await steps.read_progress_report(
+            body.get("evidence") or {},
+            body.get("profile") or {},
+            body.get("this_session") or {},
+            body.get("language") or "en",
+            model or settings.DEBRIEF.PROGRESS_AGENT_MODEL,
+            system=body.get("system_prompt"),
+            scenario_session_id=session_id,
+        )
+        if out is None:
+            return None
+        return {
+            "model": ran,
+            "report": _dump(ProgressReport, out),
             "reasoning": reasoning_of(out),
         }
 

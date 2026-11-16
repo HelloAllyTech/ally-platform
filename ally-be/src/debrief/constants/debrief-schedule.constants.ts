@@ -166,6 +166,23 @@ export const DEBRIEF_SCHEDULE_JOBS: readonly DebriefScheduleJob[] = [
     learningBudget: false,
   },
   {
+    // The nightly check: yesterday's debriefs measured against the days
+    // before; drift alerts, debriefs for a person. Calls no model.
+    key: 'debrief-nightly-check',
+    options: DAY,
+    defaults: daily,
+    locked: false,
+    learningBudget: false,
+  },
+  {
+    // Judge drift: the independent check scores the anchor set again.
+    key: 'debrief-judge-anchor',
+    options: ['weekly', '2weeks'],
+    defaults: weeklyMonday,
+    locked: false,
+    learningBudget: true,
+  },
+  {
     key: 'debrief-pm-agent-forecasts',
     options: DAY,
     defaults: daily,

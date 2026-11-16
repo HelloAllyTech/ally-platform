@@ -32,6 +32,7 @@ import { DebriefPmAgentService } from './debrief-pm-agent.service';
 import { DebriefPmAgentToolsService } from './debrief-pm-agent-tools.service';
 import { DebriefReportingService } from './debrief-reporting.service';
 import { DebriefReviewService } from './debrief-review.service';
+import { DebriefNightlyService } from './debrief-nightly.service';
 import { DebriefSettingsService } from './debrief-settings.service';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
 
@@ -111,6 +112,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
     private readonly context: DebriefContextRepository,
     private readonly testSets: DebriefTestSetsService,
     @Optional() private readonly autonomy?: DebriefAutonomyService,
+    @Optional() private readonly nightly?: DebriefNightlyService,
   ) {}
 
   onModuleInit(): void {
@@ -464,6 +466,9 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       trial: h.evidence?.trial?.status ?? null,
       canary: h.evidence?.canary?.status ?? null,
       handoff: h.evidence?.handoff?.status ?? null,
+      // A Builder change that reached production, and when (its forecast is
+      // measured from then).
+      delivered_at: h.evidence?.delivery?.at ?? null,
       forecast: h.evidence?.forecast ?? null,
       release: h.releaseVersion ?? null,
       // Why a person rejected it (pinned-rule rejections always say why).
@@ -484,6 +489,11 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       metrics: metrics.metrics,
       judge_and_evaluator: library,
       learner_flags: await this.learnerFeedback.signals(windowDays),
+      // The nightly check: the last week's measures, data-quality counts and
+      // drift alerts (v9 FR-49, R2-9). Read it before drawing conclusions.
+      nightly_check: this.nightly
+        ? await this.nightly.forPmAgent().catch(() => null)
+        : null,
       reporting_catalog: this.reporting.catalog(),
       editable_prompts: editable,
       settings,
