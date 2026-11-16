@@ -39,6 +39,7 @@ class AskAiChatController extends ChangeNotifier {
   bool _isLoading = false;
   bool _isHistoryLoaded = false;
   String? _error;
+  String? _limitReached;
   bool _disposed = false;
 
   CancelToken? _cancelToken;
@@ -58,6 +59,10 @@ class AskAiChatController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isHistoryLoaded => _isHistoryLoaded;
   String? get error => _error;
+
+  /// Set from a `done` event's `limit` (`session` | `month`): the reply was
+  /// the limit message, so the composer should go. Stays for this screen.
+  String? get limitReached => _limitReached;
 
   /// RN's `isInterrupted`: the last committed message is the learner's and
   /// nothing is streaming (the reply never arrived).
@@ -167,8 +172,9 @@ class AskAiChatController extends ChangeNotifier {
                   );
                   _notify();
                 }
-              case AskAiSseDone(content: final doneContent, citations: final doneCitations):
+              case AskAiSseDone(content: final doneContent, citations: final doneCitations, :final limit):
                 complete = true;
+                if (limit != null) _limitReached = limit;
                 if (streaming != null) {
                   _messages = [
                     ..._messages,

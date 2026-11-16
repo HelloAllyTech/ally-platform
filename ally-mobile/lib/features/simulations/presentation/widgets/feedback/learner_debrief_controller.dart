@@ -21,7 +21,16 @@ import '../../../data/learner_debrief_repository.dart';
 /// [fastPollFor] (4 minutes), then every [slowPollInterval] (30 s); every
 /// [slowPollInterval] while a person finishes one (`on_its_way`,
 /// `taking_longer`); and not at
-/// all otherwise (v9 FR-33, web `useLearnerDebrief`). Once an answer has landed, a later failed request keeps it
+/// all otherwise (v9 FR-33, web `useLearnerDebrief`). After [waitingGiveUpAfter]
+/// (30 minutes) still waiting, it stops and [view] goes back to `null`, so
+/// today's debrief shows (the server answers `not_available` by then too).
+///
+/// A ready debrief with a flag still waiting on Ally's answer is re-read
+/// every [flagPollInterval] (5 s), for up to [flagPollFor] (2 minutes) after
+/// the flag (or after the screen opened on one), so Ally's reply shows
+/// without leaving the screen.
+///
+/// Once an answer has landed, a later failed request keeps it
 /// (like RTK Query keeps the last good `data`), so a blip mid-poll doesn't
 /// swap the learner back to the old view.
 class LearnerDebriefController extends ChangeNotifier {
@@ -31,6 +40,9 @@ class LearnerDebriefController extends ChangeNotifier {
     this.pollInterval = const Duration(seconds: 3),
     this.slowPollInterval = const Duration(seconds: 30),
     this.fastPollFor = const Duration(minutes: 4),
+    this.waitingGiveUpAfter = const Duration(minutes: 30),
+    this.flagPollInterval = const Duration(seconds: 5),
+    this.flagPollFor = const Duration(minutes: 2),
     this.supervisor = false,
   }) : _repository = repository;
 
@@ -44,8 +56,26 @@ class LearnerDebriefController extends ChangeNotifier {
   final Duration pollInterval;
   final Duration slowPollInterval;
   final Duration fastPollFor;
+  final Duration waitingGiveUpAfter;
+  final Duration flagPollInterval;
+  final Duration flagPollFor;
 
   LearnerDebriefView? _latest;
+
+  /// Started when a waiting state is first seen; when it fires, polling
+  /// stops for good and today's debrief shows.
+  Timer? _giveUpTimer;
+  bool _gaveUp = false;
+
+  /// Polls left for an open flag's answer (0: not polling for one).
+  int _flagPollsLeft = 0;
+  bool _flagWindowStarted = false;
+
+  int get _flagPollBudget =>
+      flagPollInterval.inMilliseconds <= 0 ? 0 : flagPollFor.inMilliseconds ~/ flagPollInterval.inMilliseconds;
+
+  /// True once polling gave up on a debrief that never finished.
+  bool get gaveUp => _gaveUp;
   Timer? _pollTimer;
 
   /// Runs out [fastPollFor] after `working` is seen; like the web, it
@@ -62,6 +92,7 @@ class LearnerDebriefController extends ChangeNotifier {
 
   /// What to render, or `null` to keep today's debrief.
   LearnerDebriefView? get view {
+    if (_gaveUp) return null;
     if (_latest?.isShowable ?? false) return _latest;
     if (_latest == null && _loadFailure != null) return LearnerDebriefView(state: _loadFailure!);
     return null;
@@ -111,7 +142,31 @@ class LearnerDebriefController extends ChangeNotifier {
     await _fetch();
   }
 
+  static bool _isWaiting(LearnerDebriefState? state) =>
+      state == LearnerDebriefState.working ||
+      state == LearnerDebriefState.onItsWay ||
+      state == LearnerDebriefState.takingLonger;
+
+  void _giveUp() {
+    if (_disposed || !_isWaiting(_latest?.state)) return;
+    _gaveUp = true;
+    _pollTimer?.cancel();
+    _fastTimer?.cancel();
+    notifyListeners();
+  }
+
+  /// Re-reads while a flag waits on Ally's answer, within its budget.
+  void _scheduleFlagPoll() {
+    if (_pollTimer?.isActive ?? false) return;
+    if (_flagPollsLeft <= 0 || _latest?.state != LearnerDebriefState.ready || !(_latest?.hasOpenFlag ?? false)) {
+      return;
+    }
+    _flagPollsLeft--;
+    _pollTimer = Timer(flagPollInterval, _fetch);
+  }
+
   Future<void> _fetch() async {
+    if (_gaveUp) return;
     _pollTimer?.cancel();
     try {
       final next = supervisor
@@ -133,10 +188,22 @@ class LearnerDebriefController extends ChangeNotifier {
         }
       }
     }
-    if (_disposed) return;
+    if (_disposed || _gaveUp) return;
     if (_latest?.state != LearnerDebriefState.working) {
       _fastTimer?.cancel();
       _fastTimer = null;
+    }
+    if (_isWaiting(_latest?.state)) {
+      _giveUpTimer ??= Timer(waitingGiveUpAfter, _giveUp);
+    } else {
+      _giveUpTimer?.cancel();
+      _giveUpTimer = null;
+    }
+    // A screen opened on a debrief whose flag is still waiting gets one
+    // window too.
+    if (!_flagWindowStarted && !supervisor && (_latest?.hasOpenFlag ?? false)) {
+      _flagWindowStarted = true;
+      _flagPollsLeft = _flagPollBudget;
     }
     switch (_latest?.state) {
       case LearnerDebriefState.working:
@@ -145,6 +212,8 @@ class LearnerDebriefController extends ChangeNotifier {
       case LearnerDebriefState.onItsWay:
       case LearnerDebriefState.takingLonger:
         _pollTimer = Timer(slowPollInterval, _fetch);
+      case LearnerDebriefState.ready:
+        _scheduleFlagPoll();
       default:
         break;
     }
@@ -208,7 +277,14 @@ class LearnerDebriefController extends ChangeNotifier {
       );
       notifyListeners();
     }
-    unawaited(_refresh());
+    // Ally answers within a minute: re-read until it has (a fresh window per flag).
+    _flagWindowStarted = true;
+    _flagPollsLeft = _flagPollBudget;
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    unawaited(_refresh().then((_) {
+      if (!_disposed) _scheduleFlagPoll();
+    }));
   }
 
   /// Read-aloud: one card's audio link (see [LearnerDebriefRepository.getCardAudioUrl]).
@@ -294,6 +370,7 @@ class LearnerDebriefController extends ChangeNotifier {
     _disposed = true;
     _pollTimer?.cancel();
     _fastTimer?.cancel();
+    _giveUpTimer?.cancel();
     super.dispose();
   }
 }

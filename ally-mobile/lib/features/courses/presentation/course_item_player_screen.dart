@@ -495,6 +495,7 @@ class _CourseItemPlayerScreenState
           item: item,
           alreadyCompleted: alreadyCompleted,
           onLaunched: () => _refetchTrackOnReturn = true,
+          trackId: widget.trackId,
         );
       default:
         return _UnsupportedItemCard(onBackToCourse: _exitToOverview);

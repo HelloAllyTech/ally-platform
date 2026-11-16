@@ -398,17 +398,67 @@ class DebriefProgress {
   final int? round;
 }
 
+/// What Ally did with a flag (V2_AUTONOMY F1).
+enum DebriefFlagAnswerAction {
+  kept,
+  corrected,
+  removed;
+
+  /// Lenient: the past tense the learner view sends, or the verb ally-ai
+  /// uses; anything else is no answer.
+  static DebriefFlagAnswerAction? parse(Object? value) => switch (value) {
+    'kept' || 'keep' => kept,
+    'corrected' || 'correct' => corrected,
+    'removed' || 'remove' => removed,
+    _ => null,
+  };
+}
+
+/// Ally's answer to one of the learner's flags: what it did, and its reply
+/// in the debrief's language. Absent on older servers and until answered.
+class DebriefFlagAnswer {
+  const DebriefFlagAnswer({required this.action, this.reply, this.at});
+
+  static DebriefFlagAnswer? parse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final action = DebriefFlagAnswerAction.parse(json['action']);
+    if (action == null) return null;
+    return DebriefFlagAnswer(
+      action: action,
+      reply: _optStr(json['reply'])?.trim(),
+      at: json['at'] is String ? DateTime.tryParse(json['at'] as String) : null,
+    );
+  }
+
+  final DebriefFlagAnswerAction action;
+  final String? reply;
+  final DateTime? at;
+}
+
 /// One of the learner's own flags. [canUndoUntil] is null once the undo
 /// window has closed (or the flag has been reviewed).
 class DebriefMyFlag {
-  const DebriefMyFlag({required this.id, required this.section, required this.status, this.canUndoUntil});
+  const DebriefMyFlag({
+    required this.id,
+    required this.section,
+    required this.status,
+    this.canUndoUntil,
+    this.answer,
+  });
 
   factory DebriefMyFlag.fromJson(Map<String, dynamic> json) => DebriefMyFlag(
     id: '${json['id'] ?? ''}',
     section: _str(json['section']),
     status: _str(json['status']),
     canUndoUntil: json['canUndoUntil'] is String ? DateTime.tryParse(json['canUndoUntil'] as String) : null,
+    answer: DebriefFlagAnswer.parse(json['answer']),
   );
+
+  /// Ally's answer, once it has one (optional: older servers never send it).
+  final DebriefFlagAnswer? answer;
+
+  /// Still waiting on Ally (or the team): worth re-reading the debrief for.
+  bool get isOpen => status == 'open' && answer == null;
 
   final String id;
   final String section;
@@ -545,10 +595,31 @@ class DebriefPulse {
 
 /// A roleplay the learner can still open, for "Practise this (next)".
 class DebriefPracticeScenario {
-  const DebriefPracticeScenario({required this.id, required this.title});
+  const DebriefPracticeScenario({required this.id, required this.title, this.trackItemId});
 
   final int id;
   final String title;
+
+  /// Inside a course, the course item this roleplay is (this one again, or
+  /// one the learner has already reached — the server never offers a later
+  /// item). Optional: absent for a standalone roleplay and on older servers.
+  final String? trackItemId;
+}
+
+/// Whether Ask Ally still takes questions on this debrief (optional server
+/// field `askAlly`; missing reads as open, so older servers keep working).
+class DebriefAskAlly {
+  const DebriefAskAlly({required this.open, this.reason});
+
+  static DebriefAskAlly? parse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    return DebriefAskAlly(open: json['open'] != false, reason: _optStr(json['reason']));
+  }
+
+  final bool open;
+
+  /// Why it is closed (`session`, `month`, …), when the server says.
+  final String? reason;
 }
 
 class LearnerDebriefView {
@@ -568,6 +639,7 @@ class LearnerDebriefView {
     this.supervisor,
     this.pulse,
     this.stopped = false,
+    this.askAlly,
   });
 
   /// `GET /debriefs/sessions/:id/supervisor` (v9 FR-26), as a read-only
@@ -612,10 +684,16 @@ class LearnerDebriefView {
           .toList(),
       practice: [
         for (final p in _maps(json['practice']))
-          if (_optInt(p['id']) case final id?) DebriefPracticeScenario(id: id, title: _str(p['title'])),
+          if (_optInt(p['id']) case final id?)
+            DebriefPracticeScenario(
+              id: id,
+              title: _str(p['title']),
+              trackItemId: _optStr(p['trackItemId']) ?? (p['trackItemId'] is num ? '${p['trackItemId']}' : null),
+            ),
       ],
       pulse: DebriefPulse.parse(json['pulse']),
       stopped: json['stopped'] == true,
+      askAlly: DebriefAskAlly.parse(json['askAlly']),
     );
   }
 
@@ -654,6 +732,31 @@ class LearnerDebriefView {
   /// so the tab says "not available" instead of today's debrief.
   final bool stopped;
 
+  /// Ask Ally's state; null (an older server) means open.
+  final DebriefAskAlly? askAlly;
+
+  bool get askAllyOpen => askAlly?.open ?? true;
+
+  /// A flag still waiting on an answer.
+  bool get hasOpenFlag => flags.any((f) => f.isOpen);
+
+  /// Cards taken out: by the Ally team's review (a `removed` correction) or
+  /// by Ally's answer to the learner's flag.
+  Set<String> get removedSections => {
+    for (final c in corrections)
+      if (c.removed) c.section,
+    for (final f in flags)
+      if (f.answer?.action == DebriefFlagAnswerAction.removed) f.section,
+  };
+
+  /// Why [section] was taken out: the correction's note, else Ally's reply.
+  String? removalReason(String section) {
+    final note = corrections.where((c) => c.section == section && c.removed).firstOrNull?.note;
+    if (note != null) return note.trim();
+    final answer = flags.where((f) => f.section == section).firstOrNull?.answer;
+    return answer?.action == DebriefFlagAnswerAction.removed ? answer?.reply : null;
+  }
+
   DebriefPracticeScenario? practiceFor(int? scenarioId) =>
       scenarioId == null ? null : practice.where((p) => p.id == scenarioId).firstOrNull;
 
@@ -679,6 +782,7 @@ class LearnerDebriefView {
     supervisor: supervisor,
     pulse: pulse ?? this.pulse,
     stopped: stopped,
+    askAlly: askAlly,
   );
 }
 

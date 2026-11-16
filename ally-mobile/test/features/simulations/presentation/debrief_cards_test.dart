@@ -397,6 +397,191 @@ void main() {
     expect(find.byKey(const Key('debrief-flag-undo')), findsNothing);
   });
 
+  group("Ally's answer to a flag", () {
+    Map<String, dynamic> withFlags(List<Map<String, dynamic>> flags, {List<Object> corrections = const []}) => {
+      ...readyDebriefJson(),
+      'corrections': corrections,
+      'feedback': {'helpful': null, 'flags': flags},
+    };
+
+    testWidgets('kept: says Ally looked again, with its reply', (tester) async {
+      stubDebrief(withFlags([
+        {
+          'id': 'f1',
+          'section': 'what_worked[1]',
+          'status': 'kept',
+          'answer': {'action': 'kept', 'reply': 'You did slow down at 2:10.'},
+        },
+      ]));
+      await h.pump(tester);
+      final flag = find.byKey(const ValueKey('debrief-flag-what_worked[1]'));
+      expect(find.descendant(of: flag, matching: find.text('Ally looked at this again and kept it.')), findsOneWidget);
+      expect(
+        find.descendant(of: flag, matching: find.textContaining('You did slow down at 2:10.', findRichText: true)),
+        findsOneWidget,
+      );
+      expect(find.text('Sent to the Ally team'), findsNothing);
+    });
+
+    testWidgets("a review's note shows with Ally's reply under it", (tester) async {
+      stubDebrief(withFlags(
+        [
+          {
+            'id': 'f1',
+            'section': 'what_worked[1]',
+            'status': 'corrected',
+            'answer': {'action': 'corrected', 'reply': 'Fixed the wording.'},
+          },
+        ],
+        corrections: [
+          {'section': 'what_worked[1]', 'outcome': 'kept', 'note': 'It matches the transcript.'},
+        ],
+      ));
+      await h.pump(tester);
+      expect(find.text('Reviewed: the Ally team kept this point. It matches the transcript.'), findsOneWidget);
+      expect(find.textContaining('Fixed the wording.', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('a card Ally removed is hidden and says why, by name', (tester) async {
+      stubDebrief(withFlags([
+        {
+          'id': 'f1',
+          'section': 'what_worked[0]',
+          'status': 'removed',
+          'answer': {'action': 'removed', 'reply': 'That line was the client\'s, not yours.'},
+        },
+      ]));
+      await h.pump(tester);
+      expect(find.text('You named the feeling.'), findsNothing);
+      expect(
+        find.text('We took out “You named the feeling.”: That line was the client\'s, not yours.'),
+        findsOneWidget,
+      );
+      // A reason is given, so no bare "removed" line.
+      expect(find.text('A point was removed after a review by the Ally team.'), findsNothing);
+    });
+
+    testWidgets("a removed correction's note is the reason", (tester) async {
+      stubDebrief(withFlags(const [], corrections: [
+        {'section': 'work_on_this[0]', 'outcome': 'removed', 'note': 'The question was open after all.'},
+      ]));
+      await h.pump(tester);
+      expect(
+        find.text('We took out “A closed question shut the door.”: The question was open after all.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets("Ally's reply shows without leaving the screen (polled every 5 s)", (tester) async {
+      final flags = <Map<String, dynamic>>[
+        {'id': 'f1', 'section': 'what_worked[1]', 'status': 'open'},
+      ];
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer(
+        (_) async => LearnerDebriefView.fromJson(withFlags(List.of(flags))),
+      );
+      await h.pump(tester);
+      expect(find.text('Sent to the Ally team'), findsOneWidget);
+      flags[0] = {
+        ...flags[0],
+        'status': 'kept',
+        'answer': {'action': 'kept', 'reply': 'You did slow down.'},
+      };
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text('Ally looked at this again and kept it.'), findsOneWidget);
+    });
+  });
+
+  testWidgets("still working after 30 minutes: today's debrief shows instead", (tester) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    stubDebrief({'state': 'working', 'steps': <String>[]});
+    await h.pump(tester);
+    expect(find.byKey(const Key('debrief-cards')), findsOneWidget);
+    await tester.pump(const Duration(minutes: 30));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('debrief-cards')), findsNothing);
+    expect(find.textContaining('good effort today', findRichText: true), findsOneWidget);
+  });
+
+  group('Ask Ally limit', () {
+    testWidgets('the limit reply stays and the reply box goes', (tester) async {
+      stubDebrief(readyDebriefJson());
+      when(
+        () => h.chatApi.streamChatAt(any(), any(), cancelToken: any(named: 'cancelToken')),
+      ).thenAnswer(
+        (_) => Stream.fromIterable(const [
+          AskAiSseStart(),
+          AskAiSseDone(content: "That's as far as Ally can go on this debrief.", limit: 'session'),
+        ]),
+      );
+      await h.pump(tester);
+      await showQuestion(tester);
+      expect(find.byKey(const Key('ask-ally-composer')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('ask-ai-input')), 'One more?');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('ask-ai-send')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining("That's as far as Ally can go", findRichText: true), findsOneWidget);
+      expect(find.byKey(const Key('ask-ally-composer')), findsNothing);
+      expect(find.byKey(const Key('ask-ai-input')), findsNothing);
+    });
+
+    testWidgets('askAlly.open false: no reply box, and the learner is told', (tester) async {
+      stubDebrief({...readyDebriefJson(), 'askAlly': {'open': false, 'reason': 'month'}});
+      await h.pump(tester);
+      await showQuestion(tester);
+      expect(find.byKey(const Key('ask-ally-composer')), findsNothing);
+      expect(find.byKey(const Key('ask-ai-input')), findsNothing);
+      expect(find.text("You can't ask Ally more about this debrief right now."), findsOneWidget);
+    });
+
+    testWidgets('askAlly missing (older server): the reply box stays', (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester);
+      await showQuestion(tester);
+      expect(find.byKey(const Key('ask-ally-composer')), findsOneWidget);
+      expect(find.byKey(const Key('ask-ally-closed')), findsNothing);
+    });
+  });
+
+  group('Practise inside a course', () {
+    Map<String, dynamic> withPractice(Map<String, dynamic> practice) {
+      final json = readyDebriefJson();
+      final cards = json['cards'] as Map<String, dynamic>;
+      return {
+        ...json,
+        'cards': {
+          ...cards,
+          'practise_next': {...cards['practise_next'] as Map<String, dynamic>, 'scenario_id': 42},
+        },
+        'practice': [practice],
+      };
+    }
+
+    testWidgets('a suggestion that is a course item opens it in the course', (tester) async {
+      stubDebrief(withPractice({'id': 42, 'title': 'Again', 'trackItemId': 'item-1'}));
+      await h.pump(tester, trackId: 't1', trackItemId: 'item-1');
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      expect(find.text('COURSE_ITEM:t1:item-1'), findsOneWidget);
+    });
+
+    testWidgets('any other roleplay keeps the course on its details', (tester) async {
+      stubDebrief(withPractice({'id': 42, 'title': 'Again'}));
+      await h.pump(tester, trackId: 't1');
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      expect(find.text('SIMULATION_DETAILS:42:track=t1'), findsOneWidget);
+    });
+
+    testWidgets('a standalone debrief carries no course', (tester) async {
+      stubDebrief(withPractice({'id': 42, 'title': 'Again', 'trackItemId': 'item-1'}));
+      await h.pump(tester);
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      expect(find.text('SIMULATION_DETAILS:42'), findsOneWidget);
+    });
+  });
+
   testWidgets('a failed flag keeps the form open and says so', (tester) async {
     stubDebrief(readyDebriefJson());
     when(

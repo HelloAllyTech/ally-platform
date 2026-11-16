@@ -99,6 +99,8 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
     this.pathId,
     this.caseId,
     this.languageId,
+    this.trackId,
+    this.trackItemId,
     this.now = DateTime.now,
   });
 
@@ -118,6 +120,11 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
   final String? pathId;
   final String? caseId;
   final int? languageId;
+
+  /// The course this roleplay was opened from (and its item), passed on to
+  /// Feedback so the learner returns to the course.
+  final String? trackId;
+  final String? trackItemId;
 
   /// Injectable clock for the session timer, so tests can assert on a
   /// specific elapsed duration without a real wall-clock wait — the
@@ -598,6 +605,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
         pathId: widget.pathId,
         caseId: widget.caseId,
         languageId: widget.languageId,
+        trackId: widget.trackId,
+        trackItemId: widget.trackItemId,
       ),
     );
   }
