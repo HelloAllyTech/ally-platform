@@ -9441,11 +9441,6 @@ export const en = {
             ? "Needs you: one change the PM agent won’t make alone"
             : `Needs you: ${n} changes the PM agent won’t make alone`,
         yourCall: "Your call",
-        /** The Needs you bell on Home: a count, and each waiting change opens in the PM agent. */
-        bellLabel: (n: number) =>
-          n === 0 ? "Nothing needs you" : `${n} ${n === 1 ? "change needs" : "changes need"} you`,
-        bellEmpty: "Nothing waits for you.",
-        bellOpenAll: "Open the PM agent",
         expand: (title: string) => `Open ${title}`,
         whatChanges: "What changes",
         whyItChanges: "Why",

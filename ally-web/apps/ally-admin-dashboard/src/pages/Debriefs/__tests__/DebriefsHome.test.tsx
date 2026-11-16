@@ -305,31 +305,23 @@ describe("Debriefs home (v2, U1): answer first", () => {
   });
 });
 
-describe("Needs you: a bell that leads to the PM agent", () => {
-  it("is a bell with a count, not a section on Home", () => {
+describe("Needs you: listed on Home, decided on the PM agent page", () => {
+  it("lists each waiting change in one line: Your call, the title, why it asks", () => {
     renderAt();
-    expect(screen.queryByTestId("home-needs-you")).toBeNull();
-    const bell = screen.getByTestId("needs-you-bell");
-    expect(within(bell).getByTestId("needs-you-count")).toHaveTextContent("1");
-    expect(screen.queryByTestId("needs-you-menu")).toBeNull();
+    const needs = screen.getByTestId("home-needs-you");
+    expect(needs).toHaveTextContent("Needs you: one change the PM agent won’t make alone");
+    const row = within(needs).getByTestId("home-needs-item");
+    expect(row).toHaveTextContent("Your call");
+    expect(row).toHaveTextContent("Safety reader text always asks a person.");
+    // Nothing is decided on Home.
+    expect(within(needs).queryByRole("button")).toBeNull();
     expect(h.change).not.toHaveBeenCalled();
   });
 
-  it("lists each waiting change; one opens it on the PM agent page", () => {
+  it("a row opens that change on the PM agent page", () => {
     renderAt();
-    fireEvent.click(screen.getByRole("button", { name: "1 change needs you" }));
-    const menu = screen.getByTestId("needs-you-menu");
-    const link = within(menu).getByTestId("needs-you-link");
-    expect(link).toHaveTextContent("Safety reader: name indirect self-harm cues");
-    fireEvent.click(link);
+    fireEvent.click(screen.getByTestId("home-needs-item"));
     expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
-  });
-
-  it("closes on Esc", () => {
-    renderAt();
-    fireEvent.click(screen.getByRole("button", { name: "1 change needs you" }));
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByTestId("needs-you-menu")).toBeNull();
   });
 
   it("the headline's 'needs you' links to the PM agent", () => {
@@ -352,7 +344,9 @@ describe("the clinical advisor's home", () => {
   it("leads with their decision; no Changes, Analytics, Settings, This week or PM agent", () => {
     renderAt();
     expect(screen.getByTestId("home-headline")).toHaveTextContent("1 change needs your decision.");
-    expect(screen.getByTestId("needs-you-count")).toHaveTextContent("1");
+    expect(screen.getByTestId("home-needs-you")).toHaveTextContent(
+      "Needs you: a change only you or the owner can approve",
+    );
     expect(screen.queryByTestId("changes-button")).toBeNull();
     expect(screen.queryByTestId("analytics-button")).toBeNull();
     expect(screen.queryByTestId("home-more")).toBeNull();
@@ -402,7 +396,7 @@ describe("all debriefs by day", () => {
 });
 
 describe("rows never wrap", () => {
-  it("Needs you bell, PM agent and Analytics, Settings in More", () => {
+  it("PM agent and Analytics, Settings in More", () => {
     renderAt();
     const actions = screen.getByTestId("home-actions");
     const links = within(actions)
@@ -410,7 +404,6 @@ describe("rows never wrap", () => {
       .map(a => a.textContent);
     expect(links[0]).toMatch(/^PM agent/);
     expect(links[1]).toMatch(/Analytics/);
-    expect(within(actions).getByTestId("needs-you-bell")).toBeInTheDocument();
     expect(within(actions).queryByRole("link", { name: "Settings" })).toBeNull();
     fireEvent.click(
       within(screen.getByTestId("home-more")).getByRole("button", { name: "More actions" }),

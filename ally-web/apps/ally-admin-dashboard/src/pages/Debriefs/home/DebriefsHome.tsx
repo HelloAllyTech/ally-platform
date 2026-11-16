@@ -25,7 +25,7 @@ import {
 import { useDebriefAccess } from "../debriefAccess";
 import { PmConversation } from "../pm/PmConversation";
 import { FILTER_KEYS, groupByDay, readHomeState, sessionsQuery } from "../queue";
-import { NeedsYouBell } from "./NeedsYouBell";
+import { NeedsYouList } from "./NeedsYouList";
 import { SessionCard, SessionRow } from "./SessionCard";
 
 /** A session link that keeps the home's filters, so Back returns there. */
@@ -215,8 +215,8 @@ const ThisWeek: React.FC<{ home: DebriefHomeV2 }> = ({ home }) => {
 };
 
 /**
- * The Debriefs home (v2, U1): the headline sentence first; Needs you is a bell whose items open
- * on the PM agent page, where changes are decided (never here); "This week" and the PM agent conversation as accordions, closed; then every debrief by
+ * The Debriefs home (v2, U1): the headline sentence first; Needs you lists the waiting changes,
+ * each opening on the PM agent page, where changes are decided (never here); "This week" and the PM agent conversation as accordions, closed; then every debrief by
  * day. No review queue, no status pills: a debrief carries only "⚑ Flagged by the learner" and
  * its Quality score.
  */
@@ -253,7 +253,7 @@ export const DebriefsHome: React.FC = () => {
   const page = sessions.data;
   const access = useDebriefAccess(page?.viewer);
   // The Ally team and the owner run the PM agent; the clinical advisor only answers pinned-rule
-  // changes (ally-be sends them only those), reached from the bell, so gets no PM agent button.
+  // changes (ally-be sends them only those), reached from Needs you, so gets no PM agent button.
   const team = access.pmAgent;
   const openChange = params.get("change");
   // Older links to a change on Home (`/debriefs?change=`) open it on the PM agent page.
@@ -432,6 +432,7 @@ export const DebriefsHome: React.FC = () => {
 
       {home.data && (
         <div className="flex flex-col gap-4">
+          <NeedsYouList items={home.data.needsYou} advisor={!team} />
           {team && <ThisWeek home={home.data} />}
           {team && (
             <details
@@ -509,7 +510,6 @@ export const DebriefsHome: React.FC = () => {
               </button>
             ))}
           </div>
-          {home.data && <NeedsYouBell items={home.data.needsYou} />}
           {team && (
             <Link
               to={changesPath()}
