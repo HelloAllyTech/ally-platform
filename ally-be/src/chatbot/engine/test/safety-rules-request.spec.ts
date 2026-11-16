@@ -47,4 +47,27 @@ describe('safety rules in the knowledge request', () => {
     expect(body.persona?.safety_rules).toBeUndefined();
     expect(body.persona?.safety_pack).toBeUndefined();
   });
+
+  it('SP1: a medical bot names its helpline, and offers booking only with a create tool on Do it', () => {
+    const withTool = chatbotFixture({
+      safetyPack: SafetyPackId.MEDICAL,
+      settings: { abilities: { create_appointments: 'do_it' } },
+    } as never);
+    const withoutTool = chatbotFixture({
+      safetyPack: SafetyPackId.MEDICAL,
+      settings: { abilities: { create_appointments: 'never' } },
+    } as never);
+    const settings = {
+      ...DEFAULT_WHATSAPP_SETTINGS,
+      helplineNumbers: 'Tele-MANAS 14416',
+    };
+    const rules = (chatbot: ReturnType<typeof chatbotFixture>) =>
+      buildKnowledgeRequest({ ...turn(chatbot), settings }, {}, KNOWLEDGE)
+        .persona?.safety_rules ?? '';
+    expect(rules(withTool)).toContain(
+      'you may add the helpline: Tele-MANAS 14416.',
+    );
+    expect(rules(withTool)).toContain('such as booking an appointment');
+    expect(rules(withoutTool)).not.toContain('such as booking an appointment');
+  });
 });
