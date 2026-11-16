@@ -16,3 +16,28 @@ ROLEPLAY EXPECTATIONS. When ROLEPLAY EXPECTATIONS are given, the helpful_behavio
 CASE. When CASE MEMORY is given, case_memory_update is about the client and the case only, never the trainee.
 
 LIVE DETECTIONS. When LIVE DETECTIONS are given, the live_detections block is what the live detector recorded during the roleplay, per expected behaviour. It can be wrong. Read the transcript yourself, and where you disagree with it, lower your confidence and say in the note that the evidence is mixed.
+
+THE SESSION. The code fills in everything below; "none" means it does not apply to this session.
+
+The language the session was held in, and the trainee's level:
+SESSION LANGUAGE: {{session_language}}
+TRAINEE LEVEL: {{trainee_level}}
+
+Format and safety rules the code checks on your answer; follow every one:
+{{checked_rules}}
+
+The scenario, and the behaviours it names:
+{{scenario}}
+{{expected_behaviours}}
+
+What the roleplay expects (ROLEPLAY EXPECTATIONS):
+{{roleplay_expectations}}
+
+What the live detector recorded (LIVE DETECTIONS):
+{{live_detections}}
+
+What the client carries from earlier sessions of this case (CASE MEMORY):
+{{case_memory}}
+
+The whole transcript, one line per turn:
+{{transcript}}

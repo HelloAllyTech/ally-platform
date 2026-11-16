@@ -14,12 +14,12 @@ never the full transcript.
 
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
 from app.core.debrief.cue_strength import is_clear
+from app.core.debrief.render import NONE, block, or_none, render
 from app.core.debrief.risk_cue_definition import definition_block
 from app.core.debrief.safety_reader import TranscriptTurn
 from app.core.debrief.schemas import (
@@ -99,7 +99,33 @@ LIVE DETECTIONS. When LIVE DETECTIONS are given, the live_detections block \
 is what the live detector recorded during the roleplay, per expected \
 behaviour. It can be wrong. Read the transcript yourself, and where you \
 disagree with it, lower your confidence and say in the note that the \
-evidence is mixed.\
+evidence is mixed.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The language the session was held in, and the trainee's level:
+SESSION LANGUAGE: {{session_language}}
+TRAINEE LEVEL: {{trainee_level}}
+
+Format and safety rules the code checks on your answer; follow every one:
+{{checked_rules}}
+
+The scenario, and the behaviours it names:
+{{scenario}}
+{{expected_behaviours}}
+
+What the roleplay expects (ROLEPLAY EXPECTATIONS):
+{{roleplay_expectations}}
+
+What the live detector recorded (LIVE DETECTIONS):
+{{live_detections}}
+
+What the client carries from earlier sessions of this case (CASE MEMORY):
+{{case_memory}}
+
+The whole transcript, one line per turn:
+{{transcript}}\
 """
 
 DEFAULT_PROGRESS_READER_SYSTEM = """\
@@ -124,7 +150,17 @@ clearly and gently; never drop it because the learner pushed back.
 found unclear or unfair. It is never evidence about the session.
 - A point with source expert is a clinical expert's note on what the learner \
 did in that roleplay. Follow it up when this session shows the same moment; \
-never quote the expert or say an expert wrote it.\
+never quote the expert or say an expert wrote it.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The latest session's evidence map:
+{{evidence_map}}
+
+The trainee's past "Work on this" points, with what the learner and experts \
+said about them:
+{{past_points}}\
 """
 
 #: `debrief_progress_system`: the progress agent (PROGRESS_CONTRACT §2).
@@ -200,7 +236,28 @@ script, warm, specific and plain: name what they did, not a verdict.
 numbers.
 - Never diagnose or label the trainee. For worth_another_look, be kind and \
 point to what to try, never frame it as failure.
-- Leave the learner line empty for too_early.\
+- Leave the learner line empty for too_early.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The language the session was held in:
+SESSION LANGUAGE: {{session_language}}
+
+Whether a progress card is due (yes or no):
+CARD DUE: {{card_due}}
+
+The skill keys you may trend:
+SKILL KEYS: {{skill_keys}}
+
+Format rules the code checks on your answer; follow every one:
+{{checked_rules}}
+
+This session's observations, the same by skill key, and the learner's \
+progress profile:
+{{this_session_evidence}}
+{{this_session_by_skill}}
+{{learner_profile}}\
 """
 
 DEFAULT_WRITER_SYSTEM = """\
@@ -294,7 +351,56 @@ don't state them as certain; prefer a point the evidence supports clearly.
 COHORT. When COHORT is given, it is how other trainees in the same \
 organisation did on this roleplay. You may use it only to say a moment is \
 one many trainees find hard, or that a strength is less common. Never \
-compare this trainee with others, rank them, or give a number or share.\
+compare this trainee with others, rank them, or give a number or share.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The risk cue definition (the one definition every Debrief step uses):
+RISK CUE DEFINITION:
+{{risk_cue_definition}}
+
+The session's language, the trainee's level, the organisation's tone and \
+whether the learner showed distress:
+SESSION LANGUAGE: {{session_language}}
+TRAINEE LEVEL: {{trainee_level}}
+ORGANISATION TONE: {{organisation_tone}}
+LEARNER DISTRESS: {{learner_distress}}
+
+Format and safety rules the code checks on your cards; follow every one:
+{{checked_rules}}
+
+The clear risk cues the cards must cover (RISK CUES TO COVER), the possible \
+ones (POSSIBLE RISK CUES), and the moments the trainee moved past a feeling \
+(MISSED FEELINGS):
+RISK CUES TO COVER: {{risk_cue_turns}}
+POSSIBLE RISK CUES: {{possible_risk_cue_turns}}
+MISSED FEELINGS: {{missed_feelings_turns}}
+
+The course this session belongs to (COURSE), and the behaviours where the \
+live detector disagreed (MIXED EVIDENCE):
+COURSE: {{course_scenario_id}}
+MIXED EVIDENCE: {{mixed_evidence}}
+
+What the client carries from earlier sessions of this case (CASE MEMORY):
+{{case_memory}}
+
+The evidence map and the safety reading:
+{{evidence_map}}
+{{safety_reading}}
+
+The roleplays this learner can open (PRACTICE OPTIONS):
+{{practice_options}}
+
+Guidance passages, the progress reading, how other trainees did (COHORT) and \
+what the analysis agents found (FINDINGS):
+{{guidance}}
+{{progress}}
+{{cohort}}
+{{findings}}
+
+The whole transcript, one line per turn:
+{{transcript}}\
 """
 
 DEFAULT_REVISER_SYSTEM = """\
@@ -314,12 +420,54 @@ by kind with the most important first. Use a finding where it fits the \
 session; a quote in a finding was checked against the transcript. A \
 comparison finding may only say a moment is one many trainees find hard or a \
 strength is less common; never compare or rank this trainee. Never name an \
-agent or a source.\
+agent or a source.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The risk cue definition (the one definition every Debrief step uses):
+RISK CUE DEFINITION:
+{{risk_cue_definition}}
+
+The session's language, and the clear risk cues the cards must cover:
+SESSION LANGUAGE: {{session_language}}
+RISK CUES TO COVER: {{risk_cue_turns}}
+
+Format and safety rules the code checks on your cards; follow every one:
+{{checked_rules}}
+
+The draft, the CRITIQUE, any new FINDINGS and the evidence map:
+{{draft}}
+{{critique}}
+{{findings}}
+{{evidence_map}}
+
+The transcript turns the draft points at, with their neighbours:
+{{transcript}}\
 """
 
-#: Data only (2026-11-16): findings are present. How the Writer and the Reviser
-#: read them is their prompts' FINDINGS paragraph (Skills Store).
-_FINDINGS_GIVEN = "FINDINGS: given."
+#: The Skills Store codes these steps render (`{{name}}` placeholders, step 5).
+ANALYST_CODE = "debrief_analyst_system"
+PROGRESS_READER_CODE = "debrief_progress_reader_system"
+PROGRESS_CODE = "debrief_progress_system"
+WRITER_CODE = "debrief_writer_system"
+REVISER_CODE = "debrief_reviser_system"
+EVALUATOR_FIX_CODE = "debrief_evaluator_fix_system"
+PLANNER_CODE = "debrief_planner_system"
+#: The variables a live version must contain (the contracts' required ones).
+WRITER_REQUIRED = (
+    "transcript",
+    "risk_cue_turns",
+    "risk_cue_definition",
+    "safety_reading",
+)
+REVISER_REQUIRED = ("transcript", "risk_cue_turns", "risk_cue_definition")
+
+
+def _definition(text: Optional[str]) -> str:
+    """The live risk cue definition, or the default."""
+    return definition_block(text)[1]
+
 
 #: `debrief_evaluator_system` (pinned): what the Evaluator is told to do last,
 #: after the rubric, the transcript and the draft. Its own code, not the
@@ -340,12 +488,16 @@ field), judging the client's meaning in whatever language they spoke.
 FIX NOTES. After scoring, list what to change so the debrief would reach the \
 PASS BAR or more on every dimension with no hard fail. One note per section \
 that needs it, naming the section as FIX SECTIONS names them, and the \
-concrete change. Leave the list empty when nothing needs to change.\
+concrete change. Leave the list empty when nothing needs to change.
+
+The score every dimension must reach, and the section names to use:
+PASS BAR: {{pass_bar}}
+FIX SECTIONS: {{fix_sections}}\
 """
 
 #: Format: the section names the Reviser's critique is keyed by.
 FIX_SECTIONS = (
-    "FIX SECTIONS: opening, important_moment, what_worked[0], work_on_this[1], "
+    "opening, important_moment, what_worked[0], work_on_this[1], "
     "practise_next, skill_words, reflective_question, progress_note."
 )
 
@@ -353,20 +505,16 @@ FIX_SECTIONS = (
 def _pass_bar(pass_score: float) -> str:
     """Data: the release's `passScore`, as people write it (8, not 8.0)."""
     n = float(pass_score)
-    return f"PASS BAR: {int(n) if n.is_integer() else n}"
+    return str(int(n) if n.is_integer() else n)
 
 
-def evaluator_fix_lines(fix_system: Optional[str] = None, pass_score: float = 8) -> str:
-    """The text after the judge prompt: the fix wording, then its data."""
-    return "\n".join(
-        [
-            "",
-            "",
-            (fix_system or "").strip() or DEFAULT_EVALUATOR_FIX_SYSTEM,
-            "",
-            _pass_bar(pass_score),
-            FIX_SECTIONS,
-        ]
+def evaluator_fix_text(fix_system: Optional[str] = None, pass_score: float = 8) -> str:
+    """The text after the judge prompt: the fix wording with its data filled."""
+    return render(
+        EVALUATOR_FIX_CODE,
+        (fix_system or "").strip() or DEFAULT_EVALUATOR_FIX_SYSTEM,
+        {"pass_bar": _pass_bar(pass_score), "fix_sections": FIX_SECTIONS},
+        required=("pass_bar", "fix_sections"),
     )
 
 
@@ -417,19 +565,6 @@ _NO_CODES = (
 TRY_NEXT_MAX = 3
 
 
-def _expectations_line(
-    helpful: List[str], unhelpful: List[str], competencies: List[Dict[str, Any]]
-) -> List[str]:
-    """Data only (2026-11-16): the roleplay's expectations are given, plus the
-    no-codes rule the CUSTOM_CODE check enforces. How to read them is the
-    Analyst prompt's ROLEPLAY EXPECTATIONS paragraph (Skills Store). Nothing
-    when the roleplay lists neither, so the foundational skills carry the
-    analysis as before."""
-    if not (helpful or unhelpful or competencies):
-        return []
-    return ["ROLEPLAY EXPECTATIONS: given.", _NO_CODES]
-
-
 def _transcript_block(transcript: List[TranscriptTurn]) -> List[str]:
     lines = ["<transcript>"]
     for t in transcript:
@@ -439,8 +574,8 @@ def _transcript_block(transcript: List[TranscriptTurn]) -> List[str]:
     return lines
 
 
-def _json_block(tag: str, value: Any) -> List[str]:
-    return [f"<{tag}>", json.dumps(value, ensure_ascii=False, indent=1), f"</{tag}>"]
+def _transcript_text(transcript: List[TranscriptTurn]) -> str:
+    return "\n".join(_transcript_block(transcript))
 
 
 async def _call(
@@ -493,63 +628,71 @@ async def analyse(
 ) -> Tuple[Optional[EvidenceMap], str]:
     from app.core.llm_usage.tasks import LLMTask
 
-    lines = [system or DEFAULT_ANALYST_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
-    if learner_level:
-        lines.append(f"TRAINEE LEVEL: {learner_level}")
-    # Code-owned (v9 FR-42): skill coverage is computed in ally-be from these
-    # tags, under the three areas today's debrief reports, so the charts
-    # continue across the cutover.
-    lines.append(
-        "SKILL COVERAGE: set coverage_category on every behaviour to the one "
-        "area it belongs to (Listening Engagement, Emotional Attunement or "
-        "Supportive Engagement), or null when none fits."
-    )
-    # Code-owned (v9 FR-4): the session's emotional movement now comes from
-    # here, on today's debrief's scale.
-    lines.append(
-        "EMOTIONAL MOVEMENT: for every CLIENT turn, rate how the client feels "
-        "at that turn from -5 (very distressed) to +5 (very positive)."
-    )
     helpful = [b for b in helpful_behaviours or [] if b]
     unhelpful = [b for b in unhelpful_behaviours or [] if b]
     named = [c for c in competencies or [] if isinstance(c, dict) and c.get("name")]
-    lines += _expectations_line(helpful, unhelpful, named)
+    checked = [
+        # Code-owned (v9 FR-42): skill coverage is computed in ally-be from
+        # these tags, under the three areas today's debrief reports.
+        "SKILL COVERAGE: set coverage_category on every behaviour to the one "
+        "area it belongs to (Listening Engagement, Emotional Attunement or "
+        "Supportive Engagement), or null when none fits.",
+        # Code-owned (v9 FR-4): the session's emotional movement, on today's
+        # debrief's scale.
+        "EMOTIONAL MOVEMENT: for every CLIENT turn, rate how the client feels "
+        "at that turn from -5 (very distressed) to +5 (very positive).",
+    ]
+    if helpful or unhelpful or named:
+        # Checked by ally-be's custom_code check.
+        checked.append(_NO_CODES)
     if case_memory:
         # Format: the field to write. Whose it is (the client's, never the
         # trainee's) is the Analyst prompt's CASE paragraph.
-        lines.append(
+        checked.append(
             "CASE: this session continues a case. Write case_memory_update: "
             "what the client now carries into the next session, integrating "
             "CASE MEMORY with this session."
         )
     if live_detections:
-        # Data and format (v9 FR-11): the block is given and the field to set.
-        # How to weigh a second opinion is the Analyst prompt's LIVE
-        # DETECTIONS paragraph.
-        lines.append(
-            "LIVE DETECTIONS: given. For each behaviour it lists, set "
-            "detector_agreement."
+        # Format (v9 FR-11): the field to set. How to weigh a second opinion is
+        # the Analyst prompt's LIVE DETECTIONS paragraph.
+        checked.append(
+            "For each behaviour LIVE DETECTIONS lists, set detector_agreement."
         )
-    lines.append("")
-    lines += _json_block("scenario", scenario or {})
-    lines += _json_block("expected_behaviours", expected_behaviours or [])
-    if helpful or unhelpful or named:
-        lines += _json_block(
-            "roleplay_expectations",
-            {
-                "helpful_behaviours": helpful,
-                "unhelpful_behaviours": unhelpful,
-                "competencies": named,
-            },
-        )
-    if live_detections:
-        lines += _json_block("live_detections", live_detections)
-    if case_memory:
-        lines += ["CASE MEMORY:", case_memory, ""]
-    lines += _transcript_block(transcript)
+    prompt = render(
+        ANALYST_CODE,
+        system or DEFAULT_ANALYST_SYSTEM,
+        {
+            "session_language": language,
+            "trainee_level": or_none(learner_level),
+            "checked_rules": "\n".join(checked),
+            "scenario": block("scenario", scenario or {}),
+            "expected_behaviours": block(
+                "expected_behaviours", expected_behaviours or []
+            ),
+            "roleplay_expectations": (
+                block(
+                    "roleplay_expectations",
+                    {
+                        "helpful_behaviours": helpful,
+                        "unhelpful_behaviours": unhelpful,
+                        "competencies": named,
+                    },
+                )
+                if helpful or unhelpful or named
+                else NONE
+            ),
+            "live_detections": (
+                block("live_detections", live_detections) if live_detections else NONE
+            ),
+            "case_memory": or_none(case_memory),
+            "transcript": _transcript_text(transcript),
+        },
+        required=("transcript",),
+    )
     output, meta = await _call(
         EvidenceMapReasoned,
-        "\n".join(lines),
+        prompt,
         LLMTask.DEBRIEF_ANALYST.value,
         model,
         scenario_session_id,
@@ -583,15 +726,21 @@ async def read_progress(
 ) -> Tuple[Optional[ProgressReading], str]:
     from app.core.llm_usage.tasks import LLMTask
 
-    lines = [system or DEFAULT_PROGRESS_READER_SYSTEM, ""]
-    lines += _json_block("latest_evidence_map", evidence)
     # What people said about a past point (learner_note, ally_decision,
     # source expert) travels in the block; how to use it is the Progress
     # reader prompt's HOW TO USE WHAT PEOPLE SAID section (Skills Store).
-    lines += _json_block("past_work_on_this_points", past_points)
+    prompt = render(
+        PROGRESS_READER_CODE,
+        system or DEFAULT_PROGRESS_READER_SYSTEM,
+        {
+            "evidence_map": block("latest_evidence_map", evidence),
+            "past_points": block("past_work_on_this_points", past_points),
+        },
+        required=("evidence_map",),
+    )
     output, meta = await _call(
         ProgressReadingReasoned,
-        "\n".join(lines),
+        prompt,
         LLMTask.DEBRIEF_PROGRESS_READER.value,
         model,
         scenario_session_id,
@@ -630,15 +779,9 @@ async def read_progress_report(
     from app.core.llm_usage.tasks import LLMTask
 
     settings_ = profile.get("settings") or {}
-    lines = [system or DEFAULT_PROGRESS_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
-    lines += _script_line(language)
-    lines.append(f"CARD DUE: {'yes' if profile.get('card_due') else 'no'}")
-    lines.append(
-        "SKILL KEYS: " + "; ".join(f"{k} = {v}" for k, v in FOUNDATIONAL_SKILLS.items())
-    )
+    checked = list(_script_line(language))
     if not settings_.get("useFhs", True):
-        lines.append("FOUNDATIONAL SKILLS LEVELS: not used; set fhs to absent.")
-    lines.append("")
+        checked.append("FOUNDATIONAL SKILLS LEVELS: not used; set fhs to absent.")
     behaviours = [
         {
             k: b.get(k)
@@ -655,12 +798,27 @@ async def read_progress_report(
         for b in (evidence or {}).get("behaviours") or []
         if isinstance(b, dict)
     ]
-    lines += _json_block("this_session_evidence", behaviours)
-    lines += _json_block("this_session_by_skill", this_session)
-    lines += _json_block("learner_profile", {k: profile.get(k) for k in _PROFILE_KEYS})
+    prompt = render(
+        PROGRESS_CODE,
+        system or DEFAULT_PROGRESS_SYSTEM,
+        {
+            "session_language": language,
+            "card_due": "yes" if profile.get("card_due") else "no",
+            "skill_keys": "; ".join(
+                f"{k} = {v}" for k, v in FOUNDATIONAL_SKILLS.items()
+            ),
+            "checked_rules": "\n".join(checked) or NONE,
+            "this_session_evidence": block("this_session_evidence", behaviours),
+            "this_session_by_skill": block("this_session_by_skill", this_session),
+            "learner_profile": block(
+                "learner_profile", {k: profile.get(k) for k in _PROFILE_KEYS}
+            ),
+        },
+        required=("this_session_evidence", "learner_profile"),
+    )
     output, meta = await _call(
         ProgressReportReasoned,
-        "\n".join(lines),
+        prompt,
         # The Progress reader's cost label (ally-be's LlmTask enum has it).
         LLMTask.DEBRIEF_PROGRESS_READER.value,
         model,
@@ -671,38 +829,73 @@ async def read_progress_report(
     return output, meta["model"]
 
 
-def _practice_instruction(options: Optional[List[Dict[str, Any]]]) -> List[str]:
+def _practice_instruction(
+    options: Optional[List[Dict[str, Any]]],
+) -> Tuple[List[str], Optional[str]]:
     """Code-owned: "Practise this next" may only point to a roleplay this
-    learner can open, which ally-be lists and checks again afterwards. Inside
-    a course the only option is this same roleplay: "Practise this again",
-    with what to try this time (clinical review 2026-11-16)."""
+    learner can open, which ally-be lists and checks again afterwards (the
+    format line), and inside a course the only option is this same roleplay
+    (the COURSE value: which roleplay, and the cap ally-be checks). What
+    try_next holds is the Writer prompt's PRACTISE THIS AGAIN section."""
     if not options:
         return [
             "PRACTICE OPTIONS: none. Set every scenario_id to null. Set "
             "practise_next.try_next to null."
-        ]
-    lines = [
+        ], None
+    line = (
         "PRACTICE OPTIONS: practice_options lists roleplays this learner can "
         "open, with the skills each one practises. Set practise_next.scenario_id, "
         "and scenario_id on a work_on_this card, to the id of the option that "
         "best practises that skill, or null when none fits. Never mention an id "
         "or a roleplay's title in the text."
-    ]
+    )
     course = next(
         (o for o in options if (o or {}).get("course") and o.get("this_roleplay")),
         None,
     )
-    if course is not None:
-        # Data and format: which roleplay and the cap ally-be checks. What
-        # try_next holds is the Writer prompt's PRACTISE THIS AGAIN section.
-        lines.append(
-            "COURSE: this session is part of a course; set "
-            f"practise_next.scenario_id to {course.get('id')}; try_next "
-            f"applies, at most {TRY_NEXT_MAX} items."
-        )
-    else:
-        lines[0] += " Set practise_next.try_next to null."
-    return lines
+    if course is None:
+        return [line + " Set practise_next.try_next to null."], None
+    return [line], (
+        "this session is part of a course; set "
+        f"practise_next.scenario_id to {course.get('id')}; try_next "
+        f"applies, at most {TRY_NEXT_MAX} items."
+    )
+
+
+def risk_cue_turns(safety: Dict[str, Any]) -> Tuple[List[int], List[int], List[int]]:
+    """(clear, possible, missed possible) turns from the safety reading."""
+    cues = (safety or {}).get("risk_cues", []) or []
+    clear = sorted({c.get("turn_index") for c in cues if is_clear(c)})
+    possible = sorted(
+        {c.get("turn_index") for c in cues if not is_clear(c)} - set(clear)
+    )
+    missed = sorted(
+        {
+            c.get("turn_index")
+            for c in cues
+            if not is_clear(c)
+            and c.get("turn_index") in possible
+            and c.get("learner_response") == "missed"
+        }
+    )
+    return clear, possible, missed
+
+
+def _turns(turns: List[int]) -> str:
+    return "turns " + ", ".join(str(t) for t in turns) + "."
+
+
+def risk_cues_to_cover(safety: Dict[str, Any]) -> str:
+    """Code-owned, not prompt-owned: a debrief that leaves a clear cue out is
+    the worst failure it can have, whatever the live prompt says."""
+    clear = risk_cue_turns(safety)[0]
+    if not clear:
+        return NONE
+    return (
+        _turns(clear)
+        + " The important_moment card covers the most serious one; list every "
+        "other one in important_moment.others."
+    )
 
 
 def _capped_try_next(cards: Optional[DebriefCards]) -> Optional[DebriefCards]:
@@ -739,117 +932,73 @@ async def write(
     the Writer is still told to write from the evidence map."""
     from app.core.llm_usage.tasks import LLMTask
 
-    lines = [system or DEFAULT_WRITER_SYSTEM, ""]
-    # The one definition of clear and possible (pinned, Skills Store).
-    lines += definition_block(risk_cue_definition)
-    lines += ["", f"SESSION LANGUAGE: {language}"]
-    lines += _script_line(language)
-    lines += _skill_label_line(language)
-    if learner_level:
-        lines.append(f"TRAINEE LEVEL: {learner_level}")
-    if tone:
-        lines.append(f"ORGANISATION TONE: {tone}")
+    checked = list(_script_line(language)) + list(_skill_label_line(language))
     if short:
-        lines.append(
+        checked.append(
             "SHORT SESSION: write only the opening, the important moment if "
             "there is one, and ONE work-on-this card."
         )
-    if safety.get("learner_distress"):
-        lines.append("LEARNER DISTRESS: noted in this session.")
     # Code-owned: the learner never sees turn numbers, whatever the prompt says.
-    lines.append(
+    checked.append(
         "Never mention turn numbers in what you write; the quote is how the "
         "learner finds the moment."
     )
-    lines.append(_NO_CODES)
-    cues = safety.get("risk_cues", [])
-    cue_turns = sorted({c.get("turn_index") for c in cues if is_clear(c)})
-    possible_turns = sorted(
-        {c.get("turn_index") for c in cues if not is_clear(c)} - set(cue_turns)
-    )
-    if cue_turns:
-        # Code-owned, not prompt-owned: a debrief that leaves a clear cue out
-        # is the worst failure it can have, whatever the live prompt says.
-        lines.append(
-            "RISK CUES TO COVER: turns "
-            + ", ".join(str(t) for t in cue_turns)
-            + ". The important_moment card covers the most serious one; list "
-            "every other one in important_moment.others."
-        )
-    if possible_turns:
-        # Data only (2026-11-16): the cues the Safety reader filed under
-        # hopelessness with no word of death, self-harm or a means
-        # (cue_strength.py). How to decide them is the Writer prompt's
-        # POSSIBLE RISK CUES paragraph; a possible card is still dropped in
-        # code when the Evaluator does not confirm it.
-        lines.append(
-            "POSSIBLE RISK CUES: turns "
-            + ", ".join(str(t) for t in possible_turns)
-            + "."
-        )
-        missed_possible = sorted(
-            {
-                c.get("turn_index")
-                for c in cues
-                if not is_clear(c)
-                and c.get("turn_index") in possible_turns
-                and c.get("learner_response") == "missed"
-            }
-        )
-        if missed_possible:
-            # Data only (review 2026-11-16): which turns. What to do with
-            # them is the Writer prompt's MISSED FEELINGS rule (Skills Store).
-            lines.append(
-                "MISSED FEELINGS: turns "
-                + ", ".join(str(t) for t in missed_possible)
-                + "."
-            )
-    lines += _practice_instruction(practice_options)
-    if case_memory:
-        # Data only: the rule (never contradict it) is the Writer prompt's CASE.
-        lines.append("CASE: this session continues a case.")
+    checked.append(_NO_CODES)
+    practice_lines, course = _practice_instruction(practice_options)
+    checked += practice_lines
     if assessment:
         # Code-owned: the debrief explains a graded attempt, never re-grades it.
-        lines.append(
+        checked.append(
             "ASSESSMENT: this session was a graded attempt. Never mention, "
             "imply or argue with a grade, a pass or a result. Every point you "
             "make rests on a quoted moment from the transcript."
         )
+    _clear, possible, missed = risk_cue_turns(safety)
     mixed = [
         str(b.get("skill") or "a behaviour")
         for b in (evidence or {}).get("behaviours", [])
         if isinstance(b, dict) and b.get("detector_agreement") == "disagrees"
     ]
-    if mixed:
-        # Data only (eval case 19): which behaviours. Never stating them as
-        # certain is the Writer prompt's MIXED EVIDENCE rule.
-        lines.append("MIXED EVIDENCE: " + "; ".join(mixed) + ".")
-    if cohort:
-        # Data only (v9 FR-17, NFR-7): the Writer prompt's COHORT rule says how
-        # it may be used; ally-be's compares_learner check fails any card that
-        # compares or ranks the trainee.
-        lines.append("COHORT: given.")
-    if findings:
-        lines.append(_FINDINGS_GIVEN)
-    lines.append("")
-    lines += _json_block("evidence_map", evidence)
-    lines += _json_block("safety_reading", safety)
-    if practice_options:
-        lines += _json_block("practice_options", practice_options)
-    if case_memory:
-        lines += ["CASE MEMORY:", case_memory, ""]
-    if passages:
-        lines += _json_block("guidance", passages)
-    if progress:
-        lines += _json_block("progress", progress)
-    if cohort:
-        lines += _json_block("cohort", cohort)
-    if findings:
-        lines += _json_block("findings", findings)
-    lines += _transcript_block(transcript)
+    prompt = render(
+        WRITER_CODE,
+        system or DEFAULT_WRITER_SYSTEM,
+        {
+            "risk_cue_definition": _definition(risk_cue_definition),
+            "session_language": language,
+            "trainee_level": or_none(learner_level),
+            "organisation_tone": or_none(tone),
+            "learner_distress": (
+                "noted in this session." if safety.get("learner_distress") else NONE
+            ),
+            "checked_rules": "\n".join(checked),
+            "risk_cue_turns": risk_cues_to_cover(safety),
+            # Data only: how to decide a possible cue, and what to do with a
+            # missed feeling, are the Writer prompt's (a possible card is
+            # still dropped in code when the Evaluator does not confirm it).
+            "possible_risk_cue_turns": _turns(possible) if possible else NONE,
+            "missed_feelings_turns": _turns(missed) if missed else NONE,
+            "course_scenario_id": or_none(course),
+            "mixed_evidence": "; ".join(mixed) + "." if mixed else NONE,
+            "case_memory": or_none(case_memory),
+            "evidence_map": block("evidence_map", evidence),
+            "safety_reading": block("safety_reading", safety),
+            "practice_options": (
+                block("practice_options", practice_options)
+                if practice_options
+                else NONE
+            ),
+            "guidance": block("guidance", passages) if passages else NONE,
+            "progress": block("progress", progress) if progress else NONE,
+            # The compares_learner check fails any card that ranks the trainee.
+            "cohort": block("cohort", cohort) if cohort else NONE,
+            "findings": block("findings", findings) if findings else NONE,
+            "transcript": _transcript_text(transcript),
+        },
+        required=WRITER_REQUIRED,
+    )
     output, meta = await _call(
         DebriefCardsReasoned,
-        "\n".join(lines),
+        prompt,
         LLMTask.DEBRIEF_WRITER.value,
         model,
         scenario_session_id,
@@ -892,7 +1041,7 @@ async def evaluate(
     )
     output, meta = await _call(
         EvaluationOutputReasoned,
-        prompt + evaluator_fix_lines(fix_system, pass_score),
+        prompt + "\n\n" + evaluator_fix_text(fix_system, pass_score),
         LLMTask.DEBRIEF_EVALUATOR.value,
         model,
         scenario_session_id,
@@ -929,33 +1078,38 @@ async def revise(
     scenario_session_id: Optional[str] = None,
     findings: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     risk_cue_definition: Optional[str] = None,
+    safety: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[DebriefCards], str]:
     from app.core.llm_usage.tasks import LLMTask
 
-    lines = [system or DEFAULT_REVISER_SYSTEM, ""]
-    lines += definition_block(risk_cue_definition)
-    lines += ["", f"SESSION LANGUAGE: {language}"]
-    lines += _script_line(language)
-    lines += _skill_label_line(language)
+    checked = list(_script_line(language)) + list(_skill_label_line(language))
     # Code-owned: the roleplay a card points to is the learner's own list.
-    lines.append(
+    checked.append(
         "Keep every scenario_id as it is in the draft; if you change a card's "
         "skill, set its scenario_id to null. Keep practise_next.try_next as "
         "it is unless the critique names it."
     )
-    lines.append(_NO_CODES)
-    lines.append("")
-    lines += _json_block("draft", draft)
-    lines += _json_block("critique", critique)
-    if findings:
-        # Code-owned (D3): what the evidence top-up found for this revision.
-        lines.append(_FINDINGS_GIVEN)
-        lines += _json_block("findings", findings)
-    lines += _json_block("evidence_map", evidence)
-    lines += _transcript_block(excerpts)
+    checked.append(_NO_CODES)
+    prompt = render(
+        REVISER_CODE,
+        system or DEFAULT_REVISER_SYSTEM,
+        {
+            "risk_cue_definition": _definition(risk_cue_definition),
+            "session_language": language,
+            "risk_cue_turns": risk_cues_to_cover(safety or {}),
+            "checked_rules": "\n".join(checked),
+            "draft": block("draft", draft),
+            "critique": block("critique", critique),
+            # What the evidence top-up found for this revision (D3).
+            "findings": block("findings", findings) if findings else NONE,
+            "evidence_map": block("evidence_map", evidence),
+            "transcript": _transcript_text(excerpts),
+        },
+        required=REVISER_REQUIRED,
+    )
     output, meta = await _call(
         DebriefCardsReasoned,
-        "\n".join(lines),
+        prompt,
         LLMTask.DEBRIEF_REVISER.value,
         model,
         scenario_session_id,
@@ -988,17 +1142,52 @@ by id.
 TOP-UP. When TOP-UP is given, the first draft fell below the bar. CRITIQUE \
 is what the Evaluator and the checks found. Choose only agents whose \
 findings would help fix it; ALREADY RAN lists agents that may not be chosen \
-again. Choosing none is a good answer when more evidence would not help.\
+again. Choosing none is a good answer when more evidence would not help.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The most agents you may choose, and whether this is the evidence top-up \
+(TOP-UP):
+Choose at most {{max_agents}} agents.
+TOP-UP: {{top_up}}
+
+The SESSION PROFILE, the EVIDENCE SUMMARY and the AVAILABLE AGENTS:
+{{session_profile}}
+{{evidence_summary}}
+{{available_agents}}
+
+On the top-up only, the CRITIQUE and the agents that ALREADY RAN:
+{{critique}}
+{{already_ran}}\
 """
 
 DEFAULT_PROTOCOL_CHECK_SYSTEM = """\
 You check a trainee counsellor's roleplay against their organisation's own \
 protocols. The ORGANISATION PROTOCOLS are the organisation's rules, not \
-general advice. For each protocol the session touched (the client raised what \
-it covers, or a SAFETY READING risk cue falls under it), say whether the \
-trainee followed it: kind "missed" when they did not, "done_well" when they \
-did. Quote the counsellor's words that show it. Set source to \
-protocol:<code>. A protocol the session never touched gives no finding.\
+general advice. For each protocol the session touched (the client raised \
+what it covers, or a SAFETY READING risk cue falls under it), say whether \
+the trainee followed it: kind "missed" when they did not, "done_well" when \
+they did. Quote the counsellor's words that show it. Set source to \
+protocol:<code>. A protocol the session never touched gives no finding.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The language the session was held in:
+SESSION LANGUAGE: {{session_language}}
+
+Format rules the code checks on your answer; follow every one:
+{{findings_rules}}
+
+Turns the planner asked you to look at closely:
+FOCUS: {{focus_turns}}
+
+Your data:
+{{data}}
+
+The transcript, one line per turn, when you are given it:
+{{transcript}}\
 """
 
 DEFAULT_HISTORY_DEEP_SYSTEM = """\
@@ -1008,17 +1197,54 @@ keep being asked to work on, a strength that keeps showing, or a past point \
 this session answers. Name a pattern only when three or more past sessions \
 support it; one session is never a trend. Use kind "progress" for change \
 over time and "missed" for a skill that keeps coming up. Set source to \
-history:<date> of the most recent past session it rests on.\
+history:<date> of the most recent past session it rests on.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The language the session was held in:
+SESSION LANGUAGE: {{session_language}}
+
+Format rules the code checks on your answer; follow every one:
+{{findings_rules}}
+
+Turns the planner asked you to look at closely:
+FOCUS: {{focus_turns}}
+
+Your data:
+{{data}}
+
+The transcript, one line per turn, when you are given it:
+{{transcript}}\
 """
 
 DEFAULT_LANGUAGE_SPECIALIST_SYSTEM = """\
-You read a roleplay in which the counsellor wrote in more than one language or \
-script, or in an Indian language. Find what a debrief writer working in the \
-SESSION LANGUAGE could get wrong: words or phrases whose meaning or warmth \
-depends on the language, code-mixing that was a deliberate choice, and quotes \
-that must be kept in the script they were written in. Use kind "context" for \
-notes to the writer, and "done_well" or "missed" when the language choice \
-itself helped or hurt the client. Quote exactly, in the original script.\
+You read a roleplay in which the counsellor wrote in more than one language \
+or script, or in an Indian language. Find what a debrief writer working in \
+the SESSION LANGUAGE could get wrong: words or phrases whose meaning or \
+warmth depends on the language, code-mixing that was a deliberate choice, \
+and quotes that must be kept in the script they were written in. Use kind \
+"context" for notes to the writer, and "done_well" or "missed" when the \
+language choice itself helped or hurt the client. Quote exactly, in the \
+original script.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The language the session was held in:
+SESSION LANGUAGE: {{session_language}}
+
+Format rules the code checks on your answer; follow every one:
+{{findings_rules}}
+
+Turns the planner asked you to look at closely:
+FOCUS: {{focus_turns}}
+
+Your data:
+{{data}}
+
+The transcript, one line per turn, when you are given it:
+{{transcript}}\
 """
 
 #: Code-owned: the findings contract every prompt-only agent answers in,
@@ -1057,22 +1283,26 @@ async def plan_agents(
     from app.core.debrief.schemas import PlannerOutputReasoned
     from app.core.llm_usage.tasks import LLMTask
 
-    lines = [system or DEFAULT_PLANNER_SYSTEM, ""]
-    lines.append(f"Choose at most {max_agents} agents.")
-    if critique is not None:
-        # Data only (D3): this is the evidence top-up. What it means is the
-        # planner prompt's TOP-UP paragraph; code never offers an agent that ran.
-        lines.append("TOP-UP: given.")
-    lines.append("")
-    lines += _json_block("session_profile", profile)
-    lines += _json_block("evidence_summary", evidence_summary or {})
-    lines += _json_block("available_agents", agents)
-    if critique is not None:
-        lines += _json_block("critique", critique)
-        lines += _json_block("already_ran", already or [])
+    top_up = critique is not None
+    prompt = render(
+        PLANNER_CODE,
+        system or DEFAULT_PLANNER_SYSTEM,
+        {
+            "max_agents": max_agents,
+            # Data only (D3): the evidence top-up. What it means is the planner
+            # prompt's TOP-UP paragraph; code never offers an agent that ran.
+            "top_up": "given" if top_up else NONE,
+            "session_profile": block("session_profile", profile),
+            "evidence_summary": block("evidence_summary", evidence_summary or {}),
+            "available_agents": block("available_agents", agents),
+            "critique": block("critique", critique) if top_up else "",
+            "already_ran": block("already_ran", already or []) if top_up else "",
+        },
+        required=("available_agents", "max_agents"),
+    )
     output, meta = await _call(
         PlannerOutputReasoned,
-        "\n".join(lines),
+        prompt,
         LLMTask.DEBRIEF_PLANNER.value,
         model,
         scenario_session_id,
@@ -1098,22 +1328,35 @@ async def find(
     allow (blocks), and the findings contract (spec A3)."""
     from app.core.debrief.schemas import AgentFindingsReasoned
 
-    lines = [system or default_system, "", f"SESSION LANGUAGE: {language}"]
-    lines += _FINDINGS_RULES
-    if focus_turns:
-        lines.append(
-            "FOCUS: the planner asked for a closer look at turns "
-            + ", ".join(str(t) for t in focus_turns)
-            + "."
-        )
-    lines.append("")
-    for tag, value in blocks.items():
-        if value not in (None, [], {}, ""):
-            lines += _json_block(tag, value)
-    if transcript is not None:
-        lines += _transcript_block(transcript)
+    data = "\n".join(
+        block(tag, value)
+        for tag, value in blocks.items()
+        if value not in (None, [], {}, "")
+    )
+    prompt = render(
+        task,
+        system or default_system,
+        {
+            "session_language": language,
+            "findings_rules": "\n".join(_FINDINGS_RULES),
+            "focus_turns": (
+                "the planner asked for a closer look at turns "
+                + ", ".join(str(t) for t in focus_turns)
+                + "."
+                if focus_turns
+                else NONE
+            ),
+            "data": data or NONE,
+            "transcript": (
+                _transcript_text(transcript) if transcript is not None else NONE
+            ),
+        },
+        # The transcript is required wherever the agent reads it.
+        required=("findings_rules",)
+        + (("transcript",) if transcript is not None else ()),
+    )
     output, meta = await _call(
-        AgentFindingsReasoned, "\n".join(lines), task, model, scenario_session_id
+        AgentFindingsReasoned, prompt, task, model, scenario_session_id
     )
     if output is not None:
         output.findings = output.findings[:MAX_FINDINGS]

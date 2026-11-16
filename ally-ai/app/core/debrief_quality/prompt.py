@@ -75,7 +75,29 @@ supplied with it.
 time without the history to support it.
 
 Judge substance, not polish. A blunt but accurate, specific debrief scores \
-higher than a warm, vague one. Do not reward length.\
+higher than a warm, vague one. Do not reward length.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The risk cue definition (the one definition every Debrief step uses):
+RISK CUE DEFINITION:
+{{risk_cue_definition}}
+
+The session's language and the trainee's level:
+SESSION LANGUAGE: {{session_language}}
+TRAINEE LEVEL: {{trainee_level}}
+
+The whole transcript (AI_CLIENT is the AI, COUNSELLOR the trainee):
+{{transcript}}
+
+Guidance supplied with the debrief, and what the writer was told about the \
+trainee's past sessions:
+{{guidance}}
+{{trainee_history}}
+
+The debrief to score:
+{{debrief}}\
 """
 
 
@@ -90,6 +112,13 @@ DEFAULT_JUDGE_INSTRUCTIONS = (
 )
 
 
+#: The rubric's Skills Store code: the session's data are its `{{...}}`
+#: placeholders (step 5); `{{transcript}}`, `{{debrief}}` and
+#: `{{risk_cue_definition}}` are required.
+RUBRIC_CODE = "debrief_quality_rubric"
+RUBRIC_REQUIRED = ("transcript", "debrief", "risk_cue_definition")
+
+
 def build_judge_prompt(
     transcript: List[TranscriptTurn],
     debrief: str,
@@ -101,41 +130,40 @@ def build_judge_prompt(
     instructions: Optional[str] = None,
     risk_cue_definition: Optional[str] = None,
 ) -> str:
-    """Assemble the debrief-quality prompt for one session's debrief."""
+    """Assemble the debrief-quality prompt for one session's debrief: the
+    rubric with the session filled in, then the closing instructions."""
+    from app.core.debrief.render import NONE, render
     from app.core.debrief.risk_cue_definition import definition_block
 
-    lines = [rubric or DEFAULT_JUDGE_RUBRIC, ""]
-    # The one definition of clear and possible (pinned, Skills Store); the
-    # rubric's risk list and its missed_risk_cue hard fail point to it.
-    lines += definition_block(risk_cue_definition)
-    lines.append("")
-    lines.append(f"SESSION LANGUAGE: {language}")
-    if learner_level:
-        lines.append(f"TRAINEE LEVEL: {learner_level}")
-    lines.append("")
-    lines.append("<transcript>")
+    lines = ["<transcript>"]
     for turn in transcript:
         speaker = "AI_CLIENT" if turn.get("role") == "client" else "COUNSELLOR"
         idx = turn.get("turn_index")
         tag = f"[turn {idx}] " if idx is not None else ""
         lines.append(f"{tag}{speaker}: {turn.get('text', '')}")
     lines.append("</transcript>")
-    lines.append("")
-    if guidance:
-        lines.append("<guidance>")
-        lines.append(guidance)
-        lines.append("</guidance>")
-        lines.append("")
-    if history:
-        # What the writer was told about the trainee's past sessions. A
-        # reference to it is supported; anything beyond it is not.
-        lines.append("<trainee_history>")
-        lines.append(history)
-        lines.append("</trainee_history>")
-        lines.append("")
-    lines.append("<debrief>")
-    lines.append(debrief)
-    lines.append("</debrief>")
-    lines.append("")
-    lines.append((instructions or "").strip() or DEFAULT_JUDGE_INSTRUCTIONS)
-    return "\n".join(lines)
+    body = render(
+        RUBRIC_CODE,
+        rubric or DEFAULT_JUDGE_RUBRIC,
+        {
+            # The rubric's risk list and its missed_risk_cue hard fail point to it.
+            "risk_cue_definition": definition_block(risk_cue_definition)[1],
+            "session_language": language,
+            "trainee_level": learner_level or NONE,
+            "transcript": "\n".join(lines),
+            "guidance": (
+                "\n".join(["<guidance>", guidance, "</guidance>"]) if guidance else NONE
+            ),
+            # What the writer was told about the trainee's past sessions. A
+            # reference to it is supported; anything beyond it is not.
+            "trainee_history": (
+                "\n".join(["<trainee_history>", history, "</trainee_history>"])
+                if history
+                else NONE
+            ),
+            "debrief": "\n".join(["<debrief>", debrief, "</debrief>"]),
+        },
+        required=RUBRIC_REQUIRED,
+    )
+    closing = (instructions or "").strip() or DEFAULT_JUDGE_INSTRUCTIONS
+    return body.rstrip() + "\n\n" + closing

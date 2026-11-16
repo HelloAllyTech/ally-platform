@@ -415,6 +415,8 @@ prompt section that says what to do with each:
 | Progress agent | `<learner_profile>.past_points` (same fields) | `debrief_progress_system` WHAT PEOPLE SAID ABOUT PAST POINTS |
 | Ask Ally | `REPLY LIMIT: 120 words.` (last line) | `debrief_reply_system` LENGTH |
 
+Since step 5 (below) these data lines are filled into the prompts' `{{placeholders}}` rather than appended; `given` markers became the blocks themselves, and an absent value reads `none`.
+
 Code-kept safety lines are unchanged: `RISK CUES TO COVER: turns …` with `drop_possible_important_moment`, the
 no-codes line (`custom_code` check), no turn numbers, the try_next cap (`TRY_NEXT_MAX`), SCRIPT and SKILL LABELS.
 A new blocking card check, `compares_learner`, fails card text that compares the learner with others (a share of
@@ -448,6 +450,24 @@ in `docs/debrief-harness/proposals/2026-11-16-wording-to-prompts.json`.
   advisor or the owner, `clinicalLists` action; audited as `DEBRIEF_SETTINGS_CHANGED`), with a one-minute cache
   and the defaults when unreadable. English applies to every language. Entries are plain words or phrases,
   escaped and matched case-insensitively at word boundaries; the numeric score shapes stay in code.
+
+**Placeholders (step 5, 2026-11-16).** The Debrief prompts that get runtime data carry ally-be's `{{name}}`
+placeholders at the end of their text (the fixed wording first, so the prefix stays cacheable): the Safety
+reader, Analyst, Progress reader, Progress agent, Writer, Reviser, the rubric (Evaluator and judge),
+`debrief_evaluator_fix_system`, the planner, the three registry agents and Ask Ally's reply. Each contract in
+`prompt-contracts.ts` declares every variable; the required ones are `{{transcript}}` wherever the model reads
+it, `{{risk_cue_definition}}` wherever it is injected, `{{risk_cue_turns}}` for the Writer and the Reviser (the
+Reviser now gets it too), `{{safety_reading}}` for the Writer, `{{debrief}}` for the rubric and the reply,
+`{{reply_word_limit}}` for the reply (the template's last line), `{{pass_bar}}`/`{{fix_sections}}` for the fix
+notes. The Skills Store refuses a version missing one (422 `SKILLS_STORE_CONTRACT_VIOLATION`). ally-ai fills them
+with `ally-ai/app/core/debrief/render.py` (one pass, values never re-scanned, literal braces need no escaping; ally-ai's
+`load_and_format` uses `str.format` and cannot read `{{name}}`); ally-be fills the reply with `renderPrompt`. An
+absent value renders as `none` (small values and blocks the prompt names) or empty (the planner's top-up blocks).
+Format and safety lines the code checks are one variable, `{{checked_rules}}` (`{{findings_rules}}` for the
+registry agents). **No backward compatibility:** a live text missing a required variable fails the step with an
+error naming the prompt code and the variable (`PromptVariableMissing` → `StepError` 500; Ask Ally answers
+"try again"); the run's retry and the fallback to today's debrief handle it. The flag answer and the PM
+conversation append no data to their system text and are unchanged.
 
 ## 5. Ask Ally — `POST /api/v1/ask-ally/replies` (ally-ai)
 

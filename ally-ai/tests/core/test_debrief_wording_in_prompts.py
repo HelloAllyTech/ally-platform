@@ -94,10 +94,10 @@ async def test_writer_every_instruction_once(prompts):
             "MISSED FEELINGS: turns 5.",
             "COURSE: this session is part of a course",
             "try_next applies, at most 3 items.",
-            "CASE: this session continues a case.",
+            "Meena worries about exams.",
             "MIXED EVIDENCE: Reflections.",
-            "COHORT: given.",
-            "FINDINGS: given.",
+            "<cohort>",
+            "<findings>",
             "LEARNER DISTRESS: noted",
             "Never write a code such as 478_custom_27",
             # Wording (the prompt)
@@ -149,10 +149,10 @@ async def test_analyst_every_instruction_once(prompts):
     _once(
         prompts[-1],
         [
-            "ROLEPLAY EXPECTATIONS: given.",
+            "<roleplay_expectations>",
             "Never write a code such as 478_custom_27",
             "Write case_memory_update",
-            "LIVE DETECTIONS: given.",
+            "<live_detections>",
             "set detector_agreement",
             "did the counsellor show the helpful ones",
             "never as if it had a definition",
@@ -172,7 +172,7 @@ async def test_reviser_every_instruction_once(prompts):
     _once(
         prompts[-1],
         [
-            "FINDINGS: given.",
+            "<findings>",
             "never compare or rank this trainee",
             "a quote in a finding was checked against the transcript",
             "Never write a code such as 478_custom_27",
@@ -210,35 +210,55 @@ async def test_progress_steps_every_instruction_once(prompts):
 
 @pytest.mark.asyncio
 async def test_no_moved_wording_is_left_in_code(prompts):
-    """With an empty live prompt, only data, format and checked safety lines
-    remain: none of the moved wording."""
-    from app.core.debrief.steps import analyse, read_progress, revise, write
+    """With a live text that is only the placeholders, only data, format and
+    checked safety lines remain: none of the moved wording."""
+    from app.core.debrief import steps
+    from app.core.debrief.render import placeholders
 
-    await write(
+    def bare(default):
+        return " ".join("{{" + n + "}}" for n in placeholders(default))
+
+    await steps.write(
         {"behaviours": [{"skill": "R", "detector_agreement": "disagrees"}]},
         {"risk_cues": [{"turn_index": 5, "strength": "possible"}]},
         "en",
         "m",
         TRANSCRIPT,
-        system=" ",
+        system=bare(steps.DEFAULT_WRITER_SYSTEM),
         practice_options=[
             {"id": 3, "title": "t", "skills": [], "course": "c", "this_roleplay": True}
         ],
         case_memory="m",
         cohort={"x": 1},
         findings={"missed": []},
+        risk_cue_definition="DEF",
     )
-    await analyse(
+    await steps.analyse(
         TRANSCRIPT,
         "en",
         "m",
-        system=" ",
+        system=bare(steps.DEFAULT_ANALYST_SYSTEM),
         helpful_behaviours=["h"],
         live_detections=[{"behaviour": "h"}],
         case_memory="m",
     )
-    await revise({}, [], {}, TRANSCRIPT, "en", "m", system=" ", findings={"a": []})
-    await read_progress({}, [{"point": "x", "learner_note": "n"}], "m", system=" ")
+    await steps.revise(
+        {},
+        [],
+        {},
+        TRANSCRIPT,
+        "en",
+        "m",
+        system=bare(steps.DEFAULT_REVISER_SYSTEM),
+        findings={"a": []},
+        risk_cue_definition="DEF",
+    )
+    await steps.read_progress(
+        {},
+        [{"point": "x", "learner_note": "n"}],
+        "m",
+        system=bare(steps.DEFAULT_PROGRESS_READER_SYSTEM),
+    )
     code_only = "\n".join(prompts).lower()
     for moved in [
         "or might and you cannot tell",
@@ -263,9 +283,14 @@ async def test_a_plain_writer_call_has_none_of_the_conditional_data_lines(prompt
     for line in [
         "POSSIBLE RISK CUES: turns",
         "COURSE: this session",
-        "CASE: this session",
-        "MIXED EVIDENCE: ",
-        "COHORT: given.",
-        "FINDINGS: given.",
+        "<cohort>",
+        "<findings>",
     ]:
         assert line not in prompts[-1]
+    for line in [
+        "POSSIBLE RISK CUES: none",
+        "MISSED FEELINGS: none",
+        "COURSE: none",
+        "MIXED EVIDENCE: none",
+    ]:
+        assert prompts[-1].count(line) == 1

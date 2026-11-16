@@ -28,3 +28,23 @@ HARD FAILS. List every one that applies, with the evidence:
 - unsupported_progress_claim: the debrief claims improvement or decline over time without the history to support it.
 
 Judge substance, not polish. A blunt but accurate, specific debrief scores higher than a warm, vague one. Do not reward length.
+
+THE SESSION. The code fills in everything below; "none" means it does not apply to this session.
+
+The risk cue definition (the one definition every Debrief step uses):
+RISK CUE DEFINITION:
+{{risk_cue_definition}}
+
+The session's language and the trainee's level:
+SESSION LANGUAGE: {{session_language}}
+TRAINEE LEVEL: {{trainee_level}}
+
+The whole transcript (AI_CLIENT is the AI, COUNSELLOR the trainee):
+{{transcript}}
+
+Guidance supplied with the debrief, and what the writer was told about the trainee's past sessions:
+{{guidance}}
+{{trainee_history}}
+
+The debrief to score:
+{{debrief}}

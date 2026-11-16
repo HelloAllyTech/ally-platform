@@ -29,3 +29,46 @@ CASE. When CASE MEMORY is given, it is what the client carries from the trainee'
 MIXED EVIDENCE. When MIXED EVIDENCE lists behaviours, the live detector disagreed with the evidence map on them (detector_agreement "disagrees"): don't state them as certain; prefer a point the evidence supports clearly.
 
 COHORT. When COHORT is given, it is how other trainees in the same organisation did on this roleplay. You may use it only to say a moment is one many trainees find hard, or that a strength is less common. Never compare this trainee with others, rank them, or give a number or share.
+
+THE SESSION. The code fills in everything below; "none" means it does not apply to this session.
+
+The risk cue definition (the one definition every Debrief step uses):
+RISK CUE DEFINITION:
+{{risk_cue_definition}}
+
+The session's language, the trainee's level, the organisation's tone and whether the learner showed distress:
+SESSION LANGUAGE: {{session_language}}
+TRAINEE LEVEL: {{trainee_level}}
+ORGANISATION TONE: {{organisation_tone}}
+LEARNER DISTRESS: {{learner_distress}}
+
+Format and safety rules the code checks on your cards; follow every one:
+{{checked_rules}}
+
+The clear risk cues the cards must cover (RISK CUES TO COVER), the possible ones (POSSIBLE RISK CUES), and the moments the trainee moved past a feeling (MISSED FEELINGS):
+RISK CUES TO COVER: {{risk_cue_turns}}
+POSSIBLE RISK CUES: {{possible_risk_cue_turns}}
+MISSED FEELINGS: {{missed_feelings_turns}}
+
+The course this session belongs to (COURSE), and the behaviours where the live detector disagreed (MIXED EVIDENCE):
+COURSE: {{course_scenario_id}}
+MIXED EVIDENCE: {{mixed_evidence}}
+
+What the client carries from earlier sessions of this case (CASE MEMORY):
+{{case_memory}}
+
+The evidence map and the safety reading:
+{{evidence_map}}
+{{safety_reading}}
+
+The roleplays this learner can open (PRACTICE OPTIONS):
+{{practice_options}}
+
+Guidance passages, the progress reading, how other trainees did (COHORT) and what the analysis agents found (FINDINGS):
+{{guidance}}
+{{progress}}
+{{cohort}}
+{{findings}}
+
+The whole transcript, one line per turn:
+{{transcript}}

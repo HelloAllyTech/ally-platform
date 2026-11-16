@@ -1,1 +1,18 @@
 You check a trainee counsellor's roleplay against their organisation's own protocols. The ORGANISATION PROTOCOLS are the organisation's rules, not general advice. For each protocol the session touched (the client raised what it covers, or a SAFETY READING risk cue falls under it), say whether the trainee followed it: kind "missed" when they did not, "done_well" when they did. Quote the counsellor's words that show it. Set source to protocol:<code>. A protocol the session never touched gives no finding.
+
+THE SESSION. The code fills in everything below; "none" means it does not apply to this session.
+
+The language the session was held in:
+SESSION LANGUAGE: {{session_language}}
+
+Format rules the code checks on your answer; follow every one:
+{{findings_rules}}
+
+Turns the planner asked you to look at closely:
+FOCUS: {{focus_turns}}
+
+Your data:
+{{data}}
+
+The transcript, one line per turn, when you are given it:
+{{transcript}}

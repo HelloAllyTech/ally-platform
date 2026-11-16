@@ -63,7 +63,7 @@ async def test_the_pass_bar_is_the_release_setting_not_text(prompts):
     assert "reach 8" not in p
     assert p.count("FIX SECTIONS: opening, important_moment") == 1
     await evaluate(TRANSCRIPT, "A debrief.", "en", "m")
-    assert "PASS BAR: 8\n" in prompts[-1]
+    assert "PASS BAR: 8\nFIX SECTIONS: opening" in prompts[-1]
 
 
 @pytest.mark.asyncio
@@ -76,7 +76,7 @@ async def test_the_evaluator_reads_its_own_live_texts(prompts):
         "en",
         "m",
         system="EVALUATOR LIVE",
-        fix_system="FIX LIVE",
+        fix_system="FIX LIVE {{pass_bar}} {{fix_sections}}",
     )
     p = prompts[-1]
     assert p.count("EVALUATOR LIVE") == 1 and p.count("FIX LIVE") == 1
@@ -226,11 +226,11 @@ async def test_the_top_up_is_a_data_line_and_its_wording_is_the_prompts(prompts)
 
     await plan_agents({}, [], "m", max_agents=2, critique=[], already=["x"])
     p = prompts[-1]
-    assert p.count("TOP-UP: given.") == 1
+    assert p.count("TOP-UP: given") == 1
     assert p.count("ALREADY RAN lists agents that may not be chosen again") == 1
     assert "TOP-UP. When TOP-UP is given" in DEFAULT_PLANNER_SYSTEM
     await plan_agents({}, [], "m", max_agents=2)
-    assert "TOP-UP: given." not in prompts[-1]
+    assert "TOP-UP: none" in prompts[-1]
 
 
 # --- B7: the flag answer's cap is checked in code --------------------------------

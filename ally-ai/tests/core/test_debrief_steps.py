@@ -285,7 +285,7 @@ async def test_writer_must_cover_a_clear_cue_and_decides_a_possible_one(
         "gemini-3-flash-preview",
         TRANSCRIPT,
     )
-    assert "RISK CUES TO COVER" not in calls["prompt"]
+    assert "RISK CUES TO COVER: none" in calls["prompt"]
     assert "POSSIBLE RISK CUES: turns 5." in calls["prompt"]
 
 
@@ -375,14 +375,13 @@ async def test_writer_respects_case_memory_and_never_regrades(dispatch_returns):
         case_memory="Meena told you about her exams last time.",
         assessment=True,
     )
-    assert "CASE MEMORY:\nMeena told you about her exams last time." in calls["prompt"]
+    assert calls["prompt"].count("Meena told you about her exams last time.") == 1
     assert "Never contradict it" in calls["prompt"]
     assert "Never mention, imply or argue with a grade" in calls["prompt"]
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
-    assert "CASE MEMORY:" not in calls["prompt"]
-    assert "CASE: this session continues a case." not in calls["prompt"]
+    assert "(CASE MEMORY):\nnone" in calls["prompt"]
     assert "ASSESSMENT" not in calls["prompt"]
 
 
@@ -463,12 +462,12 @@ async def test_analyst_reads_the_live_detector_as_a_second_opinion(dispatch_retu
         live_detections=[{"behaviour": "Explores risk", "detected": False, "times": 0}],
     )
     prompt = calls["prompt"]
-    assert "LIVE DETECTIONS: given." in prompt and "It can be wrong" in prompt
+    assert "set detector_agreement" in prompt and "It can be wrong" in prompt
     assert '"behaviour": "Explores risk"' in prompt
 
     calls = dispatch_returns(EvidenceMap())
     await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
-    assert "LIVE DETECTIONS: given." not in calls["prompt"]
+    assert "set detector_agreement" not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -482,12 +481,12 @@ async def test_writer_may_use_the_cohort_only_to_normalise(dispatch_returns):
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT, cohort=cohort)
     prompt = calls["prompt"]
-    assert "COHORT: given." in prompt and "Never compare this trainee" in prompt
+    assert prompt.count("<cohort>") == 1 and "Never compare this trainee" in prompt
     assert "few trainees show this" in prompt
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
-    assert "COHORT: given." not in calls["prompt"]
+    assert "<cohort>" not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -544,12 +543,12 @@ async def test_analyst_rates_client_turns_and_updates_case_memory(dispatch_retur
     assert [(e.turn_index, e.level) for e in out.emotional_movement] == [(2, -3)]
     assert out.case_memory_update == "She is still anxious about exams."
     prompt = calls["prompt"]
-    assert "EMOTIONAL MOVEMENT" in prompt and "CASE MEMORY:" in prompt
+    assert "EMOTIONAL MOVEMENT" in prompt and prompt.count("Exams worry her.") == 1
 
     calls = dispatch_returns(EvidenceMap(case_memory_update="invented"))
     out, _ = await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
     assert out.case_memory_update is None
-    assert "CASE MEMORY:" not in calls["prompt"]
+    assert "Exams worry her." not in calls["prompt"]
 
 
 @pytest.mark.asyncio

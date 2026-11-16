@@ -1304,7 +1304,15 @@ export const FEEDBACK_GROUNDEDNESS_RUBRIC = definePrompt(
 /** src/prompts/debrief_quality/rubric.txt */
 export const DEBRIEF_QUALITY_RUBRIC = definePrompt(
   'debrief_quality_rubric',
-  {},
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    trainee_level: 'optional',
+    transcript: 'required',
+    guidance: 'optional',
+    trainee_history: 'optional',
+    debrief: 'required',
+  },
   {
     name: 'Debrief Quality Judge Rubric',
     description:
@@ -1330,7 +1338,11 @@ export const DEBRIEF_QUALITY_JUDGE_SYSTEM = definePrompt(
 /** src/prompts/debrief/safety_reader_system.txt */
 export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
   'debrief_safety_reader_system',
-  {},
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief Safety Reader',
     description:
@@ -1367,7 +1379,10 @@ export const DEBRIEF_EVALUATOR_SYSTEM = definePrompt(
 /** src/prompts/debrief/evaluator_fix_system.txt */
 export const DEBRIEF_EVALUATOR_FIX_SYSTEM = definePrompt(
   'debrief_evaluator_fix_system',
-  {},
+  {
+    pass_bar: 'required',
+    fix_sections: 'required',
+  },
   {
     name: "Debrief Evaluator's fix notes",
     description:
@@ -1451,7 +1466,17 @@ export const DEBRIEF_PM_SKILL_REGISTRY_AGENT = definePrompt(
 /** src/prompts/debrief/analyst_system.txt */
 export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
   'debrief_analyst_system',
-  {},
+  {
+    session_language: 'optional',
+    trainee_level: 'optional',
+    checked_rules: 'optional',
+    scenario: 'optional',
+    expected_behaviours: 'optional',
+    roleplay_expectations: 'optional',
+    live_detections: 'optional',
+    case_memory: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief Analyst',
     description:
@@ -1464,7 +1489,10 @@ export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
 /** src/prompts/debrief/progress_reader_system.txt */
 export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
   'debrief_progress_reader_system',
-  {},
+  {
+    evidence_map: 'required',
+    past_points: 'optional',
+  },
   {
     name: 'Debrief Progress Reader',
     description:
@@ -1477,7 +1505,15 @@ export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
 /** src/prompts/debrief/progress_system.txt */
 export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
   'debrief_progress_system',
-  {},
+  {
+    session_language: 'optional',
+    card_due: 'optional',
+    skill_keys: 'optional',
+    checked_rules: 'optional',
+    this_session_evidence: 'required',
+    this_session_by_skill: 'optional',
+    learner_profile: 'required',
+  },
   {
     name: 'Debrief Progress Agent',
     description:
@@ -1490,7 +1526,28 @@ export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
 /** src/prompts/debrief/writer_system.txt */
 export const DEBRIEF_WRITER_SYSTEM = definePrompt(
   'debrief_writer_system',
-  {},
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    trainee_level: 'optional',
+    organisation_tone: 'optional',
+    learner_distress: 'optional',
+    checked_rules: 'optional',
+    risk_cue_turns: 'required',
+    possible_risk_cue_turns: 'optional',
+    missed_feelings_turns: 'optional',
+    course_scenario_id: 'optional',
+    mixed_evidence: 'optional',
+    case_memory: 'optional',
+    evidence_map: 'optional',
+    safety_reading: 'required',
+    practice_options: 'optional',
+    guidance: 'optional',
+    progress: 'optional',
+    cohort: 'optional',
+    findings: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief Writer',
     description:
@@ -1503,7 +1560,17 @@ export const DEBRIEF_WRITER_SYSTEM = definePrompt(
 /** src/prompts/debrief/reviser_system.txt */
 export const DEBRIEF_REVISER_SYSTEM = definePrompt(
   'debrief_reviser_system',
-  {},
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    risk_cue_turns: 'required',
+    checked_rules: 'optional',
+    draft: 'optional',
+    critique: 'optional',
+    findings: 'optional',
+    evidence_map: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief Reviser',
     description:
@@ -1516,7 +1583,15 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
 /** src/prompts/debrief/planner_system.txt */
 export const DEBRIEF_PLANNER_SYSTEM = definePrompt(
   'debrief_planner_system',
-  {},
+  {
+    max_agents: 'required',
+    top_up: 'optional',
+    session_profile: 'optional',
+    evidence_summary: 'optional',
+    available_agents: 'required',
+    critique: 'optional',
+    already_ran: 'optional',
+  },
   {
     name: 'Debrief planner',
     description:
@@ -1529,7 +1604,13 @@ export const DEBRIEF_PLANNER_SYSTEM = definePrompt(
 /** src/prompts/debrief/protocol_check_system.txt */
 export const DEBRIEF_PROTOCOL_CHECK_SYSTEM = definePrompt(
   'debrief_protocol_check_system',
-  {},
+  {
+    session_language: 'optional',
+    findings_rules: 'required',
+    focus_turns: 'optional',
+    data: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief protocol check',
     description:
@@ -1542,7 +1623,13 @@ export const DEBRIEF_PROTOCOL_CHECK_SYSTEM = definePrompt(
 /** src/prompts/debrief/history_deep_system.txt */
 export const DEBRIEF_HISTORY_DEEP_SYSTEM = definePrompt(
   'debrief_history_deep_system',
-  {},
+  {
+    session_language: 'optional',
+    findings_rules: 'required',
+    focus_turns: 'optional',
+    data: 'optional',
+    transcript: 'optional',
+  },
   {
     name: 'Debrief history (deep)',
     description:
@@ -1555,7 +1642,13 @@ export const DEBRIEF_HISTORY_DEEP_SYSTEM = definePrompt(
 /** src/prompts/debrief/language_specialist_system.txt */
 export const DEBRIEF_LANGUAGE_SPECIALIST_SYSTEM = definePrompt(
   'debrief_language_specialist_system',
-  {},
+  {
+    session_language: 'optional',
+    findings_rules: 'required',
+    focus_turns: 'optional',
+    data: 'optional',
+    transcript: 'required',
+  },
   {
     name: 'Debrief language specialist',
     description:
@@ -1568,7 +1661,13 @@ export const DEBRIEF_LANGUAGE_SPECIALIST_SYSTEM = definePrompt(
 /** src/prompts/debrief/reply_system.txt */
 export const DEBRIEF_REPLY_SYSTEM = definePrompt(
   'debrief_reply_system',
-  {},
+  {
+    session_language: 'optional',
+    debrief: 'required',
+    transcript: 'required',
+    organisation: 'optional',
+    reply_word_limit: 'required',
+  },
   {
     name: 'Ask Ally (debrief reply)',
     description:

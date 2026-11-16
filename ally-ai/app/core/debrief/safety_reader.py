@@ -25,6 +25,7 @@ from typing import List, Literal, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.core.debrief.render import render
 from app.core.debrief.risk_cue_definition import definition_block
 from app.utils.logger import get_logger
 
@@ -116,8 +117,25 @@ for me", "I've felt like this too and it's hard to hear"). Do not count the \
 counsellor quoting or reflecting the client's words.
 
 Quote exactly as written in the transcript. Return empty lists when there is \
-nothing to report.\
+nothing to report.
+
+THE SESSION. The code fills in everything below; "none" means it does not \
+apply to this session.
+
+The risk cue definition (the one definition every Debrief step uses):
+RISK CUE DEFINITION:
+{{risk_cue_definition}}
+
+The language the session was held in:
+SESSION LANGUAGE: {{session_language}}
+
+The whole transcript, one line per turn:
+{{transcript}}\
 """
+
+
+#: Its Skills Store code; `{{transcript}}` and `{{risk_cue_definition}}` are required.
+SAFETY_READER_CODE = "debrief_safety_reader_system"
 
 
 def build_prompt(
@@ -126,18 +144,22 @@ def build_prompt(
     system: Optional[str] = None,
     risk_cue_definition: Optional[str] = None,
 ) -> str:
-    lines = [system or DEFAULT_SAFETY_READER_SYSTEM, ""]
-    # The one definition of clear and possible (pinned, Skills Store).
-    lines += definition_block(risk_cue_definition)
-    lines.append("")
-    lines.append(f"SESSION LANGUAGE: {language}")
-    lines.append("")
-    lines.append("<transcript>")
+    lines = ["<transcript>"]
     for t in transcript:
         speaker = "CLIENT" if t.role == "client" else "COUNSELLOR"
         lines.append(f"[turn {t.turn_index}] {speaker}: {t.text}")
     lines.append("</transcript>")
-    return "\n".join(lines)
+    return render(
+        SAFETY_READER_CODE,
+        system or DEFAULT_SAFETY_READER_SYSTEM,
+        {
+            # The one definition of clear and possible (pinned, Skills Store).
+            "risk_cue_definition": definition_block(risk_cue_definition)[1],
+            "session_language": language,
+            "transcript": "\n".join(lines),
+        },
+        required=("transcript", "risk_cue_definition"),
+    )
 
 
 async def read_safety(

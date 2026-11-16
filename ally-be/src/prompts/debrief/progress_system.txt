@@ -36,3 +36,22 @@ LEARNER LINES (learner_line on each skill and on the focus)
 - No scores, levels, numbers, counts, percentages or ratings, and no turn numbers.
 - Never diagnose or label the trainee. For worth_another_look, be kind and point to what to try, never frame it as failure.
 - Leave the learner line empty for too_early.
+
+THE SESSION. The code fills in everything below; "none" means it does not apply to this session.
+
+The language the session was held in:
+SESSION LANGUAGE: {{session_language}}
+
+Whether a progress card is due (yes or no):
+CARD DUE: {{card_due}}
+
+The skill keys you may trend:
+SKILL KEYS: {{skill_keys}}
+
+Format rules the code checks on your answer; follow every one:
+{{checked_rules}}
+
+This session's observations, the same by skill key, and the learner's progress profile:
+{{this_session_evidence}}
+{{this_session_by_skill}}
+{{learner_profile}}

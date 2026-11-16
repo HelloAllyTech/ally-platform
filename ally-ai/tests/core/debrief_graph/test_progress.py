@@ -496,7 +496,7 @@ async def test_the_agent_reads_the_profile_never_the_transcript(monkeypatch):
     )
     assert ran == "m" and len(out.skills) == 3
     prompt = calls["prompt"]
-    assert prompt.startswith(DEFAULT_PROGRESS_SYSTEM)
+    assert prompt.startswith(DEFAULT_PROGRESS_SYSTEM.split("{{")[0])
     assert "CARD DUE: yes" in prompt
     assert "Devanagari" in prompt
     assert "empathy = Empathy, warmth and genuineness" in prompt

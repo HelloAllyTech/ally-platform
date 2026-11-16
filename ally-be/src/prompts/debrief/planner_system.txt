@@ -5,3 +5,18 @@ The EVIDENCE SUMMARY is the Analyst's own account of the session: its pivotal mo
 Choose few: each agent costs time and money, and the learner is waiting. Read each agent's use_when and skip_when. Choose only from AVAILABLE AGENTS, by id.
 
 TOP-UP. When TOP-UP is given, the first draft fell below the bar. CRITIQUE is what the Evaluator and the checks found. Choose only agents whose findings would help fix it; ALREADY RAN lists agents that may not be chosen again. Choosing none is a good answer when more evidence would not help.
+
+THE SESSION. The code fills in everything below; "none" means it does not apply to this session.
+
+The most agents you may choose, and whether this is the evidence top-up (TOP-UP):
+Choose at most {{max_agents}} agents.
+TOP-UP: {{top_up}}
+
+The SESSION PROFILE, the EVIDENCE SUMMARY and the AVAILABLE AGENTS:
+{{session_profile}}
+{{evidence_summary}}
+{{available_agents}}
+
+On the top-up only, the CRITIQUE and the agents that ALREADY RAN:
+{{critique}}
+{{already_ran}}
