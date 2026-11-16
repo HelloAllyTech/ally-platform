@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useForm } from "react-hook-form";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
@@ -70,17 +71,58 @@ export function useUserManagement(
     { skip: !canListUsers },
   );
   const tenants: Tenant[] = allTenantsPage?.data?.length ? allTenantsPage.data : pagedTenants;
-  const [search, setSearch] = useState<string>("");
+  // Search and filters live in the URL (?q, ?org, ?role, ?status) so a refresh, the back button or
+  // a link to a colleague lands on the same list. replace: typing must not fill the history.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const search = urlParams.get("q") ?? "";
+  const setSearch = useCallback(
+    (value: string) =>
+      setUrlParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          if (value) next.set("q", value);
+          else next.delete("q");
+          return next;
+        },
+        { replace: true },
+      ),
+    [setUrlParams],
+  );
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [addUsermodalOpen, setAddUserModalOpen] = useState<boolean>(false);
   const [bulkAddModalOpen, setBulkAddModalOpen] = useState<boolean>(false);
 
-  const [filters, setFilters] = useState<FilterValues>({
-    organizations: [],
-    roles: [],
-    statuses: [],
-  });
-  const [tenantIdFilters, setTenantIdFilters] = useState<string[]>([]);
+  const orgParam = urlParams.getAll("org");
+  const roleParam = urlParams.getAll("role");
+  const statusParam = urlParams.getAll("status");
+  const filters = useMemo<FilterValues>(
+    () => ({ organizations: orgParam, roles: roleParam, statuses: statusParam }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orgParam.join("\u0001"), roleParam.join("\u0001"), statusParam.join("\u0001")],
+  );
+  const setFilters = useCallback(
+    (update: FilterValues | ((prev: FilterValues) => FilterValues)) =>
+      setUrlParams(
+        prev => {
+          const current: FilterValues = {
+            organizations: prev.getAll("org"),
+            roles: prev.getAll("role"),
+            statuses: prev.getAll("status"),
+          };
+          const value = typeof update === "function" ? update(current) : update;
+          const next = new URLSearchParams(prev);
+          next.delete("org");
+          next.delete("role");
+          next.delete("status");
+          value.organizations.forEach(v => next.append("org", v));
+          value.roles.forEach(v => next.append("role", v));
+          value.statuses.forEach(v => next.append("status", v));
+          return next;
+        },
+        { replace: true },
+      ),
+    [setUrlParams],
+  );
 
   const [users, setUsers] = useState<UserListUser[]>([]);
   const [usersCount, setUsersCount] = useState<number>(0);
@@ -134,6 +176,14 @@ export function useUserManagement(
   // No opt-in: a viewer who is allowed to see platform accounts sees them in
   // the list like any other account.
   const includePlatformAdmins = canListPlatformAdmins;
+  // Filter by id. Two organisations can share a name, so every match counts.
+  const tenantIdFilters = useMemo(
+    () =>
+      filters.organizations.flatMap(name =>
+        tenants.filter(tenant => tenant.name === name).map(tenant => tenant.id),
+      ),
+    [filters.organizations, tenants],
+  );
   const userParams = {
     limit: USERS_PAGE_SIZE,
     offset: usersOffset,
@@ -208,7 +258,6 @@ export function useUserManagement(
         allValue: filters.organizations,
         onClear: () => {
           setFilters(previousFilters => ({ ...previousFilters, organizations: [] }));
-          setTenantIdFilters([]);
         },
       });
     }
@@ -233,11 +282,6 @@ export function useUserManagement(
 
   const handleApplyFilters = (newFilters: FilterValues) => {
     setFilters(newFilters);
-    // Filter by id. Two organisations can share a name, so every match counts.
-    const organizationIds = newFilters.organizations.flatMap(name =>
-      tenants.filter(tenant => tenant.name === name).map(tenant => tenant.id),
-    );
-    setTenantIdFilters(organizationIds);
   };
 
   const getField = (userData: FieldProps[]) => {

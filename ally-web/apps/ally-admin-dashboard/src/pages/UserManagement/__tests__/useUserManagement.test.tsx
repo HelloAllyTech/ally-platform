@@ -5,6 +5,20 @@ import { UserRole } from "@constants";
 
 import { useUserManagement } from "../useUserManagement";
 
+// Search/filters are URL-backed; a plain stateful stand-in keeps these hook tests router-free.
+vi.mock("react-router-dom", async importOriginal => {
+  const React = await import("react");
+  return {
+    ...(await importOriginal<Record<string, unknown>>()),
+    useSearchParams: () => {
+      const [params, setParams] = React.useState(new URLSearchParams());
+      const set = (next: any) =>
+        setParams(prev => (typeof next === "function" ? next(prev) : new URLSearchParams(next)));
+      return [params, set];
+    },
+  };
+});
+
 const changeRole = vi.fn();
 const getUsersQuery = vi.fn();
 const USERS_RESULT = { data: { data: [], count: 0 }, isFetching: false };
@@ -57,6 +71,24 @@ const staffAccount = {
 } as any;
 
 describe("useUserManagement", () => {
+  it("keeps search and filters in the URL state and filters by organisation id", () => {
+    const tenants = [
+      { id: "t1", name: "Acme" },
+      { id: "t2", name: "Acme" },
+      { id: "t3", name: "Zed" },
+    ] as any;
+    const { result } = renderHook(() => useUserManagement(tenants));
+    act(() => result.current.setSearch("asha"));
+    expect(result.current.search).toBe("asha");
+    act(() =>
+      result.current.handleApplyFilters({ organizations: ["Acme"], roles: [], statuses: [] }),
+    );
+    expect(result.current.filters.organizations).toEqual(["Acme"]);
+    expect(getUsersQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: "asha", tenantIds: ["t1", "t2"] }),
+    );
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     changeRole.mockReturnValue({ unwrap: () => Promise.resolve({ success: true }) });
