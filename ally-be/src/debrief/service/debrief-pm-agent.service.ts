@@ -1761,10 +1761,11 @@ export class DebriefPmAgentService
     const next: DebriefBundle = JSON.parse(JSON.stringify(bundle));
     let releaseId: string | null = null;
     let releaseVersion: number | null = null;
-    if (!(code in next.prompts)) {
-      // A pinned rule read from the Skills Store's current version (the risk
-      // cue definition, the Evaluator's and the PM reviewer's instructions)
-      // goes live by promoting the signed-off version there.
+    // The signed-off version becomes the Skills Store's current version for
+    // every reader: the runner (for rules outside the release), the
+    // independent judge (which reads the store's rubric and definition) and
+    // the PM agent. A release pins it too when the rule is in the bundle.
+    {
       const [{ currentVersion }] = await this.dataSource.query(
         `SELECT "currentVersion" FROM prompts WHERE id = $1`,
         [prompt.id],

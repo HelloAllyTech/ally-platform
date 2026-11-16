@@ -357,7 +357,8 @@ describe('pinned rules: proposals', () => {
   });
 
   it('the proposer may approve their own proposal: a new version, live for everyone at once and watched', async () => {
-    const { svc, lessons, createVersion, createDraft, makeGa } = build();
+    const { svc, lessons, createVersion, createDraft, makeGa, promote } =
+      build();
     const { id } = await propose(svc, ADVISOR);
     const res = await svc.approvePinnedRule(id, ADVISOR);
     expect(createVersion).toHaveBeenCalledWith(
@@ -369,6 +370,13 @@ describe('pinned rules: proposals', () => {
     );
     expect(createDraft).toHaveBeenCalled();
     expect(res.releaseId).toBe('rel-draft');
+    // Every reader (the judge reads the store) sees the signed-off version.
+    expect(promote).toHaveBeenCalledWith(
+      `prompt-${SAFETY}`,
+      2,
+      1,
+      expect.objectContaining({ signedOffPinnedRule: true }),
+    );
     // The sign-off is the gate: no learner try-out at this volume (2026-11-16).
     expect(makeGa).toHaveBeenCalledWith(
       'rel-draft',
