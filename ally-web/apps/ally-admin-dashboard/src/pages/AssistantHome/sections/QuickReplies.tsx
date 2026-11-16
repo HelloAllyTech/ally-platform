@@ -1,6 +1,7 @@
 import React, { useId, useState } from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 import type { HomeQuickReply } from "@types";
 
 import { HOME, fill } from "../copy";
@@ -78,10 +79,10 @@ const ReplyForm: React.FC<{
         />
       </div>
       <div className="ally-btn-row">
-        <Button type="submit" disabled={disabled || !ready}>
+        <Button variant={ButtonVariant.TERTIARY} type="submit" disabled={disabled || !ready}>
           {t.save}
         </Button>
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant={ButtonVariant.TEXT} type="button" onClick={onCancel}>
           {t.cancel}
         </Button>
       </div>
@@ -139,13 +140,19 @@ export const QuickReplies: React.FC<{ botId: string; canEdit: boolean }> = ({ bo
               canEdit &&
               editing !== reply.id && (
                 <>
-                  <Button className="ally-btn--sm" onClick={() => setEditing(reply.id)}>
+                  <Button
+                    variant={ButtonVariant.TERTIARY}
+                    size="sm"
+                    type="button"
+                    onClick={() => setEditing(reply.id)}
+                  >
                     {t.reword}
                   </Button>
                   {reply.state !== "own" && !reply.required && (
                     <Button
-                      variant="ghost"
-                      className="ally-btn--sm"
+                      variant={ButtonVariant.TEXT}
+                      size="sm"
+                      type="button"
                       disabled={list.saving}
                       onClick={() =>
                         void list.change(
@@ -209,7 +216,13 @@ export const QuickReplies: React.FC<{ botId: string; canEdit: boolean }> = ({ bo
           />
         ) : (
           <div>
-            <Button onClick={() => setEditing("new")}>{t.add}</Button>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              onClick={() => setEditing("new")}
+            >
+              {t.add}
+            </Button>
           </div>
         ))}
       <ListError error={list.error} />

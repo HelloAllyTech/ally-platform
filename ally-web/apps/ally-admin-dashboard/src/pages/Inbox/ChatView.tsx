@@ -8,7 +8,8 @@ import {
   useAddCheckupCaseMutation,
 } from "@api";
 import type { InboxThread } from "@api";
-import { Button, PrimaryButton } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { channelLabel, fill, INBOX } from "./copy";
 import { CheckupCaseEditor } from "../AssistantHome/sections/CheckupCaseEditor";
@@ -119,7 +120,9 @@ export const ChatView: React.FC<{
           {/* On the name's line, right-aligned (chunk 20d-2). */}
           {!thread.heldBy ? (
             <Button
-              className="ally-btn--sm"
+              variant={ButtonVariant.TERTIARY}
+              size="sm"
+              type="button"
               disabled={taking.isLoading}
               onClick={() => void run(() => takeOver({ chatbotId, id }).unwrap())}
             >
@@ -127,7 +130,9 @@ export const ChatView: React.FC<{
             </Button>
           ) : (
             <Button
-              className="ally-btn--sm"
+              variant={ButtonVariant.TERTIARY}
+              size="sm"
+              type="button"
               disabled={handing.isLoading}
               onClick={() => void run(() => handBack({ chatbotId, id }).unwrap())}
             >
@@ -284,12 +289,13 @@ export const ChatView: React.FC<{
             disabled={windowClosed}
             onChange={event => setText(event.target.value)}
           />
-          <PrimaryButton
+          <Button
+            variant={ButtonVariant.PRIMARY}
             type="submit"
             disabled={!text.trim() || replying.isLoading || windowClosed}
           >
             {INBOX.send}
-          </PrimaryButton>
+          </Button>
         </form>
       )}
     </section>

@@ -40,7 +40,7 @@
   border-color: color-mix(in srgb, var(--ally-danger) 40%, var(--ally-line-strong));
 }
 
-/* Inputs: the UI font, never the dashboard's serif (digits included). */
+/* Inputs: the screen's UI font token (Plex Serif here, like the dashboard), digits included. */
 :where(.ally-home, .ally-inbox, .ally-list-page) :is(.ally-input, input, select, textarea) {
   font-family: var(--ally-font-ui);
 }

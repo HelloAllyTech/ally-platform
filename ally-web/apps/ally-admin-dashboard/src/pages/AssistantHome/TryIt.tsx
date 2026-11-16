@@ -1,7 +1,9 @@
 import React, { useMemo, useRef, useState } from "react";
 
 import { useGetAssistantHomeQuery, useGetBotImagesQuery, useTestChatbotMutation } from "@api";
-import { Button, PhonePreview } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { PhonePreview } from "@components/v2";
 import { ChatbotTestStreamUnavailable, useChatbotTestStream } from "@hooks/useChatbotTestStream";
 import type { BotPageView, Chatbot, TestChatbotResponse } from "@types";
 
@@ -223,6 +225,8 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
         <div className="ally-btn-row">
           {messages.length > 0 && (
             <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
               onClick={() => {
                 stream.cancel();
                 setMessages([]);
@@ -233,7 +237,9 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
               {HOME.tryPanel.newChat}
             </Button>
           )}
-          <Button onClick={onClose}>{HOME.tryPanel.close}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+            {HOME.tryPanel.close}
+          </Button>
         </div>
       </div>
       {preview && (
