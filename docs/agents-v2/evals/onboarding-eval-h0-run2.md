@@ -1,4 +1,4 @@
-> H0 run 2, 13 Nov 2026 (local stack): 9 of 13, an open fail. gp-clinic, diagnostic-lab, pharmacy and coaching are held at publish by `safety_recheck`; the fix is a safety-pack chunk. Pharmacy predates 15a's "painkiller" fix. See `../CHUNK-H0-NOTES.md`.
+> H0 run 2, 13 Nov 2026 (local stack): 9 of 13, an open fail. gp-clinic, diagnostic-lab, pharmacy and coaching are held at publish by `safety_recheck`; the fix is a safety-pack chunk. Pharmacy predates 15a's "painkiller" fix. See [CHUNK-H0-NOTES.md](../CHUNK-H0-NOTES.md).
 
 # Onboarding eval
 

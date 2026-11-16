@@ -1,4 +1,4 @@
-> H0 run 1, 13 Nov 2026 (local stack): purposes read, but the old booking pattern counted "Keep your steps in order" as taking orders, so every live case failed on it. Kept for the judge notes on the held health cases. See `../CHUNK-H0-NOTES.md`.
+> H0 run 1, 13 Nov 2026 (local stack): purposes read, but the old booking pattern counted "Keep your steps in order" as taking orders, so every live case failed on it. Kept for the judge notes on the held health cases. See [CHUNK-H0-NOTES.md](../CHUNK-H0-NOTES.md).
 
 # Onboarding eval
 
