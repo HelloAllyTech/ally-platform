@@ -33,6 +33,8 @@ stored result.
   "bundle": { "recipes": { ... }, "settings": { ... }, "reply": { ... } },   // DebriefBundle, settings already merged with run overrides
   "prompts": { "<prompt code>": "<live text>" },                            // every prompt the bundle names, overrides applied
   "ceiling_usd": 0.5,
+  "allow_over_ceiling": true,                                               // live runs only: the minimum path may pass the ceiling (see "The learner always gets a debrief")
+  "attempt": 0,                                                             // a retry from the start: n > 0 runs on thread `<run_id>:retry<n>`
   "prices": { "<model>": { "input_per_m": 0.3, "output_per_m": 2.5 } },      // for every model the bundle names; unpriced = cannot run
   "session": {                                                              // DebriefSessionContext as ally-be loads it today
     "tenant_id": "...", "language": "en-IN", "language_source": "recorded | null", "language_recorded": true,
@@ -44,7 +46,7 @@ stored result.
     "past_work_on_this": [ ... ],    // progress reader input
     "cohort": { ... } | null,
     "case_memory": { ... } | null,
-    "practice_options": [ { "id": 41, "title": "...", "skills": [...] } ]
+    "practice_options": [ { "id": 41, "title": "...", "skills": [...], "course": "Basics", "this_roleplay": true } ]   // course/this_roleplay only for a session played inside a course
   },
   "run_token": "<JWT signed by ally-be>",
   "gateway_url": "https://<ally-be>/api/v1/internal/debrief"
@@ -242,6 +244,58 @@ Recorded by the ally-be build (2026-11-10).
     checkpoint in memory and lose resume across restarts.
 23. **Rule checks stay in ally-be** (`run_checks` tool), per D11: rules on data stay with the data; the graph
     can't skip them because every draft goes through the `checks` node.
+
+### The learner always gets a debrief (2026-11-16)
+
+Gopi: "as much as possible the learner should get the debrief; in the worst case fall back to the old debrief
+(today's debrief)". Nothing leaves the learner on "working", "on its way" or "taking longer" for good:
+
+- **Past the month's cap.** A **live** run whose ceiling (the cap, what is left of it, or the session budget) is
+  below `settings.runFloorUsd` runs with `ceiling_usd = runFloorUsd` and `allow_over_ceiling: true`; when the
+  month's cap is what stopped it, ally-be marks `workspace.overCap = true` and `workspace.overCapSpend
+  {spentUsd, capUsd}`. In the graph, `allow_over_ceiling` lets the minimum path's reservations (safety reader in
+  `plan`, writer in `prepare_writer`) pass the ceiling when the model is priced (an unpriced model still never
+  runs); optional steps keep to it, and a writer reserved past it sets `workspace.overCeiling`. `monthly_cap`
+  and `budget_below_minimum` now end only shadow runs (or a live run whose minimum-path model is unpriced).
+  The owner is told once per IST day (`workspace.overCapNotice {day, at}` on the run that told them) with the
+  amount, in the app (`DebriefNotifier.owner`) and on Slack when it is set up (`DebriefAgentService.notifyOverCap`).
+- **Provider not allowed.** `restrictBundleToProviders(bundle, allowed, substitutes)`: a step whose model and
+  backup are both on providers the organisation does not allow runs on a priced model from the ally-ai model
+  catalogue on an allowed provider (same tier first, then cheapest; never the judge's model; the evaluator
+  never on the writer's), recorded as `workspace.providerAllowlist.substitutedSteps`. Learner data still never
+  reaches a provider the organisation does not allow (FR-57). Only when no candidate exists does the run end:
+  `skipped` / `provider_not_allowed` (no longer `needs_person`).
+- **No draft (safety reader or writer failed, stuck, an error).** The run is run again **once** from the start
+  (`DebriefAgentService.retryRun`: the row goes back to `running` with `workspace.retries` + 1, claimed in one
+  statement; `DebriefRunnerService.retry` sends `attempt: n`, so ally-ai starts a fresh thread
+  `<run_id>:retry<n>` — the safety reader runs again, so nothing is published without a safety reading). The
+  stuck sweep retries any it missed (`retryFailedRuns`). Retried: `needs_person` with `safety_reader_failed`,
+  `writer_failed`, `stuck`, `budget_below_minimum`, `monthly_cap`, and every `failed`.
+- **Today's debrief.** A live run that still has no draft (and `provider_not_allowed`, `debrief_tab_off`) marks
+  `workspace.fallbackToToday {at, outcome}` and emits `debrief.fallback_to_today`; `ScenarioSessionService`
+  writes today's debrief for the session (it skips switched-on organisations at session end), keeping one
+  already written. Organisations switched on never had today's summary, so this is what makes the fallback real.
+  **Unless** today's debrief's provider (its AI task registry row `scenario-evaluation`, `providerOfModel`) is
+  not on the organisation's allowlist: then `outcome: "not_available"`, nothing is generated, and the learner
+  view says "not available" (`stopped: true, reason: "provider_not_allowed"`).
+- **Debrief tab off.** `scenarios.metadata.feedbackTabs.debrief === false` → the runner records `skipped` /
+  `debrief_tab_off` before any model step; no "ready" notification.
+- **Every ended session gets a run.** The drain no longer requires a learner message (the runner records
+  `too_short`).
+
+The learner view (`GET /v1/debriefs/sessions/:id`): `too_short` at once when the session has no learner turn;
+`not_available` when the agent mode is `off`, the Debrief tab is off, no run has started 30 minutes after the
+session ended (`NO_RUN_GIVE_UP_MINUTES`), or a live run has no draft and no retry due (`working` while it is
+due); `taking_longer` / `on_its_way` only for a held draft about to be shown. Every such `not_available` asks for
+today's debrief when it is not written yet. `ready` carries `askAlly {open, reason?}`: closed after Ask Ally
+answered with its limit (`workspace.askAllyLimit {reason, at}`, written by the reply service; a `month` limit
+reopens when the IST month turns). `practice[]` items carry `trackItemId` inside a course.
+
+**Practise next inside a course.** For a session with `trackItemProgressId`, `DebriefPracticeService` offers
+only that course's roleplays the learner has reached — items at or before this one (section order, item order)
+or completed ones, plus this one — not-done first, then this one, then done ones; never a later item, never the
+library (an unreadable course offers nothing). Each option carries `course` and, for this one, `this_roleplay`;
+the Writer's practice instruction says to stay within the course.
 
 ### Where an Agent log entry came from (2026-11-16)
 

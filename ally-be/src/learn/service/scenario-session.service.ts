@@ -3,6 +3,8 @@ import {
   ScenarioSessionDebriefReadyEvent,
 } from '../constants/scenario-session-events.constants';
 import {
+  DEBRIEF_FALLBACK_TO_TODAY_EVENT,
+  DebriefFallbackToTodayEventParams,
   hasLegacyFeedback,
   isDebriefAgentLiveForSession,
 } from '../../debrief/util/debrief-live.util';
@@ -15,7 +17,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Pagination } from 'src/common/type/common.type';
 import { ScenarioSessionRepository } from '../repository/scenario-session.repository';
 import { ScenarioSessionMessagesRepository } from '../repository/scenario-session-messages.repository';
@@ -1990,6 +1992,59 @@ export class ScenarioSessionService {
    * poll keeps its shape. Fails open: if Redis is unreachable, a duplicate
    * evaluation beats none.
    */
+  /**
+   * The Debrief agent could not give this learner a debrief (no draft after
+   * its retry, the agent or the roleplay's Debrief tab off, no run started)
+   * and asks for today's (Gopi, 2026-11-16: "in the worst case fall back to
+   * today's debrief"). Written as at session end, except that a switched-on
+   * organisation no longer skips it. A debrief already written is kept, and
+   * the Debrief agent has already checked today's provider is allowed.
+   */
+  @OnEvent(DEBRIEF_FALLBACK_TO_TODAY_EVENT, { async: true })
+  async onDebriefFallbackToToday(
+    event: DebriefFallbackToTodayEventParams,
+  ): Promise<void> {
+    const sessionId = event?.scenarioSessionId;
+    if (!sessionId) return;
+    try {
+      const [s] = await this.dataSource.query(
+        `SELECT s.tenant_id, s."counselorId" AS user_id, s."caseSessionItemId" AS case_item,
+                d."callDuration" AS call_duration
+           FROM scenario_sessions s
+           LEFT JOIN scenario_session_details d ON d."scenarioSessionId" = s.id
+          WHERE s.id = $1 AND s.status = 'ENDED'
+          LIMIT 1`,
+        [sessionId],
+      );
+      if (!s?.tenant_id) return;
+      await ExecutionManager.runWithContext(
+        async () => {
+          ExecutionManager.setAuthContext(
+            String(s.user_id ?? ''),
+            s.tenant_id as string,
+          );
+          const previousMemory = s.case_item
+            ? await this.caseSharedService.getPreviousCaseMemory(s.case_item)
+            : null;
+          await this.getScenarioSessionSummaryFromAIOnce(
+            sessionId,
+            !!s.case_item,
+            s.call_duration == null ? undefined : Number(s.call_duration),
+            previousMemory,
+            undefined,
+            undefined,
+            { evenIfDebriefAgentLive: true },
+          );
+        },
+        { path: 'debrief-fallback-to-today' },
+      );
+    } catch (error) {
+      this.logger.error(
+        `Today's debrief for ${sessionId} (Debrief agent fallback) failed: ${JSON.stringify((error as Error)?.message)}`,
+      );
+    }
+  }
+
   private async getScenarioSessionSummaryFromAIOnce(
     scenarioSessionId: string,
     needMemory: boolean,
@@ -1997,6 +2052,7 @@ export class ScenarioSessionService {
     previousMemory?: string | null,
     enableRecommendations?: boolean,
     languageCode?: string,
+    opts: { evenIfDebriefAgentLive?: boolean } = {},
   ): Promise<void> {
     const lockKey = `scenario-session-summary:${scenarioSessionId}`;
     let locked = false;
@@ -2027,6 +2083,7 @@ export class ScenarioSessionService {
         previousMemory,
         enableRecommendations,
         languageCode,
+        opts,
       );
     } finally {
       if (locked) {
@@ -2049,6 +2106,7 @@ export class ScenarioSessionService {
     previousMemory?: string | null,
     enableRecommendations?: boolean,
     languageCode?: string,
+    opts: { evenIfDebriefAgentLive?: boolean } = {},
   ) {
     const tenantId = ExecutionManager.getTenantId();
     if (!tenantId) {
@@ -2085,10 +2143,10 @@ export class ScenarioSessionService {
     // learner reads the agent's debrief, so the supervisor memory update and
     // the "debrief ready" event come from it (DebriefPublishService), not
     // from this note.
-    const debriefAgentLive = await isDebriefAgentLiveForSession(
-      this.dataSource,
-      scenarioSessionId,
-    );
+    // The Debrief agent's fallback asks for today's even so.
+    const debriefAgentLive =
+      !opts.evenIfDebriefAgentLive &&
+      (await isDebriefAgentLiveForSession(this.dataSource, scenarioSessionId));
     if (debriefAgentLive) {
       // v9 FR-4: the Debrief agent writes this session's whole debrief —
       // note, skill coverage, emotional movement, case memory, the learner's

@@ -462,6 +462,62 @@ class TestBudget:
             constants.END_WHY["budget_below_minimum"]
         )
 
+    async def test_a_live_run_writes_past_a_ceiling_too_small_for_it(
+        self, steps, gateway
+    ):
+        """Gopi, 2026-11-16: a learner's debrief may go past the budget. The
+        minimum path (safety reader, writer, checks) runs; the optional steps
+        still keep to the ceiling."""
+        result = await run(
+            steps, gateway, ceiling_usd=0.000001, allow_over_ceiling=True
+        )
+
+        assert steps.count("safety-reader") == 1
+        assert steps.count("writer") == 1
+        assert steps.count("analyst") == 0
+        assert result["skip_reason"] != "budget_below_minimum"
+        assert result["cards"]
+        assert result["workspace"]["overCeiling"] is True
+
+    async def test_past_the_ceiling_never_runs_an_unpriced_model(self, steps, gateway):
+        prices = dict(PRICES)
+        del prices["safety-m"]
+        result = await run(steps, gateway, prices=prices, allow_over_ceiling=True)
+
+        assert result["skip_reason"] == "budget_below_minimum"
+        assert steps.calls == []
+
+    async def test_a_spent_month_still_ends_a_run_that_may_not_pass_it(
+        self, steps, gateway
+    ):
+        result = await run(steps, gateway, ceiling_usd=0)
+        assert result["skip_reason"] == "monthly_cap"
+
+
+class TestRetry:
+    async def test_a_retry_starts_afresh_on_its_own_thread(self, steps, gateway):
+        """A retry (`attempt`) must not read back the first attempt's decision:
+        it runs from the start, the safety reader first."""
+        graph = new_graph()
+        steps.fail["safety-reader"] = "always"
+        first = await run(steps, gateway, graph=graph)
+        assert first["status"] == "needs_person"
+        assert first["skip_reason"] == "safety_reader_failed"
+
+        steps.fail.pop("safety-reader")
+        again = await run(steps, gateway, graph=graph)
+        assert again["skip_reason"] == "safety_reader_failed"  # stored result
+
+        retried = await run(steps, gateway, graph=graph, attempt=1)
+        assert retried["status"] in ("published", "below_bar")
+        assert steps.count("writer") >= 1
+
+    async def test_thread_ids(self, steps, gateway):
+        from tests.core.debrief_graph.fakes import make_ctx
+
+        assert make_ctx(steps, gateway).thread_id == "run-1"
+        assert make_ctx(steps, gateway, attempt=2).thread_id == "run-1:retry2"
+
 
 class TestModels:
     async def test_backup_model_after_a_primary_failure(self, steps, gateway):

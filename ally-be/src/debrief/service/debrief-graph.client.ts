@@ -41,6 +41,13 @@ export interface DebriefGraphRequest {
   bundle: DebriefBundle;
   prompts: Record<string, string | null>;
   ceiling_usd: number;
+  /**
+   * Live runs: the minimum path (safety reader, writer, checks) runs even
+   * when its estimate passes `ceiling_usd`; optional steps still keep to it.
+   */
+  allow_over_ceiling?: boolean;
+  /** A retry from the start on a fresh graph thread (`<run_id>:retry<n>`); absent = first attempt. */
+  attempt?: number;
   prices: Record<string, { input_per_m: number; output_per_m: number }>;
   session: Record<string, unknown>;
   transcript: Array<{ turn_index: number; role: string; text: string }>;

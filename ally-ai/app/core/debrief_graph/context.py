@@ -38,6 +38,12 @@ class DebriefRunContext:
     steps: StepRunner
     gateway: Gateway
     resumed: bool = False
+    #: Live runs (a learner is waiting): the minimum path (safety reader,
+    #: writer, checks) runs even when its estimate passes the ceiling.
+    allow_over_ceiling: bool = False
+    #: 0 for a run's first attempt; n for its n-th retry from the start, which
+    #: runs on its own graph thread (`thread_id`).
+    attempt: int = 0
     clock: Callable[[], float] = now_ms
     started_at: float = 0.0
     #: Per-invocation scratch for a step node's attempts (the model order chosen
@@ -48,6 +54,13 @@ class DebriefRunContext:
     def __post_init__(self) -> None:
         if not self.started_at:
             self.started_at = self.clock()
+
+    @property
+    def thread_id(self) -> str:
+        """The checkpoint thread: the run id, or a retry's own thread, so a
+        retry starts from the beginning rather than reading back the first
+        attempt's decision."""
+        return self.run_id if not self.attempt else f"{self.run_id}:retry{self.attempt}"
 
     # --- the session, in ally-be's snake_case or camelCase -------------------
 

@@ -75,7 +75,7 @@ async def run_debrief(
     # so a resumed run settles on the same one.
     ctx.session = resolve_language(ctx.session, ctx.transcript)
     config = {
-        "configurable": {"thread_id": ctx.run_id},
+        "configurable": {"thread_id": ctx.thread_id},
         "recursion_limit": _recursion_limit(ctx),
         "run_name": "debrief_run",
         "metadata": {"run_id": ctx.run_id},

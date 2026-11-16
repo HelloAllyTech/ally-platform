@@ -9,6 +9,31 @@ export interface PracticeOption {
   id: number;
   title: string;
   skills: string[];
+  /**
+   * The session is part of a course: every option is a roleplay of that
+   * course (named here, for the Writer), never one from outside it.
+   */
+  course?: string;
+  /** In a course: this is the roleplay the learner just did. */
+  this_roleplay?: boolean;
+}
+
+/** A roleplay of the session's course the learner has reached. */
+export interface CourseRoleplay {
+  id: number;
+  title: string;
+  /** The learner completed its course item. */
+  done: boolean;
+  /** The roleplay of this session. */
+  current: boolean;
+  /** The course item it is (the apps open it inside the course player). */
+  trackItemId: string;
+}
+
+/** The session's course and the roleplays in it the learner may be sent to. */
+export interface SessionCourse {
+  title: string;
+  roleplays: CourseRoleplay[];
 }
 
 /** The most options the Writer is shown; enough to choose, cheap to read. */
@@ -33,13 +58,125 @@ export class DebriefPracticeService {
     private readonly scenarios: ScenarioService,
   ) {}
 
-  /** The learner's roleplays with the skills each practises, for the Writer. */
+  /**
+   * The learner's roleplays with the skills each practises, for the Writer.
+   * A session played inside a course is offered only that course's
+   * roleplays the learner has already reached (see `course`), never the
+   * library's.
+   */
   async optionsFor(
     userId: number | null,
     tenantId: string | null,
+    sessionId?: string | null,
   ): Promise<PracticeOption[]> {
+    const course = sessionId ? await this.course(sessionId) : null;
+    if (course) {
+      const skills = await this.skillsOf(course.roleplays.map((r) => r.id));
+      return course.roleplays.slice(0, MAX_OPTIONS).map((r) => ({
+        id: r.id,
+        title: r.title,
+        skills: skills.get(r.id) ?? [],
+        course: course.title,
+        ...(r.current ? { this_roleplay: true } : {}),
+      }));
+    }
     const listed = await this.listed(userId, tenantId);
     if (!listed.length) return [];
+    const skills = await this.skillsOf(listed.map((s) => s.id));
+    return listed
+      .map((s) => ({ ...s, skills: skills.get(s.id) ?? [] }))
+      .sort((a, b) => b.skills.length - a.skills.length)
+      .slice(0, MAX_OPTIONS);
+  }
+
+  /**
+   * The course a session was played in (`scenario_sessions.trackItemProgressId`
+   * → its item → its course), with the roleplays of that course the learner
+   * has reached: items at or before this one in course order, or ones they
+   * completed. Never a later item they have not reached (it would spoil the
+   * course), never one outside it. Ordered: reached but not done first, then
+   * this roleplay, then the done ones; this roleplay is always there. Null
+   * for a session outside a course; no roleplays when the course cannot be
+   * read.
+   */
+  async course(sessionId: string): Promise<SessionCourse | null> {
+    try {
+      const rows: Array<{
+        id: number;
+        title: string | null;
+        course: string | null;
+        done: boolean;
+        current: boolean;
+        track_item_id: string;
+      }> = await this.dataSource.query(
+        `WITH cur AS (
+           SELECT s."scenarioId" AS scenario_id, ti."trackId" AS track_id,
+                  ti.id AS item_id, ts."order" AS s_order, ti."order" AS i_order,
+                  tip."trackEnrollmentId" AS enrollment_id
+             FROM scenario_sessions s
+             JOIN track_item_progress tip ON tip.id = s."trackItemProgressId"
+             JOIN track_items ti ON ti.id = tip."trackItemId"
+             JOIN track_sections ts ON ts.id = ti."trackSectionId"
+            WHERE s.id = $1)
+         SELECT sc.id, sc.title, t.title AS course, ti.id AS track_item_id,
+                COALESCE(p.status = 'COMPLETED', false) AS done,
+                (ti.id = cur.item_id OR sc.id = cur.scenario_id) AS current
+           FROM cur
+           JOIN tracks t ON t.id = cur.track_id
+           JOIN track_items ti ON ti."trackId" = cur.track_id
+                              AND ti."deletedAt" IS NULL
+                              AND ti."scenarioId" IS NOT NULL
+           JOIN track_sections ts ON ts.id = ti."trackSectionId" AND ts."deletedAt" IS NULL
+           JOIN scenarios sc ON sc.id = ti."scenarioId"
+           LEFT JOIN track_item_progress p ON p."trackItemId" = ti.id
+                                          AND p."trackEnrollmentId" = cur.enrollment_id
+                                          AND p."deletedAt" IS NULL
+          WHERE (ts."order", ti."order") <= (cur.s_order, cur.i_order)
+             OR p.status = 'COMPLETED'
+             OR ti.id = cur.item_id
+          ORDER BY ts."order", ti."order"`,
+        [sessionId],
+      );
+      if (!rows?.length) {
+        // A course session whose course lists no roleplay it can offer still
+        // never gets the library's.
+        const [own] = await this.dataSource.query(
+          `SELECT "trackItemProgressId" AS tip FROM scenario_sessions WHERE id = $1`,
+          [sessionId],
+        );
+        return own?.tip ? { title: '', roleplays: [] } : null;
+      }
+      const seen = new Map<number, CourseRoleplay>();
+      for (const r of rows) {
+        const id = Number(r.id);
+        const prev = seen.get(id);
+        const current = (prev?.current ?? false) || r.current === true;
+        seen.set(id, {
+          id,
+          title: r.title ?? '',
+          // The item this session was played for, else the first one.
+          trackItemId:
+            r.current === true || !prev
+              ? String(r.track_item_id)
+              : prev.trackItemId,
+          done: (prev?.done ?? false) || r.done === true,
+          current,
+        });
+      }
+      const rank = (r: CourseRoleplay) => (r.current ? 1 : r.done ? 2 : 0);
+      const roleplays = [...seen.values()].sort((a, b) => rank(a) - rank(b));
+      return { title: rows[0].course ?? '', roleplays };
+    } catch (e) {
+      // Unreadable: offer nothing rather than risk the wrong roleplays.
+      this.logger.warn(
+        `[debrief] course practice options unavailable: ${(e as Error).message}`,
+      );
+      return { title: '', roleplays: [] };
+    }
+  }
+
+  private async skillsOf(ids: number[]): Promise<Map<number, string[]>> {
+    if (!ids.length) return new Map();
     const rows: Array<{ id: number; skills: string[] | null }> =
       await this.dataSource.query(
         `SELECT s.id,
@@ -48,13 +185,9 @@ export class DebriefPracticeService {
                          SELECT jsonb_array_elements_text(COALESCE(s."competencyIds", '[]'::jsonb)))
                        ORDER BY c.name) AS skills
            FROM scenarios s WHERE s.id = ANY($1::int[])`,
-        [listed.map((s) => s.id)],
+        [ids],
       );
-    const skills = new Map(rows.map((r) => [Number(r.id), r.skills ?? []]));
-    return listed
-      .map((s) => ({ ...s, skills: skills.get(s.id) ?? [] }))
-      .sort((a, b) => b.skills.length - a.skills.length)
-      .slice(0, MAX_OPTIONS);
+    return new Map(rows.map((r) => [Number(r.id), r.skills ?? []]));
   }
 
   /**
@@ -65,9 +198,17 @@ export class DebriefPracticeService {
     userId: number,
     tenantId: string,
     ids: number[],
-  ): Promise<Array<{ id: number; title: string }>> {
+    sessionId?: string | null,
+  ): Promise<Array<{ id: number; title: string; trackItemId?: string }>> {
     if (!ids.length) return [];
     const wanted = new Set(ids);
+    // Inside a course, only the course's roleplays the learner has reached.
+    const course = sessionId ? await this.course(sessionId) : null;
+    if (course) {
+      return course.roleplays
+        .filter((r) => wanted.has(r.id))
+        .map(({ id, title, trackItemId }) => ({ id, title, trackItemId }));
+    }
     return (await this.listed(userId, tenantId)).filter((s) =>
       wanted.has(s.id),
     );

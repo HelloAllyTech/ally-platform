@@ -7,6 +7,7 @@ routes with a typed `Command` or follows its static edge.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Literal, Optional
 
 from langgraph.runtime import Runtime
@@ -59,13 +60,26 @@ _REVISION_MIN_MS = 30_000
 
 
 def _reserve(
-    ctx: Ctx, estimated: float, step: Dict[str, Any], input_chars: int
+    ctx: Ctx,
+    estimated: float,
+    step: Dict[str, Any],
+    input_chars: int,
+    required: bool = False,
 ) -> Optional[float]:
-    """Fits the budget? The reservation when it does, None when it does not."""
+    """Fits the budget? The reservation when it does, None when it does not.
+
+    A `required` step (the minimum path: safety reader and writer) of a run
+    allowed past its ceiling (`allow_over_ceiling`, live runs: a learner is
+    waiting) is reserved even when it does not fit, as long as its model is
+    priced; an unpriced model never runs."""
     est = estimate_step_cost_usd(
         step["step"], step.get("model"), input_chars + _PROMPT_ALLOWANCE, ctx.prices
     )
-    return None if estimated + est > ctx.ceiling_usd else est
+    if estimated + est <= ctx.ceiling_usd:
+        return est
+    if required and ctx.allow_over_ceiling and math.isfinite(est):
+        return est
+    return None
 
 
 def _end(status: str, skip_reason: Optional[str], **update: Any) -> Command:
@@ -176,7 +190,7 @@ async def plan(
         "has_risk_cue": False,
         "learner_distress": False,
     }
-    if ctx.ceiling_usd <= 0:
+    if ctx.ceiling_usd <= 0 and not ctx.allow_over_ceiling:
         return _end(
             Status.NEEDS_PERSON,
             "monthly_cap",
@@ -195,7 +209,7 @@ async def plan(
 
     safety_step = ctx.step_of(recipe_key, Step.SAFETY_READER)
     analyst_step = ctx.step_of(recipe_key, Step.ANALYST)
-    safety_est = _reserve(ctx, 0.0, safety_step, ctx.transcript_chars)
+    safety_est = _reserve(ctx, 0.0, safety_step, ctx.transcript_chars, required=True)
     if safety_est is None:
         return _end(
             Status.NEEDS_PERSON,
@@ -533,9 +547,18 @@ async def prepare_writer(
     workspace = {"cohort": cohort} if cohort else {}
     writer_step = ctx.step_of(state["recipe_key"], Step.WRITER)
     estimated = state.get("estimated", 0.0)
-    est = _reserve(ctx, estimated, writer_step, js_len(body.writer_body(state, ctx)))
+    est = _reserve(
+        ctx,
+        estimated,
+        writer_step,
+        js_len(body.writer_body(state, ctx)),
+        required=True,
+    )
     if est is None:
         return _end(Status.NEEDS_PERSON, "budget_below_minimum", workspace=workspace)
+    if estimated + est > ctx.ceiling_usd:
+        # The minimum path went past the ceiling (a live run): say so.
+        workspace = {**workspace, "overCeiling": True}
     return Command(
         update={
             "workspace": workspace,

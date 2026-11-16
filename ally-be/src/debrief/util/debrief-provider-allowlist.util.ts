@@ -1,8 +1,12 @@
+import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants';
 import {
   DEBRIEF_APPROVED_PROVIDERS,
+  DEBRIEF_MODELS,
   DebriefBundle,
   DebriefProvider,
   DebriefRecipeKey,
+  DebriefStep,
+  modelProblem,
   providerOfModel,
 } from '../constants/debrief-release.constants';
 
@@ -43,6 +47,12 @@ export interface RestrictedBundle {
   blockedRecipes: DebriefRecipeKey[];
   /** The steps that made them so, as `recipe.step`. */
   blockedSteps: string[];
+  /**
+   * Steps whose own and backup models are both on providers the organisation
+   * does not allow, given a priced model on an allowed provider instead, as
+   * `recipe.step` → model. Only with substitutes offered.
+   */
+  substitutedSteps: Record<string, string>;
   /** Ask Ally's model is not on an allowed provider. */
   replyBlocked: boolean;
   /** The orchestrator was on and had to be switched off for this run. */
@@ -51,17 +61,64 @@ export interface RestrictedBundle {
   changed: boolean;
 }
 
+/** A model's rough tier, from its id: the fast/cheap family or the strong one. */
+export function modelTier(model: string | null | undefined): 'fast' | 'strong' {
+  const id = (model ?? '').toLowerCase();
+  return /(^|[-_.])(flash|mini|nano|lite|haiku)([-_.]|$)/.test(id)
+    ? 'fast'
+    : 'strong';
+}
+
+const inputPrice = (model: string): number =>
+  computeCostUsd(model, 1_000_000, 0).costUsd;
+
+/**
+ * A model on an allowed provider to run a step whose own models are not
+ * (2026-11-16, Gopi: the learner should get the debrief): one with a known
+ * price that may run in a release, never the judge's pinned model, not the
+ * model the evaluator must differ from, same tier as the step's own model
+ * first, then the cheapest. Null when no candidate fits.
+ */
+export function substituteModel(
+  stepModel: string | null | undefined,
+  candidates: readonly string[],
+  allowed: readonly DebriefProvider[],
+  avoid: ReadonlyArray<string | null | undefined> = [],
+): string | null {
+  const tier = modelTier(stepModel);
+  const fits = [...new Set(candidates)].filter((m) => {
+    const p = providerOfModel(m);
+    return (
+      p !== null &&
+      allowed.includes(p) &&
+      modelProblem(m) === null &&
+      m !== DEBRIEF_MODELS.judge &&
+      !avoid.includes(m)
+    );
+  });
+  fits.sort(
+    (a, b) =>
+      Number(modelTier(a) !== tier) - Number(modelTier(b) !== tier) ||
+      inputPrice(a) - inputPrice(b) ||
+      a.localeCompare(b),
+  );
+  return fits[0] ?? null;
+}
+
 /**
  * The release as one organisation may run it. Each step keeps its model when
  * the provider is allowed (dropping a disallowed backup), falls to its backup
- * when only that is allowed, and otherwise blocks its recipe: a run on a
- * blocked recipe goes to a person rather than to another company. The
- * orchestrator is switched off (today's fixed recipe runs) when any of its
- * models is disallowed. Every approved provider allowed → the bundle as is.
+ * when only that is allowed, then — when `substitutes` are offered (the
+ * model catalogue) — to a priced model on an allowed provider, and otherwise
+ * blocks its recipe. Learner data never reaches a provider the organisation
+ * does not allow (plan §8.9, FR-57). The orchestrator is switched off
+ * (today's fixed recipe runs) when any of its models is disallowed. Every
+ * approved provider allowed → the bundle as is.
  */
 export function restrictBundleToProviders(
   bundle: DebriefBundle,
   allowed: readonly DebriefProvider[],
+  substitutes: readonly string[] = [],
 ): RestrictedBundle {
   const ok = (model: string | null | undefined) => {
     const p = providerOf(model);
@@ -71,6 +128,7 @@ export function restrictBundleToProviders(
     bundle,
     blockedRecipes: [],
     blockedSteps: [],
+    substitutedSteps: {},
     replyBlocked: false,
     orchestratorOff: false,
     changed: false,
@@ -79,9 +137,13 @@ export function restrictBundleToProviders(
 
   const blockedRecipes: DebriefRecipeKey[] = [];
   const blockedSteps: string[] = [];
+  const substitutedSteps: Record<string, string> = {};
   const recipes = { ...bundle.recipes } as DebriefBundle['recipes'];
   for (const [key, recipe] of Object.entries(bundle.recipes)) {
     if (!recipe) continue;
+    const writerModel = recipe.steps.find(
+      (s) => s.step === DebriefStep.WRITER,
+    )?.model;
     const steps = recipe.steps.map((s) => {
       if (ok(s.model)) {
         return s.backupModel && !ok(s.backupModel)
@@ -90,6 +152,19 @@ export function restrictBundleToProviders(
       }
       if (s.backupModel && ok(s.backupModel)) {
         return { ...s, model: s.backupModel, backupModel: null };
+      }
+      const sub = substituteModel(
+        s.model,
+        substitutes,
+        allowed,
+        // The evaluator never runs on the writer's model.
+        s.step === DebriefStep.EVALUATOR
+          ? [writerModel, substitutedSteps[`${key}.${DebriefStep.WRITER}`]]
+          : [],
+      );
+      if (sub) {
+        substitutedSteps[`${key}.${s.step}`] = sub;
+        return { ...s, model: sub, backupModel: null };
       }
       blockedSteps.push(`${key}.${s.step}`);
       return s;
@@ -140,6 +215,7 @@ export function restrictBundleToProviders(
     },
     blockedRecipes,
     blockedSteps,
+    substitutedSteps,
     replyBlocked: !!bundle.reply && !ok(bundle.reply.model),
     orchestratorOff,
     changed: true,

@@ -252,6 +252,8 @@ export class DebriefReplyService {
       subject.complete();
       // For the Console's Ask Ally tab: which card it was about (when the app
       // says), and how long the learner waited for the first words.
+      // The learner view closes Ask Ally on reload too (`askAlly`).
+      if (limit) void this.keepReplyLimit(run.id, limit);
       void this.keepReplyMeta(run.id, {
         at: new Date().toISOString(),
         section: opts.section?.trim() ? opts.section.trim().slice(0, 48) : null,
@@ -497,6 +499,31 @@ export class DebriefReplyService {
   }
 
   /** Each reply's card and time to first words, kept on the run (the last 50). Never throws. */
+  /**
+   * Ask Ally answered with its limit message: marked on the run
+   * (`workspace.askAllyLimit`), so the learner view says the reply box is
+   * closed after a reload instead of the apps guessing from the text.
+   * Never throws.
+   */
+  private async keepReplyLimit(
+    runId: string,
+    reason: 'session' | 'month',
+  ): Promise<void> {
+    try {
+      await this.chats.manager.query(
+        `UPDATE debrief_runs
+            SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{askAllyLimit}',
+                  jsonb_build_object('reason', $2::text, 'at', now()), true)
+          WHERE id = $1`,
+        [runId, reason],
+      );
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] could not mark the Ask Ally limit for run ${runId}: ${(e as Error).message}`,
+      );
+    }
+  }
+
   private async keepReplyMeta(
     runId: string,
     entry: { at: string; section: string | null; firstWordsMs: number },
