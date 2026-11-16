@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { CustomImage, GoogleSignInButton } from "@ally-ui-mono/ui-shared";
@@ -20,13 +20,27 @@ import {
 } from "@constants";
 import { useUser } from "@hooks";
 import { RootState } from "@store";
-import { validateEmail, openLinkInNewTab } from "@utils";
+import { afterLoginPath, validateEmail, openLinkInNewTab } from "@utils";
 
 const RESEND_CODE_COUNTDOWN = 60; // 60 seconds
 const DEFAULT_EXPIRES_IN = 10; // 10 minutes
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Once logged in, PublicRoute already sends them on (to `next`, or through "/"). A navigate from
+  // here after this page has gone would send them back to "/" from wherever they landed: the
+  // white page at "/" after login. So this page navigates only while it is still on screen.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const goOn = useCallback(() => {
+    if (mounted.current) navigate(afterLoginPath(location.search), { replace: true });
+  }, [navigate, location.search]);
   const { user } = useSelector((state: RootState) => state.user);
 
   const [loginSection, setLoginSection] = useState<any>(LoginSection.EMAIL);
@@ -74,7 +88,7 @@ export const Login: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && user) {
       // Route through the root so DefaultRedirect lands the user on their first tab.
-      navigate("/");
+      goOn();
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -115,7 +129,7 @@ export const Login: React.FC = () => {
         localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
         const userData = await checkAuth();
         if (userData) {
-          navigate("/");
+          goOn();
         }
       }
     })();
@@ -168,7 +182,7 @@ export const Login: React.FC = () => {
         localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
         const userData = await checkAuth();
         if (userData) {
-          navigate("/");
+          goOn();
         }
       } else {
         const error = response.error as FetchBaseQueryError;

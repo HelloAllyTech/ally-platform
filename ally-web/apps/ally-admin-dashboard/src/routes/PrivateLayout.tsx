@@ -12,12 +12,12 @@ import {
   useGetCharacterLibraryEnabledQuery,
 } from "@api";
 import { Sidebar, AccessDenied, ErrorBoundary } from "@components";
+import { AssistantsHeader } from "@components/assistants-shell";
 import { NotificationBell } from "@components/notification-bell/NotificationBell";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import {
   LOCAL_STORAGE_KEYS,
-  ROUTES,
   OrgToggle,
   Permissions,
   en,
@@ -25,7 +25,7 @@ import {
 } from "@constants";
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
 import { setUser, setPermissions, setFeatures } from "@reducer";
-import { hasPermissions, hasFeature } from "@utils";
+import { hasPermissions, hasFeature, loginPathWithNext } from "@utils";
 
 interface PrivateLayoutProps {
   children: React.ReactNode;
@@ -65,6 +65,11 @@ interface PrivateLayoutProps {
    * onboarding, chunk 20d).
    */
   fullBleed?: boolean;
+  /**
+   * Which frame the page sits in. `assistants` (A1) is the assistants area's own slim space: a
+   * header with Your assistants and the account menu, and no Ally admin navigation.
+   */
+  shell?: "admin" | "assistants";
 }
 
 export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
@@ -76,6 +81,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   requiredOrgToggle,
   allowedEmails,
   fullBleed = false,
+  shell = "admin",
 }) => {
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
@@ -109,7 +115,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   // Only used to reset the crash barrier below: React Router reuses this
   // element position across routes, so without a per-route key a page that
   // crashed would keep showing its error panel on the next page you opened.
-  const { pathname } = useLocation();
+  const { pathname, search, hash } = useLocation();
 
   // Phone-only nav drawer (the Sidebar is an in-flow rail from md up). It
   // covers the page, so any navigation and Escape close it.
@@ -133,7 +139,8 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   }, [userData, permissions, features]);
 
   if (!isAuthenticated) {
-    return <Navigate to={ROUTES.LOGIN} replace />;
+    // Back here after logging in (A1): `/login?next=<this page>`.
+    return <Navigate to={loginPathWithNext(pathname, search, hash)} replace />;
   }
 
   // Check if user has permission to access current route
@@ -239,6 +246,57 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
     void refetchFeatures();
   };
 
+  // The page itself, or what stands in for it while access is checked or refused.
+  const content = (
+    <ErrorBoundary resetKey={pathname}>
+      {entitlementsLoading ? (
+        <div
+          className="flex h-full min-h-[500px] items-center justify-center"
+          data-testid="entitlements-loading"
+        >
+          <InlineLoading description={en.accessCheck.checking} />
+        </div>
+      ) : entitlementsFailed ? (
+        <div data-testid="entitlements-failed">
+          <AccessDenied
+            title={en.accessCheck.failedTitle}
+            message={en.accessCheck.failedMessage}
+            nextStep={en.accessCheck.failedNextStep}
+            showBackButton={false}
+          />
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={retryEntitlements}
+              data-testid="entitlements-retry"
+              className="inline-flex items-center rounded-lg bg-primary-500 px-6 py-3 text-base font-medium text-white shadow-sm transition-colors hover:bg-primary-600"
+            >
+              {en.accessCheck.retry}
+            </button>
+          </div>
+        </div>
+      ) : hasAccess ? (
+        children
+      ) : (
+        <AccessDenied reason={accessDeniedReason} nextStep={en.accessDenied.nextStepContactAdmin} />
+      )}
+    </ErrorBoundary>
+  );
+
+  // The assistants area (A1): its own slim header, no Ally admin navigation.
+  if (shell === "assistants") {
+    return (
+      <div className="flex h-dvh flex-col bg-white" data-testid="assistants-shell">
+        <AssistantsHeader />
+        <main
+          className={`relative min-h-0 flex-1 overflow-y-auto ${fullBleed ? "" : "p-4 lg:p-6"}`}
+        >
+          {content}
+        </main>
+      </div>
+    );
+  }
+
   // The preview routes render bare, with no shell to preserve — but a crash
   // there used to blank the page just the same, so they get the barrier too.
   if (hasAccess && isPreview) return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
@@ -284,42 +342,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
           <div
             className={`relative min-h-0 flex-1 overflow-y-auto ${fullBleed ? "" : "p-4 lg:p-6"}`}
           >
-            <ErrorBoundary resetKey={pathname}>
-              {entitlementsLoading ? (
-                <div
-                  className="flex h-full min-h-[500px] items-center justify-center"
-                  data-testid="entitlements-loading"
-                >
-                  <InlineLoading description={en.accessCheck.checking} />
-                </div>
-              ) : entitlementsFailed ? (
-                <div data-testid="entitlements-failed">
-                  <AccessDenied
-                    title={en.accessCheck.failedTitle}
-                    message={en.accessCheck.failedMessage}
-                    nextStep={en.accessCheck.failedNextStep}
-                    showBackButton={false}
-                  />
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      onClick={retryEntitlements}
-                      data-testid="entitlements-retry"
-                      className="inline-flex items-center rounded-lg bg-primary-500 px-6 py-3 text-base font-medium text-white shadow-sm transition-colors hover:bg-primary-600"
-                    >
-                      {en.accessCheck.retry}
-                    </button>
-                  </div>
-                </div>
-              ) : hasAccess ? (
-                children
-              ) : (
-                <AccessDenied
-                  reason={accessDeniedReason}
-                  nextStep={en.accessDenied.nextStepContactAdmin}
-                />
-              )}
-            </ErrorBoundary>
+            {content}
           </div>
         </main>
         <ReportUploadProgressDialog />

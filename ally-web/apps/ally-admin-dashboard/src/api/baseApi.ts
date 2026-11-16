@@ -7,8 +7,10 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import { toast } from "sonner";
 
-import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS, ROUTES, TAG_TYPES, en } from "@constants";
+import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS, TAG_TYPES, en } from "@constants";
 import { RefreshResponse } from "@types";
+
+import { loginPathWithNext } from "../utils/loginRedirect";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -18,8 +20,12 @@ const handleLogout = () => {
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED);
 
   // Raw window.location bypasses the router basename - prefix the Vite base
-  // (the app lives under /admin in production, / everywhere else).
-  window.location.href = import.meta.env.BASE_URL.replace(/\/$/, "") + ROUTES.LOGIN;
+  // (the app lives under /admin in production, / everywhere else). `next` brings them back to
+  // the page they were on once they log in again (A1).
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const { pathname, search, hash } = window.location;
+  const inApp = base && pathname.startsWith(base) ? pathname.slice(base.length) || "/" : pathname;
+  window.location.href = base + loginPathWithNext(inApp, search, hash);
 };
 
 const baseQuery = fetchBaseQuery({

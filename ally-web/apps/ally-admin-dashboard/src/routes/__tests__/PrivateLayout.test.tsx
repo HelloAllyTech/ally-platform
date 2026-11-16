@@ -3,7 +3,7 @@ import React from "react";
 import { configureStore } from "@reduxjs/toolkit";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
 
 import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle, Permissions } from "@constants";
@@ -23,6 +23,10 @@ vi.mock("@components", async importOriginal => {
     ),
   };
 });
+
+vi.mock("@components/assistants-shell", () => ({
+  AssistantsHeader: () => <div data-testid="assistants-header">Your assistants</div>,
+}));
 
 vi.mock("@components/notification-bell/NotificationBell", () => ({
   NotificationBell: () => null,
@@ -144,6 +148,58 @@ describe("PrivateLayout", () => {
     );
 
     expect(screen.getByText("LoginPage")).toBeInTheDocument();
+  });
+
+  it("keeps the deep link when sending a logged-out visitor to login (A1)", () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "false");
+    const Login = () => {
+      const { search } = useLocation();
+      return <div data-testid="login">{new URLSearchParams(search).get("next")}</div>;
+    };
+    render(
+      <Provider store={mockStore}>
+        <MemoryRouter initialEntries={["/assistants/b1?section=lists&tool=memory"]}>
+          <Routes>
+            <Route path={ROUTES.LOGIN} element={<Login />} />
+            <Route
+              path="/assistants/:botId"
+              element={
+                <PrivateLayout shell="assistants">
+                  <div>Assistant</div>
+                </PrivateLayout>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+    expect(screen.getByTestId("login").textContent).toBe(
+      "/assistants/b1?section=lists&tool=memory",
+    );
+  });
+
+  it("draws the assistants area in its own slim space, with no Ally admin navigation (A1)", () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+    render(
+      <Provider store={mockStore}>
+        <MemoryRouter initialEntries={["/assistants"]}>
+          <Routes>
+            <Route
+              path="/assistants"
+              element={
+                <PrivateLayout shell="assistants">
+                  <div>Your list</div>
+                </PrivateLayout>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+    expect(screen.getByTestId("assistants-shell")).toBeInTheDocument();
+    expect(screen.getByTestId("assistants-header")).toBeInTheDocument();
+    expect(screen.getByText("Your list")).toBeInTheDocument();
+    expect(screen.queryByText("Sidebar")).not.toBeInTheDocument();
   });
 
   it("renders children when authenticated and has permissions", () => {

@@ -19,11 +19,16 @@ import {
 } from "@api";
 import { TooltipIcon } from "@assets";
 import { ActionConfirmationPopup, Button, EmptyState, ListToolbar, StatusBadge } from "@components";
+import { Button as ButtonDirect } from "@components/button";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { PlatformAdmin } from "@types";
 
+import { CustomLoginPanel } from "./CustomLoginPanel";
 import { PlatformAdminDetail } from "./PlatformAdminDetail";
+
+// From its own module: User Management's tests mock the `@components` barrel.
+const CustomLoginButton = ButtonDirect;
 
 const strings = en.superAdmins;
 
@@ -62,6 +67,8 @@ export const SuperAdmins: React.FC = () => {
     });
 
   const [assignPlatformAdmin] = useAssignPlatformAdminMutation();
+  // A1 custom logins: create one, or change what an existing platform admin can use.
+  const [customLogin, setCustomLogin] = useState<{ edit?: PlatformAdmin } | null>(null);
   const [removePlatformAdmin] = useRemovePlatformAdminMutation();
 
   const admins = useMemo<PlatformAdmin[]>(
@@ -173,7 +180,18 @@ export const SuperAdmins: React.FC = () => {
                 <StatusBadge status={admin.status} />
               </TableCell>
               <TableCell className="py-3 pr-4">{formatDate(admin.roleGrantedAt)}</TableCell>
-              <TableCell className="py-3 text-right">
+              <TableCell className="py-3 text-right whitespace-nowrap">
+                <CustomLoginButton
+                  variant={ButtonVariant.TERTIARY}
+                  onClick={event => {
+                    event.stopPropagation();
+                    setCustomLogin({ edit: admin });
+                  }}
+                  className="mr-2 px-3 py-1 text-sm"
+                  data-testid="sa-edit-features"
+                >
+                  {en.customLogins.edit}
+                </CustomLoginButton>
                 <Button
                   variant={ButtonVariant.DESTRUCTIVE}
                   onClick={event => {
@@ -279,12 +297,25 @@ export const SuperAdmins: React.FC = () => {
           variant: ButtonVariant.PRIMARY,
         }}
       />
+      <div className="mt-3 flex justify-end">
+        <CustomLoginButton
+          variant={ButtonVariant.SECONDARY}
+          onClick={() => setCustomLogin({})}
+          data-testid="custom-login-create"
+        >
+          {en.customLogins.create}
+        </CustomLoginButton>
+      </div>
       {/* 260px ≈ User Management header + tab strip + this tab's own chrome. */}
       <div className="mt-[20px] md:overflow-y-auto md:h-[calc(100vh-260px)]">
         {renderAdminsTable()}
       </div>
 
       {renderAddPanel()}
+
+      {customLogin && (
+        <CustomLoginPanel edit={customLogin.edit} onClose={() => setCustomLogin(null)} />
+      )}
 
       {pendingAction && pendingCopy && (
         <ActionConfirmationPopup

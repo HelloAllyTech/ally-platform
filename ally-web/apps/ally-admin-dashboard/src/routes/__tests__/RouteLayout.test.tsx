@@ -124,6 +124,39 @@ describe("RouteLayout", () => {
     }
   });
 
+  it("redirects old chatbot links to /assistants, keeping the section and query (A1)", () => {
+    for (const [from, to] of [
+      ["/chatbots", "/assistants"],
+      ["/chatbots/bot-1?section=lists&tool=memory", "/assistants/bot-1?section=lists&tool=memory"],
+      ["/chatbots/bot-1?section=conversations", "/assistants/bot-1?section=conversations"],
+      ["/whatsapp-bot", "/assistants"],
+    ]) {
+      window.history.pushState({}, "", from);
+      const { unmount } = render(<RouteLayout />);
+      expect(`${window.location.pathname}${window.location.search}`).toBe(to);
+      unmount();
+    }
+  });
+
+  it("opens an assistant at /assistants/:id in the assistants' own space (A1)", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", "/assistants/bot-1?section=lists");
+    render(<RouteLayout />);
+    expect(screen.getByText("AssistantHomePage")).toBeInTheDocument();
+    const last = privateLayoutCalls.props.at(-1) as { shell?: string };
+    expect(last.shell).toBe("assistants");
+  });
+
+  it("has no sign-up: /signup and /sign-up go to the login screen (A1)", () => {
+    for (const path of ["/signup", "/sign-up"]) {
+      window.history.pushState({}, "", path);
+      const { unmount } = render(<RouteLayout />);
+      expect(screen.getByText("LoginPage")).toBeInTheDocument();
+      expect(window.location.pathname).toBe(ROUTES.LOGIN);
+      unmount();
+    }
+  });
+
   it("renders Login route", () => {
     window.history.pushState({}, "", ROUTES.LOGIN);
     render(<RouteLayout />);

@@ -15,6 +15,8 @@ import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle, en } from "@constants";
 // need for, and would otherwise bloat its chunk.
 import { deriveNavigationItems } from "@utils/navigation";
 
+import { FeatureToggleKey } from "../constants/featureToggles";
+
 /**
  * Resolves the post-login landing route to the current user's FIRST sidebar tab
  * (the top item of their personalized, permission/role-gated nav), instead of a
@@ -117,6 +119,14 @@ export const DefaultRedirect: React.FC = () => {
     );
   }
 
+  // A login whose only feature is Chatbots (a custom login, A1) lands on its assistants, as does
+  // anyone with Chatbots and nothing else in Ally admin's navigation (Chatbots left it in A1).
+  const enabledFeatures = features ?? [];
+  const chatbotsOnly =
+    enabledFeatures.length > 0 &&
+    enabledFeatures.every(key => key === FeatureToggleKey.WHATSAPP_BOT);
+  if (chatbotsOnly) return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
+
   const items = deriveNavigationItems({
     permissions: permissions ?? [],
     features: features ?? [],
@@ -125,6 +135,10 @@ export const DefaultRedirect: React.FC = () => {
       [OrgToggle.CHARACTER_LIBRARY]: Boolean(isCharacterLibraryOrgEnabled),
     },
   });
+
+  if (!items.length && enabledFeatures.includes(FeatureToggleKey.WHATSAPP_BOT)) {
+    return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
+  }
 
   // Nothing this account can open (a clinical advisor before their toggle, say): a clear
   // message, not Simulation Studio's "This page is not accessible" beside an empty sidebar.

@@ -1171,6 +1171,13 @@ says when a save can't be made. More lines for the home's sections are added her
 - When someone asks for a person, your assistant tells them your team has been asked, and lets you know.
 - Change in Share
 
+Whether it may hand over at all (A1: the assistant's owners decide; Ally's platform admins did before):
+
+- Can your assistant hand a chat to your team?
+- On: when someone asks for a person, it hands the chat to your team. Off: it keeps answering itself.
+- Only this assistant's owners can change this.
+- That didn't save. Try again.
+
 **A list's menu:**
 
 - More for {list}

@@ -1214,14 +1214,20 @@ export const ROUTES = {
   SETTINGS: "/settings",
   LOGS: "/logs",
   MOBILE_RELEASES: "/mobile-releases",
-  WHATSAPP_BOT: "/chatbots",
+  /** The assistants area (A1): its own space, out of Ally admin's navigation. */
+  WHATSAPP_BOT: "/assistants",
   /** Bookmarks from before chatbots; redirected to WHATSAPP_BOT. */
   WHATSAPP_BOT_LEGACY: "/whatsapp-bot",
-  CHATBOT_DETAIL: "/chatbots/:botId",
+  /** Links from before A1 (`/chatbots`, `/chatbots/:id?section=…`); redirected to `/assistants…`. */
+  CHATBOTS_LEGACY: "/chatbots",
+  CHATBOT_DETAIL: "/assistants/:botId",
   /** Onboarding (chunk 20a). Static, so it outranks `:botId`. */
-  CHATBOT_NEW: "/chatbots/new",
+  CHATBOT_NEW: "/assistants/new",
   INBOX: "/inbox",
-  CHATBOT_NEW_SESSION: (draftId: string) => `/chatbots/new/${draftId}`,
+  CHATBOT_NEW_SESSION: (draftId: string) => `/assistants/new/${draftId}`,
+  /** There is no sign-up (A1): these redirect to the login screen. */
+  SIGN_UP: "/signup",
+  SIGN_UP_ALT: "/sign-up",
   TERMS: "/terms",
   PRIVACY: "/privacy",
   // Fully public, no-login gallery of the centralised design-system components.

@@ -2,12 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import {
-  useGetAssistantHomeQuery,
-  useGetBotPageQuery,
-  useGetChatbotQuery,
-  useGetChatbotsQuery,
-} from "@api";
+import { useGetAssistantHomeQuery, useGetBotPageQuery, useGetChatbotQuery } from "@api";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
 import { Toast } from "@components/v2";
@@ -18,8 +13,10 @@ import { ChangePanel } from "./ChangePanel";
 import { fill, HOME } from "./copy";
 import { day } from "./dates";
 import { EnginePanel } from "./EnginePanel";
+import { isNoAccess, NoAccess } from "./NoAccess";
 import { SECTION_IDS, SectionId, sectionFromUrl } from "./sections";
 import { SettingsPanel } from "./SettingsPanel";
+import { HomeSaves, HomeSavesContext, SaveState } from "./useHomeField";
 import { COPY } from "../Onboarding/copy";
 import { ChatbotContext } from "../WhatsAppBot/chatbotContext";
 import { LoadError } from "../WhatsAppBot/shared";
@@ -38,7 +35,6 @@ import { AssistantSwitcher } from "./ui/AssistantSwitcher";
 import { MoreMenu } from "./ui/Menu";
 import { Sheet } from "./ui/Sheet";
 import { useRestoreAssistant } from "./ui/useRestoreAssistant";
-import { HomeSaves, HomeSavesContext, SaveState } from "./useHomeField";
 import { ListsSection } from "./userLists/ListsSection";
 
 import "./home.css";
@@ -89,11 +85,15 @@ const useMedia = (query: string): boolean => {
 export const AssistantHome: React.FC = () => {
   const { botId = "" } = useParams();
   const [params, setParams] = useSearchParams();
-  const { data: bot, isLoading, isError, refetch } = useGetChatbotQuery(botId, { skip: !botId });
+  const {
+    data: bot,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useGetChatbotQuery(botId, { skip: !botId });
   const home = useGetAssistantHomeQuery(botId, { skip: !botId });
   const { data: page } = useGetBotPageQuery(botId, { skip: !botId });
-  const { data: list } = useGetChatbotsQuery();
-  const isPlatformAdmin = Boolean(list?.canCreate);
   const { restore, restoring } = useRestoreAssistant();
 
   const fromUrl = sectionFromUrl(params);
@@ -163,6 +163,11 @@ export const AssistantHome: React.FC = () => {
         </div>
       </div>
     );
+  }
+  // Not on this assistant's team (404, which is also how a missing one answers) or not allowed
+  // (403): say so, with the way back to their own assistants (A1). Anything else can be retried.
+  if (isNoAccess(error) || isNoAccess(home.error)) {
+    return <NoAccess />;
   }
   if (isError || !bot || home.isError || !home.data) {
     return (
@@ -335,8 +340,8 @@ export const AssistantHome: React.FC = () => {
                               },
                             ]
                           : []),
-                        // Ally staff only: how it answers, and this assistant's own settings.
-                        ...(isPlatformAdmin
+                        // Owners only (A1; Ally staff before): how it answers, and its own settings.
+                        ...(canManage
                           ? [
                               { label: HOME.more.engine, onSelect: () => setPanel("engine") },
                               { label: HOME.more.settings, onSelect: () => setPanel("settings") },

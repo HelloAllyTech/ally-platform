@@ -818,6 +818,38 @@ export const en = {
       CLIENT: "Client",
     } as Record<string, string>,
   },
+  // A1: custom logins — a login that can use only the features ticked (Chatbots only, say).
+  customLogins: {
+    create: "Create a custom login",
+    edit: "Edit what they can use",
+    editTitle: "What can {name} use?",
+    intro:
+      "A login that can use only what you tick. It is a platform admin with just those features, so give it only to people you trust.",
+    name: "Name",
+    email: "Email",
+    organisation: "Organisation",
+    organisationHint: "The organisation their account belongs to.",
+    choose: "Choose an organisation",
+    whatCanTheyUse: "What can they use?",
+    chatbots: "Chatbots",
+    chatbotsHint:
+      "Their own assistants, and ones they're added to. They land there after logging in.",
+    save: "Create login",
+    saveEdit: "Save",
+    cancel: "Cancel",
+    loading: "Loading…",
+    created: "Login created. They can log in with their email.",
+    saved: "Saved.",
+    pickOne: "Tick at least one thing they can use.",
+    needName: "Write their name.",
+    needEmail: "Write their email address.",
+    needOrganisation: "Choose an organisation.",
+    failedCreate: "Couldn't create the account: {reason}",
+    failedAdmin:
+      "The account was made, but it couldn't be given access: {reason}. Open it from Ally admins to finish.",
+    failedFeatures:
+      "The account was made, but its features couldn't be set: {reason}. Open it from Ally admins and use Edit what they can use.",
+  },
   superAdmins: {
     title: "Ally admins",
     subtitle:
@@ -1528,6 +1560,14 @@ export const en = {
     stop: "Stop",
     loadingTracks: "Loading tracks...",
     noTracks: "No tracks available — a superadmin can upload them in Settings.",
+  },
+  // A1: the assistants area's own slim space, out of Ally admin's navigation.
+  assistantsShell: {
+    yourAssistants: "Your assistants",
+    allyAdmin: "Ally admin",
+    signOut: "Sign out",
+    noAccess: "You don't have access to this assistant. Ask its owner to add you.",
+    toYourAssistants: "Go to your assistants",
   },
   whatsappBot: {
     navLabel: "AI Chatbots",

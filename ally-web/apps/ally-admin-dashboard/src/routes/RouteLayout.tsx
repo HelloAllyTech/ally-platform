@@ -1,6 +1,13 @@
 import React, { lazy, Suspense } from "react";
 
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 
 import { Permissions, ROUTES, FeatureToggleKey, OrgToggle } from "@constants";
 import {
@@ -92,11 +99,21 @@ const InboxRedirect: React.FC = () => {
 };
 
 /**
+ * Links from before A1 (`/chatbots`, `/chatbots/:id?section=tools`, `/chatbots/new/…`, emails and
+ * bookmarks): the same place under `/assistants`, with its query and hash.
+ */
+export const ChatbotsLegacyRedirect: React.FC = () => {
+  const { pathname, search, hash } = useLocation();
+  const rest = pathname.replace(/^\/chatbots/, "");
+  return <Navigate to={`${ROUTES.WHATSAPP_BOT}${rest}${search}${hash}`} replace />;
+};
+
+/**
  * One assistant: the assistant home (chunk 20d), edge to edge. The classic tabbed page went in CL1;
  * an old `?view=classic` link opens the home, and its `tab=` still lands on the right section.
  */
 const ChatbotDetailRoute: React.FC = () => (
-  <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
+  <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed shell="assistants">
     <AssistantHome />
   </PrivateLayout>
 );
@@ -734,7 +751,11 @@ export const RouteLayout: React.FC = () => {
           path={ROUTES.WHATSAPP_BOT}
           element={
             // Full bleed, as the assistant home: the page draws its own background to the edges.
-            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
+            <PrivateLayout
+              requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
+              fullBleed
+              shell="assistants"
+            >
               <WhatsAppBot />
             </PrivateLayout>
           }
@@ -747,6 +768,7 @@ export const RouteLayout: React.FC = () => {
               requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
               requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
               fullBleed
+              shell="assistants"
             >
               <OnboardingStart />
             </PrivateLayout>
@@ -759,6 +781,7 @@ export const RouteLayout: React.FC = () => {
               requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
               requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
               fullBleed
+              shell="assistants"
             >
               <OnboardingSession />
             </PrivateLayout>
@@ -769,6 +792,8 @@ export const RouteLayout: React.FC = () => {
           path={ROUTES.WHATSAPP_BOT_LEGACY}
           element={<Navigate to={ROUTES.WHATSAPP_BOT} replace />}
         />
+        <Route path={ROUTES.CHATBOTS_LEGACY} element={<ChatbotsLegacyRedirect />} />
+        <Route path={`${ROUTES.CHATBOTS_LEGACY}/*`} element={<ChatbotsLegacyRedirect />} />
         <Route
           path={ROUTES.DEBRIEFS}
           element={
@@ -842,6 +867,9 @@ export const RouteLayout: React.FC = () => {
           }
         />
         <Route path="/" element={<DefaultRedirect />} />
+        {/* No sign-up (A1): accounts are made by Ally admin or an owner's invite. */}
+        <Route path={ROUTES.SIGN_UP} element={<Navigate to={ROUTES.LOGIN} replace />} />
+        <Route path={ROUTES.SIGN_UP_ALT} element={<Navigate to={ROUTES.LOGIN} replace />} />
 
         <Route path="*" element={<Navigate to={ROUTES.SIMULATION_STUDIO} replace />} />
       </Routes>

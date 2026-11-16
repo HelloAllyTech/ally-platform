@@ -112,6 +112,30 @@ describe("DefaultRedirect", () => {
     expect(screen.queryByText("EventsPage")).not.toBeInTheDocument();
   });
 
+  it("lands a login whose only feature is Chatbots on its assistants (A1 custom login)", async () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+    // A custom login is a platform admin: lots of permissions, one toggle.
+    mockPermsQuery.mockReturnValue({
+      data: [Permissions.EDIT_EVENT, Permissions.EDIT_USER],
+      isLoading: false,
+    } as any);
+    const { useGetFeatureTogglesQuery } = await import("@api");
+    vi.mocked(useGetFeatureTogglesQuery).mockReturnValueOnce({
+      data: ["whatsapp_bot"],
+      isLoading: false,
+    } as any);
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<DefaultRedirect />} />
+          <Route path={ROUTES.WHATSAPP_BOT} element={<div>AssistantsPage</div>} />
+          <Route path={ROUTES.MANAGE_EVENTS} element={<div>EventsPage</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("AssistantsPage")).toBeInTheDocument();
+  });
+
   it("redirects to the user's first accessible tab", () => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
     mockPermsQuery.mockReturnValue({ data: [Permissions.EDIT_EVENT], isLoading: false } as any);

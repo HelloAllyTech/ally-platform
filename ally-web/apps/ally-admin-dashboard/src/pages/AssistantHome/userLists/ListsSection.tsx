@@ -13,6 +13,7 @@ import { DetailsBlock } from "./DetailsBlock";
 import { EntriesTable } from "./EntriesTable";
 import { exampleOptions } from "./examples";
 import { human, liveFields, lower } from "./format";
+import { HandOverAbility } from "./HandOverAbility";
 import { ListMenu } from "./ListMenu";
 import { NewListForm } from "./NewListForm";
 import { ReadyMadeSetup } from "./ReadyMadeSetup";
@@ -21,6 +22,7 @@ import { MemorySettings } from "../sections/MemorySettings";
 import { Sheet } from "../ui/Sheet";
 
 import type { SectionProps } from "../sections/props";
+
 import "./lists.css";
 
 const t = () => HOME.userLists;
@@ -33,7 +35,14 @@ type Mode = { kind: "lists" } | { kind: "setup" } | { kind: "scratch" };
  * assistant may do. Switching assistant remounts the home (it's keyed by bot), so the open tab
  * starts again at the first list.
  */
-export const ListsSection: React.FC<SectionProps> = ({ bot, home, canEdit, go, tryIt }) => {
+export const ListsSection: React.FC<SectionProps> = ({
+  bot,
+  home,
+  canEdit,
+  canManage,
+  go,
+  tryIt,
+}) => {
   const { data: lists, isLoading, isError, refetch } = useGetUserListsQuery(bot.id);
   const { data: catalogue } = useGetReadyMadeListsQuery(bot.id, { skip: !canEdit });
   const [mode, setMode] = useState<Mode>({ kind: "lists" });
@@ -94,7 +103,14 @@ export const ListsSection: React.FC<SectionProps> = ({ bot, home, canEdit, go, t
             onAdd={canEdit ? () => setAdding(true) : undefined}
           />
           {builtIn ? (
-            <BuiltInPanel tool={builtIn} bot={bot} home={home} canEdit={canEdit} go={go} />
+            <BuiltInPanel
+              tool={builtIn}
+              bot={bot}
+              home={home}
+              canEdit={canEdit}
+              canManage={canManage}
+              go={go}
+            />
           ) : current ? (
             <OpenList
               key={current.key}
@@ -287,8 +303,9 @@ const BuiltInPanel: React.FC<{
   bot: SectionProps["bot"];
   home: SectionProps["home"];
   canEdit: boolean;
+  canManage: boolean;
   go: SectionProps["go"];
-}> = ({ tool, bot, home, canEdit, go }) => {
+}> = ({ tool, bot, home, canEdit, canManage, go }) => {
   const { data: how } = useGetHowItWorksQuery(bot.id);
   const name = tool.slice(1);
   return (
@@ -331,6 +348,7 @@ const BuiltInPanel: React.FC<{
         <div className="ally-card ally-tools__card">
           <h3 className="ally-home__group-title">{t().tools.handover}</h3>
           <p className="ally-small">{t().tools.handoverBody}</p>
+          <HandOverAbility botId={bot.id} canManage={canManage} />
           <div>
             <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("share")}>
               {t().tools.handoverChange}

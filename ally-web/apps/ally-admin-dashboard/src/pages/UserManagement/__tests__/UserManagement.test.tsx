@@ -770,6 +770,26 @@ describe("UserManagement", () => {
     });
   });
 
+  // A1: custom logins are made from Ally admins, so only holders of Admin User Management (the
+  // super admins) see the screen; ally-be refuses its three routes to everyone else.
+  describe("Create a custom login", () => {
+    it("is offered on Ally admins with Admin User Management", () => {
+      mockUserState(
+        [Permissions.EDIT_USER],
+        [FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT],
+      );
+      renderUserManagement([`/?tab=${TabType.SUPER_ADMINS}`]);
+      expect(screen.getByTestId("custom-login-create")).toBeInTheDocument();
+    });
+
+    it("is hidden from anyone without it", () => {
+      mockUserState([Permissions.EDIT_USER, Permissions.VIEW_USERS], [FeatureToggleKey.USERS]);
+      renderUserManagement([`/?tab=${TabType.SUPER_ADMINS}`]);
+      expect(screen.queryByTestId("custom-login-create")).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Ally admins/)).not.toBeInTheDocument();
+    });
+  });
+
   // With the Users toggle off, an admin who holds Admin User Management still
   // reaches the page — for the Ally admins list — and nothing else on it.
   describe("with the Users toggle off", () => {

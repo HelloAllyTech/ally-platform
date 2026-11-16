@@ -28,6 +28,12 @@ export const USER_LISTS = {
     handoverBody:
       "When someone asks for a person, your assistant tells them your team has been asked, and lets you know.",
     handoverChange: "Change in Share",
+    // A1: whether the assistant may hand a chat to a person moved from Ally to the owners.
+    handoverAbility: "Can your assistant hand a chat to your team?",
+    handoverAbilityHint:
+      "On: when someone asks for a person, it hands the chat to your team. Off: it keeps answering itself.",
+    handoverAbilityOwners: "Only this assistant's owners can change this.",
+    handoverAbilityFailed: "That didn't save. Try again.",
   },
 
   listMenu: {

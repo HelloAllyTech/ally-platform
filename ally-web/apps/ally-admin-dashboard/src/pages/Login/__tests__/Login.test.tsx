@@ -1,7 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { Login } from "../Login";
@@ -215,7 +215,10 @@ vi.mock("@constants", () => ({
 }));
 
 // Mock utils
-vi.mock("@utils", () => ({
+vi.mock("@utils", async () => ({
+  ...(await vi.importActual<typeof import("../../../utils/loginRedirect")>(
+    "../../../utils/loginRedirect",
+  )),
   validateEmail: (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -655,6 +658,47 @@ describe("Login", () => {
       fireEvent.click(privacyLink);
 
       expect(openLinkInNewTab).toHaveBeenCalledWith("https://ally.com/privacy");
+    });
+  });
+
+  // A1: no sign-up, and back to the link they opened.
+  describe("Login only, then back where they were (A1)", () => {
+    it("has no sign-up link or button", () => {
+      renderLogin();
+      expect(screen.queryByText(/sign\s*up/i)).toBeNull();
+      expect(screen.queryByText(/create (an )?account/i)).toBeNull();
+    });
+
+    it("goes back to the deep link in ?next once logged in", () => {
+      mockUseUser.mockReturnValue({ isAuthenticated: true, checkAuth: mockCheckAuth });
+      const loggedIn = configureStore({ reducer: { user: () => ({ user: { id: 1 } }) } });
+      render(
+        <Provider store={loggedIn}>
+          <MemoryRouter
+            initialEntries={[
+              `/login?next=${encodeURIComponent("/assistants/b1?section=lists&tool=memory")}`,
+            ]}
+          >
+            <Login />
+          </MemoryRouter>
+        </Provider>,
+      );
+      expect(mockNavigate).toHaveBeenCalledWith("/assistants/b1?section=lists&tool=memory", {
+        replace: true,
+      });
+    });
+
+    it("ignores a next that leaves the app", () => {
+      mockUseUser.mockReturnValue({ isAuthenticated: true, checkAuth: mockCheckAuth });
+      const loggedIn = configureStore({ reducer: { user: () => ({ user: { id: 1 } }) } });
+      render(
+        <Provider store={loggedIn}>
+          <MemoryRouter initialEntries={["/login?next=//evil.example"]}>
+            <Login />
+          </MemoryRouter>
+        </Provider>,
+      );
+      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
     });
   });
 });

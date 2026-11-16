@@ -204,7 +204,8 @@ describe("deriveNavigationItems", () => {
     expect(ids).toContain(SIDEBAR_ITEMS.USER_BADGES);
     expect(ids).toContain(SIDEBAR_ITEMS.ANALYTICS);
     expect(ids).toContain(SIDEBAR_ITEMS.SCENARIO_LANGUAGES);
-    expect(ids).toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
+    // Chatbots left Ally admin's navigation in A1 (assistants have their own space).
+    expect(ids).not.toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
     expect(ids).toContain(SIDEBAR_ITEMS.BUG_HUNTER);
   });
 
@@ -318,15 +319,14 @@ describe("deriveNavigationItems", () => {
     expect(ids).not.toContain(SIDEBAR_ITEMS.DEBRIEFS);
   });
 
-  it("shows WhatsApp Bot to a holder of the whatsapp_bot toggle", () => {
+  it("never shows Chatbots in Ally admin's navigation, even to a holder of the toggle (A1)", () => {
     const result = deriveNavigationItems({
       permissions: [],
       features: [FeatureToggleKey.WHATSAPP_BOT],
       savedOrder: undefined,
     });
-    const item = result.find(i => i.id === SIDEBAR_ITEMS.WHATSAPP_BOT);
-    expect(item).toBeDefined();
-    expect(item?.path).toBe(ROUTES.WHATSAPP_BOT);
+    expect(result.find(i => i.id === SIDEBAR_ITEMS.WHATSAPP_BOT)).toBeUndefined();
+    expect(result.find(i => i.path === ROUTES.WHATSAPP_BOT)).toBeUndefined();
   });
 
   // Both halves are required, like Simulation Studio: Course Copilot is deliberately not in
