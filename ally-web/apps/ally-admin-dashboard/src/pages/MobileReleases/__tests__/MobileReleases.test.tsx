@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Control the data/loading state the page renders from.
@@ -115,7 +116,11 @@ describe("MobileReleases page — Android pipeline panel gating", () => {
 
   it("does not show the 'no successful build' placeholder while the run history is still loading", () => {
     (useMobileReleases as any).mockReturnValue(makeState({ runs: [], isRunsLoading: true }));
-    render(<MobileReleases />);
+    render(
+      <MemoryRouter>
+        <MobileReleases />
+      </MemoryRouter>,
+    );
 
     // The version card above already shows a build exists — the pipeline
     // panel below must not contradict it just because the separate runs
@@ -125,16 +130,36 @@ describe("MobileReleases page — Android pipeline panel gating", () => {
 
   it("does not show the 'no successful build' placeholder when the run history failed to load", () => {
     (useMobileReleases as any).mockReturnValue(makeState({ runs: [], isRunsError: true }));
-    render(<MobileReleases />);
+    render(
+      <MemoryRouter>
+        <MobileReleases />
+      </MemoryRouter>,
+    );
 
     expect(screen.queryByText(/No successful Android build yet/i)).not.toBeInTheDocument();
   });
 
   it("shows the real pipeline once the run history has loaded with a successful build", () => {
     (useMobileReleases as any).mockReturnValue(makeState({ runs: [androidBuildRun] }));
-    render(<MobileReleases />);
+    render(
+      <MemoryRouter>
+        <MobileReleases />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText("Current Android build's pipeline")).toBeInTheDocument();
     expect(screen.queryByText(/No successful Android build yet/i)).not.toBeInTheDocument();
+  });
+
+  it("opens the history tab named in ?tab=", () => {
+    (useMobileReleases as any).mockReturnValue(makeState({ runs: [] }));
+    render(
+      <MemoryRouter initialEntries={["/mobile-releases?tab=history"]}>
+        <MobileReleases />
+      </MemoryRouter>,
+    );
+
+    // Only the Release History tab carries this intro line.
+    expect(screen.getByText(/Every run of every release workflow/)).toBeInTheDocument();
   });
 });

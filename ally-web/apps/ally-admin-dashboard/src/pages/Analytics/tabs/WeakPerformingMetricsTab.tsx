@@ -32,6 +32,7 @@ import {
 } from "@types";
 
 import { AnalyticsTabFilters } from "../analyticsFilters";
+import { Jargon } from "../analyticsGlossary";
 import { inProgressCaption, isInProgress, withoutInProgress } from "../analyticsGrouping";
 import { ChartCard, buildSource, lineOpts, single, timeBarOpts } from "../chartKit";
 import { PALETTE } from "../chartScales";
@@ -790,7 +791,9 @@ export const WeakPerformingMetricsTab: FC<AnalyticsTabFilters> = ({ query, langu
               the fix for clienthood is a scenario-brief edit, and this is the
               only view that says which brief. */}
           <section style={{ marginBottom: "2.5rem" }}>
-            <h3 style={{ margin: "0 0 0.25rem" }}>Worst scenarios by role-slip rate</h3>
+            <h3 style={{ margin: "0 0 0.25rem" }}>
+              Worst scenarios by <Jargon term="role-slip">role-slip</Jargon> rate
+            </h3>
             <p style={{ margin: "0 0 1rem", opacity: 0.75 }}>
               Role-slip is concentrated, not diffuse — a small number of scenarios carry a quarter
               of every slip, and an English scenario sits among the worst. The aggregate language

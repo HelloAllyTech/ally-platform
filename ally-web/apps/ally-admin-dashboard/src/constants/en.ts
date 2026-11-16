@@ -6154,6 +6154,12 @@ export const en = {
       "The control room for Ally, the AI course companion: how it is doing, what it said, which release is live, and the switches that turn it off.",
     viewOnly:
       "View only. Changing anything here needs the edit permission for the Ally guide, and yours is read-only.",
+    groups: {
+      label: "Ally Console areas",
+      monitor: "Monitor",
+      release: "Release",
+      configure: "Configure",
+    },
     tabs: {
       overview: "Overview",
       conversations: "Conversations",
