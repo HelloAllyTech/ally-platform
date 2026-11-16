@@ -161,6 +161,21 @@ Memory is left on for those two local bots (`settings.memory.on`).
 - ally-be: 1,137 of 1,139 suites. The two failures are the pre-existing `backfill-check` truncate and the flaky `llm-completion`. Lint ✅.
 - ally-web: as in §4.
 
+### Shehbaz's manual test on Amaha (16 Nov): two fixes
+
+Shehbaz built "Amaha assistant" from amahahealth.com (Bring in customers, mental-health pack, ready-made Appointments, memory on) and booked as asha@example.com. Then, in a new chat, "what do you know about me?" got v1's "I don't have any personal information about you in the materials I can access." Two 20a-2 heuristics misfired on the crawled page titles (`aef60e063`):
+- **"About Amaha" made "about" a name of the organisation.** The question counted as about Amaha, the reply was sent back to search first, the forced-search step replied anyway (a schema error), and too little time was left to retry, so v1 answered. Everyday title words (about, contact, find, online, care, …) no longer count; the full title still does.
+- **"Psychiatry" in three page titles counted as three topics,** so the booking confirmation was trimmed as a repeated topic list. The person was booked but never told. A topic now counts only for a word no topic counted before it.
+- **Also:** with memory on, the person's name heads their lines ("Name: Rahul"), so "what do you know about me?" has it.
+- **Replayed on Amaha, 3 runs each:** "what do you know about me?" → "I know your name is Shehbaz, and that you prefer evenings" (3 of 3); booking Thursday 15:00 → "I've booked your psychiatry session for Thursday 19 Nov 2026 at 15:00" (3 of 3).
+
+**Still open:**
+- **Asking for a time with no slot** ("Thursday evening" on a list with 10:00–16:00 only) is answered with the decline wording, a v1 fallback or a hand-over, not "nothing's free in the evening; the latest is 16:00".
+- **The forced-search step** fails the run when the model replies anyway and too little time is left.
+- **Such turns ran 35–50 s.**
+
+These are 6's lists behaviour and 20a-2's check, not memory; they're for the next lists chunk.
+
 ## 6. Open, for later chunks
 
 - **16c (the assistant map, sprint 1): show a reply's steps in Try it** (decided 14 Nov). The run's trace already comes back in Try it's result (each search, list tool call and the `remember` step, counts only); Try it drops the live steps and "Why this answer?" shows only sources and timing. For example: "Looked up Slots: 3 found · Booked in Appointments · Would remember: prefers evenings". The full "Why?" for live chats in the Inbox needs an ally-be route (16b).
