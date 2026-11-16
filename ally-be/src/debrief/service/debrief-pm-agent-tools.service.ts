@@ -59,6 +59,23 @@ const refuse = (reason: string): never => {
 };
 const text = (v: unknown, max = 2000): string =>
   typeof v === 'string' ? v.trim().slice(0, max) : '';
+/**
+ * V2_AUTONOMY A2: the confidence the PM agent states on a change, as stored in
+ * `evidence.confidence`. One the agent left out reads as low: it never skips
+ * the always-ask list by omission.
+ */
+export function changeConfidence(v: unknown): {
+  level: 'high' | 'low';
+  why: string;
+} {
+  const c = (v ?? {}) as { level?: unknown; why?: unknown };
+  const why = text(c.why, 300);
+  if (c.level === 'high' || c.level === 'low') {
+    return { level: c.level, why: why || 'No reason given.' };
+  }
+  return { level: 'low', why: 'The PM agent did not say how sure it is.' };
+}
+
 /** Runs counted as one change's evidence (R2-18): enough for 10 learners in 3 organisations. */
 const MAX_EVIDENCE_RUNS = 100;
 
@@ -139,6 +156,9 @@ export class DebriefPmAgentToolsService {
           return await this.questionsRead();
         case 'question_answer':
           return await this.questionAnswer(claims, b);
+        default:
+          // The conversation's tools are DebriefPmConversationService's.
+          return refuse(`${tool} is not a PM agent run tool`);
       }
     } catch (e) {
       if (e instanceof Refused) {
@@ -344,6 +364,8 @@ export class DebriefPmAgentToolsService {
             baselineAt: new Date().toISOString(),
           },
           agentRunId: claims.agentRunId,
+          // V2_AUTONOMY A2: how sure the agent is, and why, on every change.
+          confidence: changeConfidence(b.confidence),
         }),
         hash,
       ],
@@ -480,6 +502,13 @@ export class DebriefPmAgentToolsService {
       `UPDATE agent_lessons SET change = $2::jsonb, kind = $3, "updatedAt" = now() WHERE id = $1`,
       [idea.id, JSON.stringify(next), lessonKind],
     );
+    if (b.confidence) {
+      await this.pm.writeEvidence(
+        idea.id,
+        'confidence',
+        changeConfidence(b.confidence),
+      );
+    }
     await this.pm.writeEvidence(idea.id, 'draft', {
       kind,
       draftedAt: new Date().toISOString(),
@@ -889,6 +918,29 @@ export class DebriefPmAgentToolsService {
       agentRunId: claims.agentRunId,
       step: `${handoff.kind}_handoff`,
     });
+    // V2_AUTONOMY A8: Builder and Bug Hunter start on their own; a Builder
+    // pull request still waits for an engineer to merge.
+    if (handoff.kind === 'builder' || handoff.kind === 'bug_hunter') {
+      const started = await this.pm.autoStartHandoff(idea.id);
+      return {
+        ok: true,
+        idea_id: idea.id,
+        started: started.started,
+        ...(started.started
+          ? {
+              waiting_for:
+                handoff.kind === 'builder'
+                  ? 'nobody: Builder started; its pull request waits for an engineer to merge'
+                  : 'nobody: the bug was filed for Bug Hunter',
+            }
+          : {
+              waiting_for: `a person in the Debrief Console (${started.reason})`,
+            }),
+        ...(typeof handoff.quotesRemoved === 'number'
+          ? { quotes_removed: handoff.quotesRemoved }
+          : {}),
+      };
+    }
     return {
       ok: true,
       idea_id: idea.id,

@@ -57,6 +57,10 @@ import {
 } from '../util/debrief-pinned-rules.util';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
+import {
+  DebriefChangeHoldsService,
+  normaliseLanguages,
+} from './debrief-change-holds.service';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefMetricsService } from './debrief-metrics.service';
 import {
@@ -132,6 +136,8 @@ export class DebriefPmAgentService
     @Optional() private readonly notifier?: DebriefNotifier,
     /** The gate's safety-recall rule runs the seeded set in ally-ai. Absent → the rule fails closed. */
     @Optional() private readonly graph?: DebriefGraphClient,
+    /** V2_AUTONOMY A9 and C2: language pins and paused kinds of change. */
+    @Optional() private readonly holds?: DebriefChangeHoldsService,
   ) {}
 
   /** The policy for this idea at this step; 'auto' when no policy is wired (tests). */
@@ -772,7 +778,13 @@ export class DebriefPmAgentService
       | 'approval'
       | 'watch'
       | 'undo'
-      | 'stopped',
+      | 'stopped'
+      // V2_AUTONOMY A2, A8, A9 (the conversation): confidence, an automatic
+      // hand-off, an undo or retry for some languages.
+      | 'confidence'
+      | 'undone'
+      | 'retried'
+      | 'autoStart',
     value: Record<string, unknown>,
   ): Promise<void> {
     await this.dataSource.query(
@@ -863,6 +875,15 @@ export class DebriefPmAgentService
     // trial that passed starts a canary; nothing else may reach learners.
     const canary = idea.evidence?.canary;
     if (canary?.status === 'passed' && canary.releaseId) {
+      // V2_AUTONOMY A9: a change scoped to some languages goes live for them only.
+      const scoped = await this.liveForLanguagesOnly(
+        idea,
+        { id: canary.releaseId, version: canary.version },
+        userId,
+        note,
+        true,
+      );
+      if (scoped) return scoped;
       const before = await this.releases.getGa(DEBRIEF_AGENT_KEY);
       const released = await this.releases.makeGa(
         canary.releaseId,
@@ -997,6 +1018,8 @@ export class DebriefPmAgentService
     userId: number | null,
     note?: string,
   ): Promise<{ releaseId: string; version: number; stage: 'promoted' }> {
+    const scoped = await this.liveForLanguagesOnly(idea, draft, userId, note);
+    if (scoped) return scoped;
     const ideaId = idea.id as string;
     const before = await this.releases.getGa(DEBRIEF_AGENT_KEY);
     const released = await this.releases.makeGa(
@@ -1032,6 +1055,73 @@ export class DebriefPmAgentService
       excludeUserId: userId,
     });
     return { releaseId: draft.id, version, stage: 'promoted' };
+  }
+
+  /**
+   * V2_AUTONOMY A9: a change retried "only for Hindi" (`change.languages`)
+   * goes live for those languages only: each is pinned to its release
+   * (`debrief_change_holds`, reason `only`) and the release in force stays as
+   * it is for everyone else. A try-out release is ended first, so it no longer
+   * takes a share of other languages. Null when the change has no language
+   * scope (it goes live for everyone as before).
+   */
+  async liveForLanguagesOnly(
+    idea: Record<string, any>,
+    release: { id: string; version: number },
+    userId: number | null,
+    note?: string,
+    endTryOut = false,
+  ): Promise<{ releaseId: string; version: number; stage: 'promoted' } | null> {
+    const languages = normaliseLanguages(idea.change?.languages);
+    if (!languages || !this.holds) return null;
+    if (endTryOut) {
+      await this.releases
+        .stopCanary(
+          DEBRIEF_AGENT_KEY,
+          userId,
+          false,
+          `Live for ${languages.join(', ')} only`,
+        )
+        .catch(() => undefined);
+    }
+    for (const language of languages) {
+      await this.holds.pin({
+        language,
+        releaseId: release.id,
+        ideaId: idea.id,
+        reason: 'only',
+        by: userId,
+        note: note ?? null,
+      });
+    }
+    await this.dataSource.query(
+      `UPDATE agent_lessons SET status = 'active', "releaseId" = $2, "updatedAt" = now() WHERE id = $1`,
+      [idea.id, release.id],
+    );
+    await this.writeEvidence(idea.id, 'canary', {
+      ...(idea.evidence?.canary ?? {}),
+      status: 'promoted',
+      releaseId: release.id,
+      version: release.version,
+      languages,
+      promotedAt: new Date().toISOString(),
+    });
+    await this.audit('activated', idea.id, userId, {
+      releaseId: release.id,
+      languages,
+      note: note ?? null,
+    });
+    await this.notifier?.owner({
+      title: `Debriefs: a change is live for ${languages.join(', ')}`,
+      body: `“${idea.text}” is live for ${languages.join(', ')} only; every other language stays as it was.`,
+      data: { ideaId: idea.id, releaseId: release.id },
+      excludeUserId: userId ?? undefined,
+    });
+    return {
+      releaseId: release.id,
+      version: release.version,
+      stage: 'promoted',
+    };
   }
 
   /** Rung 4: the candidate release reaches a share of live learners; the canary watcher decides. */
@@ -1145,10 +1235,13 @@ export class DebriefPmAgentService
     userId: number,
     note?: string,
     answerer: BuilderAnswerer = 'person',
+    /** V2_AUTONOMY A8: started on its own; `userId` is only the session's owner of record. */
+    auto = false,
   ): Promise<{
     stage: 'builder' | 'bug_hunter' | 'answered';
     id: string | null;
   }> {
+    const decidedBy = auto ? null : userId;
     const h = idea.evidence?.handoff;
     const kind = idea.change?.ideaKind;
     if (!h || h.status !== 'waiting') {
@@ -1179,7 +1272,8 @@ export class DebriefPmAgentService
         status: 'filed',
         filedId: id,
         answerer,
-        decidedBy: userId,
+        decidedBy,
+        ...(auto ? { startedOnItsOwn: true } : {}),
         decidedAt: new Date().toISOString(),
         note: note ?? null,
       });
@@ -1213,19 +1307,21 @@ export class DebriefPmAgentService
       status: stage === 'answered' ? 'answered' : 'filed',
       filedId: id,
       ...(stage === 'builder' ? { answerer } : {}),
-      decidedBy: userId,
+      decidedBy,
+      ...(auto ? { startedOnItsOwn: true } : {}),
       decidedAt: new Date().toISOString(),
       note: note ?? null,
     });
     await this.dataSource.query(
       `UPDATE agent_lessons SET status = 'approved', "decidedBy" = $2, "decidedAt" = now(),
               "updatedAt" = now() WHERE id = $1`,
-      [idea.id, userId],
+      [idea.id, decidedBy],
     );
-    await this.audit('approved', idea.id, userId, {
+    await this.audit('approved', idea.id, decidedBy, {
       stage,
       id,
       note: note ?? null,
+      ...(auto ? { startedOnItsOwn: true, ownerOfRecord: userId } : {}),
     });
     if (stage !== 'answered') {
       await this.notifier?.owner({
@@ -1233,12 +1329,101 @@ export class DebriefPmAgentService
           stage === 'builder'
             ? 'Debriefs: a Builder session was filed'
             : 'Debriefs: a bug was filed for Bug Hunter',
-        body: `From PM agent idea “${idea.text}”.`,
+        body: auto
+          ? `Started on its own from PM agent idea “${idea.text}”.${stage === 'builder' ? ' Its pull request still waits for an engineer.' : ''}`
+          : `From PM agent idea “${idea.text}”.`,
         data: { ideaId: idea.id, filedId: id },
-        excludeUserId: userId,
+        excludeUserId: auto ? undefined : userId,
       });
     }
     return { stage, id };
+  }
+
+  /**
+   * V2_AUTONOMY A8: a Builder or Bug Hunter hand-off starts on its own as soon
+   * as the PM agent writes it; nobody approves it. A Builder pull request still
+   * waits for an engineer to merge. Builder needs a person to own the session:
+   * the Debrief owner is its owner of record (the hand-off itself records no
+   * decider), and the PM agent answers Builder's questions. Left waiting, with
+   * the reason on `evidence.autoStart`, while code changes are paused or when
+   * there is no owner to hold the session.
+   */
+  async autoStartHandoff(ideaId: string): Promise<{
+    started: boolean;
+    reason?: string;
+    stage?: string;
+    id?: string | null;
+  }> {
+    const idea = await this.getIdea(ideaId);
+    const kind = idea.change?.ideaKind;
+    if (kind !== 'needs_code' && kind !== 'defect') {
+      return {
+        started: false,
+        reason: 'only Builder and Bug Hunter hand-offs start on their own',
+      };
+    }
+    const at = new Date().toISOString();
+    const paused = await this.holds?.pausedUntil('code').catch(() => null);
+    if (paused) {
+      const reason = `code changes are paused until ${paused.toISOString().slice(0, 10)}`;
+      await this.writeEvidence(ideaId, 'autoStart', {
+        status: 'paused',
+        reason,
+        at,
+      });
+      return { started: false, reason };
+    }
+    const actor = await this.ownerOfRecord();
+    if (actor == null) {
+      const reason = 'there is no Debrief owner to hold the Builder session';
+      await this.writeEvidence(ideaId, 'autoStart', {
+        status: 'waiting',
+        reason,
+        at,
+      });
+      return { started: false, reason };
+    }
+    try {
+      const out = await this.approveHandoff(
+        idea,
+        actor,
+        'Started on its own (Debrief v2: hand-offs need no approval)',
+        'pm_agent',
+        true,
+      );
+      await this.writeEvidence(ideaId, 'autoStart', {
+        status: 'started',
+        at,
+        ownerOfRecord: actor,
+        stage: out.stage,
+        filedId: out.id,
+      });
+      return { started: true, stage: out.stage, id: out.id };
+    } catch (e) {
+      const reason = (e as Error).message.slice(0, 300);
+      this.logger.warn(
+        `[pm-agent] hand-off ${ideaId} did not start: ${reason}`,
+      );
+      await this.writeEvidence(ideaId, 'autoStart', {
+        status: 'failed',
+        reason,
+        at,
+      });
+      return { started: false, reason };
+    }
+  }
+
+  /** The Debrief owner who holds an automatically started Builder session (lowest user id). */
+  async ownerOfRecord(): Promise<number | null> {
+    const [row] = await this.dataSource.query(
+      `SELECT min(u.id)::int AS id
+         FROM users u
+         JOIN user_groups ug ON ug."userId" = u.id
+         JOIN group_permissions gp ON gp."groupId" = ug."groupId"
+         JOIN permissions p ON p.id = gp."permissionId"
+        WHERE p.name = 'manage:admin:debrief-settings'`,
+    );
+    return row?.id != null ? Number(row.id) : null;
   }
 
   // --- Approvals: questions, expiry, pinned rules (plan §11.7) ----------------------
@@ -1495,10 +1680,12 @@ export class DebriefPmAgentService
       );
     }
     await this.audit('proposed', rows[0].id, userId, { kind: 'pinned_rule' });
-    await this.notifier?.owner({
+    // V2: the clinical advisor and the owner decide it from Home, where the
+    // link opens this change and the conversation about it.
+    await this.notifier?.pinnedRuleDeciders({
       title: 'Debriefs: a pinned-rule change needs approval',
       body: `Proposed change to the ${pinnedRuleName(input.promptCode)}: ${why}`,
-      data: { ideaId: rows[0].id },
+      data: { ideaId: rows[0].id, url: `/debriefs?change=${rows[0].id}` },
       excludeUserId: userId,
     });
     return { id: rows[0].id };

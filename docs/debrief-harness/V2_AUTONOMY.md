@@ -51,7 +51,7 @@ must be built, tested and ticked before release.
       low-confidence changes (on by default, switchable); new models or providers (off by
       default). Model changes within budget never wait; an organisation's provider allowlist is
       always applied.
-- [ ] A2 The PM agent states a confidence (high / low) and why on every change; low waits when
+- [x] A2 The PM agent states a confidence (high / low) and why on every change; low waits when
       A1 says so.
 - [x] A3 Every other change runs the ladder on its own: tests → tried on a share of learners →
       live for everyone, with no person step. The canary starts and promotes itself.
@@ -62,9 +62,9 @@ must be built, tested and ticked before release.
       language and recipe and with enough debriefs, or when a gate trips. Post to Slack.
 - [x] A6 Judge agreement (κ) is information only: no longer a gate or a re-lock.
 - [x] A7 Approvals for always-ask kinds wait (no 14-day auto-expiry needed for anything else).
-- [ ] A8 Builder and Bug Hunter hand-offs start on their own; a Builder pull request still needs
+- [x] A8 Builder and Bug Hunter hand-offs start on their own; a Builder pull request still needs
       an engineer to merge ("Being built"). Delivery then runs the ladder.
-- [ ] A9 Per-language scope: a change can be held, undone or retried for one language
+- [x] A9 Per-language scope: a change can be held, undone or retried for one language
       (release pinned per language).
 - [x] A10 Test settings (Settings › Tests) are tuned by the PM agent as ordinary setting
       changes; a person no longer accepts proposals.
@@ -77,14 +77,14 @@ must be built, tested and ticked before release.
 - [x] K3 Safety posts: debrief shown with a missed clear risk cue; learner distress in Ask Ally.
 
 ### PM agent conversation (intervening)
-- [ ] C1 One thread per console (shared), stored in ally-be; each message notes what it was
+- [x] C1 One thread per console (shared), stored in ally-be; each message notes what it was
       about (a change, a session, a page).
-- [ ] C2 `POST pm-agent/conversation` runs the PM agent in ally-ai with the message, the context
+- [x] C2 `POST pm-agent/conversation` runs the PM agent in ally-ai with the message, the context
       and tools; it replies and acts: approve or turn down an always-ask change (after an
       explicit yes), stop, undo, retry (optionally for one language), hold a language, pause a
       kind of change until a date, propose a change, explain with evidence.
-- [ ] C3 Each agent message carries the action it took (`done` / `awaiting_yes`).
-- [ ] C4 Permissions as today (`DEBRIEF_ACTIONS`): the Ally team and the owner read and post; the
+- [x] C3 Each agent message carries the action it took (`done` / `awaiting_yes`).
+- [x] C4 Permissions as today (`DEBRIEF_ACTIONS`): the Ally team and the owner read and post; the
       clinical advisor sees and posts only about pinned-rule changes. A "yes" to a pinned-rule
       change needs the advisor or the owner; to a budget increase, the owner. Otherwise the agent
       does not act, says who can, and notifies them. Every message shows its author.
@@ -92,12 +92,14 @@ must be built, tested and ticked before release.
       wording before and after, the evidence, and the PM agent conversation scoped to that change.
       The clinical advisor has no Changes / PM agent button: they get a notification that opens
       Home with that item expanded, and their Needs you shows only pinned-rule changes.
+      (Backend built: the notification links `/debriefs?change=<id>`, and
+      `GET pm-agent/conversation?about=<id>` scopes the thread; the Home UI is U1.)
 
 ### Learner flags (point 7)
-- [ ] F1 The Debrief agent answers every learner flag within a minute: re-reads the roleplay,
+- [x] F1 The Debrief agent answers every learner flag within a minute: re-reads the roleplay,
       keeps / corrects / removes the card, and tells the learner why. Card versions are kept.
-- [ ] F2 Every answer, correction and replaced Ask Ally reply goes to the PM agent as evidence.
-- [ ] F3 A person may still change a card ("Change it") and comment; that also goes to the
+- [x] F2 Every answer, correction and replaced Ask Ally reply goes to the PM agent as evidence.
+- [x] F3 A person may still change a card ("Change it") and comment; that also goes to the
       PM agent.
 
 ### Console UI (canvas row F)

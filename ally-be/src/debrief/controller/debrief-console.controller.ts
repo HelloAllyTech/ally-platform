@@ -58,6 +58,7 @@ import { COMMENT_BODY_MAX, QUOTE_MAX } from '../util/debrief-review.util';
 import { DebriefRunMode } from '../enum/debrief-run.enum';
 import { DebriefConsoleAuditInterceptor } from '../interceptor/debrief-console-audit.interceptor';
 import { DebriefAgentService } from '../service/debrief-agent.service';
+import { DebriefPmConversationService } from '../service/debrief-pm-conversation.service';
 import { parseMetricsFilter } from '../util/debrief-metrics-filter.util';
 import { DebriefConsoleService } from '../service/debrief-console.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
@@ -335,6 +336,38 @@ class QuestionDto {
   text!: string;
 }
 
+class PmAboutDto {
+  @ApiProperty({ enum: ['change', 'session', 'page'] })
+  @IsIn(['change', 'session', 'page'])
+  kind!: 'change' | 'session' | 'page';
+
+  @ApiProperty({
+    required: false,
+    description: 'The change (idea) id or the session run id',
+  })
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(200)
+  label!: string;
+}
+
+class PmConversationDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(4000)
+  text!: string;
+
+  @ApiProperty({ required: false, type: PmAboutDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PmAboutDto)
+  about?: PmAboutDto;
+}
+
 class StartStepDto {
   @ApiProperty({ enum: ['gate_test', 'paired_trial'] })
   @IsIn(['gate_test', 'paired_trial'])
@@ -544,6 +577,7 @@ export class DebriefConsoleController {
     private readonly builderRequester: DebriefBuilderRequesterService,
     private readonly agentLogs: DebriefRunLogsService,
     private readonly nightly: DebriefNightlyService,
+    private readonly conversation: DebriefPmConversationService,
   ) {}
 
   /** Release settings (budgets, the evaluator bar) are the owner's. */
@@ -769,6 +803,43 @@ export class DebriefConsoleController {
       counts: { open: open.length, closed: ideas.length - open.length },
       viewer: { roles: viewer.roles, can: viewer.can },
     };
+  }
+
+  @Get('pm-agent/conversation')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'The one PM agent conversation, newest page oldest first: { messages, more }. `about` (a change id) narrows it to that change; the clinical advisor sees pinned-rule changes only',
+  })
+  async pmConversation(
+    @Req() req: AuthedRequest,
+    @Query('before') before?: string,
+    @Query('limit') limit?: string,
+    @Query('about') about?: string,
+  ) {
+    return this.conversation.list(await this.view.viewer(req.user.id), {
+      before: before || undefined,
+      limit: Number(limit) || 50,
+      about: about || undefined,
+    });
+  }
+
+  @Post('pm-agent/conversation')
+  // The route admits the team, the owner and the advisor; the service keeps
+  // the advisor to pinned-rule changes and checks each action's permission.
+  @DebriefAct('comment')
+  @ApiOperation({
+    summary:
+      "Talk to the PM agent: { text, about? } → { messages: [the person's, the agent's reply] }. It answers and acts; an approval waits for an explicit yes. Takes 10–30 s",
+  })
+  async pmConversationPost(
+    @Req() req: AuthedRequest,
+    @Body() body: PmConversationDto,
+  ) {
+    return this.conversation.post(await this.view.viewer(req.user.id), {
+      text: body.text,
+      about: body.about ?? null,
+    });
   }
 
   @Get('pm-agent/reports')

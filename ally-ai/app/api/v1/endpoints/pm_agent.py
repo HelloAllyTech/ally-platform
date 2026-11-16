@@ -10,10 +10,13 @@ from fastapi import APIRouter, HTTPException, status
 from app.core.agent_runtime import checkpointer as runtime_checkpointer
 from app.core.config import settings
 from app.core.pm_agent.builder_answers import answer_builder_questions
+from app.core.pm_agent.conversation import run_conversation
 from app.core.pm_agent.runner import run_pm_agent
 from app.core.pm_agent.schemas import (
     BuilderAnswersRequest,
     BuilderAnswersResponse,
+    PmConversationRequest,
+    PmConversationResponse,
     PmAgentRunRequest,
     PmAgentRunResponse,
 )
@@ -38,6 +41,15 @@ async def pm_agent_run(req: PmAgentRunRequest) -> PmAgentRunResponse:
         default_model=settings.DEBRIEF.PM_AGENT_MODEL,
     )
     return PmAgentRunResponse(**result)
+
+
+@router.post("/conversation", response_model=PmConversationResponse)
+async def pm_agent_conversation(req: PmConversationRequest) -> PmConversationResponse:
+    """Answer one message in the Debrief console's PM agent conversation, acting
+    through the gateway when the person asks (V2_AUTONOMY C2). No checkpointer:
+    the thread lives in ally-be and comes in the request."""
+    result = await run_conversation(req, default_model=settings.DEBRIEF.PM_AGENT_MODEL)
+    return PmConversationResponse(**result)
 
 
 @router.post("/builder-answers", response_model=BuilderAnswersResponse)

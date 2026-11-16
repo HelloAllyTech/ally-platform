@@ -489,6 +489,12 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       metrics: metrics.metrics,
       judge_and_evaluator: library,
       learner_flags: await this.learnerFeedback.signals(windowDays),
+      // V2_AUTONOMY F2–F3: how the Debrief agent answered learner flags, the
+      // cards changed (by it or by a person) and Ask Ally replies replaced.
+      learner_flag_answers:
+        typeof this.learnerFeedback.pmEvidence === 'function'
+          ? await this.learnerFeedback.pmEvidence(windowDays).catch(() => null)
+          : null,
       // The nightly check: the last week's measures, data-quality counts and
       // drift alerts (v9 FR-49, R2-9). Read it before drawing conclusions.
       nightly_check: this.nightly

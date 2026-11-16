@@ -24,7 +24,7 @@ from app.core.pm_agent.models import build_models
 from app.core.pm_agent.prompt import DEFAULT_SYSTEM_PROMPT, render_inputs
 from app.core.pm_agent.schemas import PmAgentRunRequest
 from app.core.pm_agent.store import MEMORY_NAMESPACE
-from app.core.pm_agent.tools import ALL_TOOLS, make_tools
+from app.core.pm_agent.tools import ALL_TOOLS, RUN_TOOLS, make_tools
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -87,7 +87,7 @@ async def run_pm_agent(
         if ledger.exhausted:
             return result("budget_spent", None)
         allowed = (
-            [t for t in req.tools if t in ALL_TOOLS] if req.tools else list(ALL_TOOLS)
+            [t for t in req.tools if t in ALL_TOOLS] if req.tools else list(RUN_TOOLS)
         )
         agent = build_pm_agent(
             ledger=ledger,

@@ -118,11 +118,11 @@ above. Builder and Bug Hunter are never given a token, so they never receive com
 | `comments_read` | `{ "since"?: ISO date (exclusive, on `created_at`), "status"?: "open" \| "resolved" (default both), "ids"?: [uuid, ...], "limit"?: 1–200 (default 100) }` | `{ "comments": [ { "id", "run_id", "session_type", "language", "anchor": { "kind": "transcript" \| "card" \| "debrief", "turn_index", "section", "span_start", "span_end" }, "quoted_text", "body", "tag", "status", "idea": { "id", "status" } \| null, "repeat_of_id", "created_at", "replies": [ { "id", "body", "tag", "created_at" } ] } ], "next_since": ISO \| null }` — expert comment threads, oldest first (spec D8). Never the transcript, the cards or who wrote a comment. `next_since` is set when the page was full; pass it back as `since` |
 | `reporting_query` | `{ "sql": "SELECT …" }` | `ReportingQueryResult` `{ sql, ok, rows?, truncated?, refused? }` — the existing Analytics Agent guard and read-only executor over the redacted `debrief_reporting.*` views only. A refused query answers `refused` (the agent reads it as a tool error) |
 | `metrics_view` | `{ "weeks"?: 4–52 (default 8), "language"?, "recipe"?, …metric filters }` | `{ weeks, failure_points: [ { kind, name, segment, value, n, target, why } ], metrics: { <name>: value }, metric_names }` — spec C2 failure points from `DebriefMetricsService.view()` (`debrief-metric-failures.util.ts`): experience rates off the v9 targets (all, per language, per device), guardrails (hard-fail and thumbs-down above pre-launch, fabricated quotes, judge median below 8), efficiency drift (cost, revision rounds, visible seconds), steering falling, stages failing. Thin samples (n < 20) are left out |
-| `idea_propose` | `{ "problem": { title, summary, comment_ids[], metrics: [ { name, value, segment? } ] }, "route": "A"\|"B"\|"C"\|"D", "title", "hypothesis", "expected_effect": { metric, direction: "up"\|"down", by?, note? } }` | `{ idea_id, route, linked_comments, unknown_comment_ids, baseline: { metric, value }, next }` — writes an `agent_lessons` idea (`change.route`, `change.ideaKind` = `route_a` / `needs_code` / `defect` / `needs_person`; `evidence.problem`, `commentIds`, `metrics`, `forecast` with the named metric's value now), links the cited comments (`DebriefReviewService.linkIdea`). Refused: no evidence (no existing comment id and no metric), a metric not in `PM_AGENT_METRICS`, more than 5 ideas in one run, a duplicate, autonomy off |
+| `idea_propose` | `{ "problem": { title, summary, comment_ids[], metrics: [ { name, value, segment? } ] }, "route": "A"\|"B"\|"C"\|"D", "title", "hypothesis", "expected_effect": { metric, direction: "up"\|"down", by?, note? }, "confidence": { level: "high"\|"low", why } }` | `{ idea_id, route, linked_comments, unknown_comment_ids, baseline: { metric, value }, next }` — writes an `agent_lessons` idea (`change.route`, `change.ideaKind` = `route_a` / `needs_code` / `defect` / `needs_person`; `evidence.problem`, `commentIds`, `metrics`, `forecast` with the named metric's value now, `confidence` `{level, why}` (V2_AUTONOMY A2; one left out is stored as low, so it never skips the always-ask list); `release_draft` may restate it), links the cited comments (`DebriefReviewService.linkIdea`). Refused: no evidence (no existing comment id and no metric), a metric not in `PM_AGENT_METRICS`, more than 5 ideas in one run, a duplicate, autonomy off |
 | `release_draft` | `{ "idea_id", "kind": "prompt_edit"\|"setting"\|"registry_agent", prompt_code/find/replace \| setting_key/setting_value \| agent: { id, description, use_when, skip_when, prompt, tools[], scopes[], eval_cases, model? } }` | `{ ok, idea_id, kind, next }` — route A only; draft only (nothing reaches learners). Refused: the never-list (C4: the rubric and judge prompts, the Safety reader, the PM agent's own instructions, budgets, `passScore`, every owner setting), prompts outside `PM_AGENT_EDITABLE_PROMPTS` (orchestrator prompts only while GA runs the orchestrator), a `find` not exactly once in the live text, a change to `{variables}`, settings outside `PM_AGENT_SETTINGS` ranges, a change that does not apply to GA or fails bundle validation; FR-53 for registry agents (registered tools and A2 scopes only, ≥ 10 eval cases, ≤ 10 experimental, approved model). Registry agents are stored as drafts: the build defines the agents a release can enable, so they are not tested yet |
 | `ladder_start_quick_test` | `{ "idea_id" }` | `{ status: "running", startedAt, note }` — requests `DebriefPmAgentService.screen` (the deterministic ladder: quick test → gate → paired trials → canary watch; a person starts the canary and promotes). Refused: autonomy `propose_only` (a person starts it in the Console) or `off`, no drafted change, a registry agent, the learning budget spent, a quick test already running |
-| `builder_handoff` | `{ "idea_id", "problem", "evidence_summary", "expected_effect", "acceptance_checks": [ … ] }` | `{ ok, idea_id, waiting_for, quotes_removed }` — route B. Quotes and the cited comments' text (bodies, quoted spans, replies) are stripped here as well as in ally-ai; a brief that asks to change something on the never-list is refused (route D). Stored as `evidence.handoff` (`status: "waiting"`); a person's Approve in the Console opens the Builder session with it as `handoffContext` |
-| `bug_hunter_report` | `{ "idea_id", "summary", "run_ids": [uuid], "repo"? }` | `{ ok, idea_id, waiting_for, quotes_removed }` — route C, same stripping and never-list check; Approve files it through `RoadmapOpportunityService.createBugReport` (a Bug Hunter reported bug) with the summary and the run ids that exist |
+| `builder_handoff` | `{ "idea_id", "problem", "evidence_summary", "expected_effect", "acceptance_checks": [ … ] }` | `{ ok, idea_id, waiting_for, quotes_removed }` — route B. Quotes and the cited comments' text (bodies, quoted spans, replies) are stripped here as well as in ally-ai; a brief that asks to change something on the never-list is refused (route D). Stored as `evidence.handoff`, then **started on its own** (V2_AUTONOMY A8, `DebriefPmAgentService.autoStartHandoff`): the Builder session opens with it as `handoffContext`, the Debrief owner as its owner of record, the PM agent answering Builder's questions; `evidence.handoff.startedOnItsOwn`, `decidedBy: null`, `evidence.autoStart`. The pull request still waits for an engineer to merge. Left waiting (with the reason) while code changes are paused or there is no owner. Answers `started` and `waiting_for` |
+| `bug_hunter_report` | `{ "idea_id", "summary", "run_ids": [uuid], "repo"? }` | `{ ok, idea_id, waiting_for, quotes_removed }` — route C, same stripping and never-list check; filed on its own (A8) through `RoadmapOpportunityService.createBugReport` (a Bug Hunter reported bug) with the summary and the run ids that exist |
 | `person_ask` | `{ "idea_id", "topic": "rubric"\|"safety"\|"budget"\|"data_access"\|"clinical"\|"product"\|"other", "question", "context"? }` | `{ ok, idea_id, waiting_for }` — route D: a Console item for the owner (or the clinical advisor for clinical and safety); Approve marks it answered |
 | `guidance_propose` | `{ "idea_id", "action": "new"\|"change", "existing_code"? (`DG-…`), "scope": "platform"\|"organisation", "title", "situation", "guidance", "why"?, "run_ids": [..] }` | `{ ok, idea_id, waiting_for, note }` — route D only: a Debrief Guidance entry drafted for the clinical advisor. **Nothing is written to the Context Library** (spec C4); the advisor adds or edits the entry there and Approve marks it done. **Release step:** the live Skills Store prompt `debrief_improver_system` needs a new published version with the route-D `guidance_propose` sentence (CONSOLE_API.md "Release steps") Refused unless the cited runs cover ≥ 10 learners (≥ 3 organisations when platform-wide; one when `organisation`), the text has no instruction-like patterns, and no 6-word run copies a cited session or comment (plan §11.6) |
 
@@ -546,6 +546,72 @@ selected_option_ids[], answer, reason } ], estimated_cost_usd, model, error }`.
 The idea card reads `GET /v1/debriefs/console/pm-agent/ideas/:id/builder` (stage interviewing · building · PR open ·
 merged · closed, the waiting question, the PM agent's answers, pull requests) and answers from the card with
 `POST …/builder/answer { questionId, text }`.
+
+## 7c. The PM agent conversation — `POST /api/v1/pm-agent/conversation` (ally-ai)
+
+V2_AUTONOMY C1–C5. One person's message in the console's shared thread, answered. ally-ai
+(`app/core/pm_agent/conversation.py`): a LangChain `create_agent` loop over the gateway tools with
+the weekly run's guard (`PmRunGuard`: model then backup with the circuit breaker, the budget,
+`llm_usage` as `debrief_improver`, step records); no checkpointer (the thread lives in ally-be);
+LangSmith off. Instructions: Skills Store `ally_ai_debrief_pm_conversation_system` (default
+`app/prompts/debrief/pm_conversation_system.txt`).
+
+```jsonc
+{
+  "turn_id": "uuid",                 // the person's message id; also the agent token's agentRunId
+  "model": "gemini-2.5-pro", "backup_model": "gemini-2.5-flash", "prices": { ... },
+  "budget_usd": 0.25,                // min(pmAgentRunCapUsd, 0.25, learning budget left)
+  "history": [ { "who": "person|agent", "author", "text", "about", "action" } ],  // last 20, oldest first
+  "message": "...", "author": "Asha",
+  "about": { "kind", "id", "label", "evidence": { change_read or session_read output } } | null,
+  "pending_plan": { "plan_id", "plan", "action" } | null,   // only when this person was asked
+  "prompts": { ... } | null, "tools": [ ... ], "agent_token": "...", "gateway_url": "..."
+}
+```
+
+Response: `{ status: finished|budget_spent|failed, reply, steps, estimated_cost_usd, model,
+refusals, error }`. A failure still answers 200 with a plain reply. ally-be stores the reply; its
+`action` comes from the gateway's own record of the turn, never from the model.
+
+Conversation tools (same gateway route, agent token signed per turn for 15 minutes; never in a
+weekly run's token). The advisor's turn gets `change_read`, `change_approve`, `change_turn_down`,
+`confirm_plan` only. Refusals answer 200 `{ refused }` in words the agent relays.
+
+| Tool | Body | Does |
+|---|---|---|
+| `change_read` | `{ idea_id }` | the change: status, kind, confidence, `always_asks_because`, rungs, hand-off, languages / held languages, undo / stop, the last 10 conversation entries |
+| `session_read` | `{ run_id }` | the run's summary: status, language, recipe, release, cost, judge score and hard fails, helpful, flags with answers. Never the transcript or a learner's words |
+| `change_approve` / `change_turn_down` | `{ idea_id, plan, reason? }` | never acts: checks the person's permission, stores a plan, answers `awaiting_yes` + `plan_id` |
+| `confirm_plan` | `{ plan_id }` | carries out the plan made in the agent's previous message, only when the same person's current message is an explicit yes and they hold the permission; used once; plans last 24 h |
+| `change_stop` | `{ idea_id, reason? }` | `DebriefChangesService.stop` |
+| `change_undo` | `{ idea_id, languages?, reason? }` | all languages: `DebriefChangesService.undo`; named languages: pinned to the release before (`debrief_change_holds`, `undone`); a change live only for some languages: those pins lifted |
+| `change_retry` | `{ idea_id, languages?, reason? }` | held / undone languages of a live change: pins lifted; a stopped or undone prompt or setting change: ladder evidence cleared, `change.languages` set, quick check started. An always-ask change answers `awaiting_yes` first |
+| `change_hold_language` | `{ idea_id, language, reason? }` | pins one language to the release before (live) or the release in force (being tried) |
+| `changes_pause` | `{ kind: prompts\|settings\|code, until, reason? }` | no change of that kind is tried (`DebriefAutonomyService.forIdea` → off) or handed over until then; at most 90 days |
+
+Language pins (A9): `DebriefRunnerService.run` runs a production session whose recorded language has
+an active pin on the pinned release; such a session never joins a learner try-out, nor does one
+outside a try-out's `change.languages`. A change with `change.languages` goes live only for those
+languages (`DebriefPmAgentService.liveForLanguagesOnly`: pins with reason `only`; the release in
+force is unchanged for everyone else). Pins stay until lifted.
+
+## 9. A learner's flag answered — `POST /api/v1/debrief/flag-answers` (ally-ai)
+
+V2_AUTONOMY F1–F3. `DebriefFlagAnswerService` sends every new flag at once (and a 5-minute sweep
+retries failures, three times at most): `{ flag_id, run_id, language, section, reason, note, card,
+transcript: [ { turn_index, role, text } ], model, backup_model, prices, budget_usd (0.05),
+prompts }` → `{ status, action: keep|correct|remove, correction: { field: text } | null, reply,
+estimated_cost_usd, model, error }`. One structured call (`with_structured_output`, backup via
+`with_fallbacks`); an answer that removes the important moment, quotes words not in the transcript
+or rewrites nothing is sent back once with the problem, then `failed`. `llm_usage` task
+`debrief_flag_answer`; instructions Skills Store `ally_ai_debrief_flag_answer_system`.
+
+ally-be applies it with `DebriefFeedbackService.applyAgentAnswer` (the same path as a person's
+decision: a correction is a new card version with `byAgent: true`, the quote locked; the reply is the
+outcome note; the learner is told) and stores `debrief_run_feedback.answer`. The PM agent reads
+`learner_flag_answers` in its run inputs (answers by section, reason and action; flags still
+unanswered; card versions by the agent or a person; replaced Ask Ally replies by check code — counts
+and run ids only) and an audit row `flag_answered` per answer.
 
 ## 8. Safety recall for the gate — `POST /api/v1/debrief/safety-recall` (ally-ai)
 
