@@ -36,6 +36,7 @@ import { hasFeature } from "@utils";
 import { absoluteAppUrl } from "@utils/absoluteAppUrl";
 
 import { CopilotBrief } from "./CopilotBrief";
+import { DirectorStarButton } from "./DirectorStarButton";
 import { RankBreakdownPanel } from "./RankBreakdown";
 import { ReferenceImagesField } from "./ReferenceImagesField";
 import { useScoreUnit } from "./useScoreUnit";
@@ -46,7 +47,6 @@ import { formatPoints } from "./utils/points";
 import { sameReferenceImages } from "./utils/referenceImages";
 import { EFFORT_LABEL, STAGE_LABEL } from "./utils/stages";
 import { isVotable } from "./utils/votes";
-import { DirectorStarButton } from "./DirectorStarButton";
 import { VoteButton } from "./VoteButton";
 
 const PRD_MAX = 20000;
