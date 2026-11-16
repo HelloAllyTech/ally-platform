@@ -21,6 +21,7 @@ import {
   SimulationSelectionModal,
   CreateSimulationSubSection,
   PublishBlockers,
+  AutosaveIndicator,
 } from "@components";
 import { ButtonVariant } from "@components/types";
 import {
@@ -31,7 +32,7 @@ import {
   PathStepperList,
   getCreatePathSubSectionById,
 } from "@constants";
-import { useContentAuthoring, useDebounce } from "@hooks";
+import { useAutosaveDraft, useContentAuthoring, useDebounce } from "@hooks";
 import { GetScenarioType } from "@types";
 import {
   extractValidData,
@@ -127,6 +128,32 @@ export const CreateCase: FC = () => {
   const areAllMandatoryFieldsFilled = useMemo(() => {
     return areCaseFieldsFilled(getMandatoryFieldIds(), formValues);
   }, [formValues]);
+
+  // Autosave: only an existing DRAFT with a title and at least one edit. A published or archived
+  // item is never autosaved (saving as draft would unpublish or unarchive it), and a brand-new
+  // item is left to the explicit Save so autosave never creates records.
+  const { status: autosaveStatus, savedAt: autosavedAt } = useAutosaveDraft({
+    storageKey: `case-draft:${caseId ?? "new"}`,
+    value: formValues,
+    enabled:
+      !isViewOnly &&
+      !!caseId &&
+      individualCase?.status === SimulationStatus.DRAFT &&
+      !!formValues?.title &&
+      isNonEmptyObject(dirtyFields),
+    delayMs: 3000,
+    persistLocal: false,
+    save: async values => {
+      const result: any = await updateSimulationCaseByIdQuery({
+        id: caseId as string,
+        data: {
+          ...extractValidData(PATH_CREATOR_FIELD_GROUPS, values),
+          status: SimulationStatus.DRAFT,
+        },
+      });
+      if (result?.error) throw new Error("autosave failed");
+    },
+  });
 
   const toggleSimulationModal = () => {
     setShowSimulationModal(prev => !prev);
@@ -354,6 +381,10 @@ export const CreateCase: FC = () => {
           blockers={unfilledCaseFields(getMandatoryFieldIds(), formValues, MANDATORY_FIELD_LABELS)}
         />
       )}
+
+      <div className="flex justify-end px-4 min-h-[18px]">
+        <AutosaveIndicator status={autosaveStatus} savedAt={autosavedAt} />
+      </div>
 
       <div className="flex flex-col md:flex-row md:h-[calc(100vh-100px)]">
         <VerticalStepper

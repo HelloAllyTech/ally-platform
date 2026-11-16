@@ -29,6 +29,7 @@ const { mockContentAuthoring } = vi.hoisted(() => ({
 
 vi.mock("@hooks", () => ({
   useDebounce: (fn: (...args: any[]) => any) => fn,
+  useAutosaveDraft: () => ({ status: "idle", savedAt: null }),
   useContentAuthoring: mockContentAuthoring,
 }));
 
@@ -42,6 +43,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 }));
 
 vi.mock("@components", () => ({
+  AutosaveIndicator: () => null,
   PublishBlockers: ({ blockers }: any) => (
     <ul data-testid="publish-blockers">
       {blockers.map((b: any) => (

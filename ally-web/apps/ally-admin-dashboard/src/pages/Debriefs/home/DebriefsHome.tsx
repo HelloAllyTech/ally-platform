@@ -35,6 +35,9 @@ export const sessionLink = (runId: string, params: URLSearchParams) => {
     const v = params.get(k);
     if (v) q.set(k, v);
   }
+  // Which queue the viewer came from, so the session page can move on to the next item in it.
+  const cat = params.get("cat");
+  if (cat) q.set("cat", cat);
   const qs = q.toString();
   return `${ROUTES.DEBRIEF_SESSION(runId)}${qs ? `?${qs}` : ""}`;
 };

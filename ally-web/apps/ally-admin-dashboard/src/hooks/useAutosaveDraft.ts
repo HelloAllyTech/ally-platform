@@ -12,6 +12,8 @@ interface Options<T> {
   delayMs?: number;
   /** Optional server save. If omitted the draft is only kept locally (restorable). */
   save?: (value: T) => Promise<unknown>;
+  /** Also keep a local copy for `restore()`. Off when the server save is the record. */
+  persistLocal?: boolean;
 }
 
 /**
@@ -25,6 +27,7 @@ export const useAutosaveDraft = <T>({
   enabled = true,
   delayMs = 1500,
   save,
+  persistLocal = true,
 }: Options<T>) => {
   const [status, setStatus] = useState<AutosaveStatus>("idle");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -39,7 +42,7 @@ export const useAutosaveDraft = <T>({
     const timer = setTimeout(async () => {
       lastSerialised.current = serialised;
       try {
-        localStorage.setItem(storageKey, serialised);
+        if (persistLocal) localStorage.setItem(storageKey, serialised);
       } catch {
         /* storage full/blocked: fall through to server save */
       }
@@ -58,7 +61,7 @@ export const useAutosaveDraft = <T>({
       }
     }, delayMs);
     return () => clearTimeout(timer);
-  }, [value, enabled, delayMs, storageKey]);
+  }, [value, enabled, delayMs, storageKey, persistLocal]);
 
   const restore = useCallback((): T | null => {
     try {

@@ -332,6 +332,23 @@ export const en = {
   // Per-admin content toggles (Create Roleplays / Cases / Courses). A type whose
   // toggle is off is view-only; the copy names the toggle to ask for, matching
   // ally-be's refusal (ContentAccessService).
+  organizationAccess: {
+    bulk: {
+      enableAll: "Enable all",
+      enableAllHint: (noun: string) =>
+        `Turn on every published ${noun} this organisation does not have yet`,
+      enableAllTitle: "Enable everything published?",
+      copyFrom: "Copy access from…",
+      copy: "Copy",
+      copyTitle: (from: string) => `Copy access from ${from}?`,
+      consequence: (n: number, noun: string) =>
+        `This turns on ${n} ${noun} for this organisation. Nothing is switched off, and you can turn any of them off again one by one.`,
+      confirm: (n: number) => `Enable ${n}`,
+      nothingToChange: (noun: string) => `Nothing to change: no ${noun} to add.`,
+      done: (n: number, noun: string) => `Enabled ${n} ${noun}`,
+      failed: "Couldn't update access. Nothing may have changed, so check the list.",
+    },
+  },
   contentAccess: {
     view: "View",
     viewOnlyEmptyTitle: (plural: string) => `No ${plural} to show`,
@@ -10720,6 +10737,8 @@ export const en = {
     },
     // One session's page (redesign 2026-11-12): the roleplay beside the debrief, and the review.
     session: {
+      nextUp: "Done. Opening the next one.",
+      queueClear: "That was the last one in this queue.",
       turn: (n: number) => `Turn ${n}`,
       turns: (n: number) => `${n} ${n === 1 ? "turn" : "turns"}`,
       roleplay: "Roleplay",
