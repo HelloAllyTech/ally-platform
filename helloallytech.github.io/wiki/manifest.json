@@ -276,7 +276,7 @@
         "metrics"
       ],
       "last_reconciled": "2026-11-11",
-      "words": 1126,
+      "words": 1158,
       "url": "https://tech.helloally.ai/#/wiki/platform/debrief-agent.md",
       "skip_reason": ""
     },
@@ -354,7 +354,7 @@
         "reference",
         "generated"
       ],
-      "last_reconciled": "2026-11-11",
+      "last_reconciled": "2026-11-16",
       "words": 175,
       "url": "https://tech.helloally.ai/#/wiki/platform/stats.md",
       "skip_reason": ""
@@ -643,7 +643,7 @@
         "vite"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1716,
+      "words": 1727,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-web.md",
       "skip_reason": ""
     },
