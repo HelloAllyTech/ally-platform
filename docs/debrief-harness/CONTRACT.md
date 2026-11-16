@@ -38,7 +38,11 @@ stored result.
   "prices": { "<model>": { "input_per_m": 0.3, "output_per_m": 2.5 } },      // for every model the bundle names; unpriced = cannot run
   "session": {                                                              // DebriefSessionContext as ally-be loads it today
     "tenant_id": "...", "language": "en-IN", "language_source": "recorded | null", "language_recorded": true,
-    "learner_turns": 12, "assessment": false, "in_case": false, "scenario_id": 41, "...": "..."
+    "learner_turns": 12, "assessment": false, "in_case": false, "scenario_id": 41, "...": "...",
+    "expected_behaviours": ["Empathy"],                                     // named competencies only, never a custom code
+    "helpful_behaviours": ["Asks open questions"],                          // the roleplay's SHOULD_DO + custom competencies' HELPFUL
+    "unhelpful_behaviours": ["Gives advice too early"],                     // the roleplay's SHOULD_NOT_DO + custom competencies' UNHELPFUL
+    "competencies": [ { "name": "Empathy", "helpful": ["Reflects feelings"], "unhelpful": [] } ]   // named only; behaviours may be empty
   },
   "transcript": [ { "turn_index": 0, "role": "counselor | client", "text": "...", "message_id": "..." } ],
   "context": {
@@ -46,7 +50,7 @@ stored result.
     "past_work_on_this": [ ... ],    // progress reader input
     "cohort": { ... } | null,
     "case_memory": { ... } | null,
-    "practice_options": [ { "id": 41, "title": "...", "skills": [...], "course": "Basics", "this_roleplay": true } ]   // course/this_roleplay/outside_course only for a session played inside a course
+    "practice_options": [ { "id": 41, "title": "...", "skills": [...], "course": "Basics", "this_roleplay": true, "trackItemId": "..." } ]   // inside a course: only this roleplay, with course/this_roleplay/trackItemId
   },
   "run_token": "<JWT signed by ally-be>",
   "gateway_url": "https://<ally-be>/api/v1/internal/debrief"
@@ -178,7 +182,8 @@ Recorded by the ally-be build (2026-11-10).
    can only be done against a build from before this change (e.g. master at `e9c1e7123`).
 2. **`session` keys** are the snake_case of `DebriefSessionContext`: `id, tenant_id, counselor_id, status,
    language, language_source, language_recorded, learner_level, learner_turns, scenario_id, scenario
-   ({title, description}), expected_behaviours, assessment, in_case`.
+   ({title, description}), expected_behaviours, helpful_behaviours, unhelpful_behaviours, competencies,
+   assessment, in_case` (the last four: see "What the roleplay expects" below).
 3. **`transcript` turns** are `{turn_index, role, text}` (no `message_id`: the transcript ally-be builds has none).
 4. **`context` values** are passed exactly as ally-be's readers return them: `past_work_on_this` is
    `[{date, skill, point}]`, `case_memory` a string or null, `cohort` `{trainees, skills: [{skill, how_often}]}`
@@ -291,15 +296,42 @@ today's debrief when it is not written yet. `ready` carries `askAlly {open, reas
 answered with its limit (`workspace.askAllyLimit {reason, at}`, written by the reply service; a `month` limit
 reopens when the IST month turns). `practice[]` items carry `trackItemId` inside a course.
 
-**Practise next inside a course** (revised 2026-11-16: the middle option). For a session with
-`trackItemProgressId`, `DebriefPracticeService` offers that course's roleplays the learner has reached first —
-items at or before this one (section order, item order) or completed ones, plus this one; not-done first, then
-this one, then done ones — then the learner's own roleplays that are not in the course at all, marked
-`outside_course`. A course roleplay not reached yet is never offered, from either list, so nothing is spoiled; an
-unreadable course offers nothing. Every option carries `course`; this one `this_roleplay`. The Writer prefers a
-course roleplay and picks an `outside_course` one only when it clearly practises the skill better. In the
-learner view, `practice[]` items outside the course carry `outsideCourse: true`, and the card says it won't count
-towards the course.
+**Practise this again inside a course** (clinical review 2026-11-16; replaces the "middle option" of
+74fde9b32). For a session with `trackItemProgressId`, `DebriefPracticeService` offers no other roleplay: the
+only option is this same roleplay as its course item (`this_roleplay: true`, `course`, `trackItemId`); an
+unreadable course offers nothing. Outside a course the learner's own list is offered as before. The Writer
+sets `practise_next.scenario_id` to this roleplay and fills `practise_next.try_next`: at most 3 things the
+learner missed or only partly did when they had the opportunity (evidence behaviours with an opportunity and
+observation `missed` or `partial`), most important first, each one short sentence in the session language with
+no quotes and no ids; outside a course `try_next` is null. The apps title the card and its button "Practise
+this again" whenever the card's practice option has `trackItemId` or `try_next` has items, list them under
+"Try the following:", and the button opens this same course item.
+
+**`practise_next` card shape:** `{skill, reason, scenario_id?, try_next?: string[]}`. `try_next` (at most 3,
+`TRY_NEXT_MAX`) is checked (more than 3 is `structure`; an item over 25 words `too_long`), capped again in
+`finalise_cards`, rendered for the Evaluator and judge as "Practise this again: … Try the following: - …",
+read aloud after the reason, and written into today's debrief. A learner flag on `practise_next` covers it.
+`skill` may be missing on a debrief whose custom competency code was removed (below).
+
+**What the roleplay expects** (review 2026-11-16, prod facts). Competencies have only a name; 48 of 79 named
+ones have no behaviours, and 147 custom ones are named by a generated code (`{userId}_custom_{N}`). So
+ally-be sends the roleplay's own SHOULD_DO / SHOULD_NOT_DO behaviours (`scenario_behavior_instructions`, the
+same ones today's debrief reads) as `helpful_behaviours` / `unhelpful_behaviours`, adds each custom
+competency's HELPFUL / UNHELPFUL behaviours to them without duplicates (never its code), and sends named
+competencies in `competencies` as labels with their own behaviours when they have any. `expected_behaviours`
+keeps only the named competencies (cohort stats and other name readers). The Analyst gets a code-owned
+ROLEPLAY EXPECTATIONS line and a `<roleplay_expectations>` block: assess each behaviour the counsellor had the
+opportunity for (shown the helpful, avoided the unhelpful); a competency is a label for grouping or naming,
+assessed through its behaviours; one with no behaviours may be interpreted from its name, said in the note
+with lower confidence; name evidence by the competency's name or the behaviour itself; never output a code.
+With neither behaviours nor competencies there is no such line, and the foundational skills carry the
+analysis as before. No prompt variable changed, so no prompt contract change.
+
+**No custom competency code is ever shown.** Any card text or skill field matching `\b\d+_custom_\d+\b` is the
+`custom_code` check failure, which the Reviser must fix. As the last resort `finalise_cards`
+(`publishableCards`) replaces a skill that is a code with that competency's first HELPFUL behaviour, or drops
+the field (a skill word or label entry goes), and removes a code inside any sentence. The learner view, the
+supervisor's read-only view and read-aloud clean already-published debriefs the same way (`readableCards`).
 
 **"Practise this next" always has a button.** The graph sends `finalise_cards` a `fallback` (the option marked
 `this_roleplay`, else the session's own roleplay when offered, else the first option); ally-be's
