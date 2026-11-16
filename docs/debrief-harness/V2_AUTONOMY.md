@@ -99,6 +99,12 @@ must be built, tested and ticked before release.
 - [x] F1 The Debrief agent answers every learner flag within a minute: re-reads the roleplay,
       keeps / corrects / removes the card, and tells the learner why. Card versions are kept.
 - [x] F2 Every answer, correction and replaced Ask Ally reply goes to the PM agent as evidence.
+- [x] F4 What learners and experts say reaches both agents (Gopi, 2026-11-16):
+      PM agent: each flag with the learner's note and Ally's decision and reason, notes on
+      not-helpful answers, recent Ask Ally questions (`DebriefFeedbackService.signals`).
+      Debrief agent (progress reader → Writer): this learner's earlier flags with their note and
+      Ally's decision (kept = explain better, never drop; corrected/removed = never repeat), and
+      experts' comments on the learner's roleplay (comments on cards go to the PM agent only).
 - [x] F3 A person may still change a card ("Change it") and comment; that also goes to the
       PM agent.
 
