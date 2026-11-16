@@ -71,6 +71,9 @@ const DAY_MS = 86_400_000;
  * (week × language × recipe × release), the two gates, and the Analytics
  * view. Reads only; no model call.
  */
+/** The fewest debriefs each week needs before the two weeks are compared. */
+export const SCORE_COMPARE_MIN_DEBRIEFS = 20;
+
 @Injectable()
 export class DebriefScoreService {
   constructor(
@@ -162,7 +165,13 @@ export class DebriefScoreService {
     const gates = await this.gates(thisWeek, lastWeek);
     return {
       current: sliceScore(thisWeek, w),
-      previous: sliceScore(lastWeek, w),
+      // A week of a handful of debriefs is not a comparison (prod 2026-11-16:
+      // 2 debriefs last week against 56 this week read as "fell 1.0").
+      previous:
+        lastWeek.length >= SCORE_COMPARE_MIN_DEBRIEFS &&
+        thisWeek.length >= SCORE_COMPARE_MIN_DEBRIEFS
+          ? sliceScore(lastWeek, w)
+          : null,
       debriefs: thisWeek.length,
       byWeek: [...weeks.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
