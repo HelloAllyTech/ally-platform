@@ -88,6 +88,10 @@ must be built, tested and ticked before release.
       clinical advisor sees and posts only about pinned-rule changes. A "yes" to a pinned-rule
       change needs the advisor or the owner; to a budget increase, the owner. Otherwise the agent
       does not act, says who can, and notifies them. Every message shows its author.
+- [ ] C5 A "Needs you" item is dealt with on Home: it expands in place to what changes, why, the
+      wording before and after, the evidence, and the PM agent conversation scoped to that change.
+      The clinical advisor has no Changes / PM agent button: they get a notification that opens
+      Home with that item expanded, and their Needs you shows only pinned-rule changes.
 
 ### Learner flags (point 7)
 - [ ] F1 The Debrief agent answers every learner flag within a minute: re-reads the roleplay,
