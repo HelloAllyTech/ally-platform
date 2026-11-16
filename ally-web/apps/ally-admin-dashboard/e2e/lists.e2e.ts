@@ -94,6 +94,9 @@ test.describe("Lists", () => {
   });
 
   test("Repeat weekly sets the other details for each one", async ({ page }) => {
+    // The range runs from today to the end of next week, so the count depends on the date:
+    // pin it to the fixture's own "now" (Sat 14 Nov 2026), giving Mon 16 to Fri 20 Nov.
+    await page.clock.setFixedTime(new Date("2026-11-14T09:00:00.000Z"));
     await mockAssistantHome(page);
     await mockLists(page, { start: "booked" });
     await open(page);
@@ -101,7 +104,9 @@ test.describe("Lists", () => {
     await page.getByRole("button", { name: "Repeat weekly" }).first().click();
     const repeat = page.getByTestId("repeat-weekly");
     await expect(repeat.getByText("For each one")).toBeVisible();
-    await repeat.getByLabel("Practitioner").fill("Dr Mehta");
+    // "For each one" takes several values as chips (8a): add one practitioner.
+    await repeat.getByRole("textbox", { name: "Add practitioner" }).fill("Dr Mehta");
+    await repeat.getByRole("textbox", { name: "Add practitioner" }).press("Enter");
     await expect(page.getByTestId("repeat-count")).toContainText(
       "This adds 32 slots. 3 are already there, so they're skipped.",
     );

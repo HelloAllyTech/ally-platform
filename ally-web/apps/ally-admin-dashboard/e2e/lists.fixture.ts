@@ -811,11 +811,16 @@ export async function mockLists(
       ) {
         if ((b.days as number[]).includes(((d.getUTCDay() + 6) % 7) + 1)) days += 1;
       }
-      const total = perDay * days;
+      // Chunk 8a: "For each one" sends several values; every time is added once for each.
+      const each = b.each as { field: string; values: string[] } | undefined;
+      const named = each?.values ?? [b.values?.practitioner];
+      const perValue = perDay * days;
+      const total = perValue * named.length;
       // As ally-be: a time is already there only for an entry with the same details.
       const skipped =
-        def.key === "slots" && list.some(e => e.data.practitioner === b.values?.practitioner)
-          ? Math.min(3, total)
+        def.key === "slots"
+          ? named.filter(v => list.some(e => e.data.practitioner === v)).length *
+            Math.min(3, perValue)
           : 0;
       const count = total - skipped;
       const first = [
