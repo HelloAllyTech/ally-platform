@@ -545,6 +545,19 @@ class ProposeChangeDto {
 
 type AuthedRequest = { user: { id: number } };
 
+/** A budget change in plain words: "Monthly cap to $150". */
+export function budgetTitle(settings: Record<string, number>): string {
+  const label: Record<string, (v: number) => string> = {
+    monthlyCapUsd: (v) => 'Monthly cap to $' + v,
+    runCeilingUsd: (v) => 'Most one debrief may spend to $' + v.toFixed(2),
+    passScore: (v) => 'Pass mark to ' + v,
+  };
+  const parts = Object.entries(settings).map(([k, v]) =>
+    label[k] ? label[k](v) : k + ' to ' + v,
+  );
+  return parts.length ? parts.join(', ') : 'Budget change';
+}
+
 /**
  * The Debrief Console's API (plan §12): runs and their timelines, the
  * PM agent's report and ideas with the approval layer, releases and rollback,
@@ -1389,7 +1402,7 @@ export class DebriefConsoleController {
     if (body.passScore != null) settings.passScore = body.passScore;
     const proposed = await this.releaseHistory.proposeChange(
       {
-        title: `Settings: ${Object.keys(settings).join(', ')}`,
+        title: budgetTitle(settings),
         why: body.note ?? null,
         settings,
       },

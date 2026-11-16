@@ -692,7 +692,39 @@ export class DebriefPmConversationService {
       forecast: e.forecast ?? null,
       rejected_because: e.rejection?.reason ?? null,
       conversation: (e.conversation ?? []).slice(-10),
+      // What actually changes, so the agent never describes it from memory:
+      // the passage and its replacement, or for a rule's first sign-off the
+      // rule as written (the version waiting for sign-off).
+      wording:
+        typeof idea.change?.find === 'string' &&
+        typeof idea.change?.replace === 'string'
+          ? { before: idea.change.find, after: idea.change.replace }
+          : null,
+      rule_text: await this.ruleText(idea),
     };
+  }
+
+  /** The text of the rule a pinned-rule change is about, trimmed. Never throws. */
+  private async ruleText(idea: Record<string, any>): Promise<string | null> {
+    const code = idea.change?.promptCode;
+    if (idea.change?.ideaKind !== 'pinned_rule' || typeof code !== 'string') {
+      return null;
+    }
+    try {
+      const version = Number.isInteger(Number(idea.change?.version))
+        ? Number(idea.change.version)
+        : null;
+      const [v] = await this.dataSource.query(
+        `SELECT pv.prompt FROM prompts p
+           JOIN prompts_versions pv ON pv."promptId" = p.id
+          WHERE p."promptCode" = $1 AND pv.version = COALESCE($2::int, p."currentVersion")
+          LIMIT 1`,
+        [code, version],
+      );
+      return v?.prompt ? String(v.prompt).slice(0, 6000) : null;
+    } catch {
+      return null;
+    }
   }
 
   /** `session_read`: one session's run summary, never its transcript or a learner's words. */
