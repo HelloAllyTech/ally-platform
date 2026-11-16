@@ -84,6 +84,10 @@ must be built, tested and ticked before release.
       explicit yes), stop, undo, retry (optionally for one language), hold a language, pause a
       kind of change until a date, propose a change, explain with evidence.
 - [ ] C3 Each agent message carries the action it took (`done` / `awaiting_yes`).
+- [ ] C4 Permissions as today (`DEBRIEF_ACTIONS`): the Ally team and the owner read and post; the
+      clinical advisor sees and posts only about pinned-rule changes. A "yes" to a pinned-rule
+      change needs the advisor or the owner; to a budget increase, the owner. Otherwise the agent
+      does not act, says who can, and notifies them. Every message shows its author.
 
 ### Learner flags (point 7)
 - [ ] F1 The Debrief agent answers every learner flag within a minute: re-reads the roleplay,
