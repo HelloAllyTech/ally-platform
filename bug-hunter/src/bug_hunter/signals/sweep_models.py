@@ -9,6 +9,7 @@ real cost in the ledger.
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Any, Literal
 
@@ -49,6 +50,26 @@ class LensItem(BaseModel):
     )
 
 
+class LensItemNoSafety(BaseModel):
+    """The other four lenses: no ``safety`` field (only lens_logic may set it)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    category: str = Field(description=f"One of: {', '.join(CATEGORIES)}")
+    severity: Literal["critical", "high", "medium", "low"]
+    files: list[str]
+    evidence: list[str] = Field(description="`path:line — observation` items")
+    hypothesis: str
+    confidence: Literal["medium", "low"]
+
+
+class LensAnswerNoSafety(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    findings: list[LensItemNoSafety] = Field(default_factory=list, max_length=3)
+
+
 class LensAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -67,6 +88,47 @@ class SubmitVerdict(BaseModel):
 
 def _noop(**_: Any) -> str:
     return "ok"
+
+
+_COMMENT = re.compile(r"^\s*(//|#|/\*|\*|--|\"\"\"|''')")
+NEARBY = 5
+
+
+def nearby_comments(read, evidence: list[str], app_prefix: str) -> str:
+    """Comment lines within ``NEARBY`` lines of each cited ``path:line``, from the
+    checked-out code (code extracts them; the falsifier must address them)."""
+    from bug_hunter.memory.fingerprint import repo_path
+
+    out: list[str] = []
+    seen: set[tuple[str, int, int]] = set()
+    for item in evidence:
+        for m in _CITE.finditer(item):
+            path = repo_path(m.group(1), app_prefix)
+            start = int(m.group(2))
+            end = max(start, int(m.group(3) or start))
+            if (path, start, end) in seen:
+                continue
+            seen.add((path, start, end))
+            text = read(path)
+            if text is None:
+                out.append(f"- {path}:{start} — file not found at this commit")
+                continue
+            lines = text.splitlines()
+            lo, hi = max(1, start - NEARBY), min(len(lines), end + NEARBY)
+            found = [
+                f"  {path}:{n}: {lines[n - 1].strip()[:200]}"
+                for n in range(lo, hi + 1)
+                if _COMMENT.match(lines[n - 1]) or _TRAILING.search(lines[n - 1])
+            ]
+            out.append(
+                f"- {path}:{start}"
+                + ("\n" + "\n".join(found) if found else " — no comments nearby")
+            )
+    return "\n".join(out) or "(no cited lines with a line number)"
+
+
+_CITE = re.compile(r"([\w./@+-]+\.[A-Za-z0-9]+):(\d+)(?:[-–](\d+))?")
+_TRAILING = re.compile(r"\S\s+(//|#)\s")
 
 
 def sweep_deps(config, app: str, worktree, sha: str, diff: str, artefacts_dir):
@@ -146,6 +208,7 @@ class ModelSweep:
             )
         )
         self.context = deps.app_context.render() if deps.app_context else ""
+        self.related_commits = "(none)"  # set by the sweep: every batch's commits
 
     # --- LensRunner -------------------------------------------------------------
 
@@ -168,7 +231,7 @@ class ModelSweep:
         started = time.monotonic()
         answer, raws, _secs = call_structured(
             self.deps.model("lens"),
-            LensAnswer,
+            LensAnswer if lens == "logic" else LensAnswerNoSafety,
             [
                 SystemMessage(content=system),
                 HumanMessage(content="Report this lens's findings, or an empty list."),
@@ -185,7 +248,8 @@ class ModelSweep:
                 evidence=i.evidence,
                 hypothesis=i.hypothesis,
                 confidence=i.confidence,
-                safety=i.safety,
+                # only lens_logic may route a finding as safety (user, 2026-11-16)
+                safety=bool(getattr(i, "safety", False)) and lens == "logic",
             )
             for i in answer.findings[:3]
         ]
@@ -228,7 +292,7 @@ class ModelSweep:
         )
         initial: LoopState = {
             "messages": initial_messages(
-                prompt.render(context=self.context, app=app, finding=rendered),
+                self._render_falsifier(prompt, app, rendered, finding),
                 "Try to prove the finding wrong with the code, then finish with "
                 "submit_verdict.",
             ),
@@ -257,6 +321,15 @@ class ModelSweep:
             return "refuted", "low", out.get("loop_stop") or "no verdict"
         a = result["args"]
         return a["verdict"], a["confidence"], a["reason"][:600]
+
+    def _render_falsifier(self, prompt, app: str, rendered: str, finding) -> str:
+        values = dict(context=self.context, app=app, finding=rendered)
+        if "nearby_comments" in prompt.inputs:  # falsifier.v2+
+            values["nearby_comments"] = nearby_comments(
+                self.deps.read_at_ref, finding.evidence, self.deps.app_prefix
+            )
+            values["related_commits"] = self.related_commits
+        return prompt.render(**values)
 
     def _charge(self, node: str, role: str, raws, secs: float) -> None:
         spec = self.deps.config.model_for(role)

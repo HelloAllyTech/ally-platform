@@ -33,6 +33,7 @@ from bug_hunter.config import BugHunterConfig, ModelSpec
 from bug_hunter.context.scratchpad import Scratchpad
 from bug_hunter.context.tokens import TokenCounter, effective_budget, make_counter
 from bug_hunter.graph.budget import charge, exceeded
+from bug_hunter.graph.llm import invoke_with_retry
 from bug_hunter.graph.state import Budget
 from bug_hunter.safety.phi import scrub_code
 
@@ -116,7 +117,7 @@ class ToolLoop:
         else:
             bound = self.model.bind_tools([*self.tools, *self.finish_tools])
         started = time.monotonic()
-        response = bound.invoke(messages)
+        response = invoke_with_retry(bound.invoke, messages)
         seconds = time.monotonic() - started
         if not isinstance(response, AIMessage):
             response = AIMessage(content=str(response))

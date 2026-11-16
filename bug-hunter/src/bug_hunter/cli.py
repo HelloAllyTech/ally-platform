@@ -1461,7 +1461,14 @@ def daily_sources(
         git = Git(config.repo_root)
         app_paths = {a: config.app(a).path for a in sig.apps}
         batches, cursor = commit_sweep.batches(
-            git_commits(git), git_changed_files(git), state, app_paths, sig.apps
+            git_commits(git),
+            git_changed_files(git),
+            state,
+            app_paths,
+            sig.apps,
+            commit_title=lambda sha: git._git(
+                ["log", "-1", "--format=%s", sha]
+            ).stdout.strip(),
         )
         notes = [
             f"sweep: {b.app}: {len(b.commits)} commit(s), {len(b.files)} file(s)"
@@ -1497,6 +1504,7 @@ def daily_sources(
                         "findings": [vars(f) for f in b.findings],
                         "verdicts": b.verdicts,
                         "dropped": [f.title for f in b.dropped],
+                        "grouped": b.grouped,
                         "stopped": b.stopped,
                     }
                     for b in batches
@@ -1505,6 +1513,11 @@ def daily_sources(
             )
         )
         notes += [f"sweep: {b.app} stopped: {b.stopped}" for b in batches if b.stopped]
+        notes += [
+            f"sweep: {b.app}: {b.grouped} finding(s) grouped into stronger ones"
+            for b in batches
+            if b.grouped
+        ]
         if cost:
             spend.record(
                 cost,

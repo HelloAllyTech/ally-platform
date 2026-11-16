@@ -20,6 +20,47 @@ class StructuredOutputError(RuntimeError):
     pass
 
 
+# connection-shaped failures are retried with backoff (user, 2026-11-16): the local
+# network (VPN reconnects) dropped three paid dry runs at their first model call
+CONNECTION_RETRY_DELAYS_S = (2.0, 8.0, 30.0)  # up to 3 retries
+_CONNECTION_NAMES = (
+    "APIConnectionError",
+    "APITimeoutError",
+    "ConnectError",
+    "ConnectTimeout",
+    "ReadTimeout",
+    "RemoteProtocolError",
+    "ServiceUnavailable",
+    "ConnectionError",
+    "ConnectionResetError",
+    "OpenAIConnectionError",
+)
+_sleep = time.sleep  # tests replace it
+
+
+def is_connection_error(exc: BaseException) -> bool:
+    seen = 0
+    while exc is not None and seen < 6:
+        names = {cls.__name__ for cls in type(exc).__mro__}
+        if names & set(_CONNECTION_NAMES) or isinstance(exc, ConnectionError):
+            return True
+        exc = exc.__cause__ or exc.__context__
+        seen += 1
+    return False
+
+
+def invoke_with_retry(fn, *args, **kwargs):
+    """``fn(*args, **kwargs)``, retried on connection errors only; anything else (bad
+    request, auth, validation) fails at once."""
+    for attempt, delay in enumerate((*CONNECTION_RETRY_DELAYS_S, None)):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 - re-raised unless connection-shaped
+            if delay is None or not is_connection_error(exc):
+                raise
+            _sleep(delay)
+
+
 class StructuredCall(BaseModel):
     """What one call cost, for the budget."""
 
@@ -43,7 +84,7 @@ def call_structured(
     started = time.monotonic()
     last_error: Exception | None = None
     for attempt in range(retries + 1):
-        result = structured.invoke(history)
+        result = invoke_with_retry(structured.invoke, history)
         raw = result.get("raw") if isinstance(result, dict) else None
         if isinstance(raw, AIMessage):
             raws.append(raw)

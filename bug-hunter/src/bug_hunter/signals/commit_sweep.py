@@ -50,6 +50,9 @@ class SweepBatch:
     survived: list[LensFinding] = field(default_factory=list)
     dropped: list[LensFinding] = field(default_factory=list)  # past the falsify cap
     verdicts: list[dict[str, Any]] = field(default_factory=list)  # every falsifier call
+    grouped: int = 0  # findings merged into a stronger one (same file and theme)
+    titles: dict[str, str] = field(default_factory=dict)  # sha -> commit title
+    commit_files: dict[str, list[str]] = field(default_factory=dict)  # sha -> paths
     stopped: str = ""  # why this batch stopped early (cost cap, low disk)
 
 
@@ -85,6 +88,7 @@ def batches(
     state: SignalState,
     app_paths: dict[str, str],
     apps: list[str],
+    commit_title: Callable[[str], str] | None = None,
 ) -> tuple[list[SweepBatch], dict[str, Any]]:
     since = state.get(CURSOR)
     shas = list_commits(since)
@@ -97,6 +101,8 @@ def batches(
             b = by_app.setdefault(app, SweepBatch(app=app, commits=[], files=[]))
             if sha not in b.commits:
                 b.commits.append(sha)
+                b.titles[sha] = commit_title(sha) if commit_title else ""
+            b.commit_files.setdefault(sha, []).append(path)
             if path not in b.files:
                 b.files.append(path)
     cursor = {CURSOR: shas[-1]} if shas else {}
@@ -105,6 +111,57 @@ def batches(
 
 def rank(f: LensFinding) -> int:
     return SEVERITY.get(f.severity, 1) * CONFIDENCE.get(f.confidence, 1)
+
+
+GROUP_SIMILARITY = 0.3  # title word overlap within the same primary file
+
+
+def _words(text: str) -> set[str]:
+    import re
+
+    return set(re.findall(r"[a-z0-9_]{3,}", text.lower()))
+
+
+def group_findings(findings: list[LensFinding]) -> tuple[list[LensFinding], int]:
+    """Same primary file and theme -> keep the strongest (safety first, then rank).
+    Returns (kept, how many were merged away), so the falsifier cap goes to
+    distinct findings."""
+    order = sorted(findings, key=lambda f: (not f.safety, -rank(f)))
+    kept: list[LensFinding] = []
+    for f in order:
+        primary = f.files[0] if f.files else ""
+        twin = next(
+            (
+                k
+                for k in kept
+                if (k.files[0] if k.files else "") == primary
+                and len(_words(k.title) & _words(f.title)) >= 2
+                and len(_words(k.title) & _words(f.title))
+                / max(1, len(_words(k.title) | _words(f.title)))
+                >= GROUP_SIMILARITY
+            ),
+            None,
+        )
+        if twin is None:
+            kept.append(f)
+    return kept, len(findings) - len(kept)
+
+
+def related_commits_text(sweep: list[SweepBatch], max_files: int = 8) -> str:
+    """Every commit in the sweep, across apps: what the falsifier sees as related."""
+    lines: list[str] = []
+    for b in sweep:
+        for sha in b.commits:
+            files = b.commit_files.get(sha, [])
+            more = (
+                f" (+{len(files) - max_files} more)" if len(files) > max_files else ""
+            )
+            lines.append(
+                f"- {sha[:10]} [{b.app}] {b.titles.get(sha) or '(no title)'} — "
+                + ", ".join(files[:max_files])
+                + more
+            )
+    return "\n".join(lines) or "(none)"
 
 
 def collect_with(
@@ -118,9 +175,12 @@ def collect_with(
         return [], 0.0
     out: list[Candidate] = []
     cost = 0.0
+    related = related_commits_text(sweep)
     for b in sweep:
         try:
             with runner_for(b, cost) as runner:
+                if hasattr(runner, "related_commits"):
+                    runner.related_commits = related
                 try:
                     out += collect([b], runner, runner)
                 finally:
@@ -148,7 +208,8 @@ def collect(
     for b in sweep:
         for lens in LENSES:
             b.findings.extend(lenses.run(lens, b.app, b.commits))
-        ordered = sorted(b.findings, key=lambda f: (not f.safety, -rank(f)))
+        distinct, b.grouped = group_findings(b.findings)
+        ordered = sorted(distinct, key=lambda f: (not f.safety, -rank(f)))
         checked = [f for f in ordered if f.safety]
         checked += [f for f in ordered if not f.safety][
             : max(0, max_falsify - len(checked))

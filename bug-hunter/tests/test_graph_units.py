@@ -232,7 +232,13 @@ def test_prompts_load_and_render_strictly(config: BugHunterConfig) -> None:
         cfg = config.model_copy(update={"models": models})
         # later versions may add inputs (reproduce.v5: neighbour_setup; review.v4:
         # repro_source, max_counterexamples), never drop the shared ones
-        added = {"neighbour_setup", "repro_source", "max_counterexamples"}
+        added = {
+            "neighbour_setup",
+            "repro_source",
+            "max_counterexamples",
+            "nearby_comments",
+            "related_commits",
+        }
         base = set(load_prompt(config, node).inputs) - added
         assert base <= set(load_prompt(cfg, node).inputs) | added
 

@@ -76,7 +76,7 @@ def test_approved_prompts_are_registered(config) -> None:
 
     prompts = config.models.prompts
     assert prompts["triage"] == "v4" and prompts["investigate"] == "v4"
-    assert prompts["review"] == "v5" and prompts["falsifier"] == "v1"
+    assert prompts["review"] == "v5" and prompts["falsifier"] == "v2"
     assert all(prompts[n] == "v1" for n in LENS_NODES)
     for node in (*LENS_NODES, "falsifier", "triage", "investigate", "review"):
         load_prompt(config, node)  # loads and has its inputs header

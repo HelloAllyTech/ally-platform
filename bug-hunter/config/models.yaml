@@ -24,7 +24,7 @@ prompts:
   lens_security_and_data_exposure: v1
   lens_async_and_race: v1
   lens_api_contract: v1
-  falsifier: v1
+  falsifier: v2
 # USD per 1M tokens, from the providers' price pages (checked 2026-11-09; see
 # CHUNK-05-NOTES.md). Every role and fallback model must have a row: cost accounting is
 # code, and an unpriced model would make the per-run cost cap meaningless.
