@@ -24,6 +24,7 @@ export const URL_STATE_KEYS = [
   "sort",
   "dir",
   "layout",
+  "archived",
 ] as const;
 
 const LIST_KEYS = {
@@ -63,6 +64,7 @@ export const parseUrlState = (params: URLSearchParams): RoadmapViewState => {
   if (sort) {
     state.sort = { field: sort, dir: params.get("dir") === "asc" ? "asc" : "desc" };
   }
+  if (params.get("archived") === "1") state.showArchived = true;
   const layout = params.get("layout");
   if (layout && LAYOUTS.includes(layout)) state.layout = layout as RoadmapBoardLayout;
   return state;
@@ -89,6 +91,7 @@ export const writeUrlState = (
     const values = state[LIST_KEYS[key]];
     if (values?.length) next.set(key, encodeList(values));
   });
+  if (state.showArchived && !options.omitStage) next.set("archived", "1");
   if (state.sort) {
     next.set("sort", state.sort.field);
     next.set("dir", state.sort.dir);

@@ -58,6 +58,8 @@ interface OpportunitiesListViewProps {
   showFilters?: boolean;
   /** Draw the Queue presentation: reduced fields, rank at the top left. */
   isQueue?: boolean;
+  /** The Inbox, a pipeline view whose empty state is "inbox zero" rather than "queue empty". */
+  isInbox?: boolean;
   /** Left-hand slot on the control row — the Queue's sort picker. */
   leading?: React.ReactNode;
   /**
@@ -113,6 +115,7 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
   onAddClick,
   showFilters,
   isQueue,
+  isInbox,
   leading,
   onLoadMore,
   layoutToggle,
@@ -165,7 +168,7 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
         <SkeletonText paragraph lineCount={8} />
       ) : isError && !data ? (
         <RoadmapLoadError
-          what={isQueue ? "the queue" : "opportunities"}
+          what={isInbox ? "the inbox" : isQueue ? "the queue" : "opportunities"}
           onRetry={() => onRetry?.()}
           isRetrying={isFetching}
         />
@@ -173,8 +176,12 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
         // An empty queue is the goal state of triage, not a missing-data state — so no "file the
         // first one" prompt.
         <EmptyState
-          title="Nothing waiting"
-          subtitle="Every opportunity has been triaged. New ideas will show up here."
+          title={isInbox ? "Inbox zero" : "Nothing waiting"}
+          subtitle={
+            isInbox
+              ? "Every idea has been triaged. New ones will show up here."
+              : "Every opportunity has been triaged. New ideas will show up here."
+          }
         />
       ) : rows.length === 0 ? (
         // No page-vs-empty distinction to make any more: this view always starts from the top,

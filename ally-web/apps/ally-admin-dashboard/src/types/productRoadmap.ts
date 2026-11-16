@@ -228,6 +228,8 @@ export interface RoadmapOpportunitiesQuery {
   createdBy?: number[];
   /** Only opportunities that would back a colleague the caller hasn't backed lately. */
   newToMe?: boolean;
+  /** Unowned or unsized — the Inbox's definition of "needs a decision". */
+  needsTriage?: boolean;
   dateFrom?: string;
   dateTo?: string;
   releasedFrom?: string;
@@ -236,6 +238,7 @@ export interface RoadmapOpportunitiesQuery {
   priorityMax?: number;
   sortBy?:
     | "composite"
+    | "triage"
     | "priority"
     | "voters"
     | "createdAt"
@@ -608,6 +611,8 @@ export interface RoadmapViewState {
    * rather than treat undefined as a distinct third state.
    */
   layout?: RoadmapBoardLayout;
+  /** Archived rows are hidden unless this is on. Absent = hidden, so older views are unchanged. */
+  showArchived?: boolean;
 }
 
 export interface RoadmapSavedView {

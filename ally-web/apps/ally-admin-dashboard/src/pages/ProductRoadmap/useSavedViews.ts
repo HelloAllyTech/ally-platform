@@ -16,11 +16,11 @@ import { store } from "@store";
 import { RoadmapSavedView, RoadmapViewState } from "@types";
 
 import {
-  QUEUE_VIEW_ID,
-  QUEUE_VIEW_STATE,
+  INBOX_VIEW_ID,
   applySavedViewOrder,
   isValidViewDrop,
   isViewDirty,
+  pseudoViewState,
   serializeViewState,
 } from "./utils/views";
 
@@ -133,8 +133,9 @@ export const useSavedViews = ({
       setActiveViewId(id);
       // "Queue" is a hardcoded pseudo-view like "All" (see QUEUE_VIEW_ID), not a row in `views`,
       // so it needs its own branch rather than falling into the find-by-id below.
-      if (id === QUEUE_VIEW_ID) {
-        onApply(QUEUE_VIEW_STATE);
+      const pseudo = pseudoViewState(id);
+      if (pseudo) {
+        onApply(pseudo);
         return;
       }
       const view = id ? views.find(v => v.id === id) : null;
@@ -164,7 +165,7 @@ export const useSavedViews = ({
    *
    * Two problems, one fix:
    *
-   * 1. LANDING. A visit to /product-roadmap with no `?view=` should open the Queue. It cannot be
+   * 1. LANDING. A visit to /product-roadmap with no `?view=` should open the Inbox. It cannot be
    *    done by defaulting `activeViewId` to the queue, because "All" selects itself by DELETING
    *    the param — absent would then mean Queue and All would be unreachable. So the absence is
    *    resolved once, here, and written into the URL as `?view=queue`; from then on absent never
@@ -185,12 +186,13 @@ export const useSavedViews = ({
 
     if (activeViewId === null) {
       hasAppliedLandingView.current = true;
-      selectView(QUEUE_VIEW_ID);
+      selectView(INBOX_VIEW_ID);
       return;
     }
-    if (activeViewId === QUEUE_VIEW_ID) {
+    const pseudo = pseudoViewState(activeViewId);
+    if (pseudo) {
       hasAppliedLandingView.current = true;
-      onApply(QUEUE_VIEW_STATE);
+      onApply(pseudo);
       return;
     }
     // A saved view: nothing to apply until its row has arrived.
@@ -201,12 +203,19 @@ export const useSavedViews = ({
   }, [activeViewId, views, selectView, onApply]);
 
   const createNewView = useCallback(
-    async (name: string) => {
+    async (name: string, fromCurrent = false) => {
       try {
-        const created = await createView({ name, state: {} }).unwrap();
-        onApply({});
+        // `fromCurrent` saves what is on screen — the filters you are looking at — which "New
+        // view" deliberately does not (it starts empty; see the docblock above). Two actions
+        // because they answer two different intents, and the button said only one of them.
+        const created = await createView({ name, state: fromCurrent ? current : {} }).unwrap();
+        if (!fromCurrent) onApply({});
         setActiveViewId(created.id);
-        toast.success(`Created "${created.name}". Filters you set now are saved to it.`);
+        toast.success(
+          fromCurrent
+            ? `Saved "${created.name}" with the current filters.`
+            : `Created "${created.name}". Filters you set now are saved to it.`,
+        );
       } catch (error) {
         const message =
           (error as { data?: { message?: string } })?.data?.message ??
@@ -214,7 +223,7 @@ export const useSavedViews = ({
         toast.error(message);
       }
     },
-    [createView, onApply, setActiveViewId],
+    [createView, onApply, setActiveViewId, current],
   );
 
   const renameView = useCallback(

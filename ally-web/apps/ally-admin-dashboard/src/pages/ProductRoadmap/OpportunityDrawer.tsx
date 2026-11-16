@@ -45,7 +45,7 @@ import { monthKeyOf, monthLabel, shiftMonthKey } from "./utils/monthBoard";
 import { personName } from "./utils/people";
 import { formatPoints } from "./utils/points";
 import { sameReferenceImages } from "./utils/referenceImages";
-import { EFFORT_LABEL, STAGE_LABEL } from "./utils/stages";
+import { EFFORT_LABEL, STAGE_LABEL, displayStage } from "./utils/stages";
 import { isVotable } from "./utils/votes";
 import { VoteButton } from "./VoteButton";
 
@@ -61,7 +61,14 @@ const PRD_MAX = 20000;
 const AUTOSAVE_DEBOUNCE_MS = 800;
 const COMMENT_MAX = 500;
 
-const STAGES = Object.values(RoadmapOpportunityStage);
+// Idea, Prioritised, Released, and Archived (the hide/restore state). `under_development` is
+// retired and never offered; a row still carrying it displays as Prioritised (see displayStage).
+const STAGES = [
+  RoadmapOpportunityStage.NEW,
+  RoadmapOpportunityStage.PRIORITISED,
+  RoadmapOpportunityStage.RELEASED,
+  RoadmapOpportunityStage.ARCHIVED,
+];
 /** Smallest-first — EFFORT_LABEL's key order is the scale's order. See the note there. */
 const EFFORTS = Object.values(RoadmapOpportunityEffort);
 
@@ -790,7 +797,9 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
                 label="Choose a stage"
                 items={stageItems}
                 itemToString={item => item?.label ?? ""}
-                selectedItem={stageItems.find(item => item.value === draft.stage) ?? null}
+                selectedItem={
+                  stageItems.find(item => item.value === displayStage(draft.stage)) ?? null
+                }
                 disabled={!canManage}
                 onChange={({ selectedItem }) => {
                   if (!selectedItem) return;

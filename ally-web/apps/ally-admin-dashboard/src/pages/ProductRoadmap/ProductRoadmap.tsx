@@ -71,16 +71,21 @@ import { seedForHandle } from "./utils/builder";
 import { EMPTY_ADVANCED_FILTERS, RoadmapAdvancedFilterValues } from "./utils/filters";
 import { RoadmapEffortFilterValue } from "./utils/filterSelection";
 import { monthKeyOf, shiftMonthKey } from "./utils/monthBoard";
+import { expandStageFilter } from "./utils/stages";
 import { overlayUrlState, parseUrlState, writeUrlState } from "./utils/urlState";
 import {
+  INBOX_VIEW_ID,
   QUEUE_VIEW_ID,
   QUEUE_VIEW_STATE,
+  isPipelineViewId,
   normaliseSortField,
+  normaliseStageFilter,
   normaliseTypeFilter,
+  pseudoViewState,
 } from "./utils/views";
 
 /** An absent `?view=` lands on the Queue, so it counts as Queue here too. */
-const isQueueLanding = (view: string | null) => view === null || view === QUEUE_VIEW_ID;
+const isPipelineLanding = (view: string | null) => view === null || isPipelineViewId(view);
 
 /** One page of the TABLE layout, which walks `offset`. */
 const PAGE_SIZE = 50;
@@ -154,6 +159,11 @@ enum RoadmapTab {
    * `?tab=opportunities&view=queue`.
    */
   QUEUE = "queue",
+  /**
+   * The landing tab: Ideas that need a decision. Derived from `?view=inbox` exactly as QUEUE is
+   * derived from `?view=queue`, for the same one-source-of-truth reason.
+   */
+  INBOX = "inbox",
   OPPORTUNITIES = "opportunities",
   INTERVIEWS = "interviews",
   /** Bug Hunter's table, read-only. See BugsTab for why it is mirrored here. */
@@ -251,6 +261,11 @@ export const ProductRoadmap: React.FC = () => {
    */
   const canViewBugs = !!permissions?.includes(Permissions.VIEW_PRODUCT_ROADMAP);
 
+  /** Archived rows are hidden by default; this is the "Show archived" toggle. */
+  const [showArchived, setShowArchived] = useState(false);
+  const viewParam = searchParams.get("view");
+  /** Inbox and Queue define their own stages, so "Show archived" does not apply to them. */
+  const isPipelineView = isPipelineViewId(viewParam);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<RoadmapOpportunityType[]>([]);
   const [stageFilter, setStageFilter] = useState<RoadmapOpportunityStage[]>([]);
@@ -357,7 +372,7 @@ export const ProductRoadmap: React.FC = () => {
     () => ({
       search: debouncedSearch.trim() || undefined,
       type: typeFilter.length ? typeFilter : undefined,
-      stage: stageFilter.length ? stageFilter : undefined,
+      stage: expandStageFilter(stageFilter, showArchived && !isPipelineView),
       source: sourceFilter.length ? sourceFilter : undefined,
       effort: effortFilter.length ? effortFilter : undefined,
       productGoal: goalFilter.length ? goalFilter : undefined,
@@ -383,6 +398,8 @@ export const ProductRoadmap: React.FC = () => {
       debouncedSearch,
       typeFilter,
       stageFilter,
+      showArchived,
+      isPipelineView,
       sourceFilter,
       effortFilter,
       goalFilter,
@@ -468,12 +485,23 @@ export const ProductRoadmap: React.FC = () => {
     stage: QUEUE_VIEW_STATE.stageFilter,
     limit: 1,
   });
-  const { data: opportunitiesTotal } = useGetRoadmapOpportunitiesQuery({ limit: 1 });
+  const { data: opportunitiesTotal } = useGetRoadmapOpportunitiesQuery({
+    stage: expandStageFilter([], false),
+    limit: 1,
+  });
+  /** The Inbox badge: Ideas that still need an owner or a size, not every Idea. */
+  const { data: inboxTotal } = useGetRoadmapOpportunitiesQuery({
+    stage: [RoadmapOpportunityStage.NEW],
+    needsTriage: true,
+    limit: 1,
+  });
 
   const openOpportunityId = searchParams.get("opportunity");
-  const activeViewId = searchParams.get("view");
+  const activeViewId = viewParam;
   /** Queue is a pseudo-view (see QUEUE_VIEW_ID) that is defined as a list, not a filter preset. */
   const isQueueView = activeViewId === QUEUE_VIEW_ID;
+  /** Inbox is the other one — the landing view. See INBOX_VIEW_STATE. */
+  const isInboxView = activeViewId === INBOX_VIEW_ID;
   /**
    * The Builder session on screen, in the URL for the same reason the opportunity drawer is:
    * a refresh or a shared link should land back on the conversation.
@@ -517,6 +545,7 @@ export const ProductRoadmap: React.FC = () => {
       searchQuery: search.trim() || undefined,
       typeFilter,
       stageFilter,
+      showArchived: showArchived || undefined,
       sourceFilter,
       effortFilter,
       goalFilter,
@@ -540,6 +569,7 @@ export const ProductRoadmap: React.FC = () => {
       search,
       typeFilter,
       stageFilter,
+      showArchived,
       sourceFilter,
       effortFilter,
       goalFilter,
@@ -557,7 +587,11 @@ export const ProductRoadmap: React.FC = () => {
     // board may filter to `["bug"]`, which now matches nothing. See
     // normaliseTypeFilter — the view self-heals on its next autosave.
     setTypeFilter(normaliseTypeFilter(state.typeFilter) as RoadmapOpportunityType[]);
-    setStageFilter((state.stageFilter ?? []) as RoadmapOpportunityStage[]);
+    // Folded into the three visible stages — see normaliseStageFilter. A view saved with Archived
+    // picked comes back with the "Show archived" toggle on instead.
+    const { stages, archived } = normaliseStageFilter(state.stageFilter);
+    setStageFilter(stages as RoadmapOpportunityStage[]);
+    setShowArchived(!!state.showArchived || archived);
     // Absent on every view saved before this filter existed — undefined must mean "no filter",
     // not "leave whatever was previously selected", or applying an old view would leave a stale
     // source filter from whatever the user had picked before switching views.
@@ -609,9 +643,9 @@ export const ProductRoadmap: React.FC = () => {
    * is how the tab stops being a queue. Leaving the tab and coming back lands on List again —
    * the board is a way of looking at the queue, not a new definition of it.
    */
-  const layoutToggle = (
+  const layoutSwitch = (
     <div className="border-border-light flex items-center border text-sm">
-      {(isQueueView
+      {(isPipelineView
         ? [
             { id: RoadmapBoardLayout.LIST, label: "List" },
             { id: RoadmapBoardLayout.BOARD, label: "Board" },
@@ -636,6 +670,34 @@ export const ProductRoadmap: React.FC = () => {
           {option.label}
         </button>
       ))}
+    </div>
+  );
+
+  /**
+   * Archived is a hidden state, not a visible stage: rejecting an idea archives it, and it stays
+   * out of every list until this is ticked. Not offered on Inbox/Queue — their stages are their
+   * definition, and an archived row is neither waiting nor ranked.
+   */
+  const archivedToggle = isPipelineView ? null : (
+    <Tooltip
+      label="Archived ideas are hidden by default. Tick to list them, so you can restore one."
+      align="bottom"
+    >
+      <label className="text-typography-secondary flex cursor-pointer items-center gap-1.5 text-sm">
+        <input
+          type="checkbox"
+          checked={showArchived}
+          onChange={event => withPagingReset(setShowArchived)(event.target.checked)}
+        />
+        Show archived
+      </label>
+    </Tooltip>
+  );
+
+  const layoutToggle = (
+    <div className="flex flex-wrap items-center gap-3">
+      {layoutSwitch}
+      {archivedToggle}
     </div>
   );
 
@@ -749,17 +811,30 @@ export const ProductRoadmap: React.FC = () => {
       hasOverlaidUrl.current = true;
       const url = { ...(initialUrlState.current ?? {}) };
       // The Queue is a list or a board, never the table, and its stage is its definition.
-      if (isQueueLanding(searchParams.get("view")) && url.layout === RoadmapBoardLayout.TABLE) {
+      if (isPipelineLanding(searchParams.get("view")) && url.layout === RoadmapBoardLayout.TABLE) {
         delete url.layout;
       }
       applyViewState(
-        overlayUrlState(state, url, { ignoreStage: isQueueLanding(searchParams.get("view")) }),
+        overlayUrlState(state, url, { ignoreStage: isPipelineLanding(searchParams.get("view")) }),
       );
     },
     // applyViewState only calls setters and resetPaging, all of which are stable in effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [searchParams],
   );
+
+  /** True when anything on screen differs from the bare board: a filter, a search or a sort. */
+  const hasAnyFilter =
+    !!search.trim() ||
+    typeFilter.length > 0 ||
+    stageFilter.length > 0 ||
+    sourceFilter.length > 0 ||
+    effortFilter.length > 0 ||
+    goalFilter.length > 0 ||
+    ownerFilter.length > 0 ||
+    showArchived ||
+    sortBy !== "composite" ||
+    order !== "DESC";
 
   const savedViews = useSavedViews({
     current: currentViewState,
@@ -779,6 +854,7 @@ export const ProductRoadmap: React.FC = () => {
     // `?tab=queue` is therefore an unrecognised tab and falls back to Opportunities, the same
     // way the retired `?tab=release-notes` does.
     tab !== RoadmapTab.QUEUE &&
+    tab !== RoadmapTab.INBOX &&
     // A pasted `?tab=bugs` from someone who holds the toggle must fall back for
     // someone who doesn't, rather than selecting a tab with no strip entry —
     // which would render the page with no tab underlined and no body.
@@ -796,19 +872,27 @@ export const ProductRoadmap: React.FC = () => {
    */
   const baseTab = isTabAvailable(requestedTab) ? requestedTab : RoadmapTab.OPPORTUNITIES;
   const activeTab =
-    baseTab === RoadmapTab.OPPORTUNITIES && isQueueView ? RoadmapTab.QUEUE : baseTab;
+    baseTab === RoadmapTab.OPPORTUNITIES
+      ? isQueueView
+        ? RoadmapTab.QUEUE
+        : isInboxView
+          ? RoadmapTab.INBOX
+          : baseTab
+      : baseTab;
   /** Both strip entries render the same body; only the applied view differs. */
   const isOpportunitiesTab =
-    activeTab === RoadmapTab.OPPORTUNITIES || activeTab === RoadmapTab.QUEUE;
+    activeTab === RoadmapTab.OPPORTUNITIES ||
+    activeTab === RoadmapTab.QUEUE ||
+    activeTab === RoadmapTab.INBOX;
 
   /** Mirror the board's filters, sort and layout into the URL, so refresh and paste both work. */
   useEffect(() => {
     if (!hasOverlaidUrl.current || !isOpportunitiesTab) return;
-    const next = writeUrlState(searchParams, currentViewState, { omitStage: isQueueView });
+    const next = writeUrlState(searchParams, currentViewState, { omitStage: isPipelineView });
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
     // searchParams is read but not a trigger: the write is a function of the board state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentViewState, isQueueView, isOpportunitiesTab]);
+  }, [currentViewState, isPipelineView, isOpportunitiesTab]);
 
   const setTab = (id: string) => {
     const next = new URLSearchParams(searchParams);
@@ -822,17 +906,18 @@ export const ProductRoadmap: React.FC = () => {
      * happens once, here, and applyViewState is called directly for the half selectView does
      * that this cannot: applying the filters, layout and sort.
      */
-    if (id === RoadmapTab.QUEUE || id === RoadmapTab.OPPORTUNITIES) {
-      const toQueue = id === RoadmapTab.QUEUE;
+    if (id === RoadmapTab.QUEUE || id === RoadmapTab.INBOX || id === RoadmapTab.OPPORTUNITIES) {
+      const pseudoId =
+        id === RoadmapTab.QUEUE ? QUEUE_VIEW_ID : id === RoadmapTab.INBOX ? INBOX_VIEW_ID : null;
       next.set("tab", RoadmapTab.OPPORTUNITIES);
-      if (toQueue) next.set("view", QUEUE_VIEW_ID);
+      if (pseudoId) next.set("view", pseudoId);
       // Leaving Queue lands on "All" — the sibling default in the strip below — rather than on
       // whichever saved view happened to be applied last, which the reader cannot see from here.
       else next.delete("view");
       next.delete("opportunity");
       next.delete("bug");
       setSearchParams(next, { replace: true });
-      applyViewState(toQueue ? QUEUE_VIEW_STATE : {});
+      applyViewState(pseudoViewState(pseudoId) ?? {});
       return;
     }
     next.set("tab", id);
@@ -1103,6 +1188,14 @@ export const ProductRoadmap: React.FC = () => {
           // opportunities" — every row, shipped and archived included — is the reference behind
           // it.
           // Promoted out of the saved-view strip below, where it sat as a pseudo-view.
+          // Inbox is first and the landing tab: Ideas still waiting on an owner or a size. The
+          // badge counts THOSE, not every Idea — 181 Ideas is a backlog, "12 need a decision" is
+          // an inbox.
+          {
+            id: RoadmapTab.INBOX,
+            label: "Inbox",
+            count: inboxTotal?.count ?? 0,
+          },
           {
             id: RoadmapTab.QUEUE,
             label: "Queue",
@@ -1208,6 +1301,7 @@ export const ProductRoadmap: React.FC = () => {
           canSave={canVote}
           onSelect={savedViews.selectView}
           onCreateView={savedViews.createNewView}
+          hasCurrentFilters={hasAnyFilter}
           onRename={savedViews.renameView}
           onTogglePinned={savedViews.togglePinned}
           onDelete={savedViews.removeView}
@@ -1224,7 +1318,7 @@ export const ProductRoadmap: React.FC = () => {
       {isOpportunitiesTab && isBoard && (
         <MonthBoard
           showFilters
-          stageLocked={isQueueView}
+          stageLocked={isPipelineView}
           groupBy={groupBy}
           boardArgs={boardArgs}
           data={boardData}
@@ -1316,7 +1410,8 @@ export const ProductRoadmap: React.FC = () => {
           // No sort gating: the rank is computed server-side over the whole queue, so it stays
           // correct when the feed is ordered by date. That is the point of moving it to the
           // backend — a client-side position could only ever describe the current ordering.
-          isQueue={isQueueView}
+          isQueue={isPipelineView}
+          isInbox={isInboxView}
           leading={sortToolbar}
           showFilters
           listArgs={listArgs}
