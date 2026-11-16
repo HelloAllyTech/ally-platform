@@ -311,7 +311,10 @@ def _expectations_line(
         "context of this roleplay; when you do, say so in the note and lower "
         "your confidence. Name each behaviour item (skill) by its "
         "competency's name when it belongs to one, otherwise by the behaviour "
-        "itself. " + _NO_CODES
+        "itself. Name an unhelpful behaviour by what to do instead, never by "
+        'the fault ("Lets the client finish", not "Interrupts client"), '
+        "and assess it in that form: observed when the counsellor avoided "
+        "the fault, missed when they did it. " + _NO_CODES
     ]
 
 
@@ -700,6 +703,29 @@ async def write(
             "burden, loneliness, grief or guilt is not a risk cue: no "
             "important moment for it, and no coaching about assessing risk."
         )
+        missed_possible = sorted(
+            {
+                c.get("turn_index")
+                for c in cues
+                if not is_clear(c)
+                and c.get("turn_index") in possible_turns
+                and c.get("learner_response") == "missed"
+            }
+        )
+        if missed_possible:
+            # Code-owned (review 2026-11-16): a feeling the client kept
+            # voicing and the trainee passed over is never left out, even
+            # when it is not a risk cue; it is coached as ordinary
+            # counselling, never as a risk assessment.
+            lines.append(
+                "MISSED FEELINGS: the trainee passed over the client's words "
+                "at turns "
+                + ", ".join(str(t) for t in missed_possible)
+                + ". Unless one of them is a risk cue (then it is the important "
+                "moment), one work_on_this point quotes one of these moments "
+                "and coaches staying with the feeling: reflect it and explore "
+                "it before moving on. Not a risk assessment."
+            )
     lines += _practice_instruction(practice_options)
     if case_memory:
         # Code-owned: a case is one client across sessions; the debrief must

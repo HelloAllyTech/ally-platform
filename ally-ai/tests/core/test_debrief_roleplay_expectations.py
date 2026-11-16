@@ -125,3 +125,18 @@ def test_the_defaults_lead_with_the_roleplay_and_use_foundational_skills_loosely
         DEFAULT_WRITER_SYSTEM.replace("\n", " ")
     )
     assert "preferring one of this roleplay's competencies" in DEFAULT_WRITER_SYSTEM
+
+
+@pytest.mark.asyncio
+async def test_an_unhelpful_behaviour_is_named_by_what_to_do_instead(dispatch_returns):
+    """Review 2026-11-16: "Interrupts client" became a learner's card heading."""
+    from app.core.debrief.steps import _expectations_line
+
+    line = " ".join(_expectations_line([], ["Interrupts client"], []))
+    assert (
+        "Name an unhelpful behaviour by what to do instead, never by the fault" in line
+    )
+    assert (
+        "observed when the counsellor avoided the fault, missed when they did it"
+        in line
+    )

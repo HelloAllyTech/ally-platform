@@ -295,6 +295,60 @@ async def test_writer_must_cover_a_clear_cue_and_decides_a_possible_one(
 
 
 @pytest.mark.asyncio
+async def test_writer_coaches_a_missed_feeling_even_when_it_is_not_a_risk_cue(
+    dispatch_returns,
+):
+    """Review 2026-11-16 (Sangath, Nikhil): six "I feel stuck / lost" turns
+    the trainee passed over went unmentioned. A possible cue the learner
+    missed gets one work-on point about staying with the feeling, never a
+    risk assessment; one they explored, or a clear one, does not."""
+    from app.core.debrief.steps import write
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(
+        {},
+        {
+            "risk_cues": [
+                {"turn_index": 2, "strength": "clear", "learner_response": "missed"},
+                {"turn_index": 5, "strength": "possible", "learner_response": "missed"},
+                {
+                    "turn_index": 7,
+                    "strength": "possible",
+                    "learner_response": "explored",
+                },
+                {"turn_index": 9, "strength": "possible", "learner_response": "missed"},
+            ],
+        },
+        "en",
+        "gemini-3-flash-preview",
+        TRANSCRIPT,
+    )
+    assert (
+        "MISSED FEELINGS: the trainee passed over the client's words at turns 5, 9."
+        in calls["prompt"]
+    )
+    assert "Not a risk assessment." in calls["prompt"]
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(
+        {},
+        {
+            "risk_cues": [
+                {
+                    "turn_index": 5,
+                    "strength": "possible",
+                    "learner_response": "explored",
+                }
+            ]
+        },
+        "en",
+        "gemini-3-flash-preview",
+        TRANSCRIPT,
+    )
+    assert "MISSED FEELINGS" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
 async def test_writer_may_point_only_to_the_learners_own_roleplays(dispatch_returns):
     from app.core.debrief.steps import write
 
