@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
+import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
+import 'package:ally_mobile_flutter/features/simulations/data/learner_debrief_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_transcript_repository.dart';
@@ -533,6 +535,124 @@ void main() {
 
       await tester.pump(const Duration(seconds: 10));
       expect(calls, 2);
+    });
+  });
+
+  group('inside a course', () {
+    void stubNext({String? itemId, bool completed = false}) {
+      when(() => h.courses.getNextTrackItem('t1')).thenAnswer(
+        (_) async => GetNextTrackItemResponse(
+          trackCompleted: completed,
+          nextItem: itemId == null
+              ? null
+              : NextTrackItem.fromJson({
+                  'id': itemId,
+                  'type': 'VIDEO',
+                  'title': 'Next up',
+                  'sectionId': 's1',
+                  'sectionTitle': 'Section one',
+                }),
+        ),
+      );
+    }
+
+    testWidgets('back returns to the course, with Learn underneath', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
+      final router = await h.pump(tester, trackId: 't1', trackItemId: 'item-1');
+
+      await tester.tap(find.byKey(const Key('simulation-feedback-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('COURSE:t1'), findsOneWidget);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('HOME'), findsOneWidget);
+    });
+
+    testWidgets('names the course and offers Continue the course; no Try another', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
+      await h.pump(tester, trackId: 't1');
+
+      expect(find.text('Listening skills'), findsOneWidget);
+      expect(find.text('Continue the course'), findsOneWidget);
+      await tester.tap(find.text('Transcript'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('simulation-feedback-try-another')), findsNothing);
+
+      // The course name goes back to the course.
+      await tester.tap(find.byKey(const Key('simulation-feedback-course-name')));
+      await tester.pumpAndSettle();
+      expect(find.text('COURSE:t1'), findsOneWidget);
+    });
+
+    testWidgets('Continue the course opens the next item over the course', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
+      stubNext(itemId: 'item-2');
+      final router = await h.pump(tester, trackId: 't1', trackItemId: 'item-1');
+
+      await tester.tap(find.byKey(const Key('simulation-feedback-continue-course')));
+      await tester.pumpAndSettle();
+      expect(find.text('COURSE_ITEM:t1:item-2'), findsOneWidget);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('COURSE:t1'), findsOneWidget);
+    });
+
+    testWidgets('a completed course (or a failed lookup) continues to the course itself', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
+      stubNext(completed: true);
+      await h.pump(tester, trackId: 't1');
+      await tester.tap(find.byKey(const Key('simulation-feedback-continue-course')));
+      await tester.pumpAndSettle();
+      expect(find.text('COURSE:t1'), findsOneWidget);
+    });
+
+    testWidgets('unrated: Continue asks for a rating first, then continues', (tester) async {
+      h.stubSummary(summaryJson(note: _note));
+      stubNext(itemId: 'item-2');
+      await h.pump(tester, trackId: 't1');
+      await closePopup(tester); // the auto-opened one
+
+      await tester.tap(find.byKey(const Key('simulation-feedback-continue-course')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('feedback-popup')), findsOneWidget);
+      await closePopup(tester);
+      expect(find.text('COURSE_ITEM:t1:item-2'), findsOneWidget);
+    });
+
+    testWidgets('Debrief tab switched off: no Debrief tab, the transcript shows, back returns to the course',
+        (tester) async {
+      h.stubSummary(
+        summaryJson(note: _note, hasFeedback: true, rating: 5, feedbackTabs: {'debrief': false, 'transcript': true}),
+      );
+      when(() => h.learnerDebrief.getDebrief(any()))
+          .thenAnswer((_) async => const LearnerDebriefView(state: LearnerDebriefState.notAvailable));
+      await h.pump(tester, trackId: 't1');
+
+      expect(find.text('Debrief'), findsNothing);
+      expect(find.descendant(of: find.byType(TabBar), matching: find.text('Transcript')), findsOneWidget);
+      expect(find.byKey(const Key('debrief-cards')), findsNothing);
+      expect(find.byKey(const Key('debrief-list')), findsNothing);
+      expect(find.text('Continue the course'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('simulation-feedback-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('COURSE:t1'), findsOneWidget);
+    });
+
+    testWidgets('both tabs off inside a course: closing the rating returns to the course', (tester) async {
+      h.stubSummary(summaryJson(note: _note, feedbackTabs: {'debrief': false, 'transcript': false}));
+      await h.pump(tester, trackId: 't1');
+      await closePopup(tester);
+      expect(find.text('COURSE:t1'), findsOneWidget);
+    });
+
+    testWidgets('a standalone roleplay has no course row and still goes back to Learn', (tester) async {
+      h.stubSummary(summaryJson(note: _note, hasFeedback: true, rating: 5));
+      await h.pump(tester);
+      expect(find.byKey(const Key('simulation-feedback-course')), findsNothing);
+      await tester.tap(find.byKey(const Key('simulation-feedback-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('HOME'), findsOneWidget);
+      verifyNever(() => h.courses.getLearnTrackDetail(any()));
     });
   });
 }

@@ -25,6 +25,8 @@ class StartSimulationParams {
     this.scenario,
     this.pathId,
     this.caseId,
+    this.trackId,
+    this.trackItemId,
   });
 
   final int scenarioId;
@@ -43,6 +45,13 @@ class StartSimulationParams {
   /// and on to Feedback, whose back then returns to that path/case.
   final String? pathId;
   final String? caseId;
+
+  /// The course (track) this roleplay was opened from, and the course item
+  /// when it is one: carried to the live screen and on to Feedback, whose
+  /// back then returns to the course (web `ActiveTrackContext`). Null for a
+  /// standalone roleplay.
+  final String? trackId;
+  final String? trackItemId;
 }
 
 enum StartSimulationErrorKind { rateLimited, activeSimulation, other }
@@ -100,6 +109,8 @@ void _pushRoleplay(BuildContext context, SessionData session, StartSimulationPar
       'pathId': ?params.pathId,
       'caseId': ?params.caseId,
       'languageId': ?params.languageId,
+      'trackId': ?params.trackId,
+      'trackItemId': ?params.trackItemId,
     },
   );
 }

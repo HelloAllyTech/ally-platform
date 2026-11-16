@@ -61,6 +61,25 @@ void main() {
     expect(chat.messages.last.citations!.single.transcriptId, 2);
   });
 
+  test("a done event's limit (Debrief Ask Ally) keeps the limit message and marks the limit reached", () async {
+    chat.sendMessage('One more?');
+    expect(chat.limitReached, isNull);
+    stream.add(const AskAiSseDone(content: "That's all the questions for this debrief.", limit: 'session'));
+    await settle();
+    expect(chat.limitReached, 'session');
+    expect(chat.messages.last.content, "That's all the questions for this debrief.");
+  });
+
+  test('done without a limit leaves it unset; the wire limit parses (absent on older servers)', () async {
+    chat.sendMessage('Q');
+    stream.add(const AskAiSseDone(content: 'A'));
+    await settle();
+    expect(chat.limitReached, isNull);
+    final parsed = AskAiSseEvent.fromJson({'type': 'done', 'content': 'x', 'limit': 'month'});
+    expect((parsed! as AskAiSseDone).limit, 'month');
+    expect((AskAiSseEvent.fromJson({'type': 'done'})! as AskAiSseDone).limit, isNull);
+  });
+
   test('an error event drops the reply and sets the error; retry re-sends the last question', () async {
     chat.sendMessage('Q');
     stream.add(const AskAiSseError('nope'));

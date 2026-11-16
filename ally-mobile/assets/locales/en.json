@@ -1288,10 +1288,12 @@
       "practise": {
         "next": "Practise this next",
         "this": "Practise this",
-        "label": "Practise this in the roleplay \"{{title}}\""
+        "label": "Practise this in the roleplay \"{{title}}\"",
+        "roleplays": "Open my roleplays"
       },
       "reply": {
-        "placeholder": "Answer here, or ask Ally anything about this session…"
+        "placeholder": "Answer here, or ask Ally anything about this session…",
+        "closed": "You can't ask Ally more about this debrief right now."
       },
       "listen": {
         "all": "Listen all",
@@ -1383,12 +1385,18 @@
         "sent": "Thanks. Someone from the Ally team will look at this.",
         "undo": "Undo",
         "waiting": "Sent to the Ally team",
-        "failed": "That didn't send. Try again."
+        "failed": "That didn't send. Try again.",
+        "answer": {
+          "label": "Ally's answer:",
+          "kept": "Ally looked at this again and kept it.",
+          "corrected": "Ally looked at this again and changed it."
+        }
       },
       "corrections": {
         "kept": "Reviewed: the Ally team kept this point. {{note}}",
         "corrected": "Updated on {{date}} after a review by the Ally team: {{note}}",
-        "removed": "A point was removed after a review by the Ally team."
+        "removed": "A point was removed after a review by the Ally team.",
+        "removedWithReason": "We took out “{{card}}”: {{reason}}"
       },
       "helpful": {
         "question": "Was this helpful?",
@@ -1440,6 +1448,10 @@
         "title": "You're offline",
         "body": "Your debrief is safe and waiting for you. It will load when you're back online."
       }
+    },
+    "course": {
+      "continue": "Continue the course",
+      "backTo": "Back to {{title}}"
     }
   },
   "profile": {

@@ -109,7 +109,12 @@ void main() {
       builder: (context, state) {
         final extra = state.extra as Map<String, Object?>;
         return Scaffold(
-          body: TextButton(onPressed: () => context.pop(), child: Text('ROLEPLAY:${extra['scenarioSessionId']}')),
+          body: Column(
+            children: [
+              TextButton(onPressed: () => context.pop(), child: Text('ROLEPLAY:${extra['scenarioSessionId']}')),
+              Text('COURSE_CONTEXT:${extra['trackId']}:${extra['trackItemId']}'),
+            ],
+          ),
         );
       },
     ),
@@ -147,6 +152,8 @@ void main() {
 
     verify(() => sims.startScenarioSession(scenarioId: 7, trackItemProgressId: 'tip-1')).called(1);
     expect(find.text('ROLEPLAY:sess-7'), findsOneWidget);
+    // The course and item go with it, so its Feedback returns to the course.
+    expect(find.text('COURSE_CONTEXT:track-1:rp'), findsOneWidget);
 
     await tester.tap(find.text('ROLEPLAY:sess-7'));
     await tester.pumpAndSettle();
