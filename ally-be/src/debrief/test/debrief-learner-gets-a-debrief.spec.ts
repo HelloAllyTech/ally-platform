@@ -2,7 +2,9 @@ import {
   DebriefAgentService,
   istDay,
   retryPending,
+  withPractiseNextFallback,
 } from '../service/debrief-agent.service';
+import { keepOfferedPractice } from '../util/debrief-cards.util';
 import { DebriefPracticeService } from '../service/debrief-practice.service';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../util/debrief-live.util';
@@ -350,5 +352,107 @@ describe('a step with no model on an allowed provider (FR-57)', () => {
     expect(
       substituteModel('gemini-2.5-flash', [DEBRIEF_MODELS.judge], ['gemini']),
     ).toBeNull();
+  });
+});
+
+describe('"Practise this next" never loses its button', () => {
+  const cards = (scenario_id: number | null) =>
+    ({
+      opening: 'x',
+      what_worked: [],
+      work_on_this: [{ skill: 's', scenario_id: 99 }],
+      practise_next: { skill: 'Boundaries', reason: 'r', scenario_id },
+      skill_words: [],
+      reflective_question: 'q',
+    }) as any;
+
+  it('maps a missing or unoffered id to the fallback (this roleplay) when it is offered', () => {
+    const offered = new Set([3, 7]);
+    expect(
+      keepOfferedPractice(cards(null), offered, 3).practise_next?.scenario_id,
+    ).toBe(3);
+    expect(
+      keepOfferedPractice(cards(42), offered, 3).practise_next?.scenario_id,
+    ).toBe(3);
+    // A chosen, offered id stays; Work-on-this links get no fallback.
+    const kept = keepOfferedPractice(cards(7), offered, 3);
+    expect(kept.practise_next?.scenario_id).toBe(7);
+    expect(kept.work_on_this[0].scenario_id).toBeNull();
+    // A fallback that was not offered is never used.
+    expect(
+      keepOfferedPractice(cards(null), offered, 5).practise_next?.scenario_id,
+    ).toBeNull();
+  });
+
+  it('the learner view points an unopenable link at this same roleplay', () => {
+    const mapped = withPractiseNextFallback(cards(42), [{ id: 3 }], 3) as any;
+    expect(mapped.practise_next.scenario_id).toBe(3);
+    // Nothing the learner can open: left as is (the apps offer the list).
+    expect(
+      (withPractiseNextFallback(cards(42), [], 3) as any).practise_next
+        .scenario_id,
+    ).toBe(42);
+    // An openable link is kept.
+    expect(
+      (withPractiseNextFallback(cards(3), [{ id: 3 }, { id: 4 }], 4) as any)
+        .practise_next.scenario_id,
+    ).toBe(3);
+  });
+
+  it('the learner view serves the mapped link with its roleplay', async () => {
+    const dataSource = {
+      query: jest.fn(async (q: string) =>
+        q.includes('FROM scenario_sessions s WHERE s.id')
+          ? [
+              {
+                counselor_id: 7,
+                tenant_id: 't1',
+                status: 'ENDED',
+                ended_at: new Date(),
+                feedback: null,
+                learner_turns: 5,
+                debrief_tab_off: false,
+                scenario_id: 3,
+              },
+            ]
+          : [],
+      ),
+    };
+    const runs = {
+      find: jest.fn(async () => [
+        {
+          id: 'r1',
+          mode: 'live',
+          status: 'published',
+          cards: cards(null),
+          language: 'en',
+          steps: [],
+          workspace: {},
+        },
+      ]),
+    };
+    const practice = {
+      available: jest.fn(async (_u: number, _t: string, ids: number[]) =>
+        ids.includes(3)
+          ? [{ id: 3, title: 'This one', trackItemId: 'i3' }]
+          : [],
+      ),
+    };
+    const svc = new DebriefAgentService(
+      dataSource as any,
+      runs as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { get: jest.fn(async () => ({ values: { live: true } })) } as any,
+      { debriefAgentMode: 'shadow' } as any,
+      practice as any,
+      {} as any,
+    );
+    const view = await svc.learnerView('s1', 7);
+    expect((view.cards as any).practise_next.scenario_id).toBe(3);
+    expect(view.practice).toEqual([
+      { id: 3, title: 'This one', trackItemId: 'i3' },
+    ]);
   });
 });

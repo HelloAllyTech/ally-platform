@@ -831,9 +831,22 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
     pass_score = ctx.setting("passScore", 8)
     rnd = state.get("round", 0)
     ev = best.get("evaluation")
-    offered = [
-        o.get("id") for o in body.practice_options(ctx) if o.get("id") is not None
-    ]
+    options = body.practice_options(ctx)
+    offered = [o.get("id") for o in options if o.get("id") is not None]
+    # "Practise this next" never loses its button: an id the Writer left out
+    # or made up becomes this same roleplay (always an option inside a
+    # course), else the first option (ally-be `keepOfferedPractice`).
+    fallback = next(
+        (o.get("id") for o in options if o.get("this_roleplay")),
+        next(
+            (
+                o.get("id")
+                for o in options
+                if o.get("id") is not None and o.get("id") == ctx.sess("scenario_id")
+            ),
+            offered[0] if offered else None,
+        ),
+    )
     # An important moment is for a clear risk cue. Once the Evaluator has read
     # the draft, a card whose moments every signal reads as possible (low mood,
     # burden, grief, guilt) goes, and a person checks it (cue_strength).
@@ -846,7 +859,7 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
             (state.get("safety") or {}).get("risk_cues") or [],
         )
     final = await ctx.gateway.call(
-        "finalise_cards", {"cards": cards, "offered": offered}
+        "finalise_cards", {"cards": cards, "offered": offered, "fallback": fallback}
     )
     patch = {
         "cards": final["cards"],

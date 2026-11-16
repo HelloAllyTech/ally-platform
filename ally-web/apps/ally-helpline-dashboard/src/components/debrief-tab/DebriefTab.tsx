@@ -127,8 +127,21 @@ export const DebriefTab: FC<DebriefTabProps> = ({
   // switched on, an older session, a refusal — keeps today's note.
   const { data: supervisorView } = useGetSupervisorDebriefQuery(sessionId, { skip: !readOnly });
   const askAlly = learnerDebrief?.state === "ready" && !readOnly;
-  const { messages, streamingMessage, isStreaming, error, sendMessage, retryLastMessage } =
-    useSendMessage(sessionId, askAlly ? ApiEndpoints.DEBRIEFS.REPLY_STREAM(sessionId) : undefined);
+  const {
+    messages,
+    streamingMessage,
+    isStreaming,
+    error,
+    replyLimit,
+    sendMessage,
+    retryLastMessage,
+  } = useSendMessage(
+    sessionId,
+    askAlly ? ApiEndpoints.DEBRIEFS.REPLY_STREAM(sessionId) : undefined,
+  );
+  // Ask Ally's limit (this reply's `done.limit`, or the server's `askAlly`
+  // after a reload): the limit message stays in the thread, the box goes.
+  const askAllyClosed = Boolean(replyLimit) || learnerDebrief?.askAlly?.open === false;
   const { data: history, isLoading: isHistoryLoading } = useGetChatHistoryQuery(
     { sessionId },
     // No thread on screen, so no reason to fetch one — this also keeps an admin
@@ -199,7 +212,11 @@ export const DebriefTab: FC<DebriefTabProps> = ({
     </>
   );
 
-  if (readOnly && supervisorView?.state === "ready" && supervisorView.cards) {
+  // The learner's own session in Roleplay Logs reads as their debrief (with
+  // its "Practise this next" button), even when they can also read others'
+  // as a supervisor: the learner view answers only the session's own learner.
+  const ownReady = learnerDebrief?.state === "ready";
+  if (readOnly && !ownReady && supervisorView?.state === "ready" && supervisorView.cards) {
     const supervisorThread = supervisorView.thread ?? [];
     return (
       <DebriefCards
@@ -249,7 +266,7 @@ export const DebriefTab: FC<DebriefTabProps> = ({
           askAlly ? (
             <div data-testid="ask-ally" className="flex flex-col gap-3">
               {thread}
-              <AskAllyComposer onSend={sendMessage} disabled={isStreaming} />
+              {!askAllyClosed && <AskAllyComposer onSend={sendMessage} disabled={isStreaming} />}
             </div>
           ) : undefined
         }

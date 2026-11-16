@@ -246,6 +246,34 @@ export function retryPending(run: DebriefRun): boolean {
   );
 }
 
+/**
+ * "Practise this next" pointing at a roleplay the learner cannot open (none
+ * chosen, or one gone) points at this same roleplay instead, when they can
+ * open it; otherwise it is left, and the apps offer the roleplays list.
+ */
+export function withPractiseNextFallback<
+  T extends Record<string, any> | null | undefined,
+>(
+  cards: T,
+  available: ReadonlyArray<{ id: number }>,
+  thisRoleplay: number | null,
+): T {
+  const next = cards?.practise_next as
+    | { scenario_id?: number | null }
+    | null
+    | undefined;
+  if (!cards || !next) return cards;
+  const ids = new Set(available.map((p) => p.id));
+  if (next.scenario_id != null && ids.has(Number(next.scenario_id))) {
+    return cards;
+  }
+  if (thisRoleplay == null || !ids.has(thisRoleplay)) return cards;
+  return {
+    ...cards,
+    practise_next: { ...next, scenario_id: thisRoleplay },
+  } as T;
+}
+
 /** The roleplays a debrief's cards link to, once each. */
 function practiceIds(cards?: Record<string, any> | null): number[] {
   const ids = [
@@ -1131,7 +1159,8 @@ export class DebriefAgentService implements OnModuleInit {
                 WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1
                   AND btrim(m.content) <> '') AS learner_turns,
               (SELECT COALESCE(sc.metadata->'feedbackTabs'->>'debrief', '') = 'false'
-                 FROM scenarios sc WHERE sc.id = s."scenarioId") AS debrief_tab_off
+                 FROM scenarios sc WHERE sc.id = s."scenarioId") AS debrief_tab_off,
+              s."scenarioId" AS scenario_id
          FROM scenario_sessions s WHERE s.id = $1`,
       [sessionId],
     );
@@ -1206,7 +1235,22 @@ export class DebriefAgentService implements OnModuleInit {
         };
       case DebriefRunStatus.PUBLISHED:
       case DebriefRunStatus.BELOW_BAR: {
-        const cards = cardsForReader(run.cards, run.recipeKey);
+        const read = cardsForReader(run.cards, run.recipeKey);
+        const thisRoleplay =
+          s.scenario_id != null ? Number(s.scenario_id) : null;
+        const available = await this.practice.available(
+          userId,
+          s.tenant_id,
+          [
+            ...practiceIds(read),
+            ...(thisRoleplay != null ? [thisRoleplay] : []),
+          ],
+          sessionId,
+        );
+        // "Practise this next" never loses its button: a link the learner
+        // cannot open becomes this same roleplay when they can.
+        const cards = withPractiseNextFallback(read, available, thisRoleplay);
+        const linked = new Set(practiceIds(cards));
         return {
           state: 'ready',
           runId: run.id,
@@ -1218,12 +1262,7 @@ export class DebriefAgentService implements OnModuleInit {
           // grief and wrote no important moment.
           riskCue: run.hasRiskCue === true,
           supportLines: await this.supportLines(s.tenant_id, run.language),
-          practice: await this.practice.available(
-            userId,
-            s.tenant_id,
-            practiceIds(cards),
-            sessionId,
-          ),
+          practice: available.filter((p) => linked.has(p.id)),
           askAlly: askAllyState(run),
         };
       }

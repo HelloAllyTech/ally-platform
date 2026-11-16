@@ -16,6 +16,17 @@ import { baseAPI } from "./baseAPI";
 export const LEARNER_DEBRIEF_POLL_MS = 3000;
 export const LEARNER_DEBRIEF_SLOW_POLL_MS = 30_000;
 export const LEARNER_DEBRIEF_FAST_FOR_MS = 4 * 60_000;
+/**
+ * After this long waiting (working, on its way, taking longer) the app stops
+ * asking and shows today's debrief instead: the learner is never left
+ * waiting for good.
+ */
+export const LEARNER_DEBRIEF_GIVE_UP_MS = 30 * 60_000;
+/** After a flag, ask every 5 s for up to 2 minutes while it is open: Ally answers most within one. */
+export const LEARNER_DEBRIEF_FLAG_POLL_MS = 5000;
+export const LEARNER_DEBRIEF_FLAG_POLL_FOR_MS = 2 * 60_000;
+/** How long a flag can be undone (ally-be FLAG_UNDO_MS): `canUndoUntil` minus this is when it was sent. */
+export const LEARNER_DEBRIEF_FLAG_UNDO_MS = 10 * 60_000;
 
 /** The learner events only the app can see (ally-be `DEBRIEF_CLIENT_EVENT_KINDS`). */
 export type DebriefEventKind =

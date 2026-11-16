@@ -297,6 +297,16 @@ or completed ones, plus this one — not-done first, then this one, then done on
 library (an unreadable course offers nothing). Each option carries `course` and, for this one, `this_roleplay`;
 the Writer's practice instruction says to stay within the course.
 
+**"Practise this next" always has a button.** The graph sends `finalise_cards` a `fallback` (the option marked
+`this_roleplay`, else the session's own roleplay when offered, else the first option); ally-be's
+`keepOfferedPractice` maps a missing or unoffered `practise_next.scenario_id` to it. The learner view also
+points a link the learner cannot open at this same roleplay when they can (`withPractiseNextFallback`), so
+debriefs written before this change get a button too; `practice[]` carries `trackItemId` inside a course (the
+apps open the item in the course player). With nothing the learner can open, the web shows "Open my roleplays"
+(`/learn`). A supervisor reading someone else's debrief in Roleplay Logs gets the card as text, no button; a
+learner reading their own session there gets their own view (with the button), even if they are also a
+supervisor.
+
 ### Where an Agent log entry came from (2026-11-16)
 
 Every entry in the run response's `logs` carries `origin`, set by ally-ai where the entry is written

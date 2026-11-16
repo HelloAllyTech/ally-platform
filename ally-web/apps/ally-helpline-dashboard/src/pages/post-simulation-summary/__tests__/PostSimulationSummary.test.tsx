@@ -1028,6 +1028,31 @@ describe("PostSimulationSummary Component", () => {
       expect(mockNavigate).toHaveBeenCalledWith(ROUTES.LEARN);
       expect(screen.queryByTestId("tabs")).toBeNull();
     });
+
+    it("returns to the course, not the role-play list, when the roleplay was played inside one", () => {
+      sessionStorage.setItem(
+        "activeTrackContext",
+        JSON.stringify({ trackId: "t-9", itemId: "i-1" }),
+      );
+      try {
+        mockedSummaryQuery.mockReturnValue(
+          summaryQueryResult({
+            scenario: { metadata: { feedbackTabs: { debrief: false, transcript: false } } },
+            hasFeedback: true,
+            sessionFeedback: { rating: 4 },
+          }),
+        );
+        render(
+          <TestWrapper>
+            <PostSimulationSummary />
+          </TestWrapper>,
+        );
+        expect(mockNavigate).toHaveBeenCalledWith("/track/t-9");
+        expect(mockNavigate).not.toHaveBeenCalledWith(ROUTES.LEARN);
+      } finally {
+        sessionStorage.removeItem("activeTrackContext");
+      }
+    });
   });
 
   /**

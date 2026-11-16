@@ -335,8 +335,18 @@ describe('DebriefGatewayController', () => {
         offered: [7],
       }),
     ).toEqual({
-      cards: withPointIds(keepOfferedPractice(cards, new Set([7]))),
+      // No fallback named: "Practise this next" falls to the first option.
+      cards: withPointIds(keepOfferedPractice(cards, new Set([7]), 7)),
     });
+    const named = await controller.tool('finalise_cards', bearer(), {
+      cards: {
+        ...cards,
+        practise_next: { ...cards.practise_next, scenario_id: 999 },
+      },
+      offered: [7, 8],
+      fallback: 8,
+    });
+    expect((named as any).cards.practise_next.scenario_id).toBe(8);
   });
 
   it('progress: writes the learner’s working panel while the run is running', async () => {

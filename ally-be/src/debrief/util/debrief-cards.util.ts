@@ -652,13 +652,23 @@ export function renderCards(cards: DebriefCards): string {
 /**
  * Keep a roleplay link only when it is one of the learner's own options:
  * the Writer chose from that list, and anything else is dropped, never shown.
+ * "Practise this next" always links one when the learner has any (Gopi,
+ * 2026-11-16: never the card without a button): a missing or unoffered id
+ * becomes `fallback` — this same roleplay when it is an option (always,
+ * inside a course), else the first option — when it is offered.
  */
 export function keepOfferedPractice(
   cards: DebriefCards,
   offered: ReadonlySet<number>,
+  fallback?: number | null,
 ): DebriefCards {
   const keep = (id?: number | null) =>
     id != null && offered.has(Number(id)) ? Number(id) : null;
+  const next = (id?: number | null) =>
+    keep(id) ??
+    (fallback != null && offered.has(Number(fallback))
+      ? Number(fallback)
+      : null);
   return {
     ...cards,
     work_on_this: (cards.work_on_this ?? []).map((c) => ({
@@ -668,7 +678,7 @@ export function keepOfferedPractice(
     practise_next: cards.practise_next
       ? {
           ...cards.practise_next,
-          scenario_id: keep(cards.practise_next.scenario_id),
+          scenario_id: next(cards.practise_next.scenario_id),
         }
       : cards.practise_next,
   };
