@@ -329,3 +329,13 @@ export const purposeLimit = (
   if (purpose === "training") return p.training;
   return null;
 };
+
+/**
+ * The choices with one still sitting in the "Add a choice" box added too: pressing Next or Save
+ * without pressing Add first kept only the examples, and the typed choice vanished. Returns the
+ * same array when there's nothing to add.
+ */
+export const withTyped = (values: string[], typed: string): string[] => {
+  const v = typed.trim();
+  return v && !values.includes(v) ? [...values, v] : values;
+};

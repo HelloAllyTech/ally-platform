@@ -238,6 +238,37 @@ describe("no lists yet", () => {
   });
 });
 
+describe("a choice typed but not added", () => {
+  it("is kept when Next is pressed without Add (not dropped)", async () => {
+    h.results.install = () => {
+      h.lists.current = [SLOTS, APPOINTMENTS];
+      return Promise.resolve({ lists: [SLOTS, APPOINTMENTS] });
+    };
+    const view = render(
+      <ListsSection bot={BOT} home={{} as never} canEdit canManage go={vi.fn()} tryIt={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.empty.readyMade) }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: `${t.setup.use}: Appointments` }));
+    });
+    view.rerender(
+      <ListsSection bot={BOT} home={{} as never} canEdit canManage go={vi.fn()} tryIt={vi.fn()} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText("Add a service"), {
+      target: { value: "Thali" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: t.setup.next }));
+    });
+    expect(h.calls.updateField).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: "service",
+        change: { options: { values: ["Consultation", "Follow-up", "Thali"] } },
+      }),
+    );
+  });
+});
+
 describe("the entries table", () => {
   const table = () =>
     withSaves(<EntriesTable bot={BOT} list={APPOINTMENTS} lists={[SLOTS, APPOINTMENTS]} canEdit />);

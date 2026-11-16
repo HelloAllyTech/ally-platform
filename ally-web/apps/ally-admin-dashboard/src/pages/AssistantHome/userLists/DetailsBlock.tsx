@@ -14,7 +14,7 @@ import { Select, Switch } from "@components/v2";
 import type { ListField, ListFieldType, UserList } from "@types";
 
 import { HOME, fill } from "../copy";
-import { human, liveFields, lower } from "./format";
+import { human, liveFields, lower, withTyped } from "./format";
 
 const t = () => HOME.userLists;
 
@@ -252,7 +252,7 @@ const DetailEditor: React.FC<{
       type: draft.type,
       options:
         draft.type === "select"
-          ? { values: draft.values }
+          ? { values: withTyped(draft.values, choice) }
           : draft.type === "relation"
             ? { to: draft.to }
             : {},
