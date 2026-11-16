@@ -348,7 +348,13 @@ path it raised the flag 5 times on the old path and 7 on the new — the same re
 variance rather than a difference between the paths.
 
 
-## 6. The orchestrator (challenger releases only; spec Part A, D2 steps 7–8)
+## 6. The orchestrator (on by default since 2026-11-16; spec Part A, D2 steps 7–8)
+
+On by default from 2026-11-16 (Gopi): `DEBRIEF_SEED_BUNDLE` carries `DEBRIEF_ORCHESTRATOR_DEFAULT`
+(`enabled: true`) and the orchestrator prompts, so the deploy makes a code release with it on (three-way
+merge over the live release; no conflict while the live release has no orchestrator block). Releases made
+before then, and any release a person makes with it off, still run the fixed recipes. The challenger route
+below stays for trying an orchestrator variant against the live release.
 
 **Flag:** `bundle.orchestrator.enabled` (`true` = orchestrated; absent or `false` = today's fixed recipe, unchanged).
 The seed bundle never carries the block (a changed seed is promoted to GA at boot), and every release made before

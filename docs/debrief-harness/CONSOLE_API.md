@@ -395,7 +395,7 @@ A passed canary that was never promoted is stopped. `approve` on an expired item
   It returns `{ ideaId, releaseId, version, budgetOnly, diff: BundleDiff }`. The draft is copied from the live release with these changes and checked like every release. The live release is never edited.
   - Fixed steps (safety reader, writer, checks, evaluator) and the judge cannot be turned off. The judge's model is pinned.
   - Turning the Reviser off sets revision rounds to 0.
-  - Agents need a release with the orchestrator.
+  - Agents need a release with the orchestrator (on by default since 2026-11-16).
   - Models must be gemini or openai.
 - `PATCH pm-agent/ideas/:id/draft` takes the same body and changes the draft until its tests start (409 after that).
 - `PUT budgets {runCeilingUsd?, monthlyCapUsd?, passScore?, note?}` (owner) also creates a change with its idea and release. Budgets alone (no `passScore`) go live on that call, because the owner's confirm is the person's confirmation v9 asks for; the response carries `live: true`. A change with `passScore` stays proposed (`live: false`) and climbs the ladder. Changed 2026-11-16.

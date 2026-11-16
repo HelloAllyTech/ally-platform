@@ -88,7 +88,14 @@ describe('step on/off on a draft', () => {
 
   it('agents need an orchestrator', () => {
     expect(
-      applyStepEdits(seed(), [{ step: 'agent:protocol_check', enabled: true }]),
+      applyStepEdits(
+        (() => {
+          const b = seed();
+          delete b.orchestrator;
+          return b;
+        })(),
+        [{ step: 'agent:protocol_check', enabled: true }],
+      ),
     ).toEqual({
       problem: 'this release has no orchestrator; agents are off',
     });

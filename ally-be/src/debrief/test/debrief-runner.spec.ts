@@ -68,6 +68,18 @@ const graphAnswer = (
   ...over,
 });
 
+/**
+ * A release without the orchestrator (every release before 2026-11-16, and
+ * any person may still make one): the fixed recipes. The seed runs the
+ * orchestrator since 2026-11-16.
+ */
+const FIXED_RECIPES = (() => {
+  const b = JSON.parse(JSON.stringify(DEBRIEF_SEED_BUNDLE));
+  delete b.orchestrator;
+  for (const code of DEBRIEF_ORCHESTRATOR_PROMPT_CODES) delete b.prompts[code];
+  return b;
+})();
+
 function build(
   opts: {
     learnerTurns?: number;
@@ -186,7 +198,7 @@ function build(
     getGa: async () => ({
       id: 'rel',
       version: 3,
-      bundle: opts.bundle ?? DEBRIEF_SEED_BUNDLE,
+      bundle: opts.bundle ?? FIXED_RECIPES,
     }),
   };
   const practice = {
@@ -323,7 +335,7 @@ describe('DebriefRunnerService', () => {
         promptOverrides: { [DEBRIEF_PROMPT_CODES.writer]: 'challenger text' },
       });
       const prompts = request().prompts;
-      for (const code of Object.keys(DEBRIEF_SEED_BUNDLE.prompts)) {
+      for (const code of Object.keys(FIXED_RECIPES.prompts)) {
         expect(prompts).toHaveProperty(code);
       }
       expect(prompts[DEBRIEF_PROMPT_CODES.writer]).toBe('challenger text');

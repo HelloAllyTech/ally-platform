@@ -1,5 +1,6 @@
 import { guardSelectQuery } from '../../analytics-agent/util/sql-guard.util';
 import {
+  DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
   DEBRIEF_ORCHESTRATOR_DEFAULT,
   DEBRIEF_REGISTRY_AGENTS,
   DEBRIEF_SEED_BUNDLE,
@@ -15,9 +16,12 @@ import {
 } from '../service/debrief-aggregates.service';
 
 describe('The orchestrator in the release bundle (spec A2, A11)', () => {
-  it('the seed never carries it, so the boot-time seed sync changes nothing for GA', () => {
-    expect(DEBRIEF_SEED_BUNDLE.orchestrator).toBeUndefined();
-    expect(isOrchestrated(DEBRIEF_SEED_BUNDLE)).toBe(false);
+  it('the seed runs it by default (2026-11-16), with its prompts, and validates', () => {
+    expect(isOrchestrated(DEBRIEF_SEED_BUNDLE)).toBe(true);
+    expect(DEBRIEF_SEED_BUNDLE.orchestrator?.agents.length).toBeGreaterThan(0);
+    for (const code of DEBRIEF_ORCHESTRATOR_PROMPT_CODES) {
+      expect(DEBRIEF_SEED_BUNDLE.prompts).toHaveProperty(code);
+    }
     expect(validateDebriefBundle(DEBRIEF_SEED_BUNDLE)).toEqual([]);
   });
 
@@ -190,5 +194,24 @@ describe('query_aggregates (spec A4)', () => {
       min_group: 5,
       rows: [{ skill: 'pacing', learners: 6, observed_share: 0.33 }],
     });
+  });
+});
+
+describe('turning the orchestrator on by deploy (2026-11-16)', () => {
+  it('merges onto a live release without one: no conflict, people’s changes kept', () => {
+    const { mergeCodeRelease } = jest.requireActual(
+      '../util/debrief-code-merge.util',
+    );
+    const oldSeed = JSON.parse(JSON.stringify(DEBRIEF_SEED_BUNDLE));
+    delete oldSeed.orchestrator;
+    for (const code of DEBRIEF_ORCHESTRATOR_PROMPT_CODES) {
+      delete oldSeed.prompts[code];
+    }
+    const live = JSON.parse(JSON.stringify(oldSeed));
+    live.settings.monthlyCapUsd = 150;
+    const m = mergeCodeRelease(oldSeed, live, DEBRIEF_SEED_BUNDLE);
+    expect(m.conflicts).toEqual([]);
+    expect(isOrchestrated(m.merged)).toBe(true);
+    expect(m.merged.settings.monthlyCapUsd).toBe(150);
   });
 });

@@ -401,24 +401,12 @@ const SEED_RECIPES_BASE = {
   reply: DEBRIEF_REPLY_DEFAULT,
 };
 
-const standardSeed = SEED_RECIPES_BASE.recipes[DebriefRecipeKey.STANDARD]!;
-
-export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
-  ...SEED_RECIPES_BASE,
-  recipes: {
-    ...SEED_RECIPES_BASE.recipes,
-    [DebriefRecipeKey.CASE]: { ...standardSeed, key: DebriefRecipeKey.CASE },
-    [DebriefRecipeKey.ASSESSMENT]: {
-      ...standardSeed,
-      key: DebriefRecipeKey.ASSESSMENT,
-    },
-  },
-};
-
 /**
- * The orchestrator as a challenger release enables it: every registry agent
- * at the build's version, today's recipe models for the agents that were
- * recipe steps, the build's defaults for the rest.
+ * The orchestrator, on by default (Gopi, 2026-11-16): every registry agent at
+ * the build's version, today's recipe models for the agents that were recipe
+ * steps, the build's defaults for the rest. The planner decides per session
+ * whether to add any agent to the code-owned floor; adding none is a valid
+ * plan. Shipped off on 2026-11-11 as a precaution only.
  */
 export const DEBRIEF_ORCHESTRATOR_DEFAULT: DebriefOrchestratorConfig = {
   enabled: true,
@@ -433,10 +421,38 @@ export const DEBRIEF_ORCHESTRATOR_DEFAULT: DebriefOrchestratorConfig = {
   ).map(([id, { version }]) => ({ id, version })),
 };
 
+const standardSeed = SEED_RECIPES_BASE.recipes[DebriefRecipeKey.STANDARD]!;
+
+/**
+ * The code's defaults. A deploy that changes them makes a new live release
+ * (three-way merge over what people promoted; a conflict waits as a draft).
+ */
+export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
+  ...SEED_RECIPES_BASE,
+  prompts: {
+    ...SEED_RECIPES_BASE.prompts,
+    ...Object.fromEntries(
+      DEBRIEF_ORCHESTRATOR_PROMPT_CODES.filter(
+        (c) => !(c in SEED_RECIPES_BASE.prompts),
+      ).map((c) => [c, null]),
+    ),
+  },
+  orchestrator: DEBRIEF_ORCHESTRATOR_DEFAULT,
+  recipes: {
+    ...SEED_RECIPES_BASE.recipes,
+    [DebriefRecipeKey.CASE]: { ...standardSeed, key: DebriefRecipeKey.CASE },
+    [DebriefRecipeKey.ASSESSMENT]: {
+      ...standardSeed,
+      key: DebriefRecipeKey.ASSESSMENT,
+    },
+  },
+};
+
 /**
  * A challenger bundle (spec A11): `base` (normally the live GA bundle) with
- * the orchestrator on. Made a DRAFT release by the Console action; never the
- * seed, because a changed seed is promoted to GA at boot.
+ * the orchestrator on, as a DRAFT release from the Console action. Since
+ * 2026-11-16 the seed runs the orchestrator too; this stays for trying an
+ * orchestrator variant against the live release.
  */
 export function debriefChallengerBundle(
   base: DebriefBundle,
