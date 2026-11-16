@@ -34,6 +34,27 @@ import { InboxEventsService } from './inbox/inbox-events.service';
 import { InboxController } from './inbox/inbox.controller';
 import { InboxService } from './inbox/inbox.service';
 import { NotificationModule } from '../notification/notification.module';
+import { AgentGatewayController } from './agent-tools/agent-gateway.controller';
+import { AgentGatewayService } from './agent-tools/agent-gateway.service';
+import { AgentRunTokenService } from './agent-tools/agent-run-token.service';
+import { HandOverTool } from './agent-tools/hand-over.tool';
+import { ListToolsService } from './agent-tools/list-tools.service';
+import { AGENT_GATEWAY_TOOLS, AgentToolRegistry } from './agent-tools/tools';
+import { ToolRun } from './entity/tool-run.entity';
+import { MemoryEntry } from './entity/memory-entry.entity';
+import { MemoryService } from './memory/memory.service';
+import { SummaryService } from './memory/summary.service';
+import { Collection } from './entity/collection.entity';
+import { CollectionConstraint } from './entity/collection-constraint.entity';
+import { CollectionField } from './entity/collection-field.entity';
+import { CollectionRecord } from './entity/collection-record.entity';
+import { RecordEvent } from './entity/record-event.entity';
+import { RecordLink } from './entity/record-link.entity';
+import { ListController } from './lists/list.controller';
+import { ListCsvService } from './lists/list-csv.service';
+import { ListDefinitionsService } from './lists/list-definitions.service';
+import { ListOwnerService } from './lists/list-owner.service';
+import { ListRecordsService } from './lists/list-records.service';
 
 /**
  * Chatbots: configurable bots reached through connectors.
@@ -58,6 +79,15 @@ import { NotificationModule } from '../notification/notification.module';
       ChatbotContactIdentity,
       ChatbotConversation,
       ChatbotMessage,
+      ToolRun,
+      MemoryEntry,
+      // Lists (chunk 5a).
+      Collection,
+      CollectionField,
+      CollectionConstraint,
+      CollectionRecord,
+      RecordLink,
+      RecordEvent,
       WaKeywordTemplate,
       GlobalSettings,
     ]),
@@ -68,7 +98,13 @@ import { NotificationModule } from '../notification/notification.module';
     // The inbox's "nobody opened it" email (chunk 11a).
     NotificationModule,
   ],
-  controllers: [ChatbotController, ConnectorController, InboxController],
+  controllers: [
+    ChatbotController,
+    ConnectorController,
+    InboxController,
+    AgentGatewayController,
+    ListController,
+  ],
   providers: [
     GlobalSettingsRepository,
     ConnectorRegistry,
@@ -85,6 +121,26 @@ import { NotificationModule } from '../notification/notification.module';
     InboxEventsService,
     InboxService,
     HandoverService,
+    // The agent's tool gateway (chunk 3b). A new tool is one provider here, listed below.
+    AgentRunTokenService,
+    AgentGatewayService,
+    HandOverTool,
+    {
+      provide: AGENT_GATEWAY_TOOLS,
+      useFactory: (handOver: HandOverTool) => [handOver],
+      inject: [HandOverTool],
+    },
+    AgentToolRegistry,
+    ListToolsService,
+    // Lists (chunk 5a): the engine 6's tools and 5b's screens use.
+    ListRecordsService,
+    ListDefinitionsService,
+    ListCsvService,
+    // The owner's Lists section (chunk 5b): ready-made lists, Repeat weekly, switches.
+    ListOwnerService,
+    // Memory, light (chunk 8a): what it remembers about each person, and the rolling summary.
+    MemoryService,
+    SummaryService,
   ],
   exports: [
     // The Checkup (chunk 20a-2) asks questions through Preview's path.
@@ -102,6 +158,12 @@ import { NotificationModule } from '../notification/notification.module';
     InboxEventsService,
     // The assistant home's WhatsApp audience list (chunk 20d-2).
     ChatbotAudienceService,
+    // Lists (chunk 5a).
+    ListRecordsService,
+    ListDefinitionsService,
+    // Channels apply memory after a reply (chunk 8a).
+    MemoryService,
+    SummaryService,
   ],
 })
 export class ChatbotModule {}

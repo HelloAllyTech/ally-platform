@@ -359,3 +359,131 @@
   color: var(--ally-muted);
   text-align: center;
 }
+
+/* What the assistant remembers (chunk 8a): beside the chat from 1200px, a sheet below that. */
+.ally-inbox__with-memory {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.ally-inbox__with-memory > .ally-inbox__chat {
+  min-width: 0;
+}
+.ally-inbox__memory-side {
+  width: 300px;
+  flex: none;
+  overflow-y: auto;
+  border-left: 1px solid var(--ally-line);
+  padding: 16px;
+}
+.ally-inbox__chat-head .ally-inbox__memory-toggle {
+  display: none;
+  flex-basis: 100%;
+  text-align: left;
+}
+@media (max-width: 1199px) {
+  .ally-inbox__memory-side {
+    display: none;
+  }
+  .ally-inbox__chat-head .ally-inbox__memory-toggle {
+    display: inline;
+  }
+}
+.ally-inbox__msg--source .ally-inbox__bubble {
+  outline: 2px solid var(--ally-accent);
+  outline-offset: 2px;
+}
+.ally-memory {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ally-memory__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ally-memory__line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ally-memory__line .ally-body {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ally-memory__meta,
+.ally-memory__heading {
+  margin: 0;
+  color: var(--ally-muted);
+}
+.ally-memory__error {
+  color: var(--ally-danger);
+}
+.ally-memory .ally-memory__forget-person {
+  align-self: flex-start;
+  color: var(--ally-danger);
+}
+.ally-memory__loading {
+  min-height: 80px;
+}
+/* The fuller panel (chunk 8a): about them, notes with what they're for, this chat, never kept. */
+.ally-memory__intro {
+  margin: 0;
+  color: var(--ally-muted);
+}
+.ally-memory__block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ally-line);
+}
+.ally-memory__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.ally-memory .ally-memory__heading {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ally-ink-2);
+}
+.ally-memory__hint {
+  margin: 0;
+  color: var(--ally-muted);
+}
+.ally-memory__facts {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.ally-memory__facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 8px;
+}
+.ally-memory__facts dt {
+  color: var(--ally-muted);
+}
+.ally-memory__facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ally-memory__summary {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ally-memory__never {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

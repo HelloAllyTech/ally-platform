@@ -141,6 +141,12 @@ describe("Inbox", () => {
     expect(screen.getByText(INBOX.pickChat)).toBeTruthy();
   });
 
+  it("names a chat the assistant passed on (chunk 3b)", () => {
+    h.items.current = [item({ needsPersonReason: "assistant" })];
+    open();
+    expect(screen.getByText("Needs a person · Your assistant passed it on")).toBeTruthy();
+  });
+
   it("takes a chat over, replies, and hands it back", async () => {
     h.takeOver.mockReturnValue({ ok: true });
     open("/inbox?conversation=c1&bot=b1");

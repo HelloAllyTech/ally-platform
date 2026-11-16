@@ -10,6 +10,7 @@ import {
   AnalyticsSuggestionStatus,
   RoadmapOpportunityType,
 } from "@types";
+import { absoluteAppUrl } from "@utils/absoluteAppUrl";
 
 const fill = (template: string, values: Record<string, string | number>): string =>
   Object.entries(values).reduce(
@@ -110,7 +111,9 @@ export const SuggestionCard: React.FC<SuggestionCardProps> = ({
         (suggestion.opportunityId ? (
           <a
             className="text-primary-500 text-sm underline"
-            href={`${ROUTES.PRODUCT_ROADMAP}?opportunity=${suggestion.opportunityId}`}
+            href={absoluteAppUrl(
+              `${ROUTES.PRODUCT_ROADMAP}?opportunity=${suggestion.opportunityId}`,
+            )}
           >
             {strings.viewOnRoadmap}
           </a>

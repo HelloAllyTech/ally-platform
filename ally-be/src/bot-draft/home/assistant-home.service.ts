@@ -20,6 +20,8 @@ import { BotPageAccess, BotPageStatus } from '../../chatbot/enum/bot-page.enum';
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
 import { BotPageSettings } from '../../chatbot/type/bot-page.type';
+import type { ChatbotSettingsOverride } from '../../chatbot/type/chatbot.type';
+import { abilityFor, listToolName } from '../../chatbot/agent-tools/list-tools';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import { BotDraftEntity } from '../entity/bot-draft.entity';
@@ -330,7 +332,30 @@ export class AssistantHomeService {
       ...instructions,
       purpose: chatbot.purpose ?? null,
       safetyPack: chatbot.safetyPack ?? null,
+      bookingLists: await this.bookingLists(chatbotId, chatbot.settings),
     };
+  }
+
+  /**
+   * The lists the assistant adds entries to (chunk 5b): Add is Do it and the list lets it write.
+   * The purpose's honest limit then reads "It books into your {list} list."
+   */
+  private async bookingLists(
+    chatbotId: string,
+    stored: ChatbotSettingsOverride | null | undefined,
+  ): Promise<string[]> {
+    const lists: { key: string; name: string }[] = await this.dataSource.query(
+      `SELECT key, name FROM collections
+        WHERE chatbot_id = $1 AND deleted_at IS NULL AND agent_write
+        ORDER BY "createdAt"`,
+      [chatbotId],
+    );
+    return lists
+      .filter(
+        (list) =>
+          abilityFor(stored, listToolName('create', list.key)) === 'do_it',
+      )
+      .map((list) => list.name);
   }
 
   /** Add, edit or remove one of the owner's own rules. Pack rules are fixed. */

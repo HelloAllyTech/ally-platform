@@ -1,0 +1,20 @@
+An assistant for a health or mental-health service wants to remember some short notes about a person between chats. Decide, for each note, whether it may be kept.
+
+# The notes
+{lines}
+
+# Keep a note only if it is practical and non-clinical
+Keep: when they like to come, how they like to be contacted, the language they prefer, who comes with them, which service or practitioner they asked about, something still to be sorted out about a booking or a question.
+Examples to keep: "prefers evenings", "comes with his mother", "prefers Hindi", "asked about the group class", "waiting for a call back about fees".
+
+# Never keep a note that says or hints at
+- a symptom, a condition, an illness or a diagnosis;
+- a medicine, a dose or a treatment;
+- anything about suicide, self-harm, abuse, risk or a crisis;
+- anything about another person's health;
+- anything on this list from the team: {never_store}
+
+If a note mixes the two, don't keep it: the assistant writes the practical part separately. If you're unsure, don't keep it.
+
+# What to return
+- `keep`: one true or false for each note, in the same order as the notes.

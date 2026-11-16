@@ -209,6 +209,10 @@ export enum LlmTask {
   // per loop iteration on the bot's answer model. Chatbot spend, not a learner practising, so
   // absent from TASK_AREA like the helpline's.
   WHATSAPP_AGENT_STEP = 'whatsapp_agent_step',
+  // Memory, light (chunk 8a), made by ally-ai after a chatbot's reply, never while someone waits:
+  // the memory check on health assistants, and the rolling summary of a long chat. Chatbot spend.
+  CHATBOT_MEMORY_CHECK = 'chatbot_memory_check',
+  CHATBOT_CONVERSATION_SUMMARY = 'chatbot_conversation_summary',
   // Onboarding builder (chunk 20a), made by ally-ai's /builder/*: one label per
   // sub-task, so the cost of setting up an assistant shows step by step.
   // Extraction runs once per batch of crawled pages and dominates. Customer

@@ -30,7 +30,9 @@ jest.mock('src/common/execution/execution-manager', () => ({
   },
 }));
 
-function harness(over: { publicAllowed?: boolean } = {}) {
+function harness(
+  over: { publicAllowed?: boolean; settings?: Record<string, unknown> } = {},
+) {
   const config = {
     ...BotDraftService.defaultDraft('Sunrise Mind'),
     assistantName: 'Sunrise assistant',
@@ -55,7 +57,7 @@ function harness(over: { publicAllowed?: boolean } = {}) {
     id: 'bot-1',
     name: 'Sunrise Mind',
     persona: {},
-    settings: { fallbackText: 'Kept.' },
+    settings: over.settings ?? { fallbackText: 'Kept.' },
     status: ChatbotStatus.DRAFT,
   };
   let page: { id: string; slug: string; settings?: unknown } | null = null;
@@ -210,6 +212,21 @@ describe('BotDraftPublishService', () => {
     expect(row.step).toBe(BotDraftStep.PUBLISHED);
     expect(row.source.ownerNotesDocumentId).toBe('notes-1');
     expect(row.events[row.events.length - 1]?.kind).toBe('publish');
+  });
+
+  it("keeps a platform admin's abilities when the owner publishes or stages (chunk 3b)", async () => {
+    const settings = {
+      fallbackText: 'Kept.',
+      abilities: { hand_over: 'do_it' },
+    };
+    const h = harness({ settings });
+    await h.publish({ access: 'invite', emails: [] });
+    await h.service.stage(h.store.row());
+    for (const [, sent] of h.fakes.settings.updateChatbotSettings.mock
+      .calls as unknown as [unknown, Record<string, unknown>][]) {
+      expect(sent.abilities).toEqual({ hand_over: 'do_it' });
+    }
+    expect(h.fakes.settings.updateChatbotSettings).toHaveBeenCalledTimes(2);
   });
 
   it('publishing again converges the same page and notes, with nothing duplicated', async () => {

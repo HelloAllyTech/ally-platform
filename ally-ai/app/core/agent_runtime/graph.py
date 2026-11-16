@@ -3,9 +3,13 @@
 One loop serves every bot: the agent reads the turn and decides whether to search;
 a draft the check refuses goes back to it once.
 
-    START → agent ─(tool call, budget left)→ tools → agent
+    START → agent ─(tool call, budget left)→ tools ─→ agent
+                  │                                └─(hand_over done)→ END
                   └─(reply)→ check ─(refused, first time)→ agent
                                    └─(otherwise)→ END
+
+A run with ally-be's tool gateway (chunk 3b) gets its client as LangGraph runtime
+context, which is never checkpointed: the run token stays out of state.
 """
 
 from __future__ import annotations
@@ -23,12 +27,14 @@ from app.core.agent_runtime.checkpointer import (
     durable_checkpointer,
     open_checkpointer,
 )
+from app.core.agent_runtime.gateway import AgentGatewayClient, AgentRunContext
 from app.core.agent_runtime.nodes import (
     make_agent_check_node,
     make_agent_node,
     make_tools_node,
     route_after_agent,
     route_after_check,
+    route_after_tools,
 )
 from app.core.agent_runtime.state import RUN_SCOPED_KEYS, AgentState, BotConfig
 from app.core.agent_runtime.trace import summarise_run
@@ -45,14 +51,14 @@ OnEvent = Callable[[str, Dict[str, Any]], None]
 def build_graph(
     service: KnowledgeAgentService, checkpointer: Optional[BaseCheckpointSaver]
 ) -> CompiledStateGraph:
-    graph = StateGraph(AgentState)
+    graph = StateGraph(AgentState, context_schema=AgentRunContext)
     graph.add_node("agent", make_agent_node(service))
     graph.add_node("tools", make_tools_node(service))
     graph.add_node("check", make_agent_check_node(service))
 
     graph.add_edge(START, "agent")
     graph.add_conditional_edges("agent", route_after_agent, ["tools", "check"])
-    graph.add_edge("tools", "agent")
+    graph.add_conditional_edges("tools", route_after_tools, ["agent", END])
     graph.add_conditional_edges("check", route_after_check, ["agent", END])
     return graph.compile(checkpointer=checkpointer)
 
@@ -90,12 +96,17 @@ async def run_agent(
     history: List[Dict[str, str]],
     bot: BotConfig,
     on_event: Optional[OnEvent] = None,
+    gateway: Optional[AgentGatewayClient] = None,
 ) -> AgentState:
     """Run the graph once for one message. Returns the final state.
 
     `on_event` receives the run's live `status` and `step` events as they happen
     (the streamed endpoint). Without it nothing is streamed, and the run is the
     same either way.
+
+    `gateway` is the run's client to ally-be's tool gateway, passed as runtime
+    context (not `configurable`, whose plain values LangGraph copies into the
+    checkpoint's metadata).
     """
     inputs: Dict[str, Any] = {key: None for key in RUN_SCOPED_KEYS}
     inputs.update(
@@ -113,8 +124,9 @@ async def run_agent(
         "metadata": {"run_id": run_id, "chatbot_id": chatbot_id},
     }
     # recursion_limit is LangGraph's default of 25 supersteps. A run takes at most
-    # about 20: MAX_TOOL_CALLS (bounded at 8) agent→tools rounds, then the agent,
-    # check and one rewrite. Raising that bound means setting
+    # about 20: MAX_TOOL_CALLS (bounded at 8) agent→tools rounds (and at most
+    # MAX_TOOL_STEPS, 4, of any kind since chunk 3b), then the agent, check and
+    # one rewrite. Raising that bound means setting
     # recursion_limit here too, or the run fails with GraphRecursionError (a 500).
     # Never traced to LangSmith. The knowledge path this replaces sends nothing
     # there (its model calls use the provider SDKs directly), and a traced graph run
@@ -127,6 +139,7 @@ async def run_agent(
         async for mode, chunk in graph.astream(
             inputs,
             config,
+            context=AgentRunContext(gateway=gateway),
             stream_mode=modes,
             durability=settings.AGENT_RUNTIME.DURABILITY,
         ):

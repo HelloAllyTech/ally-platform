@@ -116,6 +116,23 @@ export const HOME = {
     },
     // Who can message it on WhatsApp (chunk 20d-2).
     whatsappAccess: { value: "listed", version: v(21) },
+    // Remember people between chats (chunk 8a): off, with a mental-health pack's defaults.
+    memory: {
+      value: {
+        on: false,
+        neverStore: [],
+        defaults: [
+          "Payment details",
+          "Passwords and PINs",
+          "ID numbers",
+          "Symptoms",
+          "Conditions",
+          "Medicines",
+          "Diagnoses",
+        ],
+      },
+      version: v(22),
+    },
   },
   safety: {
     pack: PACK,

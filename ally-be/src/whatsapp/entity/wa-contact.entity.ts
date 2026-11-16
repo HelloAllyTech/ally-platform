@@ -39,7 +39,7 @@ export class WaContact extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 32, name: 'phone_e164' })
+  @Column({ type: 'varchar', length: 64, name: 'phone_e164' })
   phoneE164!: string;
 
   /**

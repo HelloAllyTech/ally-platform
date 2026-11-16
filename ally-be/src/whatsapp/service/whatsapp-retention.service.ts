@@ -51,6 +51,8 @@ export class WhatsAppRetentionService {
 
   /** Entry point for the daily scheduled task. */
   async runRetentionSweep(): Promise<void> {
+    // Memory lines past their expiry go whatever the retention window (chunk 8a).
+    await this.sweepMemory();
     const settings = await this.settingsService.get();
     const days = settings.retentionDays;
 
@@ -95,6 +97,20 @@ export class WhatsAppRetentionService {
    * the cutoff rather than the ones just blanked above, so a pass that fails here is logged and the
    * next hourly run finishes it; `wa_*`, the source of truth, has already been swept.
    */
+  private async sweepMemory(): Promise<void> {
+    if (!this.conversations?.sweepMemory) return;
+    try {
+      const lines = await this.conversations.sweepMemory();
+      if (lines) this.logger.info(`Memory sweep: ${lines} expired line(s)`);
+    } catch (error) {
+      this.logger.error(
+        `Memory sweep failed; the next run retries: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
+  }
+
   private async sweepSharedStore(cutoff: Date): Promise<void> {
     if (!this.conversations) return;
     try {

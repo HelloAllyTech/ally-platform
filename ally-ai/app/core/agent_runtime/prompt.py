@@ -21,6 +21,8 @@ from app.core.knowledge_agent.schemas import is_general
 from app.prompts.resolver import load_and_format
 
 AGENT_PROMPT_PATH = "agent/system"
+#: How to use the business's lists (chunk 6): only for a run with list tools.
+LISTS_PROMPT_PATH = "agent/lists"
 #: Characters of conversation the agent reads (v1 keeps 1,500 over six
 #: messages); ten messages of a WhatsApp chat fit.
 AGENT_HISTORY_CHARS = 3000
@@ -61,11 +63,24 @@ def format_feedback(feedback: Optional[str]) -> str:
 
 
 def format_searches(records: Sequence[Dict[str, Any]]) -> str:
-    """Searches made for this message, so the model does not repeat one."""
+    """Searches made for this message, so the model does not repeat one, and what
+    each gateway tool did (chunk 3b): a failed one is shown as not done, so the
+    agent never says it worked."""
     if not records:
         return "(none yet)"
     lines: List[str] = []
     for record in records:
+        if record.get("list_kind"):
+            lines.append(_format_list_call(record))
+            continue
+        if record.get("kind") == "gateway":
+            done = (
+                "done"
+                if record.get("ok")
+                else f"failed ({record.get('error') or 'error'}), not done"
+            )
+            lines.append(f"- `{record.get('tool')}`: {done}")
+            continue
         added = record.get("added") or []
         found = (
             f"added passages {', '.join(str(n) for n in added)}"
@@ -76,14 +91,58 @@ def format_searches(records: Sequence[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _numbers(added: Sequence[int]) -> str:
+    if not added:
+        return ""
+    if len(added) == 1:
+        return f"passage {added[0]}"
+    return f"passages {added[0]}–{added[-1]}"
+
+
+def _format_list_call(record: Dict[str, Any]) -> str:
+    """What a list tool did (chunk 6): what a find found, a write done, or a
+    refusal's reason and its alternatives. A failure is shown as not done."""
+    tool = f"- `{record.get('tool')}`"
+    added = record.get("added") or []
+    if not record.get("ok"):
+        message = record.get("message")
+        if message:
+            line = f"{tool}: refused ({message}), not done"
+            return f"{line}; alternatives → {_numbers(added)}" if added else line
+        return f"{tool}: failed ({record.get('error') or 'error'}), not done"
+    if record.get("list_kind") != "find":
+        return f"{tool}: done → {_numbers(added)}" if added else f"{tool}: done"
+    aggregate = record.get("aggregate")
+    if aggregate:
+        kind = str(aggregate.get("kind") or "")
+        what = "count" if kind == "count" else kind.replace("sum:", "total of ")
+        return f"{tool}: {what} = {aggregate.get('value')}"
+    if record.get("nearest") == "other_details" and added:
+        return (
+            f"{tool}: none fit those details near then; by time alone, the nearest "
+            f"→ {_numbers(added)} (they don't fit: never book one; tell them "
+            "plainly what doesn't fit and offer a way forward: what these allow, "
+            "or passing it to the team)"
+        )
+    if record.get("nearest") and added:
+        return (
+            f"{tool}: none at that time; the nearest free → {_numbers(added)} "
+            "(tell them that time isn't free and offer these)"
+        )
+    total = record.get("total")
+    found = f"{total} found" if isinstance(total, int) else f"{len(added)} found"
+    return f"{tool}: {found} → {_numbers(added)}" if added else f"{tool}: none found"
+
+
 def format_tools(tools: Sequence[Tool]) -> str:
     """Each tool's name, what it does and its input fields: the step schema's fields."""
     if not tools:
         return "(no tools left: reply now with what you have)"
     blocks: List[str] = []
     for tool in tools:
+        # A list tool's fields go by their alias, the list's own keys (chunk 6).
         fields = ", ".join(
-            f"`{name}`: {info.description or name}"
+            f"`{info.alias or name}`: {info.description or info.alias or name}"
             for name, info in tool.input_model.model_fields.items()
         )
         blocks.append(f"- `{tool.name}`: {tool.description} Input: {fields}.")
@@ -105,6 +164,12 @@ def build_agent_prompt(
     max_chars: int = 1400,
     persona: Optional[Dict[str, Any]] = None,
     prompts: Optional[Dict[str, Any]] = None,
+    lists: bool = False,
+    today: str = "",
+    memory: str = "",
+    history_lead: str = "",
+    can_book: bool = False,
+    channel: Optional[str] = None,
 ) -> str:
     """The agent step's prompt. Empty when the template is missing (the caller
     refuses to run unguided)."""
@@ -113,10 +178,13 @@ def build_agent_prompt(
         prompts=prompts,
         message=message.strip(),
         passages=format_passages(passages),
-        history=format_history(
-            history,
-            max_turns=settings.AGENT_RUNTIME.MAX_HISTORY_MESSAGES,
-            max_chars=AGENT_HISTORY_CHARS,
+        history=_with_lead(
+            history_lead,
+            format_history(
+                history,
+                max_turns=settings.AGENT_RUNTIME.MAX_HISTORY_MESSAGES,
+                max_chars=AGENT_HISTORY_CHARS,
+            ),
         ),
         feedback=format_feedback(feedback),
         answer_scope=format_answer_scope(answer_mode),
@@ -131,4 +199,28 @@ def build_agent_prompt(
         return body
     # The persona goes first, fenced and ranked below the rules that follow, as in
     # v1's answer prompt.
-    return format_persona(persona, prompts) + body
+    # With list tools (chunk 6), the lists section follows the purpose.
+    section = (
+        load_and_format(LISTS_PROMPT_PATH, prompts=prompts, today=today).strip()
+        if lists
+        else ""
+    )
+    # Memory (chunk 8a) follows the lists; Bring in customers' booking variant is
+    # chosen when the run can book.
+    return (
+        format_persona(
+            persona,
+            prompts,
+            lists=section,
+            memory=memory,
+            can_book=can_book,
+            channel=channel,
+        )
+        + body
+    )
+
+
+def _with_lead(lead: str, history: str) -> str:
+    """The person's name and this chat's summary ahead of the last messages (chunk
+    8a); the history exactly as today when there's neither."""
+    return f"{lead}\n{history}" if lead else history

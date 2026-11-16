@@ -914,6 +914,28 @@ export const ApiEndpoints = {
     HOME: (id: string) => `/v1/chatbots/${id}/home`,
     HOME_LIST: (id: string, list: string) => `/v1/chatbots/${id}/home/lists/${list}`,
     RULES: (id: string) => `/v1/chatbots/${id}/rules`,
+    LISTS: (id: string) => `/v1/chatbots/${id}/lists`,
+    USER_LIST: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}`,
+    LIST_RESTORE: (id: string, listId: string) => `/v1/chatbots/${id}/lists/${listId}/restore`,
+    LIST_FIELDS: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/fields`,
+    LIST_FIELD: (id: string, key: string, field: string) =>
+      `/v1/chatbots/${id}/lists/${key}/fields/${field}`,
+    LIST_RULES: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/rules`,
+    LIST_RULE: (id: string, key: string, ruleId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/rules/${ruleId}`,
+    LIST_ABILITIES: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/abilities`,
+    LIST_RECORDS: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/records`,
+    LIST_RECORDS_QUERY: (id: string, key: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/query`,
+    LIST_RECORDS_REPEAT: (id: string, key: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/repeat`,
+    LIST_RECORD: (id: string, key: string, recordId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/${recordId}`,
+    LIST_RECORD_RESTORE: (id: string, key: string, recordId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/${recordId}/restore`,
+    LIST_CONTACTS: (id: string) => `/v1/chatbots/${id}/lists/contacts`,
+    READY_MADE_LISTS: (id: string) => `/v1/chatbots/${id}/lists/ready-made`,
+    READY_MADE_LIST: (id: string, name: string) => `/v1/chatbots/${id}/lists/ready-made/${name}`,
     FACT_CORRECTION: (id: string, factId: string) =>
       `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,
     IMAGES: (id: string) => `/v1/chatbots/${id}/images`,
@@ -962,6 +984,15 @@ export const ApiEndpoints = {
       `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/hand-back`,
     REPLY: (chatbotId: string, id: string) =>
       `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/messages`,
+    /** What the assistant remembers about one person (chunk 8a). */
+    MEMORY: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/memory`,
+    MEMORY_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}`,
+    FORGET_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}/forget`,
+    FORGET_PERSON: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/forget`,
   },
   BOT_DRAFTS: {
     LIST: "/v1/bot-drafts",

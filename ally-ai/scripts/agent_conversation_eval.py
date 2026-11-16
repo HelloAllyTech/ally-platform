@@ -79,7 +79,14 @@ V1_PATH = "/api/v1/knowledge-agent/answer"
 V2_PATH = "/api/v1/agent/run"
 STREAM_PATH = "/api/v1/agent/run/stream"
 TIMEOUT_SECONDS = 90.0
-AGENT_ONLY_FIELDS = ("knowledge_topics", "decline_text")
+AGENT_ONLY_FIELDS = (
+    "knowledge_topics",
+    "decline_text",
+    "memory",
+    "summary",
+    "person_name",
+    "before_chat",
+)
 LATENCY_BUDGET = 0.25
 OVERLAP_TARGET = 80.0
 
@@ -346,9 +353,46 @@ def checks(
             problems.append(f"intent {intent}")
         if answer.count("?") != 1:
             problems.append(f"{answer.count('?')} questions")
+    elif kind == "memory":
+        # Memory, light (chunk 8a): judged by its memory_checks; any intent may be
+        # right ("remember my password" is rightly refused).
+        pass
     elif kind == "pushy":
         return "judge", problems
     return ("fail" if problems else "pass"), problems
+
+
+def memory_checks(expect: Dict[str, Any], result: Dict[str, Any]) -> List[str]:
+    """Memory, light (chunk 8a): what the run asked to remember, and whether the reply
+    used what it was given. Each key is optional:
+    - remember_any: a write's text contains one of these;
+    - remember_none: no write's text contains any of these;
+    - remember_nothing: true, no writes at all;
+    - forgets: true, a `forget` write;
+    - reply_mentions: the reply contains one of these;
+    - reply_avoids: the reply contains none of these.
+    Substrings, case-insensitive."""
+    writes = result.get("memory_writes") or []
+    texts = [str(w.get("text") or "").lower() for w in writes]
+    answer = (result.get("answer") or "").lower()
+    problems: List[str] = []
+    want = [x.lower() for x in expect.get("remember_any") or []]
+    if want and not any(w in t for t in texts for w in want):
+        problems.append(f"didn't remember any of {want} (wrote {texts})")
+    for bad in (x.lower() for x in expect.get("remember_none") or []):
+        if any(bad in t for t in texts):
+            problems.append(f"remembered {bad!r}")
+    if expect.get("remember_nothing") and writes:
+        problems.append(f"remembered {len(writes)} line(s)")
+    if expect.get("forgets") and not any(w.get("op") == "forget" for w in writes):
+        problems.append("didn't forget")
+    mention = [x.lower() for x in expect.get("reply_mentions") or []]
+    if mention and not any(m in answer for m in mention):
+        problems.append(f"reply mentions none of {mention}")
+    for bad in (x.lower() for x in expect.get("reply_avoids") or []):
+        if bad in answer:
+            problems.append(f"reply mentions {bad!r}")
+    return problems
 
 
 def hard_fails(
@@ -395,6 +439,23 @@ async def judge(
         f"{'Person' if t['role'] == 'user' else 'Assistant'}: {t['content']}"
         for t in history
     )
+    # Memory, light (chunk 8a): what the run was given about the person. Using it is
+    # not inventing a fact, and it needs no source.
+    given = [
+        ((defaults.get("memory") or {}).get("lines") or "").strip(),
+        (defaults.get("summary") or "").strip(),
+        (defaults.get("person_name") or "").strip(),
+    ]
+    given = [g for g in given if g]
+    if given:
+        rendered_history = (
+            "(What the assistant was given about this person, from earlier chats and "
+            "earlier in this chat; repeating it to them is not inventing a fact and "
+            "needs no source:)\n"
+            + "\n".join(given)
+            + "\n\n"
+            + (rendered_history or "(no messages yet)")
+        )
     sources = "\n".join(
         f"- {c.get('document_title')}" for c in result.get("citations") or []
     )
@@ -483,6 +544,9 @@ def run(
             )
             if extra:
                 status, problems = "fail", problems + extra
+            remembered = memory_checks(turn["expect"], result)
+            if remembered:
+                status, problems = "fail", problems + remembered
             verdict = None
             if judge_model:
                 passages = found_passages(client, result)

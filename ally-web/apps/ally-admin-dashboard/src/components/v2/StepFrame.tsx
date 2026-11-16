@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from "react";
 
+import { absoluteAppUrl } from "@utils/absoluteAppUrl";
+
 import { Button, ProgressBar } from "./core";
 
 export interface StepFrameLabels {
@@ -69,7 +71,7 @@ export const StepFrame: React.FC<{
           <div className="ally-frame__brand">
             <a
               className="ally-frame__logo"
-              href="/chatbots"
+              href={absoluteAppUrl("/chatbots")}
               onClick={event => {
                 if (!onLeave) return;
                 event.preventDefault();
