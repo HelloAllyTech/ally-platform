@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   BugReportIcon,
@@ -71,12 +71,16 @@ import { seedForHandle } from "./utils/builder";
 import { EMPTY_ADVANCED_FILTERS, RoadmapAdvancedFilterValues } from "./utils/filters";
 import { RoadmapEffortFilterValue } from "./utils/filterSelection";
 import { monthKeyOf, shiftMonthKey } from "./utils/monthBoard";
+import { overlayUrlState, parseUrlState, writeUrlState } from "./utils/urlState";
 import {
   QUEUE_VIEW_ID,
   QUEUE_VIEW_STATE,
   normaliseSortField,
   normaliseTypeFilter,
 } from "./utils/views";
+
+/** An absent `?view=` lands on the Queue, so it counts as Queue here too. */
+const isQueueLanding = (view: string | null) => view === null || view === QUEUE_VIEW_ID;
 
 /** One page of the TABLE layout, which walks `offset`. */
 const PAGE_SIZE = 50;
@@ -728,9 +732,38 @@ export const ProductRoadmap: React.FC = () => {
     enabled: !!permissions?.includes(Permissions.VIEW_PRODUCT_ROADMAP),
   });
 
+  /**
+   * What the URL said when the page opened — captured once, before anything has a chance to write
+   * over it. The landing view is applied on first render (see useSavedViews), and a shared link's
+   * filters have to be laid on top of that, not lost to it.
+   */
+  const initialUrlState = useRef<RoadmapViewState | null>(null);
+  if (initialUrlState.current === null) initialUrlState.current = parseUrlState(searchParams);
+  const hasOverlaidUrl = useRef(false);
+  const applyLandingView = useCallback(
+    (state: RoadmapViewState) => {
+      if (hasOverlaidUrl.current) {
+        applyViewState(state);
+        return;
+      }
+      hasOverlaidUrl.current = true;
+      const url = { ...(initialUrlState.current ?? {}) };
+      // The Queue is a list or a board, never the table, and its stage is its definition.
+      if (isQueueLanding(searchParams.get("view")) && url.layout === RoadmapBoardLayout.TABLE) {
+        delete url.layout;
+      }
+      applyViewState(
+        overlayUrlState(state, url, { ignoreStage: isQueueLanding(searchParams.get("view")) }),
+      );
+    },
+    // applyViewState only calls setters and resetPaging, all of which are stable in effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchParams],
+  );
+
   const savedViews = useSavedViews({
     current: currentViewState,
-    onApply: applyViewState,
+    onApply: applyLandingView,
     activeViewId,
     setActiveViewId,
     canVote,
@@ -767,6 +800,15 @@ export const ProductRoadmap: React.FC = () => {
   /** Both strip entries render the same body; only the applied view differs. */
   const isOpportunitiesTab =
     activeTab === RoadmapTab.OPPORTUNITIES || activeTab === RoadmapTab.QUEUE;
+
+  /** Mirror the board's filters, sort and layout into the URL, so refresh and paste both work. */
+  useEffect(() => {
+    if (!hasOverlaidUrl.current || !isOpportunitiesTab) return;
+    const next = writeUrlState(searchParams, currentViewState, { omitStage: isQueueView });
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+    // searchParams is read but not a trigger: the write is a function of the board state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentViewState, isQueueView, isOpportunitiesTab]);
 
   const setTab = (id: string) => {
     const next = new URLSearchParams(searchParams);
