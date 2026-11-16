@@ -973,6 +973,41 @@ export class DebriefFeedbackService {
       [windowDays],
     );
     const answered = Number(h?.yes ?? 0) + Number(h?.no ?? 0);
+    // The learners' own words (Gopi, 2026-11-16: the PM agent reads them, not
+    // only counts). What a learner flags may be wrong, so each flag comes with
+    // what Ally decided and why. Capped and trimmed; read only by the PM agent.
+    const read = async <T>(sql: string): Promise<T[]> => {
+      try {
+        return await this.dataSource.query(sql, [windowDays]);
+      } catch {
+        return [];
+      }
+    };
+    const flagWords = await read<Record<string, any>>(
+      `SELECT regexp_replace(section, '\\[\\d+\\]', '') AS section, reason,
+              left(note, 300) AS note, answer->>'action' AS ally_action,
+              left(answer->>'reply', 300) AS ally_reason, status
+         FROM debrief_run_feedback
+        WHERE kind = 'flag' AND status <> 'withdrawn'
+          AND "createdAt" >= now() - make_interval(days => $1)
+        ORDER BY "createdAt" DESC LIMIT 40`,
+    );
+    const notHelpful = await read<Record<string, any>>(
+      `SELECT left(note, 300) AS note
+         FROM debrief_run_feedback
+        WHERE kind = 'helpful' AND helpful = false AND coalesce(note, '') <> ''
+          AND "createdAt" >= now() - make_interval(days => $1)
+        ORDER BY "createdAt" DESC LIMIT 30`,
+    );
+    const askAlly = await read<Record<string, any>>(
+      `SELECT left(m.content, 200) AS question
+         FROM scenario_session_chat_messages m
+         JOIN scenario_session_chats c ON c.id = m."chatId"
+         JOIN debrief_runs r ON r."scenarioSessionId" = c."scenarioSessionId" AND r.mode = 'live'
+        WHERE m."senderId" = c."userId"
+          AND m."createdAt" >= now() - make_interval(days => $1)
+        ORDER BY m."createdAt" DESC LIMIT 40`,
+    );
     return {
       helpful: {
         answered,
@@ -982,6 +1017,12 @@ export class DebriefFeedbackService {
           : null,
       },
       flags,
+      /** Each flag with the learner's note and what Ally decided (kept / corrected / removed) and why. */
+      flag_words: flagWords,
+      /** What learners wrote when a debrief was not helpful. */
+      not_helpful_comments: notHelpful.map((r) => r.note),
+      /** Learners' recent Ask Ally questions: summarise what they keep asking. */
+      ask_ally_questions: askAlly.map((r) => r.question),
     };
   }
 }

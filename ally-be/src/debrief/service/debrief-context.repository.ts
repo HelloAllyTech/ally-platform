@@ -565,7 +565,9 @@ export class DebriefContextRepository {
       optional(
         () =>
           this.dataSource.query(
-            `SELECT "runId" AS run_id, section, status, reason, "userId" AS user_id
+            `SELECT "runId" AS run_id, section, status, reason, "userId" AS user_id,
+                    left(note, 300) AS note, answer->>'action' AS answer_action,
+                    left(answer->>'reply', 300) AS answer_reply
                FROM debrief_run_feedback
               WHERE "runId" = ANY($1::uuid[]) AND kind = 'flag' AND status <> 'withdrawn'`,
             [runIds],
@@ -576,10 +578,12 @@ export class DebriefContextRepository {
         () =>
           this.dataSource.query(
             `SELECT "runId" AS run_id, "anchorKind" AS anchor_kind,
-                    "turnIndex" AS turn_index, section, tag
+                    "turnIndex" AS turn_index, section, tag,
+                    left(body, 300) AS body
                FROM debrief_review_comments
               WHERE "runId" = ANY($1::uuid[]) AND "parentId" IS NULL
-                AND tag IN ('wrong_or_unsupported','good_keep_this')`,
+                AND (tag IN ('wrong_or_unsupported','good_keep_this')
+                     OR "anchorKind" = 'transcript')`,
             [runIds],
           ) as Promise<ProgressCommentRow[]>,
         [] as ProgressCommentRow[],
