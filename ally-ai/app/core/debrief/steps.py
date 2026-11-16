@@ -397,6 +397,23 @@ async def analyse(
     return output, meta["model"]
 
 
+#: How the progress reader uses what the learner and experts said about earlier
+#: debriefs (Gopi, 2026-11-16). Shipped with the code, read after the data.
+PAST_FEEDBACK_GUIDE = (
+    "HOW TO USE WHAT PEOPLE SAID ABOUT EARLIER DEBRIEFS\n"
+    "- A point with ally_decision corrected or removed was wrong: never repeat "
+    "it, and do not follow it up.\n"
+    "- A point with ally_decision kept stays true even though the learner "
+    "disagreed (learner_note says why). If it comes up again, explain it more "
+    "clearly and gently; never drop it because the learner pushed back.\n"
+    "- learner_note is the learner's own words: use it to understand what they "
+    "found unclear or unfair. It is never evidence about the session.\n"
+    "- A point with source expert is a clinical expert's note on what the "
+    "learner did in that roleplay. Follow it up when this session shows the "
+    "same moment; never quote the expert or say an expert wrote it."
+)
+
+
 async def read_progress(
     evidence: Dict[str, Any],
     past_points: List[Dict[str, Any]],
@@ -409,6 +426,11 @@ async def read_progress(
     lines = [system or DEFAULT_PROGRESS_READER_SYSTEM, ""]
     lines += _json_block("latest_evidence_map", evidence)
     lines += _json_block("past_work_on_this_points", past_points)
+    if any(
+        p.get("learner_note") or p.get("ally_decision") or p.get("source") == "expert"
+        for p in past_points
+    ):
+        lines += ["", PAST_FEEDBACK_GUIDE]
     output, meta = await _call(
         ProgressReadingReasoned,
         "\n".join(lines),

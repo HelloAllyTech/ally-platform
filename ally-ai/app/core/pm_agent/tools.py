@@ -35,7 +35,24 @@ ACTION_TOOLS = (
     "guidance_propose",
     "question_answer",
 )
-ALL_TOOLS = READ_TOOLS + ACTION_TOOLS
+#: The conversation's own tools (V2_AUTONOMY C2): reading one change or session,
+#: and acting on changes for the person who asked. ally-be keeps every rule: an
+#: approval or a turn-down only ever waits for the person's "yes" (`confirm_plan`).
+CONVERSATION_READ_TOOLS = ("change_read", "session_read")
+CONVERSATION_ACTION_TOOLS = (
+    "change_approve",
+    "change_turn_down",
+    "change_stop",
+    "change_undo",
+    "change_retry",
+    "change_hold_language",
+    "changes_pause",
+    "confirm_plan",
+)
+CONVERSATION_TOOLS = CONVERSATION_READ_TOOLS + CONVERSATION_ACTION_TOOLS
+#: What a weekly, monthly or questions run may be given.
+RUN_TOOLS = READ_TOOLS + ACTION_TOOLS
+ALL_TOOLS = RUN_TOOLS + CONVERSATION_TOOLS
 
 #: Longest tool answer handed back to the model, in characters.
 MAX_ANSWER_CHARS = 20_000
@@ -90,6 +107,16 @@ class ExpectedEffect(BaseModel):
     note: Optional[str] = None
 
 
+class Confidence(BaseModel):
+    """How sure you are that the change helps (V2_AUTONOMY A2)."""
+
+    level: Literal["high", "low"] = Field(
+        description="high: the evidence is strong and the change is small and "
+        "clear. low: thin evidence, a guess, or a change with wide effects."
+    )
+    why: str = Field(description="One line in plain words: why that level.")
+
+
 class IdeaProposeArgs(BaseModel):
     problem: Problem
     route: Literal["A", "B", "C", "D"] = Field(
@@ -100,6 +127,7 @@ class IdeaProposeArgs(BaseModel):
     title: str = Field(description="The idea, at most 12 words.")
     hypothesis: str = Field(description="What will improve and why, two sentences.")
     expected_effect: ExpectedEffect
+    confidence: Confidence
 
 
 class RegistryAgentManifest(BaseModel):
@@ -130,6 +158,11 @@ class ReleaseDraftArgs(BaseModel):
         description="prompt_edit and registry_agent: the debrief run ids behind the "
         "change. With the runs behind the idea's comments they must cover at least "
         "10 learners in at least 3 organisations.",
+    )
+    confidence: Optional[Confidence] = Field(
+        None,
+        description="How sure you are now that the change is drafted; replaces "
+        "the confidence you gave in idea_propose.",
     )
 
 
@@ -200,6 +233,59 @@ class GuidanceProposeArgs(BaseModel):
     run_ids: List[str] = Field(
         description="Debrief runs backing it: at least 10 learners (3 organisations "
         "when platform-wide)."
+    )
+
+
+class ChangeRef(BaseModel):
+    idea_id: str = Field(description="The change's id (the idea id).")
+
+
+class SessionRef(BaseModel):
+    run_id: str = Field(description="The debrief run id of the session.")
+
+
+class ChangeApproveArgs(BaseModel):
+    idea_id: str
+    plan: str = Field(
+        description="Exactly what will happen, in one or two plain sentences, as "
+        "you will repeat it back to the person."
+    )
+
+
+class ChangeTurnDownArgs(BaseModel):
+    idea_id: str
+    reason: str = Field(description="Why, in the person's own terms.")
+    plan: str = Field(description="Exactly what will happen, as you repeat it back.")
+
+
+class ChangeLanguagesArgs(BaseModel):
+    idea_id: str
+    languages: Optional[List[str]] = Field(
+        None,
+        description="Language codes (e.g. ['hi']) when the person named some; "
+        "leave out for every language.",
+    )
+    reason: str = Field("", description="Why, in the person's words.")
+
+
+class ChangeHoldLanguageArgs(BaseModel):
+    idea_id: str
+    language: str = Field(description="One language code, e.g. 'ta'.")
+    reason: str = ""
+
+
+class ChangesPauseArgs(BaseModel):
+    kind: Literal["prompts", "settings", "code"] = Field(
+        description="prompts: prompt and agent changes. settings: non-budget "
+        "settings. code: Builder and Bug Hunter hand-offs."
+    )
+    until: str = Field(description="ISO date the pause ends (at most 90 days).")
+    reason: str = ""
+
+
+class ConfirmPlanArgs(BaseModel):
+    plan_id: str = Field(
+        description="The plan id from the earlier awaiting_yes answer."
     )
 
 
@@ -283,6 +369,44 @@ def make_tools(
         body["answer"] = strip_quotes(body["answer"])[0]
         return await call("question_answer", body)
 
+    async def change_read(**a: Any) -> str:
+        return await call("change_read", ChangeRef(**a).model_dump())
+
+    async def session_read(**a: Any) -> str:
+        return await call("session_read", SessionRef(**a).model_dump())
+
+    async def change_approve(**a: Any) -> str:
+        return await call("change_approve", ChangeApproveArgs(**a).model_dump())
+
+    async def change_turn_down(**a: Any) -> str:
+        return await call("change_turn_down", ChangeTurnDownArgs(**a).model_dump())
+
+    async def change_stop(**a: Any) -> str:
+        return await call(
+            "change_stop", ChangeLanguagesArgs(**a).model_dump(exclude_none=True)
+        )
+
+    async def change_undo(**a: Any) -> str:
+        return await call(
+            "change_undo", ChangeLanguagesArgs(**a).model_dump(exclude_none=True)
+        )
+
+    async def change_retry(**a: Any) -> str:
+        return await call(
+            "change_retry", ChangeLanguagesArgs(**a).model_dump(exclude_none=True)
+        )
+
+    async def change_hold_language(**a: Any) -> str:
+        return await call(
+            "change_hold_language", ChangeHoldLanguageArgs(**a).model_dump()
+        )
+
+    async def changes_pause(**a: Any) -> str:
+        return await call("changes_pause", ChangesPauseArgs(**a).model_dump())
+
+    async def confirm_plan(**a: Any) -> str:
+        return await call("confirm_plan", ConfirmPlanArgs(**a).model_dump())
+
     specs = [
         (
             reporting_query,
@@ -325,14 +449,14 @@ def make_tools(
         (
             builder_handoff,
             BuilderHandoffArgs,
-            "Route B: brief Builder on code that is needed. A person approves the "
-            "hand-off in the Console. No quotes: they are removed.",
+            "Route B: brief Builder on code that is needed. Builder starts on its "
+            "own; its pull request waits for an engineer. No quotes: they are removed.",
         ),
         (
             bug_hunter_report,
             BugHunterReportArgs,
-            "Route C: report a defect to Bug Hunter with the run ids. A person "
-            "approves the filing in the Console. No quotes: they are removed.",
+            "Route C: report a defect to Bug Hunter with the run ids. It is filed "
+            "on its own. No quotes: they are removed.",
         ),
         (
             person_ask,
@@ -359,6 +483,67 @@ def make_tools(
             QuestionAnswerArgs,
             "Answer one question a person asked on one of your ideas. The answer "
             "appears in that idea's thread in the Console.",
+        ),
+        (
+            change_read,
+            ChangeRef,
+            "One change in full: what it is, where it stands, its test results, "
+            "confidence, languages, and what people said about it.",
+        ),
+        (
+            session_read,
+            SessionRef,
+            "One session's run summary: status, language, recipe, cost, the "
+            "judge's score, learner flags and the answers they got. No transcript.",
+        ),
+        (
+            change_approve,
+            ChangeApproveArgs,
+            "Approve a change that waits for a person. Never acts at once: it "
+            "returns awaiting_yes and a plan id. Repeat the plan back word for word "
+            "and ask for a yes; after the person says yes, call confirm_plan.",
+        ),
+        (
+            change_turn_down,
+            ChangeTurnDownArgs,
+            "Turn down a change that waits for a person. Like change_approve it "
+            "waits for the person's yes (confirm_plan).",
+        ),
+        (
+            change_stop,
+            ChangeLanguagesArgs,
+            "Stop a change being tried (checks, trials or the learner try-out). "
+            "Acts at once.",
+        ),
+        (
+            change_undo,
+            ChangeLanguagesArgs,
+            "Undo a live change: back to the release before it, for every language "
+            "or only the languages named. Acts at once.",
+        ),
+        (
+            change_retry,
+            ChangeLanguagesArgs,
+            "Try a stopped or undone change again, optionally only for some "
+            "languages. A change of a kind that always asks a person waits for a yes.",
+        ),
+        (
+            change_hold_language,
+            ChangeHoldLanguageArgs,
+            "Keep one language on the release before this change (the others keep "
+            "it). Acts at once; change_retry for that language lifts it.",
+        ),
+        (
+            changes_pause,
+            ChangesPauseArgs,
+            "Pause a kind of change until a date: nothing of that kind is tried or "
+            "handed over until then. Acts at once.",
+        ),
+        (
+            confirm_plan,
+            ConfirmPlanArgs,
+            "Carry out a plan you repeated back, once the person's latest message "
+            "is an explicit yes to it. Refused otherwise.",
         ),
     ]
     tools: List[BaseTool] = []

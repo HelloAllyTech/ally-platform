@@ -116,6 +116,37 @@ async def test_progress_reader_keeps_three_items(dispatch_returns):
 
 
 @pytest.mark.asyncio
+async def test_progress_reader_reads_what_people_said_with_its_guide(dispatch_returns):
+    from app.core.debrief.steps import PAST_FEEDBACK_GUIDE, read_progress
+
+    calls = dispatch_returns(ProgressReading(items=[]))
+    await read_progress(
+        {"behaviours": []},
+        [
+            {
+                "point": "Ask about safety",
+                "learner_note": "She never said that",
+                "ally_decision": "kept",
+                "ally_reason": "Turn 4.",
+                "source": "debrief",
+            }
+        ],
+        "gemini-2.5-flash",
+    )
+    assert PAST_FEEDBACK_GUIDE in calls["prompt"]
+    assert "She never said that" in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_progress_reader_without_feedback_gets_no_guide(dispatch_returns):
+    from app.core.debrief.steps import PAST_FEEDBACK_GUIDE, read_progress
+
+    calls = dispatch_returns(ProgressReading(items=[]))
+    await read_progress({"behaviours": []}, [{"point": "x"}], "gemini-2.5-flash")
+    assert PAST_FEEDBACK_GUIDE not in calls["prompt"]
+
+
+@pytest.mark.asyncio
 async def test_writer_never_sees_the_rubric_and_notes_distress(dispatch_returns):
     from app.core.debrief.steps import write
 

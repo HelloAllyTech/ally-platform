@@ -9,7 +9,7 @@ import { en } from "@constants";
 import { PmReport, PmReportChanged, PmReportKind, PmReportListItem } from "@types";
 
 import { inWords } from "../consoleLabels";
-import { pmAgentPath, pmReleasePath, pmReportPath } from "../consoleRoutes";
+import { changesPath, pmReportPath } from "../consoleRoutes";
 import { TruncatedTitle } from "../consoleRows";
 
 // --- Choosing a report (pure, tested) ------------------------------------------------
@@ -121,13 +121,10 @@ const ideaOrRelease = (r: {
   version: number | null;
 }) =>
   r.ideaId
-    ? { code: shortId(r.ideaId), to: pmAgentPath("ideas", r.ideaId) }
+    ? { code: shortId(r.ideaId), to: changesPath(r.ideaId) }
     : r.releaseId
-      ? {
-          code: r.version != null ? `v${r.version}` : shortId(r.releaseId),
-          to: pmReleasePath(r.releaseId),
-        }
-      : { code: "", to: pmAgentPath("releases") };
+      ? { code: r.version != null ? `v${r.version}` : shortId(r.releaseId), to: changesPath() }
+      : { code: "", to: changesPath() };
 
 const listRows = (c: PmReportChanged) => {
   const s = en.debriefs.pmPage.reports;
@@ -172,17 +169,14 @@ const listRows = (c: PmReportChanged) => {
   ].filter(l => l.rows.length > 0);
 };
 
+/** The v2 tiles (U6, ReportsV2): what went live on its own, what waited, was undone or stopped. */
 const tiles = (c: PmReportChanged) => {
   const s = en.debriefs.pmPage.reports;
   const l = c.liveForEveryone;
   const oneRevert = c.reverted.count === 1 ? c.reverted.items[0]?.reason : null;
   return [
-    {
-      id: "live",
-      label: s.tiles.live,
-      value: l.count,
-      sub: !l.count ? "" : l.byPerson === l.count ? s.allByPerson : s.someByPerson(l.byPerson),
-    },
+    { id: "live", label: s.tiles.live, value: l.count - l.byPerson, sub: s.tiles.liveSub },
+    { id: "waited", label: s.tiles.waited, value: l.byPerson, sub: "" },
     {
       id: "reverted",
       label: s.tiles.reverted,
@@ -190,13 +184,17 @@ const tiles = (c: PmReportChanged) => {
       sub: oneRevert ? inWords(oneRevert) : "",
     },
     {
-      id: "rejected",
-      label: s.tiles.rejected,
-      value: c.rejected.count,
-      sub: c.rejected.count && c.rejected.items.every(r => r.reason) ? s.withReasons : "",
+      id: "stopped",
+      label: s.tiles.stopped,
+      value: Math.max(0, c.tests.count - c.tests.passed),
+      sub: s.tiles.stoppedSub,
     },
-    { id: "tests", label: s.tiles.tests, value: c.tests.count, sub: s.passed(c.tests.passed) },
-    { id: "builder", label: s.tiles.builder, value: c.sentToBuilder.count, sub: "" },
+    {
+      id: "builder",
+      label: s.tiles.builder,
+      value: c.sentToBuilder.count,
+      sub: s.tiles.builderSub,
+    },
   ];
 };
 
@@ -483,7 +481,7 @@ export const ReportsView: React.FC = () => {
               {s.download}
             </button>
           )}
-          <Link to={pmAgentPath("releases")}>{s.allReleases}</Link>
+          <Link to={changesPath()}>{s.allReleases}</Link>
         </div>
       </main>
     </div>

@@ -1,181 +1,70 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { TextArea } from "@ally-ui-mono/ui-shared";
 import {
-  useActOnDebriefRunMutation,
   useEscalateDebriefMutation,
   useGetDebriefModelsQuery,
   useGetDebriefSessionQuery,
   useResolveDebriefFlagMutation,
 } from "@api";
-import { formatUsd, releaseVersionLabel, shortId } from "@components/ally-guide/allyGuideFormat";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { en, ROUTES } from "@constants";
 import { DebriefSessionView, ExpertComment, ExpertCommentDraftAnchor } from "@types";
 import { getErrorMessage } from "@utils";
 
-import { languageLabel, modelLabels, recipeLabel } from "../consoleLabels";
+import { languageLabel, modelLabels } from "../consoleLabels";
 import { TruncatedTitle } from "../consoleRows";
-import { score } from "../consoleTable";
-import { BackLink, ConsoleTag, TagTone } from "../consoleUi";
+import { BackLink } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { selectionToAnchor } from "../expertReviewSelection";
-import { FILTER_KEYS, HOME_CATEGORIES, HomeCategory } from "../queue";
+import { FILTER_KEYS } from "../queue";
 import { cardDomId, Correcting, DebriefColumn, DebriefTab } from "./DebriefColumn";
 import { ReviewPanel } from "./ReviewPanel";
 import { RoleplayColumn, turnDomId } from "./RoleplayColumn";
 import { Decision, JumpTarget, WaitingBar } from "./WaitingBar";
-import { JUDGE_BAR, scenarioTitle, statusOf } from "../home/SessionCard";
+import { scenarioTitle } from "../home/SessionCard";
 
 /** How long a "Read first" jump keeps its highlight. */
 const HIGHLIGHT_MS = 2500;
 
-type Asking =
-  | { type: "keep" | "remove" | "checked"; flagId: string }
-  | { type: "publish" | "todays-debrief" | "reviewed"; runId: string };
+type Asking = { type: "keep" | "remove" | "checked"; flagId: string };
 
-const RUN_ACTION: Partial<Record<Decision["decision"], "publish" | "todays-debrief" | "reviewed">> =
-  {
-    publish: "publish",
-    todays_debrief: "todays-debrief",
-    looks_fine: "reviewed",
-  };
-
-const isTyping = (e: KeyboardEvent) => {
-  const t = e.target;
-  return (
-    t instanceof HTMLElement &&
-    (t.tagName === "INPUT" ||
-      t.tagName === "TEXTAREA" ||
-      t.tagName === "SELECT" ||
-      t.isContentEditable)
-  );
-};
-
-/** One of the queue's icon-only buttons: the keyboard shortcut is in its tooltip. */
 /**
- * Between Carbon’s lg breakpoint (1056px, where the header splits into two
- * rows on purpose) and its xlg (1312px) the header is one row with the least room for
- * the title, so the header drops its labels: the back link, Agent logs and
- * Reviewed become icons, Review keeps its count, and the queue position moves
- * into the queue's tooltip. Each label stays for screen readers and as a tooltip.
+ * Between Carbon’s lg breakpoint (1056px, where the header splits into two rows on purpose) and its
+ * xlg (1312px) the header drops its labels: the back link and Agent logs become icons. Each label
+ * stays for screen readers and as a tooltip.
  */
 const COMPACT_LABEL = "min-[1056px]:max-[1311px]:sr-only";
 const COMPACT_PAD = "min-[1056px]:max-[1311px]:px-2.5";
 
-const QueueButton: React.FC<{
-  to: string | null;
-  label: string;
-  hint: string;
-  testId: string;
-  direction: "previous" | "next";
-}> = ({ to, label, hint, testId, direction }) => {
-  const icon = (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      aria-hidden="true"
-    >
-      <path d={direction === "previous" ? "M10 3L5 8l5 5" : "M6 3l5 5-5 5"} />
-    </svg>
-  );
-  const cls =
-    "flex h-8 w-8 items-center justify-center rounded-sm border border-neutral-300 no-underline";
-  return to ? (
-    <Link
-      to={to}
-      aria-label={label}
-      title={hint}
-      className={`${cls} text-primary-500 hover:bg-neutral-50`}
-      data-testid={testId}
-    >
-      {icon}
-    </Link>
-  ) : (
-    <button
-      type="button"
-      disabled
-      aria-label={label}
-      title={hint}
-      className={`${cls} cursor-not-allowed bg-transparent text-neutral-400`}
-      data-testid={testId}
-    >
-      {icon}
-    </button>
-  );
-};
-
+/** The facts strip (v2): who, where and in which language. No scores, cost or time. */
 const Facts: React.FC<{ view: DebriefSessionView }> = ({ view }) => {
   const f = en.debriefs.session.facts;
-  const how = view.howItWasMade;
-  const judge = view.judge.hidden ? null : (view.judge.overall ?? null);
-  const rows: Array<{ k: string; v: string; sub: string; warn?: boolean; help?: string }> = [
+  const rows: Array<{ k: string; v: string; sub: string }> = [
     {
-      k: f.session,
-      v: shortId(view.run.sessionId),
+      k: en.debriefs.session.learner,
+      v: view.session.learner.name ?? "—",
       sub: new Date(view.run.createdAt).toLocaleString(undefined, {
         dateStyle: "medium",
         timeStyle: "short",
       }),
     },
-    {
-      k: f.organisation,
-      v: view.session.tenantName ?? "—",
-      sub: view.session.learner.name ?? "",
-    },
-    { k: f.recipe, v: recipeLabel(view.run.recipe), sub: en.debriefs.mode[view.run.mode] ?? "" },
+    { k: f.organisation, v: view.session.tenantName ?? "—", sub: "" },
     { k: f.language, v: languageLabel(view.run.language), sub: view.run.language ?? "" },
-    {
-      k: f.judge,
-      help: en.debriefs.home.scoreHelp.judge,
-      v: view.judge.hidden ? f.hidden : judge === null ? "—" : f.outOf10(score(judge)),
-      sub: view.judge.hidden ? f.hiddenSub : f.bar(JUDGE_BAR),
-      warn: judge !== null && judge < JUDGE_BAR,
-    },
-    {
-      k: f.evaluator,
-      help: en.debriefs.home.scoreHelp.evaluator,
-      v:
-        view.judge.hidden || view.judge.evaluatorOverall == null
-          ? "—"
-          : f.outOf10(score(view.judge.evaluatorOverall)),
-      sub: f.revisions(how.revisionRounds),
-    },
-    {
-      k: f.cost,
-      v: formatUsd(how.actualCostUsd ?? how.estimatedCostUsd),
-      sub: how.ceilingUsd != null ? f.ceiling(formatUsd(how.ceilingUsd)) : "",
-    },
-    { k: f.time, v: how.seconds === null ? "—" : `${how.seconds} s`, sub: "" },
-    {
-      k: f.release,
-      v: view.run.releaseVersion != null ? releaseVersionLabel(view.run.releaseVersion) : "—",
-      sub: view.run.arm ? (f.arm[view.run.arm] ?? "") : "",
-    },
   ];
   return (
     <dl
-      className="m-0 grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] rounded-sm bg-neutral-50"
+      className="m-0 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] rounded-sm bg-neutral-50"
       data-testid="session-facts"
     >
       {rows.map(r => (
         <div key={r.k} className="flex flex-col gap-1 border-r border-neutral-100 px-[18px] py-3.5">
-          <dt className="text-xs tracking-[.32px] text-neutral-600" title={r.help}>
-            {r.k}
-          </dt>
-          <dd
-            className={`m-0 text-base font-semibold ${r.warn ? "text-[#8A3800]" : "text-typography-900"}`}
-          >
-            {r.v}
-          </dd>
+          <dt className="text-xs tracking-[.32px] text-neutral-600">{r.k}</dt>
+          <dd className="m-0 text-base font-semibold text-typography-900">{r.v}</dd>
           {r.sub && <span className="text-xs text-neutral-600">{r.sub}</span>}
         </div>
       ))}
@@ -184,13 +73,31 @@ const Facts: React.FC<{ view: DebriefSessionView }> = ({ view }) => {
 };
 
 /**
+ * v2: nothing is held and there is no review queue. The Review pane keeps the clinical expert's
+ * review: escalations, and a learner's flag a person may still change (F3: Correct it / Keep it /
+ * Remove it). Held, below-the-bar and distress items are gone (distress goes to Slack, K3), and so
+ * are the run decisions (Publish, Show today's debrief, Looks fine).
+ */
+const ESCALATIONS = new Set(["escalated_flag", "escalated_run"]);
+const REVIEW_KINDS = new Set([...ESCALATIONS, "flag", "urgent_flag"]);
+const RUN_DECISIONS = new Set(["publish", "todays_debrief", "looks_fine"]);
+export const reviewActions = (view: DebriefSessionView): DebriefSessionView["pendingActions"] =>
+  view.pendingActions
+    .filter(p => REVIEW_KINDS.has(p.kind))
+    .map(p => ({ ...p, decisions: p.decisions.filter(d => !RUN_DECISIONS.has(d)) }));
+
+/** The bar above the columns: only an escalation to this viewer (no other banners). */
+export const escalationsOnly = (
+  pending: DebriefSessionView["pendingActions"],
+): DebriefSessionView["pendingActions"] => pending.filter(p => ESCALATIONS.has(p.kind));
+
+/**
  * One debriefed session (redesign 2026-11-12): the roleplay and the debrief side by side, what
  * waits on the viewer above them, and the Review button's panel top right. Everything comes from
  * ally-be's session view (`GET sessions/runs/:id`), which writes an audit event when opened.
  */
 export const DebriefSessionPage: React.FC = () => {
   const { runId = "" } = useParams<{ runId: string }>();
-  const navigate = useNavigate();
   const [params] = useSearchParams();
   const s = en.debriefs.session;
 
@@ -199,22 +106,17 @@ export const DebriefSessionPage: React.FC = () => {
   const access = useDebriefAccess(view?.viewer);
   const models = useGetDebriefModelsQuery();
   const modelLabel = modelLabels(models.data);
-  const [act, acting] = useActOnDebriefRunMutation();
   const [resolve, resolving] = useResolveDebriefFlagMutation();
   const [escalate] = useEscalateDebriefMutation();
 
-  const rawCat = params.get("cat") as HomeCategory | null;
-  const cat: HomeCategory =
-    rawCat && (HOME_CATEGORIES as readonly string[]).includes(rawCat) ? rawCat : "needs";
   const homeQuery = useMemo(() => {
     const out = new URLSearchParams();
-    for (const k of ["cat", ...FILTER_KEYS]) {
+    for (const k of FILTER_KEYS) {
       const v = params.get(k);
       if (v) out.set(k, v);
     }
     return out.toString();
   }, [params]);
-  const linkTo = (id: string) => `${ROUTES.DEBRIEF_SESSION(id)}${homeQuery ? `?${homeQuery}` : ""}`;
 
   const [paneOpen, setPaneOpen] = useState(false);
   const [tab, setTab] = useState<DebriefTab>("debrief");
@@ -299,7 +201,6 @@ export const DebriefSessionPage: React.FC = () => {
 
   const decide = (d: Decision) => {
     setReason("");
-    const runAction = RUN_ACTION[d.decision];
     if (d.decision === "correct") {
       const section =
         d.section ??
@@ -312,8 +213,6 @@ export const DebriefSessionPage: React.FC = () => {
       void escalateIt(d.flagId);
     } else if (d.decision === "verdict") {
       setPaneOpen(true);
-    } else if (runAction) {
-      setAsking({ type: runAction, runId });
     } else if (
       d.flagId &&
       (d.decision === "keep" || d.decision === "remove" || d.decision === "checked")
@@ -325,27 +224,21 @@ export const DebriefSessionPage: React.FC = () => {
   const confirm = async () => {
     if (!asking) return;
     try {
-      if ("flagId" in asking) {
-        await resolve({
-          id: asking.flagId,
-          outcome: asking.type === "remove" ? "removed" : "kept",
-          note: reason.trim() || undefined,
-        }).unwrap();
-        toast.success(
-          asking.type === "remove" ? en.debriefs.review.removed : en.debriefs.review.kept,
-        );
-        setDone(
-          asking.type === "remove"
-            ? s.reviewed.removed
-            : asking.type === "checked"
-              ? s.reviewed.reviewed
-              : s.reviewed.kept,
-        );
-      } else {
-        await act({ id: asking.runId, action: asking.type }).unwrap();
-        toast.success(en.debriefs.review.done);
-        setDone(asking.type === "publish" ? s.reviewed.published : s.reviewed[asking.type]);
-      }
+      await resolve({
+        id: asking.flagId,
+        outcome: asking.type === "remove" ? "removed" : "kept",
+        note: reason.trim() || undefined,
+      }).unwrap();
+      toast.success(
+        asking.type === "remove" ? en.debriefs.review.removed : en.debriefs.review.kept,
+      );
+      setDone(
+        asking.type === "remove"
+          ? s.reviewed.removed
+          : asking.type === "checked"
+            ? s.reviewed.reviewed
+            : s.reviewed.kept,
+      );
       setAsking(null);
       setPaneOpen(false);
     } catch (e) {
@@ -353,28 +246,7 @@ export const DebriefSessionPage: React.FC = () => {
     }
   };
 
-  // Next / Previous by J / K (the queue's order, named in the buttons' tooltips); e escalates what is waiting (the Ally team only).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!view || isTyping(e) || e.metaKey || e.ctrlKey || e.altKey || asking || draft) return;
-      if (e.key === "j" && view.queue.nextRunId) {
-        e.preventDefault();
-        navigate(linkTo(view.queue.nextRunId));
-      } else if (e.key === "k" && view.queue.previousRunId) {
-        e.preventDefault();
-        navigate(linkTo(view.queue.previousRunId));
-      } else if (e.key === "e") {
-        const first = view.pendingActions.find(p => p.decisions.includes("escalate"));
-        if (!first) return;
-        e.preventDefault();
-        void escalateIt(first.flagId);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
-  const backLabel = en.debriefs.home.categories[cat];
+  const backLabel = en.debriefs.title;
   const backTo = `${ROUTES.DEBRIEFS}${homeQuery ? `?${homeQuery}` : ""}`;
 
   if (q.isError && !view) {
@@ -413,20 +285,11 @@ export const DebriefSessionPage: React.FC = () => {
             : en.debriefs.expertReview.verdict.needsWork,
         )
       : null);
-  const st = statusOf({ status: view.run.status });
-  const urgent = view.pendingActions.some(p => p.kind === "urgent_flag");
   const title = scenarioTitle(view.session.scenario.title, view.run.sessionId);
-  // At most two tags (Urgent first, then the status); the rest behind "+N".
-  const tags: Array<{ label: string; tone: TagTone }> = [
-    ...(urgent ? [{ label: en.debriefs.home.urgent, tone: "urgent" as TagTone }] : []),
-    { label: st.label, tone: st.tone },
-    ...(view.run.hasRiskCue
-      ? [{ label: en.debriefs.home.importantMoment, tone: "info" as TagTone }]
-      : []),
-  ];
-  const shownTags = tags.slice(0, 2);
-  const moreTags = tags.slice(2);
-  const askingFlag = asking && "flagId" in asking;
+  // v2: the Review pane is the clinical expert's review; the bar shows escalations only.
+  const pending = reviewActions(view);
+  const reviewView: DebriefSessionView = { ...view, pendingActions: pending };
+  const barView: DebriefSessionView = { ...view, pendingActions: escalationsOnly(pending) };
 
   return (
     <div className="flex flex-col gap-5 font-primary" data-testid="debrief-session">
@@ -447,60 +310,11 @@ export const DebriefSessionPage: React.FC = () => {
             testId="session-title"
             className="font-secondary text-[28px] font-normal leading-tight"
           />
-          {shownTags.map(t => (
-            <ConsoleTag key={t.label} tone={t.tone}>
-              {t.label}
-            </ConsoleTag>
-          ))}
-          {moreTags.length > 0 && (
-            <ConsoleTag
-              tone="neutral"
-              title={moreTags.map(t => t.label).join(", ")}
-              testId="more-tags"
-            >
-              {s.moreTags(moreTags.length)}
-            </ConsoleTag>
-          )}
         </div>
         <div
           className="flex shrink-0 flex-nowrap items-center gap-3 max-[1055px]:basis-full max-[1055px]:justify-end"
           data-testid="session-actions"
         >
-          {(view.queue.position !== null || view.queue.previousRunId || view.queue.nextRunId) && (
-            <div
-              role="group"
-              aria-label={s.queue}
-              title={
-                view.queue.position !== null
-                  ? s.queuePosition(view.queue.position, view.queue.total)
-                  : undefined
-              }
-              className="flex items-center gap-1.5 whitespace-nowrap"
-            >
-              <QueueButton
-                to={view.queue.previousRunId ? linkTo(view.queue.previousRunId) : null}
-                label={s.previous}
-                hint={s.previousHint}
-                testId="session-prev"
-                direction="previous"
-              />
-              {view.queue.position !== null && (
-                <span
-                  className={`text-[13px] text-neutral-600 ${COMPACT_LABEL}`}
-                  data-testid="queue-position"
-                >
-                  {s.queuePosition(view.queue.position, view.queue.total)}
-                </span>
-              )}
-              <QueueButton
-                to={view.queue.nextRunId ? linkTo(view.queue.nextRunId) : null}
-                label={s.next}
-                hint={s.nextHint}
-                testId="session-next"
-                direction="next"
-              />
-            </div>
-          )}
           {access.agentLogs && (
             <Link
               to={`${ROUTES.DEBRIEF_SESSION_LOGS(runId)}${homeQuery ? `?${homeQuery}` : ""}`}
@@ -568,9 +382,9 @@ export const DebriefSessionPage: React.FC = () => {
                 <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
               </svg>
               <span className={COMPACT_LABEL}>{s.review}</span>
-              {view.pendingActions.length > 0 && (
+              {pending.length > 0 && (
                 <span className="rounded-full bg-white px-[7px] py-px text-xs font-semibold text-primary-500">
-                  {view.pendingActions.length}
+                  {pending.length}
                 </span>
               )}
             </button>
@@ -578,7 +392,7 @@ export const DebriefSessionPage: React.FC = () => {
         </div>
         {paneOpen && (
           <ReviewPanel
-            view={view}
+            view={reviewView}
             access={access}
             roots={roots}
             repliesByRoot={repliesByRoot}
@@ -592,7 +406,7 @@ export const DebriefSessionPage: React.FC = () => {
 
       <Facts view={view} />
 
-      <WaitingBar view={view} onJump={jump} onDecide={decide} />
+      <WaitingBar view={barView} onJump={jump} onDecide={decide} />
 
       <div className="flex flex-wrap items-start gap-5">
         <RoleplayColumn
@@ -633,28 +447,16 @@ export const DebriefSessionPage: React.FC = () => {
 
       <ConfirmDialog
         isOpen={asking !== null}
-        title={
-          asking
-            ? "flagId" in asking
-              ? s.ask[asking.type].title
-              : en.debriefs.review.confirmTitle[asking.type]
-            : ""
-        }
+        title={asking ? s.ask[asking.type].title : ""}
         cancelLabel={en.debriefs.review.cancel}
-        confirmLabel={
-          asking
-            ? "flagId" in asking
-              ? s.ask[asking.type].confirm
-              : en.debriefs.review.confirmLabel[asking.type]
-            : ""
-        }
-        confirmDisabled={!!askingFlag && asking?.type !== "remove" && !reason.trim()}
+        confirmLabel={asking ? s.ask[asking.type].confirm : ""}
+        confirmDisabled={!!asking && asking.type !== "remove" && !reason.trim()}
         danger={asking?.type === "remove"}
-        isWorking={acting.isLoading || resolving.isLoading}
+        isWorking={resolving.isLoading}
         onConfirm={() => void confirm()}
         onClose={() => setAsking(null)}
       >
-        {asking && "flagId" in asking ? (
+        {asking && (
           <TextArea
             id="session-decision-reason"
             labelText={s.ask[asking.type].label}
@@ -663,8 +465,6 @@ export const DebriefSessionPage: React.FC = () => {
             value={reason}
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
           />
-        ) : (
-          <p>{asking ? en.debriefs.review.confirmBody[asking.type] : ""}</p>
         )}
       </ConfirmDialog>
     </div>

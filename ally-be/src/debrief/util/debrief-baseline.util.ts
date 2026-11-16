@@ -72,7 +72,10 @@ const clampTo = (key: OwnerSettingKey, v: number) => {
 const roundUp = (v: number, step: number) => Math.ceil(v / step) * step;
 
 /** A value that differs from the current by more than half no longer fits. */
-const misfit = (current: number | boolean, proposed: number | boolean) => {
+const misfit = (
+  current: number | boolean | string,
+  proposed: number | boolean,
+) => {
   if (typeof current !== 'number' || typeof proposed !== 'number') return false;
   if (current === 0) return proposed !== 0;
   return Math.abs(proposed - current) / Math.abs(current) > 0.5;

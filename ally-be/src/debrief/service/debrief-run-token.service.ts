@@ -78,7 +78,28 @@ export const PM_AGENT_GATEWAY_TOOLS = [
   'questions_read',
   'question_answer',
 ] as const;
-export type PmAgentGatewayTool = (typeof PM_AGENT_GATEWAY_TOOLS)[number];
+/**
+ * The PM agent conversation's own tools (V2_AUTONOMY C2), served by
+ * DebriefPmConversationService. Only a conversation turn's token lists them:
+ * its `agentRunId` is the person's message id, so every action is tied to
+ * that person's words and permissions. A weekly run's token never does.
+ */
+export const PM_CONVERSATION_TOOLS = [
+  'change_read',
+  'session_read',
+  'change_approve',
+  'change_turn_down',
+  'change_stop',
+  'change_undo',
+  'change_retry',
+  'change_hold_language',
+  'changes_pause',
+  'confirm_plan',
+] as const;
+export type PmConversationTool = (typeof PM_CONVERSATION_TOOLS)[number];
+export type PmAgentGatewayTool =
+  | (typeof PM_AGENT_GATEWAY_TOOLS)[number]
+  | PmConversationTool;
 
 /** An agent token lives at most this long: a PM agent run is minutes, not hours. */
 export const AGENT_TOKEN_MAX_TTL_S = 2 * 60 * 60;
@@ -159,8 +180,10 @@ export class DebriefRunTokenService {
     tools: readonly PmAgentGatewayTool[] = PM_AGENT_GATEWAY_TOOLS,
     ttlS = AGENT_TOKEN_MAX_TTL_S,
   ): string {
-    const allowed = tools.filter((t) =>
-      (PM_AGENT_GATEWAY_TOOLS as readonly string[]).includes(t),
+    const allowed = tools.filter(
+      (t) =>
+        (PM_AGENT_GATEWAY_TOOLS as readonly string[]).includes(t) ||
+        (PM_CONVERSATION_TOOLS as readonly string[]).includes(t),
     );
     return jwt.sign(
       { kind: 'agent', agent: 'pm_agent', agentRunId, tools: allowed },

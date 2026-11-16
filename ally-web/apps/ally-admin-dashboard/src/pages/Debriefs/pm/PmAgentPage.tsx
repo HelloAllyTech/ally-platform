@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React from "react";
 
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -6,30 +6,25 @@ import { toast } from "sonner";
 import { Button } from "@ally-ui-mono/ui-shared";
 import {
   useBuildDebriefTestSetsMutation,
-  useGetDebriefAttentionQuery,
   useGetDebriefOverviewQuery,
-  useGetPmAgentStateQuery,
-  useRunPmAgentMutation,
+  useGetDebriefMeQuery,
 } from "@api";
-import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
+import { LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { en, ROUTES } from "@constants";
 import { DebriefOverview } from "@types";
 import { getErrorMessage } from "@utils";
 
 import { codeWords } from "../consoleLabels";
-import { pmAgentPath, PmAgentView } from "../consoleRoutes";
+import { pmAgentPath, PmAgentView, readChangesView } from "../consoleRoutes";
 import { TruncatedTitle } from "../consoleRows";
-import { AlertBanner, BackLink, Tile } from "../consoleUi";
+import { BackLink, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
-import { IdeasView } from "./IdeasView";
-import { ProposeChange } from "./ProposeChange";
-import { ReleasesView } from "./ReleasesView";
+import { ChangesView } from "./ChangesView";
 import { ReportsView } from "./ReportsView";
-import { bannerText } from "../home/DebriefsHome";
 
-const VIEWS: PmAgentView[] = ["ideas", "releases", "reports", "test-sets"];
+const VIEWS: PmAgentView[] = ["changes", "reports", "test-sets"];
 
-/** PM agent › Test sets: the Open / Gate / Sealed counts, and adding recent sessions. */
+/** Changes › Test sets: the Open / Gate / Sealed counts, and adding recent sessions. */
 const TestSetsView: React.FC<{
   overview: ReturnType<typeof useGetDebriefOverviewQuery>;
   canAct: boolean;
@@ -91,44 +86,18 @@ const TestSetsView: React.FC<{
 };
 
 /**
- * The PM agent (redesign 2026-11-12), opened from the Debriefs home: its ideas with the decisions
- * they wait on, the releases with their steps and models, and the test sets. `?view=` picks the
- * tab and `?idea=` the idea in focus, so a link opens exactly there.
+ * Changes (v2, U3; the old PM agent page at the same route): what the PM agent changed, grouped
+ * by where each change is, with the one PM agent conversation beside it. Reports and Test sets
+ * stay as tabs. `?view=` picks the tab and `?change=` the change in focus. There is no "Run the PM
+ * agent now": a person asks in the conversation ("look at this week's flags now").
  */
 export const PmAgentPage: React.FC = () => {
-  const s = en.debriefs.pmAgent;
-  const p = en.debriefs.pmPage;
-  // Open and closed ideas come as two lists (CONSOLE_API.md); one list for the page.
-  const open = useGetPmAgentStateQuery({ state: "open" });
-  const closed = useGetPmAgentStateQuery({ state: "closed" });
-  const access = useDebriefAccess(open.data?.viewer);
-  const [proposing, setProposing] = useState(false);
-  const attention = useGetDebriefAttentionQuery();
-  const waitingBanner = attention.data?.banners.find(b => b.kind === "release_waiting");
+  const c = en.debriefs.v2.changes;
+  const me = useGetDebriefMeQuery();
+  const access = useDebriefAccess(me.data);
   const [params, setParams] = useSearchParams();
-  const raw = params.get("view") as PmAgentView | null;
-  const view: PmAgentView = raw && VIEWS.includes(raw) ? raw : "ideas";
-  const state = useMemo(() => {
-    if (!open.data) return { ...open, data: undefined };
-    const seen = new Set(open.data.ideas.map(i => i.id));
-    const ideas = [...open.data.ideas, ...(closed.data?.ideas ?? []).filter(i => !seen.has(i.id))];
-    return { ...open, data: { ...open.data, ideas } };
-  }, [open, closed.data]);
-  const onTheWay =
-    open.data?.counts?.open ?? open.data?.ideas.filter(i => i.state !== "closed").length ?? 0;
-  const overview = useGetDebriefOverviewQuery();
-  const [run, { isLoading: running }] = useRunPmAgentMutation();
-
-  const runNow = async () => {
-    try {
-      const res = await run().unwrap();
-      if (res.skipped) toast.success(s.skipped(res.skipped));
-      else toast.success(s.ran);
-    } catch (e) {
-      toast.error(getErrorMessage(e, s.runFailed));
-    }
-  };
-
+  const { view, change } = readChangesView(params);
+  const overview = useGetDebriefOverviewQuery(undefined, { skip: view !== "test-sets" });
   return (
     <div className="font-primary" data-testid="pm-agent-page">
       <header className="flex flex-col gap-3.5 border-b border-neutral-100 px-8 pt-4">
@@ -143,23 +112,12 @@ export const PmAgentPage: React.FC = () => {
             </div>
             <TruncatedTitle
               as="h1"
-              text={p.title}
+              text={c.title}
               className="font-secondary text-[28px] font-normal"
             />
           </div>
-          <div className="hidden min-w-0 flex-1 lg:block" />
-          {access.pmAgent && (
-            <div className="flex shrink-0 flex-nowrap items-center gap-3">
-              <Button kind="tertiary" size="md" onClick={() => setProposing(true)}>
-                {p.propose.button}
-              </Button>
-              <Button kind="tertiary" size="md" disabled={running} onClick={() => void runNow()}>
-                {running ? s.running : s.runNow}
-              </Button>
-            </div>
-          )}
         </div>
-        <nav aria-label={p.title} className="flex flex-nowrap gap-6 whitespace-nowrap text-sm">
+        <nav aria-label={c.title} className="flex flex-nowrap gap-6 whitespace-nowrap text-sm">
           {VIEWS.map(v => (
             <Link
               key={v}
@@ -167,77 +125,26 @@ export const PmAgentPage: React.FC = () => {
               aria-current={v === view ? "page" : undefined}
               className={`py-2.5 no-underline ${v === view ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
             >
-              {p.tabs[v]}
+              {c.tabs[v]}
             </Link>
           ))}
         </nav>
       </header>
 
-      {waitingBanner && view !== "releases" && (
-        <div className="px-8 pt-4">
-          <AlertBanner
-            kind={waitingBanner.level === "red" ? "error" : "warning"}
-            testId="pm-release-waiting-banner"
-            action={
-              <Link to={pmAgentPath("releases")} className="text-sm font-semibold">
-                {en.debriefs.home.bannerActions.releases}
-              </Link>
-            }
-          >
-            {bannerText(waitingBanner)}
-          </AlertBanner>
-        </div>
-      )}
-      {proposing && (
-        <ProposeChange
-          canChangeBudgets={access.settings}
-          onCancel={() => setProposing(false)}
-          onDone={ideaId => {
-            setProposing(false);
-            setParams({ idea: ideaId });
-          }}
-        />
-      )}
       {view === "test-sets" ? (
         <TestSetsView overview={overview} canAct={access.testSets} />
       ) : view === "reports" ? (
         <ReportsView />
-      ) : state.isError ? (
-        <div className="px-8 py-6">
-          <ErrorPanel
-            forbiddenMessage={en.debriefs.noAccess}
-            what={s.loadFailed}
-            error={state.error}
-            onRetry={() => void state.refetch()}
-          />
-        </div>
-      ) : !state.data ? (
-        <div className="px-8 py-6">
-          <LoadingBlock lines={8} />
-        </div>
-      ) : view === "releases" ? (
-        <ReleasesView
-          canAct={access.releases}
-          onTheWay={onTheWay}
-          selected={params.get("releaseId")}
+      ) : (
+        <ChangesView
+          access={access}
+          selected={change}
           onSelect={id => {
             const next = new URLSearchParams(params);
-            next.set("releaseId", id);
+            next.delete("idea");
+            next.set("change", id);
             setParams(next, { replace: true });
           }}
-        />
-      ) : (
-        <IdeasView
-          state={state.data}
-          overview={overview.data}
-          access={access}
-          focusId={params.get("idea")}
-          onFocus={id => {
-            const next = new URLSearchParams(params);
-            next.set("idea", id);
-            setParams(next, { replace: true });
-          }}
-          onOpenRelease={releaseId => setParams({ view: "releases", releaseId })}
         />
       )}
     </div>

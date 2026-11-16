@@ -51,6 +51,8 @@ class LLMTask(str, Enum):
     DEBRIEF_LANGUAGE_SPECIALIST = "debrief_language_specialist"
     # The PM agent's own analysis; paid from the learning budget, never production.
     DEBRIEF_PM_AGENT = "debrief_improver"
+    # The Debrief agent answering a learner's flag on one card (V2_AUTONOMY F1).
+    DEBRIEF_FLAG_ANSWER = "debrief_flag_answer"
     # Ask Ally: one row per model pass of a learner's reply (app/core/ask_ally).
     # Ran in ally-be until the move to the LangGraph stack; same label.
     DEBRIEF_REPLY = "debrief_reply"

@@ -675,6 +675,14 @@ export class DebriefConsoleViewService implements OnModuleInit {
       resolvedBy: r.resolvedBy
         ? { id: Number(r.resolvedBy), name: r.resolvedByName ?? null }
         : null,
+      // V2_AUTONOMY F1: the Debrief agent's answer, as the learner read it.
+      answer: r.answer
+        ? {
+            action: r.answer.action,
+            reply: r.answer.reply,
+            at: r.answer.at,
+          }
+        : null,
       cardText:
         r.section === ASK_ALLY_SECTION ? null : sectionText(cards, r.section),
       card:
@@ -1313,6 +1321,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
         judgeMean: overview.judge.mean,
         meetsTheBar: overview.judge.passRate,
         needsAPerson: Number(needs?.n ?? 0),
+        // v2: nothing is held; how many were shown below the bar (F9).
+        shownBelowBar: Number(overview.runs.belowBar ?? 0),
         costP50Usd: overview.costUsd.p50,
         costP90Usd: overview.costUsd.p90,
         spentThisMonthUsd: overview.budget.monthSpentUsd,

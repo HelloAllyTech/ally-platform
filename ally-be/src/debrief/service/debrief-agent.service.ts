@@ -1,3 +1,4 @@
+import { DebriefSlackService } from './debrief-slack.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -49,6 +50,7 @@ import { DebriefReleasesService } from './debrief-releases.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import { hasLegacyFeedback } from '../util/debrief-live.util';
 import { cardsForReader } from '../util/debrief-cards.util';
+import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import {
   DebriefProgress,
   DebriefRunnerService,
@@ -234,6 +236,10 @@ export class DebriefAgentService implements OnModuleInit {
     @Optional() private readonly trials?: DebriefTrialsService,
     /** Code releases on deploy: live unless they would undo a promoted change. */
     @Optional() private readonly releaseHistory?: DebriefReleasesService,
+    /** V2_AUTONOMY A9: pinned languages never join a learner try-out. */
+    @Optional() private readonly holds?: DebriefChangeHoldsService,
+    /** v2 K3: a debrief shown with a missed clear risk cue goes to the safety contact. */
+    @Optional() private readonly slack?: DebriefSlackService,
   ) {}
 
   /**
@@ -550,6 +556,7 @@ export class DebriefAgentService implements OnModuleInit {
             ),
           );
         void this.trials?.onPublished(run);
+        void this.slack?.missedRiskCue(run).catch(() => false);
       }
       done++;
       this.logger.info(
@@ -604,6 +611,7 @@ export class DebriefAgentService implements OnModuleInit {
             ),
           );
         void this.trials?.onPublished(run);
+        void this.slack?.missedRiskCue(run).catch(() => false);
       }
     } catch (e) {
       this.logger.error(
@@ -631,6 +639,22 @@ export class DebriefAgentService implements OnModuleInit {
   ): Promise<Record<string, unknown>> {
     if (mode !== DebriefRunMode.LIVE || !this.trials) return {};
     const canary = await this.trials.canaryFor(sessionId).catch(() => null);
+    if (canary && this.holds) {
+      // A pinned language, or a try-out scoped to other languages: this
+      // session runs on its own release (the runner reads the pin).
+      const idea = await this.dataSource
+        .query(`SELECT change FROM agent_lessons WHERE id = $1`, [
+          canary.ideaId,
+        ])
+        .catch(() => []);
+      if (
+        await this.holds
+          .excludesCanary(sessionId, idea?.[0]?.change ?? null)
+          .catch(() => false)
+      ) {
+        return {};
+      }
+    }
     return canary
       ? {
           release: canary.release,
@@ -721,6 +745,7 @@ export class DebriefAgentService implements OnModuleInit {
         if (!run) continue;
         await this.publisher?.applyToSession(run);
         await this.notifier.ready(run);
+        void this.slack?.missedRiskCue(run).catch(() => false);
       } catch (e) {
         this.logger.warn(
           `[debrief] could not show held draft ${id}: ${(e as Error).message}`,

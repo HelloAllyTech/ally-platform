@@ -463,3 +463,61 @@ describe('progressConsoleView', () => {
     });
   });
 });
+
+describe('what people said about earlier debriefs (2026-11-16)', () => {
+  it("carries the learner's note and Ally's decision on the flagged point", () => {
+    const p = assemble({
+      flags: [
+        {
+          run_id: 'run-1',
+          section: 'work_on_this[0]',
+          status: 'open',
+          reason: 'advice_doesnt_fit',
+          user_id: 7,
+          note: 'She never said that',
+          answer_action: 'kept',
+          answer_reply: 'The client said it at turn 4.',
+        },
+      ],
+    });
+    const point = p.past_points.find(
+      (x) => x.run_id === 'run-1' && x.point === 'Point 1',
+    );
+    expect(point).toMatchObject({
+      learner_note: 'She never said that',
+      ally_decision: 'kept',
+      ally_reason: 'The client said it at turn 4.',
+      source: 'debrief',
+    });
+  });
+
+  it("adds an expert's note on the roleplay, not one on a card", () => {
+    const p = assemble({
+      comments: [
+        {
+          run_id: 'run-2',
+          anchor_kind: 'transcript',
+          turn_index: 6,
+          section: null,
+          tag: 'missed_moment',
+          body: 'She should have paused here.',
+        },
+        {
+          run_id: 'run-2',
+          anchor_kind: 'card',
+          turn_index: null,
+          section: 'work_on_this[0]',
+          tag: 'tone',
+          body: 'Too blunt.',
+        },
+      ],
+    });
+    const expert = p.past_points.filter((x) => x.source === 'expert');
+    expect(expert).toEqual([
+      expect.objectContaining({
+        run_id: 'run-2',
+        point: 'Turn 6: She should have paused here.',
+      }),
+    ]);
+  });
+});

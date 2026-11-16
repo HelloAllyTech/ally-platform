@@ -51,6 +51,58 @@ class PmAgentRunResponse(BaseModel):
     error: Optional[str] = None
 
 
+# --- The console conversation (V2_AUTONOMY C1-C3) ---------------------------------
+
+
+class PmThreadMessage(BaseModel):
+    who: Literal["person", "agent"]
+    #: The person's name for a person's message; None for the agent.
+    author: Optional[str] = None
+    text: str
+    #: What the message was about: a change, a session or a page (`PmAbout`).
+    about: Optional[Dict[str, Any]] = None
+    #: The action the agent's message took (`{label, status}`), if any.
+    action: Optional[Dict[str, Any]] = None
+
+
+class PmConversationRequest(BaseModel):
+    #: ally-be's id for this turn (the person's message id): the agent token's
+    #: run id, so every action the turn takes is tied to the person's words.
+    turn_id: str
+    model: Optional[str] = None
+    backup_model: Optional[str] = None
+    prices: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    #: What this turn may spend: decided by ally-be from the run cap and the
+    #: learning budget.
+    budget_usd: float = Field(ge=0)
+    #: Recent thread, oldest first (the person's new message not included).
+    history: List[PmThreadMessage] = Field(default_factory=list, max_length=60)
+    #: The person's new message and who they are.
+    message: str = Field(min_length=1, max_length=4000)
+    author: Optional[str] = None
+    #: What the person is looking at, with ally-be's evidence for it: the change's
+    #: evidence or the session's run summary (`{kind, id, label, evidence}`).
+    about: Optional[Dict[str, Any]] = None
+    #: The plan waiting for this person's yes from the agent's last message.
+    pending_plan: Optional[Dict[str, Any]] = None
+    #: The live Skills Store prompts for this call
+    #: (`ally_ai_debrief_pm_conversation_system`).
+    prompts: Optional[Dict[str, Any]] = None
+    tools: List[str] = Field(default_factory=list)
+    agent_token: str
+    gateway_url: str
+
+
+class PmConversationResponse(BaseModel):
+    status: Literal["finished", "budget_spent", "failed"]
+    reply: Optional[str] = None
+    steps: List[Dict[str, Any]] = Field(default_factory=list)
+    estimated_cost_usd: float = 0.0
+    model: Optional[str] = None
+    refusals: List[Dict[str, str]] = Field(default_factory=list)
+    error: Optional[str] = None
+
+
 # --- Builder's interview, answered by the PM agent (plan §11.5, FR-63) ------------
 
 

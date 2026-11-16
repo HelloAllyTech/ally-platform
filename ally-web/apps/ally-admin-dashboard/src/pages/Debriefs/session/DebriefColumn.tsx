@@ -84,34 +84,47 @@ export const cardFields = (
   return null;
 };
 
+const isOpenFlag = (f: DebriefSessionFlag) => f.status === "open" || f.status === "escalated";
+
 /**
- * An open learner flag on a card: the reason and, when the learner wrote one, their note — one
- * line, truncated; the whole note on hover or keyboard focus.
+ * The flag marker on a card (v2, U2): "⚑ Flagged by the learner", which opens to what the learner
+ * said and how Ally answered (the Debrief agent answers every flag within a minute, F1).
  */
-const FlagTag: React.FC<{ flag: DebriefSessionFlag }> = ({ flag }) => {
-  const s = en.debriefs.session;
-  const text = s.flaggedTag(en.debriefs.review.reasons[flag.reason] ?? flag.reason, flag.note);
+export const FlagMarker: React.FC<{ flag: DebriefSessionFlag }> = ({ flag }) => {
+  const f = en.debriefs.v2.flag;
+  const reason = en.debriefs.review.reasons[flag.reason] ?? flag.reason;
+  const a = flag.answer;
   return (
-    <span
-      tabIndex={0}
-      aria-label={text}
-      data-testid="card-flag-tag"
-      className="group relative ml-auto min-w-0 max-w-full rounded-full bg-destructive-100 px-2 py-0.5 text-xs text-destructive-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-destructive-600"
-    >
-      <span aria-hidden="true" className="block truncate">
-        {text}
-      </span>
-      {flag.note && (
-        <span
-          role="tooltip"
-          aria-hidden="true"
-          data-testid="card-flag-note-full"
-          className="invisible absolute right-0 top-full z-20 mt-1 w-72 max-w-[80vw] whitespace-normal rounded-sm bg-neutral-900 px-3 py-2 text-xs text-white shadow-lg group-hover:visible group-focus:visible"
-        >
-          {text}
+    <details className="w-full text-sm" data-testid="card-flag-marker">
+      <summary className="flex cursor-pointer flex-nowrap items-center gap-2">
+        <span className="shrink-0 rounded-full bg-destructive-100 px-2 py-0.5 text-xs font-semibold text-destructive-600">
+          {f.marker}
         </span>
-      )}
-    </span>
+        <span className="min-w-0 truncate text-xs text-neutral-700">{f.summary}</span>
+      </summary>
+      <div className="mt-2 flex flex-col gap-1.5 rounded-sm bg-white px-3 py-2.5">
+        <p className="m-0" data-testid="card-flag-said">
+          {f.said(reason, flag.note)}
+        </p>
+        {a ? (
+          <p className="m-0" data-testid="card-flag-answer">
+            {f.answered[a.action] ?? ""} “{a.reply}”
+            <span className="text-neutral-600">
+              {" "}
+              ·{" "}
+              {new Date(a.at).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </span>
+          </p>
+        ) : (
+          <p className="m-0 text-neutral-600" data-testid="card-flag-no-answer">
+            {f.notYet}
+          </p>
+        )}
+      </div>
+    </details>
   );
 };
 
@@ -135,16 +148,16 @@ const Card: React.FC<{
       data-highlight={lit ? "true" : undefined}
       className={[
         "flex flex-col gap-2.5 rounded-sm bg-neutral-50 px-5 py-[18px]",
-        flag ? "outline outline-2 outline-destructive-200" : "",
+        flag && isOpenFlag(flag) ? "outline outline-2 outline-destructive-200" : "",
         lit ? "ring-2 ring-warning-200" : "",
       ].join(" ")}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <div className={`text-xs tracking-[.32px] ${kickerClass}`}>{kicker}</div>
-        {flag && <FlagTag flag={flag} />}
       </div>
+      {flag && <FlagMarker flag={flag} />}
       {children}
-      {!flag && outcome && (
+      {!(flag && isOpenFlag(flag)) && outcome && (
         <p data-testid="card-learner-outcome" className="m-0 text-xs text-neutral-700">
           {outcome}
         </p>
@@ -174,10 +187,9 @@ const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
         className={className}
       />
     ) : null;
-  const flagFor = (section: string) =>
-    view.flags.find(
-      f => f.section === section && (f.status === "open" || f.status === "escalated"),
-    );
+  // The newest flag on this card, open or answered: its marker shows the learner's note and
+  // Ally's answer.
+  const flagFor = (section: string) => [...view.flags].reverse().find(f => f.section === section);
   /** What the learner reads under the card once their flag was decided (the learner app's words). */
   const outcomeLine = (section: string) => {
     const k = view.corrections.filter(c => c.section === section);

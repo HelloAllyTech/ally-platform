@@ -15,9 +15,12 @@ import {
   DebriefRunTokenService,
   GATEWAY_TOOLS,
   PM_AGENT_GATEWAY_TOOLS,
+  PM_CONVERSATION_TOOLS,
   PmAgentGatewayTool,
+  PmConversationTool,
 } from '../service/debrief-run-token.service';
 import { DebriefPmAgentToolsService } from '../service/debrief-pm-agent-tools.service';
+import { DebriefPmConversationService } from '../service/debrief-pm-conversation.service';
 
 /**
  * The Debrief gateway (docs/debrief-harness/CONTRACT.md §2, §5): the tools
@@ -37,6 +40,7 @@ export class DebriefGatewayController {
     private readonly tokens: DebriefRunTokenService,
     private readonly gateway: DebriefGatewayService,
     private readonly pmTools: DebriefPmAgentToolsService,
+    private readonly conversation: DebriefPmConversationService,
   ) {}
 
   @Public()
@@ -47,6 +51,15 @@ export class DebriefGatewayController {
     @Headers('authorization') authorization: string | undefined,
     @Body() body: Record<string, any>,
   ): Promise<Record<string, unknown>> {
+    if ((PM_CONVERSATION_TOOLS as readonly string[]).includes(name)) {
+      // The conversation's tools: a conversation turn's agent token only.
+      const claims = this.tokens.authoriseAgent(authorization, name);
+      return this.conversation.callTool(
+        name as PmConversationTool,
+        claims,
+        body ?? {},
+      );
+    }
     if ((PM_AGENT_GATEWAY_TOOLS as readonly string[]).includes(name)) {
       // The PM agent's tools take an agent token, never a debrief run's.
       const claims = this.tokens.authoriseAgent(authorization, name);

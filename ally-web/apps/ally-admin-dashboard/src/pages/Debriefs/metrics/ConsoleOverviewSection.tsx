@@ -85,7 +85,7 @@ export const ConsoleOverviewSection: React.FC<{
         <KpiTile
           label={s.person}
           description={s.personHelp}
-          value={String(t?.needsAPerson ?? "—")}
+          value={String(t?.shownBelowBar ?? "—")}
           {...tile}
         />
         <KpiTile

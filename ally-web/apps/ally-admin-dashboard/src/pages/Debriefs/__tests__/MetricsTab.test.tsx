@@ -197,13 +197,9 @@ describe("Debriefs tab: pass rate", () => {
 describe("Debriefs tab: steering, guardrails, experience, uptake", () => {
   beforeEach(() => h.metrics.mockReturnValue(answer(fullView())));
 
-  it("charts the steering score with its three parts and says which weeks lacked a part", () => {
+  it("has no steering score: the overall score leads Analytics › Debriefs instead (v2)", () => {
     render(<MetricsTab />);
-    expect(screen.getByTestId("line-chart")).toHaveAttribute("data-points", "48");
-    expect(screen.getByTestId("metrics-steering")).toHaveTextContent(
-      "Judge 50% · Practise next 25% · Thumbs-up 25%",
-    );
-    expect(screen.getByTestId("steering-partial")).toHaveTextContent("2026-08-24: Without thumbs");
+    expect(screen.queryByTestId("metrics-steering")).toBeNull();
   });
 
   it("draws every guardrail against its target, with the baselines and the state in words", () => {
@@ -355,9 +351,7 @@ describe("Debriefs tab: each agent", () => {
       row("Agreement with the judge on missed risk cues, beyond chance (0–1)"),
     ).toHaveTextContent("0.62");
     expect(row("Pass rate (needs the Ask Ally judge)")).toHaveTextContent("Not measured yet");
-    expect(row("Live for everyone / reverted / rejected / waiting")).toHaveTextContent(
-      "1 / 0 / 2 / 10",
-    );
+    expect(row("Went live / undone / turned down / waiting")).toHaveTextContent("1 / 0 / 2 / 10");
   });
 });
 

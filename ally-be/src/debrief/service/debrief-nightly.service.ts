@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { LoggerService } from '../../logger/logger.service';
@@ -15,6 +15,7 @@ import {
   NightlyRun,
 } from '../util/debrief-nightly.util';
 import { DebriefNotifier } from './debrief-notifier.service';
+import { DebriefSlackService } from './debrief-slack.service';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefSettingsService } from './debrief-settings.service';
 
@@ -97,6 +98,8 @@ export class DebriefNightlyService implements OnModuleInit {
     private readonly settings: DebriefSettingsService,
     private readonly judge: DebriefRunJudgeService,
     private readonly notifier: DebriefNotifier,
+    /** v2 K2: a measure past its limit is posted to the owner's Slack channel. */
+    @Optional() private readonly slack?: DebriefSlackService,
   ) {}
 
   onModuleInit(): void {
@@ -219,6 +222,14 @@ export class DebriefNightlyService implements OnModuleInit {
       thresholds,
     );
     await this.save(day, 'all', { ...all, dataQuality: quality }, alerts);
+    if (alerts.length) {
+      await this.slack?.post(
+        [
+          `Debriefs on ${day}: ${alerts.length === 1 ? 'a measure' : `${alerts.length} measures`} fell past ${alerts.length === 1 ? 'its limit' : 'their limits'}.`,
+          ...alerts.map((a) => `• ${a.detail}`),
+        ].join('\n'),
+      );
+    }
     // Slices, for the charts. Alerts stay on the whole day: a slice of a few
     // debriefs is too small to alert on alone.
     const slices = new Map<string, NightlyRun[]>();
@@ -415,7 +426,14 @@ export class DebriefNightlyService implements OnModuleInit {
       day: r.day,
       slice: r.slice,
       metrics: r.metrics ?? {},
-      alerts: Array.isArray(r.alerts) ? r.alerts : [],
+      // Where each finding went (v2: nobody watches this page; F7).
+      alerts: (Array.isArray(r.alerts) ? r.alerts : []).map((a) => ({
+        ...a,
+        routedTo:
+          a.code === 'judge_drift'
+            ? 'PM agent: scores since then are read with care until the judge is checked again'
+            : 'PM agent: read as evidence for its next changes',
+      })),
     }));
   }
 

@@ -19,6 +19,8 @@ export const DEBRIEF_OWNER_NOTIFICATION = 'DEBRIEF_OWNER_ALERT';
 export const DEBRIEF_TEAM_NOTIFICATION = 'DEBRIEF_TEAM_ALERT';
 /** The owner permission (migration 1981900730000). */
 const OWNER_PERMISSION = 'manage:admin:debrief-settings';
+/** The clinical advisor's permission (debrief-console-roles.util.ts ADVISOR). */
+const ADVISOR_PERMISSION = 'review:admin:debriefs';
 
 export interface DebriefStaffAlert {
   title: string;
@@ -193,6 +195,25 @@ export class DebriefNotifier {
       [OWNER_PERMISSION],
       DEBRIEF_OWNER_NOTIFICATION,
       alert,
+    );
+  }
+
+  /**
+   * V2_AUTONOMY: the people who decide a pinned-rule change — the clinical
+   * advisors (`review:admin:debriefs`) and the owner. Their link opens Home
+   * with the change and its conversation (`/debriefs?change=<id>`). Never throws.
+   */
+  async pinnedRuleDeciders(alert: DebriefStaffAlert): Promise<number> {
+    return this.staff(
+      `SELECT DISTINCT u.id, u.tenant_id
+         FROM users u
+         JOIN user_groups ug ON ug."userId" = u.id
+         JOIN group_permissions gp ON gp."groupId" = ug."groupId"
+         JOIN permissions p ON p.id = gp."permissionId"
+        WHERE p.name = ANY($1::text[])`,
+      [[ADVISOR_PERMISSION, OWNER_PERMISSION]],
+      DEBRIEF_OWNER_NOTIFICATION,
+      { ...alert, data: { screen: 'DebriefHome', ...(alert.data ?? {}) } },
     );
   }
 

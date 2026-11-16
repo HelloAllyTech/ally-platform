@@ -2,26 +2,19 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { BarChart3 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
 
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import {
-  useEscalateDebriefMutation,
-  useGetDebriefAttentionQuery,
+  useGetDebriefHomeQuery,
   useGetDebriefSessionsQuery,
+  useGetDebriefSettingsQuery,
 } from "@api";
 import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { en, ROUTES } from "@constants";
-import { DebriefAttention } from "@types";
-import { getErrorMessage } from "@utils";
+import { ChangeState, DebriefHomeV2 } from "@types";
 
 import { languageLabel, recipeLabel } from "../consoleLabels";
-import {
-  ANALYTICS_DEBRIEFS_TAB,
-  analyticsDebriefsPath,
-  pmAgentPath,
-  settingsPath,
-} from "../consoleRoutes";
+import { analyticsDebriefsPath, changesPath, settingsPath } from "../consoleRoutes";
 import {
   FilterChip,
   FilterChips,
@@ -29,27 +22,16 @@ import {
   MoreActions,
   MoreFiltersButton,
 } from "../consoleRows";
-import { AlertBanner } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
-import {
-  categoriesFor,
-  categoryCount,
-  FILTER_KEYS,
-  blindToChecks,
-  defaultCategory,
-  groupByDay,
-  queueNoteFor,
-  queueOrder,
-  readHomeState,
-  sessionsQuery,
-  waitedFor,
-} from "../queue";
+import { PmConversation } from "../pm/PmConversation";
+import { FILTER_KEYS, groupByDay, readHomeState, sessionsQuery } from "../queue";
+import { NeedsYouItem } from "./NeedsYouItem";
 import { SessionCard, SessionRow } from "./SessionCard";
 
-/** A session link that keeps the home's category and filters, so Back returns there. */
+/** A session link that keeps the home's filters, so Back returns there. */
 export const sessionLink = (runId: string, params: URLSearchParams) => {
   const q = new URLSearchParams();
-  for (const k of ["cat", ...FILTER_KEYS]) {
+  for (const k of FILTER_KEYS) {
     const v = params.get(k);
     if (v) q.set(k, v);
   }
@@ -96,112 +78,201 @@ const Filter: React.FC<{
   </div>
 );
 
-type Banner = DebriefAttention["banners"][number];
+/** The undo margin the headline uses when the owner setting hasn't loaded (V2_AUTONOMY A4). */
+export const DEFAULT_UNDO_MARGIN = 0.3;
 
-/** Where a banner's link goes. Banners link to the thing to read; they never act. */
-export const bannerHref = (b: Banner): string => {
-  if (b.kind === "release_waiting") return pmAgentPath("releases");
-  switch (b.link.page) {
-    case "session":
-      return b.link.runId ? ROUTES.DEBRIEF_SESSION(b.link.runId) : ROUTES.DEBRIEFS;
-    case "pm_agent":
-      return pmAgentPath("ideas", b.link.ideaId);
-    case "settings":
-      return settingsPath(b.kind === "cap" ? "budget" : undefined);
-    case "analytics":
-      return `${ROUTES.ANALYTICS}?tab=${ANALYTICS_DEBRIEFS_TAB}`;
-    default:
-      return `${ROUTES.DEBRIEFS}${b.link.category ? `?cat=${b.link.category === "agreement_sample" ? "agreement" : b.link.category}` : ""}`;
-  }
+const one = (n: number) => n.toFixed(1);
+
+/**
+ * The headline (U1, review 2026-11-16): the score is named only when it moved by more than the
+ * undo margin; otherwise "Debriefs are healthy this week, and …". The needs-you clause is bold.
+ */
+export const homeHeadline = (
+  h: DebriefHomeV2["headline"],
+  undone: number,
+  margin: number,
+): { score: { dir: "rose" | "fell"; by: string; undone: boolean } | null; noScore: boolean } => {
+  if (h.score === null) return { score: null, noScore: true };
+  if (h.lastWeekScore === null) return { score: null, noScore: false };
+  const delta = h.score - h.lastWeekScore;
+  if (Math.abs(delta) <= margin) return { score: null, noScore: false };
+  return {
+    score: {
+      dir: delta > 0 ? "rose" : "fell",
+      by: one(Math.abs(delta)),
+      undone: delta < 0 && undone > 0,
+    },
+    noScore: false,
+  };
 };
 
-/** A banner in the console's words; ally-be's sentence only for a kind this build doesn't know. */
-export const bannerText = (b: Banner): string => {
-  const t = en.debriefs.home.banners;
-  const n = b.count ?? 1;
-  const waited = b.oldestSince ? waitedFor(b.oldestSince) : null;
-  switch (b.kind) {
-    case "urgent":
-      return t.urgent(n, waited);
-    case "held":
-      return t.held(n, waited, !!b.overdue);
-    case "escalated":
-      return t.escalated(n);
-    case "canary_reverted":
-      return t.reverted(n);
-    case "approval_expiring":
-      return t.expiring(n);
-    case "agent_off":
-      return t.off;
-    case "cap":
-      return t.cap(b.level === "red");
-    case "provider_down":
-      return t.provider;
-    case "language_not_recorded":
-      return t.language;
-    case "release_waiting":
-      return t.releaseWaiting(n);
-    default:
-      return b.message;
-  }
+/** "steady", "up 0.3", "down 0.4": this week against last week, to one decimal. */
+export const scoreTrend = (score: number | null, last: number | null): string | null => {
+  const t = en.debriefs.v2.home;
+  if (score === null || last === null) return null;
+  const d = Math.round((score - last) * 10) / 10;
+  if (d === 0) return t.steady;
+  return d > 0 ? t.up(one(d)) : t.down(one(-d));
 };
 
-const BANNER_ACTION: Record<string, keyof typeof en.debriefs.home.bannerActions> = {
-  session: "open",
-  home: "show",
-  pm_agent: "answer",
-  settings: "settings",
-  analytics: "analytics",
+const STATE_DOT: Record<ChangeState, string> = {
+  waits: "bg-[#F1C21B]",
+  trying: "bg-primary-500",
+  testing: "bg-primary-500",
+  building: "bg-[#8A3FFC]",
+  live: "bg-success-500",
+  undone: "bg-neutral-500",
+  stopped: "bg-neutral-500",
+  turned_down: "bg-neutral-500",
+};
+
+const Headline: React.FC<{ home: DebriefHomeV2; margin: number }> = ({ home, margin }) => {
+  const t = en.debriefs.v2.home;
+  const head = homeHeadline(home.headline, home.thisWeek.undone, margin);
+  return (
+    <p
+      className="m-0 max-w-[980px] text-[22px] font-light leading-snug text-typography-900"
+      data-testid="home-headline"
+    >
+      {head.score ? (
+        <>
+          <Link
+            to={analyticsDebriefsPath()}
+            title={t.overallScoreHelp}
+            className="text-primary-500"
+            data-testid="home-headline-score"
+          >
+            {t.overallScore}
+          </Link>
+          {t.moved(head.score.dir, head.score.by)}
+          {head.score.undone ? t.movedUndone : ""}
+        </>
+      ) : head.noScore ? (
+        t.noScore
+      ) : (
+        t.healthy
+      )}
+      {t.and}
+      <b className="font-semibold">{t.needsYou(home.headline.needsYou)}</b>
+    </p>
+  );
+};
+
+const NeedsYou: React.FC<{
+  home: DebriefHomeV2;
+  openId: string | null;
+  onOpen: (id: string | null) => void;
+  advisor: boolean;
+}> = ({ home, openId, onOpen, advisor }) => {
+  const t = en.debriefs.v2.home;
+  if (home.needsYou.length === 0) return null;
+  return (
+    <section
+      aria-labelledby="home-needs"
+      className="flex flex-col gap-2.5 border-t-[3px] border-[#F1C21B] bg-neutral-50 px-5 py-[18px]"
+      data-testid="home-needs-you"
+    >
+      <h2 id="home-needs" className="m-0 text-base font-semibold">
+        {advisor
+          ? t.advisorNeedsHeading(home.needsYou.length)
+          : t.needsHeading(home.needsYou.length)}
+      </h2>
+      {home.needsYou.map(n => (
+        <NeedsYouItem
+          key={n.changeId}
+          item={n}
+          open={openId === n.changeId}
+          onToggle={o => onOpen(o ? n.changeId : null)}
+        />
+      ))}
+    </section>
+  );
+};
+
+const ThisWeek: React.FC<{ home: DebriefHomeV2 }> = ({ home }) => {
+  const t = en.debriefs.v2.home;
+  const w = home.thisWeek;
+  const trend = scoreTrend(w.score, home.headline.lastWeekScore);
+  return (
+    <details className="bg-neutral-50" data-testid="home-this-week">
+      <summary className="cursor-pointer px-[18px] py-3 text-sm text-typography-900">
+        {t.thisWeek(w.score === null ? null : one(w.score), trend, w.wentLive, w.undone)}
+      </summary>
+      <div className="flex flex-col gap-2 px-[18px] pb-3.5 text-sm">
+        {w.changes.length === 0 ? (
+          <p className="m-0 text-neutral-600">{t.noChanges}</p>
+        ) : (
+          w.changes.map(c => (
+            <Link
+              key={c.id}
+              to={changesPath(c.id)}
+              className="flex min-w-0 flex-nowrap items-center gap-2 text-typography-900 no-underline"
+              data-testid="home-week-change"
+            >
+              <span
+                aria-hidden="true"
+                className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[c.state] ?? "bg-neutral-500"}`}
+              />
+              <span className="min-w-0 truncate">
+                {[
+                  c.title,
+                  (en.debriefs.v2.changes.state[c.state] ?? c.state).toLowerCase(),
+                  c.result,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </Link>
+          ))
+        )}
+        <div className="text-[13px]">
+          <Link to={changesPath()}>{t.allChanges}</Link> ·{" "}
+          <Link to={analyticsDebriefsPath()}>{t.whatMakesScore}</Link>
+        </div>
+      </div>
+    </details>
+  );
 };
 
 /**
- * The Debriefs home (redesign 2026-11-12): every debriefed session as a card, by category, the
- * queue of what needs a person first. Opening one goes to its session page.
+ * The Debriefs home (v2, U1): the headline sentence first; "Needs you" for the always-ask changes
+ * only; "This week" and the PM agent conversation as accordions, closed; then every debrief by
+ * day. No review queue, no status pills: a debrief carries only "⚑ Flagged by the learner" and
+ * its Quality score.
  */
 export const DebriefsHome: React.FC = () => {
   const h = en.debriefs.home;
+  const t = en.debriefs.v2.home;
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [polling, setPolling] = useState(false);
-  // More filters starts open when one of the filters behind it is set, so a shared link shows it.
   const [moreOpen, setMoreOpen] = useState(() =>
     ["fallback", "riskCue", "cost"].some(k => params.get(k)),
   );
-  const attention = useGetDebriefAttentionQuery(undefined, { pollingInterval: 60_000 });
-  // The access before the list has said: the attention payload, then the user's permissions.
-  const preAccess = useDebriefAccess(attention.data?.viewer);
-  const allowedBefore = categoriesFor({
-    escalations: preAccess.receivesEscalations,
-    verdict: preAccess.verdict,
-    team: !blindToChecks(preAccess),
-  });
-  const { cat, filters, list } = readHomeState(
-    params,
-    [...allowedBefore, "escalated", "agreement"],
-    defaultCategory(preAccess),
-  );
-  // Fresh on every visit, and every 15 s while a debrief is being written.
-  const sessions = useGetDebriefSessionsQuery(sessionsQuery(cat, filters), {
+  const home = useGetDebriefHomeQuery(undefined, { pollingInterval: 60_000 });
+  const settings = useGetDebriefSettingsQuery();
+  const rawMargin = settings.data?.values.undoMargin;
+  const margin = typeof rawMargin === "number" ? rawMargin : DEFAULT_UNDO_MARGIN;
+  const { filters, list } = readHomeState(params, ["all"], "all");
+  const sessions = useGetDebriefSessionsQuery(sessionsQuery("all", filters), {
     refetchOnMountOrArgChange: true,
     pollingInterval: polling ? 15_000 : 0,
   });
   const page = sessions.data;
-  const access = useDebriefAccess(page?.viewer ?? attention.data?.viewer);
-  // Blind to the checks until their verdict (the clinical advisor): no hint of the result.
-  const blind = blindToChecks(access);
+  const access = useDebriefAccess(page?.viewer);
+  // The Ally team and the owner run the PM agent; the clinical advisor only answers the pinned-rule
+  // changes in Needs you (ally-be sends them only those), so gets no Changes or PM agent here.
+  const team = access.pmAgent;
+  const openChange = params.get("change");
+  // A link to a change that no longer waits for a person moves on to Changes (team and owner).
+  useEffect(() => {
+    if (!openChange || !home.data || !team) return;
+    if (!home.data.needsYou.some(n => n.changeId === openChange)) {
+      navigate(changesPath(openChange), { replace: true });
+    }
+  }, [openChange, home.data, team, navigate]);
   const anyRunning = !!page?.items.some(r => r.status === "running" || r.status === "queued");
   if (anyRunning !== polling) setPolling(anyRunning);
-  const [escalate] = useEscalateDebriefMutation();
-
-  const categories = useMemo(
-    () =>
-      categoriesFor({
-        escalations: access.receivesEscalations,
-        verdict: access.verdict,
-        team: !blind,
-      }),
-    [access.receivesEscalations, access.verdict, blind],
-  );
 
   const set = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -212,25 +283,10 @@ export const DebriefsHome: React.FC = () => {
     setParams(next, { replace: true });
   };
 
-  // ally-be sends the queue in order; it is kept in that order whatever the transport did.
-  const shown = useMemo(() => {
-    const items = page?.items ?? [];
-    return cat === "needs" || cat === "escalated" ? queueOrder(items) : items;
-  }, [page, cat]);
-  const queue = cat === "needs" || cat === "escalated";
-  const queueNote = queueNoteFor(cat, blind, { team: h.queueNote, blind: h.queueNoteBlind });
-  const groups = queue
-    ? shown.length
-      ? [{ label: h.inOrder, items: shown }]
-      : []
-    : groupByDay(shown, { today: h.today, yesterday: h.yesterday });
+  const shown = useMemo(() => page?.items ?? [], [page]);
+  const groups = groupByDay(shown, { today: h.today, yesterday: h.yesterday });
 
-  // j / k move through what is shown, Enter opens it, e escalates it (the Ally team only).
-  // One "Show" dropdown instead of a row of buttons (design B1, 2026-11-13): each view with its count.
-  const categoryItems: Item[] = categories.map(c => {
-    const n = categoryCount(page?.counts, c);
-    return { id: c, label: n == null ? h.categories[c] : `${h.categories[c]} (${n})` };
-  });
+  // j / k move through what is shown, Enter opens it.
   const [selected, setSelected] = useState(0);
   if (selected >= shown.length && selected !== Math.max(0, shown.length - 1)) {
     setSelected(Math.max(0, shown.length - 1));
@@ -253,19 +309,13 @@ export const DebriefsHome: React.FC = () => {
       } else if (e.key === "Enter") {
         e.preventDefault();
         navigate(sessionLink(current.runId, params));
-      } else if (e.key === "e" && access.escalate && current.needsPerson && !current.escalated) {
-        e.preventDefault();
-        escalate({ kind: "runs", id: current.runId })
-          .unwrap()
-          .then(() => toast.success(en.debriefs.review.escalatedDone))
-          .catch(err => toast.error(getErrorMessage(err, en.debriefs.review.failed)));
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [shown, selected, navigate, params, access.escalate, escalate]);
+  }, [shown, selected, navigate, params]);
 
-  const needsYou = attention.data?.counts.pmAgentNeedsYou ?? 0;
+  const needsYou = home.data?.headline.needsYou ?? 0;
   const options = page?.filterOptions;
   const opts = (key: keyof typeof h.filters, more: Item[]): Item[] => [
     { id: "", label: h.filters[key].all },
@@ -283,7 +333,7 @@ export const DebriefsHome: React.FC = () => {
       key: "tenantId",
       options: opts(
         "org",
-        (options?.tenants ?? []).map(t => ({ id: t.id, label: t.name })),
+        (options?.tenants ?? []).map(o => ({ id: o.id, label: o.name })),
       ),
     },
     {
@@ -357,57 +407,73 @@ export const DebriefsHome: React.FC = () => {
         <h1 className="font-secondary text-[32px] font-normal leading-tight text-typography-900">
           {en.debriefs.title}
         </h1>
-        <p className="text-[15px] text-neutral-600">{h.intro}</p>
+        {home.data && !team ? (
+          <p
+            className="m-0 max-w-[980px] text-[22px] font-light leading-snug text-typography-900"
+            data-testid="home-headline"
+          >
+            <b className="font-semibold">{t.advisorHeadline(home.data.needsYou.length)}</b>
+          </p>
+        ) : home.data ? (
+          <Headline home={home.data} margin={margin} />
+        ) : home.isError ? (
+          <p className="m-0 text-sm text-neutral-700" data-testid="home-summary-error">
+            {t.loadFailed}{" "}
+            <button
+              type="button"
+              className="text-primary-500 underline"
+              onClick={() => void home.refetch()}
+            >
+              {en.debriefs.v2.conversation.retry}
+            </button>
+          </p>
+        ) : (
+          <LoadingBlock lines={1} />
+        )}
       </header>
 
-      {(attention.data?.banners ?? []).map((b, i) => (
-        <AlertBanner
-          key={`${b.kind}-${i}`}
-          kind={b.level === "red" ? "error" : "warning"}
-          testId={`home-banner-${b.kind}`}
-          action={
-            <Link
-              to={bannerHref(b)}
-              className={
-                b.level === "red" && b.link.page === "session"
-                  ? "inline-flex h-9 items-center rounded-sm bg-destructive-500 px-3.5 text-sm font-semibold text-white no-underline"
-                  : "text-sm font-semibold"
-              }
+      {home.data && (
+        <div className="flex flex-col gap-4">
+          <NeedsYou
+            home={home.data}
+            openId={openChange}
+            onOpen={id => set({ change: id })}
+            advisor={!team}
+          />
+          {team && <ThisWeek home={home.data} />}
+          {team && (
+            <details
+              id="pm"
+              className="rounded-sm border border-neutral-100"
+              data-testid="home-pm-accordion"
             >
-              {
-                h.bannerActions[
-                  b.kind === "release_waiting" ? "releases" : (BANNER_ACTION[b.link.page] ?? "show")
-                ]
-              }
-            </Link>
-          }
-        >
-          {bannerText(b)}
-        </AlertBanner>
-      ))}
+              <summary className="cursor-pointer px-[18px] py-3 text-sm">
+                <b>{en.debriefs.v2.conversation.heading}</b> ·{" "}
+                {t.pmSummary(home.data.needsYou[0]?.title ?? null)}
+              </summary>
+              <PmConversation
+                testId="home-pm"
+                className="border-t border-neutral-100"
+                about={{ kind: "page", id: "home", label: t.lookingAt }}
+                placeholder={en.debriefs.v2.conversation.placeholderHome}
+                suggestions={en.debriefs.v2.conversation.suggestions.page}
+                headerAction={
+                  <Link to={changesPath()} className="text-[13px]">
+                    {t.openWithChanges}
+                  </Link>
+                }
+              />
+            </details>
+          )}
+        </div>
+      )}
 
-      {/* One row at lg and up: Show, then layout, PM agent and Analytics; Settings goes in More.
-          Below lg the actions take a second row, on purpose (design B1, 2026-11-13). */}
+      {/* One row at lg and up: layout, Changes and Analytics; Settings goes in More. Below lg the
+          actions take a second row, on purpose. */}
       <div
         className="flex flex-col gap-3 min-[1056px]:flex-row min-[1056px]:flex-nowrap min-[1056px]:items-center"
         data-testid="home-toolbar"
       >
-        <div className="min-w-[16rem] lg:shrink-0" data-testid="home-category">
-          <Dropdown
-            id="debriefs-category"
-            type="inline"
-            size="md"
-            titleText={h.showLabel}
-            label={h.showLabel}
-            items={categoryItems}
-            selectedItem={categoryItems.find(o => o.id === cat) ?? categoryItems[0]}
-            itemToString={(o: Item | null) => o?.label ?? ""}
-            onChange={({ selectedItem }: { selectedItem: Item | null }) => {
-              const c = (selectedItem?.id ?? defaultCategory(preAccess)) as typeof cat;
-              set({ cat: c === defaultCategory(preAccess) ? null : c });
-            }}
-          />
-        </div>
         <div className="hidden min-w-0 flex-1 lg:block" />
         <div className="flex flex-nowrap items-center gap-3" data-testid="home-actions">
           <div
@@ -451,34 +517,40 @@ export const DebriefsHome: React.FC = () => {
               </button>
             ))}
           </div>
-          <Link
-            to={pmAgentPath()}
-            data-testid="pm-agent-button"
-            className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
-          >
-            {h.pmAgent}
-            {needsYou > 0 && (
-              <span
-                aria-label={h.needsYouCount(needsYou)}
-                data-testid="pm-needs-you"
-                className="rounded-full bg-primary-500 px-[7px] py-px text-[11px] font-semibold text-white"
-              >
-                {needsYou}
-              </span>
-            )}
-          </Link>
-          <Link
-            to={analyticsDebriefsPath()}
-            data-testid="analytics-button"
-            className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
-          >
-            <BarChart3 aria-hidden="true" className="h-4 w-4" />
-            {h.analytics}
-          </Link>
-          <MoreActions
-            testId="home-more"
-            items={[{ id: "settings", label: h.settings, to: settingsPath() }]}
-          />
+          {team && (
+            <Link
+              to={changesPath()}
+              data-testid="changes-button"
+              className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
+            >
+              {t.changes}
+              {needsYou > 0 && (
+                <span
+                  aria-label={h.needsYouCount(needsYou)}
+                  data-testid="changes-needs-you"
+                  className="rounded-full bg-primary-500 px-[7px] py-px text-[11px] font-semibold text-white"
+                >
+                  {needsYou}
+                </span>
+              )}
+            </Link>
+          )}
+          {team && (
+            <Link
+              to={analyticsDebriefsPath()}
+              data-testid="analytics-button"
+              className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
+            >
+              <BarChart3 aria-hidden="true" className="h-4 w-4" />
+              {h.analytics}
+            </Link>
+          )}
+          {team && (
+            <MoreActions
+              testId="home-more"
+              items={[{ id: "settings", label: h.settings, to: settingsPath() }]}
+            />
+          )}
         </div>
       </div>
 
@@ -498,7 +570,7 @@ export const DebriefsHome: React.FC = () => {
             testId="home-more-filters-button"
           />
           <div className="hidden min-w-0 flex-1 sm:block" />
-          <KeyboardHint keys={access.escalate ? h.keys : h.keysNoEscalate} testId="home-keys" />
+          <KeyboardHint keys={h.keysNoEscalate} testId="home-keys" />
         </div>
         {moreOpen && (
           <div
@@ -516,12 +588,6 @@ export const DebriefsHome: React.FC = () => {
         />
       </div>
 
-      {queueNote && shown.length > 0 && (
-        <p className="text-sm text-neutral-700" data-testid="queue-note">
-          {queueNote}
-        </p>
-      )}
-
       {sessions.isError && !page ? (
         <ErrorPanel
           forbiddenMessage={en.debriefs.noAccess}
@@ -532,10 +598,7 @@ export const DebriefsHome: React.FC = () => {
       ) : !page ? (
         <LoadingBlock lines={6} />
       ) : shown.length === 0 ? (
-        <EmptyPanel
-          title={((blind && h.emptyBlind[cat]) || h.empty[cat]).title}
-          message={((blind && h.emptyBlind[cat]) || h.empty[cat]).message}
-        />
+        <EmptyPanel title={t.empty.title} message={t.empty.message} />
       ) : (
         <div ref={listRef} className="flex flex-col gap-5" data-testid="home-list">
           {groups.map(g => (

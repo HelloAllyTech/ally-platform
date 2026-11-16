@@ -149,6 +149,8 @@ export enum LlmTask {
   DEBRIEF_REFLECTION_CHECK = 'debrief_reflection_check',
   // The debrief PM agent's daily analysis; learning budget, never production.
   DEBRIEF_PM_AGENT = 'debrief_improver',
+  /** V2_AUTONOMY F1: the Debrief agent answering a learner's flag on a card. */
+  DEBRIEF_FLAG_ANSWER = 'debrief_flag_answer',
   // Thinking-filler judge in ally-ai: scores whether a filler sounded like the
   // character and fitted the turn. Its own label rather than folded into
   // LANGUAGE_JUDGE because it runs on a different cadence over a different
