@@ -1341,7 +1341,7 @@
 .ally-switcher {
   position: relative;
 }
-.ally-switcher__button {
+button.ally-switcher__button {
   display: inline-grid;
   place-items: center;
   width: 36px;
@@ -1352,17 +1352,17 @@
   color: var(--ally-muted);
   cursor: pointer;
 }
-.ally-switcher__button::after {
+button.ally-switcher__button::after {
   content: "";
   position: absolute;
   inset: -4px;
 }
-.ally-switcher__button:hover,
-.ally-switcher__button[aria-expanded="true"] {
+button.ally-switcher__button:hover,
+button.ally-switcher__button[aria-expanded="true"] {
   color: var(--ally-ink);
   background: var(--ally-sunken);
 }
-.ally-switcher__button:focus-visible {
+button.ally-switcher__button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 4px var(--ally-accent-soft);
   border-color: var(--ally-accent);
@@ -1383,11 +1383,11 @@
   transform: translateX(-50%);
   transition: opacity 0.15s var(--ally-ease);
 }
-.ally-switcher__button:hover + .ally-switcher__tip,
-.ally-switcher__button:focus-visible + .ally-switcher__tip {
+button.ally-switcher__button:hover + .ally-switcher__tip,
+button.ally-switcher__button:focus-visible + .ally-switcher__tip {
   opacity: 1;
 }
-.ally-switcher__button[aria-expanded="true"] + .ally-switcher__tip {
+button.ally-switcher__button[aria-expanded="true"] + .ally-switcher__tip {
   opacity: 0;
 }
 .ally-switcher__pop {
@@ -1407,7 +1407,7 @@
   padding: 0;
   list-style: none;
 }
-.ally-switcher__item {
+button.ally-switcher__item {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1422,12 +1422,12 @@
   text-align: left;
   cursor: pointer;
 }
-.ally-switcher__item:hover,
-.ally-switcher__item:focus-visible {
+button.ally-switcher__item:hover,
+button.ally-switcher__item:focus-visible {
   outline: none;
   background: var(--ally-sunken);
 }
-.ally-switcher__item[aria-current="true"] {
+button.ally-switcher__item[aria-current="true"] {
   background: var(--ally-accent-soft);
 }
 .ally-switcher__name {
@@ -1472,4 +1472,11 @@
 }
 .ally-how__never-note {
   margin: 6px 0 0;
+}
+
+/* The switcher's items are the shared Button (after #267): left-aligned, wrapping. */
+button.ally-switcher__item {
+  justify-content: flex-start;
+  align-items: flex-start;
+  white-space: normal;
 }

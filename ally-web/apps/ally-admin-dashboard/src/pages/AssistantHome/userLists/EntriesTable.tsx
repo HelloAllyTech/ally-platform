@@ -7,7 +7,10 @@ import {
   useLazyGetListEntriesQuery,
   useRestoreListEntryMutation,
 } from "@api";
-import { Button, Select, Skeleton, StatusPill } from "@components/v2";
+import { Button } from "@components/button";
+import { Input } from "@components/input";
+import { ButtonVariant } from "@components/types";
+import { Select, Skeleton, StatusPill } from "@components/v2";
 import type { Chatbot, ListEntry, ListField, ListFilter, ListRefusal, UserList } from "@types";
 
 import { HOME, fill } from "../copy";
@@ -115,7 +118,7 @@ export const EntriesTable: React.FC<{
           <label className="sr-only" htmlFor={`search-${list.key}`}>
             {fill(t().table.search, { list: list.name })}
           </label>
-          <input
+          <Input
             id={`search-${list.key}`}
             className="ally-input"
             type="search"
@@ -127,7 +130,12 @@ export const EntriesTable: React.FC<{
       )}
       {choices.length > 0 &&
         (phone ? (
-          <Button onClick={() => setFiltersOpen(true)} aria-haspopup="dialog">
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            aria-haspopup="dialog"
+          >
             {t().table.filters}
             {Object.values(filters).filter(Boolean).length
               ? ` · ${Object.values(filters).filter(Boolean).length}`
@@ -144,9 +152,17 @@ export const EntriesTable: React.FC<{
           ))
         ))}
       <div className="ally-lists__toolbar-actions">
-        {canEdit && dated && <Button onClick={() => setRepeating(true)}>{t().repeat.open}</Button>}
+        {canEdit && dated && (
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => setRepeating(true)}>
+            {t().repeat.open}
+          </Button>
+        )}
         {canEdit && (
-          <Button variant="primary" onClick={() => setEditing({ kind: "add" })}>
+          <Button
+            variant={ButtonVariant.PRIMARY}
+            type="button"
+            onClick={() => setEditing({ kind: "add" })}
+          >
             {t().table.add}
           </Button>
         )}
@@ -161,14 +177,18 @@ export const EntriesTable: React.FC<{
     body = (
       <div className="ally-lists__problem" role="alert">
         <p>{t().table.loadFailed}</p>
-        <Button onClick={() => void first.refetch()}>{t().table.retry}</Button>
+        <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => void first.refetch()}>
+          {t().table.retry}
+        </Button>
       </div>
     );
   } else if (!entries.length && narrowed) {
     body = (
       <div className="ally-lists__nothing" role="status">
         <p>{search ? fill(t().table.noMatch, { query: search }) : t().table.noMatchFilters}</p>
-        <Button onClick={clear}>{t().table.clear}</Button>
+        <Button variant={ButtonVariant.TERTIARY} type="button" onClick={clear}>
+          {t().table.clear}
+        </Button>
       </div>
     );
   } else if (!entries.length) {
@@ -178,10 +198,22 @@ export const EntriesTable: React.FC<{
         <p className="ally-small">{dated ? t().table.emptyDated : t().table.emptyBody}</p>
         {canEdit && (
           <div className="ally-btn-row">
-            <Button variant="primary" onClick={() => setEditing({ kind: "add" })}>
+            <Button
+              variant={ButtonVariant.PRIMARY}
+              type="button"
+              onClick={() => setEditing({ kind: "add" })}
+            >
               {t().table.add}
             </Button>
-            {dated && <Button onClick={() => setRepeating(true)}>{t().repeat.open}</Button>}
+            {dated && (
+              <Button
+                variant={ButtonVariant.TERTIARY}
+                type="button"
+                onClick={() => setRepeating(true)}
+              >
+                {t().repeat.open}
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -216,9 +248,10 @@ export const EntriesTable: React.FC<{
                       : "none";
                 return (
                   <th key={field.key} scope="col" aria-sort={active}>
-                    <button
+                    <Button
+                      variant={ButtonVariant.TEXT}
                       type="button"
-                      className="ally-lists__sort"
+                      className="ally-lists__sort !h-auto"
                       aria-label={fill(t().table.sortBy, { detail: lower(field.label) })}
                       onClick={() =>
                         setSort(s =>
@@ -234,7 +267,7 @@ export const EntriesTable: React.FC<{
                       <span aria-hidden="true" className="ally-lists__sort-mark">
                         {active === "ascending" ? "↑" : active === "descending" ? "↓" : ""}
                       </span>
-                    </button>
+                    </Button>
                   </th>
                 );
               })}
@@ -256,7 +289,9 @@ export const EntriesTable: React.FC<{
                 ))}
                 <td className="ally-lists__row-actions">
                   <Button
-                    variant="ghost"
+                    variant={ButtonVariant.TEXT}
+                    size="sm"
+                    type="button"
                     aria-label={fill(t().table.edit, { title: titleOf(list, entry) })}
                     onClick={() => setEditing({ kind: "edit", entry })}
                   >
@@ -264,7 +299,8 @@ export const EntriesTable: React.FC<{
                   </Button>
                   {canEdit && (
                     <Button
-                      variant="ghost"
+                      variant={ButtonVariant.ICON}
+                      type="button"
                       className="ally-lists__delete"
                       aria-label={fill(t().table.delete, { title: titleOf(list, entry) })}
                       onClick={() => setRemoving(entry)}
@@ -295,7 +331,12 @@ export const EntriesTable: React.FC<{
             {fill(t().table.showing, { shown: entries.length, total })}
           </span>
           {cursor && (
-            <Button onClick={() => void showMore()} disabled={moreState.isFetching}>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              onClick={() => void showMore()}
+              disabled={moreState.isFetching}
+            >
               {t().table.more}
             </Button>
           )}
@@ -341,7 +382,13 @@ export const EntriesTable: React.FC<{
           <div className="ally-lists__sheet">
             <div className="ally-home__panel-head">
               <h2 className="ally-heading ally-home__panel-title">{t().repeat.title}</h2>
-              <Button onClick={() => setRepeating(false)}>{t().form.close}</Button>
+              <Button
+                variant={ButtonVariant.TERTIARY}
+                type="button"
+                onClick={() => setRepeating(false)}
+              >
+                {t().form.close}
+              </Button>
             </div>
             <RepeatWeekly
               bot={bot}
@@ -359,7 +406,13 @@ export const EntriesTable: React.FC<{
           <div className="ally-lists__sheet">
             <div className="ally-home__panel-head">
               <h2 className="ally-heading ally-home__panel-title">{t().table.filters}</h2>
-              <Button onClick={() => setFiltersOpen(false)}>{t().form.close}</Button>
+              <Button
+                variant={ButtonVariant.TERTIARY}
+                type="button"
+                onClick={() => setFiltersOpen(false)}
+              >
+                {t().form.close}
+              </Button>
             </div>
             {choices.map(field => (
               <FilterSelect
@@ -370,7 +423,9 @@ export const EntriesTable: React.FC<{
                 onChange={value => setFilters(f => ({ ...f, [field.key]: value }))}
               />
             ))}
-            <Button onClick={() => setFilters({})}>{t().table.clearFilters}</Button>
+            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => setFilters({})}>
+              {t().table.clearFilters}
+            </Button>
           </div>
         </Sheet>
       )}
@@ -431,7 +486,12 @@ const EntryCard: React.FC<{
   const rest = fields.filter(f => f.key !== titleKey).slice(0, 3);
   return (
     <li>
-      <button type="button" className="ally-lists__card ally-press" onClick={onOpen}>
+      <Button
+        variant={ButtonVariant.TEXT}
+        type="button"
+        className="ally-lists__card ally-press !h-auto"
+        onClick={onOpen}
+      >
         <span className="ally-lists__card-title">{titleOf(list, entry)}</span>
         {entry.created_by?.kind === "agent" && (
           <span className="ally-lists__by-assistant">{t().table.byAssistant}</span>
@@ -446,7 +506,7 @@ const EntryCard: React.FC<{
             </div>
           ))}
         </dl>
-      </button>
+      </Button>
     </li>
   );
 };
@@ -490,7 +550,8 @@ const RemoveEntry: React.FC<{
         <div className="ally-btn-row">
           {!refusal && (
             <Button
-              className="ally-btn--danger"
+              variant={ButtonVariant.DESTRUCTIVE}
+              type="button"
               disabled={isLoading}
               onClick={async () => {
                 setFailed(false);
@@ -508,7 +569,9 @@ const RemoveEntry: React.FC<{
               {t().remove.confirm}
             </Button>
           )}
-          <Button onClick={onClose}>{t().remove.keep}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+            {t().remove.keep}
+          </Button>
         </div>
       </div>
     </Sheet>

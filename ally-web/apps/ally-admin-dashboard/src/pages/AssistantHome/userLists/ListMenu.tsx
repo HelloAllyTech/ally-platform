@@ -5,7 +5,9 @@ import {
   useRestoreUserListMutation,
   useUpdateUserListMutation,
 } from "@api";
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { Input } from "@components/input";
+import { ButtonVariant } from "@components/types";
 import type { UserList } from "@types";
 
 import { HOME, fill } from "../copy";
@@ -88,7 +90,7 @@ const RenameDialog: React.FC<{ botId: string; list: UserList; onClose: () => voi
         <h2 className="ally-heading">{title}</h2>
         <label className="ally-field">
           <span className="ally-field__label">{t().name}</span>
-          <input
+          <Input
             className="ally-input"
             value={name}
             maxLength={60}
@@ -102,8 +104,10 @@ const RenameDialog: React.FC<{ botId: string; list: UserList; onClose: () => voi
           </p>
         )}
         <div className="ally-remove__actions">
-          <Button onClick={onClose}>{t().cancel}</Button>
-          <Button variant="primary" type="submit" disabled={isLoading}>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+            {t().cancel}
+          </Button>
+          <Button variant={ButtonVariant.PRIMARY} type="submit" disabled={isLoading}>
             {t().save}
           </Button>
         </div>
@@ -203,9 +207,12 @@ const DeleteDialog: React.FC<{
           </p>
         )}
         <div className="ally-remove__actions">
-          <Button onClick={onClose}>{t().keep}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+            {t().keep}
+          </Button>
           <Button
-            variant="primary"
+            variant={ButtonVariant.PRIMARY}
+            type="button"
             className="ally-remove__confirm"
             disabled={isLoading}
             onClick={() => void confirm()}

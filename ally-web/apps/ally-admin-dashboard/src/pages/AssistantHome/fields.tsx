@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useState } from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { HOME, fill } from "./copy";
 import { HelpToggle } from "./ui/Help";
@@ -181,7 +182,13 @@ export const LinesField: React.FC<{
       ))}
       {!disabled && lines.length < max && (
         <div>
-          <Button onClick={() => update([...lines, ""])}>{addLabel}</Button>
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            type="button"
+            onClick={() => update([...lines, ""])}
+          >
+            {addLabel}
+          </Button>
         </div>
       )}
       <FieldError id={`${id}-error`} error={field.error} />
@@ -217,9 +224,10 @@ export const CollapsibleGroup: React.FC<{
   return (
     <section className="ally-card ally-home__group ally-collapsible" data-testid={testId}>
       <h3 className="ally-home__group-title">
-        <button
+        <Button
+          variant={ButtonVariant.TEXT}
           type="button"
-          className="ally-collapsible__toggle"
+          className="ally-collapsible__toggle !h-auto"
           aria-expanded={open}
           aria-controls={`${id}-body`}
           onClick={() => setOpen(o => !o)}
@@ -241,7 +249,7 @@ export const CollapsibleGroup: React.FC<{
               strokeLinecap="round"
             />
           </svg>
-        </button>
+        </Button>
       </h3>
       <div id={`${id}-body`} hidden={!open} className="ally-collapsible__body">
         {hint && <p className="ally-field__hint">{hint}</p>}

@@ -7,7 +7,10 @@ import {
   useUpdateListFieldMutation,
   useUpdateUserListMutation,
 } from "@api";
-import { Button, Select, Switch } from "@components/v2";
+import { Button } from "@components/button";
+import { Input } from "@components/input";
+import { ButtonVariant } from "@components/types";
+import { Select, Switch } from "@components/v2";
 import type { ListField, ListFieldType, UserList } from "@types";
 
 import { HOME, fill } from "../copy";
@@ -121,7 +124,8 @@ export const DetailsBlock: React.FC<{
               </div>
               {canEdit && (
                 <div className="ally-details__actions">
-                  <button
+                  <Button
+                    variant={ButtonVariant.ICON}
                     type="button"
                     className="ally-icon-btn"
                     aria-label={fill(t().details.up, { detail: field.label })}
@@ -129,8 +133,9 @@ export const DetailsBlock: React.FC<{
                     onClick={() => void move(field, -1)}
                   >
                     ↑
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant={ButtonVariant.ICON}
                     type="button"
                     className="ally-icon-btn"
                     aria-label={fill(t().details.down, { detail: field.label })}
@@ -138,9 +143,10 @@ export const DetailsBlock: React.FC<{
                     onClick={() => void move(field, 1)}
                   >
                     ↓
-                  </button>
+                  </Button>
                   <Button
-                    variant="ghost"
+                    variant={ButtonVariant.TEXT}
+                    type="button"
                     aria-label={fill(t().details.edit, { detail: field.label })}
                     onClick={() => setEditing(field.key)}
                   >
@@ -170,7 +176,7 @@ export const DetailsBlock: React.FC<{
       )}
       {canEdit && editing === null && (
         <div>
-          <Button onClick={() => setEditing("")}>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => setEditing("")}>
             <span aria-hidden="true">+ </span>
             {t().details.add}
           </Button>
@@ -300,7 +306,7 @@ const DetailEditor: React.FC<{
     <form className="ally-details__editor" onSubmit={save}>
       <div className="ally-field">
         <label htmlFor={`detail-name-${field?.key ?? "new"}`}>{d.name}</label>
-        <input
+        <Input
           ref={name}
           id={`detail-name-${field?.key ?? "new"}`}
           className="ally-input"
@@ -339,18 +345,19 @@ const DetailEditor: React.FC<{
             {draft.values.map(value => (
               <span key={value} className="ally-choice">
                 {human(value)}
-                <button
+                <Button
+                  variant={ButtonVariant.TEXT}
                   type="button"
                   aria-label={fill(d.removeChoice, { value: human(value) })}
                   onClick={() => set({ values: draft.values.filter(v => v !== value) })}
                 >
                   ×
-                </button>
+                </Button>
               </span>
             ))}
           </div>
           <div className="ally-details__add-choice">
-            <input
+            <Input
               className="ally-input"
               aria-label={d.addChoice}
               placeholder={d.addChoice}
@@ -366,6 +373,8 @@ const DetailEditor: React.FC<{
               }}
             />
             <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
               onClick={() => {
                 const v = choice.trim();
                 if (v && !draft.values.includes(v)) set({ values: [...draft.values, v] });
@@ -428,14 +437,20 @@ const DetailEditor: React.FC<{
         </p>
       )}
       <div className="ally-btn-row">
-        <Button variant="primary" type="submit" disabled={busy || !draft.label.trim()}>
+        <Button
+          variant={ButtonVariant.PRIMARY}
+          type="submit"
+          disabled={busy || !draft.label.trim()}
+        >
           {busy ? t().form.saving : d.save}
         </Button>
-        <Button onClick={onDone}>{d.cancel}</Button>
+        <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onDone}>
+          {d.cancel}
+        </Button>
         {field && (
           <Button
-            variant="ghost"
-            className="ally-btn--danger"
+            variant={ButtonVariant.DESTRUCTIVE}
+            type="button"
             onClick={() => void remove()}
             disabled={busy}
           >

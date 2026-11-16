@@ -1,5 +1,6 @@
 # Ally design system (v2 owner and visitor screens)
 
+> **Admin vs visitor skin (2026-11-16).** The admin screens (`.ally-v2`: list, home, settings, onboarding, Look and feel) now wear Carbon white and IBM Plex Serif, like the rest of the dashboard: the `.ally-v2` block in `components/v2/core/tokens.css` overrides the values below. The palette, type and radii in this file still describe the visitor surfaces (`.brand-surface`: bot page, landing page).
 > Applies to everything new in Agents v2 that owners or visitors see: onboarding (`/chatbots/new`), the assistant's home, Checkup, Look and feel, the bot page (`/b/<slug>`) and the landing page. The rest of the admin dashboard keeps its current look until it's touched.
 > The reference mockups are the canvas "Ally Assistant Design" (six screens: 01 onboarding, 02 bot page, 03 assistant home, 04 checkup, 05 landing page, 06 look and feel). Screenshots of them are in `docs/agents-v2/design/`, named by those numbers. When this file and a screenshot disagree, **this file wins**; when this file is silent, match the screenshot.
 > Copy is in `ONBOARDING-COPY.md`. Never invent owner-facing text; add new strings there in the same commit.

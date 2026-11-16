@@ -9,7 +9,9 @@ import {
   useGetPersonMemoryQuery,
   type MemoryLine,
 } from "@api";
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { Input } from "@components/input";
+import { ButtonVariant } from "@components/types";
 
 import { INBOX, fill } from "./copy";
 import { Sheet } from "../AssistantHome/ui/Sheet";
@@ -63,7 +65,7 @@ const Line: React.FC<{
     <li className="ally-memory__line" data-testid="memory-line">
       {editing ? (
         <div className="ally-memory__edit">
-          <input
+          <Input
             className="ally-input"
             aria-label={t.edit}
             value={text}
@@ -77,14 +79,18 @@ const Line: React.FC<{
           />
           <div className="ally-btn-row">
             <Button
-              className="ally-btn--sm"
+              variant={ButtonVariant.TERTIARY}
+              size="sm"
+              type="button"
               disabled={editing$.isLoading}
               onClick={() => void save()}
             >
               {t.save}
             </Button>
             <Button
-              className="ally-btn--sm"
+              variant={ButtonVariant.TERTIARY}
+              size="sm"
+              type="button"
               onClick={() => {
                 setEditing(false);
                 setText(line.text);
@@ -100,9 +106,15 @@ const Line: React.FC<{
       )}
       <p className="ally-small ally-memory__meta">
         {line.sourceMessageId ? (
-          <button type="button" className="ally-link" onClick={() => onOpenSource(line)}>
+          <Button
+            variant={ButtonVariant.TEXT}
+            size="sm"
+            type="button"
+            className="ally-link ally-link--inline"
+            onClick={() => onOpenSource(line)}
+          >
             {fill(here ? t.saidHere : t.saidEarlier, { date: dayOf(line.saidAt) })}
-          </button>
+          </Button>
         ) : (
           <span>{dayOf(line.saidAt)}</span>
         )}
@@ -119,9 +131,11 @@ const Line: React.FC<{
       )}
       {canEdit && !editing && (
         <div className="ally-btn-row">
-          <button
+          <Button
+            variant={ButtonVariant.TEXT}
+            size="sm"
             type="button"
-            className="ally-link ally-small"
+            className="ally-link ally-link--inline ally-small"
             aria-label={fill(t.forgetLine, { line: line.text })}
             disabled={forgetting.isLoading}
             onClick={async () => {
@@ -134,10 +148,16 @@ const Line: React.FC<{
             }}
           >
             {t.forget}
-          </button>
-          <button type="button" className="ally-link ally-small" onClick={() => setEditing(true)}>
+          </Button>
+          <Button
+            variant={ButtonVariant.TEXT}
+            size="sm"
+            type="button"
+            className="ally-link ally-link--inline ally-small"
+            onClick={() => setEditing(true)}
+          >
             {t.edit}
-          </button>
+          </Button>
         </div>
       )}
     </li>
@@ -166,9 +186,12 @@ const ForgetPersonDialog: React.FC<{
           </p>
         )}
         <div className="ally-remove__actions">
-          <Button onClick={onClose}>{t.keep}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+            {t.keep}
+          </Button>
           <Button
-            variant="primary"
+            variant={ButtonVariant.PRIMARY}
+            type="button"
             className="ally-remove__confirm"
             disabled={isLoading}
             onClick={async () => {
@@ -221,9 +244,15 @@ export const MemoryPanel: React.FC<{
     body = (
       <p className="ally-note ally-note--warn" role="alert">
         {t.loadFailed}{" "}
-        <button type="button" className="ally-link" onClick={() => void refetch()}>
+        <Button
+          variant={ButtonVariant.TEXT}
+          size="sm"
+          type="button"
+          className="ally-link ally-link--inline"
+          onClick={() => void refetch()}
+        >
           {t.retry}
-        </button>
+        </Button>
       </p>
     );
   } else {
@@ -329,13 +358,15 @@ export const MemoryPanel: React.FC<{
         </p>
       )}
       {canEdit && data && data.lines.length > 0 && (
-        <button
+        <Button
+          variant={ButtonVariant.TEXT}
+          size="sm"
           type="button"
-          className="ally-link ally-small ally-memory__forget-person"
+          className="ally-link ally-link--inline ally-small ally-memory__forget-person"
           onClick={() => setConfirming(true)}
         >
           {t.forgetPerson}
-        </button>
+        </Button>
       )}
       {confirming && (
         <ForgetPersonDialog

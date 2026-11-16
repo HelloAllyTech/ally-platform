@@ -3,6 +3,8 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useGetChatbotsQuery } from "@api";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 import type { Chatbot } from "@types";
 
 import { HOME } from "../copy";
@@ -83,10 +85,11 @@ export const AssistantSwitcher: React.FC<{ bot: Chatbot; section: SectionId; pho
     >
       {bots.map(other => (
         <li key={other.id} role="none">
-          <button
+          <Button
+            variant={ButtonVariant.TEXT}
             type="button"
             role="menuitem"
-            className="ally-switcher__item"
+            className="ally-switcher__item !h-auto"
             aria-current={other.id === bot.id ? "true" : undefined}
             onClick={() => go(other)}
           >
@@ -95,7 +98,7 @@ export const AssistantSwitcher: React.FC<{ bot: Chatbot; section: SectionId; pho
               {other.id === bot.id ? `${t().current} · ` : ""}
               {channelsOf(other)}
             </span>
-          </button>
+          </Button>
         </li>
       ))}
     </ul>
@@ -103,7 +106,8 @@ export const AssistantSwitcher: React.FC<{ bot: Chatbot; section: SectionId; pho
 
   return (
     <div className="ally-switcher">
-      <button
+      <Button
+        variant={ButtonVariant.TEXT}
         ref={button}
         type="button"
         className="ally-switcher__button"
@@ -123,7 +127,7 @@ export const AssistantSwitcher: React.FC<{ bot: Chatbot; section: SectionId; pho
             strokeLinecap="round"
           />
         </svg>
-      </button>
+      </Button>
       <span id={`${id}-tip`} role="tooltip" className="ally-switcher__tip">
         {t().label}
       </span>

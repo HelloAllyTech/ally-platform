@@ -7,7 +7,8 @@ import {
   useCreatePrivateChatbotDocumentMutation,
   useGetKbDocumentsQuery,
 } from "@api";
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 import { KbCorpus } from "@types";
 import type { HomeDocument } from "@types";
 
@@ -60,7 +61,13 @@ const LibraryPicker: React.FC<{
           key={doc.id}
           title={doc.title}
           actions={
-            <Button className="ally-btn--sm" disabled={disabled} onClick={() => onAdd(doc.id)}>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              size="sm"
+              type="button"
+              disabled={disabled}
+              onClick={() => onAdd(doc.id)}
+            >
               {HOME.lists.add}
             </Button>
           }
@@ -175,7 +182,12 @@ export const DocumentsList: React.FC<{ botId: string; canEdit: boolean }> = ({
                 if (file) void upload(file);
               }}
             />
-            <Button disabled={Boolean(uploading)} onClick={() => input.current?.click()}>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              disabled={Boolean(uploading)}
+              onClick={() => input.current?.click()}
+            >
               {t.upload}
             </Button>
             <span className="ally-small" aria-live="polite">

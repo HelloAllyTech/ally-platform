@@ -7,7 +7,9 @@ import {
   useGetChatbotDocumentsQuery,
   useUpdateChatbotDocumentMutation,
 } from "@api";
-import { Button, SourceChip } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { SourceChip } from "@components/v2";
 import type { HomeFact } from "@types";
 
 import { COPY } from "../../Onboarding/copy";
@@ -98,10 +100,20 @@ const Fact: React.FC<{ botId: string; fact: HomeFact; canEdit: boolean }> = ({
             }}
           />
           <div className="ally-btn-row">
-            <Button type="submit" variant="primary" disabled={!value.trim() || state.isLoading}>
+            <Button
+              variant={ButtonVariant.PRIMARY}
+              type="submit"
+              disabled={!value.trim() || state.isLoading}
+            >
               {t.saveCorrection}
             </Button>
-            <Button onClick={() => setEditing(false)}>{t.cancel}</Button>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              onClick={() => setEditing(false)}
+            >
+              {t.cancel}
+            </Button>
           </div>
         </form>
       ) : (

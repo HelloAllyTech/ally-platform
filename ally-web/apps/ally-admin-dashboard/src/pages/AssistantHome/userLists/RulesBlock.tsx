@@ -6,7 +6,10 @@ import {
   useDeleteListRuleMutation,
   useLazyGetListEntryQuery,
 } from "@api";
-import { Button, Chip, Segmented, Select } from "@components/v2";
+import { Button } from "@components/button";
+import { Input } from "@components/input";
+import { ButtonVariant } from "@components/types";
+import { Chip, Segmented, Select } from "@components/v2";
 import type { Chatbot, ListEntry, ListRefusal, ListRule, ListWhere, UserList } from "@types";
 
 import { HOME, fill } from "../copy";
@@ -60,7 +63,8 @@ export const RulesBlock: React.FC<{
                 </div>
                 {canEdit && (
                   <Button
-                    variant="ghost"
+                    variant={ButtonVariant.TEXT}
+                    type="button"
                     aria-label={`${t().rules.remove}: ${sentence.text}`}
                     disabled={removing.isLoading}
                     onClick={async () => {
@@ -98,7 +102,7 @@ export const RulesBlock: React.FC<{
           />
         ) : (
           <div>
-            <Button onClick={() => setAdding(true)}>
+            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => setAdding(true)}>
               <span aria-hidden="true">+ </span>
               {t().rules.add}
             </Button>
@@ -389,13 +393,15 @@ const RuleEditor: React.FC<{
             <ul className="ally-lists__refusal-list">
               {broken.map(record => (
                 <li key={record.id}>
-                  <button
+                  <Button
+                    variant={ButtonVariant.TEXT}
+                    size="sm"
                     type="button"
-                    className="ally-link"
+                    className="ally-link ally-link--inline"
                     onClick={() => onOpenEntry(record.id)}
                   >
                     {fill(r.open, { title: record.title })}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -408,10 +414,12 @@ const RuleEditor: React.FC<{
         </p>
       )}
       <div className="ally-btn-row">
-        <Button variant="primary" type="submit" disabled={isLoading}>
+        <Button variant={ButtonVariant.PRIMARY} type="submit" disabled={isLoading}>
           {isLoading ? t().form.saving : r.save}
         </Button>
-        <Button onClick={onDone}>{r.cancel}</Button>
+        <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onDone}>
+          {r.cancel}
+        </Button>
       </div>
     </form>
   );
@@ -424,7 +432,7 @@ const NumberInput: React.FC<{ label: string; value: string; onChange: (v: string
 }) => (
   <div className="ally-field ally-rules__number">
     <label htmlFor="rule-number">{label}</label>
-    <input
+    <Input
       id="rule-number"
       className="ally-input"
       inputMode="numeric"

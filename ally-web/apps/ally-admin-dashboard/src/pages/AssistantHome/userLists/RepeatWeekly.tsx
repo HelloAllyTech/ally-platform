@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import { listRefusalOf, useRepeatWeeklyMutation } from "@api";
-import { Button, Chip, DatePicker, Select, TimePicker } from "@components/v2";
+import { Button } from "@components/button";
+import { Input } from "@components/input";
+import { ButtonVariant } from "@components/types";
+import { Chip, DatePicker, Select, TimePicker } from "@components/v2";
 import type { Chatbot, ListField, ListRefusal, RepeatWeeklyResult, UserList } from "@types";
 
 import { HOME, fill } from "../copy";
@@ -285,7 +288,8 @@ export const RepeatWeekly: React.FC<{
       {added === null && (
         <div className="ally-btn-row">
           <Button
-            variant="primary"
+            variant={ButtonVariant.PRIMARY}
+            type="button"
             disabled={
               !preview || preview.count === 0 || tooMany || missing.length > 0 || state.isLoading
             }
@@ -347,7 +351,8 @@ const EachInput: React.FC<{
               {values.map(value => (
                 <li key={value} className="ally-repeat__value">
                   <span>{value}</span>
-                  <button
+                  <Button
+                    variant={ButtonVariant.TEXT}
                     type="button"
                     className="ally-repeat__value-remove"
                     aria-label={fill(t().repeat.eachRemove, { value })}
@@ -355,13 +360,13 @@ const EachInput: React.FC<{
                     onClick={() => onChange(values.filter(v => v !== value))}
                   >
                     ×
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
           <div className="ally-repeat__value-add">
-            <input
+            <Input
               className="ally-input"
               aria-label={fill(t().repeat.eachAdd, { detail: lower(field.label) })}
               value={draft}
@@ -375,7 +380,12 @@ const EachInput: React.FC<{
                 }
               }}
             />
-            <Button onClick={add} disabled={disabled || !draft.trim()}>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              onClick={add}
+              disabled={disabled || !draft.trim()}
+            >
               {fill(t().repeat.eachAdd, { detail: lower(field.label) })}
             </Button>
           </div>

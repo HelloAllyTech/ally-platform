@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import { useInstallReadyMadeListMutation, useUpdateListFieldMutation } from "@api";
-import { Button, ProgressBar } from "@components/v2";
+import { Button } from "@components/button";
+import { Input } from "@components/input";
+import { ButtonVariant } from "@components/types";
+import { ProgressBar } from "@components/v2";
 import type { Chatbot, ReadyMadeCatalogue, ReadyMadeItem, UserList } from "@types";
 
 import { HOME, fill } from "../copy";
@@ -64,7 +67,7 @@ export const ReadyMadeSetup: React.FC<{
         <span className="ally-label">
           {fill(t().setup.step, { n: at + 1, total })} · {t().setup.steps[step]}
         </span>
-        <Button variant="ghost" onClick={() => onClose(main?.key)}>
+        <Button variant={ButtonVariant.TEXT} type="button" onClick={() => onClose(main?.key)}>
           {t().setup.close}
         </Button>
       </div>
@@ -142,13 +145,23 @@ export const ReadyMadeSetup: React.FC<{
           <p className="ally-setup__body">{t().setup.tryBody}</p>
           <div className="ally-card ally-setup__try">
             <p className="ally-setup__question">“{item.examples[0]}”</p>
-            <Button variant="primary" onClick={() => tryIt?.(item.examples[0])}>
+            <Button
+              variant={ButtonVariant.PRIMARY}
+              type="button"
+              onClick={() => tryIt?.(item.examples[0])}
+            >
               {t().setup.tryOpen}
             </Button>
           </div>
           <div className="ally-setup__buttons">
-            <Button onClick={back}>{t().setup.back}</Button>
-            <Button variant="primary" onClick={() => onClose(main?.key)}>
+            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={back}>
+              {t().setup.back}
+            </Button>
+            <Button
+              variant={ButtonVariant.PRIMARY}
+              type="button"
+              onClick={() => onClose(main?.key)}
+            >
               {fill(t().setup.finish, { list: main?.name ?? "" })}
             </Button>
           </div>
@@ -166,13 +179,15 @@ const StepButtons: React.FC<{
   skipLabel?: string;
 }> = ({ onBack, onSkip, onNext, skipLabel }) => (
   <div className="ally-setup__buttons">
-    <Button onClick={onBack}>{t().setup.back}</Button>
+    <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onBack}>
+      {t().setup.back}
+    </Button>
     <span className="ally-setup__spacer" />
-    <Button variant="ghost" onClick={onSkip}>
+    <Button variant={ButtonVariant.TEXT} type="button" onClick={onSkip}>
       {skipLabel ?? t().setup.skip}
     </Button>
     {onNext && (
-      <Button variant="primary" onClick={onNext}>
+      <Button variant={ButtonVariant.PRIMARY} type="button" onClick={onNext}>
         {t().setup.next}
       </Button>
     )}
@@ -254,7 +269,8 @@ const Choose: React.FC<{
                       <span className="ally-small">{t().setup.have}</span>
                     ) : (
                       <Button
-                        variant="primary"
+                        variant={ButtonVariant.PRIMARY}
+                        type="button"
                         disabled={isLoading}
                         aria-label={`${t().setup.use}: ${item.title}`}
                         onClick={() => void use(item)}
@@ -332,7 +348,8 @@ const MakeItYours: React.FC<{
                 {examples.includes(value) && (
                   <span className="ally-choice__tag">{t().setup.example}</span>
                 )}
-                <button
+                <Button
+                  variant={ButtonVariant.TEXT}
                   type="button"
                   aria-label={fill(t().details.removeChoice, { value: human(value) })}
                   disabled={values.length === 1}
@@ -342,12 +359,12 @@ const MakeItYours: React.FC<{
                   }}
                 >
                   ×
-                </button>
+                </Button>
               </span>
             ))}
           </div>
           <div className="ally-details__add-choice">
-            <input
+            <Input
               className="ally-input"
               aria-label={fill(t().setup.choicePlaceholder, { detail: lower(need.label) })}
               placeholder={fill(t().setup.choicePlaceholder, { detail: lower(need.label) })}
@@ -360,7 +377,9 @@ const MakeItYours: React.FC<{
                 }
               }}
             />
-            <Button onClick={addOne}>{t().setup.addChoice}</Button>
+            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={addOne}>
+              {t().setup.addChoice}
+            </Button>
           </div>
           {values.length === 1 && <p className="ally-field__hint">{t().setup.needOne}</p>}
         </fieldset>
@@ -371,12 +390,19 @@ const MakeItYours: React.FC<{
         </p>
       )}
       <div className="ally-setup__buttons">
-        <Button onClick={onBack}>{t().setup.back}</Button>
+        <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onBack}>
+          {t().setup.back}
+        </Button>
         <span className="ally-setup__spacer" />
-        <Button variant="ghost" onClick={onNext}>
+        <Button variant={ButtonVariant.TEXT} type="button" onClick={onNext}>
           {t().setup.skip}
         </Button>
-        <Button variant="primary" disabled={isLoading} onClick={() => void next()}>
+        <Button
+          variant={ButtonVariant.PRIMARY}
+          type="button"
+          disabled={isLoading}
+          onClick={() => void next()}
+        >
           {isLoading ? t().form.saving : t().setup.next}
         </Button>
       </div>

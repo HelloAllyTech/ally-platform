@@ -9,7 +9,9 @@ import {
   useRunCheckupMutation,
 } from "@api";
 import type { ChangeProposal } from "@api";
-import { AssistantLine, Button, Chip, PrimaryButton, Segmented } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { AssistantLine, Chip, Segmented } from "@components/v2";
 
 import { ChangeHistory } from "./ChangeHistory";
 import { HOME } from "./copy";
@@ -109,7 +111,9 @@ export const ChangePanel: React.FC<{
     <div className="ally-change" data-testid="change-panel">
       <header className="ally-home__panel-head">
         <h2 className="ally-home__panel-title">{t.title}</h2>
-        <Button onClick={onClose}>{HOME.tryPanel.close}</Button>
+        <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+          {HOME.tryPanel.close}
+        </Button>
       </header>
       <p className="ally-small ally-change__subtitle">{c.subtitle}</p>
       <Segmented<"change" | "history">
@@ -158,10 +162,17 @@ export const ChangePanel: React.FC<{
                       <ChangeCard key={`${change.field}-${show(change.after)}`} change={change} />
                     ))}
                     <div className="ally-btn-row">
-                      <PrimaryButton onClick={() => void applyIt()} disabled={applying.isLoading}>
-                        {t.apply}
-                      </PrimaryButton>
                       <Button
+                        variant={ButtonVariant.PRIMARY}
+                        type="button"
+                        onClick={() => void applyIt()}
+                        disabled={applying.isLoading}
+                      >
+                        {t.apply}
+                      </Button>
+                      <Button
+                        variant={ButtonVariant.TERTIARY}
+                        type="button"
                         onClick={() => {
                           setProposal(null);
                           setAsked(null);
@@ -186,7 +197,12 @@ export const ChangePanel: React.FC<{
                 data-testid="change-applied"
               >
                 <span>{c.afterApply}</span>
-                <Button className="ally-btn--sm" onClick={() => void runCheckup(botId)}>
+                <Button
+                  variant={ButtonVariant.TERTIARY}
+                  size="sm"
+                  type="button"
+                  onClick={() => void runCheckup(botId)}
+                >
                   {c.runCheckup}
                 </Button>
               </div>
@@ -202,7 +218,8 @@ export const ChangePanel: React.FC<{
                     <span>{changeLabel(entry.summary)}</span>
                     {canEdit && !entry.undone && (
                       <Button
-                        variant="ghost"
+                        variant={ButtonVariant.TEXT}
+                        type="button"
                         onClick={() =>
                           setConfirming({ id: entry.id, summary: changeLabel(entry.summary) })
                         }
@@ -217,7 +234,9 @@ export const ChangePanel: React.FC<{
                 <div className="ally-card ally-change__confirm" role="group">
                   <p className="ally-body">{fill(t.undoConfirm, { change: confirming.summary })}</p>
                   <div className="ally-btn-row">
-                    <PrimaryButton
+                    <Button
+                      variant={ButtonVariant.PRIMARY}
+                      type="button"
                       disabled={undoing.isLoading}
                       onClick={async () => {
                         await undo({ id: botId, eventId: confirming.id });
@@ -226,8 +245,14 @@ export const ChangePanel: React.FC<{
                       }}
                     >
                       {t.undo}
-                    </PrimaryButton>
-                    <Button onClick={() => setConfirming(null)}>{t.cancel}</Button>
+                    </Button>
+                    <Button
+                      variant={ButtonVariant.TERTIARY}
+                      type="button"
+                      onClick={() => setConfirming(null)}
+                    >
+                      {t.cancel}
+                    </Button>
                   </div>
                 </div>
               )}
@@ -268,7 +293,11 @@ export const ChangePanel: React.FC<{
                     }
                   }}
                 />
-                <Button type="submit" disabled={!request.trim() || proposing.isLoading}>
+                <Button
+                  variant={ButtonVariant.TERTIARY}
+                  type="submit"
+                  disabled={!request.trim() || proposing.isLoading}
+                >
                   {t.send}
                 </Button>
               </form>

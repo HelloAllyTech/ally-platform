@@ -8,7 +8,10 @@ import {
   useLazySearchListContactsQuery,
   useUpdateListEntryMutation,
 } from "@api";
-import { Button, Chip, Combobox, DatePicker, Select, Switch, TimePicker } from "@components/v2";
+import { Button } from "@components/button";
+import { Input } from "@components/input";
+import { ButtonVariant } from "@components/types";
+import { Chip, Combobox, DatePicker, Select, Switch, TimePicker } from "@components/v2";
 import type { SelectOption } from "@components/v2";
 import type { Chatbot, ListEntry, ListField, ListRefusal, UserList } from "@types";
 
@@ -138,7 +141,9 @@ export const EntryForm: React.FC<{
       <form className="ally-lists__sheet ally-lists__form" onSubmit={save} noValidate>
         <div className="ally-home__panel-head">
           <h2 className="ally-heading ally-home__panel-title">{title}</h2>
-          <Button onClick={onClose}>{t().form.close}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+            {t().form.close}
+          </Button>
         </div>
 
         {entry && <CreatedBy list={list} entry={entry} />}
@@ -147,7 +152,12 @@ export const EntryForm: React.FC<{
           <div className="ally-lists__refusal" role="alert">
             <p>{formRefusal.message}</p>
             {formRefusal.code === "version_conflict" && (
-              <Button onClick={() => void doReload()} disabled={reloading.isFetching}>
+              <Button
+                variant={ButtonVariant.TERTIARY}
+                type="button"
+                onClick={() => void doReload()}
+                disabled={reloading.isFetching}
+              >
                 {t().form.reload}
               </Button>
             )}
@@ -181,17 +191,20 @@ export const EntryForm: React.FC<{
 
         {canEdit && (
           <div className="ally-lists__form-actions">
-            <Button variant="primary" type="submit" disabled={saving}>
+            <Button variant={ButtonVariant.PRIMARY} type="submit" disabled={saving}>
               {saving ? t().form.saving : entry ? t().form.save : t().form.add}
             </Button>
-            <Button onClick={onClose}>{t().form.cancel}</Button>
+            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+              {t().form.cancel}
+            </Button>
             <span className="ally-small" aria-live="polite">
               {saved ? t().form.saved : ""}
             </span>
             {onDelete && (
               <Button
-                variant="ghost"
-                className="ally-btn--danger ally-lists__form-delete"
+                variant={ButtonVariant.DESTRUCTIVE}
+                type="button"
+                className="ally-lists__form-delete"
                 onClick={onDelete}
               >
                 {t().remove.confirm}
@@ -291,7 +304,7 @@ export const FieldInput: React.FC<{
     case "money":
     case "duration":
       control = (
-        <input
+        <Input
           id={id}
           className="ally-input"
           inputMode="numeric"
@@ -421,7 +434,7 @@ export const FieldInput: React.FC<{
       );
     default:
       control = (
-        <input
+        <Input
           id={id}
           className="ally-input"
           type={

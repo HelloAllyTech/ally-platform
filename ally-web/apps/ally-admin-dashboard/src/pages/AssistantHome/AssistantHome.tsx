@@ -8,7 +8,9 @@ import {
   useGetChatbotQuery,
   useGetChatbotsQuery,
 } from "@api";
-import { Button, Toast } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { Toast } from "@components/v2";
 import { ROUTES } from "@constants";
 import { Chatbot, ChatbotMemberRole, ChatbotStatus } from "@types";
 
@@ -38,6 +40,7 @@ import { Sheet } from "./ui/Sheet";
 import { useRestoreAssistant } from "./ui/useRestoreAssistant";
 import { HomeSaves, HomeSavesContext, SaveState } from "./useHomeField";
 import { ListsSection } from "./userLists/ListsSection";
+
 import "./home.css";
 import "./ui/scale.css";
 
@@ -293,6 +296,8 @@ export const AssistantHome: React.FC = () => {
                   <div className="ally-home__actions">
                     {canEdit && (
                       <Button
+                        variant={ButtonVariant.TERTIARY}
+                        type="button"
                         aria-pressed={panel === "change"}
                         onClick={() => setPanel(p => (p === "change" ? null : "change"))}
                       >
@@ -310,7 +315,8 @@ export const AssistantHome: React.FC = () => {
                       </a>
                     )}
                     <Button
-                      variant="primary"
+                      variant={ButtonVariant.PRIMARY}
+                      type="button"
                       aria-pressed={panel === "try"}
                       onClick={() => setPanel(p => (p === "try" ? null : "try"))}
                     >
@@ -348,6 +354,8 @@ export const AssistantHome: React.FC = () => {
                   </p>
                   {bot.myRole === ChatbotMemberRole.OWNER && (
                     <Button
+                      variant={ButtonVariant.TERTIARY}
+                      type="button"
                       disabled={restoring}
                       onClick={async () => {
                         if (await restore(bot)) {

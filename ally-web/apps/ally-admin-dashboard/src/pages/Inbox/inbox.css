@@ -107,8 +107,8 @@
   color: var(--ally-warn);
 }
 .ally-inbox__needs {
-  background: var(--ally-accent-soft);
-  color: var(--ally-accent);
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
 }
 .ally-inbox__unread {
   margin-left: auto;

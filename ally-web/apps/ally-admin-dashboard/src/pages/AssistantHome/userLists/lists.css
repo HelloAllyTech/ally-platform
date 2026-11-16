@@ -5,8 +5,18 @@
   flex-direction: column;
   gap: 18px;
 }
-.ally-btn--danger {
-  color: var(--ally-danger);
+/* A text action, as the shared Button (chunk 8a, after #267): inline, no padding or height. */
+button.ally-link--inline {
+  display: inline;
+  height: auto;
+  padding: 0;
+  white-space: normal;
+  font-size: inherit;
+  line-height: inherit;
+}
+button.ally-link--inline.ally-small {
+  font-size: 13px;
+  line-height: 1.45;
 }
 .ally-link {
   padding: 0;
@@ -70,7 +80,7 @@
   max-width: 640px;
   margin-top: 14px;
 }
-.ally-lists__start {
+button.ally-lists__start {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -88,11 +98,11 @@
     box-shadow 0.2s var(--ally-ease),
     transform 0.2s var(--ally-ease);
 }
-.ally-lists__start:hover {
+button.ally-lists__start:hover {
   box-shadow: var(--ally-shadow-hover);
   transform: translateY(-2px);
 }
-.ally-lists__start:first-child {
+button.ally-lists__start:first-child {
   border-color: var(--ally-ink);
 }
 .ally-lists__start-icon {
@@ -101,8 +111,8 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: var(--ally-accent-soft);
-  color: var(--ally-accent);
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
   font-size: 16px;
 }
 .ally-lists__start-title {
@@ -134,7 +144,7 @@
   background: var(--ally-sunken);
   scrollbar-width: none;
 }
-.ally-lists__tab {
+button.ally-lists__tab {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -148,12 +158,12 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.ally-lists__tab[aria-selected="true"] {
+button.ally-lists__tab[aria-selected="true"] {
   background: var(--ally-surface);
   color: var(--ally-ink);
   box-shadow: 0 1px 2px rgba(23, 23, 28, 0.08);
 }
-.ally-lists__tab:focus-visible {
+button.ally-lists__tab:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--ally-accent);
 }
@@ -165,9 +175,9 @@
   font: 500 12px/1.2 var(--ally-font-label);
   text-align: center;
 }
-.ally-lists__tab[aria-selected="true"] .ally-lists__tab-count {
-  background: var(--ally-accent-soft);
-  color: var(--ally-accent);
+button.ally-lists__tab[aria-selected="true"] .ally-lists__tab-count {
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
 }
 .ally-lists__add-list {
   flex: none;
@@ -290,7 +300,7 @@
 .ally-lists__table tbody tr:hover {
   background: var(--ally-surface-2);
 }
-.ally-lists__sort {
+button.ally-lists__sort {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -313,9 +323,10 @@
   white-space: nowrap;
   text-align: right;
 }
-.ally-lists__row-actions .ally-btn {
-  min-height: 36px;
-  padding: 0 10px;
+/* The shared Button is display: flex; in a table cell its two actions sit side by side. */
+.ally-lists__row-actions button {
+  display: inline-flex;
+  vertical-align: middle;
 }
 .ally-lists__unset {
   color: var(--ally-faint);
@@ -335,8 +346,8 @@
   margin-left: 8px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--ally-accent-soft);
-  color: var(--ally-accent);
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
   font: 500 12px/1.4 var(--ally-font-ui);
   white-space: nowrap;
 }
@@ -372,7 +383,7 @@
   padding: 0;
   list-style: none;
 }
-.ally-lists__card {
+button.ally-lists__card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -392,7 +403,7 @@
   font-weight: 600;
   font-size: 16px;
 }
-.ally-lists__card .ally-lists__by-assistant {
+button.ally-lists__card .ally-lists__by-assistant {
   margin-left: 0;
 }
 .ally-lists__card-details {
@@ -490,7 +501,7 @@
   gap: 0;
   padding: 0;
 }
-.ally-collapsible__toggle {
+button.ally-collapsible__toggle {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -504,7 +515,7 @@
   text-align: left;
   cursor: pointer;
 }
-.ally-collapsible__toggle:focus-visible {
+button.ally-collapsible__toggle:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 3px var(--ally-accent-soft);
   border-radius: var(--ally-radius-md);
@@ -523,7 +534,7 @@
   color: var(--ally-muted);
   transition: transform 0.2s var(--ally-ease);
 }
-.ally-collapsible__toggle[aria-expanded="true"] .ally-collapsible__chevron {
+button.ally-collapsible__toggle[aria-expanded="true"] .ally-collapsible__chevron {
   transform: rotate(180deg);
 }
 .ally-collapsible__body {
@@ -819,7 +830,7 @@
   border: 1px solid var(--ally-line);
   font-size: 14px;
 }
-.ally-repeat__value-remove {
+button.ally-repeat__value-remove {
   display: inline-grid;
   place-items: center;
   width: 24px;
@@ -832,7 +843,7 @@
   line-height: 1;
   cursor: pointer;
 }
-.ally-repeat__value-remove:hover {
+button.ally-repeat__value-remove:hover {
   background: var(--ally-surface);
 }
 .ally-repeat__value-add {
@@ -942,8 +953,8 @@
 .ally-setup__badge {
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--ally-accent-soft);
-  color: var(--ally-accent);
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
   font-size: 12px;
 }
 .ally-setup__mini {
@@ -1044,8 +1055,8 @@
     flex: 1 1 100%;
     margin-left: 0;
   }
-  .ally-lists__toolbar-actions .ally-btn,
-  .ally-lists__toolbar > .ally-btn {
+  .ally-lists__toolbar-actions button,
+  .ally-lists__toolbar > button {
     flex: 1;
     min-height: 44px;
   }
@@ -1059,7 +1070,7 @@
   .ally-setup__cards {
     grid-template-columns: 1fr;
   }
-  .ally-setup__buttons .ally-btn {
+  .ally-setup__buttons button {
     min-height: 44px;
   }
   .ally-repeat__row {
@@ -1081,7 +1092,7 @@
   .ally-lists__sheet {
     padding: 20px 16px;
   }
-  .ally-lists__form-actions .ally-btn {
+  .ally-lists__form-actions button {
     min-height: 44px;
   }
 }
@@ -1185,4 +1196,17 @@
 }
 .ally-tools__choices .ally-small {
   margin: 0;
+}
+
+/* Cards, tabs and toggles that are the shared Button (after #267): their own layout, not a button's. */
+button.ally-lists__start,
+button.ally-lists__card,
+button.ally-collapsible__toggle {
+  justify-content: flex-start;
+  white-space: normal;
+}
+
+/* The shared Input is 80px wide by default; a field here fills its row, as .ally-input does. */
+input.ally-input {
+  width: 100%;
 }

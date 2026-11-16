@@ -1,6 +1,7 @@
 import React, { useId } from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 import { ChatbotStatus } from "@types";
 import type { BotPageLimits, PrechatField } from "@types";
 
@@ -183,6 +184,8 @@ const PrechatEditor: React.FC<{ field: HomeField<PrechatField[]>; disabled: bool
       {!disabled && questions.length < MAX_PRECHAT && (
         <div>
           <Button
+            variant={ButtonVariant.TERTIARY}
+            type="button"
             onClick={() =>
               // A new question waits for its wording before it's saved.
               set([
@@ -272,7 +275,11 @@ export const PageSection: React.FC<SectionProps> = ({ bot, home, canEdit, go }) 
               {on && bot.status === ChatbotStatus.PAUSED ? t.pausedNote : t.followsLive}
             </p>
           </div>
-          {canEdit && <Button onClick={() => go("overview")}>{t.toOverview}</Button>}
+          {canEdit && (
+            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("overview")}>
+              {t.toOverview}
+            </Button>
+          )}
         </div>
       </Group>
 

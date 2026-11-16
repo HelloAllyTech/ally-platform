@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 
 import { useSetListAbilitiesMutation } from "@api";
-import { Button, Segmented } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { Segmented } from "@components/v2";
 import type { ListAbility, UserList } from "@types";
 
 import { HOME, fill } from "../copy";
@@ -148,7 +150,9 @@ export const AssistantBlock: React.FC<{
       {note && (
         <div className="ally-lists__notice ally-abilities__note" role="status">
           <p>{a.firstNote}</p>
-          <Button onClick={() => setNote(false)}>{a.gotIt}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => setNote(false)}>
+            {a.gotIt}
+          </Button>
         </div>
       )}
     </div>

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { useGetHowItWorksQuery, useGetReadyMadeListsQuery, useGetUserListsQuery } from "@api";
-import { Button, Skeleton } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { Skeleton } from "@components/v2";
 import type { UserList } from "@types";
 
 import { HOME, fill } from "../copy";
@@ -77,7 +79,9 @@ export const ListsSection: React.FC<SectionProps> = ({ bot, home, canEdit, go, t
       ) : isError ? (
         <div className="ally-card ally-lists__problem" role="alert">
           <p>{t().table.loadFailed}</p>
-          <Button onClick={() => void refetch()}>{t().table.retry}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => void refetch()}>
+            {t().table.retry}
+          </Button>
         </div>
       ) : (
         <>
@@ -137,20 +141,30 @@ const StartChoices: React.FC<{ onReadyMade: () => void; onScratch: () => void }>
   onScratch,
 }) => (
   <div className="ally-lists__starts">
-    <button type="button" className="ally-lists__start ally-press" onClick={onReadyMade}>
+    <Button
+      variant={ButtonVariant.TEXT}
+      type="button"
+      className="ally-lists__start ally-press !h-auto"
+      onClick={onReadyMade}
+    >
       <span className="ally-lists__start-icon" aria-hidden="true">
         ✦
       </span>
       <span className="ally-lists__start-title">{t().empty.readyMade}</span>
       <span className="ally-small">{t().empty.readyMadeHint}</span>
-    </button>
-    <button type="button" className="ally-lists__start ally-press" onClick={onScratch}>
+    </Button>
+    <Button
+      variant={ButtonVariant.TEXT}
+      type="button"
+      className="ally-lists__start ally-press !h-auto"
+      onClick={onScratch}
+    >
       <span className="ally-lists__start-icon" aria-hidden="true">
         +
       </span>
       <span className="ally-lists__start-title">{t().empty.scratch}</span>
       <span className="ally-small">{t().empty.scratchHint}</span>
-    </button>
+    </Button>
   </div>
 );
 
@@ -230,7 +244,8 @@ const ListTabs: React.FC<{
         {tabs.map((tab, index) => {
           const selected = tab.id === selectedId;
           return (
-            <button
+            <Button
+              variant={ButtonVariant.TEXT}
               key={tab.id}
               type="button"
               role="tab"
@@ -238,7 +253,7 @@ const ListTabs: React.FC<{
               aria-selected={selected}
               aria-controls={tab.domId.replace("-tab-", "-panel-")}
               tabIndex={selected || (!selectedId && index === 0) ? 0 : -1}
-              className={`ally-lists__tab${tab.id.startsWith("@") ? " ally-lists__tab--tool" : ""}`}
+              className={`ally-lists__tab${tab.id.startsWith("@") ? " ally-lists__tab--tool" : ""} !h-auto`}
               onClick={() => onOpen(tab.id)}
               onKeyDown={event => {
                 if (event.key === "ArrowRight") focusTab(index + 1);
@@ -247,12 +262,17 @@ const ListTabs: React.FC<{
             >
               <span>{tab.label}</span>
               {tab.tag && <span className="ally-lists__tab-count">{tab.tag}</span>}
-            </button>
+            </Button>
           );
         })}
       </div>
       {onAdd && (
-        <Button className="ally-lists__add-list" onClick={onAdd}>
+        <Button
+          variant={ButtonVariant.TERTIARY}
+          type="button"
+          className="ally-lists__add-list"
+          onClick={onAdd}
+        >
           <span aria-hidden="true">+ </span>
           {t().tools.add}
         </Button>
@@ -287,7 +307,9 @@ const BuiltInPanel: React.FC<{
             <p className="ally-body">{fill(t().tools.pagesCount, { n: how.search.documents })}</p>
           )}
           <div>
-            <Button onClick={() => go("knows")}>{t().tools.pagesManage}</Button>
+            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("knows")}>
+              {t().tools.pagesManage}
+            </Button>
           </div>
         </div>
       )}
@@ -295,7 +317,13 @@ const BuiltInPanel: React.FC<{
         <>
           <MemorySettings botId={bot.id} home={home} canEdit={canEdit} />
           <div>
-            <Button onClick={() => go("conversations")}>{t().tools.memoryInbox}</Button>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              onClick={() => go("conversations")}
+            >
+              {t().tools.memoryInbox}
+            </Button>
           </div>
         </>
       )}
@@ -304,7 +332,9 @@ const BuiltInPanel: React.FC<{
           <h3 className="ally-home__group-title">{t().tools.handover}</h3>
           <p className="ally-small">{t().tools.handoverBody}</p>
           <div>
-            <Button onClick={() => go("share")}>{t().tools.handoverChange}</Button>
+            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("share")}>
+              {t().tools.handoverChange}
+            </Button>
           </div>
         </div>
       )}
@@ -330,7 +360,15 @@ const Choices: React.FC<{ list: UserList; canEdit: boolean; onEdit: (field: stri
             <h3 className="ally-home__group-title">
               {fill(t().choices.title, { detail: lower(field.label) })}
             </h3>
-            {canEdit && <Button onClick={() => onEdit(field.key)}>{t().choices.edit}</Button>}
+            {canEdit && (
+              <Button
+                variant={ButtonVariant.TERTIARY}
+                type="button"
+                onClick={() => onEdit(field.key)}
+              >
+                {t().choices.edit}
+              </Button>
+            )}
           </div>
           <p className="ally-small">{t().choices.hint}</p>
           <ul className="ally-tools__chips">
@@ -371,7 +409,11 @@ const OpenList: React.FC<{
       {needsOptions && canEdit && (
         <div className="ally-lists__notice" role="status">
           <p>{fill(t().table.replaceOptions, { detail: lower(needsOptions.label) })}</p>
-          <Button onClick={() => setFocusDetail(needsOptions.field)}>
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            type="button"
+            onClick={() => setFocusDetail(needsOptions.field)}
+          >
             {t().table.replaceAction}
           </Button>
         </div>

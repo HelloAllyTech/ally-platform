@@ -10,7 +10,9 @@ import {
   useSuggestCheckupQuestionsMutation,
   useTryCheckupCaseMutation,
 } from "@api";
-import { Button, Segmented } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { Segmented } from "@components/v2";
 
 import { COPY } from "../../Onboarding/copy";
 import {
@@ -97,8 +99,9 @@ const CaseCard: React.FC<{
           {reason && <p className="ally-small ally-checkup__reason">{reason}</p>}
         </div>
         <Button
-          variant="ghost"
-          className="ally-btn--sm"
+          variant={ButtonVariant.TEXT}
+          size="sm"
+          type="button"
           aria-expanded={open}
           onClick={() => setOpen(o => !o)}
         >
@@ -166,7 +169,9 @@ const CaseCard: React.FC<{
           {canEdit && (
             <div className="ally-btn-row">
               <Button
-                className="ally-btn--sm"
+                variant={ButtonVariant.TERTIARY}
+                size="sm"
+                type="button"
                 disabled={trying.isLoading}
                 onClick={() =>
                   void run(async () => {
@@ -177,14 +182,15 @@ const CaseCard: React.FC<{
               >
                 {trying.isLoading ? t.actions.trying : t.actions.tryOne}
               </Button>
-              <Button className="ally-btn--sm" onClick={onEdit}>
+              <Button variant={ButtonVariant.TERTIARY} size="sm" type="button" onClick={onEdit}>
                 {t.actions.edit}
               </Button>
               {!item.safety && (
                 <>
                   <Button
-                    variant="ghost"
-                    className="ally-btn--sm"
+                    variant={ButtonVariant.TEXT}
+                    size="sm"
+                    type="button"
                     disabled={editing.isLoading}
                     onClick={() =>
                       void run(() =>
@@ -200,8 +206,9 @@ const CaseCard: React.FC<{
                     {item.active ? t.actions.turnOff : t.actions.turnOn}
                   </Button>
                   <Button
-                    variant="ghost"
-                    className="ally-btn--sm ally-btn--danger"
+                    variant={ButtonVariant.DESTRUCTIVE}
+                    size="sm"
+                    type="button"
                     disabled={removing.isLoading}
                     onClick={() =>
                       void run(async () => {
@@ -251,6 +258,8 @@ const Suggestions: React.FC<{ botId: string; onDone: (note: string) => void }> =
   if (!list) {
     return (
       <Button
+        variant={ButtonVariant.TERTIARY}
+        type="button"
         disabled={suggesting.isLoading}
         onClick={() =>
           void suggest(botId)
@@ -294,7 +303,8 @@ const Suggestions: React.FC<{ botId: string; onDone: (note: string) => void }> =
       </ul>
       <div className="ally-btn-row">
         <Button
-          variant="primary"
+          variant={ButtonVariant.PRIMARY}
+          type="button"
           disabled={!chosen.length || keeping.isLoading}
           onClick={() =>
             void keep({ id: botId, questions: chosen })
@@ -308,7 +318,7 @@ const Suggestions: React.FC<{ botId: string; onDone: (note: string) => void }> =
         >
           {chosen.length === 1 ? t.suggest.keepOne : fill(t.suggest.keep, { n: chosen.length })}
         </Button>
-        <Button variant="ghost" onClick={() => setList(null)}>
+        <Button variant={ButtonVariant.TEXT} type="button" onClick={() => setList(null)}>
           {t.suggest.cancel}
         </Button>
       </div>
@@ -361,7 +371,9 @@ export const CheckupCases: React.FC<{
       <div className="ally-home__row">
         <h3 className="ally-heading">{COPY.checkup.sections.asked}</h3>
         {canEdit && editor === null && (
-          <Button onClick={() => setEditor("new")}>{t.editor.add}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => setEditor("new")}>
+            {t.editor.add}
+          </Button>
         )}
       </div>
       <Segmented<CaseFilter>

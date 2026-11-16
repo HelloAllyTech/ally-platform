@@ -23,7 +23,18 @@ test("a chat: take over, then who has it", async ({ page }) => {
   await expect(page.getByTestId("inbox-chat")).toBeVisible();
   await page.getByRole("button", { name: "Take over" }).click();
   await expect(page.getByText("Asha Rao is replying in this chat.")).toBeVisible();
-  await page.evaluate(() => document.fonts.ready);
+  // Taking over renders new text; load both Plex Serif weights before the shot, or the button and
+  // heading can be measured in the fallback face on some runs.
+  await page.evaluate(async () => {
+    await Promise.all(
+      ["400 16px", "600 16px"].map(face => document.fonts.load(`${face} "IBM Plex Serif"`)),
+    );
+    await document.fonts.ready;
+  });
+  // The chat is a scroll container; taking over can nudge it by its own padding on some runs.
+  await page.getByTestId("inbox-chat").evaluate(el => {
+    el.scrollTop = 0;
+  });
   await expect(page).toHaveScreenshot("inbox-chat.png", { fullPage: true });
   await expectNoSeriousA11yIssues(page);
 });

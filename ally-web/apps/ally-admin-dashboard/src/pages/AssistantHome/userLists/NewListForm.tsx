@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import { listRefusalOf, useCreateUserListMutation } from "@api";
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { Input } from "@components/input";
+import { ButtonVariant } from "@components/types";
 import type { UserList } from "@types";
 
 import { HOME } from "../copy";
@@ -56,7 +58,7 @@ export const NewListForm: React.FC<{
       <h2 className="ally-setup__title">{t().scratch.title}</h2>
       <div className="ally-field">
         <label htmlFor="new-list-name">{t().scratch.name}</label>
-        <input
+        <Input
           ref={input}
           id="new-list-name"
           className="ally-input"
@@ -76,10 +78,12 @@ export const NewListForm: React.FC<{
         </p>
       )}
       <div className="ally-btn-row">
-        <Button variant="primary" type="submit" disabled={!name.trim() || isLoading}>
+        <Button variant={ButtonVariant.PRIMARY} type="submit" disabled={!name.trim() || isLoading}>
           {isLoading ? t().form.saving : t().scratch.create}
         </Button>
-        <Button onClick={() => onClose()}>{t().form.cancel}</Button>
+        <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => onClose()}>
+          {t().form.cancel}
+        </Button>
       </div>
     </form>
   );
