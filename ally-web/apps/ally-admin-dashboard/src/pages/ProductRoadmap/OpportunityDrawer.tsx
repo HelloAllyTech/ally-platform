@@ -28,7 +28,6 @@ import {
   RoadmapOpportunityEffort,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
-  RoadmapReferenceImage,
   RoadmapTaxonomyItem,
   RoadmapVoteBudget,
 } from "@types";
@@ -51,7 +50,6 @@ import {
 import { monthKeyOf, monthLabel, shiftMonthKey } from "./utils/monthBoard";
 import { personName } from "./utils/people";
 import { formatPoints } from "./utils/points";
-import { sameReferenceImages } from "./utils/referenceImages";
 import { EFFORT_LABEL, STAGE_LABEL, displayStage } from "./utils/stages";
 import { isVotable } from "./utils/votes";
 import { VoteButton } from "./VoteButton";
