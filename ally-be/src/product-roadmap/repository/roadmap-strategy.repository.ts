@@ -188,7 +188,7 @@ export class RoadmapRankWeightsRepository extends Repository<RoadmapRankWeights>
          FROM users u
          JOIN user_groups ug ON ug."userId" = u.id
          JOIN groups g ON g.id = ug."groupId"
-        WHERE g.name = ANY($1) AND u."deletedAt" IS NULL
+        WHERE g.name = ANY($1) AND u.status = 'ACTIVE'
         ORDER BY u.name ASC`,
       [PLATFORM_TIER_ROLES],
     );
