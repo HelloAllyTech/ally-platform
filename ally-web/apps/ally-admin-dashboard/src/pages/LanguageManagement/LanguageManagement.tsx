@@ -20,6 +20,8 @@ import {
 } from "@constants";
 import { ScenarioLanguage } from "@types";
 
+import { PrecedenceExplainer } from "../Providers/PrecedenceExplainer";
+
 export const ScenarioLanguages: React.FC = () => {
   const limit = 30;
   const [offset, setOffset] = useState<number>(0);
@@ -305,6 +307,7 @@ export const ScenarioLanguages: React.FC = () => {
             {en.simulation.scenarioLanguages}
           </h1>
         </div>
+        <PrecedenceExplainer className="mb-4" />
         <ListToolbar
           searchValue={searchQuery}
           onSearchChange={handleSearchChange}
