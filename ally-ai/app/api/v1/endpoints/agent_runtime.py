@@ -21,10 +21,15 @@ from app.core.agent_runtime.runner import execute, stream
 from app.core.config import settings
 from app.core.dependencies import get_knowledge_agent_service
 from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.memory_lines import service as memory_lines
 from app.schemas.agent_runtime import (
     AgentRunRequest,
     AgentRunResponse,
+    ConversationSummaryRequest,
+    ConversationSummaryResponse,
     InstructionsResponse,
+    MemoryCheckRequest,
+    MemoryCheckResponse,
     OwnerTextCheckRequest,
     OwnerTextCheckResponse,
 )
@@ -126,3 +131,46 @@ async def run_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@builder_router.post(
+    "/memory-check",
+    response_model=MemoryCheckResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["agent_runtime"],
+)
+async def memory_check(payload: MemoryCheckRequest) -> MemoryCheckResponse:
+    """Which memory lines a health assistant may keep (chunk 8a). Always 200: on any
+    failure `failed` is true and nothing is kept, so ally-be fails closed."""
+    try:
+        keep = await memory_lines.check_lines(
+            payload.lines, payload.never_store, prompts=payload.prompts
+        )
+        return MemoryCheckResponse(keep=keep)
+    except Exception:
+        logger.exception("Memory check failed; keeping none of %d", len(payload.lines))
+        return MemoryCheckResponse(keep=[False] * len(payload.lines), failed=True)
+
+
+@builder_router.post(
+    "/conversation-summary",
+    response_model=ConversationSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["agent_runtime"],
+)
+async def conversation_summary(
+    payload: ConversationSummaryRequest,
+) -> ConversationSummaryResponse:
+    """A chat's new rolling summary (chunk 8a). Always 200: on failure `failed` is
+    true and ally-be keeps the old summary."""
+    try:
+        text = await memory_lines.summarize(
+            payload.summary,
+            [m.model_dump() for m in payload.messages],
+            health=payload.health,
+            prompts=payload.prompts,
+        )
+        return ConversationSummaryResponse(summary=text)
+    except Exception:
+        logger.exception("Conversation summary failed; the old one stays")
+        return ConversationSummaryResponse(failed=True)

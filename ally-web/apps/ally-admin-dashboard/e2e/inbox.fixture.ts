@@ -109,9 +109,54 @@ const THREAD = {
   ],
 };
 
-export async function mockInbox(page: Page, options: { held?: boolean } = {}): Promise<void> {
+/** What the assistant remembers about Asha (chunk 8a). */
+const MEMORY = {
+  on: true,
+  name: "Asha",
+  beforeChat: [{ label: "What are you looking for?", value: "Couples therapy" }],
+  summary: "She asked about couples sessions and their length.",
+  neverStore: ["Payment details", "Passwords and PINs", "ID numbers", "Symptoms"],
+  lines: [
+    {
+      id: "e2",
+      section: "open_items",
+      text: "waiting to hear about weekend couples sessions",
+      saidAt: at(8),
+      expiresAt: at(30),
+      sourceKind: "person",
+      sourceMessageId: "m3",
+      sourceConversationId: CHAT,
+    },
+    {
+      id: "e1",
+      section: "preferences",
+      text: "prefers evenings",
+      saidAt: at(6),
+      expiresAt: null,
+      sourceKind: "person",
+      sourceMessageId: "m1",
+      sourceConversationId: CHAT,
+    },
+    {
+      id: "e3",
+      section: "context",
+      text: "comes with her partner",
+      saidAt: at(6),
+      expiresAt: at(40),
+      sourceKind: "owner",
+      sourceMessageId: "m1",
+      sourceConversationId: CHAT,
+    },
+  ],
+};
+
+export async function mockInbox(
+  page: Page,
+  options: { held?: boolean; memory?: boolean } = {},
+): Promise<void> {
   await mockAssistantHome(page);
   let held = Boolean(options.held);
+  let memory = MEMORY;
   await page.route("**/api/v1/inbox/**", async route => {
     const path = new URL(route.request().url()).pathname.replace(/^.*\/api\/v1/, "");
     const method = route.request().method();
@@ -129,10 +174,17 @@ export async function mockInbox(page: Page, options: { held?: boolean } = {}): P
       held = true;
       return json(route, { ok: true });
     }
+    if (path.endsWith("/memory") && method === "GET") return json(route, memory);
+    if (path.endsWith("/forget") && method === "POST" && path.includes("/memory/")) {
+      const id = path.split("/memory/")[1].replace("/forget", "");
+      memory = { ...memory, lines: memory.lines.filter(l => l.id !== id) };
+      return json(route, { forgotten: true });
+    }
     if (path.endsWith(CHAT)) {
+      const thread = options.memory ? { ...THREAD, contactId: "p1" } : THREAD;
       return json(
         route,
-        held ? { ...THREAD, state: "held", heldBy: { id: 1, name: "Asha Rao" } } : THREAD,
+        held ? { ...thread, state: "held", heldBy: { id: 1, name: "Asha Rao" } } : thread,
       );
     }
     return json(route, {});

@@ -152,7 +152,8 @@ export class InboxService {
   async thread(chatbotId: string, conversationId: string) {
     await this.access.assert(chatbotId, ChatbotMemberRole.VIEWER);
     const [conversation] = (await this.dataSource.query(
-      `SELECT c.id, c.chatbot_id, b.name AS assistant, c.channel, c.metadata->'intake' AS intake,
+      `SELECT c.id, c.chatbot_id, c.contact_id, b.name AS assistant, c.channel,
+              c.metadata->'intake' AS intake,
               c.metadata->'source'->>'kind' AS source,
               c.handled_by_user_id, u.name AS held_by_name, c.needs_person_since,
               c.needs_person_reason, c.safety_at, c.last_message_at
@@ -178,6 +179,8 @@ export class InboxService {
       ?.at as Date | undefined;
     return {
       ...toItem({ ...conversation, preview: '', unread: 0 }),
+      // Whose chat it is, for what the assistant remembers about them (chunk 8a).
+      contactId: (conversation.contact_id as string | null) ?? null,
       intake:
         (conversation.intake as { answers?: unknown[] } | null)?.answers ?? [],
       // WhatsApp only lets the team reply within 24 hours of the visitor's last message.

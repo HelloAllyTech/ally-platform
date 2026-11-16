@@ -38,3 +38,34 @@ test("a chat: take over, then who has it", async ({ page }) => {
   await expect(page).toHaveScreenshot("inbox-chat.png", { fullPage: true });
   await expectNoSeriousA11yIssues(page);
 });
+
+// What the assistant remembers (chunk 8a): beside the chat on a wide screen, a sheet on a phone.
+test("what the assistant remembers: by section, with its source; forget a line", async ({
+  page,
+}, info) => {
+  await mockInbox(page, { memory: true });
+  await page.goto(`/dev/inbox?conversation=${CHAT}&bot=${BOT_ID}`);
+  await expect(page.getByTestId("inbox-chat")).toBeVisible();
+  const phone = info.project.name === "phone";
+  if (phone) {
+    await page
+      .getByRole("button", { name: "What your assistant remembers about this person" })
+      .click();
+  }
+  const panel = page.getByTestId("memory-panel").locator("visible=true");
+  await expect(panel.getByText("prefers evenings")).toBeVisible();
+  await expect(
+    panel.getByRole("heading", { name: "What your assistant remembers about Asha" }),
+  ).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page).toHaveScreenshot("inbox-memory.png", { fullPage: true });
+  await expectNoSeriousA11yIssues(page);
+  await panel.getByRole("button", { name: "Forget “prefers evenings”" }).click();
+  await expect(panel.getByText("Forgotten.")).toBeVisible();
+  await expect(panel.getByText("prefers evenings")).toHaveCount(0);
+  // No sideways scroll at either width.
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+});

@@ -1,6 +1,7 @@
 import { ConversationService } from 'src/chatbot/service/conversation.service';
 import { WaConsentStatus, WaMessageDirection } from '../../enum/whatsapp.enum';
 import type { WhatsAppBotSettings } from '../../type/whatsapp-settings.type';
+import { contactIdsFor } from '../wa-shared-store.mapper';
 import {
   SHARED_HISTORY_WAIT_MS,
   WaSharedStoreWriter,
@@ -142,12 +143,76 @@ describe('WhatsApp inbound with the shared store', () => {
     expect(store.recentHistory).not.toHaveBeenCalled();
   });
 
+  describe('the contact in the run (chunk 6)', () => {
+    const contactGiven = (engine: { respond: jest.Mock }) =>
+      engine.respond.mock.calls[0][0].contactId;
+
+    it('with the switch on, resolves the shared contact before the reply, as the copy will', async () => {
+      const store = {
+        resolveContact: jest.fn(async () => ({ id: 'shared-contact-1' })),
+        openConversation: jest.fn(async () => ({ id: CONVERSATION_ID })),
+        appendMessage: jest.fn(async () => ({})),
+        updateMessage: jest.fn(async () => undefined),
+      };
+      const { inbound, engine, writer } = build(
+        { sharedStoreWrites: true },
+        (settings) => writerFor(store as never, settings),
+      );
+      await inbound('book me in for thursday');
+      await writer!.settled();
+      expect(contactGiven(engine)).toBe('shared-contact-1');
+      expect(store.resolveContact).toHaveBeenCalledWith(
+        { chatbotId: CHATBOT_ID },
+        'whatsapp',
+        '919800000001',
+        expect.objectContaining({
+          preferredIds: contactIdsFor('contact-1', CHATBOT_ID),
+        }),
+      );
+    });
+
+    it('with the switch off, the run has no contact', async () => {
+      const store = { resolveContact: jest.fn() };
+      const { inbound, engine } = build(
+        { sharedStoreWrites: false },
+        (settings) => writerFor(store as never, settings),
+      );
+      await inbound('book me in for thursday');
+      expect(contactGiven(engine)).toBeNull();
+      expect(store.resolveContact).not.toHaveBeenCalled();
+    });
+
+    it('a store that fails leaves the run without a contact, and the reply goes out', async () => {
+      const down = async () => {
+        throw new Error('shared store down');
+      };
+      const { inbound, engine, provider, writer } = build(
+        { sharedStoreWrites: true },
+        (settings) =>
+          writerFor(
+            {
+              resolveContact: down,
+              openConversation: down,
+              appendMessage: down,
+              updateMessage: down,
+            } as never,
+            settings,
+          ),
+      );
+      await inbound('book me in for thursday');
+      await writer!.settled();
+      expect(contactGiven(engine)).toBeNull();
+      expect(provider.sendText).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('reading history from wa, a copy that never finishes adds no wait', async () => {
     const writer = {
       readsShared: () => false,
       mirrorInbound: jest.fn(() => new Promise<boolean>(() => undefined)),
       history: jest.fn(),
       sync: jest.fn(async () => true),
+      contactIdFor: jest.fn(async () => null),
     };
     const { inbound, engine } = build(
       { sharedStoreWrites: true, readHistoryFrom: 'wa' },
@@ -241,6 +306,7 @@ describe('WhatsApp inbound with the shared store', () => {
         order.push(`sync ${ids.join(',')} after ${after}`);
         return true;
       }),
+      contactIdFor: jest.fn(async () => null),
     };
     const { inbound, provider } = build({ sharedStoreWrites: true }, () => {
       return writer as unknown as WaSharedStoreWriter;

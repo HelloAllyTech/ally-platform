@@ -30,6 +30,7 @@ import {
   HANDOVER_COPY,
   handoverMessage,
   handoverOf,
+  type NeedsPersonReason,
   senderLabel,
   whatsappWindowOpen,
 } from './handover';
@@ -129,6 +130,7 @@ export class HandoverService implements OnModuleInit {
           conversationId,
         });
       } else if (decision.handover === 'asked') {
+        // An `assistant` hand-over was already marked by the gateway's `hand_over` tool (chunk 3b).
         await this.markNeedsPerson(chatbot.id, conversationId, 'asked');
       } else if (
         decision.handledBy === WaHandledBy.DECLINED &&
@@ -176,7 +178,7 @@ export class HandoverService implements OnModuleInit {
   async markNeedsPerson(
     chatbotId: string,
     conversationId: string,
-    reason: 'asked' | 'declined_twice',
+    reason: NeedsPersonReason,
   ): Promise<void> {
     await this.dataSource.query(
       `UPDATE chatbot_conversations

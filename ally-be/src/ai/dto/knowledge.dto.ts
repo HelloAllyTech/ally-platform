@@ -139,6 +139,30 @@ export interface KnowledgeAnswerRequest {
  * Mirrors ally-ai `app/schemas/agent_runtime.py::AgentRunRequest`; the limits noted here are its
  * validation (a 422 past them).
  */
+/**
+ * Where and how a run calls ally-be's tool gateway back (chunk 3b). Sent only for a bot with a
+ * tool on; `token` is a credential, signed for this run alone.
+ */
+export interface AgentGatewayBlock {
+  url: string;
+  token: string;
+  tools: string[];
+  /**
+   * The generated list tools (chunk 6), each `{ name, description, input_schema, kind }`. Sent
+   * only when the run has one; at most 12.
+   */
+  definitions?: {
+    name: string;
+    description: string;
+    input_schema: { type: 'object'; properties: Record<string, unknown> };
+    kind: 'find' | 'create' | 'update';
+  }[];
+  /** List tools the bot has on that didn't fit under the cap; named in the run's trace. */
+  omitted?: string[];
+  /** Today where the business is, for the agent's lists section; sent with `definitions`. */
+  today?: string;
+}
+
 export interface AgentRunRequest extends KnowledgeAnswerRequest {
   /**
    * The checkpointer's thread id: the conversation, or a `preview-…` thread.
@@ -160,6 +184,31 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
    * characters (`MAX_DECLINE_TEXT_CHARS`).
    */
   decline_text?: string;
+  /** The tool gateway, for a bot with a tool on (chunk 3b). Absent: today's run, search only. */
+  gateway?: AgentGatewayBlock;
+  /**
+   * What the assistant knows about the person (chunk 8a), when the bot's memory is on. `lines` is
+   * `renderMemory`'s text (at most 4,000 characters); `never_store` at most 60 lines.
+   */
+  memory?: { lines: string; never_store: string[] };
+  /** This chat's rolling summary of the messages before the last 10 (chunk 8a). */
+  summary?: string;
+  /** The person's name, when it's known (chunk 8a). At most 80 characters. */
+  person_name?: string;
+  /**
+   * What they told the page before the chat (chunk 8a): its choice, date and text answers other
+   * than their name, never their phone or email. At most 6, each part 120 characters.
+   */
+  before_chat?: { label: string; value: string }[];
+}
+
+/** One memory write a run asks for (chunk 8a); ally-be checks and applies it after the reply. */
+export interface AgentMemoryWrite {
+  op: 'add' | 'replace' | 'done' | 'forget' | 'name';
+  section?: 'preferences' | 'context' | 'open_items';
+  text?: string;
+  /** The short id of the line it changes (`m2`). */
+  id?: string;
 }
 
 /** What the conversational agent understood a message to be. */
@@ -193,6 +242,33 @@ export interface AgentRunResponse extends KnowledgeAnswerResponse {
    * grounded answer.
    */
   turn_type?: AgentTurnType;
+  /** The agent passed the chat to a person with `hand_over` (chunk 3b); the answer is empty. */
+  handover?: boolean;
+  /** What the run asked to remember (chunk 8a). Absent when nothing. */
+  memory_writes?: AgentMemoryWrite[];
+}
+
+/** ally-ai `/agent/memory-check` (chunk 8a). */
+export interface MemoryCheckRequest {
+  lines: string[];
+  never_store?: string[];
+  prompts?: Record<string, unknown>;
+}
+export interface MemoryCheckResponse {
+  keep: boolean[];
+  failed: boolean;
+}
+
+/** ally-ai `/agent/conversation-summary` (chunk 8a). */
+export interface ConversationSummaryRequest {
+  summary?: string | null;
+  messages: { role: 'user' | 'assistant'; content: string }[];
+  health?: boolean;
+  prompts?: Record<string, unknown>;
+}
+export interface ConversationSummaryResponse {
+  summary: string;
+  failed: boolean;
 }
 
 interface KnowledgePersonaRequest {
@@ -221,6 +297,11 @@ export interface KnowledgeCitation {
   section_path: string;
   source_url: string;
   similarity: number;
+  /**
+   * Set when the passage was a list record (chunk 6): `document_title` is the list's name,
+   * `section_path` the record's title, `document_id` empty and `chunk_id` the record's id.
+   */
+  record_id?: string;
 }
 
 export interface KnowledgeRetrievalMeta {
@@ -253,6 +334,11 @@ export interface KnowledgeAnswerResponse {
 
 export interface CrisisCheckRequest {
   message: string;
+  /**
+   * The person's own earlier messages in this conversation, newest last, without `message`
+   * (chunk 15a). Left out when there are none, so the request is exactly the old one.
+   */
+  history?: string[];
   prompts?: Record<string, unknown>;
 }
 

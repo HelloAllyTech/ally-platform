@@ -34,10 +34,12 @@ import { PersonalitySection } from "./sections/Personality";
 import { SafetySection } from "./sections/Safety";
 import { ShareSection } from "./sections/Share";
 import { TryIt } from "./TryIt";
+import { AssistantSwitcher } from "./ui/AssistantSwitcher";
 import { MoreMenu } from "./ui/Menu";
 import { Sheet } from "./ui/Sheet";
 import { useRestoreAssistant } from "./ui/useRestoreAssistant";
 import { HomeSaves, HomeSavesContext, SaveState } from "./useHomeField";
+import { ListsSection } from "./userLists/ListsSection";
 
 import "./home.css";
 import "./ui/scale.css";
@@ -97,13 +99,14 @@ export const AssistantHome: React.FC = () => {
   const fromUrl = sectionFromUrl(params);
   const section = fromUrl.section;
   const [panel, setPanel] = useState<Panel>(fromUrl.tryIt ? "try" : null);
+  const [tryQuestion, setTryQuestion] = useState<string | undefined>();
 
   // The page's one save status and "Changed · Undo" toast, fed by every field.
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [undo, setUndo] = useState<{ run: () => void; key: number } | null>(null);
+  const [undo, setUndo] = useState<{ run: () => void; key: number; message?: string } | null>(null);
   const saves = useMemo<HomeSaves>(
     () => ({
-      changed: run => setUndo({ run, key: Date.now() }),
+      changed: (run, message) => setUndo({ run, key: Date.now(), message }),
       status: setSaveState,
     }),
     [],
@@ -178,7 +181,11 @@ export const AssistantHome: React.FC = () => {
   const canEdit =
     !archived && RANK[bot.myRole] >= RANK[ChatbotMemberRole.EDITOR] && home.data.canEdit;
   const canManage = !archived && RANK[bot.myRole] >= RANK[ChatbotMemberRole.OWNER];
-  const props = { bot, home: home.data, canEdit, canManage, go };
+  const tryIt = (question?: string) => {
+    setTryQuestion(question);
+    setPanel("try");
+  };
+  const props = { bot, home: home.data, canEdit, canManage, go, tryIt };
 
   const panelLabel =
     panel === "try"
@@ -206,7 +213,15 @@ export const AssistantHome: React.FC = () => {
         }}
       />
     ) : panel === "try" ? (
-      <TryIt bot={bot} page={page ?? null} onClose={() => setPanel(null)} />
+      <TryIt
+        bot={bot}
+        page={page ?? null}
+        question={tryQuestion}
+        onClose={() => {
+          setPanel(null);
+          setTryQuestion(undefined);
+        }}
+      />
     ) : panel === "engine" ? (
       <EnginePanel bot={bot} onClose={() => setPanel(null)} onTry={() => setPanel("try")} />
     ) : panel === "settings" ? (
@@ -217,6 +232,8 @@ export const AssistantHome: React.FC = () => {
     switch (id) {
       case "knows":
         return <KnowsSection {...props} />;
+      case "lists":
+        return <ListsSection {...props} />;
       case "personality":
         return <PersonalitySection {...props} />;
       case "safety":
@@ -262,6 +279,7 @@ export const AssistantHome: React.FC = () => {
               </nav>
               <div className="ally-home__title-row">
                 <h1 className="ally-home__title">{bot.name}</h1>
+                <AssistantSwitcher bot={bot} section={section} phone={phone} />
                 <StatusPill bot={bot} />
                 <span className="ally-small ally-home__saving" aria-live="polite">
                   {saveState === "saving"
@@ -399,7 +417,7 @@ export const AssistantHome: React.FC = () => {
             {undo && (
               <Toast
                 key={undo.key}
-                message={COPY.look.changed}
+                message={undo.message ?? COPY.look.changed}
                 actionLabel={COPY.look.undo}
                 onAction={undo.run}
                 onDone={() => setUndo(null)}

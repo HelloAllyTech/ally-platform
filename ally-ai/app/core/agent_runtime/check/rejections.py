@@ -22,6 +22,7 @@ class Rejection(StrEnum):
     USE_FOUND = "use_found"
     SEARCH_AGAIN = "search_again"
     OFFERS_SLOT = "offers_slot"
+    UNFOUND_SLOT = "unfound_slot"
 
 
 def rejection_feedback(
@@ -38,6 +39,7 @@ def rejection_feedback(
         Rejection.EMPTY,
         Rejection.SEARCH_FIRST,
         Rejection.MENTIONS_SOURCES,
+        Rejection.UNFOUND_SLOT,
     ):
         feedback += " You haven't searched yet: search before you reply."
     return feedback
@@ -87,5 +89,11 @@ REJECTIONS: Dict[Rejection, str] = {
         "It named a day or time as available, called it a slot, or said it was "
         "booked. You can't see or hold appointments: say the team will confirm "
         "what's free, and keep the rest."
+    ),
+    Rejection.UNFOUND_SLOT: (
+        "It named a day or time as free, or as booked, without citing an entry a "
+        "find_ or create_ tool returned. Look it up with find first and offer only "
+        "what it shows, citing it; say something is booked only after create or "
+        "update did it, citing that."
     ),
 }

@@ -72,6 +72,10 @@ export const ENDPOINTS = {
   KNOWLEDGE_AGENT_CRISIS_CHECK: 'api/v1/knowledge-agent/crisis-check',
   /** Agents v2: the LangGraph runtime. 404 while ally-ai's AGENT_RUNTIME__ENABLED is off. */
   AGENT_RUN: 'api/v1/agent/run',
+  /** Memory, light (chunk 8a): which lines a health assistant may keep. Fails closed. */
+  AGENT_MEMORY_CHECK: 'api/v1/agent/memory-check',
+  /** Memory, light (chunk 8a): a chat's rolling summary, after the reply. */
+  AGENT_CONVERSATION_SUMMARY: 'api/v1/agent/conversation-summary',
   /** The instructions a run would start from, without running (chunk 20d-2). */
   AGENT_INSTRUCTIONS: 'api/v1/agent/instructions',
   AGENT_INSTRUCTIONS_CHECK: 'api/v1/agent/instructions/check',

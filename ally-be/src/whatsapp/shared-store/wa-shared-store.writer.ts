@@ -160,6 +160,37 @@ export class WaSharedStoreWriter {
     return true;
   }
 
+  /**
+   * The shared store's contact for this WhatsApp contact, resolved now (chunk 6): the run token
+   * needs it before the reply, and the background copy hasn't run yet. The same resolution the
+   * copy makes (`copyThread`), so both land on one row. Null while `sharedStoreWrites` is off, or
+   * if it fails: that run isn't offered the tools of lists with a person field.
+   */
+  async contactIdFor(
+    settings: WhatsAppBotSettings,
+    contact: WaContact,
+    chatbotId: string,
+  ): Promise<string | null> {
+    if (!settings.sharedStoreWrites) return null;
+    try {
+      const identity = whatsappIdentityOf(contact);
+      const shared = await this.conversations.resolveContact(
+        { chatbotId },
+        ConversationChannel.WHATSAPP,
+        identity.externalId,
+        {
+          verified: identity.verified,
+          verifiedAt: identity.verifiedAt,
+          preferredIds: contactIdsFor(contact.id, chatbotId),
+        },
+      );
+      return shared.id;
+    } catch (error) {
+      this.recordFailure('contact', contact.id, error);
+      return null;
+    }
+  }
+
   /** The thread and its contact, copied with the `wa_*` ids. Null for a thread with no bot. */
   private async copyThread(
     waConversationId: string,

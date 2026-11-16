@@ -557,7 +557,7 @@ says when a save can't be made. More lines for the home's sections are added her
   - On a phone, from a chat: Back to chats
   - Settings hint for opening hours: Without opening hours, visitors are always told when you usually reply.
   - List labels: Needs a person · Safety · {name} is replying · Your assistant
-  - Reasons: Asked for a person · Couldn't help twice
+  - Reasons: Asked for a person · Couldn't help twice · Your assistant passed it on
   - Empty inbox: No conversations yet. They'll appear here as people chat.
   - No chat open: Pick a chat to read it.
   - Nothing needs a person: Nobody is waiting for a person.
@@ -720,3 +720,490 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Overview numbers, with the 7 / 30 days switch (20d-2, at approval):** Your numbers · Show the last · 7 days · 30 days
 - **Overview, All numbers (CL1, replacing the classic usage tab; opens in place under the numbers):** See all numbers · Hide all numbers · Show the last · 7 days · 30 days · 90 days · Messages in · People · Didn't know · Of the questions it was asked · Too few questions to say · Typical reply time · 1 in 20 took {s} s or longer · {s} s · What happened to each message · Answered · Didn't know · Asked to clarify · Safety replies · From numbers it didn't recognise · Errors on our side · Other · Replies per day · {day}: {n} replies · Languages · Language · Questions · Documents it used most · {n} times · Not used in this period: 1 document · Not used in this period: {n} documents · No messages in this period yet. · We couldn't load these numbers. · Try again
 - **The header's `···` menu, staff only (CL1, replacing the classic view's Settings tab):** Settings · This assistant's own engine settings. Only platform admins see this.
+
+## 26. Lists (5a)
+
+*(The refusals a list write can get. The owner's screens (5b) and the agent (6) both show them. `{field}` is the field's label; mid-sentence, a label or list name reads in lower case, as in "That slot is already taken.")*
+
+- **required_missing:** {field} is needed.
+- **invalid_value:** {field} isn't valid: {why}.
+- **not_writable:** {field} can't be changed here.
+- **unique_taken:** That {field} is already taken.
+- **capacity_full:** {target} is full.
+- **limit_reached:** This person already has {max} {list}.
+- **transition_not_allowed:** {list} can't go from {from} to {to}.
+- **not_found:** That entry doesn't exist any more.
+- **version_conflict:** Someone changed this entry just now. Reload and try again.
+- **limit_exceeded:** This would go over the limit of {limit}.
+
+**The `{why}` reasons (5a, in the engine):** it should be text · it's longer than {max} characters · it should be a number · it should be a whole number of minutes · it should be a date like 2026-11-20 · it should be a date and time with its offset, like 2026-11-20T11:15:00+05:30 · it should be one of {values} · it should be yes or no · it isn't a phone number · it isn't an email address · it isn't a web address · it should be an entry's id · that entry doesn't exist · it isn't a field of this list · its type can't change while entries have a value for it · {n} entries already break it (adding a rule).
+
+**`{limit}` (5a):** 50 lists · 100 fields · 200,000 entries · 32 KB per entry · 5,000 rows a file · 5 MB a file · 20 rules.
+
+**When a run fails after a list write (6):** Done: {record title} in {list}. *(8a: one line per write, in order; a change that set a status says it instead: "{Status}: {record title} in {list}.", e.g. "Cancelled: Thu 19 Nov 2026, 19:00 in Appointments.")* *(Sent instead of the bot's fallback wording when the assistant booked or changed something and then couldn't finish its reply; the record's title as the list shows it, the list's name as the owner wrote it.)*
+
+**Added in 5b (ally-be, in the engine):**
+
+- **in_use:** {n} entries in {list} use this. Cancel or move them first. · One: 1 entry in {list} uses this. Cancel or move it first. *(Two lists are joined with "and".)*
+- **More `{why}` reasons:** there's already a list with this name · there's none called {name} · no detail lets your assistant fill it in · it should be a date and time · choose at least one day of the week · they should be like 10:00 · it should be after the start · it should be 5 to 720 minutes · it should be a date like 2026-11-20, on or after the start · it should be within a year
+- **More `{limit}`:** 500 entries at a time
+
+
+## 27. Lists in the dashboard (5b)
+
+*(Approved at 5b's stop, 14 Nov, with Shehbaz's changes. The owner's Lists section on the assistant's home. On screen, say entries, details, "can move to" and "linked to"; never record, field, transition or relation. A list's name keeps its capital everywhere, as the owner gave it ("New entry in Appointments"); only Repeat weekly's count uses it as a plain plural ("This adds 35 slots."). A detail's label reads in lower case mid-sentence. Statuses and choices show as written, with `_` as a space and a capital first letter: "No show". Dates and times read "Mon 16 Nov, 15:00", never with the year.)*
+
+**The section:**
+
+- Lists
+- Bookings, leads and orders your assistant can look up and keep.
+- Each list is a table you own. Your assistant can look things up in it and, if you let it, add and change entries, always under the rules you set here.
+
+**No lists yet:**
+
+- Keep your bookings, leads and orders here
+- Your assistant can look things up in them and, if you let it, book and change entries.
+- Start from a ready-made list
+- Appointments, classes, orders and more, set up for you.
+- Start from scratch
+- Name it, then add the details you want to keep.
+
+**Tabs:**
+
+- Your lists
+- Add a list
+- Add a list
+
+**The blocks under the table:**
+
+- Details
+- What each entry keeps. Your assistant only sees what you let it see.
+- Rules
+- Your assistant and your team both follow these. A change that breaks one is stopped, with the reason.
+- What your assistant can do
+- It only ever acts for the person it's talking to, and always under this list's rules.
+
+**Entries:**
+
+- Search {list}
+- Filters
+- Any {detail}
+- Clear filters
+- Sort by {detail}
+- Add an entry
+- Edit {title}
+- Edit
+- Open
+- Delete {title}
+- Show more
+- {shown} of {total}
+- By your assistant
+- No entries yet
+- Add the first one, or turn on Add below and your assistant will add them as people book.
+- Add one, or fill the next few weeks at once with Repeat weekly.
+- Nothing matches “{query}”.
+- Nothing matches these filters.
+- Clear
+- We couldn't load these entries.
+- Try again
+- Your {detail} choices are still examples. Replace them with yours.
+- Replace them
+- Not set
+- —
+
+**An entry (add and edit):**
+
+- New entry in {list}
+- Edit entry
+- Needed
+- Save
+- Add it
+- Saving…
+- Saved
+- Cancel
+- Close
+- Couldn't save. Try again.
+- Reload
+- Yes
+- No
+- Choose…
+- Choose a person
+- Choose from {list}
+- Search {list}
+- Nothing matches.
+- From {status}, it can move to {next}.
+- Free nearby:
+- Use {title}
+- {status} is where it ends.
+- Added by you on {date}
+- Added by {name} on {date}
+- Added by your assistant on {date}
+- Added from a file on {date}
+- Open the conversation
+- Your assistant never sees this.
+
+**Date and time pickers:**
+
+- Choose a date
+- Time
+- Previous month
+- Next month
+- Today
+
+**Delete:**
+
+- Delete this entry?
+- {title} leaves the list. You can undo it for a few seconds.
+- Delete it
+- Keep it
+- Entry deleted
+- Undo
+
+**Details:**
+
+- Add a detail
+- Name
+- Kind
+- *Kinds:*
+  - Short text
+  - Long text
+  - Number
+  - Amount (₹)
+  - Date
+  - Date and time
+  - Minutes
+  - Choice
+  - Yes or no
+  - Phone number
+  - Email
+  - Web address
+  - Linked to another list
+  - Linked to a person
+- Linked to {list}
+- Linked to a person in your chats
+- Which list?
+- Choices
+- Add a choice
+- Remove {value}
+- Every entry needs this
+- Starts as
+- Nothing
+- Move {detail} up
+- Move {detail} down
+- Remove {detail}
+- Past entries keep their values, but it isn't shown or asked for any more.
+- Privacy
+- Your assistant can see this
+- Your assistant can fill this in
+- Hide most of it from your assistant
+- Never take this from a conversation
+- Whose entry is this?
+- Each entry belongs to this person. Your assistant only ever sees the entries of the person it's talking to.
+- Nobody's: it's one shared list
+- This can't change now that the list has entries: each one already belongs to someone.
+- Save
+- Cancel
+- Change {detail}
+
+**Rules, in plain words:**
+
+- Add a rule
+- No rules yet. Add one to stop double bookings or a full class.
+- {n} rules
+- 1 rule
+- Which kind of rule?
+- Remove this rule
+- Add the rule
+- Cancel
+- *Kinds:*
+  - Only one entry per…
+  - At most a number of entries per…
+  - At most a number per person
+  - A choice can only move in order
+- Only one entry per {detail}.
+- At most {n} entries per {detail}.
+- As many entries per {detail} as its {number}.
+- At most {n} per person.
+- {detail} can only move like this:
+- {from} can move to {to}.
+- New entries start as {values}.
+- Not counting entries whose {detail} is {values}.
+- or
+- So two people can't book the same {detail}.
+- So a {detail} stops taking entries once it's full.
+- So one person can't hold more than {n} at a time.
+- So nothing skips a step: an entry moves only the way you set here.
+- *The add-a-rule form:*
+  - Per
+  - How many
+  - A number
+  - Its own number
+  - Not counting entries whose
+  - is
+  - From
+  - Can move to
+  - New entries start as
+  - Count every entry
+- {n} entries already break this rule. Change them first, or adjust the rule.
+- Open {title}
+
+**What your assistant can do:**
+
+- Look things up in it
+- Add entries
+- Change entries
+- Do it
+- Never
+- It might say
+- “{title} is free. Shall I book it?”
+- “Here's what I found in {list}.”
+- “Done: you're booked for {title}.”
+- “Done: I've added that to {list}.”
+- “Done: I've changed that for you.”
+- Add and Change appear once a detail lets your assistant fill it in.
+- Your assistant books these through {list}: each booking is added there. *(8a: on a list another list books, such as Tables through Reservations)*
+- To let your assistant book these, turn on Add entries in {list}.
+- Your assistant will book only after the person confirms. Check new entries for the first few days.
+- Got it
+
+**Start from a ready-made list (the guided setup):**
+
+- Start from a ready-made list
+- Step {n} of {total}
+- *Step names:*
+  - Choose a list
+  - Make it yours
+  - Add times
+  - Let your assistant use it
+  - Try it
+- Next
+- Back
+- Skip
+- Skip for now
+- Done
+- Close
+- Use this list
+- Comes with {list}
+- People can ask
+- What it keeps
+- You already have it
+- Setting it up…
+- {list} is ready.
+- Couldn't set it up. Try again.
+- Make {list} yours
+- These are examples to get you started. Replace them with your own.
+- Example
+- Add
+- Add a {detail}
+- Keep at least one.
+- Add the times people can book
+- Pick the days and hours. You can change or remove any of them later.
+- What can your assistant do with {list}?
+- Start with looking things up. Turn on Add and Change once you've tried a booking in Try it.
+- Try it out
+- Ask your assistant what a customer would. Nothing you do in Try it is saved.
+- Open Try it
+- Go to {list}
+
+**Repeat weekly until:**
+
+- Repeat weekly
+- Repeat weekly until
+- Days
+- Mon · Tue · Wed · Thu · Fri · Sat · Sun
+- From
+- Until
+- Every
+- {n} minutes
+- 1 hour
+- Repeat until
+- This adds {n} {list}.
+- This adds 1 entry.
+- That adds nothing. Check the days and times.
+- {n} are already there, so they're skipped.
+- The first few:
+- Add them
+- Adding…
+- Added {n} {list}.
+- That's more than 500 at once. Choose an earlier end date.
+- Counting…
+- For each one
+- Fill in {detail} first.
+- Every time you add gets these. For another practitioner, repeat it again.
+- Every time you add gets these. *(8a: replaces the line above; several practitioners, tables or teachers go in one batch now)*
+- Add one or more. Each gets every time above.
+- Add {detail}
+- Remove {value}
+
+**Start from scratch:**
+
+- Start a new list
+- What's it called?
+- Orders, Rooms, Waiting list…
+- You'll add its details next.
+- Create the list
+
+**Switch assistant:**
+
+- Switch assistant
+- Your assistants
+- You're here
+- WhatsApp
+- Website
+- Page
+- Not shared yet
+
+**Try it:**
+
+- Test only: this wasn't saved.
+
+**The purpose's honest limit (How it works):**
+
+- What it can't do yet
+- It books into your {list} list. It can't take payments yet.
+- It can't book or take payments yet. It sends you each new enquiry by email.
+- It doesn't keep track of each person's progress yet.
+
+## 28. Memory (8a)
+
+*(Drafted at 8a. What the assistant remembers about each person between chats, and the rolling summary of a long chat. On screen, say "remembers" and "forget", never memory entries, records or profile. A line reads as the assistant wrote it ("prefers evenings"); the date is when the person last said it, "12 Nov", never with the year. Editors change and forget; viewers read.)*
+
+**How it works, the switch:**
+
+- Remember people between chats
+- Your assistant keeps short notes about each person, like "prefers evenings", and uses them next time. You can see and forget every note in the Inbox.
+- It never remembers:
+- Always on this list
+- Add something it should never remember
+- Add
+- Remove {item}
+- Up to 20 of your own.
+
+**The Inbox, beside a chat:**
+
+- What your assistant remembers about {name}
+- What your assistant remembers about this person
+- Still open
+- Preferences
+- Context
+- From their message on {date}
+- Changed by your team
+- Nothing yet. Notes appear here as they chat.
+- Forget
+- Forget “{line}”
+- Edit
+- Save
+- Cancel
+- Forgotten.
+- Write it in 1 to 200 characters.
+- That's on the list of things your assistant never remembers.
+- Couldn't change this. Try again.
+- Forget this person
+- Forget everything about {name}?
+- Forget everything about this person?
+- Your assistant forgets every note about them and the summaries of their chats. Their messages stay.
+- Forget everything
+- Keep
+- Your assistant has forgotten them.
+- We couldn't load what your assistant remembers.
+- Try again
+
+**The Inbox panel, in more detail (8a, after Shehbaz's test):**
+
+- It uses these in later chats, so {name} doesn't have to repeat themselves. You can change or forget any of it.
+- It uses these in later chats, so they don't have to repeat themselves. You can change or forget any of it.
+- About them
+- Name
+- Not given yet
+- What they told the page before the chat
+- Your assistant reads this in every chat.
+- Notes it keeps
+- Things they're waiting on. Marked done when sorted, or dropped after 30 days.
+- How they like things. Used to suggest times and options.
+- Useful background about them.
+- Said on {date} in this chat
+- Said on {date} in an earlier chat
+- Kept until {date}
+- Kept until forgotten
+- This chat so far
+- Your assistant's own summary of the earlier messages, which it no longer reads word for word.
+- It never keeps:
+- Change this in How it works
+
+**When memory is off:**
+
+- Your assistant doesn't remember people between chats.
+- Turn it on in How it works
+
+**Try it:**
+
+- Would remember: {line}
+
+## 29. Tools (8a)
+
+*(Drafted 16 Nov at Shehbaz's request: the Lists section becomes Tools, everything the assistant can use. Its pages, its memory, a person on the team, and the owner's own lists, each a tab; a list's tab opens its table as before. The section's address stays `?section=lists`. On screen, "tool" and "list"; a list keeps its name as the owner gave it.)*
+
+**The section:**
+
+- Tools
+- Everything your assistant can use: your pages, its memory, your team, and your own lists.
+- Each tool is something your assistant can use. Your lists are tables you own: it looks things up in them and, if you let it, books and changes entries, always under your rules.
+- Your tools
+- Add a tool
+
+**Your pages:**
+
+- Your pages
+- {n} pages
+- Your assistant searches your pages to answer questions, and says where each answer came from.
+- Manage in What it knows
+
+**Memory:**
+
+- Memory
+- On
+- Off
+- See what it remembers in the Inbox
+
+**Hand over:**
+
+- Hand over
+- When someone asks for a person, your assistant tells them your team has been asked, and lets you know.
+- Change in Share
+
+**A list's menu:**
+
+- More for {list}
+- Rename
+- Delete list
+- Rename {list}
+- Name
+- Save
+- Cancel
+- Couldn't rename it. Try again.
+- Delete {list}?
+- It goes with its 1 entry. You can undo this.
+- It goes with its {n} entries. You can undo this.
+- You can undo this.
+- Keep
+- Couldn't delete it. Try again.
+- {list} deleted.
+- Appointments links to this list. Delete Appointments first, or remove that detail. *(from ally-be, with the linking list's name; the dialog now offers to delete them together instead)*
+- Delete {list} and {others}?
+- Deleting {list} also deletes {others}, which uses it. That's {n} entries in all. You can undo this.
+- Deleting {list} also deletes {others}, which use it. That's {n} entries in all. You can undo this.
+- Delete everything
+- {list} and {others} deleted.
+
+**A list's choices, always in view:**
+
+- Your {detail} choices
+- Your assistant offers these, and people choose from them.
+- Edit
+
+**How it works and the Inbox, after the move:**
+
+- Memory has moved to Tools.
+- Open Tools
+- Turn it on in Tools
+- Change this in Tools

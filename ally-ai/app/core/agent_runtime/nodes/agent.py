@@ -7,17 +7,22 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, Literal, Tuple, Union
 
-from app.core.agent_runtime import conversation
+from app.core.agent_runtime import conversation, memory
 from app.core.agent_runtime.budget import (
+    MAX_TOOL_STEPS,
     MUST_SEARCH_AFTER,
     REWRITE_RESERVE_SECONDS,
+    is_search,
     recent,
-    tool_budget,
+    run_cap,
+    search_budget,
+    searches,
+    steps_left,
 )
 from app.core.agent_runtime.schemas import REPLY_ACTION
 from app.core.agent_runtime.state import AgentState, json_safe
-from app.core.agent_runtime.tools import allowed_tools
-from app.core.agent_runtime.trace import Node, StatusCode, traced
+from app.core.agent_runtime.tools import gateway_tools, search_tools
+from app.core.agent_runtime.trace import Node, StatusCode, trace_step, traced
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
@@ -51,18 +56,46 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
                 "revisions": 0,
                 "started_at": time.time(),
             }
-        budget = tool_budget(state)
-        # Past the cap the schema itself offers only `reply`.
-        tools = allowed_tools(bot) if budget > 0 else []
+            omitted = bot.get("gateway_omitted") or []
+            if omitted:
+                # List tools over the cap of 12 (chunk 6), named once per run.
+                start["trace"] = [
+                    trace_step(
+                        "tools",
+                        time.monotonic(),
+                        "list tools left out (over 12): " + ", ".join(omitted),
+                    )
+                ]
+        budget = search_budget(state)
+        # Past the caps the schema itself offers only `reply`. Searches keep their
+        # own limit; gateway tools (chunk 3b) are offered while a tool step of any
+        # kind fits, and only when ally-be's request named them.
+        offered_searches = search_tools(bot) if budget > 0 else []
+        # A gateway tool that failed isn't offered again this run: it's shown as
+        # not done, and calling it again would only spend the run's time (each
+        # call may wait 5 s) and run it past its cap. One that succeeded may run
+        # again within the step cap (chunk 6): find can look at Thursday, then
+        # Friday. `hand_over` ends the run when it succeeds.
+        failed = {
+            call.get("tool")
+            for call in state.get("tool_calls") or []
+            if not is_search(call) and not call.get("ok")
+        }
+        offered_gateway = (
+            [tool for tool in gateway_tools(bot) if tool.name not in failed]
+            if steps_left(state)
+            else []
+        )
+        tools = offered_searches + offered_gateway
         # Sent back for not searching, and still nothing searched: this step can
         # only search. Asking alone was not enough in the eval.
         # A step sent back to search again (SEARCH_AGAIN) is asked to, not forced:
         # forcing the schema made a step that replied anyway fail validation, and
         # the failed run fell back to v1 (chunk 20a-2).
         must_search = bool(
-            tools
+            offered_searches
             and state.get("feedback") in MUST_SEARCH_AFTER
-            and not state.get("tool_calls")
+            and not searches(state)
         )
         started_at = state.get("started_at") or start["started_at"]
 
@@ -70,14 +103,15 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             return await conversation.agent_step(
                 state["question"],
                 passages=state.get("passages") or [],
-                tools=tools,
+                # Forced to search: only the searches are offered.
+                tools=offered_searches if force else tools,
                 tool_budget=budget,
                 bot=bot,
                 history=recent(state.get("history")),
                 searches=state.get("tool_calls") or [],
                 feedback=state.get("feedback_text"),
                 must_search=force,
-                timeout=_time_left(started_at),
+                timeout=_time_left(started_at, state),
             )
 
         try:
@@ -86,11 +120,23 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             # A step that doesn't fit the schema (forced to search but replied, or
             # a search with no query) would fail the run, and v1 would answer.
             # Asked once more, unforced, while there's time for it (chunk 20a-2).
-            if _time_left(started_at) < REWRITE_RESERVE_SECONDS:
+            if _time_left(started_at, state) < REWRITE_RESERVE_SECONDS:
                 raise
             step, meta = await step_once(False)
+        # What the step asked to remember (chunk 8a): collected, returned with the
+        # result, never stored here. The trace gets counts, never the text.
+        writes = memory.collect(
+            state.get("memory_writes") or [], step, memory.remember_mode(bot)
+        )
+        added = writes[len(state.get("memory_writes") or []) :]
+        if added:
+            start["trace"] = [
+                *(start.get("trace") or []),
+                trace_step("remember", time.monotonic(), memory.trace_summary(added)),
+            ]
         return {
             **start,
+            "memory_writes": writes,
             "agent_step": json_safe(step),
             "agent_meta": json_safe(meta),
             "agent_calls": (state.get("agent_calls") or 0) + 1,
@@ -103,17 +149,22 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
     return agent
 
 
-def _time_left(started_at: float) -> float:
-    """Seconds left of the run's hard cap, for the model call (at least one)."""
-    deadline = started_at + settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS
+def _time_left(started_at: float, state: AgentState) -> float:
+    """Seconds left of the run's hard cap, for the model call (at least one). The cap
+    grows once the run has written (chunk 8a, budget.run_cap)."""
+    deadline = started_at + run_cap(state)
     return max(deadline - time.time(), 1.0)
 
 
 def route_after_agent(state: AgentState) -> Literal["tools", "check"]:
-    # Only the cap here: a step that was offered a search runs it, even if the time
+    # Only the caps here: a step that was offered a tool runs it, even if the time
     # budget ran out while the model was deciding.
     action = (state.get("agent_step") or {}).get("action", REPLY_ACTION)
-    calls = len(state.get("tool_calls") or [])
-    if action != REPLY_ACTION and calls < settings.AGENT_RUNTIME.MAX_TOOL_CALLS:
+    calls = state.get("tool_calls") or []
+    if action == REPLY_ACTION or len(calls) >= MAX_TOOL_STEPS:
+        return "check"
+    if action in {tool.name for tool in gateway_tools(state["bot"])}:
+        return "tools"
+    if len(searches(state)) < settings.AGENT_RUNTIME.MAX_TOOL_CALLS:
         return "tools"
     return "check"

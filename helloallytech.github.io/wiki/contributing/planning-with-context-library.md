@@ -113,7 +113,8 @@ no library unless you added it at user scope (above).
 **Builder's design runs need no key of their own.** Builder's runner reaches the same MCP
 endpoint with the platform's service-to-service key (the `X-API-Key` it already uses for every
 other ally-be call), which the endpoint accepts in place of a reader key with exactly the same
-read-only grants. So the Builder workflow has no Context Library setting to configure; setting
+read-only grants. It is compared in constant time by ally-be's shared service-key check, the same
+one the Agents v2 tool gateway uses. So the Builder workflow has no Context Library setting to configure; setting
 `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY` for it is only an override. Engineers'
 own sessions still use a reader key, as above.
 

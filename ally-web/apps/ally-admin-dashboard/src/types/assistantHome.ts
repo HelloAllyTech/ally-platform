@@ -28,6 +28,18 @@ export interface HomeFieldValues {
   widget: WidgetSettings;
   /** Who can message it on WhatsApp (chunk 20d-2). */
   whatsappAccess: ChatbotAccessMode;
+  /** Remember people between chats (chunk 8a), and what it never remembers. */
+  memory: MemorySettings;
+}
+
+/**
+ * Memory (chunk 8a): off by default. `defaults` are every bot's and the safety pack's, shown and
+ * never removable; `neverStore` is the owner's own lines, up to 20.
+ */
+export interface MemorySettings {
+  on: boolean;
+  neverStore: string[];
+  defaults: string[];
 }
 
 export interface WidgetSettings {
@@ -198,6 +210,8 @@ export interface HowItWorks {
   };
   purpose: string | null;
   safetyPack: string | null;
+  /** Lists the assistant books into: Add is Do it (chunk 5b). */
+  bookingLists?: string[];
 }
 
 export type HowLayer =

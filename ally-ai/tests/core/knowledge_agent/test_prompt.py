@@ -8,11 +8,14 @@ wrong passage — the answer would still read fine.
 
 from app.core.knowledge_agent.prompt import (
     ANSWER_PROMPT_PATH,
+    MAX_CRISIS_HISTORY_CHARS,
     MAX_PASSAGE_CHARS,
+    NO_CRISIS_HISTORY,
     TRANSLATE_PROMPT_PATH,
     build_answer_prompt,
     build_crisis_prompt,
     build_translate_prompt,
+    format_crisis_history,
     format_history,
     format_passages,
 )
@@ -167,3 +170,80 @@ class TestTemplatesResolve:
 
         assert "आत्महत्या के बारे में कैसे पूछूं?" in rendered
         assert "{question}" not in rendered
+
+
+def crisis_override(template):
+    """A Skills Store override of the crisis prompt's text, as ally-be sends it."""
+    return {
+        "ally_ai_knowledge_crisis_classify": {
+            "prompt": template,
+            "availableVariables": [{"name": "message"}, {"name": "history"}],
+        }
+    }
+
+
+class TestCrisisHistory:
+    """Chunk 15a: the crisis check reads the sender's earlier messages.
+
+    A follow-up like "I mean it" carries no risk on its own; it is only readable against
+    the disclosure before it. The old text must keep rendering exactly as before,
+    because production gets the new text only after the code that fills `{history}`.
+    """
+
+    # The live text before chunk 15a used only `{message}`.
+    OLD_TEXT = "Decide whether the message shows risk.\n\n# Message\n{message}\n"
+
+    def test_an_old_text_renders_exactly_as_before(self):
+        old = crisis_override(self.OLD_TEXT)
+        expected = "Decide whether the message shows risk.\n\n# Message\nhello"
+        assert build_crisis_prompt("hello", prompts=old) == expected
+        assert build_crisis_prompt("hello", history=[], prompts=old) == expected
+        assert (
+            build_crisis_prompt("hello", history=["earlier"], prompts=old) == expected
+        )
+
+    def test_the_seed_renders_with_and_without_history(self):
+        none = build_crisis_prompt("hi")
+        assert "{history}" not in none and "{message}" not in none
+        assert NO_CRISIS_HISTORY in none
+
+        some = build_crisis_prompt("I mean it", history=["I saved up my pills"])
+        assert "- I saved up my pills" in some
+        assert NO_CRISIS_HISTORY not in some
+
+    def test_history_reaches_a_text_that_uses_it(self):
+        rendered = build_crisis_prompt(
+            "I mean it",
+            history=["I've saved up my pills", "tonight I'm taking them all"],
+            prompts=crisis_override("Earlier:\n{history}\nLatest: {message}"),
+        )
+        assert rendered == (
+            "Earlier:\n- I've saved up my pills\n- tonight I'm taking them all\n"
+            "Latest: I mean it"
+        )
+
+    def test_a_text_that_uses_history_renders_without_any(self):
+        rendered = build_crisis_prompt(
+            "hi", prompts=crisis_override("Earlier:\n{history}\nLatest: {message}")
+        )
+        assert rendered == f"Earlier:\n{NO_CRISIS_HISTORY}\nLatest: hi"
+
+    def test_keeps_the_newest_five_oldest_first(self):
+        rendered = format_crisis_history([f"m{i}" for i in range(8)])
+        assert rendered.splitlines() == ["- m3", "- m4", "- m5", "- m6", "- m7"]
+
+    def test_drops_blank_messages_and_flattens_whitespace(self):
+        assert format_crisis_history(["  ", "a\n  b", ""]) == "- a b"
+        assert format_crisis_history(["", " "]) == NO_CRISIS_HISTORY
+
+    def test_the_character_budget_keeps_the_newest_text(self):
+        old = "o" * 1000
+        middle = "m" * 1200
+        new = "n" * 400
+        rendered = format_crisis_history([old, middle, new]).splitlines()
+
+        assert rendered[-1] == f"- {new}"
+        # The message that crosses the budget keeps its end; anything older is gone.
+        assert rendered[0].startswith("- …m")
+        assert len(rendered) == 2
+        assert sum(len(line) - 2 for line in rendered) == MAX_CRISIS_HISTORY_CHARS

@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from app.core.agent_runtime.prompt import build_agent_prompt
 from app.core.agent_runtime.tools import allowed_tools
+from app.core.agent_runtime.tools.lists import offers_create
 from app.core.builder.change import weakens_safety
 from app.core.config import settings
 from app.core.knowledge_agent.prompt import (
@@ -50,6 +51,10 @@ def first_step_prompt(bot: Dict[str, Any]) -> str:
         max_chars=bot.get("max_answer_chars") or 1400,
         persona=bot.get("persona"),
         prompts=bot.get("prompts"),
+        # Bring in customers' booking variant when the assistant can book (8a), so
+        # How it works shows what a run is given.
+        can_book=offers_create(bot.get("gateway_definitions")),
+        channel=bot.get("channel"),
     )
 
 
@@ -74,7 +79,12 @@ def split_parts(bot: Dict[str, Any], full: str) -> List[Dict[str, Any]]:
             :MAX_PERSONA_PROMPT_CHARS
         ]
         rules = (persona.get("safety_rules") or "").strip()
-        purpose = format_purpose(persona, prompts)
+        purpose = format_purpose(
+            persona,
+            prompts,
+            can_book=offers_create(bot.get("gateway_definitions")),
+            channel=bot.get("channel"),
+        )
         at = 0
         for layer, piece in (
             ("business", f"You are {name}." if name else ""),

@@ -32,6 +32,11 @@ import {
 } from '../../chatbot/type/chatbot.type';
 import { SafetyLockedError } from '../safety-pack/safety-lock';
 import { packFor } from '../safety-pack/safety-packs';
+import { memorySettingsOf } from '../../chatbot/memory/memory-settings';
+import {
+  cleanOwnerNeverStore,
+  neverStoreList,
+} from '../../chatbot/memory/never-store';
 
 /**
  * The assistant home's fields (chunk 20d): each thing an owner edits once, mapped to every place it
@@ -414,6 +419,53 @@ export const HOME_FIELDS = {
       },
     }),
   } as HomeField<HandoverSettings>,
+
+  /**
+   * Remember people between chats (chunk 8a), off by default, and the things it must never remember.
+   * `defaults` (every bot's, and a health pack's) are shown and can't be removed: only the owner's
+   * own lines are saved.
+   */
+  memory: {
+    read: (s) => {
+      const settings = memorySettingsOf(s.chatbot);
+      return {
+        on: settings.on,
+        neverStore: settings.neverStore,
+        defaults: neverStoreList(s.chatbot.safetyPack, []),
+      };
+    },
+    parse: (value) => {
+      if (!value || typeof value !== 'object') {
+        throw new HomeFieldInvalid('Choose whether it remembers people.');
+      }
+      const v = value as Record<string, unknown>;
+      if (typeof v.on !== 'boolean') {
+        throw new HomeFieldInvalid('Choose whether it remembers people.');
+      }
+      let neverStore: string[] = [];
+      try {
+        // Checked against the defaults on write, where the pack is known.
+        neverStore = cleanOwnerNeverStore(null, v.neverStore ?? []);
+      } catch (error) {
+        throw new HomeFieldInvalid((error as Error).message);
+      }
+      return { on: v.on, neverStore, defaults: [] };
+    },
+    write: (value, s) => ({
+      chatbot: {
+        settings: {
+          ...(s.chatbot.settings ?? {}),
+          memory: {
+            on: value.on,
+            neverStore: cleanOwnerNeverStore(
+              s.chatbot.safetyPack,
+              value.neverStore,
+            ),
+          },
+        } as ChatbotSettingsOverride,
+      },
+    }),
+  } as HomeField<{ on: boolean; neverStore: string[]; defaults: string[] }>,
 
   /** The website widget (chunk 13): the bubble's look and timing, and where it may appear. */
   widget: {

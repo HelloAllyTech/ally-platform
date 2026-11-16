@@ -3,6 +3,18 @@
  * they're told, and the owner's settings. No I/O here; `HandoverService` does that.
  */
 
+/**
+ * Why a chat needs a person: they asked, the assistant said "I don't know" twice in a row, or the
+ * assistant passed it on with its `hand_over` tool (chunk 3b). The database's check constraint
+ * lists the same values.
+ */
+export const NEEDS_PERSON_REASONS = [
+  'asked',
+  'declined_twice',
+  'assistant',
+] as const;
+export type NeedsPersonReason = (typeof NEEDS_PERSON_REASONS)[number];
+
 /** Opening hours, in the business's time zone. Days are 0 (Sunday) to 6. */
 export interface OpeningHours {
   timeZone: string;

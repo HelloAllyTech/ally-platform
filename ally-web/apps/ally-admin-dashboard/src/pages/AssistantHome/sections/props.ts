@@ -11,4 +11,6 @@ export interface SectionProps {
   /** Owners also manage the team and channels, and can remove the assistant. */
   canManage: boolean;
   go: (section: SectionId) => void;
+  /** Opens Try it, with a question in the box when one is given (chunk 5b). */
+  tryIt?: (question?: string) => void;
 }

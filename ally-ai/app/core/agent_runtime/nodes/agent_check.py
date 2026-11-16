@@ -17,15 +17,18 @@ from app.core.agent_runtime.budget import (
     SEARCH_AGAIN_RESERVE_SECONDS,
     can_send_back,
     recent,
+    search_budget,
+    searches,
     time_left,
-    tool_budget,
 )
 from app.core.agent_runtime.check import (
     check_reply,
     organisation_of,
     rejection_feedback,
 )
+from app.core.agent_runtime.memory import personal_context
 from app.core.agent_runtime.state import AgentState, json_safe
+from app.core.agent_runtime.tools.lists import offers_create
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.core.knowledge_agent.schemas import is_general
@@ -51,7 +54,8 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             translated=None,
             translation_degraded=False,
         )
-        searched = bool(state.get("tool_calls"))
+        # Searches only: a gateway tool (chunk 3b) is not a search.
+        searched = bool(searches(state))
         result, rejection = check_reply(
             state.get("agent_step") or {},
             state.get("agent_meta") or {},
@@ -69,8 +73,10 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             decline_text=state["bot"].get("decline_text"),
             avoid_topics=(state["bot"].get("persona") or {}).get("avoid_topics") or (),
             purpose=(state["bot"].get("persona") or {}).get("purpose"),
-            can_search_again=len(state.get("tool_calls") or []) == 1
-            and tool_budget(state) > 0
+            can_book=offers_create(state["bot"].get("gateway_definitions")),
+            personal=personal_context(state["bot"]),
+            can_search_again=len(searches(state)) == 1
+            and search_budget(state) > 0
             and (state.get("revisions") or 0) < MAX_REVISIONS
             and time_left(state) >= SEARCH_AGAIN_RESERVE_SECONDS,
         )
