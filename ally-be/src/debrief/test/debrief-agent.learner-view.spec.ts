@@ -467,3 +467,32 @@ describe('DebriefAgentService.sweepStuckRuns', () => {
     expect(params).toEqual(['needs_person', 'failed', 'running']);
   });
 });
+
+describe('DebriefAgentService.showHeldDrafts', () => {
+  it('shows a held live draft below the bar, writes it and tells the learner', async () => {
+    const run = { id: 'a', mode: 'live', status: 'below_bar', cards: {} };
+    const query = jest.fn(async () => [[{ id: 'a' }], 1]);
+    const findOne = jest.fn(async () => run);
+    const applyToSession = jest.fn(async () => true);
+    const ready = jest.fn(async () => undefined);
+    const svc = new DebriefAgentService(
+      { query } as any,
+      { findOne } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { ready } as any,
+      { applyToSession } as any,
+    );
+    expect(await svc.showHeldDrafts()).toBe(1);
+    const [sql, params] = query.mock.calls[0] as unknown as [string, string[]];
+    expect(sql).toContain('cards IS NOT NULL');
+    expect(sql).toContain("NOT (coalesce(workspace, '{}'::jsonb) ? 'review')");
+    expect(params).toEqual(['below_bar', 'needs_person']);
+    expect(applyToSession).toHaveBeenCalledWith(run);
+    expect(ready).toHaveBeenCalledWith(run);
+  });
+});

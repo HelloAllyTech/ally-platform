@@ -23,9 +23,13 @@ import {
 import { LoggerService } from '../../logger/logger.service';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import {
+  DEBRIEF_MAX_REPLIES_DEFAULT,
+  DEBRIEF_MIN_REPLY_USD,
   DEBRIEF_PROMPT_CODES,
   DEBRIEF_REFLECTION_CHECK_MODEL,
+  DEBRIEF_REPLY_BUDGET_MAX,
   DEBRIEF_REPLY_DEFAULT,
+  DEBRIEF_SESSION_BUDGET_DEFAULT,
 } from '../constants/debrief-release.constants';
 import { modelPrices } from '../util/debrief-budget.util';
 import {
@@ -60,6 +64,68 @@ const SUPPORT_LEAD: Record<string, string> = {
   mr: 'आता कुणाशी बोलायचं वाटत असेल तर:',
   ta: 'இப்போது யாரிடமாவது பேச விரும்பினால்:',
 };
+
+/**
+ * Why Ask Ally stopped taking questions, in the debrief's language: this
+ * session's budget or reply limit is used up, or this month's debrief budget
+ * is spent. The learner keeps reading their debrief either way.
+ */
+export const REPLY_LIMIT: Record<
+  'session' | 'month',
+  Record<string, string>
+> = {
+  session: {
+    en: "That's all the questions I can take on this debrief. Your debrief stays here to read, and you can ask me about your next one.",
+    hi: 'इस डीब्रीफ़ पर मैं इतने ही सवाल ले सकती हूँ। आपकी डीब्रीफ़ यहीं पढ़ने के लिए रहेगी, और अगली डीब्रीफ़ के बारे में आप मुझसे फिर पूछ सकते हैं।',
+    kn: 'ಈ ಡೀಬ್ರೀಫ್ ಬಗ್ಗೆ ನಾನು ಇಷ್ಟೇ ಪ್ರಶ್ನೆಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳಬಹುದು. ನಿಮ್ಮ ಡೀಬ್ರೀಫ್ ಇಲ್ಲೇ ಓದಲು ಇರುತ್ತದೆ, ಮುಂದಿನ ಡೀಬ್ರೀಫ್ ಬಗ್ಗೆ ನನ್ನನ್ನು ಮತ್ತೆ ಕೇಳಬಹುದು.',
+    mr: 'या डीब्रीफवर मी इतकेच प्रश्न घेऊ शकते. तुमची डीब्रीफ इथेच वाचायला राहील, आणि पुढच्या डीब्रीफबद्दल तुम्ही मला पुन्हा विचारू शकता.',
+    ta: 'இந்த டீப்ரீஃப் பற்றி இவ்வளவு கேள்விகளே என்னால் எடுக்க முடியும். உங்கள் டீப்ரீஃப் இங்கேயே படிக்க இருக்கும், அடுத்த டீப்ரீஃப் பற்றி என்னிடம் மீண்டும் கேட்கலாம்.',
+  },
+  month: {
+    en: "I can't take more questions just now. Your debrief stays here to read; please try asking again later.",
+    hi: 'अभी मैं और सवाल नहीं ले सकती। आपकी डीब्रीफ़ यहीं पढ़ने के लिए रहेगी; कृपया बाद में फिर पूछें।',
+    kn: 'ಈಗ ನಾನು ಇನ್ನಷ್ಟು ಪ್ರಶ್ನೆಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳಲು ಆಗುವುದಿಲ್ಲ. ನಿಮ್ಮ ಡೀಬ್ರೀಫ್ ಇಲ್ಲೇ ಓದಲು ಇರುತ್ತದೆ; ದಯವಿಟ್ಟು ನಂತರ ಮತ್ತೆ ಕೇಳಿ.',
+    mr: 'आत्ता मी आणखी प्रश्न घेऊ शकत नाही. तुमची डीब्रीफ इथेच वाचायला राहील; कृपया नंतर पुन्हा विचारा.',
+    ta: 'இப்போது மேலும் கேள்விகளை என்னால் எடுக்க முடியாது. உங்கள் டீப்ரீஃப் இங்கேயே படிக்க இருக்கும்; தயவுசெய்து பிறகு மீண்டும் கேளுங்கள்.',
+  },
+};
+
+/**
+ * Whether Ask Ally may answer one more question in this session, and with
+ * how much: the session's budget covers its debrief run and every reply
+ * before this one; the month's cap covers every session. Pure, for tests.
+ */
+export function replyAllowance(input: {
+  sessionBudgetUsd: number;
+  maxReplies: number;
+  runCostUsd: number;
+  askAllySpentUsd: number;
+  repliesSoFar: number;
+  monthSpentUsd: number;
+  monthlyCapUsd: number;
+  replyBudgetUsd: number;
+}):
+  | { ok: true; budgetUsd: number }
+  | { ok: false; reason: 'session' | 'month' } {
+  if (input.monthSpentUsd >= input.monthlyCapUsd) {
+    return { ok: false, reason: 'month' };
+  }
+  if (input.repliesSoFar >= input.maxReplies) {
+    return { ok: false, reason: 'session' };
+  }
+  const left =
+    input.sessionBudgetUsd - input.runCostUsd - input.askAllySpentUsd;
+  if (left < DEBRIEF_MIN_REPLY_USD) return { ok: false, reason: 'session' };
+  return {
+    ok: true,
+    budgetUsd: Math.min(
+      input.replyBudgetUsd,
+      DEBRIEF_REPLY_BUDGET_MAX,
+      left,
+      input.monthlyCapUsd - input.monthSpentUsd,
+    ),
+  };
+}
 
 const event = (data: Record<string, unknown>): SseMessageEvent => ({
   data: JSON.stringify(data),
@@ -174,8 +240,15 @@ export class DebriefReplyService {
     // Replayed: the crisis reply, and a fast model, can emit before the
     // controller has subscribed, and nothing the learner should see is lost.
     const subject = new ReplaySubject<SseMessageEvent>();
-    const finish = async (content: string) => {
-      subject.next(event({ type: 'done', content, citations: [] }));
+    const finish = async (content: string, limit?: 'session' | 'month') => {
+      subject.next(
+        event({
+          type: 'done',
+          content,
+          citations: [],
+          ...(limit ? { limit } : {}),
+        }),
+      );
       subject.complete();
       // For the Console's Ask Ally tab: which card it was about (when the app
       // says), and how long the learner waited for the first words.
@@ -213,7 +286,33 @@ export class DebriefReplyService {
         this.orgContext(tenantId),
       ]);
     // The release names Ask Ally's model, as it names every step's.
-    const model = bundle.reply ?? DEBRIEF_REPLY_DEFAULT;
+    const released = bundle.reply ?? DEBRIEF_REPLY_DEFAULT;
+    // Sandeep's session budget (2026-11-16): the run and every reply share
+    // one budget, replies are counted, and the month's cap applies here too.
+    // When any is used up the learner gets a plain "no more questions" in
+    // their language, never an error and never a model call.
+    const month = await this.context.monthToDate();
+    const allowance = replyAllowance({
+      sessionBudgetUsd:
+        bundle.settings.sessionBudgetUsd ?? DEBRIEF_SESSION_BUDGET_DEFAULT,
+      maxReplies:
+        bundle.settings.maxRepliesPerSession ?? DEBRIEF_MAX_REPLIES_DEFAULT,
+      runCostUsd: Number(run.actualCostUsd ?? run.estimatedCostUsd ?? 0),
+      askAllySpentUsd: Number(run.workspace?.askAllySpentUsd ?? 0),
+      repliesSoFar: prior.filter((m) => m.senderId === ALLY_SENDER).length,
+      monthSpentUsd: month.spentUsd,
+      monthlyCapUsd: bundle.settings.monthlyCapUsd,
+      replyBudgetUsd: released.budgetUsd ?? DEBRIEF_REPLY_BUDGET_MAX,
+    });
+    if (!allowance.ok) {
+      this.logger.warn(
+        `[debrief] Ask Ally limit for run ${run.id}: ${allowance.reason}`,
+      );
+      const copy = REPLY_LIMIT[allowance.reason];
+      void finish(copy[language] ?? copy.en, allowance.reason);
+      return subject.pipe(startWith(event({ type: 'start' })));
+    }
+    const model = { ...released, budgetUsd: allowance.budgetUsd };
     // Plan §8.9 (FR-57): never to a provider the organisation doesn't allow.
     // No fallback model: the learner gets the usual "try again" instead.
     const allowed = await this.context.providerAllowlist(tenantId);
@@ -312,7 +411,10 @@ export class DebriefReplyService {
         );
         // A quote from what a tool returned is not a misquote.
         sources.push(...res.toolTexts);
-        if (res.trace) void this.keepReplyTrace(run.id, res.trace);
+        if (res.trace) {
+          void this.keepReplyTrace(run.id, res.trace);
+          void this.addReplySpend(run.id, res.trace.costUsd);
+        }
         await settle(res.text, res.distress);
       } catch (e) {
         this.logger.warn(
@@ -320,6 +422,7 @@ export class DebriefReplyService {
         );
         if (e instanceof AskAllyError && e.trace) {
           void this.keepReplyTrace(run.id, e.trace);
+          void this.addReplySpend(run.id, e.trace.costUsd);
         }
         // A reply that failed before its last event carries no verdict: the
         // keyword screen already ran, and a failed read adds nothing.
@@ -366,6 +469,29 @@ export class DebriefReplyService {
     } catch (e) {
       this.logger.warn(
         `[debrief] could not keep a reply trace for run ${runId}: ${(e as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * What Ask Ally has spent on this session, added to on every reply that
+   * reports a cost: the session budget and the month's spend read it. The
+   * traces keep only the last 20, so the total lives apart. Never throws.
+   */
+  private async addReplySpend(runId: string, costUsd: number): Promise<void> {
+    if (!Number.isFinite(costUsd) || costUsd <= 0) return;
+    try {
+      await this.chats.manager.query(
+        `UPDATE debrief_runs
+            SET workspace = jsonb_set(
+              coalesce(workspace, '{}'::jsonb), '{askAllySpentUsd}',
+              to_jsonb(round((coalesce((workspace->>'askAllySpentUsd')::numeric, 0) + $2::numeric), 6)))
+          WHERE id = $1`,
+        [runId, costUsd],
+      );
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] could not add Ask Ally spend for run ${runId}: ${(e as Error).message}`,
       );
     }
   }

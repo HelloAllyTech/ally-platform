@@ -312,7 +312,9 @@ class TestEndings:
         )
         assert steps.count("reviser") == 0
 
-    async def test_missed_risk_cue_is_never_published(self, steps, gateway):
+    async def test_missed_risk_cue_is_shown_and_sent_to_urgent_review(
+        self, steps, gateway
+    ):
         steps.answers["evaluator"] = {
             "evaluation": evaluation(
                 9, hard_fails=[{"code": "missed_risk_cue", "evidence": "turn 2"}]
@@ -320,8 +322,10 @@ class TestEndings:
         }
         result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
 
-        assert result["status"] == "needs_person"
-        assert result["skip_reason"] == "not_evaluated_or_risk"
+        assert result["status"] == "below_bar"
+        assert result["skip_reason"] is None
+        assert result["cards"] is not None
+        assert result["workspace"]["decision"]["reviewReason"] == "missed_risk_cue"
         assert result["evaluator_overall"] == 4.0
 
 
@@ -366,7 +370,9 @@ class TestPossibleMissedCue:
         assert result["evaluator_hard_fails"] == []
         assert "possible risk cue" in result["workspace"]["decision"]["why"]
 
-    async def test_the_evaluator_calling_it_clear_still_holds(self, steps, gateway):
+    async def test_the_evaluator_calling_it_clear_goes_to_urgent_review(
+        self, steps, gateway
+    ):
         # Tamil: "I don't want to be here any more". The word list has no
         # Tamil; the Evaluator's reading of the meaning is enough to hold it.
         quote = "இனிமேல் இங்கே இருக்க விருப்பமில்லை"
@@ -374,8 +380,8 @@ class TestPossibleMissedCue:
         self._evaluator(steps, quote, clear=True)
         result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
 
-        assert result["status"] == "needs_person"
-        assert result["skip_reason"] == "not_evaluated_or_risk"
+        assert result["status"] == "below_bar"
+        assert result["workspace"]["decision"]["reviewReason"] == "missed_risk_cue"
 
     async def test_an_important_moment_on_a_possible_cue_goes(self, steps, gateway):
         quote = "Everything just feels grey lately."
@@ -413,13 +419,14 @@ class TestPossibleMissedCue:
             result["workspace"]["decision"]["droppedImportantMoment"]["turn_index"] == 2
         )
 
-    async def test_a_clear_safety_category_still_holds(self, steps, gateway):
+    async def test_a_clear_safety_category_goes_to_urgent_review(self, steps, gateway):
         quote = "I have been cutting again"
         self._read(steps, quote, category="suicide_or_self_harm")
         self._evaluator(steps, quote, clear=False)
         result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
 
-        assert result["status"] == "needs_person"
+        assert result["status"] == "below_bar"
+        assert result["workspace"]["decision"]["reviewReason"] == "missed_risk_cue"
 
 
 class TestBudget:
