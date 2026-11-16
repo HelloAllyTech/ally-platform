@@ -638,7 +638,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'A request wants a bot that answers questions from documents, or to reach users on WhatsApp ' +
       'or another messaging channel.',
     modules: ['ally-be:src/chatbot', 'ally-be:src/whatsapp'],
-    adminRoute: '/chatbots',
+    adminRoute: '/assistants',
     keywords: [
       'whatsapp',
       'chatbot',
@@ -661,7 +661,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     extendVia:
       'The draft step machine and BotDraftService (later steps are added, not forked).',
     modules: ['ally-be:src/bot-draft', 'ally-ai:app/core/builder'],
-    adminRoute: '/chatbots/new',
+    adminRoute: '/assistants/new',
     keywords: [
       'onboarding',
       'new assistant',

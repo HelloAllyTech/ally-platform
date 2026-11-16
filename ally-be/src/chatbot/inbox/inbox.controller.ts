@@ -48,6 +48,7 @@ import {
   type InboxChannelFilter,
   type InboxView,
 } from './inbox.service';
+import { ChatbotRole, AssistantScope } from '../access/chatbot-role.decorator';
 
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
 /** How often a live inbox stream re-reads which assistants its user can see. */
@@ -136,6 +137,7 @@ export class InboxController {
   }
 
   @Get('chatbots/:chatbotId/contacts/:contactId/memory')
+  @ChatbotRole(ChatbotMemberRole.VIEWER, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
   @ApiOperation({
     summary:
@@ -161,6 +163,7 @@ export class InboxController {
   }
 
   @Post('chatbots/:chatbotId/memory/:entryId/forget')
+  @ChatbotRole(ChatbotMemberRole.EDITOR, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Forget one line: deleted now' })
   async forgetLine(
@@ -175,6 +178,7 @@ export class InboxController {
   }
 
   @Patch('chatbots/:chatbotId/memory/:entryId')
+  @ChatbotRole(ChatbotMemberRole.EDITOR, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Change a line’s text; it becomes yours (source: owner)',
@@ -201,6 +205,7 @@ export class InboxController {
   }
 
   @Post('chatbots/:chatbotId/contacts/:contactId/forget')
+  @ChatbotRole(ChatbotMemberRole.EDITOR, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -216,6 +221,7 @@ export class InboxController {
   }
 
   @Get('conversations')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
   @ApiOperation({
     summary: 'Chats from every channel: Safety and Needs a person first',
@@ -225,6 +231,7 @@ export class InboxController {
   }
 
   @Get('counts')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
   @ApiOperation({
     summary: 'Unread chats, Needs a person and Safety, for the nav',
@@ -234,6 +241,7 @@ export class InboxController {
   }
 
   @Get('events')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
   @ApiOperation({
     summary: 'Live inbox events (SSE)',
@@ -248,15 +256,8 @@ export class InboxController {
       sse.send(type, data);
     };
     const subscribe = async () => {
-      const ids = await this.inbox.scope();
-      // A platform admin sees every assistant: listen to all that have chats.
-      const chatbots =
-        ids ??
-        (
-          (await this.dataSource.query(
-            `SELECT id FROM chatbots WHERE archived_at IS NULL`,
-          )) as { id: string }[]
-        ).map((r) => r.id);
+      // Only the assistants the caller is a member of (platform admins included, A1).
+      const chatbots = await this.inbox.scope();
       return this.events.listenInbox(chatbots, forward);
     };
     let stop = await subscribe();
@@ -276,6 +277,7 @@ export class InboxController {
   }
 
   @Get('chatbots/:chatbotId/conversations/:id')
+  @ChatbotRole(ChatbotMemberRole.VIEWER, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
   @ApiOperation({ summary: 'One chat, marked read for you' })
   async thread(
@@ -295,6 +297,7 @@ export class InboxController {
   }
 
   @Post('chatbots/:chatbotId/conversations/:id/take-over')
+  @ChatbotRole(ChatbotMemberRole.EDITOR, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -309,6 +312,7 @@ export class InboxController {
   }
 
   @Post('chatbots/:chatbotId/conversations/:id/hand-back')
+  @ChatbotRole(ChatbotMemberRole.EDITOR, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -331,6 +335,7 @@ export class InboxController {
   }
 
   @Post('chatbots/:chatbotId/conversations/:id/messages')
+  @ChatbotRole(ChatbotMemberRole.EDITOR, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:

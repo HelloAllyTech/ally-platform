@@ -89,7 +89,6 @@ export class WhatsAppConversationService {
     what: string,
   ): Promise<void> {
     const botIds = await this.access.accessibleChatbotIds();
-    if (botIds === null) return;
     if (!botIds.includes(chatbotId)) {
       throw new NotFoundException(`${what} was not found`);
     }
@@ -97,7 +96,7 @@ export class WhatsAppConversationService {
 
   /**
    * Refuse a contact the caller has no bot in common with — answering exactly like a missing one,
-   * so a guessed id reveals nothing. Platform admins pass straight through.
+   * so a guessed id reveals nothing. Platform admins are refused like anyone else (A1).
    *
    * Every per-row route goes through here (thread, reveal, block, erase, and the unanswered
    * question's thread): the list routes are filtered by `chatbotId`, but an id in a URL is not.
@@ -107,7 +106,6 @@ export class WhatsAppConversationService {
     what: string,
   ): Promise<void> {
     const botIds = await this.access.accessibleChatbotIds();
-    if (botIds === null) return;
     const found = botIds.length
       ? await this.conversationRepository
           .createQueryBuilder('c')
@@ -118,10 +116,9 @@ export class WhatsAppConversationService {
     if (!found) throw new NotFoundException(`${what} was not found`);
   }
 
-  /** A list route must name one of the caller's bots unless they are a platform admin. */
+  /** A list route must name one of the caller's bots (platform admins included). */
   async assertListScope(chatbotId?: string): Promise<void> {
     const botIds = await this.access.accessibleChatbotIds();
-    if (botIds === null) return;
     if (!chatbotId || !botIds.includes(chatbotId)) {
       throw new NotFoundException('Choose one of your chatbots.');
     }

@@ -263,8 +263,9 @@ export class ChatbotSettingsService {
 }
 
 /**
- * Whether a settings write changes a key only a platform admin may set: "Show typing" (which also
- * turns on read receipts), and what the agent may do (`abilities`, chunk 3b). Leaving it as stored,
+ * Whether a settings write changes a key only the bot's owners may set (A1; platform admins before):
+ * "Show typing" (which also turns on read receipts), and what the agent may do (`abilities`, chunk
+ * 3b, `hand_over` included). Leaving it as stored,
  * or leaving it out when it was never set, is not a change, so a bot editor's save round-trips it.
  */
 export function changesAdminOnlySetting(

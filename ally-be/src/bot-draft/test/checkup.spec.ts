@@ -187,7 +187,7 @@ describe('CheckupService.gradeRequest', () => {
 });
 
 describe('CheckupService.start', () => {
-  const build = (runsToday: number, admin = false) => {
+  const build = (runsToday: number, owner = false) => {
     const cases = { find: jest.fn().mockResolvedValue([item('a')]) };
     const runs = {
       count: jest.fn().mockResolvedValue(runsToday),
@@ -196,9 +196,13 @@ describe('CheckupService.start', () => {
       update: jest.fn(),
     };
     const access = {
-      assert: jest.fn().mockResolvedValue({ chatbot: {} }),
+      // An editor unless `owner`: owner-only steps are refused.
+      assert: jest.fn(async (_id: string, role?: string) => {
+        if (role === 'owner' && !owner) throw new Error('forbidden');
+        return { chatbot: {} };
+      }),
       assertPlatformAdmin: jest.fn(async () => {
-        if (!admin) throw new Error('forbidden');
+        throw new Error('platform admin checked');
       }),
     };
     const service = new CheckupService(
@@ -232,7 +236,7 @@ describe('CheckupService.start', () => {
     expect(run.status).toBe('running');
   });
 
-  it('evals and repeated attempts are for platform admins only', async () => {
+  it('evals and repeated attempts are for the bot’s owners (A1; was platform admins)', async () => {
     await expect(
       build(0).service.start('bot', { trigger: 'eval', attempts: 3 }),
     ).rejects.toThrow('forbidden');

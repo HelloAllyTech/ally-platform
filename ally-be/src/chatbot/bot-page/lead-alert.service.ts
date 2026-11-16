@@ -80,7 +80,7 @@ export class LeadAlertService {
         ],
       );
       const owners = await this.ownerEmails(chatbot.id);
-      const link = `${this.config.adminBaseUrl.replace(/\/$/, '')}/chatbots/${chatbot.id}?section=conversations`;
+      const link = `${this.config.adminBaseUrl.replace(/\/$/, '')}/assistants/${chatbot.id}?section=conversations`;
       const body = fill(t.body, { ...lead, link })
         .replace(/\s+/g, ' ')
         .trim();

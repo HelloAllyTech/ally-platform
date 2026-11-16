@@ -34,6 +34,7 @@ import { ChatbotMemberRole } from '../enum/chatbot.enum';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { BotImageService, IMAGE_ERRORS } from './bot-image.service';
 import { IMAGE_MAX_BYTES } from './image-check';
+import { ChatbotRole } from '../access/chatbot-role.decorator';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -55,6 +56,7 @@ export class BotImageController {
   ) {}
 
   @Get(':id/images')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: "The bot's images, with short-lived signed URLs" })
   async list(@Param('id', ParseUUIDPipe) id: string) {
@@ -63,6 +65,7 @@ export class BotImageController {
   }
 
   @Post(':id/images')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
@@ -87,6 +90,7 @@ export class BotImageController {
   }
 
   @Patch(':id/images/:imageId')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: "Change an image's alt text" })
   async update(
@@ -100,6 +104,7 @@ export class BotImageController {
 
   @Delete(':id/images/:imageId')
   @HttpCode(204)
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Remove an image',
@@ -115,6 +120,7 @@ export class BotImageController {
   }
 
   @Post(':id/images/:imageId/restore')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Undo removing an image (within 30 days)' })
   async restore(
@@ -126,6 +132,7 @@ export class BotImageController {
   }
 
   @Patch(':id/page/brand')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
