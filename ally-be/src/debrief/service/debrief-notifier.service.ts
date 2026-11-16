@@ -35,7 +35,7 @@ export interface DebriefEscalation {
   by: number;
 }
 
-type Kind = 'ready' | 'reviewed';
+type Kind = 'ready' | 'reviewed' | 'progress';
 
 /** v9 §7.7 microcopy, in the debrief's language; `{s}` is the roleplay's title. */
 const COPY: Record<string, Record<Kind, { title: string; body: string }>> = {
@@ -48,6 +48,10 @@ const COPY: Record<string, Record<Kind, { title: string; body: string }>> = {
       title: 'Ally updated your debrief',
       body: 'Ally updated your debrief for {s} after a review.',
     },
+    progress: {
+      title: 'Your debrief is ready',
+      body: 'See how your last {n} sessions add up, in your debrief for {s}.',
+    },
   },
   hi: {
     ready: {
@@ -57,6 +61,10 @@ const COPY: Record<string, Record<Kind, { title: string; body: string }>> = {
     reviewed: {
       title: 'Ally ने आपकी डीब्रीफ़ अपडेट की',
       body: 'Ally ने समीक्षा के बाद {s} के लिए आपकी डीब्रीफ़ अपडेट की है।',
+    },
+    progress: {
+      title: 'आपकी डीब्रीफ़ तैयार है',
+      body: '{s} की डीब्रीफ़ में देखें कि आपके पिछले {n} सेशन कैसे रहे।',
     },
   },
   kn: {
@@ -68,6 +76,10 @@ const COPY: Record<string, Record<Kind, { title: string; body: string }>> = {
       title: 'ಆಲಿ ನಿಮ್ಮ ಡೀಬ್ರೀಫ್ ಅನ್ನು ನವೀಕರಿಸಿದ್ದಾರೆ',
       body: 'ಆಲಿ ಪರಿಶೀಲನೆಯ ನಂತರ {s}ಗಾಗಿ ನಿಮ್ಮ ಡೀಬ್ರೀಫ್ ಅನ್ನು ನವೀಕರಿಸಿದ್ದಾರೆ.',
     },
+    progress: {
+      title: 'ನಿಮ್ಮ ಡೀಬ್ರೀಫ್ ಸಿದ್ಧವಾಗಿದೆ',
+      body: '{s}ಗಾಗಿ ನಿಮ್ಮ ಡೀಬ್ರೀಫ್‌ನಲ್ಲಿ ನಿಮ್ಮ ಕಳೆದ {n} ಸೆಷನ್‌ಗಳು ಹೇಗಿದ್ದವು ಎಂದು ನೋಡಿ.',
+    },
   },
   mr: {
     ready: {
@@ -78,6 +90,10 @@ const COPY: Record<string, Record<Kind, { title: string; body: string }>> = {
       title: 'अ‍ॅलीने तुमची डीब्रीफ अपडेट केली आहे',
       body: 'अ‍ॅलीने पुनरावलोकनानंतर {s} साठी तुमची डीब्रीफ अपडेट केली आहे.',
     },
+    progress: {
+      title: 'तुमची डीब्रीफ तयार आहे',
+      body: '{s} च्या डीब्रीफमध्ये पाहा तुमचे मागील {n} सेशन कसे झाले.',
+    },
   },
   ta: {
     ready: {
@@ -87,6 +103,10 @@ const COPY: Record<string, Record<Kind, { title: string; body: string }>> = {
     reviewed: {
       title: 'ஆலி உங்கள் டீப்ரீஃப்பை புதுப்பித்துள்ளார்',
       body: 'ஆலி மதிப்பாய்வுக்குப் பிறகு {s}க்கான உங்கள் டீப்ரீஃப்பை புதுப்பித்துள்ளார்.',
+    },
+    progress: {
+      title: 'உங்கள் டீப்ரீஃப் தயாராக உள்ளது',
+      body: '{s}க்கான டீப்ரீஃபில் உங்கள் கடைசி {n} அமர்வுகள் எப்படி இருந்தன என்று பாருங்கள்.',
     },
   },
 };
@@ -241,9 +261,18 @@ export class DebriefNotifier {
       );
       if (!s?.user_id || !s.tenant_id) return;
       const lang = (run.language ?? 'en').slice(0, 2).toLowerCase();
-      const copy = (COPY[lang] ?? COPY.en)[kind];
+      // A ready debrief carrying "Your last n sessions" says so (plan §7.7);
+      // it is the same debrief, so it opens the same screen.
+      const sessions = Number(
+        (run.cards as { progress_card?: { sessions?: number } } | null)
+          ?.progress_card?.sessions ?? 0,
+      );
+      const said: Kind = kind === 'ready' && sessions > 0 ? 'progress' : kind;
+      const copy = (COPY[lang] ?? COPY.en)[said];
       const scenario = s.title ?? '';
-      const body = copy.body.replace('{s}', scenario);
+      const body = copy.body
+        .replace('{s}', scenario)
+        .replace('{n}', String(sessions));
       const type =
         kind === 'ready'
           ? DEBRIEF_READY_NOTIFICATION

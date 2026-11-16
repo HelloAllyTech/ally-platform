@@ -63,6 +63,12 @@ export interface DebriefCards {
     skill: string;
     word: 'strength' | 'keep_practising' | 'didnt_come_up';
   }>;
+  /**
+   * Only on a debrief not in English: each skill name the cards use, with its
+   * name in the debrief's language. The `skill` fields stay as the evidence
+   * map names them (progress and metrics match on them); readers show the label.
+   */
+  skill_labels?: Array<{ skill: string; label: string }>;
   reflective_question: string;
   progress_note?: string | null;
   /**
@@ -676,8 +682,51 @@ export function keepOfferedPractice(
 export function cardsForReader<
   T extends Record<string, any> | null | undefined,
 >(cards: T, recipeKey?: string | null): T {
-  if (!cards || recipeKey !== 'short') return cards;
-  return { ...cards, practise_next: null, skill_words: [] } as T;
+  if (!cards) return cards;
+  const labelled = withSkillLabels(cards);
+  if (recipeKey !== 'short') return labelled;
+  return { ...labelled, practise_next: null, skill_words: [] } as T;
+}
+
+/**
+ * The cards with each skill shown by its name in the debrief's language
+ * (`skill_labels`, written by the Writer for a debrief not in English), for
+ * whoever reads or hears them. A skill with no label keeps its name. The
+ * stored cards are never changed: their `skill` is the key progress and
+ * metrics match on.
+ */
+export function withSkillLabels<T extends Record<string, any>>(cards: T): T {
+  const labels = new Map<string, string>();
+  for (const l of (cards.skill_labels ?? []) as Array<{
+    skill?: unknown;
+    label?: unknown;
+  }>) {
+    const skill = typeof l?.skill === 'string' ? l.skill.trim() : '';
+    const label = typeof l?.label === 'string' ? l.label.trim() : '';
+    if (skill && label) labels.set(skill.toLowerCase(), label);
+  }
+  const rest: Record<string, any> = { ...cards };
+  delete rest.skill_labels;
+  if (!labels.size) return rest as T;
+  const name = (skill: unknown) =>
+    typeof skill === 'string'
+      ? (labels.get(skill.trim().toLowerCase()) ?? skill)
+      : skill;
+  const relabel = (c: any) =>
+    c && typeof c === 'object' ? { ...c, skill: name(c.skill) } : c;
+  return {
+    ...rest,
+    what_worked: Array.isArray(rest.what_worked)
+      ? rest.what_worked.map(relabel)
+      : rest.what_worked,
+    work_on_this: Array.isArray(rest.work_on_this)
+      ? rest.work_on_this.map(relabel)
+      : rest.work_on_this,
+    practise_next: relabel(rest.practise_next),
+    skill_words: Array.isArray(rest.skill_words)
+      ? rest.skill_words.map(relabel)
+      : rest.skill_words,
+  } as unknown as T;
 }
 
 /**

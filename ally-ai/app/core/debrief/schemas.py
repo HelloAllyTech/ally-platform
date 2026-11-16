@@ -302,6 +302,13 @@ class SkillWordItem(BaseModel):
     word: SkillWord
 
 
+class SkillLabel(BaseModel):
+    skill: str = Field(description="A skill name exactly as used in the cards.")
+    label: str = Field(
+        description="That skill's name in the SESSION LANGUAGE, for the learner."
+    )
+
+
 class DebriefCards(BaseModel):
     opening: str
     important_moment: Optional[ImportantMomentCard] = None
@@ -309,6 +316,13 @@ class DebriefCards(BaseModel):
     work_on_this: List[WorkOnThisCard] = Field(default_factory=list)
     practise_next: Optional[PractiseNext] = None
     skill_words: List[SkillWordItem] = Field(default_factory=list)
+    skill_labels: List[SkillLabel] = Field(
+        default_factory=list,
+        description=(
+            "Only for a debrief not in English: each skill name used in the "
+            "cards, with its name in the SESSION LANGUAGE. Empty in English."
+        ),
+    )
     reflective_question: str = ""
     progress_note: Optional[str] = None
     # Attached in code after the Writer/Reviser loop (debrief_graph/progress.py),
@@ -332,9 +346,26 @@ class FixNote(BaseModel):
     note: str = Field(description="What to change, concretely.")
 
 
+class EvaluatorRiskCue(JudgeRiskCue):
+    """The judge's risk cue, plus whether it is a clear one. Only the
+    Evaluator answers this; the independent judge's schema is unchanged."""
+
+    clear: bool = Field(
+        default=True,
+        description=(
+            "True when the client's words, in any language, say or point to "
+            "wanting to die, not wanting to live or be here, ending their "
+            "life, self-harm, a plan or a means, harming someone else, or "
+            "being abused or in danger; also when you cannot tell. False for "
+            "low mood, stress, tiredness, burden, loneliness, grief or guilt "
+            "that does not point to any of these."
+        ),
+    )
+
+
 class EvaluationOutput(BaseModel):
     # Risk first, as in the judge: a cue the draft leaves out is the worst failure.
-    risk_cues: List[JudgeRiskCue] = Field(default_factory=list)
+    risk_cues: List[EvaluatorRiskCue] = Field(default_factory=list)
     dimensions: List[DimensionScore]
     hard_fails: List[HardFailFinding] = Field(default_factory=list)
     fixes: List[FixNote] = Field(default_factory=list)

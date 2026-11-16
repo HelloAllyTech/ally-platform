@@ -70,3 +70,161 @@ def test_strength_is_added_without_touching_the_reader_fields():
 def test_a_cue_without_a_strength_counts_as_clear():
     assert is_clear({"turn_index": 3})
     assert not is_clear({"turn_index": 3, "strength": "possible"})
+
+
+class TestSplitMissedCues:
+    """Only a cue every signal reads as possible stops holding a debrief."""
+
+    def _cue(self, quote, clear, turn=2, addressed=False):
+        return {
+            "turn_index": turn,
+            "quote": quote,
+            "addressed_by_debrief": addressed,
+            "clear": clear,
+        }
+
+    def _safety(self, quote, category="hopelessness", turn=2):
+        from app.core.debrief.cue_strength import with_strength
+
+        return with_strength(
+            [{"turn_index": turn, "quote": quote, "category": category}]
+        )
+
+    def test_possible_when_every_signal_says_so(self):
+        from app.core.debrief.cue_strength import split_missed_cues
+
+        q = "अभी कुछ करने का मन नहीं करता"
+        clear, possible = split_missed_cues([self._cue(q, False)], self._safety(q))
+        assert clear == [] and len(possible) == 1
+
+    def test_the_evaluator_alone_can_make_it_clear(self):
+        from app.core.debrief.cue_strength import split_missed_cues
+
+        q = "ನಾನು ಇನ್ನು ಇರಬಾರದು ಅನ್ನಿಸುತ್ತೆ"  # Kannada; no words in the list
+        clear, possible = split_missed_cues([self._cue(q, True)], self._safety(q))
+        assert len(clear) == 1 and possible == []
+
+    def test_words_raise_it_to_clear_whatever_the_evaluator_says(self):
+        from app.core.debrief.cue_strength import split_missed_cues
+
+        q = "sometimes I wish I could just disappear"
+        clear, possible = split_missed_cues([self._cue(q, False)], self._safety(q))
+        assert len(clear) == 1 and possible == []
+
+    def test_an_unflagged_turn_follows_the_evaluator(self):
+        from app.core.debrief.cue_strength import split_missed_cues
+
+        # Tamil, a turn the Safety reader never flagged: the Evaluator's
+        # reading of the meaning decides, either way.
+        q = "எல்லாம் முடிந்துவிட்டது"
+        clear, possible = split_missed_cues(
+            [self._cue(q, False, turn=5)], self._safety("x")
+        )
+        assert clear == [] and len(possible) == 1
+        clear, possible = split_missed_cues(
+            [self._cue(q, True, turn=5)], self._safety("x")
+        )
+        assert len(clear) == 1 and possible == []
+
+    def test_an_old_answer_without_clear_counts_as_clear(self):
+        from app.core.debrief.cue_strength import split_missed_cues
+
+        q = "I feel so tired of everything"
+        cue = self._cue(q, False)
+        del cue["clear"]
+        clear, possible = split_missed_cues([cue], self._safety(q))
+        assert len(clear) == 1 and possible == []
+
+    def test_addressed_cues_are_neither(self):
+        from app.core.debrief.cue_strength import split_missed_cues
+
+        q = "grey"
+        assert split_missed_cues(
+            [self._cue(q, True, addressed=True)], self._safety(q)
+        ) == (
+            [],
+            [],
+        )
+
+
+class TestDropPossibleImportantMoment:
+    def _cards(self, turn, quote, others=()):
+        return {
+            "opening": "o",
+            "important_moment": {
+                "turn_index": turn,
+                "quote": quote,
+                "handled_well": True,
+                "lead": "l",
+                "body": "b",
+                "others": list(others),
+            },
+        }
+
+    def test_goes_when_no_signal_reads_it_as_clear(self):
+        from app.core.debrief.cue_strength import (
+            drop_possible_important_moment,
+            with_strength,
+        )
+
+        q = "अभी कुछ करने का मन नहीं करता।"
+        cards, dropped = drop_possible_important_moment(
+            self._cards(4, q),
+            [
+                {
+                    "turn_index": 4,
+                    "quote": q,
+                    "addressed_by_debrief": True,
+                    "clear": False,
+                }
+            ],
+            with_strength([]),
+        )
+        assert cards["important_moment"] is None
+        assert dropped == {"turn_index": 4, "quote": q}
+
+    def test_stays_when_the_evaluator_reads_it_as_clear(self):
+        from app.core.debrief.cue_strength import drop_possible_important_moment
+
+        q = "ನನಗೆ ಇನ್ನು ಇರಬೇಕು ಅನ್ನಿಸಲ್ಲ"  # Kannada, no words in the list
+        cards, dropped = drop_possible_important_moment(
+            self._cards(4, q),
+            [
+                {
+                    "turn_index": 4,
+                    "quote": q,
+                    "addressed_by_debrief": True,
+                    "clear": True,
+                }
+            ],
+            [],
+        )
+        assert cards["important_moment"] is not None and dropped is None
+
+    def test_stays_when_the_safety_reader_filed_it_as_clear(self):
+        from app.core.debrief.cue_strength import (
+            drop_possible_important_moment,
+            with_strength,
+        )
+
+        q = "When he drinks he hits me."
+        cards, dropped = drop_possible_important_moment(
+            self._cards(3, q),
+            [],
+            with_strength(
+                [{"turn_index": 3, "quote": q, "category": "abuse_disclosure"}]
+            ),
+        )
+        assert dropped is None
+
+    def test_stays_when_any_other_moment_on_it_is_clear(self):
+        from app.core.debrief.cue_strength import drop_possible_important_moment
+
+        cards, dropped = drop_possible_important_moment(
+            self._cards(
+                2, "so tired", others=[{"turn_index": 6, "quote": "I want to die"}]
+            ),
+            [{"turn_index": 2, "quote": "so tired", "clear": False}],
+            [],
+        )
+        assert dropped is None

@@ -499,3 +499,44 @@ describe('debrief checks', () => {
     expect(text).toContain('One question to think about:');
   });
 });
+
+describe('skill labels for readers', () => {
+  const { cardsForReader, withSkillLabels } = jest.requireActual(
+    '../util/debrief-cards.util',
+  );
+  const cards = {
+    opening: 'नमस्ते',
+    what_worked: [{ skill: 'Validation', lead: 'x' }],
+    work_on_this: [{ skill: 'Open questions', lead: 'y' }],
+    practise_next: { skill: 'open questions', reason: 'z' },
+    skill_words: [
+      { skill: 'Validation', word: 'strength' },
+      { skill: 'Summarising', word: 'keep_practising' },
+    ],
+    skill_labels: [
+      { skill: 'Validation', label: 'भावनाओं को मान्यता देना' },
+      { skill: 'Open questions', label: 'खुले सवाल' },
+    ],
+    reflective_question: '?',
+  };
+
+  it('shows each skill by its label, keeps unlabelled ones, drops the list', () => {
+    const out = cardsForReader(cards, 'standard');
+    expect(out.what_worked[0].skill).toBe('भावनाओं को मान्यता देना');
+    expect(out.work_on_this[0].skill).toBe('खुले सवाल');
+    // Matched without regard to case.
+    expect(out.practise_next.skill).toBe('खुले सवाल');
+    expect(out.skill_words.map((w: any) => w.skill)).toEqual([
+      'भावनाओं को मान्यता देना',
+      'Summarising',
+    ]);
+    expect(out.skill_labels).toBeUndefined();
+    // The stored cards are untouched.
+    expect(cards.what_worked[0].skill).toBe('Validation');
+  });
+
+  it('leaves English cards as they are', () => {
+    const en = { ...cards, skill_labels: [] };
+    expect(withSkillLabels(en).what_worked[0].skill).toBe('Validation');
+  });
+});

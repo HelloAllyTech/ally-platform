@@ -12,7 +12,11 @@ from typing import Any, Dict, List, Literal, Optional
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
-from app.core.debrief.cue_strength import with_strength
+from app.core.debrief.cue_strength import (
+    drop_possible_important_moment,
+    split_missed_cues,
+    with_strength,
+)
 from app.core.debrief_graph import inputs as body
 from app.core.debrief_graph.agent_logs import code_log
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
@@ -672,14 +676,29 @@ async def score_draft(
     evaluation = None
     if res:
         ev = res["evaluation"]
+        # A missed cue holds the debrief only when it is clear; one that every
+        # signal reads as possible (low mood, burden, grief, guilt) is sent to
+        # review with the debrief published (cue_strength.split_missed_cues).
+        clear_missed, possible_missed = split_missed_cues(
+            ev.get("risk_cues") or [],
+            (state.get("safety") or {}).get("risk_cues") or [],
+        )
+        hard_fails = ev["hard_fails"]
+        if possible_missed and not clear_missed:
+            hard_fails = [h for h in hard_fails if h["code"] != "missed_risk_cue"]
         evaluation = {
             "overall": compute_overall(
                 {d["dimension"]: d["score"] for d in ev["dimensions"]},
-                len(ev["hard_fails"]),
+                len(hard_fails),
             ),
-            "hardFails": ev["hard_fails"],
+            "hardFails": hard_fails,
             "fixes": ev.get("fixes") or [],
             "dimensions": ev["dimensions"],
+            "possibleMissedCues": [
+                {"turn_index": c.get("turn_index"), "quote": c.get("quote")}
+                for c in possible_missed
+            ],
+            "riskCues": ev.get("risk_cues") or [],
         }
     draft = {
         "cards": cur["cards"],
@@ -791,8 +810,19 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
     offered = [
         o.get("id") for o in body.practice_options(ctx) if o.get("id") is not None
     ]
+    # An important moment is for a clear risk cue. Once the Evaluator has read
+    # the draft, a card whose moments every signal reads as possible (low mood,
+    # burden, grief, guilt) goes, and a person checks it (cue_strength).
+    cards = best["cards"]
+    dropped_moment = None
+    if ev:
+        cards, dropped_moment = drop_possible_important_moment(
+            cards,
+            ev.get("riskCues") or [],
+            (state.get("safety") or {}).get("risk_cues") or [],
+        )
     final = await ctx.gateway.call(
-        "finalise_cards", {"cards": best["cards"], "offered": offered}
+        "finalise_cards", {"cards": cards, "offered": offered}
     )
     patch = {
         "cards": final["cards"],
@@ -811,7 +841,28 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
     blocking = [c["code"] for c in best["checks"] if c["code"] not in advisory]
     rung = 0
     skip_reason = None
-    if meets_bar(best, advisory, pass_score):
+    possible_missed = (ev or {}).get("possibleMissedCues") or []
+    if meets_bar(best, advisory, pass_score) and dropped_moment:
+        status = Status.BELOW_BAR
+        why = (
+            f"Published round {best['round']} and sent it to review: it passed "
+            f"every check and {scored}. Its important moment (turn "
+            f"{dropped_moment['turn_index']}) was taken out: no signal read it "
+            "as a clear risk cue, so it is coached as ordinary counselling and "
+            "a person checks it."
+        )
+    elif meets_bar(best, advisory, pass_score) and possible_missed:
+        # Published, and a person looks: the Evaluator read a cue as missed
+        # that every other signal reads as possible, not clear.
+        status = Status.BELOW_BAR
+        why = (
+            f"Published round {best['round']} and sent it to review: it passed "
+            f"every check and {scored}, but the Evaluator thought it may have "
+            "left out a possible risk cue ("
+            + "; ".join(f"turn {c['turn_index']}" for c in possible_missed)
+            + "). A possible cue does not hold a debrief; a person checks it."
+        )
+    elif meets_bar(best, advisory, pass_score):
         status = Status.PUBLISHED
         why = (
             f"Published round {best['round']}: it passed every check and {scored} "
@@ -877,7 +928,15 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
             "evaluations": state.get("evaluations") or [],
             "bestRound": best["round"],
             "drafts": state.get("drafts") or [],
-            "decision": {"status": status, "round": best["round"], "why": why},
+            "decision": {
+                "status": status,
+                "round": best["round"],
+                "why": why,
+                # For the person who reviews it: what code took out or let
+                # through as possible, not clear.
+                "droppedImportantMoment": dropped_moment,
+                "possibleMissedCues": possible_missed,
+            },
         },
         "patch": patch,
         "rung": rung,

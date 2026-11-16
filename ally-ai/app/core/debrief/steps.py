@@ -220,6 +220,9 @@ _FINDINGS_FOR_WRITER = (
 
 EVALUATOR_FIX_INSTRUCTIONS = """\
 
+CLEAR OR NOT. For each risk cue you list, say whether it is clear (see its \
+field), judging the client's meaning in whatever language they spoke.
+
 FIX NOTES. After scoring, list what to change so the debrief would reach 8 \
 or more on every dimension with no hard fail. One note per section that \
 needs it, naming the section (opening, important_moment, what_worked[0], \
@@ -246,6 +249,21 @@ def _script_line(language: str) -> List[str]:
         "transcript is in Latin letters (romanised). Only quotes from the "
         "transcript keep the script they were written in, copied exactly; "
         "a try-saying line may follow the script the session was spoken in."
+    ]
+
+
+def _skill_label_line(language: str) -> List[str]:
+    """Code-owned: a skill's name stays exactly as the evidence map writes it
+    (it is the key progress and metrics match on), so a debrief that is not
+    in English names each skill for the learner in skill_labels."""
+    if not language or language[:2].lower() == "en":
+        return ["SKILL LABELS: leave skill_labels empty."]
+    return [
+        "SKILL LABELS: keep every skill field exactly as the evidence map "
+        "names it, in English. In skill_labels, give each distinct skill name "
+        "you used once, with a short name for it in the SESSION LANGUAGE and "
+        "its script that a lay helper understands, without the English in "
+        "brackets."
     ]
 
 
@@ -512,6 +530,7 @@ async def write(
 
     lines = [system or DEFAULT_WRITER_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
     lines += _script_line(language)
+    lines += _skill_label_line(language)
     if learner_level:
         lines.append(f"TRAINEE LEVEL: {learner_level}")
     if tone:
@@ -694,6 +713,7 @@ async def revise(
 
     lines = [system or DEFAULT_REVISER_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
     lines += _script_line(language)
+    lines += _skill_label_line(language)
     # Code-owned: the roleplay a card points to is the learner's own list.
     lines.append(
         "Keep every scenario_id as it is in the draft; if you change a card's "

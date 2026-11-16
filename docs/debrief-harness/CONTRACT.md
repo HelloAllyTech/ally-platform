@@ -235,6 +235,23 @@ Recorded by the ally-be build (2026-11-10).
 23. **Rule checks stay in ally-be** (`run_checks` tool), per D11: rules on data stay with the data; the graph
     can't skip them because every draft goes through the `checks` node.
 
+### Clear and possible risk cues (2026-11-16)
+
+A client turn is a **clear** risk cue when any signal says so: the Safety reader filed it under a clear
+category or with clear words; the Evaluator listed it and did not answer `clear: false` (its own reading
+of the meaning, in any language); or the word list in `cue_strength.py` matches its quote. Otherwise it is
+**possible**. No signal can lower another's clear (`turn_is_clear`).
+
+- **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; the independent judge's schema is unchanged).
+  A missed clear cue is the `missed_risk_cue` hard fail and holds the debrief, as before. A missed possible cue
+  drops that hard fail; the run publishes as `below_bar` and is sent to review.
+- **Important moment:** once the Evaluator has read the draft, a card whose moments are all possible is taken
+  out before `finalise_cards`; the run publishes as `below_bar` (review).
+- `workspace.decision` carries `droppedImportantMoment` and `possibleMissedCues` for the reviewer.
+- **Skill labels:** a debrief not in English carries `cards.skill_labels: [{skill, label}]`, written by the
+  Writer and Reviser. `skill` stays as the evidence map names it (progress and metrics match on it); the
+  learner and supervisor views and Listen show the label (`withSkillLabels` in ally-be).
+
 ## 5. Ask Ally — `POST /api/v1/ask-ally/replies` (ally-ai)
 
 Added 2026-11-11 (spec §A10, §D2 step 4). Ask Ally answers a learner's reply under their published
