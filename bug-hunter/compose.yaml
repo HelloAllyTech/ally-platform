@@ -1,6 +1,7 @@
 # Local Postgres for the bug hunter's own state: LangGraph checkpoints (chunk 05) and the
-# long-term store (chunk 07). Dev only; production uses a separate `bughunter` database on
-# ally-be's server (spec §15). Port 5433 keeps clear of ally-be's 5432 and Bug Hunter v1's 5477.
+# long-term store (chunk 07). LEGACY since 2026-11-16: the bug hunter now lives in ally-be's
+# own database, schema `bughunter` (spec §15, `make ally-db-setup`); this container stays
+# for semantic-memory (pgvector) experiments only. Port 5433 keeps clear of ally-be's 5432 and Bug Hunter v1's 5477.
 # The named volume holds the checkpoints: never prune Docker volumes on this machine.
 services:
   postgres:

@@ -23,7 +23,8 @@ poetry run bug-hunter cache clean         # prune kept artefacts by age (30 d) a
 poetry run bug-hunter runs clean          # sweep what a crashed run left behind
 make eval CASES=<id>                      # one golden case against the baseline agent (Docker)
 make eval-oracle CASES=<id>               # prove one case: oracle fails before, passes after the real fix
-make db-up                                # local Postgres for checkpoints (compose.yaml, port 5433)
+make ally-db-setup                        # bughunter role + schema in the local ally-be Postgres (:5477), then migrate
+make db-up                                # legacy standalone pgvector Postgres (compose.yaml, :5433), experiments only
 poetry run bug-hunter run --app ally-be --issue-text "…"   # one signal through graph v1 (issue mode)
 poetry run bug-hunter run --commit <sha>                   # sweep mode: review one commit's diff
 poetry run bug-hunter replay <run_id> [--resume]           # list checkpoints / continue a killed run

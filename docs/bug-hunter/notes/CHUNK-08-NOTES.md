@@ -125,20 +125,20 @@ disabled. To remove later:
 - **The VM** on Ally's private network (about 4 vCPU, 16 GB RAM, 120 GB disk), not on
   metal01's production host, with Docker for the later graph runs and outbound access
   only.
-- **The `bughunter` database** on the private network, with pgvector if possible, and
-  migrations 0001–0005 applied.
+- **The `bughunter` schema in ally-be's database** (user, 2026-11-16: same database as
+  ally-be, like the old Bug Hunter): run `bug-hunter/db/ally-db-setup.sql` once as the
+  database owner, set the `bughunter` role's password, then `bug-hunter db migrate` as
+  that role. The VM needs a network path to ally-be's Postgres.
 - **The GitHub App** (read ally-platform; write issues in `bug-hunter-reports`), or a
   fine-grained token as the fallback; and the private repo
   `HelloAllyTech/bug-hunter-reports`.
 - **Read-only CloudWatch credentials** and the `signals.log_groups` mapping.
-- **The `bughunter_dashboard` role** (chunk 09) on the `bughunter` database, with its
-  own password. Migration 0007 grants it read on reports, read and insert on
-  verdicts, update of `superseded_by`/`superseded_at` only, and update of the approval
-  decision columns only. Its credentials go into ally-be's environment
-  (`BUGHUNTER_DB_*`).
-- **ally-be's network path to the `bughunter` database**, so the admin dashboard's
-  ally-be can reach it. The agent's own role must still have no access to ally-be's
-  database.
+- **`GRANT bughunter_dashboard TO <ally-be's login role>;`** (chunk 09). The setup script
+  creates the NOLOGIN group role; migration 0007 grants it read on reports, read and
+  insert on verdicts, update of `superseded_by`/`superseded_at` only, and update of the
+  approval decision columns only. No new credentials and no network path for ally-be:
+  it reads with its normal connection. The agent's role has no grant on ally-be's
+  tables.
 - **Install:** the venv at `/opt/bug-hunter/venv`, the checkout at `/opt/ally-platform`,
   the units in `deploy/` and `/etc/bug-hunter/env` (root-only).
 - **Then:** `bug-hunter daily --dry-run` on the VM (the chunk's "done when"), and the

@@ -30,9 +30,9 @@ class InMemoryState:
 
 class PostgresState:
     def __init__(self, url: str):
-        from psycopg import Connection
+        from bug_hunter.graph.checkpointer import connect
 
-        self.conn = Connection.connect(url, autocommit=True)
+        self.conn = connect(url, autocommit=True)
 
     def get(self, key: str, default: Any = None) -> Any:
         row = self.conn.execute(

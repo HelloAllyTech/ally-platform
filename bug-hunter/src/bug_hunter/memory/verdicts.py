@@ -125,10 +125,11 @@ class PostgresVerdicts:
     )
 
     def __init__(self, url: str):
-        from psycopg import Connection
         from psycopg.rows import dict_row
 
-        self.conn = Connection.connect(url, autocommit=True, row_factory=dict_row)
+        from bug_hunter.graph.checkpointer import connect
+
+        self.conn = connect(url, autocommit=True, row_factory=dict_row)
 
     def _row(self, row: dict) -> Verdict:
         row = dict(row)

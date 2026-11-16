@@ -1,7 +1,13 @@
 -- Bug Hunter v2 (chunk 08): one row per daily-service outcome (suggested fix,
 -- escalation, no bug, skipped). The private reports repo gets an issue for the ones
 -- a human should read; nothing about findings goes to the public ally-platform repo.
-CREATE SCHEMA IF NOT EXISTS bughunter;
+DO $$ BEGIN
+  -- Only when missing: in ally-be's database the schema is created by
+  -- db/ally-db-setup.sql, and the agent's role has no CREATE on the database.
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'bughunter') THEN
+    CREATE SCHEMA bughunter;
+  END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS bughunter.reports (
     id            BIGSERIAL PRIMARY KEY,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),

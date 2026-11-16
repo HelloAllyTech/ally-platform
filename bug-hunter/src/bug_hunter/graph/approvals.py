@@ -85,17 +85,18 @@ class PostgresApprovals:
     """Rows in ``bughunter.approvals``; ``migrate()`` applies ``migrations/*.sql``."""
 
     def __init__(self, url: str):
-        from psycopg import Connection
         from psycopg.rows import dict_row
 
-        self.conn = Connection.connect(url, autocommit=True, row_factory=dict_row)
+        from bug_hunter.graph.checkpointer import connect
+
+        self.conn = connect(url, autocommit=True, row_factory=dict_row)
 
     @staticmethod
     def migrate(url: str, migrations: Path = MIGRATIONS_DIR) -> list[str]:
-        from psycopg import Connection
+        from bug_hunter.graph.checkpointer import connect
 
         applied = []
-        with Connection.connect(url, autocommit=True) as conn:
+        with connect(url, autocommit=True) as conn:
             for path in sorted(migrations.glob("*.sql")):
                 conn.execute(path.read_text(encoding="utf-8"))
                 applied.append(path.name)

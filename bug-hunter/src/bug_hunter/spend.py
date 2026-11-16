@@ -76,9 +76,9 @@ class PostgresLedger:
         self.url = url
 
     def _conn(self):
-        from psycopg import Connection
+        from bug_hunter.graph.checkpointer import connect
 
-        return Connection.connect(self.url, autocommit=True)
+        return connect(self.url, autocommit=True)
 
     def entries(self) -> list[Entry]:
         with self._conn() as conn:

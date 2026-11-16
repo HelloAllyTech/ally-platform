@@ -11,7 +11,8 @@ help:
 	@echo "  make eval        Golden cases vs an agent: CASES=<filter> AGENT=baseline MODE=issue|sweep (single cases locally)"
 	@echo "  make eval-oracle Prove cases: oracle fails before, passes after the real fix (CASES=<filter>)"
 	@echo "  make eval-mine   Mine bug/clean candidates from git history into evals/golden/candidates/"
-	@echo "  make db-up       Start the local Postgres (checkpoints) from compose.yaml; make db-down stops it"
+	@echo "  make ally-db-setup  Create the bughunter role + schema in the local ally-be Postgres and migrate"
+	@echo "  make db-up       Legacy standalone pgvector Postgres (compose.yaml, :5433); make db-down stops it"
 
 # Install dependencies (same flags as the CI step for the Python apps)
 .PHONY: install
@@ -60,7 +61,21 @@ eval-oracle:
 check:
 	@poetry run bug-hunter config check
 
-# Local Postgres for checkpoints (compose.yaml). Data lives in the bughunter-pg-data volume.
+# The bug hunter's data lives in ally-be's database, schema `bughunter` (spec §15).
+# ally-db-setup creates the agent's role and schema in the local ally-be Postgres
+# (container ally-be-postgres-1, started from ally-be/docker-compose.yml), then applies
+# migrations/ as that role. Idempotent; never touches ally-be's own tables.
+ALLY_DB_CONTAINER ?= ally-be-postgres-1
+ALLY_DB_NAME ?= ally_local
+.PHONY: ally-db-setup
+ally-db-setup:
+	@docker exec -i $(ALLY_DB_CONTAINER) psql -q -v ON_ERROR_STOP=1 -U postgres -d $(ALLY_DB_NAME) < db/ally-db-setup.sql
+	@docker exec $(ALLY_DB_CONTAINER) psql -q -U postgres -d $(ALLY_DB_NAME) -c "ALTER ROLE bughunter PASSWORD 'bughunter'"
+	@poetry run bug-hunter db migrate
+
+# Legacy: the standalone pgvector Postgres (compose.yaml, port 5433) the bug hunter used
+# before it moved into ally-be's database. Kept for semantic-memory experiments; point
+# BUGHUNTER_CHECKPOINT_DB_URL at it to use it. Never prune its volume.
 .PHONY: db-up db-down
 db-up:
 	@docker compose -f compose.yaml up -d --wait

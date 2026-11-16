@@ -238,13 +238,12 @@ def open_memory(
     """``PostgresStore`` in the bughunter database (``memory.semantic`` decides the
     index); the store's tables are created on first use."""
     from langgraph.store.postgres import PostgresStore
-    from psycopg import Connection
     from psycopg.rows import dict_row
 
-    from bug_hunter.graph.checkpointer import db_url
+    from bug_hunter.graph.checkpointer import connect, db_url
 
     cfg = config.limits.memory
-    conn = Connection.connect(
+    conn = connect(
         url or db_url(), autocommit=True, prepare_threshold=0, row_factory=dict_row
     )
     try:

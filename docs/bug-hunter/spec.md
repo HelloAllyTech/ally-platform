@@ -396,10 +396,10 @@ Branch protection on `master` keeps all required status checks. Because the appr
 
 - **Runs in GitHub Actions** (chunk 08), on a schedule and on issue/CI events, using Docker on the runner for the sandbox. Flutter is fine there: `test-ally-mobile.yml` already runs `flutter test` on `ubuntu-22.04` with Flutter 3.47.7 (30-minute timeout); the mobile sandbox uses the same version. Only unit and widget tests run; no iOS/Android builds.
 - **Approvers**: users with Ally's `SUPER_DUPER_ADMIN` role, approving in the admin dashboard (§13a). No GitHub usernames needed.
-- **Access between the two databases**: the bug hunter's role cannot read ally-be's database. ally-be gets a second, limited connection to the `bughunter` database: read on approvals and run summaries, update on the approval decision columns only.
-- **Postgres**: the same Postgres server ally-be uses, but a **separate database** `bughunter` with its **own role** that has no access to ally-be's database. Ally-be's data contains PHI, so the agent's credentials must not be able to read it. The checkpointer and store create their own tables there (`.setup()`).
-  - pgvector: ally-be's images are `postgres:14-alpine` and its migrations deliberately avoid pgvector, so the extension is probably not installed. Ask whoever runs infra whether `CREATE EXTENSION vector` can be enabled in the `bughunter` database only. Until then, the store runs without vector search (§8); at this scale that is fine.
-  - Local dev uses a `pgvector/pgvector:pg14` container from `bug-hunter/compose.yaml`.
+- **Postgres** (user, 2026-11-16, replacing "separate database"): **ally-be's own database**, in its own schema `bughunter`, like the old Bug Hunter's tables. The agent connects with its **own role** `bughunter`, which owns that schema and has **no grant on ally-be's tables**: ally-be's data contains PHI, so the agent's credentials must not be able to read it. Setup: `bug-hunter/db/ally-db-setup.sql`, run once per environment by the database owner; locally `make ally-db-setup`. Every connection pins `search_path=bughunter` (`graph/checkpointer.py` `connect`), so the checkpointer's and store's `.setup()` tables land in `bughunter`, never in `public`. `tests/integration/test_ally_db_isolation.py` proves it (no read of `users`, nothing owned in `public`).
+- **ally-be's access**: its normal connection, no second data source. Its login role joins the NOLOGIN group role `bughunter_dashboard` (migration 0007: read on reports, read and insert on verdicts, update of `superseded_by`/`superseded_at` and of the approval decision columns only). Raw SQL against `bughunter.*`, no entities, so ally-be's migration generator never sees these tables.
+  - pgvector: ally-be's images are `postgres:14-alpine` and its migrations deliberately avoid pgvector, so the extension is not installed there. `memory.semantic: auto` then uses signature, app and file lookup (§8), which is what recall relies on anyway (similarity only ranks). Enabling `CREATE EXTENSION vector` in ally-be's database is an infra decision.
+  - The old standalone `pgvector/pgvector:pg14` container (`bug-hunter/compose.yaml`, :5433) stays for semantic-memory experiments only.
 - **GitHub App** "Ally Bug Hunter", installed only on `ally-platform`: Contents read/write, Pull requests read/write, Issues read/write, Checks read, Metadata read. No Administration, no Workflows. Branch protection on `master` requires review and passing CI.
 - **Secrets** (repo secrets, never in code): GitHub App ID and private key, model API keys, Postgres URL, read-only CloudWatch credentials.
 
@@ -407,7 +407,7 @@ Branch protection on `master` keeps all required status checks. Because the appr
 
 | Question | Decision |
 |----------|----------|
-| Database | Same Postgres server as ally-be; separate `bughunter` database and role (§15) |
+| Database | ally-be's database, schema `bughunter`, own role with no grant on ally-be's tables (§15; user, 2026-11-16) |
 | Approvers | `SUPER_DUPER_ADMIN` users, in the admin dashboard (§13a) |
 | Tracing | LangSmith, project `ally-bug-hunter`, as ally-ai already does |
 | Flutter in Actions | Yes; already runs in `test-ally-mobile.yml` |

@@ -1,6 +1,12 @@
 -- Bug Hunter v2: pending human approvals (spec §13a). Lives in the bughunter database,
 -- never in ally-be's. Applied by `bug-hunter db migrate`.
-CREATE SCHEMA IF NOT EXISTS bughunter;
+DO $$ BEGIN
+  -- Only when missing: in ally-be's database the schema is created by
+  -- db/ally-db-setup.sql, and the agent's role has no CREATE on the database.
+  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'bughunter') THEN
+    CREATE SCHEMA bughunter;
+  END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS bughunter.approvals (
     id            TEXT PRIMARY KEY,            -- run id
     app           TEXT NOT NULL,

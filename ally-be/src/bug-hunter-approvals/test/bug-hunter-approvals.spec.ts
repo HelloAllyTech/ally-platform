@@ -15,6 +15,7 @@ import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-togg
 import { BugHunterApprovalsController } from '../controller/bug-hunter-approvals.controller';
 import { CreateVerdictDto } from '../dto/verdict.dto';
 import { BugHunterApprovalsService } from '../service/bug-hunter-approvals.service';
+import { DataSource } from 'typeorm';
 import { BughunterDbService } from '../service/bughunter-db.service';
 
 /**
@@ -263,13 +264,27 @@ describe('BugHunterApprovalsService', () => {
 });
 
 describe('BughunterDbService', () => {
-  it('answers 503 when the bughunter database is not configured', async () => {
-    const before = process.env.BUGHUNTER_DB_HOST;
-    delete process.env.BUGHUNTER_DB_HOST;
-    await expect(new BughunterDbService().get()).rejects.toBeInstanceOf(
+  const dataSource = (present: boolean) => {
+    const query = jest.fn().mockResolvedValue([{ present }]);
+    return { ds: { query } as unknown as DataSource, query };
+  };
+
+  it('answers 503 while the bughunter schema is not set up', async () => {
+    const { ds } = dataSource(false);
+    await expect(new BughunterDbService(ds).get()).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    if (before !== undefined) process.env.BUGHUNTER_DB_HOST = before;
+  });
+
+  it("returns ally-be's own connection once the schema exists, checking only once", async () => {
+    const { ds, query } = dataSource(true);
+    const service = new BughunterDbService(ds);
+    await expect(service.get()).resolves.toBe(ds);
+    await expect(service.get()).resolves.toBe(ds);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0][0]).toContain(
+      "to_regclass('bughunter.reports')",
+    );
   });
 });
 
