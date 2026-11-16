@@ -42,6 +42,7 @@ import {
   SplitOpportunityDto,
   UpdateOpportunityDto,
 } from '../dto/roadmap-opportunity.dto';
+import { SetDirectorStarDto } from '../dto/roadmap-strategy.dto';
 import {
   VoteBudgetDto,
   BreadthDto,
@@ -425,6 +426,25 @@ export class RoadmapOpportunityController {
     @Body() dto: UpdateOpportunityDto,
   ): Promise<OpportunityResponseDto> {
     return this.opportunityService.update(user.id, id, dto);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
+  @Put('opportunities/:id/director-star')
+  @ApiOperation({
+    summary: "Set or clear the Prod Director's star",
+    description:
+      'Only the configured Prod Director may call this (403 otherwise). A star adds the star ' +
+      "weight to the opportunity's composite rank.",
+  })
+  @ApiResponse({ status: 200, type: OpportunityResponseDto })
+  setDirectorStar(
+    @CurrentUser() user: TokenUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetDirectorStarDto,
+  ): Promise<OpportunityResponseDto> {
+    return this.opportunityService.setDirectorStar(user.id, id, dto.starred);
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, {

@@ -41,6 +41,7 @@ import {
   STAGE_STYLE,
   typeLabel,
 } from "./utils/stages";
+import { DirectorStarButton } from "./DirectorStarButton";
 import { VoteButton } from "./VoteButton";
 
 interface OpportunitiesBoardProps {
@@ -281,14 +282,17 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
                   {/* stopPropagation, or every click inside the vote button also opens the
                       drawer. */}
                   <TableCell onClick={event => event.stopPropagation()}>
-                    {budget ? (
-                      <VoteButton
-                        opportunity={opportunity}
-                        budget={budget}
-                        onSetVotes={allocate}
-                        disabled={!canVote}
-                      />
-                    ) : null}
+                    <div className="flex items-center gap-1">
+                      <DirectorStarButton opportunity={opportunity} />
+                      {budget ? (
+                        <VoteButton
+                          opportunity={opportunity}
+                          budget={budget}
+                          onSetVotes={allocate}
+                          disabled={!canVote}
+                        />
+                      ) : null}
+                    </div>
                   </TableCell>
 
                   <TableCell>

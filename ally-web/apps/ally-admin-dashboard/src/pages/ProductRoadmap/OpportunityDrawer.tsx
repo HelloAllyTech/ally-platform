@@ -46,6 +46,7 @@ import { formatPoints } from "./utils/points";
 import { sameReferenceImages } from "./utils/referenceImages";
 import { EFFORT_LABEL, STAGE_LABEL } from "./utils/stages";
 import { isVotable } from "./utils/votes";
+import { DirectorStarButton } from "./DirectorStarButton";
 import { VoteButton } from "./VoteButton";
 
 const PRD_MAX = 20000;
@@ -636,6 +637,8 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
               First in the set and fenced off from the drawer-level icons by a rule: it acts on
               the opportunity, they act on the drawer.
             */}
+            {/* Renders only for the Prod Director; null (hidden) for everyone else. */}
+            {opportunity && <DirectorStarButton opportunity={opportunity} />}
             {canVote && budget && opportunity && isVotable(opportunity) && (
               <>
                 <VoteButton opportunity={opportunity} budget={budget} onSetVotes={setVotes} />
