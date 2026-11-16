@@ -217,10 +217,6 @@ export class RoadmapUpNextService {
         { id: opportunity.id },
         {
           builderSessionId: null,
-          stage:
-            opportunity.stage === RoadmapOpportunityStage.UNDER_DEVELOPMENT
-              ? RoadmapOpportunityStage.PRIORITISED
-              : opportunity.stage,
           updatedBy: userId,
         },
       );

@@ -119,7 +119,6 @@ describe('RoadmapBuilderService.reconcileShippedOpportunities', () => {
       expect.arrayContaining([
         RoadmapOpportunityStage.NEW,
         RoadmapOpportunityStage.PRIORITISED,
-        RoadmapOpportunityStage.UNDER_DEVELOPMENT,
       ]),
     );
   });

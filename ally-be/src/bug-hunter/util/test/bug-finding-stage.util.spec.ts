@@ -76,17 +76,6 @@ describe('effectiveStage', () => {
     );
   });
 
-  it('reads a pre-retirement under_development override as Prioritised', () => {
-    expect(
-      effectiveStage(
-        finding({
-          status: BugFindingStatus.NEW,
-          stageOverride: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
-        }),
-      ),
-    ).toBe(RoadmapOpportunityStage.PRIORITISED);
-  });
-
   /**
    * The case the override exists for: a bug fixed with an ordinary hand-written
    * PR. Bug Hunter never ran, so `status` is still NEW and would derive to New

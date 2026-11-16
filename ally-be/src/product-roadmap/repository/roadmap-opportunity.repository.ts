@@ -337,7 +337,7 @@ const queueRankSql = (p: RankPlaceholders): string => `(
            ON qg."opportunityId" = q.id
    WHERE q."deletedAt" IS NULL
      AND q."type" <> 'bug'
-     AND q."stage" IN ('new', 'prioritised', 'under_development')
+     AND q."stage" IN ('new', 'prioritised')
 )`;
 
 /**

@@ -1,6 +1,5 @@
 import { RoadmapOpportunityStage } from 'src/product-roadmap/enum/roadmap-opportunity.enum';
 
-import { normaliseStage } from 'src/product-roadmap/util/roadmap-stage.util';
 import { BugFinding } from '../entity/bug-finding.entity';
 import { BugFindingStatus } from '../enum/bug-finding.enum';
 
@@ -75,6 +74,5 @@ export function deriveStage(status: BugFindingStatus): RoadmapOpportunityStage {
 export function effectiveStage(
   finding: Pick<BugFinding, 'status' | 'stageOverride'>,
 ): RoadmapOpportunityStage {
-  // An override saved before the retirement may still say `under_development`.
-  return normaliseStage(finding.stageOverride) ?? deriveStage(finding.status);
+  return finding.stageOverride ?? deriveStage(finding.status);
 }

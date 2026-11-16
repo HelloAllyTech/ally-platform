@@ -245,7 +245,6 @@ describe('RoadmapAllocationService', () => {
   describe('the stage rule', () => {
     it.each([
       RoadmapOpportunityStage.PRIORITISED,
-      RoadmapOpportunityStage.UNDER_DEVELOPMENT,
       RoadmapOpportunityStage.RELEASED,
       RoadmapOpportunityStage.ARCHIVED,
     ])('rejects a vote on a %s opportunity with 409', async (stage) => {

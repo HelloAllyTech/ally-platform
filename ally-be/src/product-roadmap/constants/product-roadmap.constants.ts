@@ -240,7 +240,6 @@ export const ROADMAP_RANK = {
 export const ROADMAP_QUEUE_STAGES = [
   RoadmapOpportunityStage.NEW,
   RoadmapOpportunityStage.PRIORITISED,
-  RoadmapOpportunityStage.UNDER_DEVELOPMENT,
 ] as const;
 
 export const ROADMAP_LIST_DEFAULTS = {
