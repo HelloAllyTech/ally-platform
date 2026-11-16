@@ -126,7 +126,7 @@ export class RoadmapOpportunityService {
       rank: await this.strategyGoalService.getRankContext(),
     });
     return {
-      items: await this.toResponseList(result.items),
+      items: await this.toResponseList(result.items, userId),
       count: result.count,
       maxScore: result.maxScore,
       // The client must never derive the period itself — see SetAllocationDto.
@@ -142,7 +142,34 @@ export class RoadmapOpportunityService {
       await this.strategyGoalService.getRankContext(),
     );
     if (!row) throw new NotFoundException(`Opportunity ${id} not found`);
-    return (await this.toResponseList([row]))[0];
+    return (await this.toResponseList([row], userId))[0];
+  }
+
+  /**
+   * Set or clear the Prod Director's star. Only the configured director may; everyone else gets
+   * 403. Raises the opportunity's composite rank by the star weight, so the whole board is
+   * invalidated (other cards' queue positions move too).
+   */
+  async setDirectorStar(
+    userId: number,
+    id: string,
+    starred: boolean,
+  ): Promise<OpportunityResponseDto> {
+    if (!(await this.strategyGoalService.isProdDirector(userId))) {
+      throw new ForbiddenException(
+        'Only the Prod Director can star opportunities.',
+      );
+    }
+    const existing = await this.opportunityRepository.findOne({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException(`Opportunity ${id} not found`);
+    await this.opportunityRepository.update(id, {
+      directorStarred: starred,
+      updatedBy: userId,
+    });
+    this.strategyGoalService.invalidate(userId);
+    return this.findOne(userId, id);
   }
 
   /**
@@ -352,7 +379,8 @@ export class RoadmapOpportunityService {
       this.notifications.emit({
         kind: 'OPPORTUNITY_UPSERTED',
         actorId: userId,
-        opportunity: response,
+        // Broadcast to every client: the star is the director's private view.
+        opportunity: { ...response, directorStarred: null },
       });
     }
     return response;
@@ -614,7 +642,8 @@ export class RoadmapOpportunityService {
       this.notifications.emit({
         kind: 'OPPORTUNITY_UPSERTED',
         actorId: userId,
-        opportunity: response,
+        // Broadcast to every client: the star is the director's private view.
+        opportunity: { ...response, directorStarred: null },
       });
     }
     return response;
@@ -697,12 +726,16 @@ export class RoadmapOpportunityService {
    */
   async toResponseList(
     rows: RoadmapOpportunityRow[],
+    viewerId?: number,
   ): Promise<OpportunityResponseDto[]> {
     // Both resolved ONCE for the whole page, not per row: the goal count is the same for every
     // opportunity in a response, and fetching it per row would issue a query per card.
-    const [users, goalsTotal] = await Promise.all([
+    const [users, goalsTotal, viewerIsDirector] = await Promise.all([
       this.resolveUsers(rows.map((r) => r.createdBy)),
       this.strategyGoalService.countGoals(),
+      viewerId === undefined
+        ? Promise.resolve(false)
+        : this.strategyGoalService.isProdDirector(viewerId),
     ]);
     return rows.map((row) => ({
       id: row.id,
@@ -742,6 +775,8 @@ export class RoadmapOpportunityService {
       // 63.33333333333333.
       compositeScore: Math.round(Number(row.compositeScore ?? 0) * 10) / 10,
       voterCount: Number(row.voterCount ?? 0),
+      // Only the Prod Director ever sees the flag; null for everyone else (and for the broadcast).
+      directorStarred: viewerIsDirector ? row.directorStarred === true : null,
       goalsHelped: Number(row.goalsHelped ?? 0),
       goalsAssessed: Number(row.goalsAssessed ?? 0),
       goalsTotal,

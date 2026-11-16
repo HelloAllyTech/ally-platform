@@ -59,7 +59,9 @@ import {
   BulkAssessResponseDto,
   CreateStrategyGoalDto,
   GoalImpactVerdictDto,
+  ProdDirectorResponseDto,
   RankWeightsResponseDto,
+  SetProdDirectorDto,
   RenameStrategyGoalDto,
   ReorderStrategyGoalsDto,
   RoadmapStrategyContextDto,
@@ -416,6 +418,34 @@ export class RoadmapAdminController {
   @ApiResponse({ status: HttpStatus.OK, type: RankWeightsResponseDto })
   getRankWeights() {
     return this.strategyGoalService.getWeights();
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, {
+    permissions: [PERMISSIONS.EDIT_PRODUCT_ROADMAP],
+  })
+  @Get('prod-director')
+  @ApiOperation({
+    summary: 'The Prod Director pick and the platform admins to choose from',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: ProdDirectorResponseDto })
+  getProdDirector() {
+    return this.strategyGoalService.getProdDirector();
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, {
+    permissions: [PERMISSIONS.EDIT_PRODUCT_ROADMAP],
+  })
+  @Put('prod-director')
+  @ApiOperation({
+    summary: 'Pick the Prod Director (a platform admin), or clear with null',
+    description:
+      'One person at a time. Only they see the star icon and can flip it; existing stars persist.',
+  })
+  setProdDirector(
+    @CurrentUser() user: TokenUser,
+    @Body() dto: SetProdDirectorDto,
+  ) {
+    return this.strategyGoalService.setProdDirector(user.id, dto.userId);
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, {

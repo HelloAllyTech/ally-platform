@@ -410,6 +410,10 @@ export const ApiEndpoints = {
     STRATEGY_GOALS_ORDER: "/v1/product-roadmap/strategy-goals/order",
     STRATEGY_GOALS_ASSESS_MISSING: "/v1/product-roadmap/strategy-goals/assess-missing",
     RANK_WEIGHTS: "/v1/product-roadmap/rank-weights",
+    /** The Prod Director pick (GET/PUT) — a platform admin whose star boosts rank. */
+    PROD_DIRECTOR: "/v1/product-roadmap/prod-director",
+    OPPORTUNITY_DIRECTOR_STAR: (id: string) =>
+      `/v1/product-roadmap/opportunities/${id}/director-star`,
     /** The Vision & strategy page the opportunity copilot reads on every turn. */
     STRATEGY_CONTEXT: "/v1/product-roadmap/strategy-context",
     OPPORTUNITY_GOAL_IMPACT: (id: string) => `/v1/product-roadmap/opportunities/${id}/goal-impact`,

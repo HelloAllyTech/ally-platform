@@ -121,6 +121,8 @@ export interface RankContext {
     votersWeight: number;
     effortWeight: number;
     goalImpactWeight: number;
+    /** Optional: absent = the star factor is off (older callers and fixtures). */
+    starWeight?: number;
   };
   bases: { maxScore: number; maxVoters: number; totalGoals: number };
 }
@@ -247,6 +249,7 @@ interface RankPlaceholders {
   wVoters: string;
   wEffort: string;
   wGoal: string;
+  wStar: string;
   maxScore: string;
   maxVoters: string;
   totalGoals: string;
@@ -259,6 +262,7 @@ const NAMED_RANK_PLACEHOLDERS: RankPlaceholders = {
   wVoters: 'CAST(:wVoters AS numeric)',
   wEffort: 'CAST(:wEffort AS numeric)',
   wGoal: 'CAST(:wGoal AS numeric)',
+  wStar: 'CAST(:wStar AS numeric)',
   maxScore: 'CAST(:maxScore AS numeric)',
   maxVoters: 'CAST(:maxVoters AS numeric)',
   totalGoals: 'CAST(:totalGoals AS numeric)',
@@ -321,6 +325,7 @@ const queueRankSql = (p: RankPlaceholders): string => `(
              + ${p.wGoal}   * (CASE WHEN ${p.totalGoals} > 0
                                     THEN COALESCE(qg.helped, 0)::numeric / ${p.totalGoals} * 100
                                     ELSE 0 END)
+             + ${p.wStar}   * (CASE WHEN q."directorStarred" THEN 100 ELSE 0 END)
            ) / ${p.weightTotal}) DESC,
            q."createdAt" DESC, q.id ASC
          )::int AS rank
@@ -394,6 +399,7 @@ const COMPOSITE_SCORE_SQL = `((
   + CAST(:wGoal AS numeric)   * (CASE WHEN CAST(:totalGoals AS numeric) > 0
                      THEN COALESCE(gimp.helped, 0)::numeric / CAST(:totalGoals AS numeric) * 100
                      ELSE 0 END)
+  + CAST(:wStar AS numeric)   * (CASE WHEN opp."directorStarred" THEN 100 ELSE 0 END)
 ) / CAST(:weightTotal AS numeric))`;
 
 const SORT_COLUMNS: Record<string, string> = {
@@ -718,7 +724,8 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
       weights.votesWeight +
       weights.votersWeight +
       weights.effortWeight +
-      weights.goalImpactWeight;
+      weights.goalImpactWeight +
+      (weights.starWeight ?? 0);
 
     // The composite is spelled out again here rather than shared with COMPOSITE_SCORE_SQL: this
     // path is positional-parameter raw SQL and that one is a named-parameter query-builder
@@ -740,6 +747,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
                 + CAST($7 AS numeric) * (CASE WHEN CAST($10 AS numeric) > 0
                              THEN COALESCE(gimp.helped, 0)::numeric / CAST($10 AS numeric) * 100
                              ELSE 0 END)
+                + CAST($12 AS numeric) * (CASE WHEN opp."directorStarred" THEN 100 ELSE 0 END)
               ) / CAST($11 AS numeric))                                                       AS "compositeScore",
               COALESCE((SELECT a.votes FROM roadmap_allocations a
                          WHERE a."opportunityId" = opp.id
@@ -780,6 +788,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
            wVoters: 'CAST($5 AS numeric)',
            wEffort: 'CAST($6 AS numeric)',
            wGoal: 'CAST($7 AS numeric)',
+           wStar: 'CAST($12 AS numeric)',
            maxScore: 'CAST($8 AS numeric)',
            maxVoters: 'CAST($9 AS numeric)',
            totalGoals: 'CAST($10 AS numeric)',
@@ -798,6 +807,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
         bases.maxVoters,
         bases.totalGoals,
         weightTotal,
+        weights.starWeight ?? 0,
       ],
     );
     return rows[0] ?? null;
@@ -880,11 +890,13 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
           wVoters: rank.weights.votersWeight,
           wEffort: rank.weights.effortWeight,
           wGoal: rank.weights.goalImpactWeight,
+          wStar: rank.weights.starWeight ?? 0,
           weightTotal:
             rank.weights.votesWeight +
             rank.weights.votersWeight +
             rank.weights.effortWeight +
-            rank.weights.goalImpactWeight,
+            rank.weights.goalImpactWeight +
+            (rank.weights.starWeight ?? 0),
           maxScore: rank.bases.maxScore,
           maxVoters: rank.bases.maxVoters,
           totalGoals: rank.bases.totalGoals,

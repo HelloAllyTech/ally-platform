@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -9,6 +10,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import {
   ROADMAP_LIMITS,
@@ -74,6 +76,13 @@ export class UpdateRankWeightsDto {
   @Min(0)
   @Max(10)
   goalImpactWeight?: number;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 10 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  starWeight?: number;
 }
 
 export class StrategyGoalDto {
@@ -99,6 +108,36 @@ export class RankWeightsResponseDto {
   @ApiProperty() votersWeight!: number;
   @ApiProperty() effortWeight!: number;
   @ApiProperty() goalImpactWeight!: number;
+  @ApiProperty() starWeight!: number;
+  @ApiProperty({ nullable: true }) prodDirectorUserId!: number | null;
+}
+
+export class SetProdDirectorDto {
+  @ApiProperty({
+    nullable: true,
+    description: 'A platform admin, or null to clear.',
+  })
+  @ValidateIf((o: SetProdDirectorDto) => o.userId !== null)
+  @IsInt()
+  userId!: number | null;
+}
+
+export class ProdDirectorCandidateDto {
+  @ApiProperty() id!: number;
+  @ApiProperty() name!: string;
+  @ApiProperty() email!: string;
+}
+
+export class ProdDirectorResponseDto {
+  @ApiProperty({ nullable: true }) userId!: number | null;
+  @ApiProperty({ type: [ProdDirectorCandidateDto] })
+  candidates!: ProdDirectorCandidateDto[];
+}
+
+export class SetDirectorStarDto {
+  @ApiProperty()
+  @IsBoolean()
+  starred!: boolean;
 }
 
 export class GoalImpactVerdictDto {
