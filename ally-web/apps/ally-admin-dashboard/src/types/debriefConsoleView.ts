@@ -809,6 +809,10 @@ export interface AgentLogEntry {
   retries: number;
   error: string | null;
   attention: boolean;
+  /** Where it came from; null on entries from before it was recorded. */
+  origin?: "fixed" | "planned" | "top_up" | null;
+  /** The planner's reason, on a planned agent's entries. */
+  planReason?: string | null;
 }
 
 export interface AgentLogsView {

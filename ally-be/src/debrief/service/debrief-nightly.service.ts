@@ -310,7 +310,7 @@ export class DebriefNightlyService implements OnModuleInit {
         `UPDATE debrief_runs
             SET workspace = coalesce(workspace, '{}'::jsonb) || jsonb_build_object('escalation',
                   jsonb_build_object('by', null, 'at', now(), 'source', 'nightly',
-                    'note', 'From the nightly check: the independent check and the debrief disagree on a risk cue.'))
+                    'note', 'From the nightly check: the quality score and the debrief disagree on a risk cue.'))
           WHERE id = $1 AND NOT (coalesce(workspace, '{}'::jsonb) ? 'escalation')`,
         [r.id],
       );
@@ -318,7 +318,7 @@ export class DebriefNightlyService implements OnModuleInit {
       await this.notifier.escalated({
         what: 'run',
         scenarioSessionId: r.sid,
-        note: 'From the nightly check: the independent check and the debrief disagree on a risk cue.',
+        note: 'From the nightly check: the quality score and the debrief disagree on a risk cue.',
         by: 0,
       });
       routed += 1;
@@ -375,7 +375,7 @@ export class DebriefNightlyService implements OnModuleInit {
         ? [
             {
               code: 'judge_drift',
-              detail: `The independent check moved ${drift.drift >= 0 ? '+' : ''}${drift.drift} points scoring the same ${drift.n} debriefs again (limit ±${max}).`,
+              detail: `The quality score moved ${drift.drift >= 0 ? '+' : ''}${drift.drift} points scoring the same ${drift.n} debriefs again (limit ±${max}).`,
               value: drift.drift,
               baseline: 0,
             },

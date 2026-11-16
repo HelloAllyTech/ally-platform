@@ -21,7 +21,7 @@ text people read changed. In the admin and in ally-be's reasons, notifications a
 `quick_test` → Quick check, `gate_test` → Pass test, `paired_trial` → Side-by-side trial, `canary` →
 Try on learners / learner try-out, promote → Live for everyone / put live for everyone, the open and
 gate test sets → Practice sessions and Test sessions, κ → Agreement. On the Debriefs list and the
-session review: the judge → Independent check, the Evaluator → Ally's own check, and a run in a
+session review: the judge → Quality score, the Evaluator → draft score, and a run in a
 trial reads "Version vN · In a trial: the current version". A person's pinned-rule proposal is
 titled "<rule name>: <why>" (e.g. "Safety rules: …"); the closed groups are "Rejected or
 withdrawn" and "Live for everyone".
@@ -255,7 +255,7 @@ the session.
   accepted plan with each agent's estimated cost and what was dropped, then what was applied,
   sent and skipped), `top_up`, code and data agents, `guidance_lookup`, `checks`, `score_draft`,
   `decide`.
-- **`step: judge`**: the independent check, logged later, on the judge's schedule, against the
+- **`step: judge`**: the quality score, logged later, on the judge's schedule, against the
   same run.
 - **`attention`**: a failed check, a draft below the bar, a decision other than published, an
   error, a dispatch that dropped or skipped an agent.
@@ -332,7 +332,7 @@ outside test organisations, while fewer than 10 sampled ones wait. Stored in
 ordinary reviews count too.
 
 In the admin these read in plain words (2026-11-12): "Agreement" for κ (κ only in a tooltip),
-"Independent check caught 3 of 4 problems you found", and "Not measurable yet: every answer is the
+"Quality score caught 3 of 4 problems you found", and "Not measurable yet: every answer is the
 same" for an undefined κ.
 
 ## PM agent: ideas (like pull requests) and approvals (plan §11.7)

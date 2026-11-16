@@ -18,7 +18,7 @@ from app.core.debrief.cue_strength import (
     with_strength,
 )
 from app.core.debrief_graph import inputs as body
-from app.core.debrief_graph.agent_logs import code_log
+from app.core.debrief_graph.agent_logs import code_log, origin_of
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
 from app.core.debrief_graph.constants import (
     DEFAULT_ADVISORY_CHECKS,
@@ -494,6 +494,7 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
                 ctx,
                 Step.GUIDANCE_LOOKUP,
                 t0,
+                origin=origin_of(state, Step.GUIDANCE_LOOKUP),
                 input={
                     "situations": [
                         (m or {}).get("summary")

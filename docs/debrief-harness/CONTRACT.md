@@ -235,6 +235,15 @@ Recorded by the ally-be build (2026-11-10).
 23. **Rule checks stay in ally-be** (`run_checks` tool), per D11: rules on data stay with the data; the graph
     can't skip them because every draft goes through the `checks` node.
 
+### Where an Agent log entry came from (2026-11-16)
+
+Every entry in the run response's `logs` carries `origin`, set by ally-ai where the entry is written
+(`agent_logs.origin_of`, from the run's own plan, never from the step's name): `fixed` for steps the code
+always runs (and for the default plan's steps when the planner is off or failed), `planned` for an agent the
+planner chose, with `planReason` (the planner's reason), and `top_up` for the evidence top-up and the agents
+it chose. ally-be stores both (`debrief_run_logs.origin`, `plan_reason`, migration 1981901400000), tags the
+quality score `fixed`, and leaves entries from before as null (shown as "Source unknown").
+
 ### Clear and possible risk cues (2026-11-16)
 
 A client turn is a **clear** risk cue when any signal says so: the Safety reader filed it under a clear

@@ -9527,9 +9527,9 @@ export const en = {
         saved: "Verdict saved",
         failed: "Couldn't save the verdict",
         pick: "Choose Good or Needs work.",
-        judge: (score: string) => `Independent check: ${score}`,
-        agentCheck: (score: string) => `Ally's own check: ${score}`,
-        hiddenNote: "The independent check's score and other verdicts show after you submit.",
+        judge: (score: string) => `Quality score: ${score}`,
+        agentCheck: (score: string) => `Draft score: ${score}`,
+        hiddenNote: "The quality score, the draft score and other verdicts show after you submit.",
         others: (n: number) =>
           n === 0
             ? "No one else has reviewed it."
@@ -9631,9 +9631,9 @@ export const en = {
         nightlySamenessMax: "Nightly check: alert when debriefs read alike above",
         nightlySpecificityDrop: "Nightly check: alert when specificity falls by (points)",
         nightlyGapMax:
-          "Nightly check: alert when Ally’s own check is above the independent one by (points)",
+          "Nightly check: alert when the draft score is above the quality score by (points)",
         judgeDriftMax: "Judge drift that re-locks autonomy (points)",
-        judgeAnchorSize: "Debriefs the independent check scores again each week",
+        judgeAnchorSize: "Debriefs scored again each week for the quality score",
       } as Record<string, string>,
       columns: {
         setting: "Setting",
@@ -10132,10 +10132,17 @@ export const en = {
         "Picked at random this week so agreement isn't built only from debriefs someone chose to open. Review it as usual and answer the questions under your verdict.",
       untitled: (id: string) => `Roleplay ${id}`,
       columns: {
-        judge: "Independent check",
-        evaluator: "Ally’s own check",
+        judge: "Quality score",
+        evaluator: "Draft score",
         cost: "Cost",
         time: "Time",
+      },
+      // The two debrief scores, explained wherever they are shown.
+      scoreHelp: {
+        judge:
+          "Scored after publishing by a separate AI reviewer that never sees how the debrief was written. Below 8 goes to review.",
+        evaluator:
+          "Scored before publishing, to decide whether the debrief is good enough to go out or needs another revision.",
       },
       layoutLabel: "Layout",
       layout: { cards: "Cards", list: "List" },
@@ -10173,7 +10180,7 @@ export const en = {
         "Most urgent first: important-moment flags, then other flags, then debriefs below the bar.",
       /**
        * The same note for a viewer blind to the checks (the clinical advisor): no hint of the
-       * independent check's result before their verdict. True to the order ally-be sends them.
+       * quality score before their verdict. True to the order ally-be sends them.
        */
       queueNoteBlind: {
         needs: "Most urgent first: important-moment flags, then other flags, then held debriefs.",
@@ -10199,7 +10206,7 @@ export const en = {
         },
         below: {
           title: "Nothing below the bar",
-          message: "Debriefs the independent check scored under the bar appear here.",
+          message: "Debriefs with a quality score under the bar appear here.",
         },
         published: {
           title: "Nothing published yet",
@@ -10271,6 +10278,21 @@ export const en = {
       readable: "Readable",
       raw: "Raw JSON",
       note: "Ally team only · contains the full transcript · deleted with the session",
+      origin: {
+        fixed: "Fixed",
+        planned: "Planned",
+        top_up: "Top-up",
+        unknown: "Source unknown",
+      } as Record<string, string>,
+      originHelp: {
+        fixed: "A step the code always runs",
+        planned: "An agent the planner chose for this session",
+        top_up: "Extra evidence after a failed evaluation",
+        unknown: "Logged before sources were recorded",
+      } as Record<string, string>,
+      why: (reason: string) => `Why: ${reason}`,
+      source: "Source",
+      allSources: "All sources",
       summary: {
         run: (id: string) => `run ${id}`,
         version: (v: string) => `version ${v}`,
@@ -10314,8 +10336,8 @@ export const en = {
         top_up: "Top-up",
         score_draft: "Scoring",
         decide: "Decision",
-        evaluator: "Ally's own check",
-        judge: "Independent check",
+        evaluator: "Draft score",
+        judge: "Quality score",
       } as Record<string, string>,
     },
     // One session's page (redesign 2026-11-12): the roleplay beside the debrief, and the review.
@@ -10358,8 +10380,8 @@ export const en = {
         organisation: "Organisation",
         recipe: "Recipe",
         language: "Language",
-        judge: "Independent check",
-        evaluator: "Ally’s own check",
+        judge: "Quality score",
+        evaluator: "Draft score",
         cost: "Cost",
         time: "Time",
         release: "Version",
@@ -10552,8 +10574,7 @@ export const en = {
         turns: (a: number, b: number) => `turns ${a}–${b} in the roleplay`,
         flaggedCard: "the flagged card",
         theirNote: "their note",
-        judgeReasons: (n: number) =>
-          `the independent check’s ${n} ${n === 1 ? "reason" : "reasons"}`,
+        judgeReasons: (n: number) => `the quality score’s ${n} ${n === 1 ? "reason" : "reasons"}`,
         urgent: (w: string) => `Urgent · ${w}.`,
         flag: (w: string) => `Learner flag · ${w}.`,
         held: (w: string) => `Held · ${w}.`,
@@ -10563,17 +10584,17 @@ export const en = {
         escalated: (w: string) => `Escalated to you · ${w}.`,
         flagBody: (card: string, reason: string) => `The learner flagged “${card}”: “${reason}”.`,
         heldBody: (judge: string) =>
-          `The independent check scored it ${judge}; the learner sees “on its way” until you decide.`,
+          `Quality score ${judge}; the learner sees “on its way” until you decide.`,
         distressBody:
           "The learner stepped out in distress. They have their debrief with the support lines; check on them.",
         belowBarBody: (judge: string) =>
-          `Already published; the independent check scored it ${judge}, below the bar.`,
+          `Already published; quality score ${judge}, below the bar.`,
         escalatedAsk: "The Ally team asks for your view.",
         escalatedNote: (by: string, note: string) => `${by} asks: “${note}”`,
         theTeam: "The Ally team",
         distressAskAlly: "The learner showed distress in Ask Ally after reading the debrief.",
         theCard: "the card",
-        judgeReasonsLink: "the independent check’s reasons",
+        judgeReasonsLink: "the quality score’s reasons",
         askAlly: "the Ask Ally conversation",
         escalate: "Escalate to clinical advisor",
         giveVerdict: "Give your verdict",
@@ -10586,13 +10607,12 @@ export const en = {
         theyAdded: (note: string) => `They added: “${note}”`,
         keepRemoveHelp:
           "Keep and Remove ask for a reason the learner reads. Correct edits the card in place.",
-        held: (judge: string, w: string) =>
-          `Held · the independent check scored it ${judge}, below the bar · ${w}`,
+        held: (judge: string, w: string) => `Held · quality score ${judge}, below the bar · ${w}`,
         heldHelp: "The learner sees “on its way” until you decide.",
         distress: (w: string) => `Learner distress · ${w}`,
         belowBar: (judge: string, w: string) =>
-          `Published, then the independent check scored it below the bar (${judge}) · ${w}`,
-        whyHeld: "Why the independent check held it",
+          `Published, then the quality score came in below the bar (${judge}) · ${w}`,
+        whyHeld: "Why the quality score held it",
         escalate: "Escalate to clinical advisor · e",
         comments: "Comments",
         commentHint: "Select words in the roleplay or the debrief to add one.",
@@ -11084,7 +11104,7 @@ export const en = {
           },
           "debrief-judge-anchor": {
             name: "Judge drift",
-            what: "The independent check scores a fixed set of debriefs again (learning budget)",
+            what: "Scores a fixed set of debriefs again for the quality score, to catch drift (learning budget)",
           },
           "debrief-pm-agent-forecasts": {
             name: "Check forecasts",
@@ -11233,7 +11253,7 @@ export const en = {
         autoNeedsAgreement: "On its own (override: asks to confirm)",
         overrideTitle: "Let learner try-outs run on their own?",
         overrideBody: (kind: string) =>
-          `The independent check hasn't been shown to agree with the clinical advisor yet. Learner try-outs for ${kind} will reach learners without approval.`,
+          `The quality score hasn't been shown to agree with the clinical advisor yet. Learner try-outs for ${kind} will reach learners without approval.`,
         overrideSafety:
           "The safety nets stay: a try-out that misses a risk cue is taken back on its own, and the system still sets it back to asks first after reverts or a failed baseline, and tells you.",
         overrideConfirm: "Let them run",
@@ -11249,7 +11269,7 @@ export const en = {
           },
           {
             lead: "Try on learners:",
-            text: "asks first until the independent check agrees with the clinical advisor’s reviews (agreement 0.6 or more on every measure). Then you’re told it can run on its own, and you switch it on here. It never switches itself on. You can also switch it on earlier; you’ll be asked to confirm and the override is recorded.",
+            text: "asks first until the quality score agrees with the clinical advisor’s reviews (agreement 0.6 or more on every measure). Then you’re told it can run on its own, and you switch it on here. It never switches itself on. You can also switch it on earlier; you’ll be asked to confirm and the override is recorded.",
           },
           {
             lead: "Taken back automatically:",
@@ -11272,7 +11292,7 @@ export const en = {
         loading: "Loading…",
         loadFailed: "Couldn't load what the PM agent may do alone.",
         driftFrom:
-          "Judge drift: not measured yet. The independent check scores a fixed set of debriefs again each week.",
+          "Judge drift: not measured yet. A fixed set of debriefs is scored again for the quality score each week.",
         drift: "Judge drift found: everything asks first.",
         noDrift: "No judge drift.",
         baselineFailed: "The monthly baseline failed: everything asks first.",
@@ -11297,7 +11317,7 @@ export const en = {
         orgLive: "Live",
         orgNotLive: "Not switched on yet · no trials or try-outs",
         orgStopped: "Stopped · no trials or try-outs",
-        // Agreement between the independent check and the clinical advisor's yes/no answers.
+        // Agreement between the quality score and the clinical advisor's yes/no answers.
         agreement: {
           heading: "Judge agreement with the clinical advisor",
           source: (sampled: number) =>
@@ -11314,11 +11334,11 @@ export const en = {
           caught: (caught: number, of: number) =>
             of === 0
               ? "No problems found yet"
-              : `Independent check caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
+              : `The quality score caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
           caughtHelp:
-            "Of the debriefs the clinical advisor answered No to, how many the independent check also marked No.",
+            "Of the debriefs the clinical advisor answered No to, how many the quality score also marked No.",
           undefinedHelp:
-            "The advisor and the independent check have only ever given the same answer, so agreement can't be worked out yet (Cohen's κ is undefined).",
+            "The advisor and the quality score have only ever given the same answer, so agreement can't be worked out yet (Cohen's κ is undefined).",
           footer: (min: number) =>
             `Line at 0.6. Each measure needs ${min} reviews and agreement of at least 0.6. If any drops below, learner try-outs go back to asking a person.`,
         },
@@ -11868,11 +11888,11 @@ export const en = {
       providersAtLeastOne: "Allow at least one provider. To stop its debriefs, use Emergency stop.",
       providersConfirm: "Save providers",
     },
-    // Analytics › Debriefs › Judge agreement: the independent check against the clinical
+    // Analytics › Debriefs › Judge agreement: the quality score against the clinical
     // advisor's yes/no answers under their verdicts (hand scoring removed 2026-11-12).
     nightly: {
       heading: "Nightly check",
-      help: "Each night, yesterday's debriefs are measured against the two weeks before. Alerts mean something drifted. Words are counted and lines compared the same way in every language; vagueness is the independent check's own specificity score.",
+      help: "Each night, yesterday's debriefs are measured against the two weeks before. Alerts mean something drifted. Words are counted and lines compared the same way in every language; vagueness is the quality score's specificity part.",
       slice: "Show",
       all: "All debriefs",
       language: (code: string) => `Language: ${code}`,
@@ -11889,15 +11909,15 @@ export const en = {
         sameness: "How alike debriefs read",
         samenessHelp:
           "0 to 1: how close each debrief's lead lines come to another learner's. Rising means debriefs read the same for everyone.",
-        specificity: "Specificity (independent check)",
+        specificity: "Specificity (quality score)",
         specificityHelp:
-          "The independent check's score for how specific the evidence is, 0 to 10. Falling means debriefs are getting vaguer.",
-        gap: "Ally's own check above the independent check",
+          "The quality score's part for how specific the evidence is, 0 to 10. Falling means debriefs are getting vaguer.",
+        gap: "Draft score above quality score",
         gapHelp:
-          "Points, on average. A growing gap means Ally's own check is getting easier than the independent one.",
+          "Points, on average. A growing gap means the draft score is getting easier than the quality score.",
         drift: "Judge drift",
         driftHelp:
-          "Each week the independent check scores the same debriefs again. The line is how far its scores moved; beyond the limit, autonomy re-locks.",
+          "Each week the same debriefs are scored again for the quality score. The line is how far its scores moved; beyond the limit, autonomy re-locks.",
         limit: "Limit",
       },
       dataQuality: (
@@ -11907,9 +11927,9 @@ export const en = {
         stuck: number,
         failed: number,
       ) =>
-        `Yesterday: ${runs} debriefs; ${noLanguage} without a language, ${unjudged} not yet scored by the independent check, ${stuck} stuck, ${failed} failed.`,
+        `Yesterday: ${runs} debriefs; ${noLanguage} without a language, ${unjudged} without a quality score yet, ${stuck} stuck, ${failed} failed.`,
       reasons: {
-        judge_human_disagree: "A clinician and the independent check disagree",
+        judge_human_disagree: "A clinician and the quality score disagree",
         thumbs_down_comment: "Learner said not helpful, with a comment",
         risk_cue_disagree: "Risk cue: the checks disagree",
       } as Record<string, string>,
@@ -11920,7 +11940,7 @@ export const en = {
       noAgreement:
         "The clinical advisor hasn't answered the questions under a verdict yet, so there's no agreement to show.",
       sectionHelp:
-        "How closely the independent check agrees with the clinical advisor's yes/no answers under each verdict. Decides what the PM agent may do alone: learner try-outs can run on their own only once every measure reaches 0.6.",
+        "How closely the quality score agrees with the clinical advisor's yes/no answers under each verdict. Decides what the PM agent may do alone: learner try-outs can run on their own only once every measure reaches 0.6.",
       agreementFailed: "agreement",
       kpis: {
         rated: "Reviews with answers",
@@ -11932,24 +11952,24 @@ export const en = {
         sampleValue: (week: number, waiting: number) => `${week} this week · ${waiting} waiting`,
         gate: "Learner try-outs on their own",
         gateHelp:
-          "Allowed only while the independent check agrees with the clinical advisor on accuracy, evidence and missed risk cues.",
+          "Allowed only while the quality score agrees with the clinical advisor on accuracy, evidence and missed risk cues.",
         met: "Allowed",
         notMet: "Needs approval",
       },
       gateHeading: "What the PM agent's freedom depends on",
       gateAbout: "About agreement",
       gateHelp: (min: number) =>
-        `Agreement is Cohen's κ between the clinical advisor's answer and the independent check's on the same debrief: 1 is perfect, 0 is chance. Each measure needs ${min} reviews and 0.6 or more.`,
+        `Agreement is Cohen's κ between the clinical advisor's answer and the quality score's on the same debrief: 1 is perfect, 0 is chance. Each measure needs ${min} reviews and 0.6 or more.`,
       chartAxis: "Bar: agreement beyond chance, 0 to 1. Dark rule: the 0.6 each measure needs",
       chartCaption:
-        "Agreement between the independent check and the clinical advisor, beyond what chance alone would give.",
+        "Agreement between the quality score and the clinical advisor, beyond what chance alone would give.",
       kappaWords: (k: string, words: string) => `${k}, ${words.toLowerCase()}`,
       notYet: (n: number, min: number) => `Not measured yet: ${n} of ${min} reviews`,
       reviews: (n: number, min: number) => (n < min ? `${n} of ${min}` : String(n)),
       caught: (caught: number, of: number) =>
         of === 0
           ? "No problems found yet"
-          : `Independent check caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
+          : `The quality score caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
       states: {
         not_enough: "Not measured yet",
         undefined: "Not measurable yet: every answer is the same",

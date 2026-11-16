@@ -324,8 +324,8 @@ describe("Session page", () => {
     const facts = screen.getByTestId("session-facts");
     expect(facts).toHaveTextContent("6.4 / 10");
     // Plain words on the advisor's page: no "Judge", "Evaluator" or "Release".
-    expect(facts).toHaveTextContent("Independent check");
-    expect(facts).toHaveTextContent("Ally’s own check");
+    expect(facts).toHaveTextContent("Quality score");
+    expect(facts).toHaveTextContent("Draft score");
     expect(facts).toHaveTextContent("Versionv5");
     expect(facts).not.toHaveTextContent(/Judge|Evaluator|Release/);
   });

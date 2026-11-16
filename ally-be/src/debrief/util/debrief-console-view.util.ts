@@ -445,7 +445,7 @@ export interface AutonomyFacts {
 export const JUDGE_DRIFT_SOURCE = {
   measured: true,
   from: 'nightly_check',
-  note: 'The independent check scores a fixed set of debriefs again each week; a move beyond the limit in Settings re-locks.',
+  note: 'A fixed set of debriefs is scored again for the quality score each week; a move beyond the limit in Settings re-locks.',
 } as const;
 
 export const RELOCK_REVERTS = 2;
@@ -462,7 +462,7 @@ export function relockReason(
   if (f.failedBaseline.failed) {
     return `the monthly baseline failed${f.failedBaseline.detail ? ` (${f.failedBaseline.detail})` : ''}`;
   }
-  if (f.judgeDrift) return 'the independent check has drifted';
+  if (f.judgeDrift) return 'the quality score has drifted';
   return null;
 }
 

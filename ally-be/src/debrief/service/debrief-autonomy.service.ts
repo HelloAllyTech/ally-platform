@@ -292,7 +292,7 @@ export class DebriefAutonomyService implements OnModuleInit {
     for (const kind of nowEligible) {
       await this.notifyOwner({
         title: `Learner try-outs can now run on their own for ${KIND_WORDS[kind].toLowerCase()}`,
-        body: `The independent check now agrees with the clinical advisor, so "Try on learners" can run on its own for ${KIND_WORDS[kind].toLowerCase()}. Switch it on? It stays "Asks first" until you change it in Debrief settings.`,
+        body: `The quality score now agrees with the clinical advisor, so "Try on learners" can run on its own for ${KIND_WORDS[kind].toLowerCase()}. Switch it on? It stays "Asks first" until you change it in Debrief settings.`,
         data: { settings: 'autonomy', kind },
       });
     }

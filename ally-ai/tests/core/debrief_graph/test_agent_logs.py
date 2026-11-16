@@ -382,3 +382,35 @@ class TestDispatchCapture:
                     )
         assert calls[0]["reply"] is None
         assert "bad json" in calls[0]["error"]
+
+
+class TestOrigin:
+    async def test_origin_of(self):
+        from app.core.debrief_graph.agent_logs import origin_of
+
+        state = {
+            "actions": {
+                "history_deep": {"agent": "history_deep", "why": "60 past debriefs"},
+                "guidance_lookup": {
+                    "agent": "guidance_lookup",
+                    "why": "Today's recipe.",
+                },
+                "language_specialist": {
+                    "agent": "language_specialist",
+                    "why": "Hinglish",
+                },
+            },
+            "top_up_agents": ["language_specialist"],
+        }
+        assert origin_of(state, "history_deep") == {
+            "origin": "planned",
+            "planReason": "60 past debriefs",
+        }
+        assert origin_of(state, "guidance_lookup") == {"origin": "fixed"}
+        assert origin_of(state, "language_specialist") == {
+            "origin": "top_up",
+            "planReason": "Hinglish",
+        }
+        assert origin_of(state, "top_up") == {"origin": "top_up"}
+        assert origin_of(state, "writer") == {"origin": "fixed"}
+        assert origin_of({}, "analyst") == {"origin": "fixed"}

@@ -92,7 +92,7 @@ describe("Analytics › Debriefs › Judge agreement (from the advisor's answers
     expect(accuracy).toHaveTextContent("0.72, substantial");
     expect(accuracy).toHaveTextContent("Target: ≥ 0.6");
     expect(accuracy).toHaveTextContent("On target");
-    expect(accuracy).toHaveTextContent("Independent check caught 3 of 4 problems you found");
+    expect(accuracy).toHaveTextContent("The quality score caught 3 of 4 problems you found");
     expect(screen.getByTestId("gate-chart-evidence_specificity")).toHaveTextContent(
       "Not measurable yet: every answer is the same",
     );

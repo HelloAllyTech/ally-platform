@@ -15,7 +15,7 @@ import { AgentLogEntry, AgentLogsView } from "@types";
 
 import { modelLabels } from "../consoleLabels";
 import { TruncatedTitle } from "../consoleRows";
-import { BackLink } from "../consoleUi";
+import { BackLink, ConsoleTag, TagTone } from "../consoleUi";
 import {
   entryName,
   exactInput,
@@ -149,6 +149,15 @@ const SystemPrompt: React.FC<{ entry: AgentLogEntry; prompts: Record<string, str
   );
 };
 
+type Source = "all" | "fixed" | "planned" | "top_up" | "unknown";
+
+const ORIGIN_TONE: Record<string, TagTone> = {
+  fixed: "neutral",
+  planned: "info",
+  top_up: "warning",
+  unknown: "neutral",
+};
+
 const meta = (e: AgentLogEntry): string => {
   const t = en.debriefs.agentLogs;
   return [
@@ -193,6 +202,11 @@ const Entry: React.FC<{
           {e.seq} · {clock(e.startedAt)}
         </span>
         <span className="text-[15px] font-semibold">{name}</span>
+        <span title={t.originHelp[e.origin ?? "unknown"]} className="inline-flex shrink-0">
+          <ConsoleTag tone={ORIGIN_TONE[e.origin ?? "unknown"]}>
+            {t.origin[e.origin ?? "unknown"]}
+          </ConsoleTag>
+        </span>
         <span
           className="text-[13px] font-semibold"
           style={{ color: e.attention || e.error ? ATTENTION : "#0E6027" }}
@@ -215,6 +229,11 @@ const Entry: React.FC<{
           </span>
         )}
         {extra && <span>{extra}</span>}
+        {e.planReason && (
+          <span className="min-w-0 truncate" title={e.planReason} data-testid="log-plan-reason">
+            {t.why(e.planReason)}
+          </span>
+        )}
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(380px,1fr))] gap-3 px-[18px] pb-3.5">
         <Pane
@@ -276,15 +295,18 @@ export const AgentLogsPage: React.FC = () => {
   const modelLabel = modelLabels(models.data);
   const [mode, setMode] = useState<Mode>("readable");
   const [search, setSearch] = useState("");
+  const [source, setSource] = useState<Source>("all");
   const needle = search.trim();
 
   const view = q.data;
   const shown = useMemo(() => {
-    const all = view?.entries ?? [];
-    if (!needle) return all;
+    const bySource = (view?.entries ?? []).filter(
+      e => source === "all" || (e.origin ?? "unknown") === source,
+    );
+    if (!needle) return bySource;
     const n = needle.toLowerCase();
-    return all.filter(e => haystack(e).includes(n));
-  }, [view, needle]);
+    return bySource.filter(e => haystack(e).includes(n));
+  }, [view, needle, source]);
 
   const qs = params.toString();
   const back = (
@@ -353,6 +375,20 @@ export const AgentLogsPage: React.FC = () => {
           aria-label={t.searchLabel}
           className="h-9 min-w-[180px] max-w-[520px] flex-[1_1_320px] border-0 border-b border-neutral-500 bg-neutral-50 px-3 text-sm"
         />
+        <select
+          value={source}
+          onChange={e => setSource(e.target.value as Source)}
+          aria-label={t.source}
+          data-testid="agent-logs-source"
+          className="h-9 shrink-0 border-0 border-b border-neutral-500 bg-neutral-50 px-2 text-sm"
+        >
+          <option value="all">{t.allSources}</option>
+          {(["fixed", "planned", "top_up", "unknown"] as const).map(o => (
+            <option key={o} value={o}>
+              {t.origin[o]}
+            </option>
+          ))}
+        </select>
         <span
           role="group"
           aria-label={t.show}
@@ -373,7 +409,9 @@ export const AgentLogsPage: React.FC = () => {
           ))}
         </span>
         <span title={t.note} className="min-w-0 truncate text-xs text-neutral-600">
-          {needle && view.entries.length ? `${t.matches(shown.length)} · ` : ""}
+          {(needle || source !== "all") && view.entries.length
+            ? `${t.matches(shown.length)} · `
+            : ""}
           {t.note}
         </span>
       </div>

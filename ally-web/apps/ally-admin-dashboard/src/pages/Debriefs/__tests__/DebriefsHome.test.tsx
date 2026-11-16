@@ -327,8 +327,9 @@ describe("Debriefs home", () => {
     expect(screen.getByRole("option", { name: /Agreement sample/ })).toBeInTheDocument();
     expect(screen.queryByTestId("to-score-badge")).toBeNull();
     const card = screen.getAllByTestId("session-card")[0];
-    expect(card).toHaveTextContent("Independent check");
-    expect(card).toHaveTextContent("Ally’s own check");
+    // The list shows the quality score only; the draft score is on the session page.
+    expect(card).toHaveTextContent("Quality score");
+    expect(card).not.toHaveTextContent("Draft score");
     expect(card).not.toHaveTextContent("Evaluator");
   });
 

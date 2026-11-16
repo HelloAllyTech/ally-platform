@@ -95,7 +95,7 @@ describe("Analytics › Debriefs › Nightly check", () => {
       within(screen.getByTestId("nightly-alerts")).getByText(/Debriefs are longer/),
     ).toBeTruthy();
     expect(screen.getByTestId("nightly-data-quality")).toHaveTextContent(
-      "2 not yet scored by the independent check",
+      "2 without a quality score yet",
     );
     expect(screen.getByTestId("chart-Words per debrief")).toHaveTextContent("2");
     expect(screen.getByTestId("chart-Judge drift")).not.toHaveTextContent("empty");

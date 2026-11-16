@@ -247,6 +247,34 @@ describe("Agent logs page", () => {
     expect(within(bar).getByText(/Ally team only/).className).toMatch(/\btruncate\b/);
   });
 
+  it("tags each entry with where it came from, gives a planned agent's reason, and filters by source", () => {
+    const [first, second, ...rest] = LOGS.entries as any[];
+    h.logs.mockReturnValue(
+      ok({
+        ...LOGS,
+        entries: [
+          { ...first, origin: "fixed" },
+          { ...second, origin: "planned", planReason: "60 past debriefs" },
+          ...rest.map((e: any) => ({ ...e, origin: null })),
+        ],
+      }),
+    );
+    renderPage();
+    const cards = screen.getAllByTestId("log-entry");
+    expect(cards[0]).toHaveTextContent("Fixed");
+    expect(cards[1]).toHaveTextContent("Planned");
+    expect(within(cards[1]).getByTestId("log-plan-reason")).toHaveTextContent(
+      "Why: 60 past debriefs",
+    );
+    if (rest.length) expect(cards[2]).toHaveTextContent("Source unknown");
+    fireEvent.change(screen.getByTestId("agent-logs-source"), { target: { value: "planned" } });
+    expect(screen.getAllByTestId("log-entry")).toHaveLength(1);
+    // The source filter sits in the one toolbar row.
+    expect(
+      within(screen.getByTestId("agent-logs-toolbar")).getByTestId("agent-logs-source"),
+    ).toBeTruthy();
+  });
+
   it("a run from before logs were kept says from when they are", () => {
     h.logs.mockReturnValue(ok({ ...LOGS, entries: [], prompts: {} }));
     renderPage();

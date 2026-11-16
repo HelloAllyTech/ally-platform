@@ -716,10 +716,10 @@ describe("What the PM agent may do alone", () => {
     expect(panel).toHaveTextContent("Judge agreement with the clinical advisor");
     expect(panel).toHaveTextContent("random sample: 3 this week");
     expect(screen.getByTestId("agreement-row-accuracy")).toHaveTextContent(
-      "AccuracyNot measured yet37 of 50 reviews · Independent check caught 3 of 4 problems you found",
+      "AccuracyNot measured yet37 of 50 reviews · The quality score caught 3 of 4 problems you found",
     );
     expect(screen.getByTestId("agreement-row-evidence_specificity")).toHaveTextContent(
-      "EvidenceMetAgreement 0.71 · 52 reviews · Independent check caught 6 of 7 problems you found",
+      "EvidenceMetAgreement 0.71 · 52 reviews · The quality score caught 6 of 7 problems you found",
     );
     expect(screen.getByTestId("agreement-row-missed_risk_cue")).toHaveTextContent(
       "Missed risk cueNot measurable yet: every answer is the sameAgreement — · 60 reviews · No problems found yet",
@@ -842,7 +842,7 @@ describe("What the PM agent may do alone", () => {
       );
       expect(h.setMatrix).not.toHaveBeenCalled();
       expect(screen.getByTestId("autonomy-override-body")).toHaveTextContent(
-        "The independent check hasn't been shown to agree with the clinical advisor yet. Learner try-outs for prompts, agents and default plans will reach learners without approval.",
+        "The quality score hasn't been shown to agree with the clinical advisor yet. Learner try-outs for prompts, agents and default plans will reach learners without approval.",
       );
       fireEvent.click(screen.getByRole("button", { name: "Let them run" }));
       await waitFor(() =>

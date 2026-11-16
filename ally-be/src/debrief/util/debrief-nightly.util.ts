@@ -243,7 +243,7 @@ export function nightlyAlerts(
   ) {
     out.push({
       code: 'vaguer',
-      detail: `Debriefs are vaguer: the independent check scored specificity ${today.specificity}, against ${baseline.specificity} before.`,
+      detail: `Debriefs are vaguer: specificity in the quality score is ${today.specificity}, against ${baseline.specificity} before.`,
       value: today.specificity,
       baseline: baseline.specificity,
     });
@@ -251,7 +251,7 @@ export function nightlyAlerts(
   if (today.evaluatorJudgeGap != null && today.evaluatorJudgeGap >= t.gapMax) {
     out.push({
       code: 'evaluator_judge_gap',
-      detail: `Ally's own check scores ${today.evaluatorJudgeGap} points above the independent check on average.`,
+      detail: `The draft score is ${today.evaluatorJudgeGap} points above the quality score on average.`,
       value: today.evaluatorJudgeGap,
       baseline: baseline.evaluatorJudgeGap ?? null,
     });

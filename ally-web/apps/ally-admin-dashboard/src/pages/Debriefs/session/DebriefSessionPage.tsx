@@ -117,7 +117,7 @@ const Facts: React.FC<{ view: DebriefSessionView }> = ({ view }) => {
   const f = en.debriefs.session.facts;
   const how = view.howItWasMade;
   const judge = view.judge.hidden ? null : (view.judge.overall ?? null);
-  const rows: Array<{ k: string; v: string; sub: string; warn?: boolean }> = [
+  const rows: Array<{ k: string; v: string; sub: string; warn?: boolean; help?: string }> = [
     {
       k: f.session,
       v: shortId(view.run.sessionId),
@@ -135,12 +135,14 @@ const Facts: React.FC<{ view: DebriefSessionView }> = ({ view }) => {
     { k: f.language, v: languageLabel(view.run.language), sub: view.run.language ?? "" },
     {
       k: f.judge,
+      help: en.debriefs.home.scoreHelp.judge,
       v: view.judge.hidden ? f.hidden : judge === null ? "—" : f.outOf10(score(judge)),
       sub: view.judge.hidden ? f.hiddenSub : f.bar(JUDGE_BAR),
       warn: judge !== null && judge < JUDGE_BAR,
     },
     {
       k: f.evaluator,
+      help: en.debriefs.home.scoreHelp.evaluator,
       v:
         view.judge.hidden || view.judge.evaluatorOverall == null
           ? "—"
@@ -166,7 +168,9 @@ const Facts: React.FC<{ view: DebriefSessionView }> = ({ view }) => {
     >
       {rows.map(r => (
         <div key={r.k} className="flex flex-col gap-1 border-r border-neutral-100 px-[18px] py-3.5">
-          <dt className="text-xs tracking-[.32px] text-neutral-600">{r.k}</dt>
+          <dt className="text-xs tracking-[.32px] text-neutral-600" title={r.help}>
+            {r.k}
+          </dt>
           <dd
             className={`m-0 text-base font-semibold ${r.warn ? "text-[#8A3800]" : "text-typography-900"}`}
           >
