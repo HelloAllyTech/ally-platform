@@ -505,16 +505,61 @@ describe("Repeat weekly", () => {
     );
     expect(screen.getByText(t.repeat.forEach)).toBeTruthy();
     expect((screen.getByLabelText("Duration") as HTMLInputElement).value).toBe("50");
-    fireEvent.change(screen.getByLabelText("Practitioner"), { target: { value: "Dr Rao" } });
+    fireEvent.change(screen.getByLabelText("Add practitioner"), { target: { value: "Dr Rao" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add practitioner" }));
     await screen.findByText(/This adds 32 slots\./);
     expect(screen.getByText(/3 are already there, so they're skipped\./)).toBeTruthy();
     expect(screen.getByText("Mon 16 Nov, 10:00")).toBeTruthy();
     expect(h.calls.repeat).toHaveBeenLastCalledWith(
       expect.objectContaining({
         dry_run: true,
-        values: { practitioner: "Dr Rao", duration: 50, open: true },
+        values: { duration: 50, open: true },
+        each: { field: "practitioner", values: ["Dr Rao"] },
       }),
     );
+  });
+
+  it("adds every time once for each table, and a table can be taken off again", async () => {
+    h.results.repeat = () =>
+      Promise.resolve({
+        count: 105,
+        skipped: 0,
+        first: ["Mon 16 Nov 2026, 10:00 · T1", "Mon 16 Nov 2026, 10:00 · T2"],
+        dry_run: true,
+      });
+    const tables = {
+      ...SLOTS,
+      key: "tables",
+      name: "Tables",
+      fields: [
+        ...SLOTS.fields,
+        { ...SLOTS.fields[1], key: "table", label: "Table", required: true, position: 5 },
+      ],
+    } as never;
+    render(
+      <RepeatWeekly
+        bot={BOT}
+        list={tables}
+        lists={[tables]}
+        field={SLOTS.fields[0]}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(t.repeat.eachHint)).toBeTruthy();
+    const input = screen.getByLabelText("Add table");
+    for (const table of ["T1", "T2", "T3", "T2"]) {
+      fireEvent.change(input, { target: { value: table } });
+      fireEvent.keyDown(input, { key: "Enter" });
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Remove T3" }));
+    await screen.findByText(/This adds 105/);
+    expect(screen.getByText("Mon 16 Nov, 10:00 · T2")).toBeTruthy();
+    expect(h.calls.repeat).toHaveBeenLastCalledWith(
+      expect.objectContaining({ each: { field: "table", values: ["T1", "T2"] } }),
+    );
+    expect(
+      (h.calls.repeat.mock.lastCall?.[0] as { values: Record<string, unknown> }).values,
+    ).not.toHaveProperty("table");
   });
 
   it("waits for a needed detail before it adds anything", () => {

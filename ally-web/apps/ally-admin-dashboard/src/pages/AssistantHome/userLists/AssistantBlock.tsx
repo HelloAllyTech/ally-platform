@@ -47,7 +47,8 @@ export const examplesFor = (
 /**
  * What your assistant can do with a list (chunk 5b): Look things up, Add entries and Change
  * entries, each Do it or Never. Add and Change show only when a detail lets the assistant fill it
- * in. Turning on Add or Change the first time shows a short note.
+ * in; a list another list books says where booking happens instead (8a). Turning on Add or
+ * Change the first time shows a short note.
  */
 export const AssistantBlock: React.FC<{
   botId: string;
@@ -63,6 +64,13 @@ export const AssistantBlock: React.FC<{
   const [failed, setFailed] = useState(false);
   const examples = examplesFor(list, lists, sample);
   const writes = fillable(list).length > 0;
+  // The list that books this one: it has a live detail that points here (Reservations → Tables).
+  const booker = lists.find(
+    other =>
+      other.key !== list.key &&
+      !other.deleted_at &&
+      other.fields.some(f => !f.archived_at && f.type === "relation" && f.options.to === list.key),
+  );
   const a = t().assistant;
 
   const change = async (action: Action, value: ListAbility) => {
@@ -123,7 +131,15 @@ export const AssistantBlock: React.FC<{
           )}
         </div>
       ))}
-      {!writes && <p className="ally-field__hint">{a.noFill}</p>}
+      {!writes && (
+        <p className="ally-field__hint" data-testid="list-booked-through">
+          {booker
+            ? fill(booker.abilities.create === "do_it" ? a.bookedThrough : a.bookThroughOff, {
+                list: booker.name,
+              })
+            : a.noFill}
+        </p>
+      )}
       {failed && (
         <p className="ally-error" role="alert">
           {t().form.failed}

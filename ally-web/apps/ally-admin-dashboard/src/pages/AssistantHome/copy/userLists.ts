@@ -46,6 +46,14 @@ export const USER_LISTS = {
     keep: "Keep",
     deleteFailed: "Couldn't delete it. Try again.",
     deleted: "{list} deleted.",
+    // A list others link to goes with them (chunk 8a).
+    deleteLinkedTitle: "Delete {list} and {others}?",
+    deleteLinkedOne:
+      "Deleting {list} also deletes {others}, which uses it. That's {n} entries in all. You can undo this.",
+    deleteLinkedMany:
+      "Deleting {list} also deletes {others}, which use it. That's {n} entries in all. You can undo this.",
+    deleteEverything: "Delete everything",
+    deletedLinked: "{list} and {others} deleted.",
   },
 
   choices: {
@@ -263,6 +271,9 @@ export const USER_LISTS = {
     exampleAdd: "“Done: I've added that to {list}.”",
     exampleChange: "“Done: I've changed that for you.”",
     noFill: "Add and Change appear once a detail lets your assistant fill it in.",
+    // A list another list books (Tables, booked through Reservations) (chunk 8a).
+    bookedThrough: "Your assistant books these through {list}: each booking is added there.",
+    bookThroughOff: "To let your assistant book these, turn on Add entries in {list}.",
     firstNote:
       "Your assistant will book only after the person confirms. Check new entries for the first few days.",
     gotIt: "Got it",
@@ -332,7 +343,11 @@ export const USER_LISTS = {
     checking: "Counting…",
     forEach: "For each one",
     fillFirst: "Fill in {detail} first.",
-    forEachHint: "Every time you add gets these. For another practitioner, repeat it again.",
+    forEachHint: "Every time you add gets these.",
+    // Several practitioners, tables or teachers in one batch (chunk 8a).
+    eachHint: "Add one or more. Each gets every time above.",
+    eachAdd: "Add {detail}",
+    eachRemove: "Remove {value}",
   },
 
   scratch: {

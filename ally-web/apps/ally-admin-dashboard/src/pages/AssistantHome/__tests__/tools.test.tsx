@@ -172,6 +172,27 @@ describe("Tools", () => {
     expect(screen.getByRole("button", { name: t.choices.edit })).toBeTruthy();
   });
 
+  it("says where a booked list is booked, and how to let the assistant book it", () => {
+    h.lists.current = [
+      SLOTS,
+      { ...APPOINTMENTS, abilities: { find: "do_it", create: "do_it", update: "never" } },
+    ];
+    const { unmount } = show();
+    fireEvent.click(screen.getByRole("tab", { name: /Slots/ }));
+    fireEvent.click(screen.getByRole("button", { name: /What your assistant can do/ }));
+    expect(screen.getByTestId("list-booked-through").textContent).toBe(
+      "Your assistant books these through Appointments: each booking is added there.",
+    );
+    unmount();
+    h.lists.current = [SLOTS, APPOINTMENTS];
+    show();
+    fireEvent.click(screen.getByRole("tab", { name: /Slots/ }));
+    fireEvent.click(screen.getByRole("button", { name: /What your assistant can do/ }));
+    expect(screen.getByTestId("list-booked-through").textContent).toBe(
+      "To let your assistant book these, turn on Add entries in Appointments.",
+    );
+  });
+
   it("renames a list", async () => {
     show();
     fireEvent.click(screen.getByRole("tab", { name: /Appointments/ }));
@@ -206,25 +227,48 @@ describe("Tools", () => {
     expect(h.calls.restoreList).toHaveBeenCalledWith({ id: "bot-1", listId: "l2" });
   });
 
-  it("shows why a delete is refused, and Keep changes nothing", async () => {
-    h.results.deleteList = () =>
-      Promise.reject({
-        data: {
-          message:
-            "Appointments links to this list. Delete Appointments first, or remove that detail.",
-        },
-      });
+  it("offers to delete the lists that link to it too, and Undo brings them all back", async () => {
     show();
     fireEvent.click(screen.getByRole("tab", { name: /Slots/ }));
     fireEvent.click(screen.getByRole("button", { name: "More for Slots" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: t.listMenu.delete }));
+    expect(screen.getByRole("heading", { name: "Delete Slots and Appointments?" })).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Deleting Slots also deletes Appointments, which uses it. That's 6 entries in all. You can undo this.",
+      ),
+    ).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: t.listMenu.deleteEverything }));
+    });
+    expect(h.calls.deleteList).toHaveBeenCalledWith({
+      id: "bot-1",
+      key: "slots",
+      withLinked: true,
+    });
+    expect(changed).toHaveBeenCalledWith(expect.any(Function), "Slots and Appointments deleted.");
+    await act(async () => {
+      changed.mock.calls[0][0]();
+    });
+    await waitFor(() => expect(h.calls.restoreList).toHaveBeenCalledTimes(2));
+    expect(h.calls.restoreList.mock.calls.map(c => (c[0] as { listId: string }).listId)).toEqual([
+      SLOTS.id,
+      "l2",
+    ]);
+  });
+
+  it("shows why a delete failed, and Keep changes nothing", async () => {
+    h.results.deleteList = () =>
+      Promise.reject({ data: { message: "Someone changed this list just now." } });
+    show();
+    fireEvent.click(screen.getByRole("tab", { name: /Appointments/ }));
+    fireEvent.click(screen.getByRole("button", { name: "More for Appointments" }));
     fireEvent.click(screen.getByRole("menuitem", { name: t.listMenu.delete }));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: t.listMenu.delete }));
     });
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toBe(
-        "Appointments links to this list. Delete Appointments first, or remove that detail.",
-      ),
+      expect(screen.getByRole("alert").textContent).toBe("Someone changed this list just now."),
     );
     fireEvent.click(screen.getByRole("button", { name: t.listMenu.keep }));
     expect(changed).not.toHaveBeenCalled();
@@ -244,6 +288,8 @@ describe("the copy", () => {
     ...strings(t.tools),
     ...strings(t.listMenu),
     ...strings(t.choices),
+    t.assistant.bookedThrough,
+    t.assistant.bookThroughOff,
     t.title,
     t.subtitle,
     t.help,

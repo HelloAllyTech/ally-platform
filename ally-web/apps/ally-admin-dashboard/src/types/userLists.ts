@@ -198,6 +198,8 @@ export interface RepeatWeeklyRequest {
   from?: string;
   until: string;
   values?: Record<string, unknown>;
+  /** Several values for one text or choice detail: every time is added once for each (8a). */
+  each?: { field: string; values: string[] };
   dry_run?: boolean;
 }
 

@@ -23,11 +23,13 @@ const messageOf = (failure: unknown, fallback: string): string =>
  * A list's `⋯` (chunk 8a): Rename, and Delete list with one confirmation and Undo. A list another
  * list links to is refused by ally-be with the reason ("Appointments links to this list…").
  */
-export const ListMenu: React.FC<{ botId: string; list: UserList; onDeleted: () => void }> = ({
-  botId,
-  list,
-  onDeleted,
-}) => {
+export const ListMenu: React.FC<{
+  botId: string;
+  list: UserList;
+  /** Every live list, to find the ones that link to this one (chunk 8a). */
+  lists: UserList[];
+  onDeleted: () => void;
+}> = ({ botId, list, lists, onDeleted }) => {
   const [open, setOpen] = useState<"rename" | "delete" | null>(null);
   return (
     <>
@@ -45,6 +47,7 @@ export const ListMenu: React.FC<{ botId: string; list: UserList; onDeleted: () =
         <DeleteDialog
           botId={botId}
           list={list}
+          linked={linkingLists(list, lists)}
           onClose={() => setOpen(null)}
           onDeleted={onDeleted}
         />
@@ -109,19 +112,57 @@ const RenameDialog: React.FC<{ botId: string; list: UserList; onClose: () => voi
   );
 };
 
+/** Every list that links to `list`, directly or through another (as ally-be finds them). */
+export const linkingLists = (list: UserList, lists: UserList[]): UserList[] => {
+  const found: UserList[] = [];
+  const queue = [list.key];
+  const seen = new Set([list.key]);
+  while (queue.length) {
+    const target = queue.shift()!;
+    for (const other of lists) {
+      if (other.deleted_at || seen.has(other.key)) continue;
+      const links = other.fields.some(
+        f => !f.archived_at && f.type === "relation" && f.options.to === target,
+      );
+      if (links) {
+        seen.add(other.key);
+        found.push(other);
+        queue.push(other.key);
+      }
+    }
+  }
+  return found;
+};
+
+const names = (lists: UserList[]): string => {
+  const all = lists.map(l => l.name);
+  return all.length <= 1 ? (all[0] ?? "") : `${all.slice(0, -1).join(", ")} and ${all.at(-1)}`;
+};
+
 const DeleteDialog: React.FC<{
   botId: string;
   list: UserList;
+  /** The lists that go with it: they link to it (chunk 8a). */
+  linked: UserList[];
   onClose: () => void;
   onDeleted: () => void;
-}> = ({ botId, list, onClose, onDeleted }) => {
+}> = ({ botId, list, linked, onClose, onDeleted }) => {
   const [remove, { isLoading }] = useDeleteUserListMutation();
   const [restore] = useRestoreUserListMutation();
   const saves = useContext(HomeSavesContext);
   const [error, setError] = useState<string | null>(null);
-  const title = fill(t().deleteTitle, { list: list.name });
-  const body =
-    list.record_count === 0
+  const others = names(linked);
+  const entries = [list, ...linked].reduce((n, l) => n + l.record_count, 0);
+  const title = linked.length
+    ? fill(t().deleteLinkedTitle, { list: list.name, others })
+    : fill(t().deleteTitle, { list: list.name });
+  const body = linked.length
+    ? fill(linked.length === 1 ? t().deleteLinkedOne : t().deleteLinkedMany, {
+        list: list.name,
+        others,
+        n: entries,
+      })
+    : list.record_count === 0
       ? t().deleteNone
       : list.record_count === 1
         ? t().deleteOne
@@ -129,12 +170,23 @@ const DeleteDialog: React.FC<{
   const confirm = async () => {
     setError(null);
     try {
-      await remove({ id: botId, key: list.key }).unwrap();
+      await remove({
+        id: botId,
+        key: list.key,
+        ...(linked.length ? { withLinked: true } : {}),
+      }).unwrap();
       onClose();
       onDeleted();
+      // Undo: the list first, then those that link to it.
       saves.changed(
-        () => void restore({ id: botId, listId: list.id }),
-        fill(t().deleted, { list: list.name }),
+        () => {
+          void (async () => {
+            for (const l of [list, ...linked]) await restore({ id: botId, listId: l.id });
+          })();
+        },
+        linked.length
+          ? fill(t().deletedLinked, { list: list.name, others })
+          : fill(t().deleted, { list: list.name }),
       );
     } catch (failure) {
       setError(messageOf(failure, t().deleteFailed));
@@ -158,7 +210,7 @@ const DeleteDialog: React.FC<{
             disabled={isLoading}
             onClick={() => void confirm()}
           >
-            {t().delete}
+            {linked.length ? t().deleteEverything : t().delete}
           </Button>
         </div>
       </div>

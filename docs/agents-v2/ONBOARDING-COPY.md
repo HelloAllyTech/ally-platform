@@ -961,6 +961,8 @@ says when a save can't be made. More lines for the home's sections are added her
 - “Done: I've added that to {list}.”
 - “Done: I've changed that for you.”
 - Add and Change appear once a detail lets your assistant fill it in.
+- Your assistant books these through {list}: each booking is added there. *(8a: on a list another list books, such as Tables through Reservations)*
+- To let your assistant book these, turn on Add entries in {list}.
 - Your assistant will book only after the person confirms. Check new entries for the first few days.
 - Got it
 
@@ -1028,6 +1030,10 @@ says when a save can't be made. More lines for the home's sections are added her
 - For each one
 - Fill in {detail} first.
 - Every time you add gets these. For another practitioner, repeat it again.
+- Every time you add gets these. *(8a: replaces the line above; several practitioners, tables or teachers go in one batch now)*
+- Add one or more. Each gets every time above.
+- Add {detail}
+- Remove {value}
 
 **Start from scratch:**
 
@@ -1182,7 +1188,12 @@ says when a save can't be made. More lines for the home's sections are added her
 - Keep
 - Couldn't delete it. Try again.
 - {list} deleted.
-- Appointments links to this list. Delete Appointments first, or remove that detail. *(from ally-be, with the linking list's name)*
+- Appointments links to this list. Delete Appointments first, or remove that detail. *(from ally-be, with the linking list's name; the dialog now offers to delete them together instead)*
+- Delete {list} and {others}?
+- Deleting {list} also deletes {others}, which uses it. That's {n} entries in all. You can undo this.
+- Deleting {list} also deletes {others}, which use it. That's {n} entries in all. You can undo this.
+- Delete everything
+- {list} and {others} deleted.
 
 **A list's choices, always in view:**
 

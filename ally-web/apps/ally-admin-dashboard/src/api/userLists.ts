@@ -95,10 +95,15 @@ export const userListsApi = baseAPI.injectEndpoints({
       invalidatesTags: (r, _e, { id }) => (r ? [listsTag(id)] : []),
     }),
 
-    deleteUserList: builder.mutation<void, { id: string; key: string }>({
-      query: ({ id, key }) => ({
+    // `withLinked` (chunk 8a): the lists that link to it go too, in one go.
+    deleteUserList: builder.mutation<
+      { also_deleted?: { id: string; key: string; name: string }[] } | void,
+      { id: string; key: string; withLinked?: boolean }
+    >({
+      query: ({ id, key, withLinked }) => ({
         url: ApiEndpoints.CHATBOTS.USER_LIST(id, key),
         method: HttpMethod.DELETE,
+        params: withLinked ? { with_linked: "true" } : undefined,
       }),
       invalidatesTags: (_r, e, { id }) => (e ? [] : [listsTag(id)]),
     }),

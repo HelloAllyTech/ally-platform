@@ -365,7 +365,7 @@ const OpenList: React.FC<{
     >
       <div className="ally-tools__list-head">
         <h3 className="ally-heading">{list.name}</h3>
-        {canEdit && <ListMenu botId={bot.id} list={list} onDeleted={onDeleted} />}
+        {canEdit && <ListMenu botId={bot.id} list={list} lists={lists} onDeleted={onDeleted} />}
       </div>
       <Choices list={list} canEdit={canEdit} onEdit={setFocusDetail} />
       {needsOptions && canEdit && (

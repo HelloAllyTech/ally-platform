@@ -53,8 +53,19 @@ export const RepeatWeekly: React.FC<{
   const [end, setEnd] = useState("17:00");
   const [every, setEvery] = useState(60);
   const [until, setUntil] = useState(endOfNextWeek(today));
+  // The detail that takes several values (chunk 8a): the first text or choice one, such as
+  // Practitioner, Table or Teacher (a needed one first). Every time is added once for each.
+  const named = details.filter(
+    f => (f.type === "text" || f.type === "select") && f.key !== "status",
+  );
+  const multi = named.find(f => f.required) ?? named[0];
+  const [eachValues, setEachValues] = useState<string[]>(() =>
+    multi && typeof multi.default === "string" && multi.default ? [multi.default] : [],
+  );
   const [values, setValues] = useState<Record<string, unknown>>(() =>
-    Object.fromEntries(details.map(f => [f.key, f.default ?? null])),
+    Object.fromEntries(
+      details.filter(f => f.key !== multi?.key).map(f => [f.key, f.default ?? null]),
+    ),
   );
   const [preview, setPreview] = useState<RepeatWeeklyResult | null>(null);
   const [refusal, setRefusal] = useState<ListRefusal | null>(null);
@@ -62,7 +73,13 @@ export const RepeatWeekly: React.FC<{
   const [failed, setFailed] = useState(false);
   const [repeat, state] = useRepeatWeeklyMutation();
 
-  const missing = details.filter(f => f.required && blank(values[f.key])).map(f => f.key);
+  const missing = details
+    .filter(f =>
+      f.key === multi?.key
+        ? f.required && eachValues.length === 0
+        : f.required && blank(values[f.key]),
+    )
+    .map(f => f.key);
   const given = useMemo(
     () => Object.fromEntries(Object.entries(values).filter(([, v]) => !blank(v))),
     [values],
@@ -79,8 +96,9 @@ export const RepeatWeekly: React.FC<{
       from: today,
       until,
       values: given,
+      ...(multi && eachValues.length ? { each: { field: multi.key, values: eachValues } } : {}),
     }),
-    [bot.id, list.key, field.key, days, start, end, every, today, until, given],
+    [bot.id, list.key, field.key, days, start, end, every, today, until, given, multi, eachValues],
   );
   const ready = days.length > 0 && start < end && until >= today;
 
@@ -228,21 +246,31 @@ export const RepeatWeekly: React.FC<{
         <fieldset className="ally-repeat__each" data-testid="repeat-each">
           <legend className="ally-repeat__each-title">{t().repeat.forEach}</legend>
           <p className="ally-field__hint">{t().repeat.forEachHint}</p>
-          {details.map(detail => (
-            <FieldInput
-              key={detail.key}
-              bot={bot}
-              list={list}
-              lists={lists}
-              field={detail}
-              entry={null}
-              value={values[detail.key]}
-              current={null}
+          {multi && (
+            <EachInput
+              field={multi}
+              values={eachValues}
               disabled={state.isLoading && !state.originalArgs?.dry_run}
-              refusal={detailRefusal?.field === detail.key ? detailRefusal : null}
-              onChange={value => setValues(v => ({ ...v, [detail.key]: value }))}
+              onChange={setEachValues}
             />
-          ))}
+          )}
+          {details
+            .filter(detail => detail.key !== multi?.key)
+            .map(detail => (
+              <FieldInput
+                key={detail.key}
+                bot={bot}
+                list={list}
+                lists={lists}
+                field={detail}
+                entry={null}
+                value={values[detail.key]}
+                current={null}
+                disabled={state.isLoading && !state.originalArgs?.dry_run}
+                refusal={detailRefusal?.field === detail.key ? detailRefusal : null}
+                onChange={value => setValues(v => ({ ...v, [detail.key]: value }))}
+              />
+            ))}
         </fieldset>
       )}
 
@@ -268,5 +296,91 @@ export const RepeatWeekly: React.FC<{
         </div>
       )}
     </div>
+  );
+};
+
+/**
+ * Several values for one detail (chunk 8a): typed and added one at a time for text (T1, T2, T3),
+ * or picked from the choices for a choice detail. Each gets every time in the batch.
+ */
+const EachInput: React.FC<{
+  field: ListField;
+  values: string[];
+  disabled: boolean;
+  onChange: (values: string[]) => void;
+}> = ({ field, values, disabled, onChange }) => {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const value = draft.replace(/\s+/g, " ").trim();
+    if (!value || values.includes(value) || values.length >= 20) return;
+    onChange([...values, value]);
+    setDraft("");
+  };
+  const choices = field.type === "select" ? (field.options.values ?? []) : null;
+  return (
+    <fieldset className="ally-field ally-repeat__multi" data-testid="repeat-each-values">
+      <legend className="ally-field__label">
+        {field.label}
+        {field.required && <span className="ally-lists__needed"> {t().form.needed}</span>}
+      </legend>
+      <span className="ally-field__hint">{t().repeat.eachHint}</span>
+      {choices ? (
+        <div className="ally-chips">
+          {choices.map(choice => (
+            <Chip
+              key={choice}
+              selected={values.includes(choice)}
+              onToggle={() =>
+                onChange(
+                  values.includes(choice) ? values.filter(v => v !== choice) : [...values, choice],
+                )
+              }
+            >
+              {choice}
+            </Chip>
+          ))}
+        </div>
+      ) : (
+        <>
+          {values.length > 0 && (
+            <ul className="ally-repeat__values">
+              {values.map(value => (
+                <li key={value} className="ally-repeat__value">
+                  <span>{value}</span>
+                  <button
+                    type="button"
+                    className="ally-repeat__value-remove"
+                    aria-label={fill(t().repeat.eachRemove, { value })}
+                    disabled={disabled}
+                    onClick={() => onChange(values.filter(v => v !== value))}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="ally-repeat__value-add">
+            <input
+              className="ally-input"
+              aria-label={fill(t().repeat.eachAdd, { detail: lower(field.label) })}
+              value={draft}
+              maxLength={80}
+              disabled={disabled}
+              onChange={event => setDraft(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  add();
+                }
+              }}
+            />
+            <Button onClick={add} disabled={disabled || !draft.trim()}>
+              {fill(t().repeat.eachAdd, { detail: lower(field.label) })}
+            </Button>
+          </div>
+        </>
+      )}
+    </fieldset>
   );
 };

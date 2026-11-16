@@ -800,6 +800,50 @@
 .ally-repeat__count.is-done {
   color: var(--ally-good);
 }
+/* Several practitioners, tables or teachers in one batch (8a). */
+.ally-repeat__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ally-repeat__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 999px;
+  background: var(--ally-surface-2);
+  border: 1px solid var(--ally-line);
+  font-size: 14px;
+}
+.ally-repeat__value-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ally-muted, inherit);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ally-repeat__value-remove:hover {
+  background: var(--ally-surface);
+}
+.ally-repeat__value-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ally-repeat__value-add .ally-input {
+  flex: 1;
+  min-width: 0;
+}
 .ally-repeat__first {
   margin-top: 8px;
 }

@@ -206,6 +206,19 @@ These are 6's lists behaviour and 20a-2's check, not memory; they're for the nex
 - the hook's run of about 5,000 related tests timed out twice in `rate-limited-routes.spec.ts`, which passes alone (22 of 22);
 - every suite these changes touch passed separately.
 
+**From the restaurant test (The Bombay Canteen, 16 Nov), committed together:**
+- **Delete a tool with what uses it.** Deleting a list another list links to offers to delete those too ("Delete Tables and Reservations?", with the entry count). It happens in one transaction (`DELETE …?with_linked=true`), and Undo restores them all. Without `with_linked`, ally-be still refuses with the reason.
+- **Repeat weekly, several at once.** "For each one" takes several values for the first text or choice detail (a needed one first): T1, T2, T3, or Dr Mehta and Dr Rao. Every time is added once for each (`each: {field, values}`, 1–20 values). A time one of them already has is skipped for that one only.
+- **A list another list books** (Tables, booked through Reservations) says so under What your assistant can do, instead of "Add and Change appear once…".
+- **Nothing at the time asked:**
+  - **The nearest times.** A timed find that finds nothing returns the 3 nearest entries (12 hours before, never before now, to 7 days after), marked `nearest`. When nothing near then fits the other details either (a party of 5, every table seating 3), it returns the nearest by time alone, marked `other_details`. The agent's note says to tell them and offer those, or to say what doesn't fit and offer a way forward, never booking one that doesn't fit. Before, the agent repeated the same find and fell back to "the team will confirm".
+  - **"At least" seats.** A number range that finds nothing ("seats 2 to 2") is retried as at least the lower bound, so a table for 3 seats 2.
+- **The booking guard** (chunk 6's confirmed time) read "tomorrow around 1" as no time and refused every booking that followed. It now reads "around / about / by 1" and "1 o'clock", never "for 2". A plain yes ("perfect, book it") confirms the assistant's previous message when it named exactly one time; "3 or 4?" answered "yes" confirms neither.
+- **Public pages remember a visitor only by the browser cookie** (7 days). A new browser or cleared cookies is a new person: unverified intake answers (name, phone) never identify anyone. Invite-only pages link to the verified email. Proposed for a later chunk: an optional "Remember me" email code on public pages, reusing the invite-only code step.
+- **Prompt fixes waiting for Shehbaz's OK:**
+  - `agent/system.txt` says "over WhatsApp" on every channel;
+  - a phone number sent on its own on the website gets the decline text.
+
 **Still to do:**
 - **Playwright baselines** for the home, Lists and the Inbox panel need refreshing in Docker.
 - **Option 1** (the booking rules moved into the lists section, so every purpose that can book gets them) waits for Shehbaz.
