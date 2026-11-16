@@ -10,6 +10,7 @@ import { useContentAuthoring } from "./useContentAuthoring";
 import { useCourseCopilotSocket } from "./useCourseCopilotSocket";
 import { useCourseCopilotStream } from "./useCourseCopilotStream";
 import { useCreatePortal } from "./useCreatePortal";
+import { useAdminActionTracking, useAdminPageView } from "./useAdminAnalytics";
 import { useDebounce } from "./useDebounce";
 import { toImageStudioError, useImageStudioJobs, useSlotImageJobs } from "./useImageStudioJobs";
 import { useIsPlaceholderUsed } from "./useIsPlaceholderUsed";
@@ -33,6 +34,8 @@ export {
   useUser,
   useLiveKitRoom,
   useClickOutside,
+  useAdminActionTracking,
+  useAdminPageView,
   useDebounce,
   useIsPlaceholderUsed,
   useSimulations,
