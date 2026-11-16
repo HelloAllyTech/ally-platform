@@ -332,7 +332,7 @@ describe('pinned rules: proposals', () => {
       expect.objectContaining({
         body: 'Proposed change to the Safety rules: Clearer',
         excludeUserId: ADVISOR,
-        data: expect.objectContaining({ url: `/debriefs?change=${id}` }),
+        data: expect.objectContaining({ url: `/debriefs/pm-agent?change=${id}` }),
       }),
     );
   });

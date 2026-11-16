@@ -517,6 +517,8 @@ export const ApiEndpoints = {
       `/v1/debriefs/console/comments/${id}/${action}`,
     IDEA_QUESTIONS: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/questions`,
     IDEA_START_STEP: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/start-step`,
+    IDEA_APPROVE: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/approve`,
+    IDEA_REJECT: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/reject`,
     IDEA_APPROVE_PINNED: (id: string) =>
       `/v1/debriefs/console/pm-agent/ideas/${id}/approve-pinned-rule`,
     IDEA_WITHDRAW_PINNED: (id: string) =>

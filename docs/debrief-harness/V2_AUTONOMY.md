@@ -88,12 +88,14 @@ must be built, tested and ticked before release.
       clinical advisor sees and posts only about pinned-rule changes. A "yes" to a pinned-rule
       change needs the advisor or the owner; to a budget increase, the owner. Otherwise the agent
       does not act, says who can, and notifies them. Every message shows its author.
-- [x] C5 A "Needs you" item is dealt with on Home: it expands in place to what changes, why, the
-      wording before and after, the evidence, and the PM agent conversation scoped to that change.
-      The clinical advisor has no Changes / PM agent button: they get a notification that opens
-      Home with that item expanded, and their Needs you shows only pinned-rule changes.
-      (Backend built: the notification links `/debriefs?change=<id>`, and
-      `GET pm-agent/conversation?about=<id>` scopes the thread; the Home UI is U1.)
+- [x] C5 (revised 2026-11-16: "Needs you as a notification icon… take it to the right place only")
+      Nothing is decided on Home. Home shows a Needs you bell with a count; each waiting change
+      opens on the PM agent page (`/debriefs/pm-agent?change=<id>`), which shows the whole change
+      (the whole rule for a pinned rule, the wording before and after), the decision buttons
+      outside the conversation, and that change's own conversation (All messages toggles the
+      whole thread). Notifications and old `/debriefs?change=` links go there too. The clinical
+      advisor reaches the same page with only pinned-rule changes (the API filters `changes` and
+      `changes/:id`), no Reports or Test sets, and their own conversation thread.
 
 ### Learner flags (point 7)
 - [x] F1 The Debrief agent answers every learner flag within a minute: re-reads the roleplay,

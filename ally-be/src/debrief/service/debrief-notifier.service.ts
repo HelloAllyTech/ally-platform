@@ -200,8 +200,8 @@ export class DebriefNotifier {
 
   /**
    * V2_AUTONOMY: the people who decide a pinned-rule change — the clinical
-   * advisors (`review:admin:debriefs`) and the owner. Their link opens Home
-   * with the change and its conversation (`/debriefs?change=<id>`). Never throws.
+   * advisors (`review:admin:debriefs`) and the owner. Their link opens the PM agent page
+   * at the change and its conversation (`/debriefs/pm-agent?change=<id>`). Never throws.
    */
   async pinnedRuleDeciders(alert: DebriefStaffAlert): Promise<number> {
     return this.staff(

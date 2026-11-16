@@ -856,7 +856,7 @@ export class DebriefConsoleController {
   }
 
   @Get('pm-agent/reports')
-  @DebriefRead()
+  @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
       "The PM agent's weekly reports and monthly reviews, newest first (months with records but no review yet included)",
@@ -866,7 +866,7 @@ export class DebriefConsoleController {
   }
 
   @Get('pm-agent/reports/:kind/:period')
-  @DebriefRead()
+  @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
       "One report: what changed in the period (from the records) and the PM agent's text",

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -61,6 +62,11 @@ export class DebriefChangesController {
     const can = (await this.view.viewer(req.user.id)).can;
     return this.changes.home(new Date(), {
       pinnedRulesOnly: !can.pmAgent,
+      can: {
+        pinnedRules: can.approvePinnedRule,
+        budgets: can.ownerSettings,
+        changes: can.pmAgent,
+      },
     });
   }
 
@@ -70,15 +76,31 @@ export class DebriefChangesController {
     summary:
       "The PM agent's changes in plain words, newest activity first; ?state=waits|trying|building|testing|live|undone|stopped|turned_down",
   })
-  list(@Query('state') state?: string) {
-    return this.changes.list(state);
+  async list(@Req() req: AuthedRequest, @Query('state') state?: string) {
+    // The clinical advisor gets only the pinned-rule changes they take part in, never the rest.
+    const can = (await this.view.viewer(req.user.id)).can;
+    const out = await this.changes.list(state);
+    if (can.pmAgent) return out;
+    return {
+      changes: can.approvePinnedRule
+        ? out.changes.filter((c) => c.kindKey === 'pinned_rule')
+        : [],
+    };
   }
 
   @Get('changes/:id')
   @DebriefRead()
   @ApiOperation({ summary: 'One change: result, why, measures and steps' })
-  get(@Param('id', ParseUUIDPipe) id: string) {
-    return this.changes.get(id);
+  async get(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
+    const can = (await this.view.viewer(req.user.id)).can;
+    const change = await this.changes.get(id);
+    if (
+      !can.pmAgent &&
+      !(can.approvePinnedRule && change.kindKey === 'pinned_rule')
+    ) {
+      throw new NotFoundException('Change not found');
+    }
+    return change;
   }
 
   @Post('changes/:id/undo')

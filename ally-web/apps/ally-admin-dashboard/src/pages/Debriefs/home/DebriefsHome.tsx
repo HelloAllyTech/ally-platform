@@ -25,7 +25,7 @@ import {
 import { useDebriefAccess } from "../debriefAccess";
 import { PmConversation } from "../pm/PmConversation";
 import { FILTER_KEYS, groupByDay, readHomeState, sessionsQuery } from "../queue";
-import { NeedsYouItem } from "./NeedsYouItem";
+import { NeedsYouBell } from "./NeedsYouBell";
 import { SessionCard, SessionRow } from "./SessionCard";
 
 /** A session link that keeps the home's filters, so Back returns there. */
@@ -119,6 +119,7 @@ const STATE_DOT: Record<ChangeState, string> = {
   waits: "bg-[#F1C21B]",
   trying: "bg-primary-500",
   testing: "bg-primary-500",
+  proposed: "bg-neutral-300",
   building: "bg-[#8A3FFC]",
   live: "bg-success-500",
   undone: "bg-neutral-500",
@@ -153,39 +154,18 @@ const Headline: React.FC<{ home: DebriefHomeV2; margin: number }> = ({ home, mar
         t.healthy
       )}
       {t.and}
-      <b className="font-semibold">{t.needsYou(home.headline.needsYou)}</b>
+      {home.headline.needsYou > 0 ? (
+        <Link
+          to={changesPath()}
+          className="font-semibold text-primary-500"
+          data-testid="home-needs-link"
+        >
+          {t.needsYou(home.headline.needsYou)}
+        </Link>
+      ) : (
+        <b className="font-semibold">{t.needsYou(0)}</b>
+      )}
     </p>
-  );
-};
-
-const NeedsYou: React.FC<{
-  home: DebriefHomeV2;
-  openId: string | null;
-  onOpen: (id: string | null) => void;
-  advisor: boolean;
-}> = ({ home, openId, onOpen, advisor }) => {
-  const t = en.debriefs.v2.home;
-  if (home.needsYou.length === 0) return null;
-  return (
-    <section
-      aria-labelledby="home-needs"
-      className="flex flex-col gap-2.5 border-t-[3px] border-[#F1C21B] bg-neutral-50 px-5 py-[18px]"
-      data-testid="home-needs-you"
-    >
-      <h2 id="home-needs" className="m-0 text-base font-semibold">
-        {advisor
-          ? t.advisorNeedsHeading(home.needsYou.length)
-          : t.needsHeading(home.needsYou.length)}
-      </h2>
-      {home.needsYou.map(n => (
-        <NeedsYouItem
-          key={n.changeId}
-          item={n}
-          open={openId === n.changeId}
-          onToggle={o => onOpen(o ? n.changeId : null)}
-        />
-      ))}
-    </section>
   );
 };
 
@@ -235,8 +215,8 @@ const ThisWeek: React.FC<{ home: DebriefHomeV2 }> = ({ home }) => {
 };
 
 /**
- * The Debriefs home (v2, U1): the headline sentence first; "Needs you" for the always-ask changes
- * only; "This week" and the PM agent conversation as accordions, closed; then every debrief by
+ * The Debriefs home (v2, U1): the headline sentence first; Needs you is a bell whose items open
+ * on the PM agent page, where changes are decided (never here); "This week" and the PM agent conversation as accordions, closed; then every debrief by
  * day. No review queue, no status pills: a debrief carries only "⚑ Flagged by the learner" and
  * its Quality score.
  */
@@ -272,17 +252,14 @@ export const DebriefsHome: React.FC = () => {
   );
   const page = sessions.data;
   const access = useDebriefAccess(page?.viewer);
-  // The Ally team and the owner run the PM agent; the clinical advisor only answers the pinned-rule
-  // changes in Needs you (ally-be sends them only those), so gets no Changes or PM agent here.
+  // The Ally team and the owner run the PM agent; the clinical advisor only answers pinned-rule
+  // changes (ally-be sends them only those), reached from the bell, so gets no PM agent button.
   const team = access.pmAgent;
   const openChange = params.get("change");
-  // A link to a change that no longer waits for a person moves on to Changes (team and owner).
+  // Older links to a change on Home (`/debriefs?change=`) open it on the PM agent page.
   useEffect(() => {
-    if (!openChange || !home.data || !team) return;
-    if (!home.data.needsYou.some(n => n.changeId === openChange)) {
-      navigate(changesPath(openChange), { replace: true });
-    }
-  }, [openChange, home.data, team, navigate]);
+    if (openChange) navigate(changesPath(openChange), { replace: true });
+  }, [openChange, navigate]);
   const anyRunning = !!page?.items.some(r => r.status === "running" || r.status === "queued");
   if (anyRunning !== polling) setPolling(anyRunning);
 
@@ -327,7 +304,6 @@ export const DebriefsHome: React.FC = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [shown, selected, navigate, params]);
 
-  const needsYou = home.data?.headline.needsYou ?? 0;
   const options = page?.filterOptions;
   const opts = (key: keyof typeof h.filters, more: Item[]): Item[] => [
     { id: "", label: h.filters[key].all },
@@ -424,7 +400,17 @@ export const DebriefsHome: React.FC = () => {
             className="m-0 max-w-[980px] text-[22px] font-light leading-snug text-typography-900"
             data-testid="home-headline"
           >
-            <b className="font-semibold">{t.advisorHeadline(home.data.needsYou.length)}</b>
+            {home.data.needsYou.length > 0 ? (
+              <Link
+                to={changesPath()}
+                className="font-semibold text-primary-500"
+                data-testid="home-needs-link"
+              >
+                {t.advisorHeadline(home.data.needsYou.length)}
+              </Link>
+            ) : (
+              <b className="font-semibold">{t.advisorHeadline(0)}</b>
+            )}
           </p>
         ) : home.data ? (
           <Headline home={home.data} margin={margin} />
@@ -446,12 +432,6 @@ export const DebriefsHome: React.FC = () => {
 
       {home.data && (
         <div className="flex flex-col gap-4">
-          <NeedsYou
-            home={home.data}
-            openId={openChange}
-            onOpen={id => set({ change: id })}
-            advisor={!team}
-          />
           {team && <ThisWeek home={home.data} />}
           {team && (
             <details
@@ -529,6 +509,7 @@ export const DebriefsHome: React.FC = () => {
               </button>
             ))}
           </div>
+          {home.data && <NeedsYouBell items={home.data.needsYou} />}
           {team && (
             <Link
               to={changesPath()}
@@ -536,15 +517,6 @@ export const DebriefsHome: React.FC = () => {
               className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
             >
               {t.changes}
-              {needsYou > 0 && (
-                <span
-                  aria-label={h.needsYouCount(needsYou)}
-                  data-testid="changes-needs-you"
-                  className="rounded-full bg-primary-500 px-[7px] py-px text-[11px] font-semibold text-white"
-                >
-                  {needsYou}
-                </span>
-              )}
             </Link>
           )}
           {team && (

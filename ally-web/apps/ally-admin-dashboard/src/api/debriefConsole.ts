@@ -362,6 +362,22 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    approveDebriefChange: builder.mutation<unknown, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_APPROVE(id),
+        method: HttpMethod.POST,
+        body: reason ? { reason } : {},
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    turnDownDebriefChange: builder.mutation<unknown, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_REJECT(id),
+        method: HttpMethod.POST,
+        body: { reason },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     withdrawPinnedRule: builder.mutation<void, { id: string }>({
       query: ({ id }) => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_WITHDRAW_PINNED(id),
@@ -533,12 +549,14 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
     }),
     getPmConversation: builder.query<
       PmConversationPage,
-      { before?: string; limit?: number } | void
+      { before?: string; limit?: number; about?: string } | void
     >({
       query: arg => {
         const a = arg || {};
         const params: Record<string, string | number> = { limit: a.limit ?? 50 };
         if (a.before) params.before = a.before;
+        // One change's own thread (the server filters, so older messages are never missed).
+        if (a.about) params.about = a.about;
         return {
           url: ApiEndpoints.DEBRIEF_CONSOLE.PM_CONVERSATION,
           method: HttpMethod.GET,
@@ -613,6 +631,8 @@ export const {
   useAskIdeaQuestionMutation,
   useStartIdeaStepMutation,
   useApprovePinnedRuleMutation,
+  useApproveDebriefChangeMutation,
+  useTurnDownDebriefChangeMutation,
   useWithdrawPinnedRuleMutation,
   useRejectPinnedRuleMutation,
   useProposePinnedRuleMutation,

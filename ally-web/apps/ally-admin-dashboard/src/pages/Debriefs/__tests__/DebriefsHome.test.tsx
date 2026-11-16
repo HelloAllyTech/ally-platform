@@ -42,7 +42,6 @@ vi.mock("@api", async importOriginal => ({
 import { redirectForOldTab } from "../consoleRoutes";
 import { DebriefConsole } from "../DebriefConsole";
 import { homeHeadline, scoreTrend } from "../home/DebriefsHome";
-import { wordDiff } from "../home/NeedsYouItem";
 import { ok, resolves } from "./consoleFixtures";
 /* eslint-enable import/first */
 
@@ -162,6 +161,18 @@ const SAFETY = {
   wording: {
     before: "A risk cue is a direct statement about harming oneself.",
     after: "A risk cue is a statement about harming oneself, direct or indirect.",
+  },
+  rule: {
+    name: "Safety rules",
+    segments: [
+      { text: "RISK CUES FROM THE CLIENT. ", changed: false },
+      {
+        text: "A risk cue is a statement about harming oneself, direct or indirect.",
+        changed: true,
+      },
+      { text: " Say how the learner responded.", changed: false },
+    ],
+    stale: false,
   },
   canUndo: false,
   canStop: false,
@@ -294,66 +305,42 @@ describe("Debriefs home (v2, U1): answer first", () => {
   });
 });
 
-describe("Needs you: always-ask changes, handled on Home", () => {
-  it("lists them closed, each a one-line row: Your call, the title, why it asks", () => {
+describe("Needs you: a bell that leads to the PM agent", () => {
+  it("is a bell with a count, not a section on Home", () => {
     renderAt();
-    const needs = screen.getByTestId("home-needs-you");
-    expect(needs).toHaveTextContent("Needs you: one change the PM agent won’t make alone");
-    const row = within(needs).getByTestId("home-needs-item");
-    expect(row.tagName).toBe("DETAILS");
-    expect(row).not.toHaveAttribute("open");
-    expect(row).toHaveTextContent("Your call");
-    expect(row).toHaveTextContent("Safety reader text always asks a person.");
-    expect(screen.queryByTestId("needs-detail")).toBeNull();
+    expect(screen.queryByTestId("home-needs-you")).toBeNull();
+    const bell = screen.getByTestId("needs-you-bell");
+    expect(within(bell).getByTestId("needs-you-count")).toHaveTextContent("1");
+    expect(screen.queryByTestId("needs-you-menu")).toBeNull();
     expect(h.change).not.toHaveBeenCalled();
   });
 
-  it("?change=<id> opens that item expanded, with a scoped conversation", async () => {
+  it("lists each waiting change; one opens it on the PM agent page", () => {
+    renderAt();
+    fireEvent.click(screen.getByRole("button", { name: "1 change needs you" }));
+    const menu = screen.getByTestId("needs-you-menu");
+    const link = within(menu).getByTestId("needs-you-link");
+    expect(link).toHaveTextContent("Safety reader: name indirect self-harm cues");
+    fireEvent.click(link);
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
+  });
+
+  it("closes on Esc", () => {
+    renderAt();
+    fireEvent.click(screen.getByRole("button", { name: "1 change needs you" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByTestId("needs-you-menu")).toBeNull();
+  });
+
+  it("the headline's 'needs you' links to the PM agent", () => {
+    renderAt();
+    fireEvent.click(screen.getByTestId("home-needs-link"));
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent");
+  });
+
+  it("an old Home link to a change opens it on the PM agent page", () => {
     renderAt("/debriefs?change=c-safety");
-    const detail = screen.getByTestId("needs-detail");
-    expect(within(detail).getByTestId("needs-result")).toHaveTextContent(
-      "It caught all 4 indirect cues",
-    );
-    const diff = within(detail).getByTestId("needs-diff");
-    expect(diff.querySelector("del")).toHaveTextContent("direct");
-    expect(diff.querySelector("ins")).toHaveTextContent(", direct or indirect.");
-    expect(within(detail).getByTestId("needs-evidence")).toHaveTextContent(
-      "Based on 4 learner flags",
-    );
-    const pm = within(detail).getByTestId("needs-pm-c-safety");
-    expect(pm).toHaveTextContent("PM agent · about this change");
-    // Only this change's messages, without "about".
-    const msgs = within(pm).getAllByTestId("pm-message");
-    expect(msgs).toHaveLength(1);
-    expect(msgs[0]).not.toHaveTextContent("about");
-    fireEvent.change(within(pm).getByLabelText("Reply to the PM agent about this change"), {
-      target: { value: "yes" },
-    });
-    fireEvent.click(within(pm).getByRole("button", { name: "Send" }));
-    await waitFor(() =>
-      expect(h.send).toHaveBeenCalledWith({
-        text: "yes",
-        about: {
-          kind: "change",
-          id: "c-safety",
-          label: "Safety reader: name indirect self-harm cues",
-        },
-      }),
-    );
-  });
-
-  it("a link to a change that no longer waits moves on to Changes", () => {
-    renderAt("/debriefs?change=c-gone");
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-gone");
-  });
-
-  it("wordDiff marks what was removed and added", () => {
-    expect(wordDiff("a b c", "a x c")).toEqual([
-      { text: "a ", kind: "same" },
-      { text: "b", kind: "removed" },
-      { text: "x", kind: "added" },
-      { text: " c", kind: "same" },
-    ]);
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
   });
 });
 
@@ -365,9 +352,7 @@ describe("the clinical advisor's home", () => {
   it("leads with their decision; no Changes, Analytics, Settings, This week or PM agent", () => {
     renderAt();
     expect(screen.getByTestId("home-headline")).toHaveTextContent("1 change needs your decision.");
-    expect(screen.getByTestId("home-needs-you")).toHaveTextContent(
-      "Needs you: a change only you or the owner can approve",
-    );
+    expect(screen.getByTestId("needs-you-count")).toHaveTextContent("1");
     expect(screen.queryByTestId("changes-button")).toBeNull();
     expect(screen.queryByTestId("analytics-button")).toBeNull();
     expect(screen.queryByTestId("home-more")).toBeNull();
@@ -375,10 +360,9 @@ describe("the clinical advisor's home", () => {
     expect(screen.queryByTestId("home-pm-accordion")).toBeNull();
   });
 
-  it("a deep link opens their item on Home, never Changes", () => {
-    renderAt("/debriefs?change=c-gone");
-    expect(screen.queryByTestId("where")).toBeNull();
-    expect(screen.getByTestId("debriefs-home")).toBeInTheDocument();
+  it("a deep link opens their change on the PM agent page", () => {
+    renderAt("/debriefs?change=c-safety");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
   });
 });
 
@@ -418,15 +402,15 @@ describe("all debriefs by day", () => {
 });
 
 describe("rows never wrap", () => {
-  it("Changes (with its needs-you count) and Analytics, Settings in More", () => {
+  it("Needs you bell, PM agent and Analytics, Settings in More", () => {
     renderAt();
     const actions = screen.getByTestId("home-actions");
     const links = within(actions)
       .getAllByRole("link")
       .map(a => a.textContent);
-    expect(links[0]).toMatch(/^Changes/);
+    expect(links[0]).toMatch(/^PM agent/);
     expect(links[1]).toMatch(/Analytics/);
-    expect(screen.getByTestId("changes-needs-you")).toHaveTextContent("1");
+    expect(within(actions).getByTestId("needs-you-bell")).toBeInTheDocument();
     expect(within(actions).queryByRole("link", { name: "Settings" })).toBeNull();
     fireEvent.click(
       within(screen.getByTestId("home-more")).getByRole("button", { name: "More actions" }),

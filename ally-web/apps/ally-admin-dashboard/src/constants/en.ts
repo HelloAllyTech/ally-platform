@@ -9441,11 +9441,21 @@ export const en = {
             ? "Needs you: one change the PM agent won’t make alone"
             : `Needs you: ${n} changes the PM agent won’t make alone`,
         yourCall: "Your call",
+        /** The Needs you bell on Home: a count, and each waiting change opens in the PM agent. */
+        bellLabel: (n: number) =>
+          n === 0 ? "Nothing needs you" : `${n} ${n === 1 ? "change needs" : "changes need"} you`,
+        bellEmpty: "Nothing waits for you.",
+        bellOpenAll: "Open the PM agent",
         expand: (title: string) => `Open ${title}`,
         whatChanges: "What changes",
         whyItChanges: "Why",
         before: "Before",
         after: "After",
+        wholeRule: (name: string) => `The whole ${name}`,
+        wholeRuleChanged: (name: string) =>
+          `The whole ${name} after the change (the change is marked)`,
+        ruleStale:
+          "The rule has changed since this was proposed, so the passage no longer matches. Ask the PM agent to redo it.",
         evidence: "Evidence",
         changeFailed: "Couldn't load this change.",
         needsHint: (why: string) => `${why} Tell the PM agent below what you think.`.trim(),
@@ -9477,7 +9487,7 @@ export const en = {
         pmSummary: (title: string | null) =>
           title ? `it wants your view on ${title}` : "say what you think, or what you want done",
         openWithChanges: "Open with changes",
-        changes: "Changes",
+        changes: "PM agent",
         lookingAt: "Debriefs home",
         flagged: "⚑ Flagged by the learner",
         flaggedShort: "⚑ Flagged",
@@ -9515,8 +9525,8 @@ export const en = {
         } as Record<string, (label: string) => string>,
         suggestions: {
           page: ["What changed this week?", "What needs me?"],
-          waits: ["Approve it", "Turn it down", "What exactly would it change?"],
-          needsYou: ["Yes, go ahead", "What exactly would it change?"],
+          waits: ["What does it change for learners?", "Why now?"],
+          needsYou: ["What does it change for learners?", "Why now?"],
           trying: ["Hold it for one language", "Why this change?"],
           testing: ["Why this change?"],
           building: ["Why does this need code?"],
@@ -9526,8 +9536,22 @@ export const en = {
           turned_down: ["Why was it turned down?"],
         } as Record<string, string[]>,
       },
+      decision: {
+        approve: "Approve",
+        signOff: "Sign it off",
+        turnDown: "Turn it down",
+        confirmTurnDown: "Turn it down",
+        reasonLabel: "Why (the PM agent reads this)",
+        reasonPlaceholder: "One line is enough",
+        signOffHelp: "To change the rule instead, tell the PM agent below.",
+        askHelp: "Questions first? Ask the PM agent below.",
+        approved: "Approved. It goes through its tests and tries next.",
+        signedOff: "Signed off.",
+        turnedDown: "Turned down. The PM agent has your reason.",
+        failed: "That didn't go through. Try again.",
+      },
       changes: {
-        title: "Changes",
+        title: "PM agent",
         runNow: "Run the PM agent now",
         running: "Running…",
         tabs: { changes: "Changes", reports: "Reports", "test-sets": "Test sets" } as Record<
@@ -9549,6 +9573,8 @@ export const en = {
         groups: {
           waits: "Waits for you",
           trying: "On some learners",
+          testing: "Being tested",
+          proposed: "Not tested yet",
           building: "Being built",
           live: "Live",
           undone: "Undone",
@@ -9557,6 +9583,7 @@ export const en = {
           waits: "Waits for you",
           trying: "On some learners",
           testing: "Being tested",
+          proposed: "Not tested yet",
           building: "Being built",
           live: "Live for everyone",
           undone: "Undone",
@@ -9565,6 +9592,9 @@ export const en = {
         } as Record<string, string>,
         theChange: "The change",
         why: "Why the PM agent made it",
+        waitsShort: "Waits for your decision.",
+        allMessages: "All messages",
+        thisChangeOnly: "This change only",
         whereItIs: "Where it is",
         waitsNote:
           "This kind always asks a person. Tell the PM agent what you think in the conversation: approve it, turn it down, or say what to change. For a safety change it repeats back exactly what it will do and waits for your yes.",

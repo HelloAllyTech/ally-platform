@@ -33,7 +33,8 @@ const idea = (over: Partial<IdeaRow> = {}): IdeaRow => ({
 
 describe('a change in the owner’s words (v2 Changes)', () => {
   it('maps every rung to a ChangeState', () => {
-    expect(changeState(idea())).toBe('testing');
+    // No test has started: proposed, not "being tried".
+    expect(changeState(idea())).toBe('proposed');
     expect(
       changeState(idea({ evidence: { trial: { status: 'passed' } } })),
     ).toBe('testing');
@@ -251,6 +252,32 @@ describe('fields the v2 console needs', () => {
     expect(c.kindKey).toBe('setting');
     expect(c.wording).toBeNull();
     expect(typeof c.summary).toBe('string');
+  });
+});
+
+describe('a rule sign-off reads in plain words (review 2026-11-16)', () => {
+  const signOff = idea({
+    status: 'proposed',
+    createdAt: '2026-11-12T05:00:00Z',
+    change: {
+      ideaKind: 'pinned_rule',
+      promptCode: 'debrief_quality_judge_system',
+      firstVersion: true,
+      version: 1,
+    },
+    evidence: {},
+  });
+
+  it('is titled as a sign-off, says once what the rule does, and has no empty analysis', () => {
+    const c = toDebriefChange(signOff, ctx);
+    expect(c.title).toBe(
+      "Sign off the Judge's instructions (in use since 12 Nov)",
+    );
+    expect(c.waitsBecause).toBe(
+      'It tells the judge how to score every debrief. It is already in use, but the clinical advisor or the owner has not checked it yet.',
+    );
+    expect(c.basedOn).toBe('');
+    expect(c.kindKey).toBe('pinned_rule');
   });
 });
 
@@ -713,5 +740,43 @@ describe('Slack (v2 K1–K3)', () => {
         ),
       }),
     );
+  });
+});
+
+describe('nothing sits untested waiting for a person (review 2026-11-16)', () => {
+  it('the hourly watch starts proposed hand-offs and one untested drafted change', async () => {
+    const c = changes(liveIdea);
+    Object.assign(c.pmAgent, {
+      autoStartHandoff: jest.fn(async () => ({ started: true })),
+      screen: jest.fn(async () => ({})),
+    });
+    c.query
+      .mockResolvedValueOnce([{ id: 'h1' }, { id: 'h2' }] as never) // hand-offs
+      .mockResolvedValueOnce([{ id: 'u1' }] as never) // the oldest untested change
+      .mockResolvedValueOnce([] as never) // ready to move on
+      .mockResolvedValueOnce([] as never); // watching
+    const out = await c.svc.watch(new Date('2026-11-16T00:00:00Z'));
+    expect((c.pmAgent as any).autoStartHandoff).toHaveBeenCalledTimes(2);
+    expect((c.pmAgent as any).screen).toHaveBeenCalledWith('u1');
+    expect(out.moved).toBe(3);
+  });
+
+  it('a hand-off or test that cannot start does not stop the watch', async () => {
+    const c = changes(liveIdea);
+    Object.assign(c.pmAgent, {
+      autoStartHandoff: jest.fn(async () => {
+        throw new Error('no budget');
+      }),
+      screen: jest.fn(async () => {
+        throw new Error('learning budget spent');
+      }),
+    });
+    c.query
+      .mockResolvedValueOnce([{ id: 'h1' }] as never)
+      .mockResolvedValueOnce([{ id: 'u1' }] as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never);
+    const out = await c.svc.watch(new Date('2026-11-16T00:00:00Z'));
+    expect(out.moved).toBe(0);
   });
 });

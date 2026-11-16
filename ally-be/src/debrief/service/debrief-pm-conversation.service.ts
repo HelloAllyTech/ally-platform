@@ -1051,7 +1051,7 @@ export class DebriefPmConversationService {
     const alert = {
       title: `Debriefs: ${what} needs your decision`,
       body: `${person.authorName ?? 'Someone'} asked the PM agent to ${what} ${changeName(idea)}. Only ${who} can.`,
-      data: { ideaId: idea.id, url: `/debriefs?change=${idea.id}` },
+      data: { ideaId: idea.id, url: `/debriefs/pm-agent?change=${idea.id}` },
       excludeUserId: person.authorUserId ?? undefined,
     };
     if (action === 'approvePinnedRule') {

@@ -252,7 +252,7 @@ beforeEach(() => {
 describe("Changes › Reports", () => {
   it("is a tab between Changes and Test sets, with no Run the PM agent now", () => {
     renderAt("?view=reports&kind=monthly&period=2026-10");
-    const tabs = within(screen.getByRole("navigation", { name: "Changes" }))
+    const tabs = within(screen.getByRole("navigation", { name: "PM agent" }))
       .getAllByRole("link")
       .map(a => a.textContent);
     expect(tabs).toEqual(["Changes", "Reports", "Test sets"]);
@@ -270,7 +270,7 @@ describe("Changes › Reports", () => {
     expect(screen.getByTestId("pm-report-title")).toHaveClass("truncate");
     // The page header keeps one row at lg; below lg the actions take a second row on purpose.
     expect(screen.getByTestId("pm-header")).toHaveClass("min-[1056px]:flex-nowrap");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute("title", "Changes");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute("title", "PM agent");
     const changed = screen.getByTestId("pm-report-changed");
     expect(changed).toHaveTextContent("What changed this month");
     expect(changed).toHaveTextContent(

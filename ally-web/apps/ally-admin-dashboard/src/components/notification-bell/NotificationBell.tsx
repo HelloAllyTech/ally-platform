@@ -22,9 +22,8 @@ export const notificationHref = (n: AppNotification): string | null => {
   const d = n.data ?? {};
   if (d.screen !== "DebriefConsole") return null;
   if (typeof d.runId === "string") return ROUTES.DEBRIEF_SESSION(d.runId);
-  // A change opens on the Debriefs home, expanded under Needs you; one that no longer waits for a
-  // person moves on to Changes from there (v2).
-  if (typeof d.ideaId === "string") return `${ROUTES.DEBRIEFS}?change=${d.ideaId}`;
+  // A change opens on the PM agent page, where it is decided and talked about.
+  if (typeof d.ideaId === "string") return `${ROUTES.DEBRIEFS_PM_AGENT}?change=${d.ideaId}`;
   // Autonomy: the canary can now run alone, or the system set a cell back to asks first.
   if (d.settings === "autonomy") return `${ROUTES.DEBRIEFS_SETTINGS}#autonomy`;
   if (typeof d.releaseId === "string") {

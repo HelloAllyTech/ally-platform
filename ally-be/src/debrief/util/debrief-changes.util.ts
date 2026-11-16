@@ -1,3 +1,4 @@
+import { pinnedRuleName } from './debrief-pinned-rules.util';
 import { DEBRIEF_PROMPT_CODES } from '../constants/debrief-release.constants';
 import { confidenceOf } from './debrief-always-ask.util';
 import {
@@ -16,6 +17,8 @@ export type ChangeState =
   | 'trying'
   | 'building'
   | 'testing'
+  /** Proposed; no test has started yet. */
+  | 'proposed'
   | 'live'
   | 'undone'
   | 'stopped'
@@ -26,6 +29,7 @@ export const CHANGE_STATES: readonly ChangeState[] = [
   'trying',
   'building',
   'testing',
+  'proposed',
   'live',
   'undone',
   'stopped',
@@ -71,6 +75,16 @@ export interface DebriefChange {
   wording: { before: string; after: string } | null;
   /** One short line for the list: when, and the first measure. */
   summary: string;
+  /**
+   * A pinned rule in full, so the person deciding reads all of it: the rule
+   * as it stands (a sign-off), or as it would read after the change, with
+   * the changed passage marked. Filled by the service; null for other kinds.
+   */
+  rule?: {
+    name: string;
+    segments: Array<{ text: string; changed: boolean }>;
+    stale: boolean;
+  } | null;
 }
 
 /** What the mapping needs besides the idea. */
@@ -195,6 +209,16 @@ const n1 = (x: unknown) =>
     ? '–'
     : (Math.round(Number(x) * 10) / 10).toFixed(1);
 
+/** What each pinned rule does, in one sentence, for the person signing it off. */
+const RULE_PURPOSE: Record<string, string> = {
+  [DEBRIEF_PROMPT_CODES.safetyReader]:
+    'It decides what counts as a risk cue in a roleplay.',
+  [DEBRIEF_PROMPT_CODES.rubric]:
+    'It decides what a good debrief must do; every debrief is scored against it.',
+  debrief_quality_judge_system:
+    'It tells the judge how to score every debrief.',
+};
+
 /** The waits the always-ask list covers (A1): the only ones a person must answer. */
 function waitsFor(idea: IdeaRow): string | null {
   const w = awaitingDecision(idea as Parameters<typeof awaitingDecision>[0]);
@@ -202,8 +226,8 @@ function waitsFor(idea: IdeaRow): string | null {
   const e = idea.evidence ?? {};
   if (w.wait === 'pinned_rule') {
     return idea.change?.firstVersion
-      ? 'The rule in force has never been approved.'
-      : 'It changes a pinned rule; the clinical advisor or the owner approves it.';
+      ? `${RULE_PURPOSE[idea.change?.promptCode] ?? 'It decides how debriefs are checked.'} It is already in use, but the clinical advisor or the owner has not checked it yet.`
+      : 'It changes a pinned rule, so the clinical advisor or the owner decides.';
   }
   if (w.wait === 'promote_budget') return 'Budgets are the owner’s to change.';
   if (e.ask && !e.approval && expiresWhileWaiting(idea as never, w.wait)) {
@@ -240,6 +264,8 @@ export function changeState(idea: IdeaRow): ChangeState {
   if (e.canary && ['running', 'passed'].includes(e.canary.status)) {
     return 'trying';
   }
+  // No test has started: an idea, or a draft waiting for its first check.
+  if (!e.screen && !e.gate && !e.trial) return 'proposed';
   return 'testing';
 }
 
@@ -499,6 +525,17 @@ export function changeResult(
         return 'Passed its try-out on learners; going live for everyone.';
       return `Tried on ${pct(Number(c.share ?? 0))} of learners: ${c.canaryRuns ?? 0} of ${ctx.canaryMinRuns} debriefs, ${c.days ?? 0} of ${ctx.canaryMinDays} days.`;
     }
+    case 'proposed': {
+      const drafted = [
+        'prompt_edit',
+        'setting',
+        'registry_agent',
+        'default_plan',
+      ].includes(String(idea.change?.ideaKind));
+      return drafted
+        ? 'Not tested yet: its first check starts on the next hourly run.'
+        : 'An idea, not a change yet: the PM agent drafts it on its next run.';
+    }
     case 'testing':
     default: {
       if (e.trial?.status === 'running') {
@@ -539,7 +576,7 @@ export function changeBasedOn(idea: IdeaRow): string {
   if (idea.change?.ideaKind === 'test_settings') {
     parts.push('The baseline: production volume and how much scores move');
   }
-  return parts.join(' · ') || 'The PM agent’s analysis';
+  return parts.join(' · ');
 }
 
 /** When, in a few words, for the row. */
@@ -578,9 +615,13 @@ export function toDebriefChange(
   const kind = changeKindLabel(idea);
   const when = changeWhen(idea, state);
   const measures = changeMeasures(idea);
+  const firstVersion =
+    idea.change?.ideaKind === 'pinned_rule' && idea.change?.firstVersion;
   return {
     id: idea.id,
-    title: String(idea.text ?? idea.title ?? ''),
+    title: firstVersion
+      ? `Sign off the ${pinnedRuleName(String(idea.change?.promptCode))} (in use since ${shortDate(idea.createdAt)})`
+      : String(idea.text ?? idea.title ?? ''),
     kind,
     state,
     result: changeResult(idea, state, ctx, waitsBecause),
@@ -596,7 +637,7 @@ export function toDebriefChange(
       state === 'live' &&
       (idea.change?.ideaKind === 'test_settings' ||
         (!!releaseId && releaseId === ctx.gaReleaseId)),
-    canStop: state === 'trying' || state === 'testing',
+    canStop: state === 'trying' || state === 'testing' || state === 'proposed',
     kindKey: kindKeyOf(kind),
     wording:
       typeof idea.change?.find === 'string' &&

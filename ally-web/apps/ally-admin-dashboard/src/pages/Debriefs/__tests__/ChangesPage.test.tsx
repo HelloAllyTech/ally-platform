@@ -13,6 +13,10 @@ const h = vi.hoisted(() => ({
   send: vi.fn(),
   undo: vi.fn(),
   stop: vi.fn(),
+  approve: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
+  turnDown: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
+  approveRule: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
+  rejectRule: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
   me: vi.fn(),
   permissions: [] as string[],
 }));
@@ -44,12 +48,16 @@ vi.mock("@api", async importOriginal => ({
   useGetPmConversationQuery: () => h.conversation(),
   useLazyGetPmConversationQuery: () => [vi.fn(), { isFetching: false }],
   useSendPmMessageMutation: () => [h.send, { isLoading: false }],
+  useApproveDebriefChangeMutation: () => [h.approve, { isLoading: false }],
+  useTurnDownDebriefChangeMutation: () => [h.turnDown, { isLoading: false }],
+  useApprovePinnedRuleMutation: () => [h.approveRule, { isLoading: false }],
+  useRejectPinnedRuleMutation: () => [h.rejectRule, { isLoading: false }],
 }));
 
 /* eslint-disable import/first */
 import { groupOf, visibleChanges } from "../pm/ChangesView";
 import { PmAgentPage } from "../pm/PmAgentPage";
-import { ok, resolves, TEAM_PERMS } from "./consoleFixtures";
+import { ADVISOR_PERMS, OWNER_PERMS, ok, resolves, TEAM_PERMS } from "./consoleFixtures";
 import { debriefAccessFor } from "../debriefAccess";
 /* eslint-enable import/first */
 
@@ -170,7 +178,7 @@ beforeEach(() => {
 });
 
 describe("Changes (v2, U3)", () => {
-  it("groups changes: Waits for you, On some learners, Being built, Live, Undone", () => {
+  it("groups changes: Waits for you, On some learners, Being tested, Being built, Live, Undone", () => {
     renderAt();
     const list = screen.getByTestId("changes-list");
     const headings = within(list)
@@ -178,36 +186,47 @@ describe("Changes (v2, U3)", () => {
       .map(h2 => h2.textContent);
     expect(headings).toEqual([
       "Waits for you1",
-      "On some learners2",
+      "On some learners1",
+      "Being tested1",
       "Being built1",
       "Live1",
       "Undone1",
     ]);
     expect(screen.getByTestId("changes-headline")).toHaveTextContent(
-      "The PM agent is improving debriefs on its own: one change went live this week, two are being tried, and one waits for you.",
+      "The PM agent is improving debriefs on its own: one change went live this week, one is being tried, and one waits for you.",
     );
   });
 
-  it("groupOf: testing sits with the changes being tried; stopped and turned down with Undone", () => {
-    expect(groupOf("testing")).toBe("trying");
+  it("groupOf: testing and not-yet-tested have their own groups; stopped and turned down with Undone", () => {
+    expect(groupOf("testing")).toBe("testing");
+    expect(groupOf("proposed")).toBe("proposed");
     expect(groupOf("stopped")).toBe("undone");
     expect(groupOf("turned_down")).toBe("undone");
   });
 
-  it("opens the first change that waits, with its result headline, measures and steps", () => {
+  it("opens the first change that waits: its title and why it waits", () => {
     renderAt();
     const detail = screen.getByTestId("change-detail");
-    expect(detail).toHaveTextContent("Catches every indirect cue on the test sets");
+    expect(within(detail).getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Safety reader: indirect self-harm cues",
+    );
     expect(screen.getByTestId("change-state")).toHaveTextContent("Waits for you");
     expect(screen.getByTestId("change-waits-note")).toHaveTextContent(
       "Safety reader text always asks a person.",
     );
-    // No approve, reject or try buttons: approving happens in the conversation.
-    for (const name of [/approve/i, /reject/i, /turn it down/i, /^try/i]) {
-      expect(within(detail).queryByRole("button", { name })).toBeNull();
-    }
+    // A pinned rule is the clinical advisor's or the owner's call: the team gets no buttons.
+    expect(within(detail).queryByTestId("decision-buttons")).toBeNull();
     expect(within(detail).queryByRole("button", { name: "Undo now" })).toBeNull();
     expect(within(detail).queryByRole("button", { name: "Stop now" })).toBeNull();
+  });
+
+  it("the owner decides with buttons right after the change, outside the conversation", async () => {
+    h.permissions = [...TEAM_PERMS, ...OWNER_PERMS];
+    renderAt();
+    const decide = within(screen.getByTestId("change-detail")).getByTestId("decision-buttons");
+    expect(within(screen.getByTestId("changes-pm")).queryByTestId("decision-buttons")).toBeNull();
+    fireEvent.click(within(decide).getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(h.approveRule).toHaveBeenCalledWith({ id: "c-safety" }));
   });
 
   it("Undo now on a live change undoes it at once", async () => {
@@ -244,8 +263,9 @@ describe("Changes (v2, U3)", () => {
 });
 
 describe("the PM agent conversation beside Changes", () => {
-  it("shows the one thread: who, what each message was about, and each action's status", () => {
+  it("All messages shows the one thread: who, what each message was about, and each action's status", () => {
     renderAt();
+    fireEvent.click(screen.getByTestId("changes-pm-scope"));
     const pm = screen.getByTestId("changes-pm");
     const msgs = within(pm).getAllByTestId("pm-message");
     expect(msgs).toHaveLength(3);
@@ -259,13 +279,13 @@ describe("the PM agent conversation beside Changes", () => {
     expect(actions[1]).toHaveAttribute("data-status", "awaiting_yes");
   });
 
-  it("Looking at names the selected change, and Send passes it as about", async () => {
+  it("the conversation is this change's own, and Send passes it as about", async () => {
     renderAt("?change=c-live");
     const pm = screen.getByTestId("changes-pm");
     expect(within(pm).getByTestId("pm-looking-at")).toHaveTextContent(
       "“Work on this” cards are at most two sentences.",
     );
-    fireEvent.change(within(pm).getByLabelText("Message the PM agent"), {
+    fireEvent.change(within(pm).getByLabelText("Reply to the PM agent about this change"), {
       target: { value: "Undo it for Tamil only" },
     });
     fireEvent.click(within(pm).getByRole("button", { name: "Send" }));
@@ -343,6 +363,17 @@ describe("who sees which changes", () => {
     renderAt("?change=c-live");
     expect(screen.getByTestId("change-detail")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Undo now" })).toBeNull();
+  });
+
+  it("the clinical advisor gets their changes only: no Reports or Test sets, even by link", () => {
+    h.permissions = ADVISOR_PERMS;
+    renderAt("?view=reports");
+    expect(screen.queryByRole("link", { name: "Reports" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Test sets" })).toBeNull();
+    expect(screen.getByTestId("changes-list")).toHaveTextContent(
+      "Safety reader: indirect self-harm cues",
+    );
+    expect(screen.getByTestId("changes-list")).not.toHaveTextContent("Writer on a cheaper model");
   });
 
   it("someone with neither the PM agent nor pinned rules gets no conversation", () => {

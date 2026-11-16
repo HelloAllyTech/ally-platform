@@ -96,7 +96,11 @@ export const PmAgentPage: React.FC = () => {
   const me = useGetDebriefMeQuery();
   const access = useDebriefAccess(me.data);
   const [params, setParams] = useSearchParams();
-  const { view, change } = readChangesView(params);
+  const read = readChangesView(params);
+  const change = read.change;
+  // The clinical advisor sees only the changes they decide: no Reports or Test sets.
+  const views = access.pmAgent ? VIEWS : (["changes"] as PmAgentView[]);
+  const view = views.includes(read.view) ? read.view : "changes";
   const overview = useGetDebriefOverviewQuery(undefined, { skip: view !== "test-sets" });
   return (
     <div className="font-primary" data-testid="pm-agent-page">
@@ -117,18 +121,20 @@ export const PmAgentPage: React.FC = () => {
             />
           </div>
         </div>
-        <nav aria-label={c.title} className="flex flex-nowrap gap-6 whitespace-nowrap text-sm">
-          {VIEWS.map(v => (
-            <Link
-              key={v}
-              to={pmAgentPath(v)}
-              aria-current={v === view ? "page" : undefined}
-              className={`py-2.5 no-underline ${v === view ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
-            >
-              {c.tabs[v]}
-            </Link>
-          ))}
-        </nav>
+        {views.length > 1 && (
+          <nav aria-label={c.title} className="flex flex-nowrap gap-6 whitespace-nowrap text-sm">
+            {views.map(v => (
+              <Link
+                key={v}
+                to={pmAgentPath(v)}
+                aria-current={v === view ? "page" : undefined}
+                className={`py-2.5 no-underline ${v === view ? "border-b-2 border-primary-500 font-semibold text-typography-900" : "text-neutral-600"}`}
+              >
+                {c.tabs[v]}
+              </Link>
+            ))}
+          </nav>
+        )}
       </header>
 
       {view === "test-sets" ? (

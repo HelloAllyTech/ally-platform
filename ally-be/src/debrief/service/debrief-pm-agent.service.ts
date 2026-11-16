@@ -1688,7 +1688,7 @@ export class DebriefPmAgentService
     await this.notifier?.pinnedRuleDeciders({
       title: 'Debriefs: a pinned-rule change needs approval',
       body: `Proposed change to the ${pinnedRuleName(input.promptCode)}: ${why}`,
-      data: { ideaId: rows[0].id, url: `/debriefs?change=${rows[0].id}` },
+      data: { ideaId: rows[0].id, url: `/debriefs/pm-agent?change=${rows[0].id}` },
       excludeUserId: userId,
     });
     return { id: rows[0].id };

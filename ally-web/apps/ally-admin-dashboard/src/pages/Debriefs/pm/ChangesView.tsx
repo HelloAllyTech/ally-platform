@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 import { toast } from "sonner";
 
@@ -17,10 +17,20 @@ import { getErrorMessage } from "@utils";
 
 import { languageLabel } from "../consoleLabels";
 import { DebriefAccess } from "../debriefAccess";
+import { Wording, WholeRule } from "./ChangeText";
+import { DecisionButtons } from "./DecisionButtons";
 import { PmConversation } from "./PmConversation";
 
 /** The five groups of the Changes list (V2_AUTONOMY U3), in order. */
-export const CHANGE_GROUPS = ["waits", "trying", "building", "live", "undone"] as const;
+export const CHANGE_GROUPS = [
+  "waits",
+  "trying",
+  "testing",
+  "proposed",
+  "building",
+  "live",
+  "undone",
+] as const;
 export type ChangeGroup = (typeof CHANGE_GROUPS)[number];
 
 /**
@@ -32,8 +42,11 @@ export const groupOf = (state: ChangeState): ChangeGroup => {
     case "waits":
       return "waits";
     case "trying":
-    case "testing":
       return "trying";
+    case "testing":
+      return "testing";
+    case "proposed":
+      return "proposed";
     case "building":
       return "building";
     case "live":
@@ -46,6 +59,8 @@ export const groupOf = (state: ChangeState): ChangeGroup => {
 const GROUP_DOT: Record<ChangeGroup, string> = {
   waits: "bg-[#F1C21B]",
   trying: "bg-primary-500",
+  testing: "bg-primary-300",
+  proposed: "bg-neutral-300",
   building: "bg-[#8A3FFC]",
   live: "bg-success-500",
   undone: "bg-neutral-500",
@@ -54,6 +69,8 @@ const GROUP_DOT: Record<ChangeGroup, string> = {
 const STATE_TAG: Record<ChangeGroup, string> = {
   waits: "bg-[#FFF2E8] text-[#8A3800]",
   trying: "bg-primary-50 text-primary-700",
+  testing: "bg-primary-50 text-primary-700",
+  proposed: "bg-neutral-100 text-neutral-900",
   building: "bg-[#E8DAFF] text-[#491D8B]",
   live: "bg-success-50 text-success-600",
   undone: "bg-neutral-100 text-neutral-900",
@@ -85,7 +102,11 @@ const STEP_TONE: Record<string, string> = {
   wait: "bg-white text-neutral-700",
 };
 
-const Detail: React.FC<{ change: DebriefChange; canAct: boolean }> = ({ change, canAct }) => {
+const Detail: React.FC<{ change: DebriefChange; canAct: boolean; access: DebriefAccess }> = ({
+  change,
+  canAct,
+  access,
+}) => {
   const c = en.debriefs.v2.changes;
   const [undo, undoing] = useUndoDebriefChangeMutation();
   const [stop, stopping] = useStopDebriefChangeMutation();
@@ -125,7 +146,18 @@ const Detail: React.FC<{ change: DebriefChange; canAct: boolean }> = ({ change, 
         ))}
         <span className="min-w-0 truncate text-neutral-600">{change.when}</span>
       </div>
-      <h2 className="m-0 font-secondary text-[22px] font-normal leading-snug">{change.result}</h2>
+      {/* A waiting change's result only repeats why it waits: the title leads instead. */}
+      <h2 className="m-0 font-secondary text-[22px] font-normal leading-snug">
+        {change.state === "waits" ? change.title : change.result}
+      </h2>
+      {change.state === "waits" && (
+        <p className="m-0 text-sm text-neutral-700" data-testid="change-waits-note">
+          {change.waitsBecause ?? c.waitsShort}
+        </p>
+      )}
+      {change.wording && <Wording before={change.wording.before} after={change.wording.after} />}
+      {change.rule && <WholeRule rule={change.rule} changed={!!change.wording} />}
+      <DecisionButtons change={change} access={access} />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="flex flex-col gap-1 rounded-sm bg-neutral-50 px-4 py-3 text-sm">
           <div className="text-xs text-neutral-600">{c.theChange}</div>
@@ -168,15 +200,6 @@ const Detail: React.FC<{ change: DebriefChange; canAct: boolean }> = ({ change, 
               </li>
             ))}
           </ol>
-        </div>
-      )}
-      {change.state === "waits" && (
-        <div
-          className="border-l-[3px] border-[#F1C21B] bg-[#FFF8E1] px-4 py-3 text-sm"
-          data-testid="change-waits-note"
-        >
-          {change.waitsBecause && <p className="m-0 mb-1 font-semibold">{change.waitsBecause}</p>}
-          {c.waitsNote}
         </div>
       )}
       {(canStop || canUndo) && (
@@ -223,6 +246,7 @@ export const ChangesView: React.FC<{
   onSelect: (id: string) => void;
 }> = ({ access, selected, onSelect }) => {
   const c = en.debriefs.v2.changes;
+  const [allMessages, setAllMessages] = useState(false);
   const q = useGetDebriefChangesQuery();
   const home = useGetDebriefHomeQuery(undefined, { skip: !access.pmAgent });
   const items = visibleChanges(q.data ?? [], access);
@@ -309,16 +333,31 @@ export const ChangesView: React.FC<{
         </aside>
         <main className="min-w-0">
           {shown ? (
-            <Detail change={shown} canAct={access.releases} />
+            <Detail change={shown} canAct={access.releases} access={access} />
           ) : groups.length > 0 ? (
             <p className="text-sm text-neutral-600">{c.pick}</p>
           ) : null}
         </main>
         {canTalk && (
           <PmConversation
+            key={allMessages || !shown ? "all" : shown.id}
             testId="changes-pm"
             className="rounded-sm border border-neutral-100"
             about={about}
+            // Each change shows its own conversation; "All messages" shows the whole thread.
+            scoped={!!shown && !allMessages}
+            headerAction={
+              shown ? (
+                <button
+                  type="button"
+                  className="text-[13px] font-semibold text-primary-500"
+                  onClick={() => setAllMessages(v => !v)}
+                  data-testid="changes-pm-scope"
+                >
+                  {allMessages ? c.thisChangeOnly : c.allMessages}
+                </button>
+              ) : undefined
+            }
             suggestions={
               en.debriefs.v2.conversation.suggestions[shown ? shown.state : "page"] ?? []
             }

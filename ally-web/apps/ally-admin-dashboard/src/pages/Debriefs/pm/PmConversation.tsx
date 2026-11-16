@@ -82,7 +82,8 @@ export const PmConversation: React.FC<{
   scoped?: boolean;
 }> = ({ about, placeholder, suggestions = [], testId, headerAction, className, scoped }) => {
   const c = en.debriefs.v2.conversation;
-  const q = useGetPmConversationQuery();
+  const scopeId = scoped && about.kind === "change" ? about.id : undefined;
+  const q = useGetPmConversationQuery(scopeId ? { about: scopeId } : undefined);
   const [loadEarlier, earlierState] = useLazyGetPmConversationQuery();
   const [older, setOlder] = useState<PmMessage[]>([]);
   const [olderMore, setOlderMore] = useState<boolean | null>(null);
@@ -125,7 +126,7 @@ export const PmConversation: React.FC<{
     const first = messages[0];
     if (!first) return;
     try {
-      const page = await loadEarlier({ before: first.id, limit: 50 }).unwrap();
+      const page = await loadEarlier({ before: first.id, limit: 50, about: scopeId }).unwrap();
       setOlder(o => [...page.messages, ...o]);
       setOlderMore(page.more);
     } catch (e) {
