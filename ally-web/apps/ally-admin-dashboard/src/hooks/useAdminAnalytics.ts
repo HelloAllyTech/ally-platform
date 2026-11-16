@@ -19,9 +19,7 @@ export const resolveTenantTier = (role?: string | null): "platform" | "tenant" =
 export const toRoutePattern = (pathname: string): string =>
   pathname
     .split("/")
-    .map((seg) =>
-      /^\d+$/.test(seg) || /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(seg) ? ":id" : seg,
-    )
+    .map(seg => (/^\d+$/.test(seg) || /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(seg) ? ":id" : seg))
     .join("/") || "/";
 
 /**
