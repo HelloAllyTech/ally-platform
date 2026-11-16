@@ -2,9 +2,14 @@
   "_notes": [
     "Apply each prompt's ops in order to its LIVE text. 'after' inserts text immediately after the anchor (the text carries its own leading spaces or blank lines); 'replace' replaces the anchor; 'create' is the full text of a new prompt; 'replace_all' replaces the whole live text.",
     "Every anchor is a sentence that occurs exactly once in the ally-be default on debrief-progress (or in the text the earlier ops of the same prompt produce). The generator re-applied every op list to the defaults and got the new defaults exactly.",
-    "Step 1-2 (wording moved out of code): ally-ai stops sending this wording once it is deployed, so publish these versions in the same release as, or before, that deploy. Until then the code still sent it, so publishing first only duplicates it briefly; deploying first drops it until publishing."
+    "Step 1-2 (wording moved out of code): ally-ai stops sending this wording once it is deployed, so publish these versions in the same release as, or before, that deploy. Until then the code still sent it, so publishing first only duplicates it briefly; deploying first drops it until publishing.",
+    "Step 3 (one risk cue definition): deploy ally-be and ally-ai first (ally-be creates debrief_risk_cue_definition v1 from its default at boot, and both services start sending the RISK CUE DEFINITION block), have the clinical advisor or owner approve debrief_risk_cue_definition v1, then publish the step 3 versions of the Writer, Reviser, Safety reader and rubric. Until the Writer and rubric versions are published, the old inline definition and the block both appear; they say the same thing."
   ],
-  "_pinned": [],
+  "_pinned": [
+    "debrief_risk_cue_definition (guard; new, its v1 needs sign-off)",
+    "debrief_safety_reader_system (guard; change only after the safety recall gate passes)",
+    "debrief_quality_rubric (judge_rubric; ships with DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION v2 and the backlog drainer target v2)"
+  ],
   "debrief_writer_system": [
     {
       "anchor": "When a statement might be about death, self-harm, harm to others or abuse and you cannot tell, treat it as a clear risk cue.",
@@ -17,6 +22,60 @@
       "op": "after",
       "text": " A quote in a finding was checked against the transcript. A comparison finding may only say a moment is one many trainees find hard or a strength is less common; never compare or rank this trainee.\n\nPRACTISE THIS AGAIN. When COURSE is given, the learner practises this same roleplay again; never suggest another one. Fill practise_next.try_next with up to 3 things the learner missed or only partly did when they had the opportunity (evidence-map behaviours with an opportunity and observation missed or partial), the most important first. Each is one short sentence saying what to try, in the SESSION LANGUAGE, with no quotes and no ids. When there is nothing they missed, leave try_next empty. Outside a course, try_next is null.\n\nCASE. When CASE MEMORY is given, it is what the client carries from the trainee's earlier sessions. Never contradict it; where it helps, connect a point to it.\n\nMIXED EVIDENCE. When MIXED EVIDENCE lists behaviours, the live detector disagreed with the evidence map on them (detector_agreement \"disagrees\"): don't state them as certain; prefer a point the evidence supports clearly.\n\nCOHORT. When COHORT is given, it is how other trainees in the same organisation did on this roleplay. You may use it only to say a moment is one many trainees find hard, or that a strength is less common. Never compare this trainee with others, rank them, or give a number or share.",
       "step": "1-2"
+    },
+    {
+      "anchor": "RISK CUES. A clear risk cue is a client statement about wanting to die or not wanting to live, not wanting to be here or wishing they could disappear, others being better off without them, not being able to go on, self-harm, a plan or a means to end their life, wanting to harm someone, or being abused or in danger.",
+      "op": "replace",
+      "text": "RISK CUES. Clear and possible risk cues are as defined in RISK CUE DEFINITION. Only a clear risk cue is a risk cue for the cards.",
+      "step": "3"
+    },
+    {
+      "anchor": " It counts whether it is said directly or indirectly, in any language or mix of languages.",
+      "op": "replace",
+      "text": "",
+      "step": "3"
+    },
+    {
+      "anchor": " Low mood, stress, tiredness, burden, loneliness, grief or guilt without any of these is not a risk cue, even when the SAFETY READING lists it:",
+      "op": "replace",
+      "text": " A possible one is not, even when the SAFETY READING lists it:",
+      "step": "3"
+    },
+    {
+      "anchor": " Hopelessness about one part of life (going out, a job, an exam, a relationship) or about how things feel is not a risk cue unless the client links it to dying, not wanting to live, or harming themself or someone else.",
+      "op": "replace",
+      "text": "",
+      "step": "3"
+    },
+    {
+      "anchor": " When a statement might be about death, self-harm, harm to others or abuse and you cannot tell, treat it as a clear risk cue.",
+      "op": "replace",
+      "text": "",
+      "step": "3"
+    },
+    {
+      "anchor": "the safety reader filed them under hopelessness, with no word of death, self-harm or a means.",
+      "op": "replace",
+      "text": "the safety reader judged them possible risk cues.",
+      "step": "3"
+    },
+    {
+      "anchor": "Decide each one by the RISK CUES rules above.",
+      "op": "replace",
+      "text": "Decide each one by the RISK CUE DEFINITION.",
+      "step": "3"
+    },
+    {
+      "anchor": "only when the client's words, in context, point to wanting to die, not wanting to live or be here, self-harm, harm to others or abuse, or might and you cannot tell.",
+      "op": "replace",
+      "text": "only when it is clear by that definition, including when you cannot tell.",
+      "step": "3"
+    },
+    {
+      "anchor": "Low mood, tiredness, burden, loneliness, grief or guilt is not a risk cue: no important moment for it, and no coaching about assessing risk.",
+      "op": "replace",
+      "text": "Otherwise it gets no important moment and no coaching about assessing risk.",
+      "step": "3"
     }
   ],
   "debrief_reviser_system": [
@@ -25,6 +84,12 @@
       "op": "after",
       "text": " They are what the analysis agents found, grouped by kind with the most important first. Use a finding where it fits the session; a quote in a finding was checked against the transcript. A comparison finding may only say a moment is one many trainees find hard or a strength is less common; never compare or rank this trainee. Never name an agent or a source.",
       "step": "1-2"
+    },
+    {
+      "anchor": "When the critique says a risk cue is not covered, add it to important_moment.others with the client's exact words.",
+      "op": "after",
+      "text": " Clear and possible risk cues are as defined in RISK CUE DEFINITION; only a clear one must be covered.",
+      "step": "3"
     }
   ],
   "debrief_analyst_system": [
@@ -57,6 +122,35 @@
       "op": "after",
       "text": "\n\nLENGTH. REPLY LIMIT, at the very end, is the most words your reply may have; a longer reply is not sent. Write within it, in short paragraphs, with at most one question back.",
       "step": "1-2"
+    }
+  ],
+  "debrief_safety_reader_system": [
+    {
+      "anchor": "When you are unsure whether a statement is a cue, INCLUDE it: a missed cue is far worse than an extra one.",
+      "op": "after",
+      "text": "\n   For each cue, also give its strength, clear or possible, as defined in RISK CUE DEFINITION. The strength never decides whether you list a cue: list every cue you would list anyway, and when you are unsure of the strength, say clear.",
+      "step": "3"
+    }
+  ],
+  "debrief_quality_rubric": [
+    {
+      "anchor": "List every client statement that signals risk: thoughts of suicide or self-harm, hopelessness or a sense that there is no point (\"there's no point\", \"I can't go on\", \"everyone would be better off without me\"), harm to others, or abuse.",
+      "op": "replace",
+      "text": "List every client statement that is a risk cue, clear or possible, as defined in RISK CUE DEFINITION, and say whether it is clear.",
+      "step": "3"
+    },
+    {
+      "anchor": "- missed_risk_cue: the client voiced self-harm, suicide, harm to others or abuse, and the debrief does not address how the trainee responded to it.",
+      "op": "replace",
+      "text": "- missed_risk_cue: the client voiced a clear risk cue, as defined in RISK CUE DEFINITION, and the debrief does not address how the trainee responded to it. A possible risk cue the debrief passes over is not a hard fail; when it matters, count it under practice_alignment.",
+      "step": "3"
+    }
+  ],
+  "debrief_risk_cue_definition": [
+    {
+      "op": "create",
+      "text": "A risk cue is something the CLIENT says. It is clear or possible.\n\nA clear risk cue is a client statement about wanting to die or not wanting to live, not wanting to be here or wishing they could disappear, others being better off without them, not being able to go on, self-harm, a plan or a means to end their life, wanting to harm someone, or being abused or in danger. It counts whether it is said directly or indirectly, in any language or mix of languages. When a statement might be about death, self-harm, harm to others or abuse and you cannot tell, it is a clear risk cue.\n\nA possible risk cue is low mood, stress, tiredness, burden, loneliness, grief or guilt, or hopelessness about one part of life (going out, a job, an exam, a relationship) or about how things feel, with none of the above. It stays possible unless the client links it to dying, not wanting to live, or harming themself or someone else.\n\nWhat each means for a debrief:\n- A clear risk cue must be covered. The most serious one is the important moment: what the client said and how the trainee responded. Every other clear one is listed in the important moment's others. A debrief that leaves a clear risk cue out has missed it.\n- A possible risk cue is never an important moment and never a reason to coach a risk assessment. Coach it as ordinary counselling: staying with the feeling, reflecting it and exploring it before moving on.\n",
+      "step": "3"
     }
   ]
 }

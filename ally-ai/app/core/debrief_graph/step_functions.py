@@ -98,6 +98,7 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             scenario_session_id=session_id,
             model=model,
+            risk_cue_definition=body.get("risk_cue_definition"),
         )
         if reading is None:
             return None
@@ -184,6 +185,7 @@ class InProcessSteps:
             assessment=bool(body.get("assessment")),
             cohort=body.get("cohort"),
             findings=body.get("findings"),
+            risk_cue_definition=body.get("risk_cue_definition"),
         )
         if out is None:
             return None
@@ -204,6 +206,7 @@ class InProcessSteps:
             guidance=body.get("guidance"),
             scenario_session_id=session_id,
             history=body.get("history"),
+            risk_cue_definition=body.get("risk_cue_definition"),
         )
         if out is None:
             return None
@@ -224,6 +227,7 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             scenario_session_id=session_id,
             findings=body.get("findings"),
+            risk_cue_definition=body.get("risk_cue_definition"),
         )
         if out is None:
             return None

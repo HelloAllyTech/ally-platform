@@ -101,7 +101,8 @@ async def test_writer_every_instruction_once(prompts):
             "LEARNER DISTRESS: noted",
             "Never write a code such as 478_custom_27",
             # Wording (the prompt)
-            "or might and you cannot tell",
+            "RISK CUE DEFINITION:",
+            "you cannot tell, it is a clear risk cue",
             "no coaching about assessing risk",
             "Never a risk assessment.",
             "never suggest another one",

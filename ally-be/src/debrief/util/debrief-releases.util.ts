@@ -440,6 +440,7 @@ export const RECIPE_LABELS: Record<string, string> = {
 export function promptLabel(code: string): string {
   const known: Record<string, string> = {
     debrief_safety_reader_system: 'Safety reader',
+    debrief_risk_cue_definition: 'Risk cue definition',
     debrief_analyst_system: 'Analyst',
     debrief_progress_reader_system: 'Progress reader',
     debrief_progress_system: 'Progress agent',

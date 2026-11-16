@@ -103,6 +103,7 @@ export interface RunOptions {
 /** The prompts the debrief graph's steps run, whether or not a release pins them. */
 const GRAPH_PROMPT_CODES: readonly string[] = [
   DEBRIEF_PROMPT_CODES.safetyReader,
+  DEBRIEF_PROMPT_CODES.riskCueDefinition,
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
   DEBRIEF_PROMPT_CODES.progress,

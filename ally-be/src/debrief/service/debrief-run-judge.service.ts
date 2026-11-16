@@ -93,6 +93,10 @@ export class DebriefRunJudgeService {
       DEBRIEF_JUDGE_INSTRUCTIONS_CODE,
       null,
     );
+    const riskCueDefinition = await this.context.promptText(
+      DEBRIEF_PROMPT_CODES.riskCueDefinition,
+      null,
+    );
     const guidance = await this.guidanceSeen(run);
     // Judging a stored score is exclusive: "Debrief now" and the drain must
     // never both pay for one run, nor overwrite each other's score.
@@ -106,6 +110,7 @@ export class DebriefRunJudgeService {
         session,
         rubric,
         judgeInstructions,
+        riskCueDefinition,
         guidance,
       });
     } finally {
@@ -123,10 +128,12 @@ export class DebriefRunJudgeService {
       judgeInstructions: Awaited<
         ReturnType<DebriefContextRepository['promptText']>
       >;
+      riskCueDefinition?: string | null;
       guidance: string | null;
     },
   ): Promise<RunJudgment | null> {
     const { transcript, session, rubric, judgeInstructions, guidance } = input;
+    const riskCueDefinition = input.riskCueDefinition ?? null;
     const { apiUrl, outboundApiKey } = this.config.ai;
     const res = await withJudgeSlot(() =>
       axios.post(
@@ -138,6 +145,7 @@ export class DebriefRunJudgeService {
           learner_level: session?.learnerLevel ?? null,
           rubric,
           judge_instructions: judgeInstructions,
+          risk_cue_definition: riskCueDefinition,
           history: (run.workspace?.history as string | null) ?? null,
           guidance,
           scenario_session_id: run.scenarioSessionId,

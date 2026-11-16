@@ -10,6 +10,7 @@ Find two kinds of moment and keep them apart.
    - harm to others: wanting or planning to hurt someone;
    - abuse: being hit, threatened, controlled or sexually harmed, now or in the past.
    These count whether they are said directly or indirectly, in any language or mix of languages. Ordinary idioms are NOT cues ("this exam is killing me", "I'm dying to see the results"). When you are unsure whether a statement is a cue, INCLUDE it: a missed cue is far worse than an extra one.
+   For each cue, also give its strength, clear or possible, as defined in RISK CUE DEFINITION. The strength never decides whether you list a cue: list every cue you would list anyway, and when you are unsure of the strength, say clear.
    For each cue, say how the learner responded in the turns that follow:
    explored (asked about it directly or stayed with it), acknowledged (noticed it but did not explore it), missed (moved on as if it had not been said), or harmful (dismissed, shamed or argued with it).
 

@@ -363,7 +363,21 @@ category or with clear words; the Evaluator listed it and did not answer `clear:
 of the meaning, in any language); or the word list in `cue_strength.py` matches its quote. Otherwise it is
 **possible**. No signal can lower another's clear (`turn_is_clear`).
 
-- **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; the independent judge's schema is unchanged).
+**One definition (2026-11-16).** What clear and possible mean lives in one pinned Skills Store prompt,
+`debrief_risk_cue_definition` (guard; default `ally-be/src/prompts/debrief/risk_cue_definition.txt`, fallback
+`app/core/debrief/risk_cue_definition.py`). ally-be sends its live text in the run's `prompts` (it is in the
+graph's prompt codes, so a release can pin it) and to `POST /debrief-quality/judge` as `risk_cue_definition`.
+ally-ai adds it once, as a `RISK CUE DEFINITION:` block, to the Safety reader, the Writer, the Reviser, the
+Evaluator and the independent judge; the Writer's RISK CUES section, the rubric and the `clear` field's
+description point to it instead of repeating it. The Safety reader also returns `strength` per cue, by the
+definition, with recall unchanged ("when unsure, INCLUDE"; unsure strength is clear). The final strength
+(`cue_strength`) is clear when the reader says clear, the category is a clear one, or the word list matches
+(English, Hindi, Tamil, Kannada, Marathi, Malayalam; the list only raises). A cue the reader gave no strength
+reads as before. The judge (`DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION` v2) lists cues with `clear` and hard-fails
+`missed_risk_cue` only for a missed clear one; the Evaluator keeps listing every missed cue for
+`split_missed_cues`. Ask Ally's distress read uses ally-ai's default definition.
+
+- **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; since 2026-11-16 the judge's `RiskCue` carries it too).
   A missed clear cue is the `missed_risk_cue` hard fail. A missed possible cue
   drops that hard fail; the run publishes as `below_bar` and is sent to review.
 - **No debrief is held (2026-11-16):** when the best draft fails the bar for any reason (a blocking check, no score,

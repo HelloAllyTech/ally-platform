@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 from pydantic import BaseModel
 
 from app.core.debrief.cue_strength import is_clear
+from app.core.debrief.risk_cue_definition import definition_block
 from app.core.debrief.safety_reader import TranscriptTurn
 from app.core.debrief.schemas import (
     DebriefCards,
@@ -238,30 +239,18 @@ or didnt_come_up.
 - progress_note: only when a PROGRESS reading is given, one or two sentences \
 following up on past points. Otherwise leave it empty.
 
-RISK CUES. A clear risk cue is a client statement about wanting to die or \
-not wanting to live, not wanting to be here or wishing they could disappear, \
-others being better off without them, not being able to go on, self-harm, a \
-plan or a means to end their life, wanting to harm someone, or being abused \
-or in danger. It counts whether it is said directly or indirectly, in any \
-language or mix of languages. Low mood, stress, tiredness, burden, \
-loneliness, grief or guilt without any of these is not a risk cue, even when \
-the SAFETY READING lists it: do not make an important moment of it, and \
-coach it as ordinary counselling (staying with the feeling, reflecting, \
-exploring it), never as assessing risk. Hopelessness about one part of life \
-(going out, a job, an exam, a relationship) or about how things feel is not \
-a risk cue unless the client links it to dying, not wanting to live, or \
-harming themself or someone else. When a statement might be about death, \
-self-harm, harm to others or abuse and you cannot tell, treat it as a clear \
-risk cue.
+RISK CUES. Clear and possible risk cues are as defined in RISK CUE \
+DEFINITION. Only a clear risk cue is a risk cue for the cards. A possible \
+one is not, even when the SAFETY READING lists it: do not make an important \
+moment of it, and coach it as ordinary counselling (staying with the \
+feeling, reflecting, exploring it), never as assessing risk.
 
 POSSIBLE RISK CUES. When POSSIBLE RISK CUES lists turns, the safety reader \
-filed them under hopelessness, with no word of death, self-harm or a means. \
-Decide each one by the RISK CUES rules above. Treat one as a risk cue (the \
-important moment, or a line in important_moment.others) only when the \
-client's words, in context, point to wanting to die, not wanting to live or \
-be here, self-harm, harm to others or abuse, or might and you cannot tell. \
-Low mood, tiredness, burden, loneliness, grief or guilt is not a risk cue: \
-no important moment for it, and no coaching about assessing risk.
+judged them possible risk cues. Decide each one by the RISK CUE DEFINITION. \
+Treat one as a risk cue (the important moment, or a line in \
+important_moment.others) only when it is clear by that definition, including \
+when you cannot tell. Otherwise it gets no important moment and no coaching \
+about assessing risk.
 
 MISSED FEELINGS. When MISSED FEELINGS lists turns, they are moments the \
 safety reading noted as possible risk cues (low mood or hopelessness with no \
@@ -312,10 +301,12 @@ DEFAULT_REVISER_SYSTEM = """\
 You revise a debrief draft. Change ONLY the sections named in the CRITIQUE; \
 copy every other section exactly. When the critique says a risk cue is not \
 covered, add it to important_moment.others with the client's exact words. \
-Keep every rule the draft was written under: quotes exactly as in the \
-transcript, every card anchored to a real turn, no scores, no diagnosis, the \
-session's language, lead lines at most 25 words and bodies at most 60 words, \
-1 to 3 work-on-this points each with a try-saying line.
+Clear and possible risk cues are as defined in RISK CUE DEFINITION; only a \
+clear one must be covered. Keep every rule the draft was written under: \
+quotes exactly as in the transcript, every card anchored to a real turn, no \
+scores, no diagnosis, the session's language, lead lines at most 25 words \
+and bodies at most 60 words, 1 to 3 work-on-this points each with a \
+try-saying line.
 
 When FINDINGS are given, they are new evidence for the sections the critique \
 names; use them only there. They are what the analysis agents found, grouped \
@@ -707,12 +698,16 @@ async def write(
     assessment: bool = False,
     cohort: Optional[Dict[str, Any]] = None,
     findings: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    risk_cue_definition: Optional[str] = None,
 ) -> Tuple[Optional[DebriefCards], str]:
     """Write the cards. The transcript is sent so quotes can be copied exactly;
     the Writer is still told to write from the evidence map."""
     from app.core.llm_usage.tasks import LLMTask
 
-    lines = [system or DEFAULT_WRITER_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
+    lines = [system or DEFAULT_WRITER_SYSTEM, ""]
+    # The one definition of clear and possible (pinned, Skills Store).
+    lines += definition_block(risk_cue_definition)
+    lines += ["", f"SESSION LANGUAGE: {language}"]
     lines += _script_line(language)
     lines += _skill_label_line(language)
     if learner_level:
@@ -837,6 +832,7 @@ async def evaluate(
     guidance: Optional[str] = None,
     scenario_session_id: Optional[str] = None,
     history: Optional[str] = None,
+    risk_cue_definition: Optional[str] = None,
 ) -> Tuple[Optional[EvaluationOutput], str]:
     """Score a draft on the rubric, with fix notes per section.
 
@@ -853,6 +849,7 @@ async def evaluate(
         guidance=guidance,
         rubric=rubric,
         history=history,
+        risk_cue_definition=risk_cue_definition,
     )
     output, meta = await _call(
         EvaluationOutputReasoned,
@@ -892,10 +889,13 @@ async def revise(
     system: Optional[str] = None,
     scenario_session_id: Optional[str] = None,
     findings: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    risk_cue_definition: Optional[str] = None,
 ) -> Tuple[Optional[DebriefCards], str]:
     from app.core.llm_usage.tasks import LLMTask
 
-    lines = [system or DEFAULT_REVISER_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
+    lines = [system or DEFAULT_REVISER_SYSTEM, ""]
+    lines += definition_block(risk_cue_definition)
+    lines += ["", f"SESSION LANGUAGE: {language}"]
     lines += _script_line(language)
     lines += _skill_label_line(language)
     # Code-owned: the roleplay a card points to is the learner's own list.

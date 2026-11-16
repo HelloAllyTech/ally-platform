@@ -58,6 +58,7 @@ def safety_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "transcript": ctx.transcript,
         "language": ctx.language,
         "system_prompt": ctx.prompt(PROMPT_CODES["safety_reader"]),
+        "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
     }
 
 
@@ -143,6 +144,7 @@ def writer_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "learner_level": ctx.sess("learner_level"),
         "short": bool(r.get("shortForm")),
         "system_prompt": ctx.prompt(PROMPT_CODES["writer"]),
+        "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
     }
     if state.get("orchestrated"):
         out["findings"] = writer_findings(state) or None
@@ -157,6 +159,7 @@ def evaluator_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "history": state.get("history"),
         "language": ctx.language,
         "learner_level": ctx.sess("learner_level"),
+        "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
     }
 
 
@@ -205,6 +208,7 @@ def reviser_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "excerpts": excerpts(state, ctx),
         "language": ctx.language,
         "system_prompt": ctx.prompt(PROMPT_CODES["reviser"]),
+        "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
         # What the evidence top-up found (D3), for an orchestrated run only.
         **(
             {

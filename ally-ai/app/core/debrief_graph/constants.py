@@ -48,6 +48,8 @@ PROMPT_CODES = {
     "writer": "debrief_writer_system",
     "reviser": "debrief_reviser_system",
     "rubric": "debrief_quality_rubric",
+    # Pinned: the one definition of a clear and a possible risk cue.
+    "risk_cue_definition": "debrief_risk_cue_definition",
 }
 
 

@@ -124,7 +124,7 @@ export class DebriefQualityJudgeService {
     const sinceDays = opts.sinceDays ?? 90;
     const pair = {
       judgeModel: opts.judgeModel ?? 'gemini-2.5-pro',
-      judgePromptVersion: opts.judgePromptVersion ?? 'v1',
+      judgePromptVersion: opts.judgePromptVersion ?? 'v2',
     };
     const slice = async (
       s: 'language' | 'workerType' | 'sessionLength' | 'debriefSource',
@@ -212,6 +212,9 @@ export class DebriefQualityJudgeService {
     try {
       const rubric = await this.repo.fetchRubric();
       const instructions = await this.repo.fetchJudgeInstructions();
+      const riskCueDefinition = await this.repo
+        .fetchRiskCueDefinition()
+        .catch(() => null);
       const sessions = await this.repo.selectSessions({
         sinceDays,
         unjudgedForVersion,
@@ -246,6 +249,7 @@ export class DebriefQualityJudgeService {
             rubric,
             s.id,
             instructions,
+            riskCueDefinition,
           );
 
           // ally-ai answers 200 with no dimensions when the model's answer was
@@ -318,6 +322,7 @@ export class DebriefQualityJudgeService {
     rubric: string | null,
     scenarioSessionId: string,
     judgeInstructions: string | null = null,
+    riskCueDefinition: string | null = null,
   ): Promise<JudgeResult> {
     const { apiUrl, outboundApiKey } = this.config.ai;
     // Held inside the GLOBAL judge slot, shared with every other judge.
@@ -331,6 +336,7 @@ export class DebriefQualityJudgeService {
           learner_level: learnerLevel,
           rubric,
           judge_instructions: judgeInstructions,
+          risk_cue_definition: riskCueDefinition,
           scenario_session_id: scenarioSessionId,
         },
         {

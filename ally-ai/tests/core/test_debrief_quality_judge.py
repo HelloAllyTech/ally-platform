@@ -253,7 +253,7 @@ class TestEndpoint:
         assert r.status_code == 200
         body = r.json()
         assert body["dimensions"] == [] and body["hard_fails"] == []
-        assert body["judge_prompt_version"] == "v1"
+        assert body["judge_prompt_version"] == "v2"
 
     def test_the_endpoint_passes_the_store_instructions(self, client, dispatch_returns):
         calls = dispatch_returns(_output())
@@ -268,7 +268,7 @@ class TestEndpoint:
         assert r.status_code == 200
         assert calls["prompt"].endswith("LIVE INSTRUCTIONS")
         # Same text, same series: the version label does not move.
-        assert r.json()["judge_prompt_version"] == "v1"
+        assert r.json()["judge_prompt_version"] == "v2"
 
 
 class TestAgentLog:

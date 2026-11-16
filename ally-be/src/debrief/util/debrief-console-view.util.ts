@@ -235,6 +235,10 @@ export const PINNED_RULE_PROMPTS: ReadonlyArray<{
 }> = [
   { code: DEBRIEF_PROMPT_CODES.safetyReader, label: 'Safety rules' },
   {
+    code: DEBRIEF_PROMPT_CODES.riskCueDefinition,
+    label: 'Risk cue definition (clear or possible)',
+  },
+  {
     code: DEBRIEF_PROMPT_CODES.rubric,
     label: 'Rubric (the Evaluator and the judge score by it)',
   },

@@ -199,6 +199,8 @@ export const DEBRIEF_MAX_AGENTS_PER_PLAN = 10;
 
 export const DEBRIEF_PROMPT_CODES = {
   safetyReader: 'debrief_safety_reader_system',
+  /** Pinned: the one definition of a clear and a possible risk cue. */
+  riskCueDefinition: 'debrief_risk_cue_definition',
   analyst: 'debrief_analyst_system',
   progressReader: 'debrief_progress_reader_system',
   /** The progress agent (learner progress over past sessions); its step key stays `progress_reader`. */

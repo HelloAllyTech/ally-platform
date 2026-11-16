@@ -11910,6 +11910,7 @@ export const en = {
       // ally-be debrief-release.constants DEBRIEF prompt codes.
       promptNames: {
         debrief_safety_reader_system: "Safety reader's prompt",
+        debrief_risk_cue_definition: "Risk cue definition",
         debrief_analyst_system: "Analyst's prompt",
         debrief_progress_reader_system: "Progress reader's prompt",
         debrief_writer_system: "Writer's prompt",

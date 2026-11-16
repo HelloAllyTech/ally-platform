@@ -1334,9 +1334,21 @@ export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
   {
     name: 'Debrief Safety Reader',
     description:
-      "The debrief agent's mandatory safety step: finds the client's risk cues (and how the learner responded) and the learner's own distress. The step composes the transcript around this text. Pinned: change it only after the safety recall gate passes.",
+      "The debrief agent's mandatory safety step: finds the client's risk cues (and how the learner responded) and the learner's own distress. The step composes the transcript around this text, with the RISK CUE DEFINITION block; each cue also carries its strength (clear or possible). Pinned: change it only after the safety recall gate passes.",
     category: 'evaluation',
     output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/risk_cue_definition.txt */
+export const DEBRIEF_RISK_CUE_DEFINITION = definePrompt(
+  'debrief_risk_cue_definition',
+  {},
+  {
+    name: 'Debrief risk cue definition',
+    description:
+      'The one definition of a clear and a possible client risk cue, and what each means for a debrief. ally-ai adds it as a RISK CUE DEFINITION block to every Debrief call that judges risk cues: the Safety reader, the Writer, the Reviser, the Evaluator and the independent debrief-quality judge. Pinned: a change is approved by the clinical advisor or the owner.',
+    category: 'evaluation',
   },
 );
 
