@@ -131,6 +131,14 @@ disabled. To remove later:
   fine-grained token as the fallback; and the private repo
   `HelloAllyTech/bug-hunter-reports`.
 - **Read-only CloudWatch credentials** and the `signals.log_groups` mapping.
+- **The `bughunter_dashboard` role** (chunk 09) on the `bughunter` database, with its
+  own password. Migration 0007 grants it read on reports, read and insert on
+  verdicts, update of `superseded_by`/`superseded_at` only, and update of the approval
+  decision columns only. Its credentials go into ally-be's environment
+  (`BUGHUNTER_DB_*`).
+- **ally-be's network path to the `bughunter` database**, so the admin dashboard's
+  ally-be can reach it. The agent's own role must still have no access to ally-be's
+  database.
 - **Install:** the venv at `/opt/bug-hunter/venv`, the checkout at `/opt/ally-platform`,
   the units in `deploy/` and `/etc/bug-hunter/env` (root-only).
 - **Then:** `bug-hunter daily --dry-run` on the VM (the chunk's "done when"), and the

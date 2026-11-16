@@ -88,3 +88,49 @@ def test_spend_ledger_in_the_database() -> None:
     before = spend.total_for(path=led)
     spend.record(0.0123, "it", "integration test", path=led)
     assert spend.total_for(path=led) == pytest.approx(before + 0.0123)
+
+
+def test_amended_verdicts_and_report_details_in_postgres() -> None:
+    from bug_hunter.graph.approvals import PostgresApprovals
+    from bug_hunter.memory.verdicts import PostgresVerdicts, Verdict
+    from bug_hunter.reports.store import PostgresReports, Report
+
+    url = _db_or_skip()
+    applied = PostgresApprovals.migrate(url)
+    assert "0006_verdict_amend_and_report_details.sql" in applied
+    reports = PostgresReports(url)
+    rep = reports.add(
+        Report(
+            day="2026-11-16",
+            source="issue",
+            app="ally-be",
+            signal_key=f"it:{uuid.uuid4().hex[:6]}",
+            status="suggested_fix",
+            title="t",
+            run_id="run-it",
+            finding={"title": "t"},
+            repro={"test_name": "n"},
+            patch_diff="diff --git a b",
+            review={"verdict": "approve", "notes": []},
+        )
+    )
+    assert rep.finding == {"title": "t"} and rep.patch_diff.startswith("diff")
+    store = PostgresVerdicts(url)
+
+    def verdict(diagnosis, fix):
+        return Verdict(
+            run_id="run-it",
+            app="ally-be",
+            diagnosis=diagnosis,
+            fix=fix,
+            reason="r",
+            decided_by="u-1",
+            source="dashboard",
+            report_id=rep.id,
+        )
+
+    a = store.add(verdict("not_a_bug", "none"))
+    b = store.add(verdict("correct", "worked"))
+    (old,) = store.superseded_by(b.id)
+    assert old.id == a.id and old.superseded_at is not None
+    assert [x.id for x in store.unapplied() if x.report_id == rep.id] == [b.id]

@@ -26,6 +26,17 @@ SEVERITY = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 Collected = tuple[list[Candidate], dict[str, Any], list[str]]
 SourceFn = Callable[[], Collected]
 HUMAN_STATUSES = ("suggested_fix", "escalated")
+REPORT_DETAIL_FIELDS = (
+    "finding",
+    "root_cause",
+    "repro",
+    "patch_diff",
+    "review",
+    "confidence",
+    "risk_level",
+    "stop_reason",
+    "severity",
+)
 
 
 @dataclass
@@ -34,6 +45,7 @@ class RunOutcome:
     status: str
     cost_usd: float
     body_md: str  # scrubbed report (report.md + suggested-fix.md)
+    details: dict[str, Any] = field(default_factory=dict)  # Report's dashboard fields
 
 
 @dataclass
@@ -188,6 +200,7 @@ def run_daily(
             body_md=outcome.body_md,
             run_id=outcome.run_id or None,
             cost_usd=outcome.cost_usd,
+            **{k: v for k, v in outcome.details.items() if k in REPORT_DETAIL_FIELDS},
         )
         if reports_repo is not None and outcome.status in HUMAN_STATUSES:
             report.private_issue = reports_repo.post(

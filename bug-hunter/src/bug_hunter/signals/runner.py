@@ -35,6 +35,65 @@ def ref_for(c: Candidate) -> str:
     return c.ref if c.source in REF_FROM_CANDIDATE else "origin/master"
 
 
+def details_from_state(state: Any, artefacts: Path) -> dict[str, Any]:
+    """The dashboard fields of a finished run, from its state and artefacts (all
+    already scrubbed by the graph)."""
+    finding = getattr(state, "finding", None)
+    repro = getattr(state, "repro", None)
+    review = getattr(state, "review", None)
+    out: dict[str, Any] = {
+        "finding": finding.model_dump() if finding is not None else None,
+        "root_cause": getattr(state, "root_cause", None),
+        "confidence": getattr(state, "confidence", None),
+        "risk_level": getattr(state, "risk_level", None),
+        "stop_reason": getattr(state, "stop_reason", None),
+        "severity": finding.severity if finding is not None else None,
+    }
+    if repro is not None:
+        source = Path(artefacts) / "suggested-fix.md"
+        out["repro"] = {
+            "test_path": repro.test_path,
+            "test_name": repro.test_name,
+            "failure_excerpt": repro.failing_output_excerpt,
+            "source": _repro_source(source),
+        }
+    for name in ("suggested-fix.patch", "fix.patch"):
+        p = Path(artefacts) / name
+        if p.is_file():
+            out["patch_diff"] = p.read_text(encoding="utf-8")
+            break
+    if review is not None:
+        out["review"] = {
+            "verdict": review.verdict,
+            "notes": list(review.notes) + list(review.issues),
+            "counterexamples": [
+                {
+                    "name": c.name,
+                    "claim": c.claim,
+                    "status": c.status,
+                    "dispute_reason": c.dispute_reason,
+                }
+                for c in getattr(state, "counterexamples", [])
+            ],
+            "disputed": bool(getattr(state, "disputed", False)),
+        }
+    return out
+
+
+def _repro_source(suggested_fix_md: Path) -> str | None:
+    """The failing test's source as the suggested-fix report printed it."""
+    if not suggested_fix_md.is_file():
+        return None
+    text = suggested_fix_md.read_text(encoding="utf-8")
+    start = text.find("## Verified failing test")
+    end = text.find("## Suggested patch")
+    if start < 0:
+        return None
+    block = text[start : end if end > start else None]
+    fences = block.split("```")
+    return fences[-2].strip() if len(fences) >= 3 else None
+
+
 def human_only_outcome(c: Candidate) -> RunOutcome:
     return RunOutcome(
         run_id="",
@@ -45,6 +104,16 @@ def human_only_outcome(c: Candidate) -> RunOutcome:
             "crisis detection, guardrails or safety escalation. The bug hunter does "
             "not investigate or fix it automatically."
         ),
+        details={
+            "finding": {
+                "title": c.title,
+                "hypothesis": c.summary[:2000],
+                "evidence": [],
+                "files": [],
+            },
+            "severity": c.severity_hint,
+            "stop_reason": "routed to a human: safety-related",
+        },
     )
 
 
@@ -68,6 +137,7 @@ def make_start_run(
             status=state.status,
             cost_usd=float(state.budget_used.cost_usd),
             body_md=body,
+            details=details_from_state(state, Path(artefacts)),
         )
 
     return start_run

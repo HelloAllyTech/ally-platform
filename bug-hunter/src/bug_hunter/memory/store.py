@@ -43,6 +43,7 @@ NOT_TEXT = {
     "finding",  # scrubbed field by field in scrub_record
     "key",
     "sources",
+    "source_verdicts",
 }
 _WORD = re.compile(r"[a-z0-9_]{3,}")
 

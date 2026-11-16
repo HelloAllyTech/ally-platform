@@ -29,6 +29,16 @@ class Report:
     run_id: str | None = None
     cost_usd: float = 0.0
     private_issue: str | None = None
+    # what the dashboard shows (chunk 09); all scrubbed by the bug hunter
+    finding: dict[str, Any] | None = None
+    root_cause: str | None = None
+    repro: dict[str, Any] | None = None
+    patch_diff: str | None = None
+    review: dict[str, Any] | None = None
+    confidence: str | None = None
+    risk_level: str | None = None
+    stop_reason: str | None = None
+    severity: str | None = None
     id: int | None = None
     created_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -71,7 +81,17 @@ class PostgresReports:
         "run_id",
         "cost_usd",
         "private_issue",
+        "finding",
+        "root_cause",
+        "repro",
+        "patch_diff",
+        "review",
+        "confidence",
+        "risk_level",
+        "stop_reason",
+        "severity",
     )
+    JSON_COLS = ("finding", "repro", "review")
 
     def __init__(self, url: str):
         from psycopg import Connection
@@ -88,7 +108,11 @@ class PostgresReports:
         return Report(**data)
 
     def add(self, report: Report) -> Report:
+        from psycopg.types.json import Jsonb
+
         d = asdict(report)
+        for col in self.JSON_COLS:
+            d[col] = Jsonb(d[col]) if d[col] is not None else None
         row = self.conn.execute(
             f"INSERT INTO bughunter.reports ({', '.join(self.COLS)}) VALUES "
             f"({', '.join('%(' + c + ')s' for c in self.COLS)}) RETURNING *",

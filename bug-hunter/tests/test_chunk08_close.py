@@ -100,3 +100,48 @@ def test_deploy_units_share_one_lock_and_never_use_actions() -> None:
         assert "EnvironmentFile=/etc/bug-hunter/env" in units[name]
     assert "03:30:00 Asia/Kolkata" in units["bug-hunter-daily.timer"]
     assert "--live" not in "".join(units.values())  # dry run until the rollout
+
+
+def test_report_details_come_from_the_run(config, tmp_path) -> None:
+    import subprocess
+
+    from bug_hunter.signals.runner import details_from_state
+    from tests.test_graph_chunk06 import EDIT_FIX, RUN_REPRO, SUBMIT_FIX, _deps, _run
+
+    root = tmp_path / "wt"
+    (root / "ally-be/src").mkdir(parents=True)
+    (root / "ally-be/package-lock.json").write_text("{}")
+    (root / "ally-be/src/x.ts").write_text(
+        "export const x = () => {\n  return 0; // bug\n};\n"
+    )
+    for args in (["init", "-q", "-b", "master"], ["add", "."], ["commit", "-qm", "i"]):
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        )
+    deps = _deps(
+        config,
+        root,
+        tmp_path,
+        [EDIT_FIX, RUN_REPRO, SUBMIT_FIX],
+        output_mode="suggested_fix",
+    )
+    _, state = _run(deps)
+    assert state.status == "suggested_fix"
+    d = details_from_state(state, tmp_path / "artefacts")
+    assert d["finding"]["title"] == "x returns 0" and d["severity"] == "medium"
+    assert d["repro"]["test_name"] == "x returns 3"
+    assert d["repro"]["source"] == "tests src/x.ts"
+    assert d["patch_diff"].startswith("diff --git")
+    assert d["review"]["verdict"] == "approve" and d["review"]["disputed"] is False
+    assert d["risk_level"] == "low"
+
+
+def test_human_only_reports_carry_their_finding() -> None:
+    from bug_hunter.signals.runner import human_only_outcome
+
+    out = human_only_outcome(cand("commit_sweep", human_only=True))
+    assert out.details["finding"]["title"] == "title"
+    assert out.details["stop_reason"].startswith("routed to a human")

@@ -138,10 +138,17 @@ def apply_verdict(
     # the run's bug record carries the verdict
     found = memory.get(bug_id(run.run_id))
     bug = found[1] if found else bug_record_for(run, read)
+    vid = verdict.id
+
+    def tag(record):
+        if vid is not None and vid not in record.source_verdicts:
+            record.source_verdicts = [*record.source_verdicts, vid]
+        return record
+
     if bug is not None:
         bug.diagnosis, bug.fix_verdict = verdict.diagnosis, verdict.fix
         bug.verdict_reason = verdict.reason
-        written.append(memory.put("bugs", bug).id)
+        written.append(memory.put("bugs", tag(bug)).id)
 
     if verdict.diagnosis == "not_a_bug" and f:
         refs = line_refs(f.get("evidence") or [], files, run.app_path)
@@ -157,7 +164,7 @@ def apply_verdict(
             source_run=run.run_id,
             fingerprints=fingerprint(refs, read),
         )
-        written.append(memory.put("false_alarms", record).id)
+        written.append(memory.put("false_alarms", tag(record)).id)
     elif verdict.diagnosis == "wrong":
         theory = f"{title}: {f.get('hypothesis', '')[:300]}"
         if run.root_cause:
@@ -174,7 +181,7 @@ def apply_verdict(
             files=files,
             source_run=run.run_id,
         )
-        written.append(memory.put("wrong_theories", record).id)
+        written.append(memory.put("wrong_theories", tag(record)).id)
 
     if verdict.fix in ("wrong", "needed_edits"):
         changed = [repo_path(p, run.app_path) for p in run.patch_files] or files
@@ -197,11 +204,54 @@ def apply_verdict(
                     source_run=run.run_id,
                     reasons=[verdict.reason],
                 )
-            written.append(memory.put("fragile_areas", area).id)
+            written.append(memory.put("fragile_areas", tag(area)).id)
         written.append(add_convention_candidate(memory, app, verdict, run.run_id))
 
     written.append(update_run_stats(memory, verdict, run))
     return written
+
+
+def retract_verdict(memory: Memory, verdict: Verdict) -> list[str]:
+    """Undo what an amended verdict taught (user, 2026-11-16): records it created are
+    deleted; records it only added to lose its contribution (and are deleted when
+    nothing else supports them); run stats are decremented. Returns touched ids."""
+    vid = verdict.id
+    touched: list[str] = []
+    if vid is None:
+        return touched
+    for kind, record in memory.list():
+        if vid not in record.source_verdicts:
+            continue
+        others = [v for v in record.source_verdicts if v != vid]
+        if kind in ("false_alarms", "wrong_theories"):
+            memory.delete(record.id)
+        elif kind in ("fragile_areas", "conventions"):
+            record.count -= 1
+            if kind == "fragile_areas" and verdict.reason in record.reasons:
+                record.reasons.remove(verdict.reason)
+            if record.count <= 0 or not others:
+                memory.delete(record.id)
+                touched.append(record.id)
+                continue
+            record.source_verdicts = others
+            memory.put(kind, record)
+        elif kind == "bugs":
+            record.diagnosis = record.fix_verdict = None
+            record.verdict_reason = ""
+            record.source_verdicts = others
+            memory.put(kind, record)
+        elif kind == "run_stats":
+            record.diagnoses = max(0, record.diagnoses - 1)
+            record.diagnosis_correct -= verdict.diagnosis == "correct"
+            record.not_a_bug -= verdict.diagnosis == "not_a_bug"
+            if verdict.fix != "none":
+                record.fixes = max(0, record.fixes - 1)
+                record.fix_worked -= verdict.fix == "worked"
+                record.fix_needed_edits -= verdict.fix == "needed_edits"
+            record.source_verdicts = others
+            memory.put(kind, record)
+        touched.append(record.id)
+    return touched
 
 
 def add_convention_candidate(
@@ -213,6 +263,8 @@ def add_convention_candidate(
         if overlap(words(text), words(existing.text)) >= CONVENTION_SIMILARITY:
             existing.count += 1
             existing.sources = (existing.sources + [run_id])[-20:]
+            if verdict.id is not None:
+                existing.source_verdicts = [*existing.source_verdicts, verdict.id]
             return memory.put("conventions", existing).id
     record = ConventionRecord(
         id=new_id("conventions"),
@@ -220,6 +272,7 @@ def add_convention_candidate(
         text=text,
         source_run=run_id,
         sources=[run_id],
+        source_verdicts=[verdict.id] if verdict.id is not None else [],
     )
     return memory.put("conventions", record).id
 
@@ -250,6 +303,8 @@ def update_run_stats(memory: Memory, verdict: Verdict, run: RunSnapshot) -> str:
             id=new_id("run_stats"), app="global", key=key, signature=key, text=key
         )
     )
+    if verdict.id is not None:
+        stats.source_verdicts = [*stats.source_verdicts, verdict.id]
     stats.diagnoses += 1
     stats.diagnosis_correct += verdict.diagnosis == "correct"
     stats.not_a_bug += verdict.diagnosis == "not_a_bug"
@@ -361,6 +416,21 @@ class GitHubLabelFeedback:
         return out
 
 
+def _predecessors(store: VerdictStore, verdict: Verdict) -> list[Verdict]:
+    """Every verdict this one replaced, directly or through earlier amendments."""
+    out: list[Verdict] = []
+    todo = [verdict]
+    while todo:
+        current = todo.pop()
+        if current.id is None:
+            continue
+        for old in store.superseded_by(current.id):
+            if all(o.id != old.id for o in out):
+                out.append(old)
+                todo.append(old)
+    return out
+
+
 def run_feedback(
     memory: Memory,
     verdicts: VerdictStore,
@@ -375,6 +445,16 @@ def run_feedback(
             verdicts.add(v)
     done: list[tuple[Verdict, list[str]]] = []
     for v in verdicts.unapplied():
+        # an amendment: first take back what the verdicts it replaced taught
+        for old in _predecessors(verdicts, v):
+            if old.applied_at and not old.retracted_at and old.id is not None:
+                retract_verdict(memory, old)
+                verdicts.mark_retracted(old.id)
+        if not v.run_id:  # a human-only escalation: no run to learn from
+            if v.id is not None:
+                verdicts.mark_applied(v.id)
+            done.append((v, []))
+            continue
         run = load(v.run_id)
         ids = apply_verdict(memory, v, run, reader_for(run))
         if v.id is not None:

@@ -61,6 +61,9 @@ class Record(BaseModel):
     files: list[str] = Field(default_factory=list)
     signature: str = ""  # normalised error/finding signature for exact lookup
     source_run: str = ""
+    # the verdicts that created or changed this record, so an amended verdict's
+    # contribution can be retracted (chunk 09)
+    source_verdicts: list[int] = Field(default_factory=list)
     created_at: str = Field(default_factory=now)
     last_used_at: str | None = None
 
