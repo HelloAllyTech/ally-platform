@@ -221,35 +221,77 @@ export class ListDefinitionsService {
   }
 
   /** Soft delete: its records stay, and it can be restored for 30 days if its key is still free. */
+  /**
+   * Delete a list (restorable for 30 days). A list other live lists link to (Slots, from
+   * Appointments) goes only `withLinked`: then every list that links to it, and every list linking
+   * to those, goes with it in the same transaction (chunk 8a), so no list is left pointing at
+   * nothing. Without it, the delete is refused with the linking lists' names.
+   */
   async deleteList(
     chatbotId: string,
     key: string,
-  ): Promise<ListDefinitionView> {
+    options: { withLinked?: boolean } = {},
+  ): Promise<
+    ListDefinitionView & {
+      also_deleted: { id: string; key: string; name: string }[];
+    }
+  > {
     return this.dataSource.transaction(async (m) => {
       const list = await this.mustLoad(m, chatbotId, key, true);
-      // A list another live list links to can't go (chunk 8a): Appointments' slots would point at
-      // nothing, and booking would break.
-      const users = (await m.query(
-        `SELECT DISTINCT c.name FROM collections c
-           JOIN collection_fields f ON f.collection_id = c.id
-          WHERE c.chatbot_id = $1 AND c.deleted_at IS NULL AND c.id <> $2
-            AND f.archived_at IS NULL AND f.type = 'relation' AND f.options->>'to' = $3
-          ORDER BY c.name`,
-        [chatbotId, list.collection.id, list.collection.key],
-      )) as { name: string }[];
-      if (users.length) {
-        throw refuse.listInUse(users.map((u) => u.name).join(' and '));
+      const linked = await this.linkingLists(m, chatbotId, list.collection.key);
+      if (linked.length && !options.withLinked) {
+        throw refuse.listInUse(
+          linked
+            .filter((l) => l.via === list.collection.key)
+            .map((l) => l.name)
+            .join(' and '),
+        );
       }
-      await m.update(
-        Collection,
-        { id: list.collection.id },
-        { deletedAt: new Date() },
-      );
-      return this.view(
-        m,
-        (await loadListById(m, chatbotId, list.collection.id))!,
-      );
+      const now = new Date();
+      for (const id of [list.collection.id, ...linked.map((l) => l.id)]) {
+        await m.update(Collection, { id }, { deletedAt: now });
+      }
+      return {
+        ...(await this.view(
+          m,
+          (await loadListById(m, chatbotId, list.collection.id))!,
+        )),
+        also_deleted: linked.map(({ id, key: k, name }) => ({
+          id,
+          key: k,
+          name,
+        })),
+      };
     });
+  }
+
+  /** Every live list that links to `key`, directly or through another, nearest first. */
+  private async linkingLists(
+    m: EntityManager,
+    chatbotId: string,
+    key: string,
+  ): Promise<{ id: string; key: string; name: string; via: string }[]> {
+    const found: { id: string; key: string; name: string; via: string }[] = [];
+    const queue = [key];
+    const seen = new Set([key]);
+    while (queue.length) {
+      const target = queue.shift()!;
+      const rows = (await m.query(
+        `SELECT DISTINCT c.id, c.key, c.name FROM collections c
+           JOIN collection_fields f ON f.collection_id = c.id
+          WHERE c.chatbot_id = $1 AND c.deleted_at IS NULL
+            AND f.archived_at IS NULL AND f.type = 'relation' AND f.options->>'to' = $2
+          ORDER BY c.name`,
+        [chatbotId, target],
+      )) as { id: string; key: string; name: string }[];
+      for (const row of rows) {
+        if (seen.has(row.key)) continue;
+        seen.add(row.key);
+        found.push({ ...row, via: target });
+        queue.push(row.key);
+      }
+    }
+    return found;
   }
 
   async restoreList(

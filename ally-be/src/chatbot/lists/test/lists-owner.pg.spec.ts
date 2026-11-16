@@ -215,7 +215,7 @@ describePg('Lists, the owner’s section (Postgres)', () => {
     });
   });
 
-  it("won't delete a list another list links to, until that one goes", async () => {
+  it('deletes a list another links to only with them, in one go; Undo brings both back', async () => {
     await owner.install(await chatbot(), 'appointments');
     const refused = await refusal(definitions.deleteList(bot, 'slots'));
     expect(refused).toMatchObject({
@@ -223,9 +223,29 @@ describePg('Lists, the owner’s section (Postgres)', () => {
       message:
         'Appointments links to this list. Delete Appointments first, or remove that detail.',
     });
-    await definitions.deleteList(bot, 'appointments');
-    const deleted = await definitions.deleteList(bot, 'slots');
+    const deleted = await definitions.deleteList(bot, 'slots', {
+      withLinked: true,
+    });
     expect(deleted.deleted_at).toBeTruthy();
+    expect(deleted.also_deleted.map((l) => l.key)).toEqual(['appointments']);
+    expect(
+      (await definitions.listLists(bot)).filter((l) => !l.deleted_at),
+    ).toEqual([]);
+
+    await definitions.restoreList(bot, deleted.id);
+    await definitions.restoreList(bot, deleted.also_deleted[0].id);
+    expect(
+      (await definitions.listLists(bot))
+        .filter((l) => !l.deleted_at)
+        .map((l) => l.key)
+        .sort(),
+    ).toEqual(['appointments', 'slots']);
+  });
+
+  it('deletes a list nothing links to straight away', async () => {
+    await owner.install(await chatbot(), 'appointments');
+    const deleted = await definitions.deleteList(bot, 'appointments');
+    expect(deleted.also_deleted).toEqual([]);
   });
 
   describe('Repeat weekly until', () => {
@@ -373,6 +393,60 @@ describePg('Lists, the owner’s section (Postgres)', () => {
         NOW,
       );
       expect(ok).toMatchObject({ count: 35, skipped: 0 });
+    });
+
+    it('adds every time once for each table, in one go; a time already there is skipped for that table only', async () => {
+      await owner.install(await chatbot(), 'table_reservations');
+      const dry = await owner.repeat(
+        await chatbot(),
+        'tables',
+        OWNER,
+        {
+          ...week,
+          each: { field: 'table', values: ['T1', 'T2', ' T2 ', 'T3'] },
+          dry_run: true,
+        },
+        NOW,
+      );
+      expect(dry).toMatchObject({ count: 105, skipped: 0 });
+      expect(dry.first.slice(0, 3)).toEqual([
+        'Mon 16 Nov 2026, 10:00 · T1',
+        'Mon 16 Nov 2026, 10:00 · T2',
+        'Mon 16 Nov 2026, 10:00 · T3',
+      ]);
+
+      await records.create(bot, 'tables', OWNER, {
+        starts_at: '2026-11-16T04:30:00Z',
+        table: 'T2',
+      });
+      const done = await owner.repeat(
+        await chatbot(),
+        'tables',
+        OWNER,
+        { ...week, each: { field: 'table', values: ['T1', 'T2', 'T3'] } },
+        NOW,
+      );
+      expect(done).toMatchObject({ count: 104, skipped: 1, dry_run: false });
+    });
+
+    it("refuses each on a detail that isn't text or a choice, or with no values", async () => {
+      await owner.install(await chatbot(), 'table_reservations');
+      for (const each of [
+        { field: 'seats', values: ['2'] },
+        { field: 'table', values: [] },
+      ]) {
+        expect(
+          await refusal(
+            owner.repeat(
+              await chatbot(),
+              'tables',
+              OWNER,
+              { ...week, each, dry_run: true },
+              NOW,
+            ),
+          ),
+        ).toMatchObject({ code: 'invalid_value' });
+      }
     });
 
     it('leaves out times already past', async () => {

@@ -354,6 +354,15 @@ export class RepeatListRecordsDto {
   until!: string;
 
   @ApiPropertyOptional({
+    example: { field: 'table', values: ['T1', 'T2', 'T3'] },
+    description:
+      'Chunk 8a: one detail with several values; every time is added once for each (at most 20)',
+  })
+  @IsOptional()
+  @IsObject()
+  each?: { field: string; values: string[] };
+
+  @ApiPropertyOptional({
     example: { practitioner: 'Dr Mehta' },
     description: 'Other details for every entry it adds',
   })

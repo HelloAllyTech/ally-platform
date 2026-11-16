@@ -244,16 +244,23 @@ export class ListController {
 
   @Delete(':id/lists/:key')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
-  @ApiOperation({ summary: 'Delete a list (restorable for 30 days)' })
+  @ApiOperation({
+    summary: 'Delete a list (restorable for 30 days)',
+    description:
+      'A list other lists link to is refused (`in_use`) unless `with_linked=true`: then the lists linking to it go too, in one transaction, and `also_deleted` names them (restore each by id).',
+  })
   async deleteList(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('key') key: string,
+    @Query('with_linked') withLinked?: string,
   ) {
     const { chatbot } = await this.access.assert(id, EDITOR);
-    return this.owner.decorate(
-      chatbot,
-      await this.definitions.deleteList(id, key),
+    const { also_deleted, ...view } = await this.definitions.deleteList(
+      id,
+      key,
+      { withLinked: withLinked === 'true' },
     );
+    return { ...(await this.owner.decorate(chatbot, view)), also_deleted };
   }
 
   @Post(':id/lists/:listId/restore')

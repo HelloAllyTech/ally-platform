@@ -60,6 +60,11 @@ export interface RepeatInput {
   from?: string;
   until: string;
   values?: Record<string, unknown>;
+  /**
+   * One detail with several values (chunk 8a): every time is added once for each ("T1", "T2",
+   * "T3"), in one go. A text or choice detail; at most 20 values.
+   */
+  each?: { field: string; values: string[] };
   dry_run?: boolean;
 }
 
@@ -493,8 +498,11 @@ export class ListOwnerService {
     // needed detail must be given here or have a default, or the batch would fail part way.
     const values = { ...(input.values ?? {}) };
     delete values[field.key];
+    // Several values for one detail (chunk 8a): checked, then one batch for each.
+    const each = input.each ? this.eachOf(list, field.key, input.each) : null;
+    if (each) delete values[each.field];
     for (const f of list.fields) {
-      if (f.key === field.key || !f.required) continue;
+      if (f.key === field.key || f.key === each?.field || !f.required) continue;
       const given = values[f.key];
       const blank = given === undefined || given === null || given === '';
       if (blank && (f.default === undefined || f.default === null)) {
@@ -505,15 +513,16 @@ export class ListOwnerService {
     // 10:00 isn't skipped because Dr Mehta has 10:00. Only text and choice details take part
     // (practitioner, table, teacher): numbers, durations and yes/no don't, so a 50-minute
     // batch still skips Dr Mehta's 30-minute 10:00.
-    const same = Object.fromEntries(
-      Object.entries(values).filter(
-        ([k, v]) =>
-          v !== null &&
-          v !== '' &&
-          typeof v === 'string' &&
-          SAME_TYPES.has(list.field(k)?.type as ListFieldType),
-      ),
-    );
+    const sameOf = (variant: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(variant).filter(
+          ([k, v]) =>
+            v !== null &&
+            v !== '' &&
+            typeof v === 'string' &&
+            SAME_TYPES.has(list.field(k)?.type as ListFieldType),
+        ),
+      );
     const times: { value: string; at: number }[] = [];
     for (
       let day = from, i = 0;
@@ -537,38 +546,63 @@ export class ListOwnerService {
       }
     }
 
+    // One set of details per batch: the given ones, or one per value of `each`.
+    const variants: {
+      values: Record<string, unknown>;
+      label: string | null;
+    }[] = each
+      ? each.values.map((v) => ({
+          values: { ...values, [each.field]: v },
+          label: v,
+        }))
+      : [{ values, label: null }];
+    type Planned = {
+      value: string;
+      at: number;
+      values: Record<string, unknown>;
+      label: string | null;
+    };
     const plan = async (m: EntityManager) => {
-      if (!times.length) return { add: [], skipped: 0 };
-      const rows: { at: Date }[] = await m.query(
-        `SELECT DISTINCT (data->>$2)::timestamptz AS at FROM collection_records
-          WHERE collection_id = $1 AND deleted_at IS NULL AND data ? $2
-            AND (data->>$2)::timestamptz BETWEEN $3 AND $4
-            AND data @> $5::jsonb`,
-        [
-          list.collection.id,
-          field.key,
-          new Date(times[0].at).toISOString(),
-          new Date(times[times.length - 1].at).toISOString(),
-          JSON.stringify(same),
-        ],
-      );
-      const taken = new Set(rows.map((r) => new Date(r.at).getTime()));
-      const add = times.filter((t) => !taken.has(t.at));
+      if (!times.length) return { add: [] as Planned[], skipped: 0 };
+      const add: Planned[] = [];
+      let skipped = 0;
+      for (const variant of variants) {
+        const rows: { at: Date }[] = await m.query(
+          `SELECT DISTINCT (data->>$2)::timestamptz AS at FROM collection_records
+            WHERE collection_id = $1 AND deleted_at IS NULL AND data ? $2
+              AND (data->>$2)::timestamptz BETWEEN $3 AND $4
+              AND data @> $5::jsonb`,
+          [
+            list.collection.id,
+            field.key,
+            new Date(times[0].at).toISOString(),
+            new Date(times[times.length - 1].at).toISOString(),
+            JSON.stringify(sameOf(variant.values)),
+          ],
+        );
+        const taken = new Set(rows.map((r) => new Date(r.at).getTime()));
+        for (const time of times) {
+          if (taken.has(time.at)) skipped++;
+          else
+            add.push({ ...time, values: variant.values, label: variant.label });
+        }
+      }
       if (add.length > REPEAT_MAX) {
         throw refuse.limitExceeded(REPEAT_LIMIT_WORDS);
       }
-      return { add, skipped: times.length - add.length };
+      // In time order, so the first few read as the week fills.
+      add.sort((a, b) => a.at - b.at);
+      return { add, skipped };
     };
-    const result = (
-      add: { value: string }[],
-      skipped: number,
-      dry: boolean,
-    ) => ({
+    const result = (add: Planned[], skipped: number, dry: boolean) => ({
       count: add.length,
       skipped,
       first: add
         .slice(0, REPEAT_FIRST)
-        .map((t) => displayValue(field, t.value)),
+        .map(
+          (t) =>
+            displayValue(field, t.value) + (t.label ? ` · ${t.label}` : ''),
+        ),
       dry_run: dry,
     });
 
@@ -587,11 +621,52 @@ export class ListOwnerService {
           chatbot.id,
           key,
           actor,
-          { ...values, [field.key]: time.value },
+          { ...time.values, [field.key]: time.value },
           { manager: m, lockMode: 'list' },
         );
       }
       return result(add, skipped, false);
     });
+  }
+
+  /** `each` checked (chunk 8a): a live text or choice detail, 1–20 distinct values. */
+  private eachOf(
+    list: NonNullable<Awaited<ReturnType<typeof loadList>>>,
+    dateField: string,
+    each: { field: string; values: string[] },
+  ): { field: string; values: string[] } {
+    const target = list.field(each.field);
+    if (
+      !target ||
+      target.key === dateField ||
+      !SAME_TYPES.has(target.type as ListFieldType)
+    ) {
+      throw refuse.invalidValue(
+        each.field,
+        target?.label ?? 'That detail',
+        'it should be a text or choice detail',
+      );
+    }
+    const values = [
+      ...new Set(
+        (Array.isArray(each.values) ? each.values : [])
+          .map((v) =>
+            typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '',
+          )
+          .filter(Boolean),
+      ),
+    ];
+    if (
+      !values.length ||
+      values.length > 20 ||
+      values.some((v) => v.length > 80)
+    ) {
+      throw refuse.invalidValue(
+        each.field,
+        target.label,
+        'give 1 to 20, each up to 80 characters',
+      );
+    }
+    return { field: target.key, values };
   }
 }

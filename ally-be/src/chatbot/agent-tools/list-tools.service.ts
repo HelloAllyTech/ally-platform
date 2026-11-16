@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ListDefinitionsService } from '../lists/list-definitions.service';
 import type { ListDefinitionView } from '../lists/list-definitions.service';
+import { ListFieldType } from '../enum/list.enum';
 import { relationTarget } from '../lists/list-fields';
 import { ListRecordsService } from '../lists/list-records.service';
 import { LIST_COPY, ListRefusalException } from '../lists/list-refusals';
@@ -95,19 +96,63 @@ export class ListToolsService {
     const personList = Boolean(list.settings?.person_field);
     try {
       if (def.kind === 'find') {
-        const found = await this.records.query(
+        let found = await this.records.query(
           ctx.chatbotId,
           list.key,
           actor,
           toListQuery(list, input),
           scope,
         );
+        // A number with an upper bound ("seats 2 to 2") found nothing: read it as "at
+        // least" (chunk 8a), since a table for 3 seats 2. Only when something comes back.
+        const atLeast = withoutUpperBounds(list, input);
+        if (found.total === 0 && !found.aggregate && atLeast) {
+          const roomier = await this.records.query(
+            ctx.chatbotId,
+            list.key,
+            actor,
+            toListQuery(list, atLeast),
+            scope,
+          );
+          if (roomier.total > 0) found = roomier;
+        }
+        // Nothing at the time asked for (chunk 8a): the nearest times there are, so the agent
+        // offers them instead of passing the booking to the team.
+        // When nothing near then fits the other details either (a party of 5, every table
+        // seating 3), the nearest at that time without them, so the agent can say why.
+        let nearest: ListRecordView[] = [];
+        let loosened = false;
+        if (found.total === 0 && !found.aggregate) {
+          nearest = await this.nearest(
+            ctx.chatbotId,
+            list,
+            actor,
+            atLeast ?? input,
+            scope,
+          );
+          if (!nearest.length) {
+            nearest = await this.nearest(
+              ctx.chatbotId,
+              list,
+              actor,
+              atLeast ?? input,
+              scope,
+              true,
+            );
+            loosened = nearest.length > 0;
+          }
+        }
         return {
           ok: true,
           result: {
             list: about,
-            passages: found.records.map((r) => recordPassage(list, r)),
+            passages: (nearest.length ? nearest : found.records).map((r) =>
+              recordPassage(list, r),
+            ),
             total: found.total,
+            ...(nearest.length
+              ? { nearest: loosened ? 'other_details' : true }
+              : {}),
             ...(found.aggregate ? { aggregate: found.aggregate } : {}),
           },
         };
@@ -165,6 +210,78 @@ export class ListToolsService {
     }
   }
   /**
+   * The entries nearest a time asked for, when none matches it exactly (chunk 8a). Only for a
+   * find with a time (`starts_at_at`, `_from` or `_to` on a date-and-time detail). The other
+   * filters stay (open, seats) except text matches ("window" may be no table's name). It looks
+   * from 12 hours before (never before now) to 7 days after, and keeps the 3 closest, in order.
+   */
+  private async nearest(
+    chatbotId: string,
+    list: ListDefinitionView,
+    actor: ListActor,
+    input: Record<string, string | number>,
+    scope: { contactId: string | null },
+    /** Only the time: the other details left out, open kept (chunk 8a). */
+    timeOnly = false,
+  ): Promise<ListRecordView[]> {
+    const field = list.fields.find(
+      (f) =>
+        !f.archived_at &&
+        f.type === ListFieldType.DATETIME &&
+        ['at', 'from', 'to'].some(
+          (op) => input[`${f.key}_${op}`] !== undefined,
+        ),
+    );
+    if (!field) return [];
+    const asked = Date.parse(
+      String(
+        input[`${field.key}_at`] ??
+          input[`${field.key}_from`] ??
+          input[`${field.key}_to`],
+      ),
+    );
+    if (Number.isNaN(asked)) return [];
+    const HOUR = 3_600_000;
+    const from = new Date(Math.max(Date.now(), asked - 12 * HOUR));
+    const to = new Date(asked + 7 * 24 * HOUR);
+    if (from >= to) return [];
+    const rest = Object.fromEntries(
+      Object.entries(input).filter(
+        ([k]) =>
+          !k.endsWith('_contains') &&
+          !k.startsWith(`${field.key}_`) &&
+          (!timeOnly || k === 'open') &&
+          k !== 'limit' &&
+          k !== 'sort',
+      ),
+    );
+    const query = toListQuery(list, {
+      ...rest,
+      [`${field.key}_from`]: from.toISOString(),
+      [`${field.key}_to`]: to.toISOString(),
+      sort: field.key,
+      limit: NEAREST_LOOK,
+    });
+    try {
+      const { records } = await this.records.query(
+        chatbotId,
+        list.key,
+        actor,
+        query,
+        scope,
+      );
+      const at = (r: ListRecordView) => Date.parse(String(r.data[field.key]));
+      return records
+        .filter((r) => !Number.isNaN(at(r)))
+        .sort((a, b) => Math.abs(at(a) - asked) - Math.abs(at(b) - asked))
+        .slice(0, NEAREST_MAX)
+        .sort((a, b) => at(a) - at(b));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * Preview knows no person, but Try it must still show what a booking would do (chunk 6): a
    * stand-in contact is made inside a transaction, the record is created for them with every rule
    * checked, and the whole transaction is rolled back. Nothing is saved, not even the stand-in.
@@ -202,7 +319,33 @@ export class ListToolsService {
   }
 }
 
+/**
+ * The find's input with the upper bound of each number detail that also has a lower
+ * one dropped ("seats_from 2, seats_to 2" → "seats_from 2"), or null when there's none.
+ */
+export function withoutUpperBounds(
+  list: ListDefinitionView,
+  input: Record<string, string | number>,
+): Record<string, string | number> | null {
+  const drop = list.fields
+    .filter(
+      (f) =>
+        !f.archived_at &&
+        f.type === ListFieldType.NUMBER &&
+        input[`${f.key}_to`] !== undefined &&
+        input[`${f.key}_from`] !== undefined,
+    )
+    .map((f) => `${f.key}_to`);
+  if (!drop.length) return null;
+  return Object.fromEntries(
+    Object.entries(input).filter(([k]) => !drop.includes(k)),
+  );
+}
+
 const PREVIEW_ROLLBACK = new Error('preview: roll back');
+/** How many entries the nearest look reads, and how many it offers. */
+const NEAREST_LOOK = 50;
+const NEAREST_MAX = 3;
 
 /**
  * A refusal the agent reads: the code (stored as the run's error code), §26's message, and any

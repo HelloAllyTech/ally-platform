@@ -468,3 +468,31 @@ describe('today', () => {
     );
   });
 });
+
+describe('at least, for a number range that found nothing (8a)', () => {
+  // Imported here: the service file pulls in Nest only for its class.
+  const { withoutUpperBounds } = require('../list-tools.service');
+  const tables = list('tables', 'Tables', [
+    field('starts_at', ListFieldType.DATETIME),
+    field('seats', ListFieldType.NUMBER),
+    field('duration', ListFieldType.DURATION),
+  ]);
+
+  it('drops the upper bound of a number with a lower one: a table for 3 seats 2', () => {
+    expect(
+      withoutUpperBounds(tables, {
+        starts_at_at: '2026-11-17T13:00:00+05:30',
+        seats_from: '2',
+        seats_to: '2',
+      }),
+    ).toEqual({ starts_at_at: '2026-11-17T13:00:00+05:30', seats_from: '2' });
+  });
+
+  it('leaves a lone upper bound, a duration, or no range alone', () => {
+    expect(withoutUpperBounds(tables, { seats_to: '4' })).toBeNull();
+    expect(
+      withoutUpperBounds(tables, { duration_from: '30', duration_to: '30' }),
+    ).toBeNull();
+    expect(withoutUpperBounds(tables, {})).toBeNull();
+  });
+});

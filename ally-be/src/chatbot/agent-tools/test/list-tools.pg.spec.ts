@@ -181,6 +181,59 @@ describePg('List tools through the gateway (Postgres)', () => {
     }
   });
 
+  it('offers the nearest times when none is at the time asked for, closest first in time order', async () => {
+    const rows: { id: string; starts_at: string }[] = await ds.query(
+      `SELECT r.id, r.data->>'starts_at' AS starts_at FROM collection_records r
+         JOIN collections c ON c.id = r.collection_id
+        WHERE c.chatbot_id = $1 AND c.key = 'slots' AND r.deleted_at IS NULL
+          AND (r.data->>'starts_at')::timestamptz > now()
+        ORDER BY (r.data->>'starts_at')::timestamptz`,
+      [bot],
+    );
+    // Between two slots, a minute after the 5th: nothing there, so the nearest three.
+    const asked = new Date(new Date(rows[4].starts_at).getTime() + 60_000);
+    const found = await call('find_slots', {
+      starts_at_at: asked.toISOString(),
+      practitioner_contains: 'window',
+    });
+    expect(found.ok).toBe(true);
+    expect(found.result!.total).toBe(0);
+    expect(found.result!.nearest).toBe(true);
+    const ids = (found.result!.passages as { record_id: string }[]).map(
+      (p) => p.record_id,
+    );
+    expect(ids).toHaveLength(3);
+    expect(ids).toContain(rows[4].id);
+    const at = (id: string) =>
+      new Date(rows.find((r) => r.id === id)!.starts_at).getTime();
+    expect(ids.map(at)).toEqual([...ids.map(at)].sort((a, b) => a - b));
+
+    // Nothing near then fits the other details: the nearest by time alone, marked so.
+    const big = await call('find_slots', {
+      starts_at_at: asked.toISOString(),
+      duration_from: '600',
+    });
+    expect(big.result!.total).toBe(0);
+    expect(big.result!.nearest).toBe('other_details');
+    expect(big.result!.passages).toHaveLength(3);
+
+    // Only a number detail is read as "at least" (seats); a duration range stays exact.
+    const exact = await call('find_slots', {
+      starts_at_at: rows[4].starts_at,
+      duration_from: '40',
+      duration_to: '40',
+    });
+    expect(exact.result!.total).toBe(0);
+
+    // A find with no time, or with matches, offers nothing extra.
+    const plain = await call('find_slots', { starts_at_at: rows[4].starts_at });
+    expect(plain.result!.nearest).toBeUndefined();
+    const far = await call('find_slots', {
+      starts_at_at: '2030-01-01T10:00:00Z',
+    });
+    expect(far.result!.passages).toEqual([]);
+  });
+
   it('books for the person in the chat, and refuses the same slot for another with alternatives', async () => {
     const [slot] = await freeSlots(1);
     const booked = await call('create_appointments', { slot: slot.record_id });
