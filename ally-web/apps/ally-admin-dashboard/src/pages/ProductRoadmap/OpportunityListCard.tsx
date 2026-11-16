@@ -6,11 +6,11 @@ import { DirectorStarButton } from "./DirectorStarButton";
 import { NewColleagueTag } from "./NewToYouChip";
 import { RankScore } from "./RankBreakdown";
 import { useScoreUnit } from "./useScoreUnit";
-import { monthLabel } from "./utils/monthBoard";
 import { personName } from "./utils/people";
 import { formatPoints } from "./utils/points";
 import { priorityBorderColour } from "./utils/priorityColour";
 import {
+  EFFORT_LABEL,
   isConsumerSourced,
   SOURCE_BADGE_STYLE,
   SOURCE_LABEL,
@@ -41,9 +41,7 @@ const GOAL_CHIP_STYLE = `${CHIP_BASE} bg-primary-50 text-primary-700`;
  * Owner — purple. Shares its pair with SOURCE_BADGE_STYLE, which is safe here because the source
  * badge is non-queue only (see the meta row below), so the two never appear on one card.
  */
-const OWNER_CHIP_STYLE = `${CHIP_BASE} bg-purple-50 text-purple-700`;
-/** Planned month — Carbon's yellow-10/80 sand. Warm, and distinct from the two cool chips. */
-const MONTH_CHIP_STYLE = `${CHIP_BASE} bg-warning-50 text-warning-700`;
+const EFFORT_CHIP_STYLE = `${CHIP_BASE} bg-purple-50 text-purple-700`;
 
 interface OpportunityListCardProps {
   opportunity: RoadmapOpportunity;
@@ -181,40 +179,32 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
           )}
 
           {/*
-            Owner and planned month, queue-only. The two questions a triage pass asks after "what
-            is it" are "whose is it" and "when is it meant to land", and both were a drawer click
-            away. The non-queue card already carries owner in its meta line and does not need
-            these.
-
-            RENDERED ONLY WHEN SET. No "No owner" / "Unscheduled" placeholder, because on this
-            board unowned and unscheduled ARE the common case — a chip on every one of 159 rows
-            saying so is noise rather than signal, the same reasoning that keeps the 'staff'
-            source badge off every row ("Default to Common Case, Hide Alternatives"). The
-            absence of a chip is the fact. Those two labels exist in laneLabel for the board's
-            catch-all lanes, where a lane must be named even when its contents are defined by
-            what they lack.
+            Queue row facts, per the triage decisions: title, rank score, votes + backers, effort
+            and goal. Owner, planned month and poster moved to the peek panel — they are not what
+            a triager decides on, and the old three-chip row made every queue card the same busy
+            line. An UNSIZED row gets a dashed "Size?" chip rather than silence: it is the one
+            missing fact that changes the rank (unsized counts as 50), so absence has to be loud.
           */}
-          {isQueueCard && !!opportunity.owner && (
-            <span className={OWNER_CHIP_STYLE}>{opportunity.owner}</span>
+          {isQueueCard && (
+            <span
+              className={
+                opportunity.effort
+                  ? EFFORT_CHIP_STYLE
+                  : `${CHIP_BASE} border border-dashed border-border-light text-typography-secondary`
+              }
+              title={
+                opportunity.effort
+                  ? `Effort ${EFFORT_LABEL[opportunity.effort]}`
+                  : "Not sized yet — it ranks as if it were a 50"
+              }
+            >
+              {opportunity.effort ? EFFORT_LABEL[opportunity.effort] : "Size?"}
+            </span>
           )}
-          {isQueueCard && !!opportunity.plannedMonth && (
-            // monthLabel, not the raw "2026-08": it renders "Aug 2026", and it is the same helper
-            // the month board's lane headings use, so a card and its lane cannot disagree.
-            <span className={MONTH_CHIP_STYLE}>{monthLabel(opportunity.plannedMonth)}</span>
-          )}
-          {/*
-            Who posted it, queue-only — the non-queue card has it in its "Filed …" line below.
-            Plain text, NOT a fourth chip: owner (who will build it) and poster (who asked for it)
-            are different people with different roles, and two purple-ish name chips side by side
-            would be read as the same kind of fact. "Posted by" says which one this is.
-
-            Always set: ally-be resolves every row's creator and falls back to "Unknown user"
-            when the account is gone, so there is no empty case to hide. Never the email — see
-            personName for accounts with a blank name.
-          */}
-          {isQueueCard && opportunity.creator && (
-            <span className="text-typography-secondary truncate">
-              Posted by {personName(opportunity.creator)}
+          {isQueueCard && (
+            <span className="text-typography-secondary tabular-nums">
+              {formatPoints(opportunity.priorityScore)} {unit} · {opportunity.voterCount}{" "}
+              {opportunity.voterCount === 1 ? "backer" : "backers"}
             </span>
           )}
           {!isQueueCard && !!opportunity.owner && (
@@ -231,7 +221,8 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
               queue placement: a number, not just the edge colour. */}
           {!isQueueCard && (
             <span className="text-typography-secondary tabular-nums">
-              · {formatPoints(opportunity.priorityScore)} {unit}
+              · {formatPoints(opportunity.priorityScore)} {unit} · {opportunity.voterCount}{" "}
+              {opportunity.voterCount === 1 ? "backer" : "backers"}
               {/* Outside the queue there is no rank badge for a score to sit under, so the vote
                   total stays the headline and the composite is not shown at all. A rank score
                   with nothing to be a rank IN would invite comparison across two different
