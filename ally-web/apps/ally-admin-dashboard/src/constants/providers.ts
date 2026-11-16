@@ -23,3 +23,18 @@ export const providersCopy = {
     ],
   },
 };
+
+/** Copy for "Test this prompt" in the Prompts editor. */
+export const promptTestCopy = {
+  title: "Test this prompt",
+  hint: "Runs the text above — including edits you have not saved — against a sample on the model you pick. Nothing is saved, and the call is billed like any model call.",
+  sampleLabel: "Sample input",
+  samplePlaceholder:
+    "What the user (or the variable block) would send, e.g. “I keep freezing when a client cries.”",
+  modelLabel: "Run on",
+  run: "Run test",
+  running: "Running…",
+  emptyPrompt: "Write some prompt text first.",
+  noModels: "No active catalog models. Add one under Providers → Language Models.",
+  failed: "The model rejected the call",
+};
