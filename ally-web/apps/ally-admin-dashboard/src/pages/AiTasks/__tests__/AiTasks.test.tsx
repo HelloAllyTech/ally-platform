@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
@@ -63,7 +63,10 @@ describe("AiTasks", () => {
       "nothing-matches-this",
     );
 
-    expect(screen.getByText("No AI tasks match this search.")).toBeInTheDocument();
+    // waitFor: the toolbar debounces typing, so the filter lands a beat later.
+    await waitFor(() =>
+      expect(screen.getByText("No AI tasks match this search.")).toBeInTheDocument(),
+    );
   });
 
   it("distinguishes an empty registry from a failed load", () => {
