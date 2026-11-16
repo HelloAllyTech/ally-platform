@@ -12,8 +12,19 @@ import {
 } from "@api";
 import { TooltipIcon } from "@assets";
 import { en, ROUTES } from "@constants";
-import { BugHunterV2Bug, BugHunterV2Mode, BugHunterV2Tab } from "@types";
+import {
+  BugFindingSource,
+  BugFindingStatus,
+  BugHunterV2Bug,
+  BugHunterV2Mode,
+  BugHunterV2Tab,
+} from "@types";
 import { formatRelativeTime } from "@utils";
+
+import {
+  BUG_FINDING_SOURCE_LABELS,
+  BUG_FINDING_STATUS_LABELS,
+} from "../BugHunter/bugFindingLabels";
 
 const MODES: BugHunterV2Mode[] = ["off", "manual", "autonomous"];
 /** The old Bug Hunter's tab order: what needs a human first. */
@@ -35,7 +46,31 @@ const POLL_MS = 15000;
 const fill = (text: string, values: Record<string, string | number>) =>
   Object.entries(values).reduce((t, [k, v]) => t.replace(`{${k}}`, String(v)), text);
 
-const STATUS_TAG: Record<string, "green" | "purple" | "red" | "blue" | "gray" | "cyan"> = {
+type TagColour = "green" | "purple" | "red" | "blue" | "gray" | "cyan";
+
+/** A v1 row's status is v1's own; its colour follows the tab it sits under. */
+const TAB_TAG: Record<BugHunterV2Tab, TagColour> = {
+  needs_you: "purple",
+  failed: "red",
+  in_progress: "blue",
+  backlog: "gray",
+  done: "green",
+};
+
+const sourceLabel = (b: BugHunterV2Bug, sources: Record<string, string>) =>
+  b.origin === "v1"
+    ? (BUG_FINDING_SOURCE_LABELS[b.source.replace(/^v1:/, "") as BugFindingSource] ??
+      b.source.replace(/^v1:/, ""))
+    : (sources[b.source] ?? b.source);
+
+const statusLabel = (b: BugHunterV2Bug, statuses: Record<string, string>) =>
+  b.origin === "v1"
+    ? (BUG_FINDING_STATUS_LABELS[b.status as BugFindingStatus] ?? b.status)
+    : (statuses[b.status] ?? b.status);
+
+const rowKey = (b: BugHunterV2Bug) => (b.origin === "v1" ? `v1-${b.v1FindingId}` : `v2-${b.id}`);
+
+const STATUS_TAG: Record<string, TagColour> = {
   backlog: "gray",
   queued: "cyan",
   running: "blue",
@@ -254,15 +289,21 @@ const BugTable: FC<{ bugs: BugHunterV2Bug[]; modeOff: boolean }> = ({ bugs, mode
       </thead>
       <tbody>
         {bugs.map(b => {
-          const opens = b.reportId !== null;
+          // A v2 row opens its report; a v1 row opens in the old Bug Hunter, which owns it.
+          const target =
+            b.origin === "v1"
+              ? `${ROUTES.BUG_HUNTER}?bug=${encodeURIComponent(b.v1FindingId ?? "")}`
+              : b.reportId !== null
+                ? ROUTES.BUG_HUNTER_V2_REPORT(b.reportId)
+                : null;
           return (
             <tr
-              key={b.id}
-              data-testid={`bug-row-${b.id}`}
+              key={rowKey(b)}
+              data-testid={`bug-row-${rowKey(b)}`}
               className={`border-b border-neutral-100 align-top ${
-                opens ? "cursor-pointer hover:bg-neutral-50" : ""
+                target ? "cursor-pointer hover:bg-neutral-50" : ""
               }`}
-              onClick={() => opens && navigate(ROUTES.BUG_HUNTER_V2_REPORT(b.reportId!))}
+              onClick={() => target && navigate(target)}
             >
               <td className="py-2 pr-3">
                 <div className="font-medium text-typography-900">{b.title}</div>
@@ -272,12 +313,24 @@ const BugTable: FC<{ bugs: BugHunterV2Bug[]; modeOff: boolean }> = ({ bugs, mode
                 )}
               </td>
               <td className="py-2 pr-3">
-                {strings.sources[b.source as keyof typeof strings.sources] ?? b.source}
+                <div className="flex items-center gap-1.5">
+                  {sourceLabel(b, strings.sources)}
+                  {b.origin === "v1" && (
+                    <Tooltip label={strings.v1Help} align="top">
+                      <Tag type="outline" size="sm">
+                        {strings.v1Badge}
+                      </Tag>
+                    </Tooltip>
+                  )}
+                </div>
               </td>
               <td className="py-2 pr-3">{b.app ?? strings.noApp}</td>
               <td className="py-2 pr-3">
-                <Tag type={STATUS_TAG[b.status] ?? "gray"} size="sm">
-                  {strings.statuses[b.status] ?? b.status}
+                <Tag
+                  type={b.origin === "v1" ? TAB_TAG[b.tab] : (STATUS_TAG[b.status] ?? "gray")}
+                  size="sm"
+                >
+                  {statusLabel(b, strings.statuses)}
                 </Tag>
                 {b.status === "running" && b.startedAt && (
                   <div className="mt-0.5 text-xs text-typography-500">
@@ -305,11 +358,13 @@ const StartAction: FC<{ bug: BugHunterV2Bug }> = ({ bug }) => {
   const strings = en.bugHunterV2.board;
   const [start, { isLoading }] = useStartBugHunterV2BugMutation();
   const [app, setApp] = useState("");
+  // v1 rows are the old Bug Hunter's to run; v2 only shows them.
+  if (bug.origin !== "v2" || bug.id === null) return null;
   if (bug.status !== "backlog" && bug.status !== "failed") return null;
   const needsApp = !bug.app;
   const go = async () => {
     try {
-      await start({ id: bug.id, app: needsApp ? app : undefined }).unwrap();
+      await start({ id: bug.id!, app: needsApp ? app : undefined }).unwrap();
     } catch {
       toast.error(strings.startError);
     }

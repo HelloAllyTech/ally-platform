@@ -40,6 +40,25 @@ daily job (signals) ─┴─> bughunter.bugs (backlog) ── worker, by mode �
   waiting → needs_you), with no `started_at`, so they don't count against today's run
   limit.
 
+## v1's history on the board (user, 2026-11-16)
+
+Management reports need the history end to end, so the board shows the old Bug
+Hunter's findings too. They are **read live, not copied**: `BOARD_ROWS_SQL` in
+`bug-hunter-board.service.ts` is a `UNION ALL` of `bughunter.bugs` and
+`public.bug_findings`, run by ally-be (which can read both; the agent's `bughunter`
+role still cannot read `public`). Nothing goes stale while v1 keeps running, and there
+is no sync job.
+
+- v1's 17 statuses map onto the tabs exactly as v1's board does (`V1_STATUS_TAB`,
+  mirroring `lifecycleBucket.ts`). One gap: v1 lifts a `coordinating` plan with an
+  attention flag into Needs you; that flag is computed per request, so here it stays
+  In progress.
+- v1's plan steps (`parent_finding_id`) are left out, as v1's own reports do.
+- A bug reported after v2 was set up exists on both sides; the v1 copy is dropped so
+  it counts once.
+- A v1 row shows v1's status and source labels and a "v1" tag, opens in the old Bug
+  Hunter (`/bug-hunter?bug=<id>`), and has no Start fix: v2's worker never touches it.
+
 ## Code map
 
 | Where | What |

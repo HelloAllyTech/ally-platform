@@ -2790,6 +2790,9 @@ export const en = {
       offHint: "Mode is Off: queued bugs wait until you switch to Manual or Autonomous.",
       openReport: "Open report",
       noApp: "—",
+      v1Badge: "v1",
+      v1Help:
+        "Found or handled by the old Bug Hunter. Shown here so the board has the whole history; it opens in the old Bug Hunter, which still owns it.",
     },
   },
   bugHunter: {

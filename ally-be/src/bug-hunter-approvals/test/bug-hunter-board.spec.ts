@@ -8,14 +8,18 @@ import {
 import { DataSource } from 'typeorm';
 import { StartBugDto, UpdateModeDto } from '../dto/board.dto';
 import {
+  BOARD_ROWS_SQL,
   BugHunterBoardService,
   TAB_STATUSES,
+  V1_STATUS_TAB,
 } from '../service/bug-hunter-board.service';
 import { BughunterDbService } from '../service/bughunter-db.service';
 
 /** `bughunter.bugs` and `bughunter.settings` in memory, answering the SQL by shape. */
 class FakeBoardDb {
   bugs: any[] = [];
+  /** The old Bug Hunter's `public.bug_findings`, top-level rows only. */
+  findings: any[] = [];
   settings = { mode: 'off', daily_run_limit: 10, updated_by: null };
   schemaPresent = true;
   failInsert = false;
@@ -34,18 +38,18 @@ class FakeBoardDb {
       this.settings.updated_by = params[1];
       return [];
     }
-    if (s.startsWith('SELECT id, source, app, title')) {
-      const rows = this.bugs.filter((b) => params[0].includes(b.status));
+    if (s.startsWith('SELECT *, count(*) OVER ()')) {
+      const rows = this.board().filter((r) => r.tab === params[0]);
       return rows
         .slice(params[2], params[2] + params[1])
-        .map((b) => ({ ...b, total: rows.length }));
+        .map((r) => ({ ...r, total: rows.length }));
     }
-    if (s.startsWith('SELECT status, count(*)')) {
+    if (s.startsWith('SELECT tab, count(*)')) {
       const counts = new Map<string, number>();
-      this.bugs.forEach((b) =>
-        counts.set(b.status, (counts.get(b.status) ?? 0) + 1),
+      this.board().forEach((r) =>
+        counts.set(r.tab, (counts.get(r.tab) ?? 0) + 1),
       );
-      return [...counts].map(([status, n]) => ({ status, n }));
+      return [...counts].map(([tab, n]) => ({ tab, n }));
     }
     if (s.startsWith('SELECT id, status, app FROM bughunter.bugs')) {
       return this.bugs.filter((b) => b.id === params[0]);
@@ -80,7 +84,66 @@ class FakeBoardDb {
     }
     throw new Error(`unexpected SQL: ${s.slice(0, 80)}`);
   };
+
+  /** What BOARD_ROWS_SQL returns: v2's queue, then v1's findings not also in v2. */
+  board() {
+    const tabOf = (status: string) =>
+      (Object.entries(TAB_STATUSES).find(([, ss]) => ss.includes(status)) ?? [
+        'backlog',
+      ])[0];
+    const v2 = this.bugs.map((b) => ({
+      ...b,
+      origin: 'v2',
+      v1_finding_id: null,
+      tab: tabOf(b.status),
+    }));
+    const v1 = this.findings
+      .filter(
+        (f) =>
+          !f.reported_bug_id ||
+          !this.bugs.some(
+            (b) => b.signal_key === `reported:${f.reported_bug_id}`,
+          ),
+      )
+      .map((f) => ({
+        origin: 'v1',
+        id: null,
+        v1_finding_id: f.id,
+        source: `v1:${f.source}`,
+        app: f.repo,
+        title: f.title,
+        description: f.description,
+        status: f.status,
+        tab: V1_STATUS_TAB[f.status] ?? 'backlog',
+        reason: null,
+        severity: f.severity ?? null,
+        pr_url: f.pr_url ?? null,
+        report_id: null,
+        run_id: null,
+        attempts: 0,
+        created_at: f.created_at,
+        started_at: null,
+        finished_at: null,
+      }));
+    return [...v2, ...v1];
+  }
 }
+
+const finding = (
+  id: string,
+  status: string,
+  extra: Record<string, unknown> = {},
+) => ({
+  id,
+  source: 'reported_bug',
+  repo: 'ally-be',
+  title: `old bug ${id}`,
+  description: 'from v1',
+  status,
+  reported_bug_id: null,
+  created_at: new Date('2026-10-01T00:00:00Z'),
+  ...extra,
+});
 
 const bug = (
   id: number,
@@ -151,6 +214,76 @@ describe('BugHunterBoardService', () => {
     const needs = await service.list({});
     expect(needs.tab).toBe('needs_you');
     expect(needs.items[0]).toMatchObject({ id: 4, reportId: 9 });
+  });
+
+  it("shows the old Bug Hunter's findings on the same tabs v1 puts them in", async () => {
+    fake.bugs = [bug(1, 'needs_you')];
+    fake.findings = [
+      finding('a', 'pending_approval'),
+      finding('b', 'pr_opened', { pr_url: 'https://example.test/pr/1' }),
+      finding('c', 'merged'),
+      finding('d', 'release_failed'),
+      finding('e', 'blocked'),
+    ];
+    const out = await service.list({});
+    expect(out.counts).toEqual({
+      needs_you: 2,
+      failed: 1,
+      in_progress: 1,
+      backlog: 1,
+      done: 1,
+    });
+    expect(out.items.map((b) => b.origin)).toEqual(['v2', 'v1']);
+    expect(out.items[1]).toMatchObject({
+      origin: 'v1',
+      id: null,
+      v1FindingId: 'a',
+      source: 'v1:reported_bug',
+      status: 'pending_approval',
+      tab: 'needs_you',
+    });
+    const inProgress = await service.list({ tab: 'in_progress' });
+    expect(inProgress.items[0]).toMatchObject({
+      prUrl: 'https://example.test/pr/1',
+    });
+  });
+
+  it("counts a bug reported on both boards once, as v2's", async () => {
+    fake.bugs = [bug(1, 'backlog', { signal_key: 'reported:opp-9' })];
+    fake.findings = [
+      finding('a', 'new', { reported_bug_id: 'opp-9' }),
+      finding('b', 'new', { reported_bug_id: 'opp-10' }),
+    ];
+    const out = await service.list({ tab: 'backlog' });
+    expect(out.items.map((b) => b.origin + (b.id ?? b.v1FindingId))).toEqual([
+      'v21',
+      'v1b',
+    ]);
+  });
+
+  it("maps every v1 status to a tab, exactly as v1's board does", () => {
+    expect(V1_STATUS_TAB).toEqual({
+      pending_approval: 'needs_you',
+      needs_input: 'needs_you',
+      failed: 'failed',
+      release_failed: 'failed',
+      queued: 'in_progress',
+      fixing: 'in_progress',
+      coordinating: 'in_progress',
+      releasing: 'in_progress',
+      pr_opened: 'in_progress',
+      new: 'backlog',
+      approved: 'backlog',
+      blocked: 'backlog',
+      merged: 'done',
+      released: 'done',
+      dismissed: 'done',
+      rejected: 'done',
+      cancelled: 'done',
+    });
+    // Plan steps stay out; a reported bug v2 also has counts once.
+    expect(BOARD_ROWS_SQL).toContain('f.parent_finding_id IS NULL');
+    expect(BOARD_ROWS_SQL).toContain("'reported:' || f.reported_bug_id::text");
   });
 
   it('switches the mode with an audit entry of before and after', async () => {

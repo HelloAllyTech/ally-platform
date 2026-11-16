@@ -80,13 +80,18 @@ const counts = (c = {}) => ({
   ...c,
 });
 const bugRow = (overrides = {}) => ({
+  origin: "v2",
   id: 1,
+  v1FindingId: null,
   source: "reported",
   app: "ally-web",
   title: "Save does nothing",
   description: "",
   status: "backlog",
+  tab: "backlog",
   reason: null,
+  severity: null,
+  prUrl: null,
   reportId: null,
   runId: null,
   attempts: 0,
@@ -175,6 +180,33 @@ describe("Bug Hunter v2 board", () => {
     fireEvent.change(screen.getByLabelText(board.pickApp), { target: { value: "ally-be" } });
     fireEvent.click(button);
     expect(api.start).toHaveBeenCalledWith({ id: 1, app: "ally-be" });
+  });
+
+  it("shows the old Bug Hunter's findings with their own status, opening in v1, never startable", () => {
+    api.settingsQuery.mockReturnValue(settingsOf());
+    api.bugsQuery.mockReturnValue({
+      data: {
+        tab: "backlog",
+        counts: counts({ backlog: 2 }),
+        items: [
+          bugRow(),
+          bugRow({
+            origin: "v1",
+            id: null,
+            v1FindingId: "f-1",
+            source: "v1:lint_error",
+            status: "approved",
+            title: "Old lint bug",
+          }),
+        ],
+      },
+    });
+    renderBoard();
+    expect(screen.getByText(board.v1Badge)).toBeInTheDocument();
+    expect(screen.getByText("Old lint bug")).toBeInTheDocument();
+    // Only the v2 row offers Start fix.
+    expect(screen.getAllByRole("button", { name: board.startFix })).toHaveLength(1);
+    expect(screen.getByTestId("bug-row-v1-f-1")).toHaveClass("cursor-pointer");
   });
 
   it("explains a missing Bug Hunter database instead of a generic error", () => {

@@ -88,13 +88,23 @@ export interface BugHunterV2Settings {
 }
 
 export interface BugHunterV2Bug {
-  id: number;
+  /** `v2`: Bug Hunter v2's queue. `v1`: the old Bug Hunter's finding, read live. */
+  origin: "v2" | "v1";
+  /** The v2 queue id; null for a v1 row. */
+  id: number | null;
+  /** The old Bug Hunter's finding id; null for a v2 row. */
+  v1FindingId: string | null;
+  /** v2's source, or `v1:<finding source>` for a v1 row. */
   source: string;
   app: string | null;
   title: string;
   description: string;
-  status: BugHunterV2BugStatus;
+  /** v2's queue status, or the v1 finding's own status for a v1 row. */
+  status: BugHunterV2BugStatus | string;
+  tab: BugHunterV2Tab;
   reason: string | null;
+  severity: string | null;
+  prUrl: string | null;
   reportId: number | null;
   runId: string | null;
   attempts: number;

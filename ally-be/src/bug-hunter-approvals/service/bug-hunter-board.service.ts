@@ -29,14 +29,30 @@ export const TAB_STATUSES: Record<BoardTab, string[]> = {
 /** Statuses an admin may start from: Start fix (backlog) and Retry (failed). */
 const STARTABLE = ['backlog', 'failed'];
 
+/**
+ * Where a board row lives. `v2` rows are `bughunter.bugs`, which v2's worker runs;
+ * `v1` rows are the old Bug Hunter's `public.bug_findings`, read live and never
+ * copied, so the board carries the whole history and v1's own status changes show
+ * up as they happen. v2 never runs, starts or edits a v1 row.
+ */
+export type BoardOrigin = 'v2' | 'v1';
+
 export interface BoardBug {
-  id: number;
+  origin: BoardOrigin;
+  /** `bughunter.bugs.id` for a v2 row; null for a v1 row. */
+  id: number | null;
+  /** `bug_findings.id` for a v1 row; null for a v2 row. */
+  v1FindingId: string | null;
   source: string;
   app: string | null;
   title: string;
   description: string;
+  /** The row's own status: v2's queue status, or v1's finding status verbatim. */
   status: string;
+  tab: BoardTab;
   reason: string | null;
+  severity: string | null;
+  prUrl: string | null;
   reportId: number | null;
   runId: string | null;
   attempts: number;
@@ -44,6 +60,76 @@ export interface BoardBug {
   startedAt: string | null;
   finishedAt: string | null;
 }
+
+/**
+ * v1's seventeen finding statuses onto the five tabs, exactly as v1's own board
+ * groups them (`ally-admin-dashboard/src/pages/BugHunter/lifecycleBucket.ts`,
+ * `bucketOfStatus`), so a bug sits under the same tab on both boards.
+ * v1 also lifts a `coordinating` plan with an attention flag into Needs you; that
+ * flag is computed per request by v1's detail endpoint, so here it stays In progress.
+ */
+export const V1_STATUS_TAB: Record<string, BoardTab> = {
+  pending_approval: 'needs_you',
+  needs_input: 'needs_you',
+  failed: 'failed',
+  release_failed: 'failed',
+  queued: 'in_progress',
+  fixing: 'in_progress',
+  coordinating: 'in_progress',
+  releasing: 'in_progress',
+  pr_opened: 'in_progress',
+  new: 'backlog',
+  approved: 'backlog',
+  blocked: 'backlog',
+  merged: 'done',
+  released: 'done',
+  dismissed: 'done',
+  rejected: 'done',
+  cancelled: 'done',
+};
+
+const caseOf = (
+  column: string,
+  map: Record<string, string>,
+  fallback: string,
+) =>
+  `CASE ${column} ${Object.entries(map)
+    .map(([k, v]) => `WHEN '${k}' THEN '${v}'`)
+    .join(' ')} ELSE '${fallback}' END`;
+
+const V2_STATUS_TAB: Record<string, BoardTab> = Object.fromEntries(
+  (Object.entries(TAB_STATUSES) as [BoardTab, string[]][]).flatMap(
+    ([tab, statuses]) => statuses.map((s) => [s, tab]),
+  ),
+);
+
+/**
+ * Every bug on the board: v2's queue plus v1's findings, one row each, with its tab.
+ * v1's plan steps (`parent_finding_id`) are left out, as v1's own reports do. A bug
+ * reported after v2 was set up has a row on both sides; the v1 copy is dropped so it
+ * counts once. v1's timestamps are UTC without a zone.
+ */
+export const BOARD_ROWS_SQL = `
+  SELECT 'v2' AS origin, b.id, NULL::text AS v1_finding_id, b.source, b.app, b.title,
+         b.description, b.status, ${caseOf('b.status', V2_STATUS_TAB, 'backlog')} AS tab,
+         b.reason, NULL::text AS severity, NULL::text AS pr_url, b.report_id, b.run_id,
+         b.attempts, b.created_at, b.started_at, b.finished_at
+    FROM bughunter.bugs b
+  UNION ALL
+  SELECT 'v1', NULL, f.id::text, 'v1:' || f.source, f.repo, f.title, f.description,
+         f.status, ${caseOf('f.status', V1_STATUS_TAB, 'backlog')},
+         coalesce(f.escalation_question, f.decision_reason), f.severity, f.pr_url,
+         NULL, f.run_id::text, 0,
+         f."createdAt" AT TIME ZONE 'UTC', f.dispatched_at AT TIME ZONE 'UTC',
+         coalesce(f.released_at, f.decided_at, f.cancelled_at,
+                  CASE WHEN f.status IN ('merged', 'released', 'dismissed', 'rejected',
+                                         'cancelled') THEN f."updatedAt" END)
+           AT TIME ZONE 'UTC'
+    FROM public.bug_findings f
+   WHERE f.parent_finding_id IS NULL
+     AND NOT (f.reported_bug_id IS NOT NULL AND EXISTS (
+           SELECT 1 FROM bughunter.bugs b2
+            WHERE b2.signal_key = 'reported:' || f.reported_bug_id::text))`;
 
 const iso = (v: unknown): string | null =>
   v ? new Date(v as string).toISOString() : null;
@@ -103,27 +189,26 @@ export class BugHunterBoardService {
     const tab: BoardTab = query.tab ?? 'needs_you';
     const pageSize = query.pageSize ?? 50;
     const page = query.page ?? 1;
+    const order =
+      tab === 'done'
+        ? 'coalesce(finished_at, created_at) DESC'
+        : 'created_at ASC';
     const rows = await ds.query(
-      `SELECT id, source, app, title, description, status, reason, report_id,
-              run_id, attempts, created_at, started_at, finished_at,
-              count(*) OVER () AS total
-         FROM bughunter.bugs
-        WHERE status = ANY($1)
-        ORDER BY ${tab === 'done' ? 'coalesce(finished_at, created_at) DESC' : 'created_at ASC'}, id
+      `SELECT *, count(*) OVER () AS total
+         FROM (${BOARD_ROWS_SQL}) board
+        WHERE tab = $1
+        ORDER BY ${order}, origin DESC, id, v1_finding_id
         LIMIT $2 OFFSET $3`,
-      [TAB_STATUSES[tab], pageSize, (page - 1) * pageSize],
+      [tab, pageSize, (page - 1) * pageSize],
     );
     const countRows = await ds.query(
-      `SELECT status, count(*) AS n FROM bughunter.bugs GROUP BY status`,
+      `SELECT tab, count(*) AS n FROM (${BOARD_ROWS_SQL}) board GROUP BY tab`,
     );
-    const byStatus = new Map<string, number>(
-      countRows.map((r: any) => [r.status, Number(r.n)]),
+    const byTab = new Map<string, number>(
+      countRows.map((r: any) => [r.tab, Number(r.n)]),
     );
     const counts = Object.fromEntries(
-      BOARD_TABS.map((t) => [
-        t,
-        TAB_STATUSES[t].reduce((n, s) => n + (byStatus.get(s) ?? 0), 0),
-      ]),
+      BOARD_TABS.map((t) => [t, byTab.get(t) ?? 0]),
     ) as Record<BoardTab, number>;
     return {
       tab,
@@ -133,13 +218,18 @@ export class BugHunterBoardService {
       counts,
       items: (rows as any[]).map(
         (r: any): BoardBug => ({
-          id: Number(r.id),
+          origin: r.origin,
+          id: r.id === null || r.id === undefined ? null : Number(r.id),
+          v1FindingId: r.v1_finding_id ?? null,
           source: r.source,
           app: r.app ?? null,
           title: r.title,
           description: r.description ?? '',
           status: r.status,
+          tab: r.tab,
           reason: r.reason ?? null,
+          severity: r.severity ?? null,
+          prUrl: r.pr_url ?? null,
           reportId: r.report_id ? Number(r.report_id) : null,
           runId: r.run_id ?? null,
           attempts: Number(r.attempts ?? 0),
