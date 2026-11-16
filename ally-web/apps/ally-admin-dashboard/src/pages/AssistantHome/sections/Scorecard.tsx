@@ -8,7 +8,8 @@ import {
   useGetScorecardQuery,
   useMarkFeedbackFineMutation,
 } from "@api";
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { Sparkline } from "../../Analytics/chartKit";
 import { COPY } from "../../Onboarding/copy";
@@ -72,10 +73,12 @@ const AnswerBox: React.FC<{
         <span>{HOME.checkupControls.alsoAdd}</span>
       </label>
       <div className="ally-btn-row">
-        <Button type="submit" variant="primary" disabled={busy || !text.trim()}>
+        <Button variant={ButtonVariant.PRIMARY} type="submit" disabled={busy || !text.trim()}>
           {t.save}
         </Button>
-        <Button onClick={onCancel}>{t.cancel}</Button>
+        <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onCancel}>
+          {t.cancel}
+        </Button>
       </div>
     </form>
   );
@@ -117,7 +120,13 @@ export const UnansweredList: React.FC<{ botId: string; canEdit: boolean; testId?
               <div className="ally-home__row">
                 <p className="ally-body">“{q.question}”</p>
                 {canEdit && open !== q.id && (
-                  <Button onClick={() => setOpen(q.id)}>{t.answerIt}</Button>
+                  <Button
+                    variant={ButtonVariant.TERTIARY}
+                    type="button"
+                    onClick={() => setOpen(q.id)}
+                  >
+                    {t.answerIt}
+                  </Button>
                 )}
               </div>
               {open === q.id && (
@@ -271,9 +280,16 @@ export const Scorecard: React.FC<{
                 )}
                 {canEdit && open !== f.id && (
                   <div className="ally-btn-row">
-                    <Button onClick={() => setOpen(f.id)}>{t.correct}</Button>
                     <Button
-                      variant="ghost"
+                      variant={ButtonVariant.TERTIARY}
+                      type="button"
+                      onClick={() => setOpen(f.id)}
+                    >
+                      {t.correct}
+                    </Button>
+                    <Button
+                      variant={ButtonVariant.TEXT}
+                      type="button"
                       disabled={finishing.isLoading}
                       onClick={() =>
                         void save(() => fine({ id: botId, feedbackId: f.id }).unwrap()).then(() =>
@@ -308,7 +324,9 @@ export const Scorecard: React.FC<{
             <p className="ally-body">
               {fill(t.checkupCard, { passed: data.checkup.passed, total: data.checkup.total })}
             </p>
-            <Button onClick={() => go("checkup")}>{t.viewCheckup}</Button>
+            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("checkup")}>
+              {t.viewCheckup}
+            </Button>
           </div>
         </Group>
       )}

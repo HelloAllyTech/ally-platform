@@ -1,6 +1,7 @@
 import React from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 import type { Chatbot } from "@types";
 
 import { HOME } from "./copy";
@@ -21,7 +22,9 @@ export const EnginePanel: React.FC<{ bot: Chatbot; onClose: () => void; onTry: (
         <h2 className="ally-heading ally-home__panel-title">{HOME.admin.engine}</h2>
         <p className="ally-small">{HOME.admin.engineHint}</p>
       </div>
-      <Button onClick={onClose}>{HOME.tryPanel.close}</Button>
+      <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+        {HOME.tryPanel.close}
+      </Button>
     </div>
     <div className="ally-home__classic">
       <AgentTab bot={bot} canEdit onTest={onTry} />

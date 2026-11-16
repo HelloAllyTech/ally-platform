@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useState } from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { HOME, fill } from "./copy";
 import { HelpToggle } from "./ui/Help";
@@ -181,7 +182,13 @@ export const LinesField: React.FC<{
       ))}
       {!disabled && lines.length < max && (
         <div>
-          <Button onClick={() => update([...lines, ""])}>{addLabel}</Button>
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            type="button"
+            onClick={() => update([...lines, ""])}
+          >
+            {addLabel}
+          </Button>
         </div>
       )}
       <FieldError id={`${id}-error`} error={field.error} />

@@ -4,13 +4,14 @@ import { vi, describe, it, expect } from "vitest";
 import { Button } from "../Button";
 
 // Mock the utils
-vi.mock("@utils", () => ({
+vi.mock("../buttonStyles", () => ({
   getButtonStyles: (variant: string) => {
     const styles = {
       primary: "bg-blue-600 text-white hover:bg-blue-700",
       secondary: "bg-gray-200 text-typography-800",
       destructive: "bg-red-600 text-white",
       text: "bg-transparent text-blue-600",
+      tertiary: "border border-blue-600 text-blue-600",
     };
     return styles[variant as keyof typeof styles] || styles.primary;
   },
@@ -94,6 +95,18 @@ describe("Button", () => {
     render(<Button>Hover me</Button>);
     const button = screen.getByText("Hover me");
     expect(button.className).toContain("hover:bg-blue-700");
+  });
+
+  it("renders the tertiary (outlined) variant", () => {
+    render(<Button variant="tertiary">Outline</Button>);
+    expect(screen.getByText("Outline").className).toContain("border-blue-600");
+  });
+
+  it("renders the small size at 32px", () => {
+    render(<Button size="sm">Small</Button>);
+    const { className } = screen.getByText("Small");
+    expect(className).toContain("h-8");
+    expect(className).not.toContain("h-10");
   });
 
   it("has correct default height", () => {

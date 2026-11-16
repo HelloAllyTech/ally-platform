@@ -1,6 +1,7 @@
 import React, { useId, useState } from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 import type { WidgetSettings } from "@types";
 
 import { fill } from "../../Onboarding/copy";
@@ -60,7 +61,12 @@ export const WebsiteGroup: React.FC<{
     <Group title={t.title} hint={t.body} testId="share-website">
       <div className="ally-home__snippet">
         <code id={`${id}-snippet`}>{snippet}</code>
-        <Button onClick={copy} aria-describedby={`${id}-snippet`}>
+        <Button
+          variant={ButtonVariant.TERTIARY}
+          type="button"
+          onClick={copy}
+          aria-describedby={`${id}-snippet`}
+        >
           {copied ? t.copied : t.copy}
         </Button>
       </div>
@@ -107,7 +113,12 @@ export const WebsiteGroup: React.FC<{
               }
             }}
           />
-          <Button onClick={add} disabled={!draft.trim()}>
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            type="button"
+            onClick={add}
+            disabled={!draft.trim()}
+          >
             {t.add}
           </Button>
         </div>

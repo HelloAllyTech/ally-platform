@@ -23,27 +23,42 @@
   --ally-shadow-phone: 0 30px 60px rgba(23, 23, 28, 0.18);
 }
 
+/*
+ * Admin screens wear Carbon (white theme) and IBM Plex Serif, matching the rest of the dashboard
+ * (styles.css loads the face; the app is serif-only). These override the shared block above on
+ * `.ally-v2` only: `.brand-surface` (visitor screens) keeps the Ally look, and because it matches
+ * its own element it wins over this block when nested inside an admin preview.
+ */
 .ally-v2 {
-  --ally-bg: #f6f5f1;
+  --ally-font-display: "IBM Plex Serif", serif;
+  --ally-font-ui: "IBM Plex Serif", serif;
+  --ally-font-label: "IBM Plex Serif", serif;
+  --ally-radius-sm: 0;
+  --ally-radius-md: 0;
+  --ally-radius-lg: 0;
+  --ally-radius-xl: 0;
+  --ally-shadow-hover: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --ally-shadow-float: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --ally-bg: #ffffff;
   --ally-surface: #ffffff;
-  --ally-surface-2: #fbfaf7;
-  --ally-sunken: #eceae4;
-  --ally-line: #e4e2dc;
-  --ally-line-strong: #dad8d1;
-  --ally-ink: #17171c;
-  --ally-ink-2: #3c3b42;
-  --ally-muted: #5f5e66;
-  --ally-faint: #6b6a72;
-  --ally-accent: #3b3bd9;
-  --ally-accent-soft: rgba(59, 59, 217, 0.08);
+  --ally-surface-2: #f4f4f4;
+  --ally-sunken: #e8e8e8;
+  --ally-line: #e0e0e0;
+  --ally-line-strong: #c6c6c6;
+  --ally-ink: #161616;
+  --ally-ink-2: #393939;
+  --ally-muted: #525252;
+  --ally-faint: #5e5e5e;
+  --ally-accent: #0f62fe;
+  --ally-accent-soft: rgba(15, 98, 254, 0.08);
   --ally-on-accent: #ffffff;
-  --ally-good: #1f6b47;
-  --ally-good-bg: #e8f5ee;
-  --ally-warn: #9a3412;
-  --ally-warn-bg: #fdf0e7;
-  --ally-info: #2a2aa8;
-  --ally-info-bg: #ececfd;
-  --ally-danger: #a33a1f;
+  --ally-good: #198038;
+  --ally-good-bg: #defbe6;
+  --ally-warn: #8a3800;
+  --ally-warn-bg: #fff2e8;
+  --ally-info: #0043ce;
+  --ally-info-bg: #edf5ff;
+  --ally-danger: #da1e28;
   font-family: var(--ally-font-ui);
   color: var(--ally-ink);
   background: var(--ally-bg);

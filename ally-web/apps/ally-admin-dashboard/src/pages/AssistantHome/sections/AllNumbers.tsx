@@ -6,7 +6,9 @@ import {
   useGetWaAnalyticsTimeseriesQuery,
   useGetWaCorpusCoverageQuery,
 } from "@api";
-import { Button, Segmented } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { Segmented } from "@components/v2";
 import type { WaAnalyticsBucket } from "@types";
 
 import { fill, HOME } from "../copy";
@@ -112,7 +114,9 @@ export const AllNumbers: React.FC<{ botId: string }> = ({ botId }) => {
       {failed ? (
         <div className="ally-home__row" role="alert">
           <p className="ally-error">{t.loadFailed}</p>
-          <Button onClick={retry}>{t.retry}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={retry}>
+            {t.retry}
+          </Button>
         </div>
       ) : stats && stats.inbound === 0 ? (
         <p className="ally-empty">{t.empty}</p>

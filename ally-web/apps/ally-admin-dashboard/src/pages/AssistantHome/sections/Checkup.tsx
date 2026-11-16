@@ -7,7 +7,9 @@ import {
   useMarkNotOfferedMutation,
   useRunCheckupMutation,
 } from "@api";
-import { Button, GapCard, MeasureCard } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { GapCard, MeasureCard } from "@components/v2";
 
 import { Sparkline } from "../../Analytics/chartKit";
 import { COPY, fill } from "../../Onboarding/copy";
@@ -110,15 +112,18 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
         canEdit && (
           <div className="ally-btn-row">
             <Button
-              className="ally-btn--sm"
+              variant={ButtonVariant.TERTIARY}
+              size="sm"
+              type="button"
               onClick={() => void start("failed")}
               disabled={running || runState.isLoading || !view}
             >
               {c.runs.failed}
             </Button>
             <Button
-              variant="primary"
-              className="ally-btn--sm"
+              variant={ButtonVariant.PRIMARY}
+              size="sm"
+              type="button"
               onClick={() => void start()}
               disabled={running || runState.isLoading}
             >
@@ -179,7 +184,12 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
       {changedSince && canEdit && (
         <div className="ally-note ally-checkup__banner" role="status" data-testid="checkup-banner">
           <span>{c.banner}</span>
-          <Button className="ally-btn--sm" onClick={() => void start()}>
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            size="sm"
+            type="button"
+            onClick={() => void start()}
+          >
             {c.bannerRun}
           </Button>
         </div>
@@ -250,7 +260,7 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
 
           <div className="ally-home__row">
             <h3 className="ally-heading">{t.sections.checked}</h3>
-            <Button variant="ghost" onClick={() => setExplain(v => !v)}>
+            <Button variant={ButtonVariant.TEXT} type="button" onClick={() => setExplain(v => !v)}>
               {explain ? t.hide : t.explain}
             </Button>
           </div>
