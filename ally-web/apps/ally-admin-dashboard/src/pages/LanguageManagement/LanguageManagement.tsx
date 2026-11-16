@@ -131,7 +131,7 @@ export const ScenarioLanguages: React.FC = () => {
           },
         });
         if (response.error) {
-          toast.error(en.errors.failedToCreateEvent);
+          toast.error(en.errors.failedToUpdateLanguage);
         } else {
           toast.success(en.simulation.languageUpdatedSuccessfully);
           handleSidePanelClose();
@@ -142,14 +142,16 @@ export const ScenarioLanguages: React.FC = () => {
           languages: [languageData],
         });
         if (response.error) {
-          toast.error(en.errors.failedToCreateEvent);
+          toast.error(en.errors.failedToCreateLanguage);
         } else {
           toast.success(en.simulation.languageCreatedSuccessfully);
           handleSidePanelClose();
         }
       }
     } catch {
-      toast.error(en.errors.failedToCreateEvent);
+      toast.error(
+        selectedLanguage?.id ? en.errors.failedToUpdateLanguage : en.errors.failedToCreateLanguage,
+      );
     }
   };
 
