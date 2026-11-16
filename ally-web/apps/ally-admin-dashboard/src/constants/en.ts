@@ -933,6 +933,14 @@ export const en = {
     loadingToggles: "Loading feature access...",
   },
   userManagement: {
+    roleHelpHeading: "What each role can do",
+    roleHelp: {
+      COUNSELOR: "Counsellor: works the helpline and practises in the app. No admin access.",
+      ADMIN: "Admin: manages one organisation's users, content access and results.",
+      LEARNER: "Learner: practises roleplays and courses in the app. No admin access.",
+      MULTI_TENANT_ADMIN:
+        "Multi-tenant admin: an admin across several organisations. Choose which ones after the account exists.",
+    } as Record<string, string>,
     organizationCreated: "Organization created successfully",
     organizationUpdated: "Organization updated successfully",
     failedUpdateOrganization: "Failed to update organization",

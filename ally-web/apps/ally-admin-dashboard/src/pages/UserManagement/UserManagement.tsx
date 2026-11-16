@@ -47,6 +47,7 @@ import { TabType } from "@types";
 import { formatCapitalizedEnum, hasFeature } from "@utils";
 
 import { PhoneMappingsTab } from "./PhoneMappings";
+import { RoleDescriptions } from "./RoleDescriptions";
 import { useOrganizationManagement } from "./useOrganizationManagement";
 import { useUserManagement } from "./useUserManagement";
 import { DebriefAccess } from "../DebriefAccess/DebriefAccess";
@@ -331,17 +332,20 @@ export const UserManagement: FC = () => {
             formMethods={userMethods}
             handleClick={handleChangeRole}
             extraContent={
-              platformRolesNote || isMultiTenantAdmin ? (
-                <div className="flex flex-col gap-3">
-                  {platformRolesNote}
-                  {isMultiTenantAdmin && (
-                    <AssignedOrganizations
-                      userId={selectedUser?.id as number}
-                      canEdit={canEditMultiTenantAdmins}
-                    />
-                  )}
-                </div>
-              ) : undefined
+              <div className="flex flex-col gap-3">
+                <RoleDescriptions />
+                {platformRolesNote || isMultiTenantAdmin ? (
+                  <div className="flex flex-col gap-3">
+                    {platformRolesNote}
+                    {isMultiTenantAdmin && (
+                      <AssignedOrganizations
+                        userId={selectedUser?.id as number}
+                        canEdit={canEditMultiTenantAdmins}
+                      />
+                    )}
+                  </div>
+                ) : null}
+              </div>
             }
           />
         );
@@ -500,12 +504,15 @@ export const UserManagement: FC = () => {
               formMethods={userMethods}
               handleClick={handleAddUser}
               extraContent={
-                isMultiTenantAdmin ? (
-                  <div className="text-sm text-typography-600 bg-background-secondary p-3 rounded-lg border border-border-light italic">
-                    {en.userManagement.noAssignedOrganizations}. Organizations can be assigned after
-                    the user is created.
-                  </div>
-                ) : undefined
+                <div className="flex flex-col gap-3">
+                  <RoleDescriptions />
+                  {isMultiTenantAdmin ? (
+                    <div className="text-sm text-typography-600 bg-background-secondary p-3 rounded-lg border border-border-light italic">
+                      {en.userManagement.noAssignedOrganizations}. Organizations can be assigned
+                      after the user is created.
+                    </div>
+                  ) : null}
+                </div>
               }
             />
 
