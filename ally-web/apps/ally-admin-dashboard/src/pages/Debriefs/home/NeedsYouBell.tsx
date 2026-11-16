@@ -58,7 +58,7 @@ export const NeedsYouBell: React.FC<{ items: DebriefHomeV2["needsYou"] }> = ({ i
         <div
           role="menu"
           data-testid="needs-you-menu"
-          className="absolute right-0 top-11 z-20 flex w-[380px] max-w-[calc(100vw-32px)] flex-col border border-neutral-100 bg-white shadow-lg"
+          className="absolute left-0 top-11 z-20 flex w-[380px] min-[1056px]:left-auto min-[1056px]:right-0 max-w-[calc(100vw-32px)] flex-col border border-neutral-100 bg-white shadow-lg"
         >
           <div className="border-b border-neutral-100 px-4 py-2.5 text-sm font-semibold">
             {t.bellLabel(n)}

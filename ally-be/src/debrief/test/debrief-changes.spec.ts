@@ -8,6 +8,7 @@ import {
   changeKindLabel,
   changeState,
   IdeaRow,
+  plainChangeTitle,
   toDebriefChange,
 } from '../util/debrief-changes.util';
 import { approvalState } from '../util/debrief-console-view.util';
@@ -778,5 +779,17 @@ describe('nothing sits untested waiting for a person (review 2026-11-16)', () =>
       .mockResolvedValueOnce([] as never);
     const out = await c.svc.watch(new Date('2026-11-16T00:00:00Z'));
     expect(out.moved).toBe(0);
+  });
+});
+
+describe('older budget titles read in plain words', () => {
+  it('maps raw setting keys, and leaves other titles alone', () => {
+    expect(plainChangeTitle('Settings: monthlyCapUsd')).toBe(
+      'Change the monthly cap',
+    );
+    expect(plainChangeTitle('Settings: runCeilingUsd, passScore')).toBe(
+      'Change the most one debrief may spend and the pass mark',
+    );
+    expect(plainChangeTitle('Monthly cap to $150')).toBe('Monthly cap to $150');
   });
 });

@@ -602,6 +602,32 @@ export function changeWhen(idea: IdeaRow, state: ChangeState): string {
   }
 }
 
+const SETTING_NAMES: Record<string, string> = {
+  monthlyCapUsd: 'the monthly cap',
+  runCeilingUsd: 'the most one debrief may spend',
+  passScore: 'the pass mark',
+};
+
+/**
+ * Older budget changes were titled with the raw setting keys
+ * ("Settings: monthlyCapUsd"); read those in plain words. Other titles pass.
+ */
+export function plainChangeTitle(text: string): string {
+  const m = /^Settings:\s*(.+)$/.exec(text.trim());
+  if (!m) return text;
+  const names = m[1]
+    .split(/\s*,\s*/)
+    .map(
+      (k) =>
+        SETTING_NAMES[k] ?? k.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase(),
+    );
+  const list =
+    names.length > 1
+      ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+      : names[0];
+  return `Change ${list}`;
+}
+
 /** The whole change as the Changes page shows it. */
 export function toDebriefChange(
   idea: IdeaRow,
@@ -621,7 +647,7 @@ export function toDebriefChange(
     id: idea.id,
     title: firstVersion
       ? `Sign off the ${pinnedRuleName(String(idea.change?.promptCode))} (in use since ${shortDate(idea.createdAt)})`
-      : String(idea.text ?? idea.title ?? ''),
+      : plainChangeTitle(String(idea.text ?? idea.title ?? '')),
     kind,
     state,
     result: changeResult(idea, state, ctx, waitsBecause),
