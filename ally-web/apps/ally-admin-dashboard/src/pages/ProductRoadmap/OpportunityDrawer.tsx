@@ -33,6 +33,7 @@ import {
   RoadmapVoteBudget,
 } from "@types";
 import { hasFeature } from "@utils";
+import { absoluteAppUrl } from "@utils/absoluteAppUrl";
 
 import { CopilotBrief } from "./CopilotBrief";
 import { RankBreakdownPanel } from "./RankBreakdown";
@@ -520,7 +521,7 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
   }, [canManage, isDirty, saveFailed, save, onClose]);
 
   const copyLink = async () => {
-    const url = `${window.location.origin}${ROUTES.PRODUCT_ROADMAP}?opportunity=${opportunityId}`;
+    const url = absoluteAppUrl(`${ROUTES.PRODUCT_ROADMAP}?opportunity=${opportunityId}`);
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Link copied.");

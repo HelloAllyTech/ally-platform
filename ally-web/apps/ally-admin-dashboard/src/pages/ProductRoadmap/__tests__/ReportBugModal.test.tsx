@@ -142,7 +142,9 @@ describe("ReportBugModal", () => {
     expect(hint).toHaveTextContent("Already reported?");
     expect(hint).toHaveTextContent("Vote button saves zero votes");
     expect(hint.querySelectorAll("li")).toHaveLength(1);
-    expect(hint.querySelector("a")?.getAttribute("href")).toBe("/bug-hunter?bug=f-dup");
+    expect(hint.querySelector("a")?.getAttribute("href")).toBe(
+      `${window.location.origin}/bug-hunter?bug=f-dup`,
+    );
     fillRequired();
     expect(screen.getByRole("button", { name: /report bug/i })).toBeEnabled();
   });
