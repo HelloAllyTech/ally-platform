@@ -56,6 +56,59 @@ function pmService(builder: any, decisions: any) {
   return { svc, query };
 }
 
+describe('autoStartHandoff: hand-offs start on their own (V2_AUTONOMY A8)', () => {
+  function auto(opts: { owner?: number | null; pausedUntil?: Date | null }) {
+    const builder = { createSession: jest.fn(async () => ({ id: SESSION })) };
+    const decisions = { startBackgroundTurn: jest.fn(async () => undefined) };
+    const { svc, query } = pmService(builder, decisions);
+    query.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM agent_lessons WHERE id')) return [idea()];
+      if (sql.includes('min(u.id)')) return [{ id: opts.owner ?? null }];
+      return [];
+    });
+    Object.defineProperty(svc, 'holds', {
+      value: { pausedUntil: jest.fn(async () => opts.pausedUntil ?? null) },
+    });
+    return { svc, query, builder };
+  }
+
+  it('starts Builder with nobody approving; the owner only holds the session', async () => {
+    const { svc, query, builder } = auto({ owner: 3 });
+    expect(await svc.autoStartHandoff(IDEA)).toEqual({
+      started: true,
+      stage: 'builder',
+      id: SESSION,
+    });
+    expect(builder.createSession).toHaveBeenCalledWith(3, expect.anything());
+    const handoffs = query.mock.calls
+      .filter((c: any[]) => c[1]?.[1] === 'handoff')
+      .map((c: any[]) => JSON.parse(c[1][2]));
+    expect(handoffs.pop()).toMatchObject({
+      status: 'filed',
+      decidedBy: null,
+      startedOnItsOwn: true,
+      answerer: 'pm_agent',
+    });
+    const approved = query.mock.calls.find((c: any[]) =>
+      String(c[0]).includes("status = 'approved'"),
+    );
+    expect(approved?.[1]).toEqual([IDEA, null]);
+  });
+
+  it('waits while code changes are paused, or with no owner to hold the session', async () => {
+    const paused = auto({ owner: 3, pausedUntil: new Date('2026-12-01') });
+    expect(await paused.svc.autoStartHandoff(IDEA)).toMatchObject({
+      started: false,
+      reason: expect.stringMatching(/paused until 2026-12-01/),
+    });
+    expect(paused.builder.createSession).not.toHaveBeenCalled();
+    const noOwner = auto({ owner: null });
+    expect(await noOwner.svc.autoStartHandoff(IDEA)).toMatchObject({
+      started: false,
+    });
+  });
+});
+
 describe('approveHandoff: Hand to Builder', () => {
   it('opens a session requested for the PM agent, stores the link, and starts the interview', async () => {
     const builder = { createSession: jest.fn(async () => ({ id: SESSION })) };

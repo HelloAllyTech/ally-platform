@@ -96,6 +96,10 @@ async def test_run_proposes_strips_reads_refusals_and_writes_memory():
                                 "metric": "practise_click_through",
                                 "direction": "up",
                             },
+                            "confidence": {
+                                "level": "low",
+                                "why": "Four comments, one language.",
+                            },
                         },
                         "id": "a",
                     }

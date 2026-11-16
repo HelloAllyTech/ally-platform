@@ -1127,6 +1127,45 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'debrief_improver_system',
   },
   {
+    id: 'debrief-pm-conversation',
+    task: LlmTask.DEBRIEF_PM_AGENT,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A person posts in the Debrief console’s PM agent conversation (POST v1/debriefs/console/pm-agent/conversation)',
+    detail:
+      'The PM agent answering one message (V2_AUTONOMY C1–C3, POST /pm-agent/conversation): a LangChain create_agent ' +
+      'loop over the PM agent’s gateway tools (read changes, sessions and metrics; propose; stop, undo, retry, hold a ' +
+      'language, pause a kind of change; approve or turn down only after the person’s explicit yes). No transcripts, ' +
+      'no learner words. Same task label and learning budget as the weekly run: each turn at most ' +
+      'min(pmAgentRunCapUsd, $0.25, learning budget left). Its instructions are the Skills Store prompt ' +
+      'ally_ai_debrief_pm_conversation_system (not pinned); its model is DEBRIEF_MODELS.pmAgent with pmAgentBackup.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy:
+      'DEBRIEF_MODELS.pmAgent / pmAgentBackup in debrief-release.constants.ts',
+    promptOverride: 'ally_ai_debrief_pm_conversation_system',
+  },
+  {
+    id: 'debrief-flag-answer',
+    task: LlmTask.DEBRIEF_FLAG_ANSWER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A learner flags a card of their debrief as not right ("This isn’t right"); a 5-minute sweep retries any that failed',
+    detail:
+      'The Debrief agent answers the flag within a minute (V2_AUTONOMY F1, POST /debrief/flag-answers): re-reads the ' +
+      'roleplay transcript and the flagged card and decides keep / correct (rewrites the card’s own fields; the quote ' +
+      'stays, quoted words must be in the transcript) / remove (never the important moment), with a short reply to ' +
+      'the learner in the debrief’s language. One structured call, the backup via with_fallbacks, one corrected ' +
+      'retry; at most $0.05 a flag. ally-be applies it as a card version and tells the learner.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3-flash-preview',
+    configuredBy:
+      'DEBRIEF_MODELS.flagAnswer / flagAnswerBackup in debrief-release.constants.ts',
+    promptOverride: 'ally_ai_debrief_flag_answer_system',
+  },
+  {
     id: 'rag-quality-judge',
     task: LlmTask.RAG_QUALITY_JUDGE,
     runtime: LlmRuntime.ALLY_AI,

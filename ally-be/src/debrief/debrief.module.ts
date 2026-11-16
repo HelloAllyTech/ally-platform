@@ -72,6 +72,12 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
 import { DebriefAdvisorsController } from './controller/debrief-advisors.controller';
 import { DebriefAdvisorsService } from './service/debrief-advisors.service';
 
+import { DebriefPmMessage } from './entity/debrief-pm-message.entity';
+import { DebriefChangeHold } from './entity/debrief-change-hold.entity';
+import { DebriefPmConversationService } from './service/debrief-pm-conversation.service';
+import { DebriefChangeHoldsService } from './service/debrief-change-holds.service';
+import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service';
+
 /**
  * The Debrief agent and its PM agent (plan: ally-debriefs-plan.md). Runs on
  * the agent harness's releases and learning tables. A debrief run is a graph
@@ -89,6 +95,9 @@ import { DebriefAdvisorsService } from './service/debrief-advisors.service';
       // Learner progress: each run's progress reading after the vetoes.
       DebriefProgressResult,
       DebriefFeedback,
+      // V2_AUTONOMY: the one PM agent conversation, and per-language pins and pauses.
+      DebriefPmMessage,
+      DebriefChangeHold,
       DebriefOwnerSettings,
       DebriefProbeResult,
       DebriefLearnerEvent,
@@ -150,6 +159,12 @@ import { DebriefAdvisorsService } from './service/debrief-advisors.service';
     // The PM agent Deep Agent's runs (ally-ai) and its gateway tools.
     DebriefPmAgentRunService,
     DebriefPmAgentToolsService,
+    // V2_AUTONOMY C1–C3: the PM agent conversation and its gateway tools.
+    DebriefPmConversationService,
+    // V2_AUTONOMY A9 and C2: language pins the runner honours, paused kinds of change.
+    DebriefChangeHoldsService,
+    // V2_AUTONOMY F1: the Debrief agent answers every learner flag.
+    DebriefFlagAnswerService,
     // "Hand to Builder": the PM agent answers Builder's interview (R2-20).
     DebriefBuilderRequesterService,
     DebriefConsoleService,

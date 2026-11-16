@@ -58,4 +58,18 @@ export class DebriefFeedback extends BaseWithoutTenantEntity {
 
   @Column({ type: 'text', nullable: true })
   resolutionNote?: string | null;
+
+  /**
+   * The Debrief agent's answer to a flag (V2_AUTONOMY F1, migration
+   * 1981901650000): what it did and the reply the learner reads. Null until
+   * answered, and for flags a person decided.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  answer?: {
+    action: 'kept' | 'corrected' | 'removed';
+    reply: string;
+    at: string;
+    model?: string | null;
+    costUsd?: number | null;
+  } | null;
 }

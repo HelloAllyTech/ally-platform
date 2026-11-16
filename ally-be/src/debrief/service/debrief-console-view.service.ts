@@ -675,6 +675,14 @@ export class DebriefConsoleViewService implements OnModuleInit {
       resolvedBy: r.resolvedBy
         ? { id: Number(r.resolvedBy), name: r.resolvedByName ?? null }
         : null,
+      // V2_AUTONOMY F1: the Debrief agent's answer, as the learner read it.
+      answer: r.answer
+        ? {
+            action: r.answer.action,
+            reply: r.answer.reply,
+            at: r.answer.at,
+          }
+        : null,
       cardText:
         r.section === ASK_ALLY_SECTION ? null : sectionText(cards, r.section),
       card:

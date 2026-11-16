@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -30,6 +35,7 @@ import {
   StepPolicy,
 } from '../util/debrief-console-view.util';
 import { DebriefSettingsService } from './debrief-settings.service';
+import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import type { AgreementView } from './debrief-agreement.service';
 
 /**
@@ -69,6 +75,8 @@ export class DebriefAutonomyService implements OnModuleInit {
     private readonly settings: DebriefSettingsService,
     private readonly audit: AuditLogService,
     private readonly moduleRef: ModuleRef,
+    /** V2_AUTONOMY C2: a kind of change a person paused until a date. */
+    @Optional() private readonly holds?: DebriefChangeHoldsService,
   ) {}
 
   onModuleInit(): void {
@@ -112,7 +120,13 @@ export class DebriefAutonomyService implements OnModuleInit {
     step: AutonomyStep,
     orgId?: string | null,
   ): Promise<StepPolicy> {
-    return this.effective(changeKindOf(idea.change), step, orgId);
+    const kind = changeKindOf(idea.change);
+    // Paused by a person in the PM agent conversation: nothing of this kind
+    // is tried until the pause ends. A pause that cannot be read is no pause.
+    if (kind && (await this.holds?.pausedUntil(kind).catch(() => null))) {
+      return 'off';
+    }
+    return this.effective(kind, step, orgId);
   }
 
   /**

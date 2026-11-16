@@ -577,6 +577,41 @@ class DebriefPmBuilderAnswersSystemInputs(PromptInputs):
     output_format: ClassVar[Optional[str]] = "structured"
 
 
+class DebriefPmConversationSystemInputs(PromptInputs):
+    """`debrief/pm_conversation_system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_debrief_pm_conversation_system",
+        name="Debrief PM agent: the console conversation",
+        description=(
+            "Instructions for the Debrief PM agent when a person talks to it in the "
+            "Debrief console (V2_AUTONOMY C1-C3): answer in plain words with "
+            "evidence, act through its tools, and repeat back and wait for an "
+            "explicit yes before approving or turning down a change. The thread, the "
+            "context and the person's message go in the messages."
+        ),
+    )
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+
+class DebriefFlagAnswerSystemInputs(PromptInputs):
+    """`debrief/flag_answer_system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_debrief_flag_answer_system",
+        name="Debrief agent: answering a learner's flag",
+        description=(
+            "Instructions for the Debrief agent when a learner flags a card as not "
+            "right (V2_AUTONOMY F1): re-read the roleplay, keep, correct or remove "
+            "the card (never remove the important moment), and reply to the learner "
+            "in the debrief's language. The transcript and card go in the user "
+            "message; the answer is structured."
+        ),
+    )
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+    output_format: ClassVar[Optional[str]] = "structured"
+
+
 class BuilderChangeInputs(PromptInputs):
     """`builder/change.txt`."""
 

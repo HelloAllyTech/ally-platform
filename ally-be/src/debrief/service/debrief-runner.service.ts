@@ -6,6 +6,7 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
 import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
+import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import { withPinnedPrompts } from '../util/debrief-releases.util';
 import {
   DEBRIEF_AGENT_KEY,
@@ -188,6 +189,8 @@ export class DebriefRunnerService {
     @Optional()
     @InjectRepository(DebriefProgressResult)
     private readonly progressResults?: Repository<DebriefProgressResult>,
+    /** V2_AUTONOMY A9: a language pinned to another release. Absent in unit tests. */
+    @Optional() private readonly holds?: DebriefChangeHoldsService,
   ) {}
 
   /**
@@ -281,8 +284,15 @@ export class DebriefRunnerService {
    */
   async run(sessionId: string, opts: RunOptions): Promise<DebriefRun> {
     const now = opts.now ?? Date.now;
+    // V2_AUTONOMY A9: a production session whose language is pinned (a change
+    // held or undone for it, or live only for it) runs on the pinned release.
+    // A pin that cannot be read never fails the run: the release in force runs.
+    const pinned =
+      !opts.release && opts.mode !== DebriefRunMode.REPLAY
+        ? await this.holds?.releaseForSession(sessionId).catch(() => null)
+        : null;
     const { release, bundle: released } = await this.resolveRelease(
-      opts.release,
+      opts.release ?? pinned,
     );
     const bundle: DebriefBundle = {
       ...released,

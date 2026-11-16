@@ -296,6 +296,9 @@ export const DEBRIEF_MODELS = {
   /** The prompt-only registry agents (ally-ai manifests name the same). */
   registryAgent: 'gemini-2.5-flash',
   registryAgentBackup: 'gemini-3-flash-preview',
+  /** V2_AUTONOMY F1: answering a learner's flag, the Writer's models. */
+  flagAnswer: 'gemini-3-flash-preview',
+  flagAnswerBackup: 'gemini-2.5-flash',
 } as const;
 
 const step = (

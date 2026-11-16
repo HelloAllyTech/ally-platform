@@ -133,7 +133,12 @@ function build(
     {} as any,
     {} as any,
   );
-  const controller = new DebriefGatewayController(tokens, gateway, pmTools);
+  const controller = new DebriefGatewayController(
+    tokens,
+    gateway,
+    pmTools,
+    {} as any,
+  );
   const bearer = (t = tokens.sign('run-1', 's1')) => `Bearer ${t}`;
   return {
     tokens,

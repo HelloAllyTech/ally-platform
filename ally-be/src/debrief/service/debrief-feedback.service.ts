@@ -170,6 +170,13 @@ export class DebriefFeedbackService {
     @Optional() private readonly publisher?: DebriefPublishService,
   ) {}
 
+  private readonly flagListeners: Array<(flagId: string) => void> = [];
+
+  /** Told of each new flag (V2_AUTONOMY F1: DebriefFlagAnswerService answers it). */
+  onFlag(listener: (flagId: string) => void): void {
+    this.flagListeners.push(listener);
+  }
+
   /** The learner's own published live debrief, or a refusal. */
   /**
    * v9 FR-31: the learner opened the debrief — the ready cards were in the
@@ -303,6 +310,14 @@ export class DebriefFeedbackService {
       resolutionNote: null,
     });
     const saved = await this.feedback.save(row);
+    // V2_AUTONOMY F1: the Debrief agent answers it within a minute.
+    for (const listener of this.flagListeners) {
+      try {
+        listener(saved.id);
+      } catch {
+        // An answer that cannot start is picked up by the sweep.
+      }
+    }
     return {
       id: saved.id,
       section: saved.section,
@@ -380,6 +395,14 @@ export class DebriefFeedbackService {
               r.status === DebriefFeedbackStatus.ESCALATED
                 ? DebriefFeedbackStatus.OPEN
                 : r.status,
+            // V2_AUTONOMY F1: what the Debrief agent did, and its reply.
+            answer: r.answer
+              ? {
+                  action: r.answer.action,
+                  reply: r.answer.reply,
+                  at: r.answer.at,
+                }
+              : null,
             canUndoUntil:
               r.status === DebriefFeedbackStatus.OPEN
                 ? new Date(
@@ -599,8 +622,13 @@ export class DebriefFeedbackService {
     runId: string,
     section: string,
     correction: CardCorrection,
-    userId: number,
-    meta: { note?: string | null; flagId?: string | null } = {},
+    userId: number | null,
+    meta: {
+      note?: string | null;
+      flagId?: string | null;
+      /** V2_AUTONOMY F1: the Debrief agent rewrote it, answering a flag. */
+      byAgent?: boolean;
+    } = {},
   ): Promise<{ version: number }> {
     const run = await this.runs.findOne({ where: { id: runId } });
     if (!run?.cards) throw new NotFoundException('This debrief has no cards');
@@ -639,6 +667,7 @@ export class DebriefFeedbackService {
         fields: changes.map(([f]) => f),
         note: meta.note?.trim() ? meta.note.trim().slice(0, 500) : null,
         flagId: meta.flagId ?? null,
+        ...(meta.byAgent ? { byAgent: true } : {}),
         before: run.cards,
       },
     ];
@@ -652,6 +681,87 @@ export class DebriefFeedbackService {
       { announce: false },
     );
     return { version };
+  }
+
+  /**
+   * V2_AUTONOMY F1: the Debrief agent's answer to a learner's flag, applied
+   * the way a person's decision is (resolveFlag): the card kept, corrected (a
+   * new card version, the quote locked) or removed, the reply as the note the
+   * learner reads, and the learner told. Stored on the flag as `answer`. An
+   * important-moment flag is never removed here: that answer is refused.
+   * Returns null when the flag was decided or withdrawn meanwhile.
+   */
+  async applyAgentAnswer(
+    flagId: string,
+    a: {
+      action: 'keep' | 'correct' | 'remove';
+      reply: string;
+      correction?: CardCorrection | null;
+      model?: string | null;
+      costUsd?: number | null;
+    },
+  ): Promise<DebriefFeedback | null> {
+    const row = await this.feedback.findOne({
+      where: { id: flagId, kind: DebriefFeedbackKind.FLAG },
+    });
+    if (
+      !row ||
+      row.answer ||
+      ![DebriefFeedbackStatus.OPEN, DebriefFeedbackStatus.ESCALATED].includes(
+        row.status,
+      )
+    ) {
+      return null;
+    }
+    const reply = (a.reply ?? '').trim().slice(0, 500);
+    if (!reply) throw new BadRequestException('The answer has no reply');
+    const important =
+      row.section === 'important_moment' ||
+      (row.section ?? '').startsWith('important_moment.');
+    if (a.action === 'remove' && important) {
+      throw new BadRequestException(
+        'An important-moment card is never removed automatically',
+      );
+    }
+    if (a.action === 'correct') {
+      await this.correctCard(
+        row.runId,
+        row.section!,
+        a.correction ?? {},
+        null,
+        {
+          note: reply,
+          flagId: row.id,
+          byAgent: true,
+        },
+      );
+    }
+    const action =
+      a.action === 'keep'
+        ? 'kept'
+        : a.action === 'correct'
+          ? 'corrected'
+          : 'removed';
+    row.status =
+      action === 'kept'
+        ? DebriefFeedbackStatus.KEPT
+        : action === 'corrected'
+          ? DebriefFeedbackStatus.CORRECTED
+          : DebriefFeedbackStatus.REMOVED;
+    row.resolvedBy = null;
+    row.resolvedAt = new Date();
+    row.resolutionNote = reply;
+    row.answer = {
+      action,
+      reply,
+      at: row.resolvedAt.toISOString(),
+      model: a.model ?? null,
+      costUsd: a.costUsd ?? null,
+    };
+    const saved = await this.feedback.save(row);
+    const run = await this.runs.findOne({ where: { id: row.runId } });
+    if (run) await this.notifier?.reviewed(run);
+    return saved;
   }
 
   /**
@@ -786,6 +896,58 @@ export class DebriefFeedbackService {
         },
       },
     } as any);
+  }
+
+  /**
+   * V2_AUTONOMY F2–F3: what the PM agent reads about flags answered, cards
+   * changed and Ask Ally replies replaced — counts, check codes and run ids,
+   * never a learner's note or anyone's words. A person's "Change it" (a card
+   * version not written by the agent) counts as a person correction.
+   */
+  async pmEvidence(windowDays: number) {
+    const answers = await this.dataSource.query(
+      `SELECT regexp_replace(section, '\\[\\d+\\]', '') AS section, reason,
+              answer->>'action' AS action, count(*)::int AS n,
+              count(*) FILTER (WHERE (answer->>'at')::timestamptz - "createdAt" <= interval '60 seconds')::int AS within_a_minute,
+              (array_agg("runId"::text ORDER BY "createdAt" DESC))[1:5] AS run_ids
+         FROM debrief_run_feedback
+        WHERE kind = 'flag' AND answer IS NOT NULL
+          AND "createdAt" >= now() - make_interval(days => $1)
+        GROUP BY 1, 2, 3`,
+      [windowDays],
+    );
+    const [unanswered] = await this.dataSource.query(
+      `SELECT count(*)::int AS n FROM debrief_run_feedback
+        WHERE kind = 'flag' AND answer IS NULL AND status IN ('open','escalated')
+          AND section <> $2 AND "createdAt" >= now() - make_interval(days => $1)`,
+      [windowDays, ASK_ALLY_SECTION],
+    );
+    const corrections = await this.dataSource.query(
+      `SELECT regexp_replace(v->>'section', '\\[\\d+\\]', '') AS section,
+              CASE WHEN (v->>'byAgent')::boolean THEN 'debrief_agent' ELSE 'person' END AS by,
+              count(*)::int AS n,
+              (array_agg(r.id::text))[1:5] AS run_ids
+         FROM debrief_runs r,
+              jsonb_array_elements(coalesce(r.workspace->'versions', '[]'::jsonb)) v
+        WHERE (v->>'at')::timestamptz >= now() - make_interval(days => $1)
+        GROUP BY 1, 2`,
+      [windowDays],
+    );
+    const replaced = await this.dataSource.query(
+      `SELECT f AS check_code, count(*)::int AS n, (array_agg(DISTINCT r.id::text))[1:5] AS run_ids
+         FROM debrief_runs r,
+              jsonb_array_elements(coalesce(r.workspace->'replacedReplies', '[]'::jsonb)) e,
+              jsonb_array_elements_text(coalesce(e->'fails', '[]'::jsonb)) f
+        WHERE (e->>'at')::timestamptz >= now() - make_interval(days => $1)
+        GROUP BY 1`,
+      [windowDays],
+    );
+    return {
+      flag_answers: answers,
+      flags_unanswered: Number(unanswered?.n ?? 0),
+      card_changes: corrections,
+      ask_ally_replaced: replaced,
+    };
   }
 
   /** Counts the PM agent reads: never the learners' notes. */
