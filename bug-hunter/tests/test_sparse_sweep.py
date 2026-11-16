@@ -89,3 +89,9 @@ def test_the_cost_cap_stops_the_sweep_cleanly_and_keeps_results() -> None:
     # $0.60 + $0.60: the third batch's runner refuses before its first call
     assert calls == ["ally-be", "ally-web", "ally-ai"] and cost == pytest.approx(1.2)
     assert batches[2].stopped.startswith("cost cap") and batches[1].stopped == ""
+
+
+def test_free_disk_is_measured_even_before_the_folder_exists(tmp_path) -> None:
+    from bug_hunter.signals.sparse import free_gb
+
+    assert free_gb(tmp_path / "not" / "yet" / "there") > 0

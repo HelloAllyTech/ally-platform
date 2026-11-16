@@ -23,6 +23,10 @@ class LowDisk(RuntimeError):
 
 
 def free_gb(path: Path) -> float:
+    """Free space on the volume holding ``path`` (or its nearest existing parent)."""
+    path = Path(path)
+    while not path.exists() and path != path.parent:
+        path = path.parent
     return shutil.disk_usage(path).free / 1e9
 
 
