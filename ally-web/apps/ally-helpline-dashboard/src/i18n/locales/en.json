@@ -920,7 +920,8 @@
         "this": "Practise this",
         "label": "Practise this in the roleplay \"{{title}}\"",
         "roleplays": "Open my roleplays",
-        "outsideCourse": "Outside this course: it won't count towards it."
+        "again": "Practise this again",
+        "tryFollowing": "Try the following:"
       },
       "reply": {
         "placeholder": "Answer here, or ask Ally anything about this session…"
@@ -958,6 +959,7 @@
       "workOnThis": "Work on this",
       "trySaying": "Try saying:",
       "practiseNext": "Practise this next",
+      "practiseAgain": "Practise this again",
       "skillWords": {
         "title": "Your skills in this session",
         "strength": "A strength today",

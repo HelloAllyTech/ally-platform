@@ -10178,6 +10178,7 @@ export const en = {
           quote_from_gap: "Quotes a part the transcript missed",
           jargon: "Uses a term the learner wasn't taught",
           duplicate_point: "Makes the same point twice",
+          custom_code: "Shows a custom competency's code",
         } as Record<string, string>,
         plannerFallback: {
           planner_failed: "Planner failed or returned a bad plan",

@@ -940,23 +940,50 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       }
     });
 
-    it("a suggestion outside the course opens its own page and says it won't count", () => {
-      mockLearnerDebriefQuery.mockReturnValue({
-        data: {
-          state: "ready",
-          cards: withLinks,
-          language: "en",
-          practice: [{ id: 41, title: "Exam stress", outsideCourse: true }],
-        },
-      });
-      renderTab();
-      expect(screen.getByTestId("debrief-practise-next")).toHaveAttribute("href", "/scenario/41");
-      expect(screen.getByTestId("debrief-practise-outside")).toHaveTextContent(
-        "postSim.debriefCards.practise.outsideCourse",
+    it("a course session's card is Practise this again, with what to try, opening this same course item", () => {
+      sessionStorage.setItem(
+        "activeTrackContext",
+        JSON.stringify({ trackId: "t-9", itemId: "i-41" }),
       );
+      try {
+        mockLearnerDebriefQuery.mockReturnValue({
+          data: {
+            state: "ready",
+            cards: {
+              ...withLinks,
+              practise_next: {
+                ...withLinks.practise_next,
+                try_next: [
+                  "Name her feeling.",
+                  "Ask what helps.",
+                  "Check she is safe.",
+                  "Too many.",
+                ],
+              },
+            },
+            language: "en",
+            practice: [{ id: 41, title: "Exam stress", trackItemId: "i-41" }],
+          },
+        });
+        renderTab();
+        const card = screen.getByTestId("debrief-card-practise-next");
+        expect(within(card).getByText("postSim.debriefCards.practiseAgain")).toBeInTheDocument();
+        const tryList = within(card).getByTestId("debrief-practise-try");
+        expect(tryList).toHaveTextContent("postSim.debriefCards.practise.tryFollowing");
+        expect(
+          within(tryList)
+            .getAllByRole("listitem")
+            .map(li => li.textContent),
+        ).toEqual(["Name her feeling.", "Ask what helps.", "Check she is safe."]);
+        const button = screen.getByTestId("debrief-practise-next");
+        expect(button).toHaveTextContent("postSim.debriefCards.practise.again");
+        expect(button).toHaveAttribute("href", "/track/t-9/item/i-41");
+      } finally {
+        sessionStorage.removeItem("activeTrackContext");
+      }
     });
 
-    it("a course roleplay has no outside-the-course note", () => {
+    it("a course item with no try_next still reads Practise this again", () => {
       mockLearnerDebriefQuery.mockReturnValue({
         data: {
           state: "ready",
@@ -966,7 +993,42 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
         },
       });
       renderTab();
-      expect(screen.queryByTestId("debrief-practise-outside")).not.toBeInTheDocument();
+      expect(screen.getByTestId("debrief-practise-next")).toHaveTextContent(
+        "postSim.debriefCards.practise.again",
+      );
+      expect(screen.queryByTestId("debrief-practise-try")).not.toBeInTheDocument();
+    });
+
+    it("outside a course the card stays Practise this next", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: withLinks,
+          language: "en",
+          practice: [{ id: 41, title: "Exam stress" }],
+        },
+      });
+      renderTab();
+      const card = screen.getByTestId("debrief-card-practise-next");
+      expect(within(card).getByText("postSim.debriefCards.practiseNext")).toBeInTheDocument();
+      expect(screen.getByTestId("debrief-practise-next")).toHaveTextContent(
+        "postSim.debriefCards.practise.next",
+      );
+    });
+
+    it("a card whose skill was removed shows its reason without an empty heading", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: { ...withLinks, practise_next: { reason: "It came up twice.", scenario_id: 41 } },
+          language: "en",
+          practice: [{ id: 41, title: "Exam stress" }],
+        },
+      });
+      renderTab();
+      const card = screen.getByTestId("debrief-card-practise-next");
+      expect(within(card).getByText("It came up twice.")).toBeInTheDocument();
+      expect(within(card).queryByRole("heading", { level: 4 })).not.toBeInTheDocument();
     });
   });
 

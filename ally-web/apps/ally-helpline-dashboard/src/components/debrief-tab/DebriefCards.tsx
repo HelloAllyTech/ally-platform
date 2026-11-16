@@ -165,15 +165,17 @@ const practicePath = (scenario: { id: number; trackItemId?: string }) => {
 /**
  * "Practise this next" / "Practise this": opens the roleplay's own page, so
  * its language choice and trigger warnings come first. Rendered only for a
- * roleplay the server says the learner can still open.
+ * roleplay the server says the learner can still open. `again`: a course
+ * session's "Practise this again", which opens this same course item.
  */
 const PractiseLink: FC<{
-  scenario: { id: number; title: string; trackItemId?: string; outsideCourse?: boolean };
+  scenario: { id: number; title: string; trackItemId?: string };
   primary?: boolean;
+  again?: boolean;
   onClick?: () => void;
-}> = ({ scenario, primary, onClick }) => {
+}> = ({ scenario, primary, again, onClick }) => {
   const { t } = useTranslation();
-  const link = (
+  return (
     <Link
       to={practicePath(scenario)}
       onClick={onClick}
@@ -185,22 +187,12 @@ const PractiseLink: FC<{
           : "inline-flex min-h-[44px] items-center gap-1 self-start rounded-md px-2 font-primary text-sm font-semibold text-primary-700 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
       }
     >
-      {primary ? t("postSim.debriefCards.practise.next") : t("postSim.debriefCards.practise.this")}
+      {again
+        ? t("postSim.debriefCards.practise.again")
+        : primary
+          ? t("postSim.debriefCards.practise.next")
+          : t("postSim.debriefCards.practise.this")}
     </Link>
-  );
-  // In a course, Practise this next says when its roleplay is outside the course:
-  // it won't count towards the course.
-  if (!scenario.outsideCourse || !primary) return link;
-  return (
-    <div className="flex flex-col gap-1">
-      {link}
-      <p
-        className="font-primary text-xs text-typography-600"
-        data-testid="debrief-practise-outside"
-      >
-        {t("postSim.debriefCards.practise.outsideCourse")}
-      </p>
-    </div>
   );
 };
 
@@ -339,6 +331,16 @@ const ReadyCards: FC<{
     .map((item, index) => ({ item, index }))
     .filter(({ index }) => !removed.has(`work_on_this[${index}]`));
   const practise = removed.has("practise_next") ? null : cards.practise_next;
+  const practiseOption = practiceFor(practise?.scenario_id);
+  const tryNext = (Array.isArray(practise?.try_next) ? practise!.try_next : [])
+    .filter((x): x is string => typeof x === "string" && !!x.trim())
+    .slice(0, 3);
+  // A course session (clinical review 2026-11-16): practise this same course
+  // item again, with what to try this time.
+  const practiseAgain = !!practiseOption?.trackItemId || tryNext.length > 0;
+  const practiseTitle = practiseAgain
+    ? t("postSim.debriefCards.practiseAgain")
+    : t("postSim.debriefCards.practiseNext");
   const progressCard = removed.has("progress_card") ? null : parseProgressCard(cards.progress_card);
 
   const momentTitle = moment?.handled_well
@@ -459,15 +461,28 @@ const ReadyCards: FC<{
           <Card
             testId="debrief-card-practise-next"
             readSection="practise_next"
-            title={t("postSim.debriefCards.practiseNext")}
+            title={practiseTitle}
             icon={<Sprout aria-hidden="true" className="h-5 w-5 text-primary-600" />}
           >
-            <Lead>{practise.skill}</Lead>
+            {practise.skill ? <Lead>{practise.skill}</Lead> : null}
             <Body>{practise.reason}</Body>
-            {practiceFor(practise.scenario_id) ? (
+            {tryNext.length > 0 && (
+              <div data-testid="debrief-practise-try">
+                <p className="font-primary text-sm font-semibold text-typography-900">
+                  {t("postSim.debriefCards.practise.tryFollowing")}
+                </p>
+                <ul className="mt-1 list-disc ps-5 font-primary text-sm leading-relaxed text-typography-800">
+                  {tryNext.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {practiseOption ? (
               <PractiseLink
-                scenario={practiceFor(practise.scenario_id)!}
+                scenario={practiseOption}
                 primary
+                again={practiseAgain}
                 onClick={() => report("practise_next_click")}
               />
             ) : (
@@ -486,7 +501,7 @@ const ReadyCards: FC<{
                 </Link>
               )
             )}
-            {flagControl("practise_next", t("postSim.debriefCards.practiseNext"))}
+            {flagControl("practise_next", practiseTitle)}
           </Card>
         )}
 

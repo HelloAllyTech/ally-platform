@@ -65,7 +65,17 @@ export interface DebriefCardsData {
   important_moment?: DebriefImportantMoment | null;
   what_worked: DebriefWhatWorked[];
   work_on_this: DebriefWorkOnThis[];
-  practise_next?: { skill: string; reason: string; scenario_id?: number | null } | null;
+  /**
+   * `try_next`: a session played in a course — "Practise this again" with up
+   * to 3 things to try. `skill` can be missing when a custom competency's
+   * code was removed from an older debrief.
+   */
+  practise_next?: {
+    skill?: string;
+    reason: string;
+    scenario_id?: number | null;
+    try_next?: string[];
+  } | null;
   skill_words: Array<{ skill: string; word: DebriefSkillWord }>;
   reflective_question: string;
   progress_note?: string | null;
@@ -152,8 +162,7 @@ export interface LearnerDebriefView {
    * Roleplays the cards link to that the learner can still open. Inside a
    * course only that course's roleplays, each with its course item.
    */
-  /** `outsideCourse`: in a course, a roleplay outside it (it won't count towards it). */
-  practice?: Array<{ id: number; title: string; trackItemId?: string; outsideCourse?: boolean }>;
+  practice?: Array<{ id: number; title: string; trackItemId?: string }>;
   /** Present only on a debrief picked for the pulse, with the answers so far. */
   pulse?: DebriefPulse | null;
   /**
