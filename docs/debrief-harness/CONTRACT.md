@@ -450,9 +450,10 @@ synthetic planner cases, gemini-2.5-flash p50 10.8 s / p90 17.8 s / max 17.9 s),
 
 ## 7. The PM agent — `POST /api/v1/pm-agent/runs` (ally-ai)
 
-Spec Part C. One Deep Agent (`app/core/pm_agent`, `create_deep_agent`): planning (`write_todos`), one read-only
-investigator subagent per problem (`task`; it replaces the default general-purpose subagent so no subagent can
-act), memory under `/memories/` in LangGraph's Postgres store (namespace `("debrief_pm_agent", "memories")`, same
+Spec Part C. One Deep Agent (`app/core/pm_agent`, `create_deep_agent`, built by `build_pm_deep_agent`, shared
+with the conversation §7c): planning (`write_todos`), one read-only investigator subagent per problem (`task`; it
+replaces the default general-purpose subagent so no subagent can act), the reviewer subagent for every proposed
+change (§7d), memory under `/memories/` in LangGraph's Postgres store (namespace `("debrief_pm_agent", "memories")`, same
 database, schema and pool as the checkpoints; in memory without `AGENT_RUNTIME__CHECKPOINT_DB_URL`), skills under
 `/skills/` (read-only: prompt change, registry agent, Builder brief), scratch files for drafts. No outer graph
 (D7). Auth: the service `X-API-Key`. Synchronous; ally-be waits up to 45 minutes. Thread id `pm-agent:<agent_run_id>`
@@ -476,7 +477,7 @@ tracing is off for the run; the trace is the returned `steps`.
     "idea_outcomes": [ { id, title, status, route, kind, quick_test, gate, trial, canary, handoff, forecast } ],
     "last_run": { at, status, ideas, refusals } | null, "autonomy": { mode, meaning }
   },
-  "tools": [ "comments_read", ... ],      // what the agent token lists; the agent is given only these
+  "tools": [ "comments_read", ..., "change_read" ], // what the agent token lists (WEEKLY_RUN_TOOLS); the agent is given only these
   "agent_token": "<signAgent JWT>",
   "gateway_url": "https://<ally-be>/api/v1/internal/debrief"
 }
@@ -550,42 +551,86 @@ merged · closed, the waiting question, the PM agent's answers, pull requests) a
 ## 7c. The PM agent conversation — `POST /api/v1/pm-agent/conversation` (ally-ai)
 
 V2_AUTONOMY C1–C5. One person's message in the console's shared thread, answered. ally-ai
-(`app/core/pm_agent/conversation.py`): a LangChain `create_agent` loop over the gateway tools with
-the weekly run's guard (`PmRunGuard`: model then backup with the circuit breaker, the budget,
-`llm_usage` as `debrief_improver`, step records); no checkpointer (the thread lives in ally-be);
-LangSmith off. Instructions: Skills Store `ally_ai_debrief_pm_conversation_system` (default
+(`app/core/pm_agent/conversation.py`) runs the same Deep Agent harness as the weekly run
+(`agent.build_pm_deep_agent`):
+
+- **memory**: `/memories/AGENTS.md` in the same store namespace (`("debrief_pm_agent", "memories")`), loaded
+  into every turn and every weekly run. What a person tells it in the console ("Hindi formality depends on the
+  organisation") is written there and the next weekly run reads it, and the reverse;
+- **skills**: `/skills/`, read-only;
+- **subagents**: the investigator (`general-purpose`, for questions that need several lookups) and the
+  reviewer (§7d), both with read-only gateway tools (`SUBAGENT_READ_TOOLS`) and every file write denied;
+- **guard**: `PmRunGuard` (model then backup with the circuit breaker, the turn's budget, `llm_usage` as
+  `debrief_improver`, step records); LangSmith off;
+- **thread**: the Postgres checkpointer, thread id `debrief-pm-conversation` (the console's shared thread) or
+  `debrief-pm-conversation:pinned-rules` (the clinical advisor's turns, so an advisor's answer never draws on the
+  rest of the thread, C4). Each turn continues from the checkpoint; ally-be sends only the new message.
+  `debrief_pm_messages` stays the record the console reads. `503` when the checkpoint database could not be opened.
+
+Instructions: Skills Store `ally_ai_debrief_pm_conversation_system` (default
 `app/prompts/debrief/pm_conversation_system.txt`).
 
 ```jsonc
 {
   "turn_id": "uuid",                 // the person's message id; also the agent token's agentRunId
+  "thread_id": "debrief-pm-conversation" | "debrief-pm-conversation:pinned-rules",
   "model": "gemini-2.5-pro", "backup_model": "gemini-2.5-flash", "prices": { ... },
   "budget_usd": 0.25,                // min(pmAgentRunCapUsd, 0.25, learning budget left)
-  "history": [ { "who": "person|agent", "author", "text", "about", "action" } ],  // last 20, oldest first
   "message": "...", "author": "Asha",
   "about": { "kind", "id", "label", "evidence": { change_read or session_read output } } | null,
-  "pending_plan": { "plan_id", "plan", "action" } | null,   // only when this person was asked
+  "resume": { "interrupt_id", "decision": "approve" | "reject", "message"? } | null,  // the thread's pause, decided
+  "always_ask_idea_ids": [ "uuid" ], // a retry of these pauses for a yes
   "prompts": { ... } | null, "tools": [ ... ], "agent_token": "...", "gateway_url": "..."
 }
 ```
 
-Response: `{ status: finished|budget_spent|failed, reply, steps, estimated_cost_usd, model,
-refusals, error }`. A failure still answers 200 with a plain reply. ally-be stores the reply; its
-`action` comes from the gateway's own record of the turn, never from the model.
+Response: `{ status: finished|budget_spent|failed, reply, pending: { interrupt_id, actions: [ { tool, args, plan }
+] } | null, thread_id, tool_texts: [ every string the turn's tools returned ], steps, estimated_cost_usd, model,
+refusals, error }`. A failure still answers 200 with a plain reply. ally-be stores the reply; its `action` comes
+from the gateway's own record of the turn, never from the model.
 
-Conversation tools (same gateway route, agent token signed per turn for 15 minutes; never in a
-weekly run's token). The advisor's turn gets `change_read`, `change_approve`, `change_turn_down`,
-`confirm_plan` only. Refusals answer 200 `{ refused }` in words the agent relays.
+**Waiting for a yes (LangGraph human-in-the-loop).** `interrupt_on` pauses `change_approve`, `change_turn_down`,
+and `change_retry` when its change is in `always_ask_idea_ids` (allowed decisions: approve, reject). The agent's
+message before the pause states the plan (the call's `plan`); when the model wrote none, the reply is the plan and
+"Shall I go ahead? Reply yes to confirm." ally-be (`DebriefPmConversationService`):
+
+1. checks the pause at once (`checkPause`): a pausing tool, a change this person may decide (advisor: pinned rules
+   only), status `proposed`/`approved` for a decision, a turn-down's reason, and the permission (`requiredAction`:
+   a pinned rule the advisor's or owner's, a budget increase the owner's, else `pmAgent`). If not, it resumes at
+   once with `reject` and the reason (the deciders are told), in the same turn, so the reply already says who
+   decides. Otherwise it keeps the pause on the reply (`debrief_pm_messages.plan`: `{ id: interrupt id, threadId,
+   actions: [ { tool, ideaId, args, label } ], text, label, askedUserId, at }`) and records `awaiting_yes`;
+2. the thread's next message resolves it, once (`usedAt`, `decision`): the asked person's explicit yes
+   (`isExplicitYes`), within 24 hours, with the permission for every action → `resume: { decision: "approve" }`
+   and an agent token signed for that person with `approved: [ { tool, ideaId } ]`; anything else → `reject` with a
+   message holding the person's words (not a yes; someone else wrote; lapsed; no permission), and the agent answers
+   what they said;
+3. the gateway carries out `change_approve` / `change_turn_down` (and an always-ask `change_retry`) only with a
+   matching `approved` entry in the token, and checks the permission again, as the person who said yes.
+
+A plain message to a paused thread (a pause ally-be no longer keeps) continues the thread; the harness marks the
+dangling call cancelled (`PatchToolCallsMiddleware`), so nothing acts.
+
+**The quote check.** Every reply is checked in ally-be before it is shown (`pmReplyUnmatched`, Ask Ally's
+`unmatchedQuotes` plus text presented after "wording:", "rule:", "before:", "after:", "reads:", "says:" and block
+quotes): it must appear verbatim (whitespace and quote marks normalised; fragments under 12 characters not checked) in
+`tool_texts`, the `about` evidence or the person's own message. A failing reply is not shown: the message reads "I
+don't have that text, so I can't quote it. Ask me to read the change first.", the reply is kept in the audit
+(`blocked`, `step: conversation_quote_check`, `withheldReply`), and a pause it asked about is not kept. Eval:
+`ally-ai/scripts/eval_pm_conversation_quotes.py`.
+
+Conversation tools (same gateway route, agent token signed per turn for 15 minutes; a weekly run's token lists
+only `change_read` of them, for its reviewer). The advisor's turn gets `change_read`, `change_approve`,
+`change_turn_down` only. Refusals answer 200 `{ refused }` in words the agent relays.
 
 | Tool | Body | Does |
 |---|---|---|
-| `change_read` | `{ idea_id }` | the change: status, kind, confidence, `always_asks_because`, rungs, hand-off, languages / held languages, undo / stop, the last 10 conversation entries |
+| `change_read` | `{ idea_id }` | the change: status, kind, confidence, `always_asks_because`, rungs, hand-off, languages / held languages, undo / stop, the last 10 conversation entries, `wording` / `rule_text`. A weekly run's token (no person's turn) reads as the Ally team |
 | `session_read` | `{ run_id }` | the run's summary: status, language, recipe, release, cost, judge score and hard fails, helpful, flags with answers. Never the transcript or a learner's words |
-| `change_approve` / `change_turn_down` | `{ idea_id, plan, reason? }` | never acts: checks the person's permission, stores a plan, answers `awaiting_yes` + `plan_id` |
-| `confirm_plan` | `{ plan_id }` | carries out the plan made in the agent's previous message, only when the same person's current message is an explicit yes and they hold the permission; used once; plans last 24 h |
+| `change_approve` / `change_turn_down` | `{ idea_id, plan, reason? }` | only on a resumed turn whose token approves exactly this; permission checked again; then approve / reject (pinned rules through the pinned-rule path) as that person |
 | `change_stop` | `{ idea_id, reason? }` | `DebriefChangesService.stop` |
 | `change_undo` | `{ idea_id, languages?, reason? }` | all languages: `DebriefChangesService.undo`; named languages: pinned to the release before (`debrief_change_holds`, `undone`); a change live only for some languages: those pins lifted |
-| `change_retry` | `{ idea_id, languages?, reason? }` | held / undone languages of a live change: pins lifted; a stopped or undone prompt or setting change: ladder evidence cleared, `change.languages` set, quick check started. An always-ask change answers `awaiting_yes` first |
+| `change_retry` | `{ idea_id, languages?, reason?, plan? }` | held / undone languages of a live change: pins lifted; a stopped or undone prompt or setting change: ladder evidence cleared, `change.languages` set, quick check started. An always-ask change: only with the person's yes in the token |
 | `change_hold_language` | `{ idea_id, language, reason? }` | pins one language to the release before (live) or the release in force (being tried) |
 | `changes_pause` | `{ kind: prompts\|settings\|code, until, reason? }` | no change of that kind is tried (`DebriefAutonomyService.forIdea` → off) or handed over until then; at most 90 days |
 
@@ -594,6 +639,21 @@ an active pin on the pinned release; such a session never joins a learner try-ou
 outside a try-out's `change.languages`. A change with `change.languages` goes live only for those
 languages (`DebriefPmAgentService.liveForLanguagesOnly`: pins with reason `only`; the release in
 force is unchanged for everyone else). Pins stay until lifted.
+
+## 7d. The reviewer — every proposed change, before it is tried
+
+A subagent of the weekly run and the conversation (`agent.REVIEWER`): fresh context, read-only tools
+(`change_read`, reporting, comments, metrics), handed only the change's id. It answers three questions, each yes /
+no / unclear with evidence (structured `ReviewVerdict`, the subagent's `response_format`): does the evidence support
+the change (`supported`); does it fit every language and organisation it would reach (`fits_everywhere`); is it free
+of safety risk — risk cues, crisis lines and support copy, learners in distress (`safe`). ally-ai's code
+(`ReviewRecorder`, wrapping the `task` call), not a model, posts the verdict to the gateway:
+`change_review_record { idea_id, supported, fits_everywhere, safe }` (each `{ answer, evidence }`) → `{ ok, level,
+why }`. ally-be (`DebriefPmAgentToolsService.reviewRecord`) sets `evidence.confidence` to `high` only when all
+three are yes, else `low` with the reasons, and keeps the answers in `evidence.review`; the always-ask check
+(`debrief-always-ask.util.ts`, `askLowConfidence`) reads it. `idea_propose` stores the agent's own confidence as
+`evidence.statedConfidence` (advice) and `confidence: low, "Not reviewed yet"`; `release_draft`'s `confidence`
+also goes to `statedConfidence`. A change the reviewer never answered therefore waits for a person.
 
 ## 9. A learner's flag answered — `POST /api/v1/debrief/flag-answers` (ally-ai)
 

@@ -33,7 +33,9 @@ that was rejected or failed unless the evidence changed, and say what changed.
 4. Route each idea:
    - A (you): a prompt edit, a setting, or a prompt-only registry agent. Draft it \
 with release_draft (load the matching skill first), then ladder_start_quick_test. \
-ally-be runs the rest of the ladder and people promote.
+ally-be runs the rest of the ladder and people promote. After drafting, hand the \
+change's id to the reviewer subagent (task, reviewer) and nothing else: its verdict \
+sets the change's confidence, and a change it is not sure about waits for a person.
    - B (Builder): anything needing code (a new tool, data source, UI). builder_handoff \
 with the "brief Builder" skill.
    - C (Bug Hunter): a defect against existing intent. bug_hunter_report with run ids.

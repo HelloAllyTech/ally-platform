@@ -18,7 +18,7 @@ from app.core.pm_agent.quotes import REMOVED, strip_quotes
 from app.core.pm_agent.runner import run_pm_agent
 from app.core.pm_agent.schemas import PmAgentRunRequest
 from app.core.pm_agent.store import MEMORY_NAMESPACE
-from app.core.pm_agent.tools import ALL_TOOLS, READ_TOOLS
+from app.core.pm_agent.tools import ALL_TOOLS, READ_TOOLS, SUBAGENT_READ_TOOLS
 from tests.core.ask_ally.fakes import FakeGateway, ScriptedModel, ai
 
 PRIMARY = "gemini-2.5-pro"
@@ -368,13 +368,19 @@ def test_subagents_only_get_read_tools(monkeypatch):
         system_prompt="s",
         store=InMemoryStore(),
         checkpointer=None,
+        gateway=FakeGateway(),
     )
-    (sub,) = seen["subagents"]
-    assert (
-        sub["name"] == "general-purpose"
-    )  # replaces the default, which would inherit all
-    assert {t.name for t in sub["tools"]} == set(READ_TOOLS)
+    investigator, reviewer = seen["subagents"]
+    # Replaces the default, which would inherit every tool.
+    assert investigator["name"] == "general-purpose"
+    assert reviewer["name"] == "reviewer"
+    for sub in (investigator, reviewer):
+        assert {t.name for t in sub["tools"]} <= set(SUBAGENT_READ_TOOLS)
+        assert {t.name for t in sub["tools"]} == set(SUBAGENT_READ_TOOLS)
+        assert sub["interrupt_on"] == {}
+    assert reviewer["response_format"].schema is agent_module.ReviewVerdict
     assert len(seen["tools"]) == len(ALL_TOOLS)
+    assert seen["interrupt_on"] is None  # the weekly run never pauses
     assert seen["skills"] == ["/skills/"] and seen["memory"] == ["/memories/AGENTS.md"]
 
 

@@ -586,9 +586,10 @@ class DebriefPmConversationSystemInputs(PromptInputs):
         description=(
             "Instructions for the Debrief PM agent when a person talks to it in the "
             "Debrief console (V2_AUTONOMY C1-C3): answer in plain words with "
-            "evidence, act through its tools, and repeat back and wait for an "
-            "explicit yes before approving or turning down a change. The thread, the "
-            "context and the person's message go in the messages."
+            "evidence, act through its tools, state the plan and wait for an explicit "
+            "yes before approving or turning down a change (the turn pauses), and "
+            "note what people tell it in its memory. The person's message and its "
+            "context go in the messages; the thread is a checkpoint thread."
         ),
     )
     model_config = ConfigDict(extra="forbid", protected_namespaces=())

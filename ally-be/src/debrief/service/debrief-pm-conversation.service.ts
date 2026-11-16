@@ -8,7 +8,6 @@ import {
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios, { AxiosError } from 'axios';
-import { randomUUID } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
@@ -22,6 +21,7 @@ import {
   DebriefPmMessage,
   PmAbout,
   PmPlan,
+  PmPlanAction,
   PmTurnAction,
 } from '../entity/debrief-pm-message.entity';
 import { modelPrices } from '../util/debrief-budget.util';
@@ -39,7 +39,9 @@ import {
   isPinnedRuleChange,
   MAX_MESSAGE_CHARS,
   PmMessageView,
+  pmReplyUnmatched,
   requiredAction,
+  textLeaves,
   toPmMessage,
   whoDecides,
 } from '../util/debrief-pm-conversation.util';
@@ -55,6 +57,7 @@ import {
   DebriefAgentClaims,
   DebriefRunTokenService,
   PmAgentGatewayTool,
+  PmApprovedAction,
   PmConversationTool,
 } from './debrief-run-token.service';
 import { DebriefSettingsService } from './debrief-settings.service';
@@ -66,10 +69,24 @@ export const PM_CONVERSATION_PROMPT_CODE =
 export const CONVERSATION_TURN_CAP_USD = 0.25;
 /** ally-ai answers within ~10–30 s; past this the turn is failed. */
 export const CONVERSATION_TIMEOUT_MS = 120_000;
-/** Thread messages sent as context. */
-const HISTORY = 20;
-/** A plan older than this needs asking again. */
+/**
+ * ally-ai's checkpoint thread for the console's one shared conversation; the
+ * clinical advisor's turns have their own, so the agent never brings the rest
+ * of the thread into an advisor's answer (C4).
+ */
+export const PM_CONVERSATION_THREAD = 'debrief-pm-conversation';
+export const PM_CONVERSATION_ADVISOR_THREAD =
+  'debrief-pm-conversation:pinned-rules';
+/** A pause older than this lapses: the next message turns it down. */
 const PLAN_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * Shown instead of a reply that quotes, or presents as a change's wording or
+ * a rule's text, anything the turn's tools did not return verbatim.
+ */
+export const QUOTE_CHECK_REPLY =
+  "I don't have that text, so I can't quote it. Ask me to read the change first.";
+/** The tools that pause for a person's yes (ally-ai `INTERRUPT_ON`). */
+const PAUSING_TOOLS = ['change_approve', 'change_turn_down', 'change_retry'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Every tool a full conversation turn is given. */
@@ -89,14 +106,12 @@ export const CONVERSATION_TURN_TOOLS: readonly PmAgentGatewayTool[] = [
   'change_retry',
   'change_hold_language',
   'changes_pause',
-  'confirm_plan',
 ];
 /** The clinical advisor's turn: read and decide pinned-rule changes, nothing else. */
 export const ADVISOR_TURN_TOOLS: readonly PmAgentGatewayTool[] = [
   'change_read',
   'change_approve',
   'change_turn_down',
-  'confirm_plan',
 ];
 
 /** A refusal the agent reads (200 `{ refused }`) and relays in plain words. */
@@ -105,9 +120,25 @@ const refuse = (reason: string): never => {
   throw new Refused(reason);
 };
 
+/** The action(s) ally-ai's turn paused on (a LangGraph interrupt). */
+interface PmPending {
+  interrupt_id: string;
+  actions: Array<{ tool: string; args: Record<string, any>; plan: string }>;
+}
+
+/** ally-be's decision on a paused turn, for ally-ai to resume with. */
+interface PmResume {
+  interrupt_id: string;
+  decision: 'approve' | 'reject';
+  message?: string | null;
+}
+
 interface PmConversationResponse {
   status: 'finished' | 'budget_spent' | 'failed';
   reply?: string | null;
+  pending?: PmPending | null;
+  /** Every string the turn's tools returned (the quote check's sources). */
+  tool_texts?: string[];
   estimated_cost_usd?: number;
   model?: string | null;
   steps?: Array<Record<string, unknown>>;
@@ -117,19 +148,28 @@ interface PmConversationResponse {
 
 /**
  * The Debrief console's one PM agent conversation (V2_AUTONOMY C1–C3): one
- * shared thread in `debrief_pm_messages`. A person's message runs the PM
- * agent in ally-ai (`POST /api/v1/pm-agent/conversation`) with the recent
- * thread, what the person is looking at and its evidence, and a token for the
+ * shared thread in `debrief_pm_messages`, the record the console reads. A
+ * person's message runs the PM agent in ally-ai (`POST
+ * /api/v1/pm-agent/conversation`), a Deep Agent on a checkpoint thread
+ * (`PM_CONVERSATION_THREAD`; the advisor's own), with only the new message,
+ * what the person is looking at and its evidence, and a token for the
  * conversation's tools. The agent replies and acts only through those tools,
  * served here; each action is recorded on the person's message, on the change
  * (`evidence.conversation`) and in the audit with the person's words.
  *
  * Permissions are today's (debrief-console-roles.util.ts): the Ally team and
  * the owner (`pmAgent`) read and post; the clinical advisor only about
- * pinned-rule changes. Approving or turning down a change is repeated back and
- * waits for the same person's explicit yes; then it runs as that person, and
- * only if they hold the permission — a pinned rule the advisor's or owner's,
- * a budget increase the owner's — otherwise the agent says so and asks them.
+ * pinned-rule changes. Approving or turning down a change, and retrying one
+ * that always asks, pause ally-ai's turn (LangGraph human-in-the-loop); the
+ * pause is kept on the reply (`plan`). The thread's next message resolves it:
+ * the same person's explicit yes, with the permission — a pinned rule the
+ * advisor's or owner's, a budget increase the owner's — resumes with approve
+ * and a token signed for them (`approved`); anything else resumes with reject
+ * and their words, and the agent answers them.
+ *
+ * Every reply is checked before it is shown: what it quotes, or presents as a
+ * change's wording or a rule's text, must be in what the turn's tools returned
+ * (`pmReplyUnmatched`); a reply that fails is kept in the audit only.
  */
 @Injectable()
 export class DebriefPmConversationService {
@@ -282,22 +322,174 @@ export class DebriefPmConversationService {
         actions: [],
       }),
     );
-    const reply = await this.answer(person, access, about);
+    const reply = await this.answer(person, viewer, access, about);
     return { messages: [toPmMessage(person), toPmMessage(reply)] };
   }
 
-  /** The plan waiting for this person's yes, from the agent's last message to them. */
-  private async pendingPlan(before: Date): Promise<DebriefPmMessage | null> {
-    const last = await this.messages
+  /**
+   * The agent message whose pause the thread is still waiting on: at most one
+   * per thread, since every message in the thread resolves it.
+   */
+  private async pausedOn(threadId: string): Promise<DebriefPmMessage | null> {
+    return this.messages
       .createQueryBuilder('m')
       .where(`m.who = 'agent'`)
-      .andWhere('m."createdAt" < :at', { at: before })
+      .andWhere(`m.plan->>'threadId' = :threadId`, { threadId })
+      .andWhere(`m.plan->>'usedAt' IS NULL`)
       .orderBy('m."createdAt"', 'DESC')
       .getOne();
-    const plan = last?.plan;
-    if (!plan || plan.usedAt) return null;
-    if (Date.now() - new Date(plan.at).getTime() > PLAN_TTL_MS) return null;
-    return last!;
+  }
+
+  /**
+   * The person's message answers the pause: approve only for the asked
+   * person's explicit yes, within a day, with the permission for every action;
+   * otherwise reject, with words the agent reads. Resolved once, either way.
+   */
+  private async resolve(
+    paused: DebriefPmMessage,
+    person: DebriefPmMessage,
+    viewer: DebriefViewer,
+  ): Promise<{ resume: PmResume; approved: PmApprovedAction[] }> {
+    const plan = paused.plan!;
+    const who = person.authorName ?? 'The person';
+    const words = `“${person.text.slice(0, 500)}”`;
+    let reason: string | null = null;
+    if (Date.now() - new Date(plan.at).getTime() > PLAN_TTL_MS) {
+      reason = `The plan waited over a day, so it lapsed and nothing was done. ${who} wrote next: ${words}`;
+    } else if (plan.askedUserId !== person.authorUserId) {
+      reason = `${who} wrote next, and only the person who was asked can say yes to the plan, so nothing was done. ${who} wrote: ${words}`;
+    } else if (!isExplicitYes(person.text)) {
+      reason = `${who} did not say yes, so nothing was done. They wrote: ${words}`;
+    } else {
+      for (const a of plan.actions) {
+        if (!a.ideaId) continue;
+        try {
+          const idea = await this.pm.getIdea(a.ideaId);
+          await this.requirePermission(
+            person,
+            viewer,
+            idea,
+            requiredAction(idea, a.tool !== 'change_retry'),
+            verb(a.tool),
+          );
+        } catch (e) {
+          if (!(e instanceof Refused) && !(e instanceof HttpException)) throw e;
+          reason = `${(e as Error).message} Nothing was done.`;
+          break;
+        }
+      }
+    }
+    const decision = reason ? 'reject' : 'approve';
+    await this.dataSource.query(
+      `UPDATE debrief_pm_messages
+          SET plan = plan || jsonb_build_object('usedAt', now()::text, 'decision', $2::text)
+        WHERE id = $1`,
+      [paused.id, decision],
+    );
+    if (reason) {
+      return {
+        resume: { interrupt_id: plan.id, decision: 'reject', message: reason },
+        approved: [],
+      };
+    }
+    return {
+      resume: { interrupt_id: plan.id, decision: 'approve' },
+      approved: plan.actions.map((a) => ({ tool: a.tool, ideaId: a.ideaId })),
+    };
+  }
+
+  /**
+   * A pause the person could say yes to: each action is one that pauses, on a
+   * change they may decide, with what it needs. Returns why not (recorded as a
+   * failed action, the decider told when it is a permission) or the actions.
+   */
+  private async checkPause(
+    person: DebriefPmMessage,
+    viewer: DebriefViewer,
+    pending: PmPending,
+  ): Promise<{ reason: string } | { actions: PmPlanAction[] }> {
+    const actions: PmPlanAction[] = [];
+    for (const a of pending.actions ?? []) {
+      const b = a.args ?? {};
+      try {
+        if (!PAUSING_TOOLS.includes(a.tool)) {
+          refuse(`${a.tool} does not wait for a yes`);
+        }
+        const idea = await this.pm.getIdea(this.ideaId(b));
+        if (
+          conversationAccess(viewer.can) !== 'all' &&
+          !isPinnedRuleChange(idea)
+        ) {
+          refuse('the clinical advisor decides pinned-rule changes only');
+        }
+        const decision = a.tool !== 'change_retry';
+        if (decision && !['proposed', 'approved'].includes(idea.status)) {
+          refuse(
+            `${changeName(idea)} is ${idea.status}; there is nothing to decide`,
+          );
+        }
+        if (a.tool === 'change_turn_down' && !String(b.reason ?? '').trim()) {
+          refuse('say why it is turned down; the PM agent reads the reason');
+        }
+        await this.requirePermission(
+          person,
+          viewer,
+          idea,
+          requiredAction(idea, decision),
+          verb(a.tool),
+        );
+        const languages = normaliseLanguages(b.languages);
+        actions.push({
+          tool: a.tool,
+          ideaId: idea.id,
+          args: {
+            ...(b.reason ? { reason: String(b.reason).slice(0, 500) } : {}),
+            ...(languages ? { languages } : {}),
+          },
+          label:
+            a.tool === 'change_approve'
+              ? `Approve ${changeName(idea)}`
+              : a.tool === 'change_turn_down'
+                ? `Turn down ${changeName(idea)}`
+                : `Try ${changeName(idea)} again${languages ? ` for ${languages.join(', ')}` : ''}`,
+        });
+      } catch (e) {
+        if (!(e instanceof Refused) && !(e instanceof HttpException)) throw e;
+        const reason = (e as Error).message;
+        if (!(e as { recorded?: boolean }).recorded) {
+          await this.record(person, {
+            tool: a.tool,
+            ideaId: UUID.test(String(b.idea_id)) ? String(b.idea_id) : null,
+            label: `Could not ${verb(a.tool)}: ${reason}`.slice(0, 300),
+            status: 'failed',
+          });
+        }
+        return { reason };
+      }
+    }
+    return { actions };
+  }
+
+  /** Changes whose retry always asks a person: ally-ai pauses a retry of these. */
+  private async alwaysAskIds(): Promise<string[]> {
+    try {
+      const settings = (await this.ownerSettings.get()) as unknown as Record<
+        string,
+        unknown
+      >;
+      const rows: Array<Record<string, any>> = await this.dataSource.query(
+        `SELECT id, change, evidence FROM agent_lessons WHERE "agentKey" = $1`,
+        [DEBRIEF_AGENT_KEY],
+      );
+      return rows
+        .filter((r) => alwaysAsk(r, settings as any))
+        .map((r) => r.id)
+        .slice(0, 2000);
+    } catch {
+      // Without the list a retry still cannot skip a person: the gateway
+      // refuses an always-ask retry that carries no yes.
+      return [];
+    }
   }
 
   private async turnBudget(): Promise<number> {
@@ -333,24 +525,18 @@ export class DebriefPmConversationService {
 
   private async answer(
     person: DebriefPmMessage,
+    viewer: DebriefViewer,
     access: 'all' | 'pinned_rules',
     about: PmAbout | null,
   ): Promise<DebriefPmMessage> {
-    const history = (
-      await this.messages
-        .createQueryBuilder('m')
-        .where('m."createdAt" < :at', { at: person.createdAt })
-        .orderBy('m."createdAt"', 'DESC')
-        .take(HISTORY)
-        .getMany()
-    )
-      .reverse()
-      .filter((m) =>
-        access === 'all' ? true : m.about?.id && m.about.id === about?.id,
-      );
-    const pending = await this.pendingPlan(person.createdAt);
+    const threadId =
+      access === 'all'
+        ? PM_CONVERSATION_THREAD
+        : PM_CONVERSATION_ADVISOR_THREAD;
     const budgetUsd = await this.turnBudget();
+    const evidence = await this.aboutEvidence(about);
     let res: PmConversationResponse;
+    let pause: PmPlan | null = null;
     if (budgetUsd <= 0) {
       res = {
         status: 'budget_spent',
@@ -362,37 +548,77 @@ export class DebriefPmConversationService {
         access === 'all' ? CONVERSATION_TURN_TOOLS : ADVISOR_TURN_TOOLS;
       const model = DEBRIEF_MODELS.pmAgent;
       const backup = DEBRIEF_MODELS.pmAgentBackup;
-      const body = {
-        turn_id: person.id,
-        model,
-        backup_model: backup,
-        prices: modelPrices([model, backup]),
-        budget_usd: budgetUsd,
-        history: history.map((m) => ({
-          who: m.who,
-          author: m.who === 'person' ? (m.authorName ?? null) : null,
-          text: m.text,
-          about: m.about ?? null,
-          action: m.action ?? null,
-        })),
-        message: person.text,
-        author: person.authorName ?? null,
-        about: await this.aboutEvidence(about),
-        pending_plan:
-          pending?.plan && pending.plan.askedUserId === person.authorUserId
-            ? {
-                plan_id: pending.plan.id,
-                plan: pending.plan.text,
-                action: pending.plan.label,
-              }
-            : null,
-        tools: [...tools],
-        agent_token: this.tokens.signAgent(person.id, tools, 15 * 60),
-        gateway_url: this.tokens.gatewayUrl(),
-      };
       try {
+        const paused = await this.pausedOn(threadId);
+        const resolved = paused
+          ? await this.resolve(paused, person, viewer)
+          : null;
         const prompts = await this.prompts();
-        res = await this.call({ ...body, ...(prompts ? { prompts } : {}) });
+        const body = {
+          turn_id: person.id,
+          thread_id: threadId,
+          model,
+          backup_model: backup,
+          prices: modelPrices([model, backup]),
+          budget_usd: budgetUsd,
+          message: person.text,
+          author: person.authorName ?? null,
+          about: evidence,
+          always_ask_idea_ids: await this.alwaysAskIds(),
+          tools: [...tools],
+          gateway_url: this.tokens.gatewayUrl(),
+          ...(prompts ? { prompts } : {}),
+        };
+        // The gateway acts as the person who wrote this message; a resumed
+        // approval carries what they said yes to.
+        const send = (resume: PmResume | null, approved: PmApprovedAction[]) =>
+          this.call({
+            ...body,
+            resume,
+            agent_token: this.tokens.signAgent(
+              person.id,
+              tools,
+              15 * 60,
+              approved,
+            ),
+          });
+        res = await send(resolved?.resume ?? null, resolved?.approved ?? []);
+        // A pause this person could never say yes to is turned down at once,
+        // so the reply already says why (who decides, what is missing).
+        let check = res.pending
+          ? await this.checkPause(person, viewer, res.pending)
+          : null;
+        if (check && 'reason' in check && res.pending) {
+          const again = await send(
+            {
+              interrupt_id: res.pending.interrupt_id,
+              decision: 'reject',
+              message: `${check.reason} Nothing was done.`,
+            },
+            [],
+          );
+          res = mergeTurns(res, again);
+          check = res.pending
+            ? await this.checkPause(person, viewer, res.pending)
+            : null;
+        }
+        if (res.pending && check && 'actions' in check) {
+          pause = {
+            id: res.pending.interrupt_id,
+            threadId,
+            actions: check.actions,
+            text: res.pending.actions
+              .map((a) => a.plan)
+              .filter(Boolean)
+              .join(' ')
+              .slice(0, 600),
+            label: check.actions.map((a) => a.label).join('; '),
+            askedUserId: person.authorUserId ?? null,
+            at: new Date().toISOString(),
+            usedAt: null,
+          };
+        }
+        // A pause left unkept is cancelled by the thread's next message.
       } catch (e) {
         res = {
           status: 'failed',
@@ -401,22 +627,47 @@ export class DebriefPmConversationService {
         };
       }
     }
+    // The quote check: nothing quoted or presented as wording that the turn's
+    // tools (or the evidence and the person's own words) did not return.
+    let text = (res.reply ?? '').trim();
+    const unmatched =
+      res.status === 'finished'
+        ? pmReplyUnmatched([text, pause?.text ?? ''].join('\n'), [
+            ...(res.tool_texts ?? []),
+            ...textLeaves(evidence),
+            person.text,
+          ])
+        : [];
+    const withheld = unmatched.length ? text : null;
+    if (withheld) {
+      text = QUOTE_CHECK_REPLY;
+      pause = null;
+    }
+    for (const a of pause?.actions ?? []) {
+      await this.record(person, {
+        tool: a.tool,
+        ideaId: a.ideaId,
+        label: `Waiting for your yes: ${a.label.charAt(0).toLowerCase()}${a.label.slice(1)}`,
+        status: 'awaiting_yes',
+        planId: pause!.id,
+      });
+    }
     await this.recordProposals(person);
     const fresh = await this.messages.findOne({ where: { id: person.id } });
     const actions = (fresh?.actions ?? []) as PmTurnAction[];
-    // The action the reply shows: the turn's last one (a plan waiting for a
+    // The action the reply shows: the turn's last one (a pause waiting for a
     // yes, or what was done or refused), from the gateway's record.
     const last = actions[actions.length - 1] ?? null;
     const reply = await this.messages.save(
       this.messages.create({
         who: 'agent',
         text:
-          (res.reply ?? '').trim().slice(0, MAX_MESSAGE_CHARS) ||
+          text.slice(0, MAX_MESSAGE_CHARS) ||
           "I couldn't answer just now. Please try again in a minute.",
         about,
         action: last ? { label: last.label, status: last.status } : null,
         actions: [],
-        plan: await this.planFor(person, last),
+        plan: pause,
         replyTo: person.id,
         status: res.status,
         model: res.model ?? null,
@@ -426,11 +677,24 @@ export class DebriefPmConversationService {
             : null,
       }),
     );
+    if (withheld) {
+      // Kept for the Ally team, never shown in the conversation.
+      await this.pm.audit('blocked', null, person.authorUserId ?? null, {
+        step: 'conversation_quote_check',
+        messageId: person.id,
+        replyId: reply.id,
+        unmatched: unmatched.map((u) => u.slice(0, 300)),
+        withheldReply: withheld.slice(0, MAX_MESSAGE_CHARS),
+      });
+    }
     await this.pm.audit('pipeline_step', null, person.authorUserId ?? null, {
       step: 'conversation_turn',
       messageId: person.id,
       replyId: reply.id,
+      threadId,
       status: res.status,
+      paused: pause ? pause.id : null,
+      quoteCheck: withheld ? 'withheld' : 'passed',
       actions: actions.map((a) => ({
         tool: a.tool,
         status: a.status,
@@ -441,20 +705,6 @@ export class DebriefPmConversationService {
       error: res.error ?? null,
     });
     return reply;
-  }
-
-  /** Plans made during this turn are kept on the person's message until the reply carries them. */
-  private async planFor(
-    person: DebriefPmMessage,
-    last: PmTurnAction | null,
-  ): Promise<PmPlan | null> {
-    if (!last || last.status !== 'awaiting_yes' || !last.planId) return null;
-    const [row] = await this.dataSource.query(
-      `SELECT plan FROM debrief_pm_messages WHERE id = $1`,
-      [person.id],
-    );
-    const plan = row?.plan as PmPlan | null;
-    return plan && plan.id === last.planId ? plan : null;
   }
 
   /** Changes the agent proposed this turn (`idea_propose` keeps the turn id). */
@@ -580,7 +830,22 @@ export class DebriefPmConversationService {
     const person = await this.messages.findOne({
       where: { id: claims.agentRunId, who: 'person' },
     });
-    if (!person) return { refused: 'this conversation turn is not known' };
+    if (!person) {
+      // A weekly run's token (its reviewer subagent): read one change, as the
+      // Ally team would; every other conversation tool needs a person's turn.
+      if (tool === 'change_read') {
+        try {
+          return await this.changeRead(this.ideaId(b), 'all');
+        } catch (e) {
+          if (e instanceof Refused) return { refused: e.message };
+          if (e instanceof HttpException && e.getStatus() < 500) {
+            return { refused: e.message };
+          }
+          throw e;
+        }
+      }
+      return { refused: 'this conversation turn is not known' };
+    }
     try {
       const viewer = await this.view.viewer(person.authorUserId ?? -1);
       const access = conversationAccess(viewer.can);
@@ -592,16 +857,14 @@ export class DebriefPmConversationService {
           return await this.sessionRead(this.uuid(b.run_id, 'run_id'));
         case 'change_approve':
         case 'change_turn_down':
-          return await this.planDecision(tool, person, viewer, b);
-        case 'confirm_plan':
-          return await this.confirm(person, viewer, String(b.plan_id ?? ''));
+          return await this.decide(tool, person, viewer, claims, b);
         default:
           if (access !== 'all') {
             refuse(
               'the clinical advisor decides pinned-rule changes only; the Ally team does the rest',
             );
           }
-          return await this.act(tool, person, viewer, b);
+          return await this.act(tool, person, viewer, claims, b);
       }
     } catch (e) {
       const reason =
@@ -809,14 +1072,24 @@ export class DebriefPmConversationService {
     throw err;
   }
 
-  /** Approve or turn down: never at once. A plan the person must say yes to. */
-  private async planDecision(
+  /**
+   * Approve or turn down: only on a resumed turn whose token carries the
+   * person's yes to exactly this (`claims.approved`), and only if they hold
+   * the permission now. The pause itself is ally-ai's (human-in-the-loop).
+   */
+  private async decide(
     tool: 'change_approve' | 'change_turn_down',
     person: DebriefPmMessage,
     viewer: DebriefViewer,
+    claims: DebriefAgentClaims,
     b: Record<string, any>,
   ): Promise<Record<string, unknown>> {
     const idea = await this.pm.getIdea(this.ideaId(b));
+    if (!approvedFor(claims, tool, idea.id)) {
+      refuse(
+        'approving or turning down a change waits for the person’s yes; nothing was done',
+      );
+    }
     if (conversationAccess(viewer.can) !== 'all' && !isPinnedRuleChange(idea)) {
       refuse('the clinical advisor decides pinned-rule changes only');
     }
@@ -825,115 +1098,16 @@ export class DebriefPmConversationService {
         `${changeName(idea)} is ${idea.status}; there is nothing to decide`,
       );
     }
-    const what = tool === 'change_approve' ? 'approve' : 'turn down';
     await this.requirePermission(
       person,
       viewer,
       idea,
       requiredAction(idea, true),
-      what,
-    );
-    const reason = String(b.reason ?? '')
-      .trim()
-      .slice(0, 500);
-    if (tool === 'change_turn_down' && !reason) {
-      refuse('say why it is turned down; the PM agent reads the reason');
-    }
-    const label =
-      tool === 'change_approve'
-        ? `Approve ${changeName(idea)}`
-        : `Turn down ${changeName(idea)}`;
-    return this.makePlan(person, tool, idea, { reason }, label, b.plan);
-  }
-
-  private async makePlan(
-    person: DebriefPmMessage,
-    tool: string,
-    idea: Record<string, any>,
-    args: Record<string, unknown>,
-    label: string,
-    text: unknown,
-  ): Promise<Record<string, unknown>> {
-    const plan: PmPlan = {
-      id: randomUUID(),
-      tool,
-      ideaId: idea.id,
-      args,
-      text: (typeof text === 'string' && text.trim()
-        ? text.trim()
-        : `${label}.`
-      ).slice(0, 600),
-      label,
-      askedUserId: person.authorUserId ?? null,
-      at: new Date().toISOString(),
-      usedAt: null,
-    };
-    // Kept on the person's message until the reply is stored with it.
-    await this.dataSource.query(
-      `UPDATE debrief_pm_messages SET plan = $2::jsonb WHERE id = $1`,
-      [person.id, JSON.stringify(plan)],
-    );
-    await this.record(person, {
-      tool,
-      ideaId: idea.id,
-      label: `Waiting for your yes: ${label.charAt(0).toLowerCase()}${label.slice(1)}`,
-      status: 'awaiting_yes',
-      planId: plan.id,
-    });
-    return {
-      status: 'awaiting_yes',
-      plan_id: plan.id,
-      plan: plan.text,
-      say: 'Repeat the plan back exactly and ask the person to reply yes. Do not call confirm_plan in this message.',
-    };
-  }
-
-  /** `confirm_plan`: the person's message is a yes to the plan they were asked. */
-  private async confirm(
-    person: DebriefPmMessage,
-    viewer: DebriefViewer,
-    planId: string,
-  ): Promise<Record<string, unknown>> {
-    const holder = await this.pendingPlan(person.createdAt);
-    const plan = holder?.plan;
-    if (!plan || plan.id !== planId) {
-      refuse(
-        'there is no plan waiting for a yes (it was used, replaced or is over a day old); ask again',
-      );
-    }
-    if (plan!.askedUserId !== person.authorUserId) {
-      refuse(
-        'only the person who was asked can say yes to this plan; they can ask me again',
-      );
-    }
-    if (!isExplicitYes(person.text)) {
-      refuse(
-        'the person did not say a clear yes; nothing was done. Ask them to reply yes to go ahead',
-      );
-    }
-    const idea = await this.pm.getIdea(plan!.ideaId!);
-    const tool = plan!.tool;
-    const decision = tool === 'change_approve' || tool === 'change_turn_down';
-    await this.requirePermission(
-      person,
-      viewer,
-      idea,
-      requiredAction(idea, decision),
-      tool === 'change_approve'
-        ? 'approve'
-        : tool === 'change_turn_down'
-          ? 'turn down'
-          : 'retry',
-    );
-    // Used once, whatever happens next.
-    await this.dataSource.query(
-      `UPDATE debrief_pm_messages SET plan = jsonb_set(plan, '{usedAt}', to_jsonb(now()::text))
-        WHERE id = $1`,
-      [holder!.id],
+      verb(tool),
     );
     const note = `From the PM agent conversation: “${person.text.slice(0, 200)}”`;
-    let label: string;
     const userId = person.authorUserId!;
+    let label: string;
     if (tool === 'change_approve') {
       if (isPinnedRuleChange(idea)) {
         await this.pm.approvePinnedRule(idea.id, userId, note);
@@ -941,40 +1115,35 @@ export class DebriefPmConversationService {
         await this.pm.approve(idea.id, userId, note);
       }
       label = `Approved ${changeName(idea)}`;
-    } else if (tool === 'change_turn_down') {
-      const reason = String(plan!.args.reason ?? '') || note;
+    } else {
+      const reason = String(b.reason ?? '')
+        .trim()
+        .slice(0, 500);
+      if (!reason) {
+        refuse('say why it is turned down; the PM agent reads the reason');
+      }
       if (isPinnedRuleChange(idea)) {
         await this.pm.rejectPinnedRule(idea.id, userId, reason);
       } else {
         await this.pm.reject(idea.id, userId, reason);
       }
       label = `Turned down ${changeName(idea)}`;
-    } else if (tool === 'change_retry') {
-      const out = await this.retryNow(
-        idea,
-        normaliseLanguages(plan!.args.languages),
-        userId,
-      );
-      label = out.label;
-    } else {
-      refuse('this plan cannot be carried out');
-      label = '';
     }
     await this.record(person, {
       tool,
       ideaId: idea.id,
       label,
       status: 'done',
-      planId: plan!.id,
     });
     return { ok: true, done: label };
   }
 
-  /** The actions that act at once (or wait for a yes, for an always-ask retry). */
+  /** The actions that act at once (an always-ask retry only after a yes). */
   private async act(
     tool: PmConversationTool,
     person: DebriefPmMessage,
     viewer: DebriefViewer,
+    claims: DebriefAgentClaims,
     b: Record<string, any>,
   ): Promise<Record<string, unknown>> {
     const by = person.authorUserId ?? null;
@@ -1023,14 +1192,14 @@ export class DebriefPmConversationService {
           string,
           unknown
         >;
-        if (alwaysAsk(idea, settings as any)) {
-          return this.makePlan(
-            person,
-            tool,
-            idea,
-            { languages },
-            `Try ${changeName(idea)} again${languages ? ` for ${languages.join(', ')}` : ''}`,
-            b.plan,
+        // ally-ai pauses this retry for the person's yes; without one in the
+        // token (a stale always-ask list) nothing is done.
+        if (
+          alwaysAsk(idea, settings as any) &&
+          !approvedFor(claims, tool, idea.id)
+        ) {
+          refuse(
+            `${changeName(idea)} always asks a person, so trying it again waits for their yes; nothing was done`,
           );
         }
         label = (await this.retryNow(idea, languages, by)).label;
@@ -1244,6 +1413,35 @@ export class DebriefPmConversationService {
       label: `Started trying ${changeName(idea)} again${languages ? ` for ${languages.join(', ')}` : ''}`,
     };
   }
+}
+
+/** Two ally-ai calls of one turn as one: the later reply, both costs and records. */
+function mergeTurns(
+  first: PmConversationResponse,
+  then: PmConversationResponse,
+): PmConversationResponse {
+  return {
+    ...then,
+    estimated_cost_usd:
+      Math.round(
+        ((first.estimated_cost_usd ?? 0) + (then.estimated_cost_usd ?? 0)) *
+          10_000,
+      ) / 10_000,
+    tool_texts: [...(first.tool_texts ?? []), ...(then.tool_texts ?? [])],
+    steps: [...(first.steps ?? []), ...(then.steps ?? [])],
+    refusals: [...(first.refusals ?? []), ...(then.refusals ?? [])],
+  };
+}
+
+/** Was this action said yes to by the person whose message this turn answers? */
+function approvedFor(
+  claims: DebriefAgentClaims,
+  tool: string,
+  ideaId: string,
+): boolean {
+  return (claims.approved ?? []).some(
+    (a) => a.tool === tool && a.ideaId === ideaId,
+  );
 }
 
 function verb(tool: string): string {
