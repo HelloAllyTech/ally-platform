@@ -741,7 +741,8 @@ export class DebriefContextRepository {
   async monthToDate(): Promise<{ sessions: number; spentUsd: number }> {
     const rows = await this.dataSource.query(
       `SELECT count(*) FILTER (WHERE status <> 'skipped')::int AS sessions,
-              COALESCE(sum(COALESCE("actualCostUsd", "estimatedCostUsd")), 0)::float AS spent
+              COALESCE(sum(COALESCE("actualCostUsd", "estimatedCostUsd", 0)
+                       + COALESCE((workspace->>'askAllySpentUsd')::numeric, 0)), 0)::float AS spent
          FROM debrief_runs
         WHERE mode IN ('shadow','live')
           AND "createdAt" >= $1::timestamptz`,

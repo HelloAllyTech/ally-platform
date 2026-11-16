@@ -16,6 +16,7 @@ import {
   DebriefRecipeKey,
   DebriefModelCatalog,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
+  DEBRIEF_SESSION_BUDGET_DEFAULT,
   isOrchestrated,
   orchestratorModels,
   validateDebriefBundle,
@@ -480,6 +481,11 @@ export class DebriefRunnerService {
         monthElapsed: elapsed,
       });
     }
+    // The session's whole budget covers the run and every Ask Ally reply.
+    ceiling = Math.min(
+      ceiling,
+      settings.sessionBudgetUsd ?? DEBRIEF_SESSION_BUDGET_DEFAULT,
+    );
     run.ceilingUsd = ceiling.toFixed(4);
     if (ceiling <= 0) {
       return {

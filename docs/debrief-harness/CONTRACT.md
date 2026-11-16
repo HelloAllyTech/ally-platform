@@ -320,6 +320,7 @@ Limits and behaviour:
   stretch past (spent + 2 × last pass × 1.2 > budget), is called with `tool_choice: "none"`, so a reply always ends in
   words; `stoppedBy` says which. `ModelCallLimitMiddleware` is a backstop that is never reached.
 - **Budget:** `budgetUsd` (default and ceiling $0.05), from each pass's token usage and `prices`.
+- **Session budget (ally-be, 2026-11-16):** one session's debrief run and all its Ask Ally replies share `settings.sessionBudgetUsd` (default $1.00; the run's ceiling is clamped to it). ally-be sends each reply `budgetUsd` = the smallest of the release's reply budget, $0.05, what the session has left and what the month's cap has left, and keeps the session's running total on `workspace.askAllySpentUsd` (the month's spend counts it too). With under $0.01 left, `settings.maxRepliesPerSession` replies already given (default 20), or the month's cap spent, ally-be calls no model: the learner gets `REPLY_LIMIT` in the debrief's language on a `done` event carrying `limit: "session" | "month"`. The crisis screen still answers first.
 - **Tools:** each must answer within 1.5 s; a failed or slow tool is told to the model as "This is unavailable right
   now. Answer from the debrief and the session." (`ToolErrorMiddleware`) and recorded `ok: false`. `search_guidance`
   calls `guidance_search` with one topic `{situation: <topic, at most 10 words>}` and `per_moment: 3`;

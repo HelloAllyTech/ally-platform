@@ -104,6 +104,14 @@ export interface DebriefSettings {
   riskDeadlineMs: number;
   guidancePassagesPerMoment: number;
   /**
+   * Everything one session may spend: its debrief run and every Ask Ally
+   * reply after it (Sandeep, 2026-11-16). Absent in releases made before it:
+   * `DEBRIEF_SESSION_BUDGET_DEFAULT` applies.
+   */
+  sessionBudgetUsd?: number;
+  /** Ask Ally replies one session may have. Absent: `DEBRIEF_MAX_REPLIES_DEFAULT`. */
+  maxRepliesPerSession?: number;
+  /**
    * Retired with the Knowledge Base's similarity floor: Debrief Guidance answers in relevance
    * bands, not similarities. Releases made before it still carry the value; nothing reads it.
    */
@@ -221,6 +229,15 @@ export const DEBRIEF_REFLECTION_CHECK_MODEL = {
 } as const;
 
 /** Ask Ally's default: fast first words matter more than depth for a reply. */
+/** A session's whole budget, debrief and Ask Ally together, when the release names none. */
+export const DEBRIEF_SESSION_BUDGET_DEFAULT = 1;
+/** Ask Ally replies per session when the release names none. */
+export const DEBRIEF_MAX_REPLIES_DEFAULT = 20;
+/** Below this left in the session, a reply could not finish one pass: Ask Ally stops. */
+export const DEBRIEF_MIN_REPLY_USD = 0.01;
+/** ally-ai's own ceiling for one reply (`REPLY_BUDGET_USD`, app/core/ask_ally). */
+export const DEBRIEF_REPLY_BUDGET_MAX = 0.05;
+
 export const DEBRIEF_REPLY_DEFAULT: DebriefReplyConfig = {
   provider: 'gemini',
   model: 'gemini-2.5-flash',
