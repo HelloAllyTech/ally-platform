@@ -27,6 +27,7 @@ import {
 import { DebriefPmAgentService } from './debrief-pm-agent.service';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
 import { DebriefNotifier } from './debrief-notifier.service';
+import { DebriefSlackService } from './debrief-slack.service';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefRunnerService } from './debrief-runner.service';
 import { DebriefSettingsService } from './debrief-settings.service';
@@ -80,6 +81,8 @@ export class DebriefTrialsService implements OnModuleInit {
     private readonly testSets: DebriefTestSetsService,
     @Optional() private readonly autonomy?: DebriefAutonomyService,
     @Optional() private readonly notifier?: DebriefNotifier,
+    /** v2 K2: posts what was taken back to the owner's Slack channel. */
+    @Optional() private readonly slack?: DebriefSlackService,
   ) {}
 
   onModuleInit(): void {
@@ -188,7 +191,11 @@ export class DebriefTrialsService implements OnModuleInit {
     }
   }
 
-  /** Re-read an idea's pairs and record the trial's state; passing waits for a person to start the canary. */
+  /**
+   * Re-read an idea's pairs and record the trial's state. Passing moves the
+   * change on by itself (v2 A3): its learner try-out starts, unless it is an
+   * always-ask change, which waits for a person (A1).
+   */
   async decideTrial(ideaId: string) {
     const rows = await this.probes.find({ where: { ideaId, status: 'done' } });
     const verdict = trialVerdict(
@@ -209,6 +216,18 @@ export class DebriefTrialsService implements OnModuleInit {
         ? { decidedAt: new Date().toISOString() }
         : {}),
     });
+    if (
+      verdict.status === 'passed' &&
+      idea.evidence?.trial?.status !== 'passed'
+    ) {
+      await this.pmAgent
+        .advance(ideaId)
+        .catch((e) =>
+          this.logger.warn(
+            `[debrief] could not move idea ${ideaId} on after its trial: ${(e as Error).message}`,
+          ),
+        );
+    }
     return verdict;
   }
 
@@ -348,6 +367,21 @@ export class DebriefTrialsService implements OnModuleInit {
           body: decision.reason,
           data: { ideaId: id, releaseId: canary.releaseId ?? null },
         });
+        const idea = await this.pmAgent.getIdea(id).catch(() => null);
+        await this.slack?.post(
+          `A change tried on some learners was taken back on its own: ${idea?.text ?? 'a change'}. Why: ${decision.reason}.`,
+        );
+      }
+      if (decision.status === 'passed') {
+        // v2 A3: a learner try-out that passed goes live for everyone by itself.
+        this.canaryCache = null;
+        await this.pmAgent
+          .advance(id)
+          .catch((e) =>
+            this.logger.warn(
+              `[debrief] could not put idea ${id} live: ${(e as Error).message}`,
+            ),
+          );
       }
       if (decision.status !== 'running') {
         this.canaryCache = null;

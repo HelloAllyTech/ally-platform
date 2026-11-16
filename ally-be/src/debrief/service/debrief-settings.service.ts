@@ -6,11 +6,24 @@ import {
   defaultOwnerSettings,
   OWNER_SETTING_KEYS,
   OWNER_SETTINGS_SPEC,
+  OwnerSettingChange,
   OwnerSettingKey,
   ownerSettingProblem,
   OwnerSettings,
   OwnerSettingsBaseline,
 } from '../constants/debrief-owner-settings.constants';
+
+/** A value a setting can hold. */
+export type OwnerSettingValue = number | boolean | string;
+
+/** Who made a change: a person, or the PM agent (v2 A10) with its reason. */
+export interface OwnerSettingsChangeSource {
+  source?: 'edit' | 'baseline' | 'pm_agent' | 'undo';
+  /** Why, in words (the PM agent's reason; a person's note). */
+  why?: string | null;
+  /** The change (idea) the values belong to. */
+  changeId?: string | null;
+}
 import { DebriefOwnerSettings } from '../entity/debrief-owner-settings.entity';
 
 /**
@@ -37,7 +50,7 @@ export class DebriefSettingsService {
   /** The settings in force: a person's values over the defaults. Never throws for a bad stored value. */
   async get(): Promise<OwnerSettings> {
     const stored = (await this.row()).values ?? {};
-    const out = defaultOwnerSettings() as Record<string, number | boolean>;
+    const out = defaultOwnerSettings() as Record<string, OwnerSettingValue>;
     for (const key of OWNER_SETTING_KEYS) {
       if (key in stored && ownerSettingProblem(key, stored[key]) === null) {
         out[key] = stored[key];
@@ -55,6 +68,8 @@ export class DebriefSettingsService {
     baseline: OwnerSettingsBaseline | null;
     updatedAt: Date;
     updatedBy: number | null;
+    /** Settings › Tests: who last changed each setting, when, why, and its change. */
+    lastChanges: Partial<Record<OwnerSettingKey, OwnerSettingChange>>;
   }> {
     const row = await this.row();
     return {
@@ -65,7 +80,40 @@ export class DebriefSettingsService {
       baseline: (row.proposal as OwnerSettingsBaseline | null) ?? null,
       updatedAt: row.updatedAt,
       updatedBy: row.updatedBy ?? null,
+      lastChanges: await this.withNames(lastChangesOf(row.changes)),
     };
+  }
+
+  /** A person's change shows their name ("PM agent" for the agent's). */
+  private async withNames(
+    changes: Partial<Record<OwnerSettingKey, OwnerSettingChange>>,
+  ): Promise<Partial<Record<OwnerSettingKey, OwnerSettingChange>>> {
+    const ids = [
+      ...new Set(
+        Object.values(changes)
+          .filter(
+            (c) => c && c.lastChangedBy === 'A person' && c.lastChangedById,
+          )
+          .map((c) => c!.lastChangedById as number),
+      ),
+    ];
+    if (!ids.length) return changes;
+    try {
+      const users: Array<{ id: number; name: string | null }> =
+        await this.rows.manager.query(
+          `SELECT id, COALESCE(NULLIF(TRIM(name), ''), email) AS name FROM users WHERE id = ANY($1::int[])`,
+          [ids],
+        );
+      const names = new Map(users.map((u) => [Number(u.id), u.name]));
+      for (const c of Object.values(changes)) {
+        if (c && c.lastChangedBy === 'A person' && c.lastChangedById) {
+          c.lastChangedBy = names.get(c.lastChangedById) ?? 'A person';
+        }
+      }
+    } catch {
+      // Names are a nicety: the change is still shown.
+    }
+    return changes;
   }
 
   /**
@@ -73,10 +121,15 @@ export class DebriefSettingsService {
    * written when any is refused. `null` returns a key to its default.
    */
   async update(
-    changes: Record<string, number | boolean | null>,
-    userId: number,
-    source: 'edit' | 'baseline' = 'edit',
+    changes: Record<string, OwnerSettingValue | null>,
+    userId: number | null,
+    from:
+      | OwnerSettingsChangeSource['source']
+      | OwnerSettingsChangeSource = 'edit',
   ): Promise<OwnerSettings> {
+    const by: OwnerSettingsChangeSource =
+      typeof from === 'string' || from == null ? { source: from } : from;
+    const source = by.source ?? 'edit';
     const entries = Object.entries(changes ?? {});
     if (entries.length === 0) {
       throw new BadRequestException('change at least one setting');
@@ -100,6 +153,23 @@ export class DebriefSettingsService {
     }
     row.values = values;
     row.updatedBy = userId;
+    const at = new Date().toISOString();
+    const name = source === 'pm_agent' ? 'PM agent' : null;
+    row.changes = {
+      ...(row.changes ?? {}),
+      ...Object.fromEntries(
+        entries.map(([k]) => [
+          k,
+          {
+            by: name,
+            byId: userId,
+            at,
+            why: by.why ?? null,
+            changeId: by.changeId ?? null,
+          },
+        ]),
+      ),
+    };
     await this.rows.save(row);
     const after = await this.get();
     const diff = Object.fromEntries(
@@ -113,8 +183,13 @@ export class DebriefSettingsService {
     );
     await this.audit.log({
       eventType: 'DEBRIEF_SETTINGS_CHANGED',
-      userId,
-      details: { source, changes: diff },
+      userId: userId ?? undefined,
+      details: {
+        source,
+        changes: diff,
+        ...(by.why ? { why: by.why } : {}),
+        ...(by.changeId ? { changeId: by.changeId } : {}),
+      },
     });
     return after;
   }
@@ -132,7 +207,7 @@ export class DebriefSettingsService {
     const baseline = (await this.row())
       .proposal as OwnerSettingsBaseline | null;
     if (!baseline) throw new BadRequestException('there is no proposal yet');
-    const changes: Record<string, number | boolean> = {};
+    const changes: Record<string, OwnerSettingValue> = {};
     for (const k of keys ?? []) {
       const p = baseline.proposals?.[k as OwnerSettingKey];
       if (!p) throw new BadRequestException(`${k} has no proposed value`);
@@ -140,4 +215,23 @@ export class DebriefSettingsService {
     }
     return this.update(changes, userId, 'baseline');
   }
+}
+
+/** The stored change log, read leniently; a person's name is filled in by the view. */
+export function lastChangesOf(
+  stored: Record<string, any> | null | undefined,
+): Partial<Record<OwnerSettingKey, OwnerSettingChange>> {
+  const out: Partial<Record<OwnerSettingKey, OwnerSettingChange>> = {};
+  for (const key of OWNER_SETTING_KEYS) {
+    const c = stored?.[key];
+    if (!c || typeof c.at !== 'string') continue;
+    out[key] = {
+      lastChangedBy: c.by ?? 'A person',
+      lastChangedById: c.byId != null ? Number(c.byId) : null,
+      lastChangedAt: c.at,
+      why: c.why ?? null,
+      changeId: c.changeId ?? null,
+    };
+  }
+  return out;
 }

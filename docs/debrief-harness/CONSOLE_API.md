@@ -576,6 +576,37 @@ returns zeros, not 404.
   that month's production ceilings (past settings aren't kept). Builder hand-offs are not paid from
   the learning budget, so they are not in it.
 
+## Debrief v2: Home, Changes and the score (2026-11-16)
+
+The contract is in `docs/debrief-harness/V2_AUTONOMY.md` (API contract); routes are in
+`DebriefChangesController`, same base path, guards and audit as the rest.
+
+- `GET home` → `DebriefHomeV2`. `needsYou` lists only changes waiting on the always-ask list
+  (never a hand-off). `thisWeek` is the last 7 days; `headline.score` is this week's cumulative score.
+- `GET changes?state=` → `{ changes: DebriefChange[] }`, newest activity first (the latest 300
+  ideas; questions for a person are not changes). `GET changes/:id` → `DebriefChange`.
+- `POST changes/:id/undo {reason?}` (`releases` action) → `DebriefChange`. Only a live change whose
+  release is still the live one (409 otherwise); the release before comes back for everyone. A
+  test-settings change gets its old values back.
+- `POST changes/:id/stop {reason?}` (`releases` action) → `DebriefChange`. Only while it is
+  `trying` or `testing`: the try-out ends (no emergency move), its trial takes no more sessions,
+  and a check already running finishes but nothing starts after it. The idea is `retired` with
+  `evidence.stopped`; `GET pm-agent` shows `closedReason: 'stopped'`.
+- `GET metrics/score?days=56` → `DebriefScoreView`. `current`/`previous` are the last 7 days and
+  the 7 before; `byWeek` weeks start on Monday; `markers` come from `evidence.watch.liveAt` and
+  `evidence.undo.at`.
+- `GET settings` adds `lastChanges: {key: {lastChangedBy, lastChangedById, lastChangedAt, why,
+  changeId}}` and the new keys (`scoreWeight*`, `undoMargin`, `watchDays`, `askLowConfidence`,
+  `askModels`, `slackChannel`, `safetyContact`; spec kind `text` for the last two, one line).
+  `canaryMinRuns` now defaults to 40.
+- Changed behaviour: `PUT autonomy/matrix` refuses every cell (400: the always-ask list replaces
+  it); `GET autonomy` shows every kind eligible, with κ and re-lock facts as information; no
+  re-locks or "can now run on its own" notifications. Approvals expire only for pinned rules,
+  budget changes and always-ask waits (`approval.expiresAt` is null otherwise). A passed
+  side-by-side trial starts the try-out by itself, and a passed try-out goes live by itself.
+- Schedules: `debrief-change-watch` (hourly; 1 / 15 / 30 / 60 min) and `debrief-weekly-summary`
+  (weekly Mon 07:30; 1 min / weekly). The admin's `en.ts` needs their names.
+
 ## What the PM agent may do alone
 
 ### `GET autonomy`
@@ -631,7 +662,7 @@ reports always wait for a person.
 
 ## Notifications (FR-54, spec C3)
 
-These are in-app notifications only: the bell (`/v1/notifications`), with no Slack or external channel.
+These are in-app notifications. Since Debrief v2 the owner's Slack channel (`slackChannel`) also gets undos, try-outs taken back, nightly-check measures past their limit and a weekly summary; safety posts (a debrief shown with a missed clear risk cue, a learner's distress in Ask Ally) name `safetyContact`, once per debrief.
 
 | Event | Who | `type` |
 |---|---|---|

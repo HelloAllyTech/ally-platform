@@ -183,6 +183,24 @@ export const DEBRIEF_SCHEDULE_JOBS: readonly DebriefScheduleJob[] = [
     learningBudget: true,
   },
   {
+    // Debrief v2 (A3, A5, K3): moves changes whose last rung passed on,
+    // watches each live change against the release before and undoes it when
+    // it hurts, and makes any safety post a publish missed. Calls no model.
+    key: 'debrief-change-watch',
+    options: ['1min', '15min', '30min', '60min'],
+    defaults: every('60min'),
+    locked: false,
+    learningBudget: false,
+  },
+  {
+    // Debrief v2 (K2): what changed this week, to the owner's Slack channel.
+    key: 'debrief-weekly-summary',
+    options: ['1min', 'weekly'],
+    defaults: weeklyMonday,
+    locked: false,
+    learningBudget: false,
+  },
+  {
     key: 'debrief-pm-agent-forecasts',
     options: DAY,
     defaults: daily,

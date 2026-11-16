@@ -391,10 +391,11 @@ describe('debrief agreement: canary eligibility reads it', () => {
     const f = await service.facts();
     expect(agreement.gate).toHaveBeenCalled();
     expect(f.gate.met).toBe(false);
+    // v2 A6: shown as information; it no longer holds a try-out back.
     expect(kindEligibility('prompts', f, 'canary')).toMatchObject({
-      eligible: false,
+      eligible: true,
       reason:
-        'Not yet: agreement below 0.6 (Accuracy not measured yet: 37 of 50 reviews).',
+        'On its own; the change is watched and undone if it hurts (for information: agreement below 0.6 (Accuracy not measured yet: 37 of 50 reviews)).',
     });
     // Steps learners never see stay free of the gate.
     expect(kindEligibility('prompts', f, 'paired_trial').eligible).toBe(true);
@@ -411,8 +412,8 @@ describe('debrief agreement: canary eligibility reads it', () => {
       met: false,
       failing: [{ measure: 'evidence_specificity', kappa: null, n: 60 }],
     });
-    expect(kindEligibility('prompts', await service.facts()).reason).toBe(
-      'Not yet: agreement below 0.6 (Evidence not measurable yet: every answer is the same).',
+    expect(kindEligibility('prompts', await service.facts()).reason).toMatch(
+      /agreement below 0\.6 \(Evidence not measurable yet: every answer is the same\)/,
     );
   });
 });

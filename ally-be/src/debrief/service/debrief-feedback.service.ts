@@ -19,6 +19,7 @@ import {
 } from '../enum/debrief-run.enum';
 import { DebriefCards, cardsForReader } from '../util/debrief-cards.util';
 import { DebriefNotifier } from './debrief-notifier.service';
+import { DebriefSlackService } from './debrief-slack.service';
 import { DebriefPublishService } from './debrief-publish.service';
 import { LearnerDebriefView } from './debrief-agent.service';
 
@@ -168,6 +169,8 @@ export class DebriefFeedbackService {
     private readonly notifier?: DebriefNotifier,
     /** v9 FR-20: a debrief a person publishes or corrects is written where today's was. */
     @Optional() private readonly publisher?: DebriefPublishService,
+    /** v2 K3: a learner in distress in Ask Ally goes to the safety contact on Slack. */
+    @Optional() private readonly slack?: DebriefSlackService,
   ) {}
 
   /** The learner's own published live debrief, or a refusal. */
@@ -234,6 +237,8 @@ export class DebriefFeedbackService {
    * copied; the reviewer opens the thread.
    */
   async raiseChatDistress(run: DebriefRun, userId: number, source: string) {
+    // Posted once per debrief, whether or not a review item is already open.
+    void this.slack?.chatDistress(run).catch(() => false);
     const open = await this.feedback.findOne({
       where: {
         runId: run.id,

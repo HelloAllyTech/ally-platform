@@ -196,7 +196,8 @@ describe('the PM agent test ladder (v9 FR-52, FR-59)', () => {
 
   it('canary: reverts on a missed risk cue or when clearly worse, passes when not worse after runs and days', () => {
     const base = {
-      canaryRuns: 30,
+      // v2 A4: 40 debriefs and 3 days before going live.
+      canaryRuns: 40,
       controlRuns: 200,
       canaryMedian: 8.5,
       controlMedian: 8.4,
@@ -210,7 +211,7 @@ describe('the PM agent test ladder (v9 FR-52, FR-59)', () => {
       canaryDecision({ ...base, canaryMissedRiskCues: 1 }, settings).status,
     ).toBe('reverted');
     expect(
-      canaryDecision({ ...base, canaryRuns: 15, canaryMedian: 7.5 }, settings)
+      canaryDecision({ ...base, canaryRuns: 20, canaryMedian: 7.5 }, settings)
         .status,
     ).toBe('reverted');
     expect(canaryDecision({ ...base, days: 1 }, settings).status).toBe(
