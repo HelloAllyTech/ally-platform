@@ -52,13 +52,6 @@ const ORIGIN_CHIP: Record<Origin, string> = {
   unknown: "bg-neutral-100 text-neutral-600",
 };
 
-const ORIGIN_LABEL: Record<Origin, string> = {
-  fixed: "Fixed",
-  planned: "Planned",
-  top_up: "Top-up",
-  unknown: "Unknown",
-};
-
 /** The card's title: "Draft score · round 0". */
 const titleOf = (e: AgentLogEntry): string =>
   e.round !== null ? `${entryName(e.step)} · round ${e.round}` : entryName(e.step);
@@ -332,8 +325,9 @@ const Entry: React.FC<{
         <span
           className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${ORIGIN_CHIP[origin]}`}
           data-testid="log-origin"
+          title={en.debriefs.agentLogs.originHelp[origin]}
         >
-          {ORIGIN_LABEL[origin]}
+          {en.debriefs.agentLogs.origin[origin]}
         </span>
         {verdict && (
           <span

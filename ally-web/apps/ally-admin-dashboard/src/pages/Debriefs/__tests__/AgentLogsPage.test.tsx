@@ -452,7 +452,7 @@ describe("Agent logs page", () => {
     fireEvent.click(within(writer).getByRole("button", { name: /Transcript · 3 turns/ }));
     expect(within(writer).getByTestId("given-transcript")).toHaveTextContent("Learner");
     const old = screen.getAllByTestId("log-entry")[12];
-    expect(within(old).getByTestId("log-origin")).toHaveTextContent("Unknown");
+    expect(within(old).getByTestId("log-origin")).toHaveTextContent("Source unknown");
     expect(within(old).getByTestId("log-meta")).toHaveTextContent("no model");
   });
 
