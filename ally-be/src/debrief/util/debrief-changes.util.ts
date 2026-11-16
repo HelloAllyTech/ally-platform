@@ -554,12 +554,13 @@ export function changeResult(
   }
 }
 
-/** Why the PM agent (or a person) made it. */
+/**
+ * Why the PM agent (or a person) made it; empty when nobody said, never the
+ * change's own text again (that is its title).
+ */
 export function changeWhy(idea: IdeaRow): string {
   const e = idea.evidence ?? {};
-  return String(
-    e.hypothesis ?? e.why ?? e.expectedEffect ?? idea.text ?? idea.title ?? '',
-  ).trim();
+  return String(e.hypothesis ?? e.why ?? e.expectedEffect ?? '').trim();
 }
 
 /** The evidence in one line. */

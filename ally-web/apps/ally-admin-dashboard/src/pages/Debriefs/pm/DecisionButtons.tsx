@@ -99,9 +99,6 @@ export const DecisionButtons: React.FC<{
             {t.turnDown}
           </Button>
         )}
-        <span className="min-w-0 truncate text-[13px] text-neutral-600">
-          {k === "signOff" ? t.signOffHelp : t.askHelp}
-        </span>
       </div>
       {reasonOpen && (
         <div className="flex flex-nowrap items-end gap-2" data-testid="decision-reason">

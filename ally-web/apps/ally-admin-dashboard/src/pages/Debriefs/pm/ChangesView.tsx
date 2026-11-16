@@ -158,16 +158,23 @@ const Detail: React.FC<{ change: DebriefChange; canAct: boolean; access: Debrief
       {change.wording && <Wording before={change.wording.before} after={change.wording.after} />}
       {change.rule && <WholeRule rule={change.rule} changed={!!change.wording} />}
       <DecisionButtons change={change} access={access} />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <div className="flex flex-col gap-1 rounded-sm bg-neutral-50 px-4 py-3 text-sm">
-          <div className="text-xs text-neutral-600">{c.theChange}</div>
-          {change.title}
+      {/* The title already leads a waiting change; a reason shows only when someone gave one. */}
+      {(change.state !== "waits" || change.why) && (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {change.state !== "waits" && (
+            <div className="flex flex-col gap-1 rounded-sm bg-neutral-50 px-4 py-3 text-sm">
+              <div className="text-xs text-neutral-600">{c.theChange}</div>
+              {change.title}
+            </div>
+          )}
+          {change.why && (
+            <div className="flex flex-col gap-1 rounded-sm bg-neutral-50 px-4 py-3 text-sm">
+              <div className="text-xs text-neutral-600">{c.why}</div>
+              {change.why}
+            </div>
+          )}
         </div>
-        <div className="flex flex-col gap-1 rounded-sm bg-neutral-50 px-4 py-3 text-sm">
-          <div className="text-xs text-neutral-600">{c.why}</div>
-          {change.why}
-        </div>
-      </div>
+      )}
       {change.measures.length > 0 && (
         <div
           className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-px bg-neutral-100"
