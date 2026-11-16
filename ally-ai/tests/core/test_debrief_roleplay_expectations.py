@@ -50,7 +50,7 @@ async def test_analyst_assesses_the_roleplay_behaviours(dispatch_returns):
         ],
     )
     prompt = calls["prompt"]
-    assert "ROLEPLAY EXPECTATIONS" in prompt
+    assert "ROLEPLAY EXPECTATIONS: given." in prompt
     assert "did the counsellor show the helpful" in prompt
     assert "never as if it had a definition" in prompt
     assert "lower your confidence" in prompt
@@ -68,7 +68,7 @@ async def test_analyst_falls_back_to_foundational_skills_with_nothing(
 
     calls = dispatch_returns(EvidenceMap())
     await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
-    assert "ROLEPLAY EXPECTATIONS" not in calls["prompt"]
+    assert "ROLEPLAY EXPECTATIONS: given." not in calls["prompt"]
     assert "<roleplay_expectations>" not in calls["prompt"]
     assert "Empathy, warmth and genuineness" in DEFAULT_ANALYST_SYSTEM
 

@@ -319,8 +319,9 @@ ally-be sends the roleplay's own SHOULD_DO / SHOULD_NOT_DO behaviours (`scenario
 same ones today's debrief reads) as `helpful_behaviours` / `unhelpful_behaviours`, adds each custom
 competency's HELPFUL / UNHELPFUL behaviours to them without duplicates (never its code), and sends named
 competencies in `competencies` as labels with their own behaviours when they have any. `expected_behaviours`
-keeps only the named competencies (cohort stats and other name readers). The Analyst gets a code-owned
-ROLEPLAY EXPECTATIONS line and a `<roleplay_expectations>` block: assess each behaviour the counsellor had the
+keeps only the named competencies (cohort stats and other name readers). The Analyst gets the data line
+`ROLEPLAY EXPECTATIONS: given.`, the no-codes line and a `<roleplay_expectations>` block; its prompt's ROLEPLAY
+EXPECTATIONS paragraph (moved there 2026-11-16) says: assess each behaviour the counsellor had the
 opportunity for (shown the helpful, avoided the unhelpful); a competency is a label for grouping or naming,
 assessed through its behaviours; one with no behaviours may be interpreted from its name, said in the note
 with lower confidence; name evidence by the competency's name or the behaviour itself; never output a code.
@@ -377,6 +378,36 @@ of the meaning, in any language); or the word list in `cue_strength.py` matches 
   Writer and Reviser. `skill` stays as the evidence map names it (progress and metrics match on it); the
   learner and supervisor views and Listen show the label (`withSkillLabels` in ally-be).
 
+### Wording in prompts, data in code (2026-11-16)
+
+**Rule: wording and policy live in the prompt text (the Skills Store); code adds only data lines, format lines
+it parses, and safety lines a code check enforces.** A clinical lead changes how debriefs coach by publishing a
+prompt version, never by a code change. The data lines ally-ai adds after each step's live prompt, and the
+prompt section that says what to do with each:
+
+| Step | Data line (code) | Wording (prompt section) |
+|---|---|---|
+| Writer | `POSSIBLE RISK CUES: turns 5, 7.` | `debrief_writer_system` POSSIBLE RISK CUES |
+| Writer | `MISSED FEELINGS: turns 5.` | MISSED FEELINGS |
+| Writer | `COURSE: this session is part of a course; set practise_next.scenario_id to <id>; try_next applies, at most 3 items.` | PRACTISE THIS AGAIN (outside a course `try_next` is null) |
+| Writer | `CASE: this session continues a case.` + `CASE MEMORY:` block | CASE |
+| Writer | `MIXED EVIDENCE: <skill>; <skill>.` (behaviours whose `detector_agreement` is `disagrees`) | MIXED EVIDENCE |
+| Writer | `COHORT: given.` + `<cohort>` | COHORT |
+| Writer, Reviser | `FINDINGS: given.` + `<findings>` | the FINDINGS paragraph |
+| Analyst | `ROLEPLAY EXPECTATIONS: given.` + the no-codes line + `<roleplay_expectations>` | `debrief_analyst_system` ROLEPLAY EXPECTATIONS |
+| Analyst | `CASE: this session continues a case. Write case_memory_update: …` (format) + `CASE MEMORY:` | CASE (about the client only, never the trainee) |
+| Analyst | `LIVE DETECTIONS: given. For each behaviour it lists, set detector_agreement.` + `<live_detections>` | LIVE DETECTIONS |
+| Progress reader | `<past_work_on_this_points>` (with `learner_note`, `ally_decision`, `ally_reason`, `source`) | `debrief_progress_reader_system` HOW TO USE WHAT PEOPLE SAID ABOUT EARLIER DEBRIEFS |
+| Progress agent | `<learner_profile>.past_points` (same fields) | `debrief_progress_system` WHAT PEOPLE SAID ABOUT PAST POINTS |
+| Ask Ally | `REPLY LIMIT: 120 words.` (last line) | `debrief_reply_system` LENGTH |
+
+Code-kept safety lines are unchanged: `RISK CUES TO COVER: turns …` with `drop_possible_important_moment`, the
+no-codes line (`custom_code` check), no turn numbers, the try_next cap (`TRY_NEXT_MAX`), SCRIPT and SKILL LABELS.
+A new blocking card check, `compares_learner`, fails card text that compares the learner with others (a share of
+trainees, "most trainees did better", "other learners", "compared with others", ranks, top/bottom, above/below
+average); "many find this moment hard" passes. The proposed prompt versions, with anchors for the live text, are
+in `docs/debrief-harness/proposals/2026-11-16-wording-to-prompts.json`.
+
 ## 5. Ask Ally — `POST /api/v1/ask-ally/replies` (ally-ai)
 
 Added 2026-11-11 (spec §A10, §D2 step 4). Ask Ally answers a learner's reply under their published
@@ -398,7 +429,7 @@ Auth: the service `X-API-Key`. Request:
   "reply": { "provider": "gemini | openai | anthropic", "model": "gemini-2.5-flash", "maxTokens": 900,
              "budgetUsd": 0.05, "maxTurns": 4 },                 // the release bundle's `reply`; the two limits optional
   "prices": { "<reply model>": { "input_per_m": 0.3, "output_per_m": 2.5 } },   // unpriced = the reply never runs
-  "system": "...",                      // built by ally-be: live reply prompt, debrief, transcript, org wording, length rule
+  "system": "...",                      // built by ally-be: live reply prompt, debrief, transcript, org wording, then `REPLY LIMIT: 120 words.` last
   "history": [ { "role": "user | assistant", "content": "..." } ],             // the thread's last 10, oldest first
   "message": "the learner's new message",
   "run_token": "<JWT, scope reply>",
@@ -437,6 +468,10 @@ Limits and behaviour:
   words; `stoppedBy` says which. `ModelCallLimitMiddleware` is a backstop that is never reached.
 - **Budget:** `budgetUsd` (default and ceiling $0.05), from each pass's token usage and `prices`.
 - **Session budget (ally-be, 2026-11-16):** one session's debrief run and all its Ask Ally replies share `settings.sessionBudgetUsd` (default $1.00; the run's ceiling is clamped to it). ally-be sends each reply `budgetUsd` = the smallest of the release's reply budget, $0.05, what the session has left and what the month's cap has left, and keeps the session's running total on `workspace.askAllySpentUsd` (the month's spend counts it too). With under $0.01 left, `settings.maxRepliesPerSession` replies already given (default 20), or the month's cap spent, ally-be calls no model: the learner gets `REPLY_LIMIT` in the debrief's language on a `done` event carrying `limit: "session" | "month"`. The crisis screen still answers first.
+- **Length (2026-11-16):** the system text ends with the data line `REPLY LIMIT: 120 words.` (`REPLY_MAX_WORDS`);
+  how to write short is the reply prompt's LENGTH section. ally-be's `replyCheckFailures` fails a reply over the
+  cap (`reply_too_long`: whitespace-separated words; Han/Kana at 2 characters a word and Thai/Lao/Khmer/Myanmar at
+  4, scripts written without spaces) and replaces it like any other failed reply check.
 - **Tools:** each must answer within 1.5 s; a failed or slow tool is told to the model as "This is unavailable right
   now. Answer from the debrief and the session." (`ToolErrorMiddleware`) and recorded `ok: false`. `search_guidance`
   calls `guidance_search` with one topic `{situation: <topic, at most 10 words>}` and `per_moment: 3`;

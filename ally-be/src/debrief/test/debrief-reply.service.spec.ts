@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { firstValueFrom, toArray } from 'rxjs';
 import { AskAllyError, ReplyTrace } from '../service/ask-ally.client';
 import {
@@ -407,6 +409,31 @@ describe('DebriefReplyService (Ask Ally)', () => {
     const events = await run(svc, 'How did I do?');
     const done = events.find((e) => e.type === 'done');
     expect(done.content).not.toContain('7/10');
+  });
+
+  it('replaces a reply over the word cap, like any other failed check', async () => {
+    const long = Array.from({ length: 121 }, (_, i) => `w${i}`).join(' ');
+    const { svc } = build({ reply: { text: long } });
+    const done = (await run(svc, 'Tell me everything.')).find(
+      (e) => e.type === 'done',
+    );
+    expect(done.content).not.toContain('w120');
+  });
+
+  it('sends the cap as data last; how to write short is the prompt’s', () => {
+    expect(REPLY_LENGTH_REMINDER).toBe('REPLY LIMIT: 120 words.');
+    const seed = readFileSync(
+      join(__dirname, '../../prompts/debrief/reply_system.txt'),
+      'utf8',
+    );
+    const composed = `${seed}\n...\n${REPLY_LENGTH_REMINDER}`;
+    for (const phrase of ['in short paragraphs', 'REPLY LIMIT']) {
+      expect(composed.split(phrase).length - 1).toBe(
+        phrase === 'REPLY LIMIT' ? 2 : 1,
+      );
+    }
+    expect(seed).toContain('LENGTH. REPLY LIMIT, at the very end');
+    expect(REPLY_LENGTH_REMINDER).not.toContain('short paragraphs');
   });
 
   it('replaces a reply that quotes words nobody said', async () => {

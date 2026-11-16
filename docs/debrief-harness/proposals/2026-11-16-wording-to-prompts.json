@@ -1,0 +1,62 @@
+{
+  "_notes": [
+    "Apply each prompt's ops in order to its LIVE text. 'after' inserts text immediately after the anchor (the text carries its own leading spaces or blank lines); 'replace' replaces the anchor; 'create' is the full text of a new prompt; 'replace_all' replaces the whole live text.",
+    "Every anchor is a sentence that occurs exactly once in the ally-be default on debrief-progress (or in the text the earlier ops of the same prompt produce). The generator re-applied every op list to the defaults and got the new defaults exactly.",
+    "Step 1-2 (wording moved out of code): ally-ai stops sending this wording once it is deployed, so publish these versions in the same release as, or before, that deploy. Until then the code still sent it, so publishing first only duplicates it briefly; deploying first drops it until publishing."
+  ],
+  "_pinned": [],
+  "debrief_writer_system": [
+    {
+      "anchor": "When a statement might be about death, self-harm, harm to others or abuse and you cannot tell, treat it as a clear risk cue.",
+      "op": "after",
+      "text": "\n\nPOSSIBLE RISK CUES. When POSSIBLE RISK CUES lists turns, the safety reader filed them under hopelessness, with no word of death, self-harm or a means. Decide each one by the RISK CUES rules above. Treat one as a risk cue (the important moment, or a line in important_moment.others) only when the client's words, in context, point to wanting to die, not wanting to live or be here, self-harm, harm to others or abuse, or might and you cannot tell. Low mood, tiredness, burden, loneliness, grief or guilt is not a risk cue: no important moment for it, and no coaching about assessing risk.",
+      "step": "1-2"
+    },
+    {
+      "anchor": "Use a finding where it fits the session and the evidence supports it; never name an agent or a source.",
+      "op": "after",
+      "text": " A quote in a finding was checked against the transcript. A comparison finding may only say a moment is one many trainees find hard or a strength is less common; never compare or rank this trainee.\n\nPRACTISE THIS AGAIN. When COURSE is given, the learner practises this same roleplay again; never suggest another one. Fill practise_next.try_next with up to 3 things the learner missed or only partly did when they had the opportunity (evidence-map behaviours with an opportunity and observation missed or partial), the most important first. Each is one short sentence saying what to try, in the SESSION LANGUAGE, with no quotes and no ids. When there is nothing they missed, leave try_next empty. Outside a course, try_next is null.\n\nCASE. When CASE MEMORY is given, it is what the client carries from the trainee's earlier sessions. Never contradict it; where it helps, connect a point to it.\n\nMIXED EVIDENCE. When MIXED EVIDENCE lists behaviours, the live detector disagreed with the evidence map on them (detector_agreement \"disagrees\"): don't state them as certain; prefer a point the evidence supports clearly.\n\nCOHORT. When COHORT is given, it is how other trainees in the same organisation did on this roleplay. You may use it only to say a moment is one many trainees find hard, or that a strength is less common. Never compare this trainee with others, rank them, or give a number or share.",
+      "step": "1-2"
+    }
+  ],
+  "debrief_reviser_system": [
+    {
+      "anchor": "When FINDINGS are given, they are new evidence for the sections the critique names; use them only there.",
+      "op": "after",
+      "text": " They are what the analysis agents found, grouped by kind with the most important first. Use a finding where it fits the session; a quote in a finding was checked against the transcript. A comparison finding may only say a moment is one many trainees find hard or a strength is less common; never compare or rank this trainee. Never name an agent or a source.",
+      "step": "1-2"
+    }
+  ],
+  "debrief_analyst_system": [
+    {
+      "anchor": "Judge the counsellor only on what they had a chance to do.",
+      "op": "after",
+      "text": "\n\nROLEPLAY EXPECTATIONS. When ROLEPLAY EXPECTATIONS are given, the helpful_behaviours and unhelpful_behaviours in the roleplay_expectations block are what this roleplay expects of the counsellor. Assess each one they had the opportunity for: did the counsellor show the helpful ones, and avoid the unhelpful ones. Its competencies are labels, each with its own helpful and unhelpful behaviours when it has any: use a competency's name only to group or name evidence, never as if it had a definition. A competency with no behaviours you may interpret from its name in the context of this roleplay; when you do, say so in the note and lower your confidence.\n\nCASE. When CASE MEMORY is given, case_memory_update is about the client and the case only, never the trainee.\n\nLIVE DETECTIONS. When LIVE DETECTIONS are given, the live_detections block is what the live detector recorded during the roleplay, per expected behaviour. It can be wrong. Read the transcript yourself, and where you disagree with it, lower your confidence and say in the note that the evidence is mixed.",
+      "step": "1-2"
+    }
+  ],
+  "debrief_progress_reader_system": [
+    {
+      "anchor": "When a past point is answered by this session, quote that point in follows_up_point.",
+      "op": "after",
+      "text": "\n\nHOW TO USE WHAT PEOPLE SAID ABOUT EARLIER DEBRIEFS\n- A point with ally_decision corrected or removed was wrong: never repeat it, and do not follow it up.\n- A point with ally_decision kept stays true even though the learner disagreed (learner_note says why). If it comes up again, explain it more clearly and gently; never drop it because the learner pushed back.\n- learner_note is the learner's own words: use it to understand what they found unclear or unfair. It is never evidence about the session.\n- A point with source expert is a clinical expert's note on what the learner did in that roleplay. Follow it up when this session shows the same moment; never quote the expert or say an expert wrote it.",
+      "step": "1-2"
+    }
+  ],
+  "debrief_progress_system": [
+    {
+      "anchor": "Copy the point verbatim.",
+      "op": "after",
+      "text": "\n\nWHAT PEOPLE SAID ABOUT PAST POINTS (in <learner_profile>.past_points)\n- A point with ally_decision corrected or removed was wrong: never follow it up, and never repeat it.\n- A point with ally_decision kept stays true even though the learner disagreed (learner_note says why, ally_reason says why Ally kept it). If it comes up again, say it more clearly and gently; never drop it because the learner pushed back.\n- learner_note is the learner's own words: use it to understand what they found unclear or unfair. It is never evidence about a session.\n- A point with source expert is a clinical expert's note on what the learner did in that roleplay. Follow it up when this session shows the same moment; never quote the expert or say an expert wrote it.",
+      "step": "1-2"
+    }
+  ],
+  "debrief_reply_system": [
+    {
+      "anchor": "Reply in the language the trainee writes in; if unsure, the SESSION LANGUAGE.",
+      "op": "after",
+      "text": "\n\nLENGTH. REPLY LIMIT, at the very end, is the most words your reply may have; a longer reply is not sent. Write within it, in short paragraphs, with at most one question back.",
+      "step": "1-2"
+    }
+  ]
+}

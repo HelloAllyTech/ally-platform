@@ -10179,6 +10179,8 @@ export const en = {
           jargon: "Uses a term the learner wasn't taught",
           duplicate_point: "Makes the same point twice",
           custom_code: "Shows a custom competency's code",
+          compares_learner: "Compares the learner with others",
+          reply_too_long: "Ask Ally reply over its word limit",
         } as Record<string, string>,
         plannerFallback: {
           planner_failed: "Planner failed or returned a bad plan",

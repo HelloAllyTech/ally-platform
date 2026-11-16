@@ -35,6 +35,7 @@ import { modelPrices } from '../util/debrief-budget.util';
 import {
   DebriefCards,
   cardTexts,
+  REPLY_MAX_WORDS,
   replyCheckFailures,
   cardSkills,
   speakerRuns,
@@ -161,12 +162,13 @@ const CARD_SECTION_NAMES = [
 ];
 
 /**
- * The prompt's own length rule, said again after the debrief, transcript and
- * context it is followed by: from the top of a long prompt the model drifted
- * (a 190-word reply in the prod end-to-end check, 2 Nov 2026).
+ * The word cap, sent last, after the debrief, transcript and context: from the
+ * top of a long prompt the model drifted (a 190-word reply in the prod
+ * end-to-end check, 2 Nov 2026). Data only: how to write short is the reply
+ * prompt's LENGTH section (Skills Store), and `replyCheckFailures` fails a
+ * reply over the cap.
  */
-export const REPLY_LENGTH_REMINDER =
-  'Now write your reply: at most 120 words, in short paragraphs, with at most one question back.';
+export const REPLY_LENGTH_REMINDER = `REPLY LIMIT: ${REPLY_MAX_WORDS} words.`;
 
 /** The organisation's wording must arrive within this, or is left out. */
 const ORG_WORDING_MS = 1200;

@@ -117,7 +117,9 @@ async def test_progress_reader_keeps_three_items(dispatch_returns):
 
 @pytest.mark.asyncio
 async def test_progress_reader_reads_what_people_said_with_its_guide(dispatch_returns):
-    from app.core.debrief.steps import PAST_FEEDBACK_GUIDE, read_progress
+    """The guide is the Progress reader prompt's wording (2026-11-16); the
+    code sends the past points with what people said about them."""
+    from app.core.debrief.steps import DEFAULT_PROGRESS_READER_SYSTEM, read_progress
 
     calls = dispatch_returns(ProgressReading(items=[]))
     await read_progress(
@@ -133,17 +135,10 @@ async def test_progress_reader_reads_what_people_said_with_its_guide(dispatch_re
         ],
         "gemini-2.5-flash",
     )
-    assert PAST_FEEDBACK_GUIDE in calls["prompt"]
+    guide = "HOW TO USE WHAT PEOPLE SAID ABOUT EARLIER DEBRIEFS"
+    assert guide in DEFAULT_PROGRESS_READER_SYSTEM
+    assert calls["prompt"].count(guide) == 1
     assert "She never said that" in calls["prompt"]
-
-
-@pytest.mark.asyncio
-async def test_progress_reader_without_feedback_gets_no_guide(dispatch_returns):
-    from app.core.debrief.steps import PAST_FEEDBACK_GUIDE, read_progress
-
-    calls = dispatch_returns(ProgressReading(items=[]))
-    await read_progress({"behaviours": []}, [{"point": "x"}], "gemini-2.5-flash")
-    assert PAST_FEEDBACK_GUIDE not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -251,7 +246,7 @@ async def test_writer_is_told_every_risk_cue_turn_to_cover(dispatch_returns):
         TRANSCRIPT,
     )
     assert "RISK CUES TO COVER: turns 2, 9." in calls["prompt"]
-    assert "POSSIBLE RISK CUES" not in calls["prompt"]
+    assert "POSSIBLE RISK CUES: turns" not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -386,7 +381,8 @@ async def test_writer_respects_case_memory_and_never_regrades(dispatch_returns):
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
-    assert "CASE MEMORY" not in calls["prompt"]
+    assert "CASE MEMORY:" not in calls["prompt"]
+    assert "CASE: this session continues a case." not in calls["prompt"]
     assert "ASSESSMENT" not in calls["prompt"]
 
 
@@ -467,12 +463,12 @@ async def test_analyst_reads_the_live_detector_as_a_second_opinion(dispatch_retu
         live_detections=[{"behaviour": "Explores risk", "detected": False, "times": 0}],
     )
     prompt = calls["prompt"]
-    assert "LIVE DETECTIONS" in prompt and "It can be wrong" in prompt
+    assert "LIVE DETECTIONS: given." in prompt and "It can be wrong" in prompt
     assert '"behaviour": "Explores risk"' in prompt
 
     calls = dispatch_returns(EvidenceMap())
     await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
-    assert "LIVE DETECTIONS" not in calls["prompt"]
+    assert "LIVE DETECTIONS: given." not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -486,12 +482,12 @@ async def test_writer_may_use_the_cohort_only_to_normalise(dispatch_returns):
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT, cohort=cohort)
     prompt = calls["prompt"]
-    assert "COHORT:" in prompt and "Never compare this trainee" in prompt
+    assert "COHORT: given." in prompt and "Never compare this trainee" in prompt
     assert "few trainees show this" in prompt
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
-    assert "COHORT" not in calls["prompt"]
+    assert "COHORT: given." not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -503,7 +499,7 @@ async def test_writer_never_states_mixed_evidence_as_fact(dispatch_returns):
     }
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write(evidence, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
-    assert "MIXED EVIDENCE" in calls["prompt"]
+    assert "MIXED EVIDENCE: Reflections." in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -553,7 +549,7 @@ async def test_analyst_rates_client_turns_and_updates_case_memory(dispatch_retur
     calls = dispatch_returns(EvidenceMap(case_memory_update="invented"))
     out, _ = await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
     assert out.case_memory_update is None
-    assert "CASE MEMORY" not in calls["prompt"]
+    assert "CASE MEMORY:" not in calls["prompt"]
 
 
 @pytest.mark.asyncio

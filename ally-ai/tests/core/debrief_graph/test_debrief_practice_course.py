@@ -17,12 +17,24 @@ COURSE_OPTION = {
 def test_a_course_session_practises_this_roleplay_again_with_try_next():
     text = " ".join(_practice_instruction([COURSE_OPTION]))
     assert "part of a course" in text
-    assert "never suggest another one" in text
     assert "practise_next.scenario_id to 3" in text
-    assert "try_next" in text
-    assert "missed or partial" in text
-    assert "no quotes and no ids" in text
+    assert "try_next applies, at most 3 items." in text
     assert "outside_course" not in text
+
+
+def test_what_try_next_holds_is_the_writer_prompts_wording():
+    """Moved to the Writer prompt (2026-11-16); the code sends only the course
+    line and the cap."""
+    from app.core.debrief.steps import DEFAULT_WRITER_SYSTEM
+
+    prompt = DEFAULT_WRITER_SYSTEM.replace("\n", " ")
+    assert "PRACTISE THIS AGAIN. When COURSE is given" in prompt
+    assert "never suggest another one" in prompt
+    assert "missed or partial" in prompt
+    assert "no quotes and no ids" in prompt
+    assert "Outside a course, try_next is null." in prompt
+    text = " ".join(_practice_instruction([COURSE_OPTION]))
+    assert "never suggest another one" not in text
 
 
 def test_a_library_session_reads_as_before_with_no_try_next():

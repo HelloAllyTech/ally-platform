@@ -1347,7 +1347,7 @@ export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
   {
     name: 'Debrief Analyst',
     description:
-      "The debrief agent's Analyst: builds the evidence map (each behaviour's opportunity, observed/partial/missed, confidence, importance and exact quote; pivotal moments; emotional arc; AI faults), leading with what the roleplay expects (its own helpful and unhelpful behaviours and its competencies) and adding a foundational helping skill only when it clearly shaped the session. The step composes the transcript, scenario, expected behaviours and the roleplay's expectations around this text. Release-only: a new version reaches learners through an approved release.",
+      "The debrief agent's Analyst: builds the evidence map (each behaviour's opportunity, observed/partial/missed, confidence, importance and exact quote; pivotal moments; emotional arc; AI faults), leading with what the roleplay expects (its own helpful and unhelpful behaviours and its competencies) and adding a foundational helping skill only when it clearly shaped the session. The step composes the transcript, scenario, expected behaviours and the roleplay's expectations around this text, with data lines only (ROLEPLAY EXPECTATIONS, CASE, LIVE DETECTIONS); how to read them is this text's wording. Release-only: a new version reaches learners through an approved release.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1360,7 +1360,7 @@ export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
   {
     name: 'Debrief Progress Reader',
     description:
-      "The debrief agent's Progress reader: compares the latest evidence map with the learner's past Work-on-this points and says only what the evidence supports. Release-only.",
+      "The debrief agent's Progress reader: compares the latest evidence map with the learner's past Work-on-this points and says only what the evidence supports, and how to use what the learner and experts said about past points. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1373,7 +1373,7 @@ export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
   {
     name: 'Debrief Progress Agent',
     description:
-      "The debrief agent's Progress agent: reads this session's evidence map with the learner's progress profile (past sessions' Analyst observations, past points and their review verdicts, the last progress report, the learner's own words, Foundational Skills levels) and proposes up to 3 skill trends, follow-ups on past points and one focus. Code vetoes any trend the record contradicts. Release-only.",
+      "The debrief agent's Progress agent: reads this session's evidence map with the learner's progress profile (past sessions' Analyst observations, past points and their review verdicts, the last progress report, the learner's own words, Foundational Skills levels) and proposes up to 3 skill trends, follow-ups on past points and one focus. This text says how to use what people said about past points. Code vetoes any trend the record contradicts. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1386,7 +1386,7 @@ export const DEBRIEF_WRITER_SYSTEM = definePrompt(
   {
     name: 'Debrief Writer',
     description:
-      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress, preferring the roleplay's own competencies and behaviours over the foundational skills. Every client risk cue is covered: the most serious by the important moment, each other one in its `others`. Never sees the rubric. Release-only.",
+      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress, preferring the roleplay's own competencies and behaviours over the foundational skills. Every client risk cue is covered: the most serious by the important moment, each other one in its `others`. Never sees the rubric. The code adds only data lines (risk-cue turns, MISSED FEELINGS, COURSE, CASE, MIXED EVIDENCE, COHORT, FINDINGS), format lines and checked safety lines; the wording for each is in this text. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1399,7 +1399,7 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
   {
     name: 'Debrief Reviser',
     description:
-      "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged, adding any uncovered risk cue to the important moment's `others`. Release-only.",
+      "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged, adding any uncovered risk cue to the important moment's `others`. How to use FINDINGS is in this text. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1464,7 +1464,7 @@ export const DEBRIEF_REPLY_SYSTEM = definePrompt(
   {
     name: 'Ask Ally (debrief reply)',
     description:
-      "The Debrief agent in conversation mode: answers the learner's replies under the reflective question from the published debrief and the transcript. Streamed, one short answer per message, checked by code afterwards (no score, no diagnosis, quotes must match). Release-only.",
+      "The Debrief agent in conversation mode: answers the learner's replies under the reflective question from the published debrief and the transcript. Streamed, one short answer per message, checked by code afterwards (no score, no diagnosis, quotes must match, at most the REPLY LIMIT the code sends last). Release-only.",
     category: 'evaluation',
   },
 );

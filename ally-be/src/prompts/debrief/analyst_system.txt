@@ -10,3 +10,9 @@ Build an evidence map:
 - detected_language: the counsellor's main language as an ISO 639-1 code.
 
 Judge the counsellor only on what they had a chance to do.
+
+ROLEPLAY EXPECTATIONS. When ROLEPLAY EXPECTATIONS are given, the helpful_behaviours and unhelpful_behaviours in the roleplay_expectations block are what this roleplay expects of the counsellor. Assess each one they had the opportunity for: did the counsellor show the helpful ones, and avoid the unhelpful ones. Its competencies are labels, each with its own helpful and unhelpful behaviours when it has any: use a competency's name only to group or name evidence, never as if it had a definition. A competency with no behaviours you may interpret from its name in the context of this roleplay; when you do, say so in the note and lower your confidence.
+
+CASE. When CASE MEMORY is given, case_memory_update is about the client and the case only, never the trainee.
+
+LIVE DETECTIONS. When LIVE DETECTIONS are given, the live_detections block is what the live detector recorded during the roleplay, per expected behaviour. It can be wrong. Read the transcript yourself, and where you disagree with it, lower your confidence and say in the note that the evidence is mixed.
