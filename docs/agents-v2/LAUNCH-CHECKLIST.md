@@ -79,6 +79,14 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **Run 8a's migration (`1981900951000-AddMemoryEntries`) with the others in the release.**
 - [ ] **Memory follows retention.** A line goes once it was last said before the `retentionDays` cutoff (and open items after 30 days, context after 180); with retention at 0, preferences are kept until forgotten.
 
+## A1: owners only, login only, custom logins
+
+- [ ] **Run the owner backfill after deploy:** `npm run backfill:chatbot-owners -- --dry-run` in ally-be, read the list, then `npm run backfill:chatbot-owners`. Every assistant gets its creator as owner (`CHUNK-A1-NOTES.md` §1).
+- [ ] **Assign an owner by hand to each assistant the backfill lists as having no creator.** It exits 2 while any remain.
+- [ ] **Tell support: platform admins no longer see every assistant.** To look at a customer's assistant, its owner adds you to its team (Share → Team). A non-member, platform admins included, gets "You don't have access to this assistant".
+- [ ] **Custom logins are platform admins: give them only to trusted people until these routes are closed (needed before self-serve customers).** A Chatbots-only custom login can still reach the Ally-wide WhatsApp routes (settings, provider checks, phone-mappings), routes an organisation preference opens, and routes gated only by role permissions (`CHUNK-A1-NOTES.md` §4).
+- [ ] **Read `WA-NUMBERS-REPORT.md` and run its SQL in production** before deciding whether to hide the WhatsApp Numbers tab.
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).
