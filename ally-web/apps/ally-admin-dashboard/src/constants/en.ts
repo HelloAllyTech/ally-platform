@@ -950,6 +950,17 @@ export const en = {
     loadingToggles: "Loading feature access...",
   },
   userManagement: {
+    bulkSuspend: "Suspend",
+    bulkActivate: "Activate",
+    bulkSuspendTitle: (n: number) => `Suspend ${n} ${n === 1 ? "user" : "users"}?`,
+    bulkSuspendConsequence:
+      "They are signed out and cannot sign in until activated again. Their data is kept, and you can activate them at any time.",
+    bulkActivateTitle: (n: number) => `Activate ${n} ${n === 1 ? "user" : "users"}?`,
+    bulkActivateConsequence: "They can sign in again straight away.",
+    bulkStatusDone: (n: number, status: string) =>
+      `${n} ${n === 1 ? "user" : "users"} set to ${status.toLowerCase()}`,
+    bulkStatusFailed: (names: string[]) =>
+      `Couldn't update ${names.length} ${names.length === 1 ? "user" : "users"}: ${names.slice(0, 5).join(", ")}${names.length > 5 ? ` and ${names.length - 5} more` : ""}`,
     roleHelpHeading: "What each role can do",
     roleHelp: {
       COUNSELOR: "Counsellor: works the helpline and practises in the app. No admin access.",

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-
 import { MIN_LEARNER_CREDITS, resolveLearnerCreditLimit } from "../learnerCredits";
 
 describe("resolveLearnerCreditLimit", () => {

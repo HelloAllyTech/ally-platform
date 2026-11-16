@@ -17,6 +17,7 @@ import {
   useAddSimulationCreditLimitMutation,
   useGetUserImpersonatedTokenMutation,
 } from "@api";
+import { useRowSelection } from "@components/bulk-action-bar";
 import { FilterValues } from "@components/types";
 import {
   SORT_BY,
@@ -479,6 +480,34 @@ export function useUserManagement(
     }
   };
 
+  // Row selection + bulk status change. There is no bulk endpoint, so each user is updated on its
+  // own and the result names the ones that failed. A search or filter change clears the selection:
+  // the bar must never act on rows that are no longer on screen.
+  const rowSelection = useRowSelection<number>(users.map(user => user.id));
+  const clearSelection = rowSelection.clear;
+  const selectionScope = JSON.stringify([search, filters]);
+  useEffect(() => {
+    clearSelection();
+  }, [selectionScope, clearSelection]);
+
+  const handleBulkStatus = async (status: string) => {
+    const targets = users.filter(user => rowSelection.isSelected(user.id));
+    const results = await Promise.allSettled(
+      targets.map(user => updateUserStatus({ userId: user.id, status }).unwrap()),
+    );
+    const failed = targets.filter((_, index) => results[index].status === "rejected");
+    const ok = targets.length - failed.length;
+    if (ok > 0) toast.success(en.userManagement.bulkStatusDone(ok, status));
+    if (failed.length > 0) {
+      toast.error(
+        en.userManagement.bulkStatusFailed(
+          failed.map(user => user.name || user.email || `#${user.id}`),
+        ),
+      );
+    }
+    rowSelection.clear();
+  };
+
   const handleChangeRole = async (data: any) => {
     try {
       const selectedRoleNames: string[] = data.roles || [];
@@ -544,6 +573,8 @@ export function useUserManagement(
   return {
     // state
     allTenants: tenants,
+    rowSelection,
+    handleBulkStatus,
     search,
     setSearch,
     isFilterOpen,

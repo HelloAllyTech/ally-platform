@@ -40,6 +40,17 @@ vi.mock("../../DebriefAccess/DebriefAccess", () => ({
 
 // Mock components
 vi.mock("@components", () => ({
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true), dialog: null }),
+  BulkActionBar: ({ count, actions }: any) =>
+    count > 0 ? (
+      <div data-testid="bulk-bar">
+        {actions.map((a: any) => (
+          <button key={a.label} onClick={a.onClick}>
+            {a.label}
+          </button>
+        ))}
+      </div>
+    ) : null,
   cellTypes: {
     editableText: "editableText",
     dropdown: "dropdown",

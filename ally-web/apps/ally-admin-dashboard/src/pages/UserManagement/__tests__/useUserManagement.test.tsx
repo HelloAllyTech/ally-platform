@@ -1,5 +1,6 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { toast } from "sonner";
 
 import { UserRole } from "@constants";
 
@@ -20,8 +21,11 @@ vi.mock("react-router-dom", async importOriginal => {
 });
 
 const changeRole = vi.fn();
+const updateStatus = vi.fn();
 const getUsersQuery = vi.fn();
+const usersResultRef = { current: undefined as unknown };
 const USERS_RESULT = { data: { data: [], count: 0 }, isFetching: false };
+usersResultRef.current = USERS_RESULT;
 
 // Every role the backend knows about, in the shape GET /authorization/roles
 // returns. The endpoint now filters the platform tiers itself, but they are
@@ -45,7 +49,7 @@ vi.mock("@api", async importOriginal => ({
   useBulkAddUsersMutation: () => [vi.fn()],
   useDeleteUserMutation: () => [vi.fn()],
   useEditUserMutation: () => [vi.fn()],
-  useUpdateUserStatusMutation: () => [vi.fn()],
+  useUpdateUserStatusMutation: () => [updateStatus],
   useChangeRoleMutation: () => [changeRole],
   useAddSimulationCreditLimitMutation: () => [vi.fn()],
   useGetUserImpersonatedTokenMutation: () => [vi.fn()],
@@ -55,7 +59,7 @@ vi.mock("@api", async importOriginal => ({
   useGetTenantsQuery: () => ({ data: undefined }),
   useGetUsersQuery: (params: unknown) => {
     getUsersQuery(params);
-    return USERS_RESULT;
+    return usersResultRef.current;
   },
 }));
 
@@ -71,6 +75,33 @@ const staffAccount = {
 } as any;
 
 describe("useUserManagement", () => {
+  it("bulk status change updates each selected user and names the ones that fail", async () => {
+    usersResultRef.current = {
+      data: {
+        data: [
+          { id: 1, name: "Asha", email: "a@x.com" },
+          { id: 2, name: "Ben", email: "b@x.com" },
+        ],
+        count: 2,
+      },
+      isFetching: false,
+    };
+    updateStatus.mockImplementation(({ userId }: { userId: number }) => ({
+      unwrap: () => (userId === 2 ? Promise.reject(new Error("no")) : Promise.resolve({})),
+    }));
+    const { result } = renderHook(() => useUserManagement([]));
+    await waitFor(() => expect(result.current.users).toHaveLength(2));
+    act(() => result.current.rowSelection.toggleAll());
+    await act(async () => {
+      await result.current.handleBulkStatus("SUSPENDED");
+    });
+    expect(updateStatus).toHaveBeenCalledTimes(2);
+    expect(toast.success).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Ben"));
+    expect(result.current.rowSelection.count).toBe(0);
+    usersResultRef.current = USERS_RESULT;
+  });
+
   it("keeps search and filters in the URL state and filters by organisation id", () => {
     const tenants = [
       { id: "t1", name: "Acme" },

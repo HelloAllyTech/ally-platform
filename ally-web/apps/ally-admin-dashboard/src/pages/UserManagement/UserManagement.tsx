@@ -17,6 +17,8 @@ import {
   ActionConfirmationPopup,
   StatusBadge,
   AssignedOrganizations,
+  BulkActionBar,
+  useConfirm,
 } from "@components";
 import { ButtonVariant, FilterValues } from "@components/types";
 import {
@@ -131,6 +133,22 @@ export const UserManagement: FC = () => {
     logoUpload,
   } = useOrganizationManagement();
 
+  const { confirm: confirmBulk, dialog: bulkConfirmDialog } = useConfirm();
+  const bulkStatus = async (status: string) => {
+    const n = rowSelection?.count ?? 0;
+    const suspend = status === userStatus.SUSPENDED;
+    const ok = await confirmBulk({
+      title: suspend
+        ? en.userManagement.bulkSuspendTitle(n)
+        : en.userManagement.bulkActivateTitle(n),
+      consequence: suspend
+        ? en.userManagement.bulkSuspendConsequence
+        : en.userManagement.bulkActivateConsequence,
+      confirmLabel: suspend ? en.userManagement.bulkSuspend : en.userManagement.bulkActivate,
+    });
+    if (ok) await handleBulkStatus(status);
+  };
+
   // User management hook (depends on tenants)
   const {
     usersCount,
@@ -170,6 +188,8 @@ export const UserManagement: FC = () => {
     handleAddCredit,
     includePlatformAdmins,
     allTenants,
+    rowSelection,
+    handleBulkStatus,
   } = useUserManagement(tenants, canListPlatformAdmins, canSeeUsersAndOrgs);
 
   const watchedRoles = userMethods.watch("roles") || [];
@@ -584,11 +604,30 @@ export const UserManagement: FC = () => {
                 formatDate={formatDate}
                 onOptionSelect={handleOptionSelect}
                 canEditUser={canEditUser}
+                selection={canEditUser ? rowSelection : undefined}
                 renderFooter={() =>
                   renderFooter(loadUsers, isUsersFetching, usersCount > users.length)
                 }
               />
             )}
+
+            {canEditUser && rowSelection && (
+              <BulkActionBar
+                count={rowSelection.count}
+                onClear={rowSelection.clear}
+                actions={[
+                  {
+                    label: en.userManagement.bulkSuspend,
+                    onClick: () => void bulkStatus(userStatus.SUSPENDED),
+                  },
+                  {
+                    label: en.userManagement.bulkActivate,
+                    onClick: () => void bulkStatus(userStatus.ACTIVE),
+                  },
+                ]}
+              />
+            )}
+            {bulkConfirmDialog}
 
             {selectedOption && renderEditModal()}
           </div>
