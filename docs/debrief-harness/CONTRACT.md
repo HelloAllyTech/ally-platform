@@ -252,8 +252,13 @@ of the meaning, in any language); or the word list in `cue_strength.py` matches 
 **possible**. No signal can lower another's clear (`turn_is_clear`).
 
 - **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; the independent judge's schema is unchanged).
-  A missed clear cue is the `missed_risk_cue` hard fail and holds the debrief, as before. A missed possible cue
+  A missed clear cue is the `missed_risk_cue` hard fail. A missed possible cue
   drops that hard fail; the run publishes as `below_bar` and is sent to review.
+- **No debrief is held (2026-11-16):** when the best draft fails the bar for any reason (a blocking check, no score,
+  or a missed clear risk cue), `decide` still publishes it as `below_bar`, with `workspace.decision.reviewReason`
+  `checks_failed` / `not_evaluated` / `missed_risk_cue`. `missed_risk_cue` puts the run at the top of the Console
+  queue as urgent (rank 0). `needs_person` remains only where no draft exists (month's cap, budget below the
+  minimum, Safety reader or Writer failed).
 - **Important moment:** once the Evaluator has read the draft, a card whose moments are all possible is taken
   out before `finalise_cards`; the run publishes as `below_bar` (review).
 - `workspace.decision` carries `droppedImportantMoment` and `possibleMissedCues` for the reviewer.

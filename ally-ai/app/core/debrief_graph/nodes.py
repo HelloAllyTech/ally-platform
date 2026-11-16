@@ -842,6 +842,7 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
     blocking = [c["code"] for c in best["checks"] if c["code"] not in advisory]
     rung = 0
     skip_reason = None
+    review_reason = None
     possible_missed = (ev or {}).get("possibleMissedCues") or []
     if meets_bar(best, advisory, pass_score) and dropped_moment:
         status = Status.BELOW_BAR
@@ -890,21 +891,33 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
             )
         )
     else:
-        status = Status.NEEDS_PERSON
-        rung = int(FallbackRung.PERSON_FINISHES)
-        if passes_checks(best, advisory):
-            skip_reason = "not_evaluated_or_risk"
+        # No debrief is held (Gopi, 2026-11-16): the best draft is shown as it
+        # is, below the bar, and a person reviews it after. A missed risk cue
+        # makes that review urgent.
+        status = Status.BELOW_BAR
+        missed_risk = bool(ev) and any(
+            h["code"] == "missed_risk_cue" for h in ev["hardFails"]
+        )
+        if not passes_checks(best, advisory):
+            review_reason = "checks_failed"
             why = (
-                "Held for a person: the Evaluator found a missed risk cue, which is "
-                "never published automatically."
-                if ev
-                else "Held for a person: no draft could be scored, so nothing was "
-                "published automatically."
+                f"Published round {best['round']} below the bar and sent it to "
+                f"review: the best draft still failed {', '.join(blocking)}. "
+                "No debrief is held; a person checks it."
+            )
+        elif missed_risk:
+            review_reason = "missed_risk_cue"
+            why = (
+                f"Published round {best['round']} below the bar and sent it to "
+                "urgent review: the Evaluator found a missed risk cue. No "
+                "debrief is held; a person checks it first."
             )
         else:
-            skip_reason = "checks_failed"
+            review_reason = "not_evaluated"
             why = (
-                f"Held for a person: the best draft still failed {', '.join(blocking)}."
+                f"Published round {best['round']} below the bar and sent it to "
+                "review: no draft could be scored. No debrief is held; a person "
+                "checks it."
             )
     log = code_log(
         ctx,
@@ -937,6 +950,8 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
                 # through as possible, not clear.
                 "droppedImportantMoment": dropped_moment,
                 "possibleMissedCues": possible_missed,
+                # Why a draft that did not meet the bar was shown anyway.
+                "reviewReason": review_reason,
             },
         },
         "patch": patch,

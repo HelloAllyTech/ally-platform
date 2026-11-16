@@ -267,6 +267,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
                sc.title AS "scenarioTitle", s."scenarioId" AS "scenarioId",
                (r.workspace ? 'review') AS reviewed,
                (r.workspace->'nightly'->'reasons') AS nightly_reasons,
+               (r.workspace->'decision'->>'reviewReason') AS review_reason,
                EXISTS (SELECT 1 FROM debrief_agreement_samples ags WHERE ags."runId" = r.id) AS agreement_sample,
                EXISTS (SELECT 1 FROM debrief_reviews dv WHERE dv."runId" = r.id) AS has_verdict,
                (r.workspace ? 'escalation' AND NOT (r.workspace ? 'review')) AS run_escalated,
@@ -290,7 +291,9 @@ export class DebriefConsoleViewService implements OnModuleInit {
       ), r0 AS (
         SELECT b.*,
                CASE
-                 WHEN b.mode = 'live' AND (b.urgent_open OR (b."learnerDistress" AND NOT b.reviewed)) THEN 0
+                 WHEN b.mode = 'live' AND (b.urgent_open
+                      OR (b."learnerDistress" AND NOT b.reviewed)
+                      OR (b.review_reason = 'missed_risk_cue' AND NOT b.reviewed)) THEN 0
                  WHEN b.mode = 'live' AND b.any_open THEN 1
                  WHEN b.mode = 'live' AND NOT b.reviewed
                       AND (b.status IN ('needs_person','below_bar','failed')
@@ -1072,7 +1075,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         count: urgent.length,
         oldestSince: iso(urgent[0].since),
         overdue: overdue(urgent[0].since),
-        message: `${urgent.length} urgent: a flag on an important moment or a learner in distress.`,
+        message: `${urgent.length} urgent: a flag on an important moment, a learner in distress, or a debrief shown with a missed risk cue.`,
         link: { page: 'session', runId: urgent[0].id },
       });
     }
