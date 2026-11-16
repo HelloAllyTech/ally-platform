@@ -29,9 +29,24 @@ from app.core.agent_runtime.check.offered_times import (
     record_moments,
 )
 
-# "at 4", "at 11" with no am/pm: the hour, morning or afternoon.
+# "at 4", "around 1", "by 7", "4 o'clock" with no am/pm: the hour, morning or
+# afternoon. Never "for 2" (that's how many people).
 _BARE_HOUR = re.compile(
-    r"\bat\s+(1[0-2]|0?[1-9])\b(?!\s*[:.]\d|\s*(?:a\.?\s?m|p\.?\s?m|o'?clock\s+[ap]))",
+    r"\b(?:at|around|about|by|@|~)\s+(1[0-2]|0?[1-9])\b"
+    r"(?!\s*[:.]\d|\s*(?:a\.?\s?m|p\.?\s?m|o'?clock\s+[ap]))",
+    re.IGNORECASE,
+)
+_OCLOCK = re.compile(
+    r"\b(1[0-2]|0?[1-9])\s*o'?\s?clock\b(?!\s*[ap]\.?\s?m)", re.IGNORECASE
+)
+# A short yes to the assistant's last message (8a): "perfect, book it", "yes please".
+_YES = re.compile(
+    r"\b(?:yes|yeah|yep|yup|ya|sure|ok|okay|perfect|great|confirm(?:ed)?|"
+    r"book it|go ahead|do it|please do|sounds good|that works|done|fine)\b",
+    re.IGNORECASE,
+)
+_NOT_YES = re.compile(
+    r"\b(?:no|not|don'?t|instead|but|change|another|different|other)\b|\?",
     re.IGNORECASE,
 )
 _NOON = re.compile(r"\b(?:noon|midday)\b", re.IGNORECASE)
@@ -74,6 +89,39 @@ def person_messages(
     return said[-2:]
 
 
+def is_plain_yes(text: str) -> bool:
+    """A short yes with nothing else asked or changed: "perfect, book it"."""
+    words = re.findall(r"[\w']+", text)
+    return 0 < len(words) <= 8 and bool(_YES.search(text)) and not _NOT_YES.search(text)
+
+
+def confirmed_texts(
+    history: Optional[Sequence[Mapping[str, Any]]], question: str
+) -> List[str]:
+    """What the person confirmed (8a): their latest two messages, and when the latest
+    is a plain yes, the assistant's message they said yes to, if it named exactly one
+    time. That message is what was sent to them, never the model's account of it, and
+    one time only, so "3 or 4?" answered "yes" confirms neither."""
+    said = person_messages(history, question)
+    if not said or not is_plain_yes(said[-1]):
+        return said
+    turns = list(history or [])
+    if turns and turns[-1].get("role") == "user":
+        if str(turns[-1].get("content") or "").strip() == question.strip():
+            turns = turns[:-1]
+    if not turns or turns[-1].get("role") != "assistant":
+        return said
+    offered = str(turns[-1].get("content") or "")
+    if len(_exact_times(offered)) != 1:
+        return said
+    return [*said, offered]
+
+
+def _exact_times(text: str) -> Set[int]:
+    """The clock times a message names exactly ("1:00 PM", "13:00"), no bare hours."""
+    return {_minutes(m) for m in _CLOCK.finditer(text)}
+
+
 def today_of(today: str) -> Optional[date]:
     match = _TODAY.search(today or "")
     if not match:
@@ -87,7 +135,7 @@ def named_times(texts: Sequence[str]) -> Set[int]:
     times: Set[int] = set()
     for text in texts:
         times.update(_minutes(m) for m in _CLOCK.finditer(text))
-        for m in _BARE_HOUR.finditer(text):
+        for m in [*_BARE_HOUR.finditer(text), *_OCLOCK.finditer(text)]:
             hour = int(m.group(1)) % 12
             times.update({hour * 60, (hour + 12) * 60})
         if _NOON.search(text):

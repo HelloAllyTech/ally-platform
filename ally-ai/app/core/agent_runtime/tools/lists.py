@@ -183,6 +183,10 @@ def list_tool(definition: Mapping[str, Any]) -> Tool:
         if ok and kind == "find":
             if isinstance(result.get("total"), int):
                 record["total"] = result["total"]
+            if result.get("nearest") in (True, "other_details"):
+                # Nothing at the time asked for: these are the nearest (chunk 8a),
+                # or the nearest by time alone when nothing then fits the other details.
+                record["nearest"] = result["nearest"]
             aggregate = result.get("aggregate")
             if isinstance(aggregate, dict) and "value" in aggregate:
                 record["aggregate"] = {

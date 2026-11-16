@@ -23,7 +23,7 @@ from app.core.agent_runtime.budget import extend_after_write
 from app.core.agent_runtime.gateway import AgentRunContext
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import Tool, ToolContext, allowed_tools
-from app.core.agent_runtime.tools.confirmed import person_messages
+from app.core.agent_runtime.tools.confirmed import confirmed_texts
 from app.core.agent_runtime.trace import Node, status, trace_step
 from app.core.knowledge_agent.agent import KnowledgeAgentService, build_result
 from app.core.knowledge_agent.schemas import AnswerIntent, DeclineReason
@@ -64,9 +64,10 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     gateway=_gateway(),
                     run_id=state["run_id"],
                     step=len(records),
-                    # The person's own words, never the model's summary of them.
+                    # The person's own words, and the sent message a plain yes
+                    # answers (8a); never the model's summary of them.
                     messages=tuple(
-                        person_messages(state.get("history"), state["question"])
+                        confirmed_texts(state.get("history"), state["question"])
                     ),
                     today=state["bot"].get("gateway_today") or "",
                 ),

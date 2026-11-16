@@ -117,6 +117,18 @@ def _format_list_call(record: Dict[str, Any]) -> str:
         kind = str(aggregate.get("kind") or "")
         what = "count" if kind == "count" else kind.replace("sum:", "total of ")
         return f"{tool}: {what} = {aggregate.get('value')}"
+    if record.get("nearest") == "other_details" and added:
+        return (
+            f"{tool}: none fit those details near then; by time alone, the nearest "
+            f"→ {_numbers(added)} (they don't fit: never book one; tell them "
+            "plainly what doesn't fit and offer a way forward: what these allow, "
+            "or passing it to the team)"
+        )
+    if record.get("nearest") and added:
+        return (
+            f"{tool}: none at that time; the nearest free → {_numbers(added)} "
+            "(tell them that time isn't free and offer these)"
+        )
     total = record.get("total")
     found = f"{total} found" if isinstance(total, int) else f"{len(added)} found"
     return f"{tool}: {found} → {_numbers(added)}" if added else f"{tool}: none found"

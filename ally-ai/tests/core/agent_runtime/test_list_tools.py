@@ -281,6 +281,43 @@ class TestFind:
         assert "- `find_slots`: none found" in llm.calls[1]["prompt"]
         assert state["tool_calls"][0]["kind"] == "gateway"
 
+    @pytest.mark.asyncio
+    async def test_nothing_at_that_time_shows_the_nearest_as_such(self, run_lists):
+        nearest = {**FOUND, "result": {**FOUND["result"], "total": 0, "nearest": True}}
+        gateway = FakeGateway(nearest)
+        llm = FakeLLM(
+            find(starts_at_at="2026-11-19T17:00:00+05:30"),
+            reply("answer", "Thursday 11:00 is free.", citations=[1]),
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_lists(gateway=gateway)
+        assert (
+            "- `find_slots`: none at that time; the nearest free → passages 1–2 "
+            "(tell them that time isn't free and offer these)" in llm.calls[1]["prompt"]
+        )
+
+    @pytest.mark.asyncio
+    async def test_nothing_that_fits_shows_the_nearest_by_time_as_not_fitting(
+        self, run_lists
+    ):
+        loose = {
+            **FOUND,
+            "result": {**FOUND["result"], "total": 0, "nearest": "other_details"},
+        }
+        gateway = FakeGateway(loose)
+        llm = FakeLLM(
+            find(starts_at_at="2026-11-19T17:00:00+05:30"),
+            reply("answer", "Thursday 11:00 is free.", citations=[1]),
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_lists(gateway=gateway)
+        assert (
+            "- `find_slots`: none fit those details near then; by time alone, the "
+            "nearest → passages 1–2 (they don't fit: never book one; tell them plainly "
+            "what doesn't fit and offer a way forward: what these allow, or passing it "
+            "to the team)" in llm.calls[1]["prompt"]
+        )
+
 
 class TestWrites:
     @pytest.mark.asyncio
@@ -841,6 +878,30 @@ class TestConfirmedTime:
         ]
 
     @pytest.mark.asyncio
+    async def test_yes_to_the_one_time_offered_is_booked(self, run_booking):
+        # 8a: "perfect, book it" to "Thursday 19 Nov at 11:00 is free. Book it?",
+        # after asking "around 11" (no exact time of their own in the yes).
+        history = [
+            {"role": "user", "content": "anything on Thursday?"},
+            {
+                "role": "assistant",
+                "content": "Thursday 19 Nov at 11:00 is free. Book it?",
+            },
+        ]
+        gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")), BOOKED)
+        llm = FakeLLM(
+            find(starts_at_from="2026-11-19T11:00:00+05:30"),
+            create(THU_11),
+            reply("answer", "Booked: Thursday 19 Nov at 11:00.", citations=[2]),
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_booking("perfect, book it", history=history, gateway=gateway)
+        assert [c["name"] for c in gateway.calls] == [
+            "find_slots",
+            "create_appointments",
+        ]
+
+    @pytest.mark.asyncio
     async def test_no_time_named_is_not_booked(self, run_booking):
         gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")), BOOKED)
         llm = FakeLLM(
@@ -902,6 +963,28 @@ class TestNamedTimesAndDays:
         assert named_times(["at 4 please"]) == {240, 960}
         assert named_times(["around noon"]) == {720}
         assert named_times(["yes please"]) == set()
+        # 8a: "around 1", "by 7", "4 o'clock"; never "for 2" (people).
+        assert named_times(["tomorrow around 1 for two of us"]) == {60, 780}
+        assert named_times(["by 7 please"]) == {420, 1140}
+        assert named_times(["4 o'clock"]) == {240, 960}
+        assert named_times(["a table for 2 tomorrow"]) == set()
+
+    def test_a_plain_yes_confirms_the_one_time_it_answers(self):
+        from app.core.agent_runtime.tools.confirmed import confirmed_texts
+
+        offered = "Shall I book a table for two tomorrow at 1:00 PM?"
+        history = [
+            {"role": "user", "content": "a table for two tomorrow"},
+            {"role": "assistant", "content": offered},
+        ]
+        assert confirmed_texts(history, "perfect, book it")[-1] == offered
+        assert confirmed_texts(history, "yes please")[-1] == offered
+        # Not a plain yes: only their own words.
+        for no in ("no, 2pm instead", "yes but at 2?", "can I change it"):
+            assert offered not in confirmed_texts(history, no)
+        # Two times offered: a yes confirms neither.
+        two = [*history[:1], {"role": "assistant", "content": "3:00 PM or 4:00 PM?"}]
+        assert len(confirmed_texts(two, "yes")) == 2
 
     def test_days_from_today(self):
         from app.core.agent_runtime.tools.confirmed import named_days, today_of
