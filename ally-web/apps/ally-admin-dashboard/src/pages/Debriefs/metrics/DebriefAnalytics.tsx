@@ -7,19 +7,21 @@ import { MetricsTab } from "../MetricsTab";
 import { ConsoleOverviewSection } from "./ConsoleOverviewSection";
 import { JudgeAgreementSection } from "./JudgeAgreementSection";
 import { NightlyCheckSection } from "./NightlyCheckSection";
+import { ScoreSection } from "./ScoreSection";
 
 /** ally-be's `analytics` takes 1–90 days; the page's longer ranges read the last 90. */
 const DAYS: Record<AnalyticsRange, number> = { "30d": 30, "90d": 90, "12m": 90, all: 90 };
 
 /**
- * Analytics › Debriefs: the success metrics and pass rate (with their filters), then the
- * operator numbers and spend, then how far the judge agrees with people — the last two from one
- * `GET analytics` call.
+ * Analytics › Debriefs: the overall score first (v2: what the PM agent improves), then the success
+ * metrics and pass rate (with their filters), the operator numbers and spend, and how far the judge
+ * agrees with people (information only) — the last two from one `GET analytics` call.
  */
 export const DebriefAnalytics: React.FC<{ range?: AnalyticsRange }> = ({ range = "90d" }) => {
   const q = useGetDebriefAnalyticsQuery({ days: DAYS[range] });
   return (
     <div className="flex flex-col gap-10">
+      <ScoreSection />
       <MetricsTab range={range} />
       <ConsoleOverviewSection
         view={q.data}

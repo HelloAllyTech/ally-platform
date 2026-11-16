@@ -17,6 +17,8 @@ import {
   ExpertVerdict,
 } from "./debriefExpertReview";
 
+import type { DebriefFlagAnswer } from "./debriefV2";
+
 export type DebriefCanAction =
   | "comment"
   | "flagDecision"
@@ -140,6 +142,8 @@ export interface DebriefSessionFlag {
   card: DebriefCardCorrection | null;
   turns: number[];
   canDecide: boolean;
+  /** The Debrief agent's answer to the flag (v2 F1); null until it answered. */
+  answer?: DebriefFlagAnswer | null;
 }
 
 export type DebriefPendingKind =
@@ -703,6 +707,11 @@ export interface DebriefNightlyAlert {
   detail: string;
   value: number;
   baseline: number | null;
+  /**
+   * NOT IN THE CONTRACT YET (v2, NightlyV2): where the finding went and what was done, in one
+   * line ("PM agent: testing firmer wording", "Slack: sent to the named safety contact").
+   */
+  routedTo?: string | null;
 }
 export interface DebriefNightlyRow {
   day: string;
@@ -738,6 +747,8 @@ export interface DebriefAnalyticsView {
     judgeMean: number | null;
     meetsTheBar: number | null;
     needsAPerson: number;
+    /** v2 (nothing is held): debriefs shown to the learner below the bar. */
+    shownBelowBar?: number;
     costP50Usd: number | null;
     costP90Usd: number | null;
     spentThisMonthUsd: number | null;

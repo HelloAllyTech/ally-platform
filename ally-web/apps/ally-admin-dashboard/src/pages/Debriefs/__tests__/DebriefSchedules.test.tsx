@@ -42,7 +42,6 @@ vi.mock("@api", async importOriginal => ({
   useSetDebriefBudgetsMutation: () => [vi.fn(), { isLoading: false }],
   useGetDebriefMeQuery: () => ({ data: undefined }),
   useGetDebriefAutonomyQuery: () => ({ data: undefined }),
-  useSetDebriefAutonomyMatrixMutation: () => [vi.fn(), { isLoading: false }],
   useSetDebriefOrgAutonomyMutation: () => [vi.fn(), { isLoading: false }],
   useGetDebriefPinnedRulesQuery: () => ({ data: { rules: [] } }),
 }));

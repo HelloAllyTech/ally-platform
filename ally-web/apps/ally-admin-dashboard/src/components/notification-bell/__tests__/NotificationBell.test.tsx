@@ -86,14 +86,14 @@ describe("NotificationBell", () => {
     expect(h.readAll).toHaveBeenCalled();
   });
 
-  it("links debrief alerts to the session, the idea or the release", () => {
+  it("links debrief alerts to the session, the change (on the Debriefs home) or Changes", () => {
     expect(notificationHref(N() as never)).toBe("/debriefs/sessions/run-7");
     expect(notificationHref(N({ data: { screen: "DebriefConsole", ideaId: "i9" } }) as never)).toBe(
-      "/debriefs/pm-agent?idea=i9",
+      "/debriefs?change=i9",
     );
     expect(
       notificationHref(N({ data: { screen: "DebriefConsole", releaseId: "r3" } }) as never),
-    ).toBe("/debriefs/pm-agent?view=releases&releaseId=r3");
+    ).toBe("/debriefs/pm-agent");
     expect(notificationHref(N({ data: { screen: "Simulations" } }) as never)).toBeNull();
     expect(
       notificationHref(

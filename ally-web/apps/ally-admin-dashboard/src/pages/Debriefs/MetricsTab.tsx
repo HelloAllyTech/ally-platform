@@ -7,7 +7,7 @@ import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetDebriefMetricsQuery } from "@api";
 import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { InfoTip } from "@components/ally-guide/InfoTip";
-import { AreaChart, LineChart } from "@components/charts";
+import { AreaChart } from "@components/charts";
 import { en } from "@constants";
 import {
   AnalyticsRange,
@@ -176,7 +176,6 @@ const MetricsBody: React.FC<{
             segment={segment}
             onSegment={onSegment}
           />
-          <SteeringCard view={view} />
           <GuardrailsCard view={view} />
           <ExperienceSection view={view} />
           <EfficiencyCard view={view} />
@@ -432,86 +431,6 @@ const QualitySection: React.FC<{
           </div>
         </>
       )}
-    </section>
-  );
-};
-
-/* -------------------------------------------------------------------------- */
-/* Steering score                                                             */
-/* -------------------------------------------------------------------------- */
-
-const SteeringCard: React.FC<{ view: DebriefMetricsView }> = ({ view }) => {
-  const s = en.debriefs.metrics;
-  const series = view.series;
-  const last = series[series.length - 1];
-  const chart = useMemo(
-    () =>
-      series.flatMap(w => [
-        { group: s.steering.series.score, key: w.week, value: w.steering.value },
-        {
-          group: s.steering.series.judge,
-          key: w.week,
-          value: w.steering.components.judge == null ? null : w.steering.components.judge * 10,
-        },
-        {
-          group: s.steering.series.practise,
-          key: w.week,
-          value:
-            w.steering.components.practise.value == null
-              ? null
-              : Math.round(w.steering.components.practise.value * 1000) / 10,
-        },
-        {
-          group: s.steering.series.thumbs,
-          key: w.week,
-          value:
-            w.steering.components.thumbs.value == null
-              ? null
-              : Math.round(w.steering.components.thumbs.value * 1000) / 10,
-        },
-      ]),
-    [series, s],
-  );
-  const hasScore = series.some(w => w.steering.value != null);
-  const partialWeeks = series.filter(w => w.steering.value != null && w.steering.missing.length);
-  return (
-    <section className="flex flex-col gap-2" data-testid="metrics-steering">
-      <ChartCard
-        title={s.steering.heading}
-        titleHelp={<InfoTip label={s.steering.help} ariaLabel="About the steering score" />}
-        caption={s.steering.weights(view.weights.judge, view.weights.practise, view.weights.thumbs)}
-        empty={!hasScore}
-        emptyText={s.steering.empty}
-      >
-        <LineChart
-          data={chart}
-          options={lineOpts({
-            leftTitle: "0–100",
-            domain: [0, 100],
-            colorScale: {
-              [s.steering.series.score]: PALETTE.blue,
-              [s.steering.series.judge]: PALETTE.teal,
-              [s.steering.series.practise]: PALETTE.purple,
-              [s.steering.series.thumbs]: PALETTE.orange,
-            },
-          })}
-        />
-        {last?.steering.value != null && (
-          <p className="mt-2 text-sm" data-testid="steering-latest">
-            {s.steering.latest(fixed(last.steering.value))}
-          </p>
-        )}
-        {partialWeeks.length > 0 && (
-          <p className="text-xs text-typography-700" data-testid="steering-partial">
-            {partialWeeks
-              .map(
-                w =>
-                  `${w.week}: ${s.steering.partial(w.steering.missing.map(m => s.steering.parts[m]).join(", "))}`,
-              )
-              .join(" · ")}
-          </p>
-        )}
-      </ChartCard>
     </section>
   );
 };

@@ -7,8 +7,11 @@ import "@constants";
 
 const h = vi.hoisted(() => ({
   sessions: vi.fn(),
-  attention: vi.fn(),
-  escalate: vi.fn(),
+  home: vi.fn(),
+  change: vi.fn(),
+  conversation: vi.fn(),
+  send: vi.fn(),
+  settings: vi.fn(),
   permissions: [] as string[],
 }));
 
@@ -26,15 +29,20 @@ vi.mock("react-redux", async importOriginal => ({
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGetDebriefSessionsQuery: (q: unknown) => h.sessions(q),
-  useGetDebriefAttentionQuery: () => h.attention(),
-  useEscalateDebriefMutation: () => [h.escalate, { isLoading: false }],
+  useGetDebriefHomeQuery: () => h.home(),
+  useGetDebriefSettingsQuery: () => h.settings(),
+  useGetDebriefChangeQuery: (id: string, opts?: { skip?: boolean }) =>
+    opts?.skip ? { data: undefined } : h.change(id),
+  useGetPmConversationQuery: () => h.conversation(),
+  useLazyGetPmConversationQuery: () => [vi.fn(), { isFetching: false }],
+  useSendPmMessageMutation: () => [h.send, { isLoading: false }],
 }));
 
 /* eslint-disable import/first */
 import { redirectForOldTab } from "../consoleRoutes";
 import { DebriefConsole } from "../DebriefConsole";
-import { bannerHref, bannerText } from "../home/DebriefsHome";
-import { CATEGORY_PARAM, categoriesFor, categoryCount, queueNoteFor, queueOrder } from "../queue";
+import { homeHeadline, scoreTrend } from "../home/DebriefsHome";
+import { wordDiff } from "../home/NeedsYouItem";
 import { ok, resolves } from "./consoleFixtures";
 /* eslint-enable import/first */
 
@@ -60,13 +68,9 @@ const TEAM = {
   roles: { allyTeam: true, clinicalAdvisor: false, owner: false, receivesEscalations: false },
   can: { ...CAN(true), verdict: false },
 };
-const READER = {
-  roles: { allyTeam: false, clinicalAdvisor: false, owner: false, receivesEscalations: false },
-  can: CAN(false),
-};
 const ADVISOR = {
   roles: { allyTeam: false, clinicalAdvisor: true, owner: false, receivesEscalations: true },
-  can: { ...CAN(false), comment: true, verdict: true },
+  can: { ...CAN(false), comment: true, verdict: true, approvePinnedRule: true },
 };
 
 const item = (over: Record<string, unknown> = {}) => ({
@@ -87,72 +91,31 @@ const item = (over: Record<string, unknown> = {}) => ({
   ceilingUsd: 0.5,
   seconds: 44,
   fallbackRung: 0,
-  createdAt: "2026-11-12T08:00:00Z",
+  createdAt: new Date().toISOString(),
   rank: 3,
-  needsPerson: false,
-  urgent: false,
+  needsPerson: true,
+  urgent: true,
   flagged: false,
   flagCount: 0,
   importantMomentFlagged: false,
   escalated: false,
-  riskCue: false,
+  riskCue: true,
   learnerDistress: false,
-  belowBar: false,
+  belowBar: true,
   reviewed: false,
   waitingSince: null,
   ...over,
 });
 
-const QUEUE = [
-  item({
-    runId: "below",
-    scenario: { id: null, title: "Workplace anxiety" },
-    rank: 2,
-    needsPerson: true,
-    belowBar: true,
-    status: "below_bar",
-    waitingSince: "2026-11-12T06:00:00Z",
-  }),
-  item({
-    runId: "urgent-new",
-    scenario: { id: null, title: "Grief" },
-    rank: 0,
-    urgent: true,
-    flagged: true,
-    needsPerson: true,
-    waitingSince: "2026-11-12T09:00:00Z",
-  }),
-  item({
-    runId: "flag",
-    scenario: { id: null, title: "Sleep problems" },
-    rank: 1,
-    flagged: true,
-    needsPerson: true,
-    waitingSince: "2026-11-12T05:00:00Z",
-  }),
-  item({
-    runId: "urgent-old",
-    scenario: { id: null, title: "Self-harm disclosure" },
-    rank: 0,
-    urgent: true,
-    flagged: true,
-    needsPerson: true,
-    waitingSince: "2026-11-12T04:00:00Z",
-  }),
+const ITEMS = [
+  item({ runId: "a", scenario: { id: null, title: "Grief" }, flagged: true, judgeOverall: 6.4 }),
+  item({ runId: "b", scenario: { id: null, title: "Workplace anxiety" } }),
 ];
 
-const page = (items = QUEUE, viewer = TEAM) =>
+const page = (items = ITEMS, viewer = TEAM) =>
   ok({
-    category: "needs",
-    counts: {
-      needs: 4,
-      urgent: 2,
-      flagged: 2,
-      below: 1,
-      published: 120,
-      escalated: 0,
-      all: 142,
-    },
+    category: "all",
+    counts: { needs: 0, urgent: 0, flagged: 1, below: 0, published: 2, escalated: 0, all: 2 },
     items,
     filterOptions: {
       tenants: [{ id: "t1", name: "Sangath" }],
@@ -162,12 +125,47 @@ const page = (items = QUEUE, viewer = TEAM) =>
     viewer,
   });
 
-const attention = (viewer = TEAM, banners: unknown[] = []) =>
-  ok({
-    banners,
-    counts: { urgent: 2, oldestUrgentSince: null, escalatedToMe: null, pmAgentNeedsYou: 3 },
-    viewer,
-  });
+const HOME = {
+  headline: { score: 7.8, lastWeekScore: 7.7, debriefs: 128, needsYou: 1 },
+  needsYou: [
+    {
+      changeId: "c-safety",
+      title: "Safety reader: name indirect self-harm cues",
+      why: "Safety reader text always asks a person.",
+    },
+  ],
+  thisWeek: {
+    score: 7.8,
+    wentLive: 1,
+    undone: 1,
+    changes: [
+      { id: "c1", title: "Shorter “Work on this”", state: "live", result: "score +0.3" },
+      { id: "c2", title: "Cheaper Writer", state: "undone", result: "Hindi −0.6" },
+    ],
+  },
+};
+
+const SAFETY = {
+  id: "c-safety",
+  title: "The Safety reader names a self-harm cue even when it is indirect.",
+  kind: "Pinned rule · Safety reader",
+  state: "waits",
+  result: "It caught all 4 indirect cues that learners flagged this month.",
+  why: "Learners flagged 4 debriefs.",
+  when: "proposed 1 d ago",
+  waitsBecause: "Safety reader text always asks a person.",
+  confidence: "high",
+  languages: null,
+  measures: [],
+  steps: [],
+  basedOn: "Based on 4 learner flags and the safety set.",
+  wording: {
+    before: "A risk cue is a direct statement about harming oneself.",
+    after: "A risk cue is a statement about harming oneself, direct or indirect.",
+  },
+  canUndo: false,
+  canStop: false,
+};
 
 const Where = () => {
   const l = useLocation();
@@ -186,70 +184,221 @@ const renderAt = (path = "/debriefs") =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  h.permissions = [];
   h.sessions.mockReturnValue(page());
-  h.attention.mockReturnValue(attention());
-  h.escalate.mockReturnValue(resolves());
+  h.home.mockReturnValue(ok(HOME));
+  h.settings.mockReturnValue(ok({ values: { undoMargin: 0.3 }, defaults: {}, spec: {} }));
+  h.change.mockReturnValue(ok(SAFETY));
+  h.conversation.mockReturnValue(
+    ok({
+      messages: [
+        {
+          id: "m1",
+          at: "2026-11-16T09:00:00Z",
+          who: "agent",
+          author: null,
+          text: "To confirm, I will put the new wording on 10% of learners. Reply yes.",
+          about: { kind: "change", id: "c-safety", label: "Safety reader" },
+          action: { label: "the new wording on 10%", status: "awaiting_yes" },
+        },
+        {
+          id: "m2",
+          at: "2026-11-16T09:01:00Z",
+          who: "agent",
+          author: null,
+          text: "Shorter Work on this is live.",
+          about: { kind: "page", id: "home", label: "Debriefs home" },
+          action: null,
+        },
+      ],
+      more: false,
+    }),
+  );
+  h.send.mockReturnValue(resolves({ messages: [] }));
 });
 
-describe("queue order", () => {
-  it("tells a reader without console access why, in the Debriefs console's words (PE-02)", () => {
-    h.sessions.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isFetching: false,
-      isError: true,
-      error: { status: 403, data: { message: "Missing required permissions" } },
-      refetch: vi.fn(),
-    });
+describe("Debriefs home (v2, U1): answer first", () => {
+  it("a steady score is not named: “Debriefs are healthy this week, and 1 thing needs you.”", () => {
     renderAt();
-    expect(screen.getByTestId("ally-forbidden")).toHaveTextContent("Debriefs console");
-    expect(screen.getByTestId("ally-forbidden")).not.toHaveTextContent("Ally guide");
+    expect(screen.getByTestId("home-headline")).toHaveTextContent(
+      "Debriefs are healthy this week, and 1 thing needs you.",
+    );
+    expect(screen.queryByTestId("home-headline-score")).toBeNull();
   });
 
-  it("puts urgent before other flags before below the bar, the longest wait first", () => {
-    expect(queueOrder(QUEUE as never).map(i => i.runId)).toEqual([
-      "urgent-old",
-      "urgent-new",
-      "flag",
-      "below",
+  it("names the overall score only when it moved by more than the undo margin", () => {
+    h.home.mockReturnValue(
+      ok({ ...HOME, headline: { ...HOME.headline, score: 7.3, lastWeekScore: 7.7, needsYou: 0 } }),
+    );
+    renderAt();
+    expect(screen.getByTestId("home-headline")).toHaveTextContent(
+      "Overall score fell 0.4 this week; the change behind it was undone, and nothing needs you.",
+    );
+    const link = screen.getByTestId("home-headline-score");
+    expect(link).toHaveAttribute("href", "/analytics?tab=debriefs");
+    expect(link.getAttribute("title")).toMatch(/One score out of 10 from four measures/);
+  });
+
+  it("homeHeadline and scoreTrend", () => {
+    const hd = (score: number | null, last: number | null) => ({
+      score,
+      lastWeekScore: last,
+      debriefs: 1,
+      needsYou: 0,
+    });
+    expect(homeHeadline(hd(7.8, 7.6), 0, 0.3).score).toBeNull();
+    expect(homeHeadline(hd(8.2, 7.8), 0, 0.3).score).toEqual({
+      dir: "rose",
+      by: "0.4",
+      undone: false,
+    });
+    expect(homeHeadline(hd(null, 7.8), 0, 0.3).noScore).toBe(true);
+    expect(scoreTrend(7.8, 7.8)).toBe("steady");
+    expect(scoreTrend(8.1, 7.8)).toBe("up 0.3");
+    expect(scoreTrend(7.4, 7.8)).toBe("down 0.4");
+  });
+
+  it("This week and the PM agent are accordions, closed by default", () => {
+    renderAt();
+    const week = screen.getByTestId("home-this-week");
+    expect(week.tagName).toBe("DETAILS");
+    expect(week).not.toHaveAttribute("open");
+    expect(within(week).getByText(/^This week:/)).toHaveTextContent(
+      "This week: overall score 7.8 of 10, up 0.1 · 1 change went live, 1 was undone",
+    );
+    expect(within(week).getAllByTestId("home-week-change")[0]).toHaveTextContent(
+      "Shorter “Work on this” · live for everyone · score +0.3",
+    );
+    const pm = screen.getByTestId("home-pm-accordion");
+    expect(pm.tagName).toBe("DETAILS");
+    expect(pm).not.toHaveAttribute("open");
+    expect(pm).toHaveTextContent(
+      "PM agent · it wants your view on Safety reader: name indirect self-harm cues",
+    );
+    expect(within(pm).getByTestId("pm-looking-at")).toHaveTextContent("Debriefs home");
+  });
+
+  it("the home conversation sends about the Debriefs home", async () => {
+    renderAt();
+    const pm = screen.getByTestId("home-pm");
+    fireEvent.change(within(pm).getByLabelText("Message the PM agent"), {
+      target: { value: "Hindi debriefs feel too formal" },
+    });
+    fireEvent.click(within(pm).getByRole("button", { name: "Send" }));
+    await waitFor(() =>
+      expect(h.send).toHaveBeenCalledWith({
+        text: "Hindi debriefs feel too formal",
+        about: { kind: "page", id: "home", label: "Debriefs home" },
+      }),
+    );
+  });
+});
+
+describe("Needs you: always-ask changes, handled on Home", () => {
+  it("lists them closed, each a one-line row: Your call, the title, why it asks", () => {
+    renderAt();
+    const needs = screen.getByTestId("home-needs-you");
+    expect(needs).toHaveTextContent("Needs you: one change the PM agent won’t make alone");
+    const row = within(needs).getByTestId("home-needs-item");
+    expect(row.tagName).toBe("DETAILS");
+    expect(row).not.toHaveAttribute("open");
+    expect(row).toHaveTextContent("Your call");
+    expect(row).toHaveTextContent("Safety reader text always asks a person.");
+    expect(screen.queryByTestId("needs-detail")).toBeNull();
+    expect(h.change).not.toHaveBeenCalled();
+  });
+
+  it("?change=<id> opens that item expanded, with a scoped conversation", async () => {
+    renderAt("/debriefs?change=c-safety");
+    const detail = screen.getByTestId("needs-detail");
+    expect(within(detail).getByTestId("needs-result")).toHaveTextContent(
+      "It caught all 4 indirect cues",
+    );
+    const diff = within(detail).getByTestId("needs-diff");
+    expect(diff.querySelector("del")).toHaveTextContent("direct");
+    expect(diff.querySelector("ins")).toHaveTextContent(", direct or indirect.");
+    expect(within(detail).getByTestId("needs-evidence")).toHaveTextContent(
+      "Based on 4 learner flags",
+    );
+    const pm = within(detail).getByTestId("needs-pm-c-safety");
+    expect(pm).toHaveTextContent("PM agent · about this change");
+    // Only this change's messages, without "about".
+    const msgs = within(pm).getAllByTestId("pm-message");
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).not.toHaveTextContent("about");
+    fireEvent.change(within(pm).getByLabelText("Reply to the PM agent about this change"), {
+      target: { value: "yes" },
+    });
+    fireEvent.click(within(pm).getByRole("button", { name: "Send" }));
+    await waitFor(() =>
+      expect(h.send).toHaveBeenCalledWith({
+        text: "yes",
+        about: {
+          kind: "change",
+          id: "c-safety",
+          label: "Safety reader: name indirect self-harm cues",
+        },
+      }),
+    );
+  });
+
+  it("a link to a change that no longer waits moves on to Changes", () => {
+    renderAt("/debriefs?change=c-gone");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-gone");
+  });
+
+  it("wordDiff marks what was removed and added", () => {
+    expect(wordDiff("a b c", "a x c")).toEqual([
+      { text: "a ", kind: "same" },
+      { text: "b", kind: "removed" },
+      { text: "x", kind: "added" },
+      { text: " c", kind: "same" },
     ]);
   });
 });
 
-describe("Agreement sample category", () => {
-  it("shows only to whoever gives verdicts, and reads ally-be's agreement_sample", () => {
-    expect(categoriesFor({ score: false, escalations: true, verdict: true })).toContain(
-      "agreement",
+describe("the clinical advisor's home", () => {
+  beforeEach(() => {
+    h.sessions.mockReturnValue(page(ITEMS, ADVISOR));
+  });
+
+  it("leads with their decision; no Changes, Analytics, Settings, This week or PM agent", () => {
+    renderAt();
+    expect(screen.getByTestId("home-headline")).toHaveTextContent("1 change needs your decision.");
+    expect(screen.getByTestId("home-needs-you")).toHaveTextContent(
+      "Needs you: a change only you or the owner can approve",
     );
-    expect(categoriesFor({ score: true, escalations: true, verdict: false })).not.toContain(
-      "agreement",
-    );
-    expect(CATEGORY_PARAM.agreement).toBe("agreement_sample");
-    expect(categoryCount({ agreementSample: 3 } as never, "agreement")).toBe(3);
+    expect(screen.queryByTestId("changes-button")).toBeNull();
+    expect(screen.queryByTestId("analytics-button")).toBeNull();
+    expect(screen.queryByTestId("home-more")).toBeNull();
+    expect(screen.queryByTestId("home-this-week")).toBeNull();
+    expect(screen.queryByTestId("home-pm-accordion")).toBeNull();
+  });
+
+  it("a deep link opens their item on Home, never Changes", () => {
+    renderAt("/debriefs?change=c-gone");
+    expect(screen.queryByTestId("where")).toBeNull();
+    expect(screen.getByTestId("debriefs-home")).toBeInTheDocument();
   });
 });
 
-describe("Debriefs home", () => {
-  it("lists Needs a person in queue order, with the counts ally-be sends", () => {
+describe("all debriefs by day", () => {
+  it("no status or urgent pills, no Show dropdown: only ⚑ Flagged by the learner and the Quality score", () => {
     renderAt();
-    expect(h.sessions).toHaveBeenCalledWith({ category: "needs" });
+    expect(screen.queryByTestId("home-category")).toBeNull();
     const cards = screen.getAllByTestId("session-card");
-    expect(cards.map(c => c.dataset.run)).toEqual(["urgent-old", "urgent-new", "flag", "below"]);
-    expect(cards[0]).toHaveTextContent("Urgent");
-    expect(screen.getByRole("option", { name: "Needs a person (4)" })).toBeInTheDocument();
-    expect(screen.getByText(/Most urgent first/)).toBeInTheDocument();
-    // A session link keeps the category so Back and Previous / Next agree.
-    expect(cards[0]).toHaveAttribute("href", "/debriefs/sessions/urgent-old");
-  });
-
-  it("other categories group by day, newest first, and ask ally-be for the filters", () => {
-    renderAt("/debriefs?cat=published&language=hi&riskCue=true");
-    expect(h.sessions).toHaveBeenCalledWith({
-      category: "published",
-      language: "hi",
-      riskCue: "true",
-    });
-    expect(screen.queryByText(/Most urgent first/)).toBeNull();
+    expect(cards).toHaveLength(2);
+    expect(within(cards[0]).getByTestId("session-flag")).toHaveTextContent(
+      "⚑ Flagged by the learner",
+    );
+    expect(within(cards[1]).queryByTestId("session-flag")).toBeNull();
+    for (const word of ["Urgent", "Needs a person", "Below the bar", "Important moment"]) {
+      expect(screen.getByTestId("home-list")).not.toHaveTextContent(word);
+    }
+    expect(cards[0]).toHaveTextContent("Quality score6.4");
+    expect(cards[0]).not.toHaveTextContent("Cost");
+    expect(screen.getByTestId("home-list")).toHaveTextContent("Today");
+    expect(h.sessions).toHaveBeenLastCalledWith({ category: "all" });
   });
 
   it("j / k move the selection and Enter opens it", () => {
@@ -257,162 +406,27 @@ describe("Debriefs home", () => {
     fireEvent.keyDown(window, { key: "j" });
     expect(screen.getAllByTestId("session-card")[1]).toHaveAttribute("data-selected", "true");
     fireEvent.keyDown(window, { key: "Enter" });
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/sessions/urgent-new");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/sessions/b");
   });
 
-  it("e escalates the selected item for the Ally team", async () => {
-    renderAt();
-    fireEvent.keyDown(window, { key: "e" });
-    await waitFor(() =>
-      expect(h.escalate).toHaveBeenCalledWith({ kind: "runs", id: "urgent-old" }),
-    );
-  });
-
-  it("shows the banners ally-be sends; each links to what to read, never acts", () => {
-    h.attention.mockReturnValue(
-      attention(TEAM, [
-        {
-          kind: "urgent",
-          level: "red",
-          count: 2,
-          oldestSince: null,
-          message: "x",
-          link: { page: "session", runId: "urgent-old" },
-        },
-        { kind: "cap", level: "yellow", message: "x", link: { page: "settings" } },
-      ]),
-    );
-    renderAt();
-    const urgent = screen.getByTestId("home-banner-urgent");
-    expect(urgent).toHaveAttribute("role", "alert");
-    expect(within(urgent).getByRole("link", { name: "Open it" })).toHaveAttribute(
-      "href",
-      "/debriefs/sessions/urgent-old",
-    );
-    expect(screen.getByTestId("home-banner-cap")).toHaveAttribute("role", "status");
-    expect(screen.getByTestId("pm-needs-you")).toHaveTextContent("3");
-  });
-
-  it("puts PM agent before Analytics (design B1), linking to Analytics › Debriefs", () => {
-    h.attention.mockReturnValue(attention(TEAM, []));
-    renderAt();
-    const analytics = screen.getByTestId("analytics-button");
-    expect(analytics).toHaveTextContent("Analytics");
-    expect(analytics).toHaveAttribute("href", "/analytics?tab=debriefs");
+  it("the list layout keeps the flag short", () => {
+    renderAt("/debriefs?view=list");
     expect(
-      screen.getByTestId("pm-agent-button").compareDocumentPosition(analytics) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it("hides To score, the ! badge and e for someone who doesn't score or escalate", () => {
-    h.sessions.mockReturnValue(page(QUEUE, READER));
-    h.attention.mockReturnValue(attention(READER));
-    renderAt();
-    expect(screen.queryByRole("button", { name: /To score/ })).toBeNull();
-    expect(screen.queryByTestId("to-score-badge")).toBeNull();
-    // Keyboard hints live in a tooltip on an icon, never as inline text in the filter row.
-    expect(screen.getByTestId("home-keys")).toHaveAttribute("data-keys", "j / k move · Enter open");
-    expect(screen.getByTestId("home-filters")).not.toHaveTextContent("j / k move");
-    fireEvent.keyDown(window, { key: "e" });
-    expect(h.escalate).not.toHaveBeenCalled();
-  });
-
-  it("gives the clinical advisor no To score (Score by hand is gone), and plain column names", () => {
-    h.sessions.mockReturnValue(page(QUEUE, ADVISOR));
-    h.attention.mockReturnValue(attention(ADVISOR));
-    renderAt();
-    expect(screen.queryByRole("option", { name: /To score/ })).toBeNull();
-    expect(screen.getByRole("option", { name: /Escalated to you/ })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Agreement sample/ })).toBeInTheDocument();
-    expect(screen.queryByTestId("to-score-badge")).toBeNull();
-    const card = screen.getAllByTestId("session-card")[0];
-    // The list shows the quality score only; the draft score is on the session page.
-    expect(card).toHaveTextContent("Quality score");
-    expect(card).not.toHaveTextContent("Draft score");
-    expect(card).not.toHaveTextContent("Evaluator");
-  });
-
-  it("gives the clinical advisor no Below the bar until their verdict; the Ally team keeps it", () => {
-    // ally-be reads a below-the-bar run as published for the advisor (status, belowBar, rank).
-    const blinded = item({ runId: "blind", status: "published", belowBar: false });
-    const blindPage = page([blinded], ADVISOR) as { data: { counts: Record<string, unknown> } };
-    blindPage.data.counts = { ...blindPage.data.counts, below: null };
-    h.sessions.mockReturnValue(blindPage);
-    h.attention.mockReturnValue(attention(ADVISOR));
-    const { unmount } = renderAt("/debriefs?cat=below");
-    expect(screen.queryByRole("option", { name: /Below the bar/ })).toBeNull();
-    // A link to the Below the bar list falls back to the advisor's own default.
-    expect(h.sessions).not.toHaveBeenCalledWith(expect.objectContaining({ category: "below" }));
-    expect(screen.getAllByTestId("session-card")[0]).not.toHaveTextContent("Below the bar");
-    expect(categoriesFor({ escalations: true, verdict: true, team: false })).not.toContain("below");
-    unmount();
-
-    h.sessions.mockReturnValue(page(QUEUE, TEAM));
-    h.attention.mockReturnValue(attention(TEAM));
-    renderAt();
-    expect(screen.getByRole("option", { name: /Below the bar/ })).toBeInTheDocument();
-    expect(categoriesFor({ escalations: false, team: true })).toContain("below");
+      within(screen.getAllByTestId("session-row")[0]).getByTestId("session-flag"),
+    ).toHaveTextContent("⚑ Flagged");
   });
 });
 
-describe("the queue note says nothing of the checks to the clinical advisor", () => {
-  const BELOW = /below the bar/i;
-
-  it("the advisor's escalations: escalated flags, then the rest", () => {
-    const escalated = item({ runId: "esc", escalated: true, rank: 1, needsPerson: true });
-    h.sessions.mockReturnValue(page([escalated], ADVISOR));
-    h.attention.mockReturnValue(attention(ADVISOR));
-    renderAt("/debriefs?cat=escalated");
-    expect(screen.getByTestId("queue-note")).toHaveTextContent(
-      "Most urgent first: escalated flags, then the rest.",
-    );
-    expect(screen.queryByText(BELOW)).toBeNull();
-  });
-
-  it("the advisor's Needs a person: flags, then held debriefs, never below the bar", () => {
-    h.sessions.mockReturnValue(
-      page([item({ runId: "held", rank: 2, status: "needs_person" })], ADVISOR),
-    );
-    h.attention.mockReturnValue(attention(ADVISOR));
-    renderAt("/debriefs?cat=needs");
-    expect(screen.getByTestId("queue-note")).toHaveTextContent(
-      "Most urgent first: important-moment flags, then other flags, then held debriefs.",
-    );
-    expect(screen.queryByText(BELOW)).toBeNull();
-  });
-
-  it("an empty queue has no note, and its empty state names no bar for the advisor", () => {
-    h.sessions.mockReturnValue(page([], ADVISOR));
-    h.attention.mockReturnValue(attention(ADVISOR));
-    renderAt("/debriefs?cat=needs");
-    expect(screen.queryByTestId("queue-note")).toBeNull();
-    expect(screen.getByText("Nothing needs a person")).toBeInTheDocument();
-    expect(screen.queryByText(BELOW)).toBeNull();
-  });
-
-  it("the Ally team keeps the full note", () => {
-    h.sessions.mockReturnValue(page(QUEUE, TEAM));
-    h.attention.mockReturnValue(attention(TEAM));
-    renderAt("/debriefs?cat=needs");
-    expect(screen.getByTestId("queue-note")).toHaveTextContent(
-      "Most urgent first: important-moment flags, then other flags, then debriefs below the bar.",
-    );
-  });
-
-  it("queueNoteFor: no note outside a queue", () => {
-    const notes = { team: "T", blind: { needs: "N", escalated: "E" } };
-    expect(queueNoteFor("published", false, notes)).toBeNull();
-    expect(queueNoteFor("needs", false, notes)).toBe("T");
-    expect(queueNoteFor("needs", true, notes)).toBe("N");
-    expect(queueNoteFor("escalated", true, notes)).toBe("E");
-  });
-});
-
-describe("rows never wrap (2026-11-13)", () => {
-  it("keeps Settings reachable through More, after PM agent and Analytics", () => {
+describe("rows never wrap", () => {
+  it("Changes (with its needs-you count) and Analytics, Settings in More", () => {
     renderAt();
     const actions = screen.getByTestId("home-actions");
+    const links = within(actions)
+      .getAllByRole("link")
+      .map(a => a.textContent);
+    expect(links[0]).toMatch(/^Changes/);
+    expect(links[1]).toMatch(/Analytics/);
+    expect(screen.getByTestId("changes-needs-you")).toHaveTextContent("1");
     expect(within(actions).queryByRole("link", { name: "Settings" })).toBeNull();
     fireEvent.click(
       within(screen.getByTestId("home-more")).getByRole("button", { name: "More actions" }),
@@ -422,44 +436,32 @@ describe("rows never wrap (2026-11-13)", () => {
   });
 
   it("shows three filters, puts the rest behind More filters with a count, and chips every set one", () => {
-    renderAt("/debriefs?cat=published&language=hi&riskCue=true&cost=hit_ceiling");
+    renderAt("/debriefs?language=hi&riskCue=true&cost=hit_ceiling");
     const bar = screen.getByTestId("home-filters");
     for (const id of ["org", "language", "recipe"]) {
       expect(within(bar).getByTestId(`home-filter-${id}`)).toBeInTheDocument();
     }
     expect(within(bar).queryByTestId("home-filter-risk")).toBeNull();
     expect(screen.getByTestId("home-more-filters-button-count")).toHaveTextContent("2");
-    expect(screen.getByTestId("home-more-filters-button")).toHaveAccessibleName(
-      "More filters, 2 active",
-    );
-    // A link with a hidden filter set opens with More filters showing it.
-    expect(
-      within(screen.getByTestId("home-more-filters")).getByTestId("home-filter-risk"),
-    ).toBeInTheDocument();
     const chips = screen.getByTestId("home-chips");
     expect(chips).toHaveTextContent("Language: Hindi");
-    expect(chips).toHaveTextContent("Risk cue: With a risk cue");
-    expect(chips).toHaveTextContent("Cost: Hit the ceiling");
     fireEvent.click(
       within(chips).getByRole("button", { name: "Remove Risk cue: With a risk cue" }),
     );
     expect(h.sessions).toHaveBeenLastCalledWith({
-      category: "published",
+      category: "all",
       language: "hi",
       cost: "hit_ceiling",
     });
-    expect(screen.getByTestId("home-more-filters-button-count")).toHaveTextContent("1");
     fireEvent.click(
       within(screen.getByTestId("home-chips")).getByRole("button", { name: "Clear all" }),
     );
-    expect(h.sessions).toHaveBeenLastCalledWith({ category: "published" });
-    expect(screen.queryByTestId("home-chips")).toBeNull();
+    expect(h.sessions).toHaveBeenLastCalledWith({ category: "all" });
   });
 
   it("opens More filters on demand when nothing behind it is set", () => {
     renderAt();
     expect(screen.queryByTestId("home-more-filters")).toBeNull();
-    expect(screen.queryByTestId("home-more-filters-button-count")).toBeNull();
     fireEvent.click(screen.getByTestId("home-more-filters-button"));
     const more = screen.getByTestId("home-more-filters");
     for (const id of ["fallback", "risk", "cost"]) {
@@ -468,12 +470,12 @@ describe("rows never wrap (2026-11-13)", () => {
   });
 });
 
-describe("old ?tab= links", () => {
+describe("old links", () => {
   it.each([
-    ["runs", "/debriefs?cat=all"],
-    ["review", "/debriefs?cat=needs"],
+    ["runs", "/debriefs"],
+    ["review", "/debriefs"],
     ["pm-agent", "/debriefs/pm-agent"],
-    ["releases", "/debriefs/pm-agent?view=releases"],
+    ["releases", "/debriefs/pm-agent"],
     ["organisations", "/debriefs/settings#orgs"],
     ["settings", "/debriefs/settings"],
     ["knowledge", "/debriefs/settings#guidance"],
@@ -491,20 +493,17 @@ describe("old ?tab= links", () => {
 
   it("follows the redirect when the page opens", () => {
     renderAt("/debriefs?tab=releases");
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?view=releases");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent");
   });
-});
 
-describe("release waiting banner", () => {
-  it("says a release would undo a promoted change and links to Releases", () => {
-    const b = {
-      kind: "release_waiting",
-      level: "red",
-      count: 2,
-      message: "x",
-      link: { page: "pm_agent" },
-    } as never;
-    expect(bannerText(b)).toContain("2 Skills Store or code releases are waiting");
-    expect(bannerHref(b)).toBe("/debriefs/pm-agent?view=releases");
+  it("tells a reader without console access why (PE-02)", () => {
+    h.sessions.mockReturnValue({
+      data: undefined,
+      isError: true,
+      error: { status: 403 },
+      refetch: vi.fn(),
+    });
+    renderAt();
+    expect(screen.getByText(/can't open the Debriefs console/)).toBeInTheDocument();
   });
 });

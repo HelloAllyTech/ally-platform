@@ -6,23 +6,34 @@ export const ANALYTICS_DEBRIEFS_TAB = "debriefs";
 /** Analytics › Debriefs: the debriefs' metrics, PM agent and agent numbers included. */
 export const analyticsDebriefsPath = () => `${ROUTES.ANALYTICS}?tab=${ANALYTICS_DEBRIEFS_TAB}`;
 
-/** Where a PM agent link opens: `?view=` picks the tab, `?idea=` the idea in focus. */
-export type PmAgentView = "ideas" | "releases" | "reports" | "test-sets";
-export const pmAgentPath = (view: PmAgentView = "ideas", idea?: string): string => {
+/**
+ * Changes (v2: the old PM agent page). `?view=` picks the tab, `?change=` the change in focus.
+ * Older links (`?view=ideas|releases`, `?idea=`) open on Changes; see `readChangesView`.
+ */
+export type PmAgentView = "changes" | "reports" | "test-sets";
+export const pmAgentPath = (view: PmAgentView = "changes", change?: string): string => {
   const q = new URLSearchParams();
-  if (view !== "ideas") q.set("view", view);
-  if (idea) q.set("idea", idea);
+  if (view !== "changes") q.set("view", view);
+  if (change) q.set("change", change);
   const qs = q.toString();
   return `${ROUTES.DEBRIEFS_PM_AGENT}${qs ? `?${qs}` : ""}`;
 };
 
-/** PM agent › Reports at one report: `?view=reports&kind=monthly&period=2026-10`. */
+/** Changes with one change open. */
+export const changesPath = (changeId?: string): string => pmAgentPath("changes", changeId);
+
+/** The tab and change a Changes link opens, old PM agent links included. */
+export const readChangesView = (
+  params: URLSearchParams,
+): { view: PmAgentView; change: string | null } => {
+  const raw = params.get("view");
+  const view: PmAgentView = raw === "reports" || raw === "test-sets" ? raw : "changes";
+  return { view, change: params.get("change") ?? params.get("idea") };
+};
+
+/** Changes › Reports at one report: `?view=reports&kind=monthly&period=2026-10`. */
 export const pmReportPath = (kind: "weekly" | "monthly", period: string): string =>
   `${ROUTES.DEBRIEFS_PM_AGENT}?${new URLSearchParams({ view: "reports", kind, period })}`;
-
-/** PM agent › Releases with one release open. */
-export const pmReleasePath = (releaseId: string): string =>
-  `${ROUTES.DEBRIEFS_PM_AGENT}?${new URLSearchParams({ view: "releases", releaseId })}`;
 
 export type SettingsSection =
   | "orgs"
@@ -46,17 +57,15 @@ export function redirectForOldTab(params: URLSearchParams): string | null {
   if (!tab) return null;
   switch (tab) {
     case "runs":
-      return `${ROUTES.DEBRIEFS}?cat=all`;
     case "review":
-      return `${ROUTES.DEBRIEFS}?cat=needs`;
+      return ROUTES.DEBRIEFS;
     case "expert-review": {
       const run = params.get("review");
-      return run ? ROUTES.DEBRIEF_SESSION(run) : `${ROUTES.DEBRIEFS}?cat=needs`;
+      return run ? ROUTES.DEBRIEF_SESSION(run) : ROUTES.DEBRIEFS;
     }
     case "pm-agent":
-      return pmAgentPath("ideas");
     case "releases":
-      return pmAgentPath("releases");
+      return changesPath();
     case "organisations":
       return settingsPath("orgs");
     case "settings":

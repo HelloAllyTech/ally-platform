@@ -536,6 +536,14 @@ export const ApiEndpoints = {
     PROMOTE_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/promote-waiting`,
     DISMISS_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/dismiss-waiting`,
     EMERGENCY_STOP: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/emergency-stop`,
+    /** v2 (docs/debrief-harness/V2_AUTONOMY.md): the home, the changes, the one PM agent thread, the score. */
+    HOME: "/v1/debriefs/console/home",
+    CHANGES: "/v1/debriefs/console/changes",
+    CHANGE: (id: string) => `/v1/debriefs/console/changes/${id}`,
+    CHANGE_ACTION: (id: string, action: "undo" | "stop") =>
+      `/v1/debriefs/console/changes/${id}/${action}`,
+    PM_CONVERSATION: "/v1/debriefs/console/pm-agent/conversation",
+    SCORE: "/v1/debriefs/console/metrics/score",
   },
   // The caller's in-app notification feed (ally-be notification-feed.controller).
   NOTIFICATIONS: {
