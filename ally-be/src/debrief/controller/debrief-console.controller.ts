@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ConflictException,
   ForbiddenException,
   Get,
   Param,
@@ -776,6 +777,12 @@ export class DebriefConsoleController {
     const run = await this.runner.run(sessionId, {
       mode: DebriefRunMode.SHADOW,
     });
+    // The session already has a run this one could not take over.
+    if (!run) {
+      throw new ConflictException(
+        'This session already has a debrief run; open it from its session',
+      );
+    }
     if (run.cards && !run.workspace?.judge) {
       await this.judge.judge(run).catch(() => null);
     }

@@ -80,6 +80,39 @@ describe('what a roleplay expects', () => {
     expect(JSON.stringify(out)).not.toMatch(/_custom_/);
   });
 
+  it('lists each behaviour once: one a named competency lists sits under it, not again in the roleplay lists', () => {
+    const out = buildExpectations(
+      [
+        {
+          id: 'c1',
+          name: 'Psychoeducation',
+          is_custom: false,
+          behaviour: 'Asks open questions',
+          type: 'HELPFUL',
+        },
+        {
+          id: 'c1',
+          name: 'Psychoeducation',
+          is_custom: false,
+          behaviour: 'asks open questions',
+          type: 'HELPFUL',
+        },
+      ],
+      [
+        { category: 'SHOULD_DO', behaviour: 'Asks open questions' },
+        { category: 'SHOULD_DO', behaviour: 'Names the feeling' },
+      ],
+    );
+    expect(out.helpful).toEqual(['Names the feeling']);
+    expect(out.competencies).toEqual([
+      {
+        name: 'Psychoeducation',
+        helpful: ['Asks open questions'],
+        unhelpful: [],
+      },
+    ]);
+  });
+
   it('loadSession sends only named competencies as expectedBehaviours', async () => {
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('FROM scenario_sessions s')) {

@@ -19,7 +19,7 @@ export interface DebriefCompetency {
 
 /** Everything the roleplay expects, for the Analyst. */
 export interface RoleplayExpectations {
-  /** The roleplay's SHOULD_DO behaviours, then custom competencies' helpful ones. */
+  /** The roleplay's SHOULD_DO behaviours, then custom competencies' helpful ones; none that a named competency lists. */
   helpful: string[];
   /** The roleplay's SHOULD_NOT_DO behaviours, then custom competencies' unhelpful ones. */
   unhelpful: string[];
@@ -95,9 +95,21 @@ export function buildExpectations(
     }
     if (!b) continue;
     const list = unhelpfulRow ? c.unhelpful : c.helpful;
-    if (!list.includes(b)) list.push(b);
+    if (!list.some((x) => x.toLowerCase() === b.toLowerCase())) list.push(b);
   }
-  return { helpful, unhelpful, competencies: [...named.values()] };
+  // Each behaviour once (review 2026-11-16): one that belongs to a named
+  // competency sits under it, not again in the roleplay's own lists.
+  const underNamed = new Set(
+    [...named.values()].flatMap((c) =>
+      [...c.helpful, ...c.unhelpful].map((x) => x.toLowerCase()),
+    ),
+  );
+  const notUnderNamed = (b: string) => !underNamed.has(b.toLowerCase());
+  return {
+    helpful: helpful.filter(notUnderNamed),
+    unhelpful: unhelpful.filter(notUnderNamed),
+    competencies: [...named.values()],
+  };
 }
 
 /** Every custom code the cards contain, once each. */
