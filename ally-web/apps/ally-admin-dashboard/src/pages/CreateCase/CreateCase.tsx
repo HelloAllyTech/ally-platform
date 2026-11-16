@@ -20,6 +20,7 @@ import {
   Button,
   SimulationSelectionModal,
   CreateSimulationSubSection,
+  PublishBlockers,
 } from "@components";
 import { ButtonVariant } from "@components/types";
 import {
@@ -40,7 +41,7 @@ import {
   isNonEmptyString,
 } from "@utils";
 
-import { areCaseFieldsFilled } from "./caseValidity";
+import { areCaseFieldsFilled, unfilledCaseFields } from "./caseValidity";
 
 // Get all mandatory field IDs from the configuration
 const getMandatoryFieldIds = () => {
@@ -54,6 +55,14 @@ const getMandatoryFieldIds = () => {
   });
   return mandatoryFields;
 };
+
+const MANDATORY_FIELD_LABELS: Record<string, string> = {};
+PATH_CREATOR_FIELD_GROUPS.forEach(group =>
+  group.fields.forEach(field => {
+    const label = (field as { label?: unknown }).label;
+    if (field.isMandatory && typeof label === "string") MANDATORY_FIELD_LABELS[field.id] = label;
+  }),
+);
 
 const DEBOUNCE_TIME = 1000;
 
@@ -338,6 +347,13 @@ export const CreateCase: FC = () => {
             : undefined
         }
       />
+
+      {!isViewOnly && !areAllMandatoryFieldsFilled && (
+        <PublishBlockers
+          className="mx-4 mb-2"
+          blockers={unfilledCaseFields(getMandatoryFieldIds(), formValues, MANDATORY_FIELD_LABELS)}
+        />
+      )}
 
       <div className="flex flex-col md:flex-row md:h-[calc(100vh-100px)]">
         <VerticalStepper

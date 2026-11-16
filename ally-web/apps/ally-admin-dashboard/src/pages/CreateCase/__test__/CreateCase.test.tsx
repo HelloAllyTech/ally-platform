@@ -42,6 +42,13 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 }));
 
 vi.mock("@components", () => ({
+  PublishBlockers: ({ blockers }: any) => (
+    <ul data-testid="publish-blockers">
+      {blockers.map((b: any) => (
+        <li key={b.id}>{b.message}</li>
+      ))}
+    </ul>
+  ),
   Header: ({ title, onBack, onPublish, onSaveDraft, isValid, viewOnly }: any) => (
     <div data-testid="header">
       <h1>{title}</h1>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { areCaseFieldsFilled, isMandatoryValueFilled } from "../caseValidity";
+import { areCaseFieldsFilled, isMandatoryValueFilled, unfilledCaseFields } from "../caseValidity";
 
 describe("isMandatoryValueFilled", () => {
   it("treats a non-empty array as filled (it used to read as unfilled)", () => {
@@ -25,5 +25,22 @@ describe("areCaseFieldsFilled", () => {
   });
   it("is invalid when a mandatory field is missing", () => {
     expect(areCaseFieldsFilled(["title"], { scenarios: [{ id: 1 }] })).toBe(false);
+  });
+});
+
+describe("unfilledCaseFields", () => {
+  it("names each missing field and the missing roleplays", () => {
+    const out = unfilledCaseFields(
+      ["title", "summary"],
+      { title: "x", summary: "" },
+      { summary: "Summary" },
+    );
+    expect(out.map(b => b.message)).toEqual([
+      'Fill in "Summary"',
+      "Add at least one roleplay to the case",
+    ]);
+  });
+  it("is empty when everything is filled", () => {
+    expect(unfilledCaseFields(["title"], { title: "x", scenarios: [1] })).toEqual([]);
   });
 });
