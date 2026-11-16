@@ -213,13 +213,18 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
           {
             id: 4,
             label: t("postSim.tabs.debrief", "Debrief"),
+            // The drawer clips its body (SummarySidebarWrapper) and each tab
+            // scrolls on its own, as the transcript does; a long debrief
+            // otherwise could not be scrolled in the side pane.
             content: (
-              <DebriefTab
-                sessionId={summaryId}
-                summaryData={summaryData}
-                retryMaxReached={retryMaxReached}
-                readOnly
-              />
+              <div className="min-h-0 flex-1 overflow-y-auto" data-testid="debrief-tab-scroll">
+                <DebriefTab
+                  sessionId={summaryId}
+                  summaryData={summaryData}
+                  retryMaxReached={retryMaxReached}
+                  readOnly
+                />
+              </div>
             ),
           },
         ]
