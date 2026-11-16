@@ -834,10 +834,19 @@ export const Sparkline = ({
  * the id to the clipboard. `stopPropagation` keeps a click off any surrounding
  * expand/row affordance.
  */
+/**
+ * Whether chart ids render. The default is true so a chart rendered outside the
+ * Analytics page (and every existing chart test) is unchanged; the page turns
+ * them off unless the reader asks for them, because an internal handle for
+ * quoting a chart is noise to anyone who is just reading it.
+ */
+export const ChartIdsVisibleContext = createContext(true);
+
 export const ChartIdBadge = ({ id }: { id?: string }) => {
   const [copied, setCopied] = useState(false);
+  const visible = useContext(ChartIdsVisibleContext);
 
-  if (!id) return null;
+  if (!id || !visible) return null;
 
   const copy = () => {
     navigator.clipboard?.writeText(id).then(
