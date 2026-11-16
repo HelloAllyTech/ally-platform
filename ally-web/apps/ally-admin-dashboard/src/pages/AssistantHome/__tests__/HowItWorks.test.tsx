@@ -132,6 +132,27 @@ describe("How it works", () => {
     render(<HowItWorksSection {...props(false)} />);
     expect(screen.getByLabelText(t.instructionsLabel)).toBeDisabled();
   });
+
+  it("says the purpose's honest limit from what the assistant may do now (chunk 5b)", () => {
+    const how = h.how.current as {
+      parts: unknown[];
+      purpose: string | null;
+      bookingLists?: string[];
+    };
+    how.parts.splice(2, 0, { layer: "purpose", text: "Bring in customers.\n", owner: false });
+    how.purpose = "enquiries";
+    how.bookingLists = [];
+    const { unmount } = render(<HowItWorksSection {...props()} />);
+    expect(screen.getByTestId("purpose-limit").textContent).toContain(
+      "It can't book or take payments yet. It sends you each new enquiry by email.",
+    );
+    unmount();
+    how.bookingLists = ["Appointments"];
+    render(<HowItWorksSection {...props()} />);
+    expect(screen.getByTestId("purpose-limit").textContent).toContain(
+      "It books into your Appointments list. It can't take payments yet.",
+    );
+  });
 });
 
 describe("the History", () => {

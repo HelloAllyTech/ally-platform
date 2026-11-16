@@ -7,14 +7,19 @@ routes with a typed `Command` or follows its static edge.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Literal, Optional
 
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
-from app.core.debrief.cue_strength import with_strength
+from app.core.debrief.cue_strength import (
+    drop_possible_important_moment,
+    split_missed_cues,
+    with_strength,
+)
 from app.core.debrief_graph import inputs as body
-from app.core.debrief_graph.agent_logs import code_log
+from app.core.debrief_graph.agent_logs import code_log, origin_of
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
 from app.core.debrief_graph.constants import (
     DEFAULT_ADVISORY_CHECKS,
@@ -55,13 +60,26 @@ _REVISION_MIN_MS = 30_000
 
 
 def _reserve(
-    ctx: Ctx, estimated: float, step: Dict[str, Any], input_chars: int
+    ctx: Ctx,
+    estimated: float,
+    step: Dict[str, Any],
+    input_chars: int,
+    required: bool = False,
 ) -> Optional[float]:
-    """Fits the budget? The reservation when it does, None when it does not."""
+    """Fits the budget? The reservation when it does, None when it does not.
+
+    A `required` step (the minimum path: safety reader and writer) of a run
+    allowed past its ceiling (`allow_over_ceiling`, live runs: a learner is
+    waiting) is reserved even when it does not fit, as long as its model is
+    priced; an unpriced model never runs."""
     est = estimate_step_cost_usd(
         step["step"], step.get("model"), input_chars + _PROMPT_ALLOWANCE, ctx.prices
     )
-    return None if estimated + est > ctx.ceiling_usd else est
+    if estimated + est <= ctx.ceiling_usd:
+        return est
+    if required and ctx.allow_over_ceiling and math.isfinite(est):
+        return est
+    return None
 
 
 def _end(status: str, skip_reason: Optional[str], **update: Any) -> Command:
@@ -172,7 +190,7 @@ async def plan(
         "has_risk_cue": False,
         "learner_distress": False,
     }
-    if ctx.ceiling_usd <= 0:
+    if ctx.ceiling_usd <= 0 and not ctx.allow_over_ceiling:
         return _end(
             Status.NEEDS_PERSON,
             "monthly_cap",
@@ -191,7 +209,7 @@ async def plan(
 
     safety_step = ctx.step_of(recipe_key, Step.SAFETY_READER)
     analyst_step = ctx.step_of(recipe_key, Step.ANALYST)
-    safety_est = _reserve(ctx, 0.0, safety_step, ctx.transcript_chars)
+    safety_est = _reserve(ctx, 0.0, safety_step, ctx.transcript_chars, required=True)
     if safety_est is None:
         return _end(
             Status.NEEDS_PERSON,
@@ -490,6 +508,7 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
                 ctx,
                 Step.GUIDANCE_LOOKUP,
                 t0,
+                origin=origin_of(state, Step.GUIDANCE_LOOKUP),
                 input={
                     "situations": [
                         (m or {}).get("summary")
@@ -528,9 +547,18 @@ async def prepare_writer(
     workspace = {"cohort": cohort} if cohort else {}
     writer_step = ctx.step_of(state["recipe_key"], Step.WRITER)
     estimated = state.get("estimated", 0.0)
-    est = _reserve(ctx, estimated, writer_step, js_len(body.writer_body(state, ctx)))
+    est = _reserve(
+        ctx,
+        estimated,
+        writer_step,
+        js_len(body.writer_body(state, ctx)),
+        required=True,
+    )
     if est is None:
         return _end(Status.NEEDS_PERSON, "budget_below_minimum", workspace=workspace)
+    if estimated + est > ctx.ceiling_usd:
+        # The minimum path went past the ceiling (a live run): say so.
+        workspace = {**workspace, "overCeiling": True}
     return Command(
         update={
             "workspace": workspace,
@@ -672,14 +700,29 @@ async def score_draft(
     evaluation = None
     if res:
         ev = res["evaluation"]
+        # A missed cue holds the debrief only when it is clear; one that every
+        # signal reads as possible (low mood, burden, grief, guilt) is sent to
+        # review with the debrief published (cue_strength.split_missed_cues).
+        clear_missed, possible_missed = split_missed_cues(
+            ev.get("risk_cues") or [],
+            (state.get("safety") or {}).get("risk_cues") or [],
+        )
+        hard_fails = ev["hard_fails"]
+        if possible_missed and not clear_missed:
+            hard_fails = [h for h in hard_fails if h["code"] != "missed_risk_cue"]
         evaluation = {
             "overall": compute_overall(
                 {d["dimension"]: d["score"] for d in ev["dimensions"]},
-                len(ev["hard_fails"]),
+                len(hard_fails),
             ),
-            "hardFails": ev["hard_fails"],
+            "hardFails": hard_fails,
             "fixes": ev.get("fixes") or [],
             "dimensions": ev["dimensions"],
+            "possibleMissedCues": [
+                {"turn_index": c.get("turn_index"), "quote": c.get("quote")}
+                for c in possible_missed
+            ],
+            "riskCues": ev.get("risk_cues") or [],
         }
     draft = {
         "cards": cur["cards"],
@@ -788,11 +831,35 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
     pass_score = ctx.setting("passScore", 8)
     rnd = state.get("round", 0)
     ev = best.get("evaluation")
-    offered = [
-        o.get("id") for o in body.practice_options(ctx) if o.get("id") is not None
-    ]
+    options = body.practice_options(ctx)
+    offered = [o.get("id") for o in options if o.get("id") is not None]
+    # "Practise this next" never loses its button: an id the Writer left out
+    # or made up becomes this same roleplay (always an option inside a
+    # course), else the first option (ally-be `keepOfferedPractice`).
+    fallback = next(
+        (o.get("id") for o in options if o.get("this_roleplay")),
+        next(
+            (
+                o.get("id")
+                for o in options
+                if o.get("id") is not None and o.get("id") == ctx.sess("scenario_id")
+            ),
+            offered[0] if offered else None,
+        ),
+    )
+    # An important moment is for a clear risk cue. Once the Evaluator has read
+    # the draft, a card whose moments every signal reads as possible (low mood,
+    # burden, grief, guilt) goes, and a person checks it (cue_strength).
+    cards = best["cards"]
+    dropped_moment = None
+    if ev:
+        cards, dropped_moment = drop_possible_important_moment(
+            cards,
+            ev.get("riskCues") or [],
+            (state.get("safety") or {}).get("risk_cues") or [],
+        )
     final = await ctx.gateway.call(
-        "finalise_cards", {"cards": best["cards"], "offered": offered}
+        "finalise_cards", {"cards": cards, "offered": offered, "fallback": fallback}
     )
     patch = {
         "cards": final["cards"],
@@ -811,7 +878,29 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
     blocking = [c["code"] for c in best["checks"] if c["code"] not in advisory]
     rung = 0
     skip_reason = None
-    if meets_bar(best, advisory, pass_score):
+    review_reason = None
+    possible_missed = (ev or {}).get("possibleMissedCues") or []
+    if meets_bar(best, advisory, pass_score) and dropped_moment:
+        status = Status.BELOW_BAR
+        why = (
+            f"Published round {best['round']} and sent it to review: it passed "
+            f"every check and {scored}. Its important moment (turn "
+            f"{dropped_moment['turn_index']}) was taken out: no signal read it "
+            "as a clear risk cue, so it is coached as ordinary counselling and "
+            "a person checks it."
+        )
+    elif meets_bar(best, advisory, pass_score) and possible_missed:
+        # Published, and a person looks: the Evaluator read a cue as missed
+        # that every other signal reads as possible, not clear.
+        status = Status.BELOW_BAR
+        why = (
+            f"Published round {best['round']} and sent it to review: it passed "
+            f"every check and {scored}, but the Evaluator thought it may have "
+            "left out a possible risk cue ("
+            + "; ".join(f"turn {c['turn_index']}" for c in possible_missed)
+            + "). A possible cue does not hold a debrief; a person checks it."
+        )
+    elif meets_bar(best, advisory, pass_score):
         status = Status.PUBLISHED
         why = (
             f"Published round {best['round']}: it passed every check and {scored} "
@@ -838,21 +927,33 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
             )
         )
     else:
-        status = Status.NEEDS_PERSON
-        rung = int(FallbackRung.PERSON_FINISHES)
-        if passes_checks(best, advisory):
-            skip_reason = "not_evaluated_or_risk"
+        # No debrief is held (Gopi, 2026-11-16): the best draft is shown as it
+        # is, below the bar, and a person reviews it after. A missed risk cue
+        # makes that review urgent.
+        status = Status.BELOW_BAR
+        missed_risk = bool(ev) and any(
+            h["code"] == "missed_risk_cue" for h in ev["hardFails"]
+        )
+        if not passes_checks(best, advisory):
+            review_reason = "checks_failed"
             why = (
-                "Held for a person: the Evaluator found a missed risk cue, which is "
-                "never published automatically."
-                if ev
-                else "Held for a person: no draft could be scored, so nothing was "
-                "published automatically."
+                f"Published round {best['round']} below the bar and sent it to "
+                f"review: the best draft still failed {', '.join(blocking)}. "
+                "No debrief is held; a person checks it."
+            )
+        elif missed_risk:
+            review_reason = "missed_risk_cue"
+            why = (
+                f"Published round {best['round']} below the bar and sent it to "
+                "urgent review: the Evaluator found a missed risk cue. No "
+                "debrief is held; a person checks it first."
             )
         else:
-            skip_reason = "checks_failed"
+            review_reason = "not_evaluated"
             why = (
-                f"Held for a person: the best draft still failed {', '.join(blocking)}."
+                f"Published round {best['round']} below the bar and sent it to "
+                "review: no draft could be scored. No debrief is held; a person "
+                "checks it."
             )
     log = code_log(
         ctx,
@@ -877,7 +978,17 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
             "evaluations": state.get("evaluations") or [],
             "bestRound": best["round"],
             "drafts": state.get("drafts") or [],
-            "decision": {"status": status, "round": best["round"], "why": why},
+            "decision": {
+                "status": status,
+                "round": best["round"],
+                "why": why,
+                # For the person who reviews it: what code took out or let
+                # through as possible, not clear.
+                "droppedImportantMoment": dropped_moment,
+                "possibleMissedCues": possible_missed,
+                # Why a draft that did not meet the bar was shown anyway.
+                "reviewReason": review_reason,
+            },
         },
         "patch": patch,
         "rung": rung,

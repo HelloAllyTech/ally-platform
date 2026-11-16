@@ -1,5 +1,6 @@
 import type {
   AgentStreamEvent,
+  AgentMemoryWrite,
   AgentTraceStep,
   AgentTurnType,
 } from '../../ai/dto/knowledge.dto';
@@ -88,6 +89,11 @@ export interface ChatTurn {
   /** The channel's id for this message, from which the run id is derived (WhatsApp). */
   providerMessageId?: string;
   /**
+   * The shared store's contact (chunk 3b), named in the run's gateway token. Absent in Preview and
+   * wherever the channel doesn't know it.
+   */
+  contactId?: string | null;
+  /**
    * The person's first message to this bot (WhatsApp: the contact's first message; Preview: an
    * empty chat). `history` can't say: on WhatsApp it already holds the message being answered.
    */
@@ -110,7 +116,18 @@ export type AgentFailureReason =
  * answered, with its steps, or the run that failed and v1 answered instead (see `isFallback`).
  */
 export type AgentRunRef = { runId: string; conversationId: string } & (
-  | { runtime: AgentRuntimeUsed.V2; trace: AgentTraceStep[] }
+  | {
+      runtime: AgentRuntimeUsed.V2;
+      trace: AgentTraceStep[];
+      /**
+       * What the run asked to remember (chunk 8a), with the short ids it was shown. Applied by the
+       * channel after the reply has gone out, and only if that reply was the agent's own.
+       */
+      memory?: {
+        writes: AgentMemoryWrite[];
+        refs: Record<string, string>;
+      };
+    }
   | {
       runtime: AgentRuntimeUsed.V2_FALLBACK;
       fallbackReason: AgentFailureReason;
@@ -155,6 +172,9 @@ export interface ChatbotDecision {
    * and stores no reply. Never set on a crisis reply, which always goes out.
    */
   held?: boolean;
-  /** The visitor asked for a person (chunk 11a): the body tells them the team has been asked. */
-  handover?: 'asked';
+  /**
+   * The visitor asked for a person (chunk 11a), or the agent passed the chat on with its
+   * `hand_over` tool (`assistant`, chunk 3b): the body tells them the team has been asked.
+   */
+  handover?: 'asked' | 'assistant';
 }

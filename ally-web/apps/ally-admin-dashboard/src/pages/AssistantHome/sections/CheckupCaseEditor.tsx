@@ -1,6 +1,7 @@
 import React, { useId, useState } from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { HOME, fill } from "../copy";
 
@@ -71,7 +72,13 @@ const ChipsInput: React.FC<{
               }
             }}
           />
-          <Button className="ally-btn--sm" onClick={add} disabled={!draft.trim()}>
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            size="sm"
+            type="button"
+            onClick={add}
+            disabled={!draft.trim()}
+          >
             {t.editor.addChip}
           </Button>
         </div>
@@ -218,10 +225,10 @@ export const CheckupCaseEditor: React.FC<{
         </p>
       )}
       <div className="ally-btn-row">
-        <Button type="submit" variant="primary" disabled={!ready || busy}>
+        <Button variant={ButtonVariant.PRIMARY} type="submit" disabled={!ready || busy}>
           {t.editor.save}
         </Button>
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant={ButtonVariant.TEXT} type="button" onClick={onCancel}>
           {t.editor.cancel}
         </Button>
       </div>

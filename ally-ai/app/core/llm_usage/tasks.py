@@ -51,6 +51,8 @@ class LLMTask(str, Enum):
     DEBRIEF_LANGUAGE_SPECIALIST = "debrief_language_specialist"
     # The PM agent's own analysis; paid from the learning budget, never production.
     DEBRIEF_PM_AGENT = "debrief_improver"
+    # The Debrief agent answering a learner's flag on one card (V2_AUTONOMY F1).
+    DEBRIEF_FLAG_ANSWER = "debrief_flag_answer"
     # Ask Ally: one row per model pass of a learner's reply (app/core/ask_ally).
     # Ran in ally-be until the move to the LangGraph stack; same label.
     DEBRIEF_REPLY = "debrief_reply"
@@ -82,6 +84,10 @@ class LLMTask(str, Enum):
     # iteration, on the bot's answer model. It reads the turn and writes its own
     # search queries, so these bots make no translate call.
     WHATSAPP_AGENT_STEP = "whatsapp_agent_step"
+    # Memory, light (chunk 8a): after the reply, never while someone waits. The
+    # check runs only for health packs; the summary once a chat passes 10 messages.
+    CHATBOT_MEMORY_CHECK = "chatbot_memory_check"
+    CHATBOT_CONVERSATION_SUMMARY = "chatbot_conversation_summary"
     # Text helpline copilot. Two labels because they differ in volume and shape: the
     # risk classifier runs on every talker message with a tiny output, the turn call
     # runs once per (debounced) talker turn and writes the suggestions. Must have the

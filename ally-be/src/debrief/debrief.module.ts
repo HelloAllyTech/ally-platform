@@ -16,6 +16,10 @@ import { AgentHarnessModule } from '../llm-agent/harness/agent-harness.module';
 import { LearnModule } from '../learn/learn.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { DebriefConsoleController } from './controller/debrief-console.controller';
+import { DebriefChangesController } from './controller/debrief-changes.controller';
+import { DebriefChangesService } from './service/debrief-changes.service';
+import { DebriefScoreService } from './service/debrief-score.service';
+import { DebriefSlackService } from './service/debrief-slack.service';
 import { DebriefLearnerController } from './controller/debrief-learner.controller';
 import { DebriefGatewayController } from './controller/debrief-gateway.controller';
 import { DebriefReviewController } from './controller/debrief-review.controller';
@@ -42,6 +46,7 @@ import { DebriefPmAgentRunService } from './service/debrief-pm-agent-run.service
 import { DebriefBuilderRequesterService } from './service/debrief-builder-requester.service';
 import { DebriefPmAgentToolsService } from './service/debrief-pm-agent-tools.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
+import { DebriefNightlyService } from './service/debrief-nightly.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
@@ -71,6 +76,12 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
 import { DebriefAdvisorsController } from './controller/debrief-advisors.controller';
 import { DebriefAdvisorsService } from './service/debrief-advisors.service';
 
+import { DebriefPmMessage } from './entity/debrief-pm-message.entity';
+import { DebriefChangeHold } from './entity/debrief-change-hold.entity';
+import { DebriefPmConversationService } from './service/debrief-pm-conversation.service';
+import { DebriefChangeHoldsService } from './service/debrief-change-holds.service';
+import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service';
+
 /**
  * The Debrief agent and its PM agent (plan: ally-debriefs-plan.md). Runs on
  * the agent harness's releases and learning tables. A debrief run is a graph
@@ -88,6 +99,9 @@ import { DebriefAdvisorsService } from './service/debrief-advisors.service';
       // Learner progress: each run's progress reading after the vetoes.
       DebriefProgressResult,
       DebriefFeedback,
+      // V2_AUTONOMY: the one PM agent conversation, and per-language pins and pauses.
+      DebriefPmMessage,
+      DebriefChangeHold,
       DebriefOwnerSettings,
       DebriefProbeResult,
       DebriefLearnerEvent,
@@ -121,6 +135,8 @@ import { DebriefAdvisorsService } from './service/debrief-advisors.service';
   ],
   controllers: [
     DebriefConsoleController,
+    // Debrief v2: Home, Changes (Undo now, Stop now) and the cumulative score.
+    DebriefChangesController,
     DebriefLearnerController,
     // The gateway tools ally-ai's debrief graph and Ask Ally call back (run token only).
     DebriefGatewayController,
@@ -133,6 +149,10 @@ import { DebriefAdvisorsService } from './service/debrief-advisors.service';
   ],
   providers: [
     DebriefAdvisorsService,
+    // Debrief v2: the cumulative score, Changes and the watch, Slack posts.
+    DebriefScoreService,
+    DebriefChangesService,
+    DebriefSlackService,
     // Ask Ally's agent in ally-ai (CONTRACT.md §5).
     AskAllyClient,
     DebriefContextRepository,
@@ -149,6 +169,12 @@ import { DebriefAdvisorsService } from './service/debrief-advisors.service';
     // The PM agent Deep Agent's runs (ally-ai) and its gateway tools.
     DebriefPmAgentRunService,
     DebriefPmAgentToolsService,
+    // V2_AUTONOMY C1–C3: the PM agent conversation and its gateway tools.
+    DebriefPmConversationService,
+    // V2_AUTONOMY A9 and C2: language pins the runner honours, paused kinds of change.
+    DebriefChangeHoldsService,
+    // V2_AUTONOMY F1: the Debrief agent answers every learner flag.
+    DebriefFlagAnswerService,
     // "Hand to Builder": the PM agent answers Builder's interview (R2-20).
     DebriefBuilderRequesterService,
     DebriefConsoleService,
@@ -175,6 +201,7 @@ import { DebriefAdvisorsService } from './service/debrief-advisors.service';
     DebriefConsoleAuditInterceptor,
     DebriefAudioService,
     DebriefNotifier,
+    DebriefNightlyService,
     DebriefReviewService,
     GuideCrisisService,
     // Runs the debrief / PM agent jobs when their stored schedule says.

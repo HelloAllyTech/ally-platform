@@ -25,6 +25,7 @@ import { modelPrices } from '../util/debrief-budget.util';
 import {
   PM_AGENT_GATEWAY_TOOLS,
   DebriefRunTokenService,
+  PmAgentGatewayTool,
 } from './debrief-run-token.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefFeedbackService } from './debrief-feedback.service';
@@ -32,9 +33,18 @@ import { DebriefPmAgentService } from './debrief-pm-agent.service';
 import { DebriefPmAgentToolsService } from './debrief-pm-agent-tools.service';
 import { DebriefReportingService } from './debrief-reporting.service';
 import { DebriefReviewService } from './debrief-review.service';
+import { DebriefNightlyService } from './debrief-nightly.service';
 import { DebriefSettingsService } from './debrief-settings.service';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
 
+/**
+ * A weekly or monthly run's tools: the PM agent's, and `change_read` so its
+ * reviewer subagent reads the one change it reviews (as the Ally team would).
+ */
+export const WEEKLY_RUN_TOOLS: readonly PmAgentGatewayTool[] = [
+  ...PM_AGENT_GATEWAY_TOOLS,
+  'change_read',
+];
 /** An answer-only run (plan §11.7 "Ask a question") never spends more than this. */
 export const ANSWER_RUN_CAP_USD = 0.5;
 /** The tools an answer-only run gets: read, and answer; nothing that proposes or acts. */
@@ -111,6 +121,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
     private readonly context: DebriefContextRepository,
     private readonly testSets: DebriefTestSetsService,
     @Optional() private readonly autonomy?: DebriefAutonomyService,
+    @Optional() private readonly nightly?: DebriefNightlyService,
   ) {}
 
   onModuleInit(): void {
@@ -315,8 +326,8 @@ export class DebriefPmAgentRunService implements OnModuleInit {
         null,
       ),
       inputs,
-      tools: [...PM_AGENT_GATEWAY_TOOLS],
-      agent_token: this.tokens.signAgent(agentRunId),
+      tools: [...WEEKLY_RUN_TOOLS],
+      agent_token: this.tokens.signAgent(agentRunId, WEEKLY_RUN_TOOLS),
       gateway_url: this.tokens.gatewayUrl(),
     };
     let res: PmAgentRunResponse;
@@ -464,6 +475,9 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       trial: h.evidence?.trial?.status ?? null,
       canary: h.evidence?.canary?.status ?? null,
       handoff: h.evidence?.handoff?.status ?? null,
+      // A Builder change that reached production, and when (its forecast is
+      // measured from then).
+      delivered_at: h.evidence?.delivery?.at ?? null,
       forecast: h.evidence?.forecast ?? null,
       release: h.releaseVersion ?? null,
       // Why a person rejected it (pinned-rule rejections always say why).
@@ -484,6 +498,17 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       metrics: metrics.metrics,
       judge_and_evaluator: library,
       learner_flags: await this.learnerFeedback.signals(windowDays),
+      // V2_AUTONOMY F2–F3: how the Debrief agent answered learner flags, the
+      // cards changed (by it or by a person) and Ask Ally replies replaced.
+      learner_flag_answers:
+        typeof this.learnerFeedback.pmEvidence === 'function'
+          ? await this.learnerFeedback.pmEvidence(windowDays).catch(() => null)
+          : null,
+      // The nightly check: the last week's measures, data-quality counts and
+      // drift alerts (v9 FR-49, R2-9). Read it before drawing conclusions.
+      nightly_check: this.nightly
+        ? await this.nightly.forPmAgent().catch(() => null)
+        : null,
       reporting_catalog: this.reporting.catalog(),
       editable_prompts: editable,
       settings,

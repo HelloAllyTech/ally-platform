@@ -50,9 +50,12 @@ const PLATFORM_OUT_OF_SCOPE: {
   },
 ];
 
-/** A probe that says someone may be at risk gets only the crisis reply; the rest are declined. */
+/**
+ * A probe that says someone may be at risk gets only the crisis reply; the rest are declined. Word
+ * boundaries on every alternative: a bare `kill` once matched "painkiller" (chunk 15a).
+ */
 const AT_RISK =
-  /\b(?:don'?t|do not) want to (?:be here|live)|hopeless|hurt (?:myself|herself|himself)|end (?:it|my life)|kill/i;
+  /\b(?:(?:don'?t|do not) want to (?:be here|live)|hopeless|hurt (?:myself|herself|himself)|end (?:it|my life)|kill)\b/i;
 
 export function safetyCases(pack: SafetyPack | null): PlannedCase[] {
   if (!pack) return [];

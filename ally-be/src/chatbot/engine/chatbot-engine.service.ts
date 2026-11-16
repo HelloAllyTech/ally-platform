@@ -30,6 +30,7 @@ import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import { ConversationService } from '../service/conversation.service';
 import { effectiveRuntime } from './agent-runtime';
 import {
+  AgentActedError,
   AgentFallbackFailedError,
   AgentRuntimeRunner,
   type Answered,
@@ -41,6 +42,7 @@ import type {
   ChatTurn,
   LiveReply,
 } from './chatbot-engine.types';
+import { crisisRequest } from './crisis-history';
 import { holdTextUntilCleared } from './live-reply';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
@@ -63,7 +65,11 @@ const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
  * The conversational agent's prompts (Agents v2). Loaded only when the agent answers, so a v1
  * request (the emergency switch off) is exactly as before.
  */
-export const AGENT_PROMPT_CODES = [AGENT_SYSTEM_PROMPT_CODE];
+export const AGENT_PROMPT_CODES = [
+  AGENT_SYSTEM_PROMPT_CODE,
+  // What it knows about the person (chunk 8a); used only when the bot's memory is on.
+  'ally_ai_agent_memory',
+];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 
 /** Purposes with a section of their own in the Skills Store (chunk 20a-2). */
@@ -73,6 +79,16 @@ const PURPOSE_SECTIONS = new Set(['answer', 'enquiries', 'training', 'guide']);
 export function purposePromptCodes(purpose?: string | null): string[] {
   return purpose && PURPOSE_SECTIONS.has(purpose)
     ? [`ally_ai_agent_purpose_${purpose}`]
+    : [];
+}
+
+/**
+ * Bring in customers' variant for an assistant that can book (chunk 8a): loaded with the purpose,
+ * and ally-ai picks it when the run offers a create tool.
+ */
+export function bookingPurposePromptCodes(purpose?: string | null): string[] {
+  return purpose === 'enquiries'
+    ? ['ally_ai_agent_purpose_enquiries_can_book']
     : [];
 }
 /** Used by bots allowed to answer beyond their documents. */
@@ -86,7 +102,8 @@ const runBehind = (
 ): AgentRunRef | undefined =>
   answerResult.status === 'fulfilled'
     ? answerResult.value.agent
-    : answerResult.reason instanceof AgentFallbackFailedError
+    : answerResult.reason instanceof AgentFallbackFailedError ||
+        answerResult.reason instanceof AgentActedError
       ? answerResult.reason.agent
       : undefined;
 
@@ -144,7 +161,7 @@ export class ChatbotEngineService {
     const holder = await this.holderOf(turn);
     if (holder !== null) {
       return (
-        (await this.crisisOnly(turn)) ?? {
+        (await this.crisisOnly(turn, { held: true })) ?? {
           handledBy: WaHandledBy.HELD,
           body: '',
           held: true,
@@ -162,6 +179,15 @@ export class ChatbotEngineService {
       );
     }
     return this.decide(turn, live);
+  }
+
+  /**
+   * The crisis classifier's verdict alone, asked exactly as `answer` asks it: no keyword rules and
+   * no reply. The crisis eval's fast mode (chunk 15a); a channel never calls this.
+   */
+  async classifyCrisis(turn: ChatTurn): Promise<CrisisCheckResponse | null> {
+    const { prompts } = await this.loadPromptOverrides(turn);
+    return this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts));
   }
 
   /** Who holds this chat: a team member's id, or null (the assistant). A lookup failure is null. */
@@ -183,8 +209,16 @@ export class ChatbotEngineService {
    * Crisis alone (chunk 11a): the keyword templates, then the classifier. The crisis decision, or
    * null when it isn't one. Used while a person holds a chat and before a hand-over, so a crisis
    * reply never waits for anyone.
+   *
+   * While a person holds the chat (`held`) the classifier judges the latest message alone (chunk
+   * 15a): it can't see the team member's messages, so "yes" to "are you safe right now?" would read
+   * as confirming an earlier disclosure, and the fixed reply would land on top of their conversation.
+   * The team sees every held message anyway.
    */
-  private async crisisOnly(turn: ChatTurn): Promise<ChatbotDecision | null> {
+  private async crisisOnly(
+    turn: ChatTurn,
+    { held = false }: { held?: boolean } = {},
+  ): Promise<ChatbotDecision | null> {
     const match = await this.replyService.match(
       turn.text,
       turn.language,
@@ -196,10 +230,9 @@ export class ChatbotEngineService {
     if (!turn.settings.crisisClassifierEnabled) return null;
     try {
       const { prompts, ran } = await this.loadPromptOverrides(turn);
-      const crisis = await this.aiService.checkWhatsAppCrisis({
-        message: turn.text,
-        prompts,
-      });
+      const crisis = await this.aiService.checkWhatsAppCrisis(
+        crisisRequest(held ? { ...turn, history: [] } : turn, prompts),
+      );
       return crisis?.is_crisis
         ? this.crisisDecision(turn, crisis, ran, { notOnList: false })
         : null;
@@ -309,10 +342,9 @@ export class ChatbotEngineService {
     if (settings.crisisClassifierEnabled) {
       try {
         const { prompts, ran } = await this.loadPromptOverrides(turn);
-        const crisis = await this.aiService.checkWhatsAppCrisis({
-          message: turn.text,
-          prompts,
-        });
+        const crisis = await this.aiService.checkWhatsAppCrisis(
+          crisisRequest(turn, prompts),
+        );
         if (crisis?.is_crisis) {
           return this.crisisDecision(turn, crisis, ran, { notOnList: true });
         }
@@ -344,9 +376,11 @@ export class ChatbotEngineService {
     const { prompts } = await this.loadPromptOverrides(turn, true);
     const knowledge = await this.knowledgeFor(turn);
     const request = buildKnowledgeRequest(turn, prompts, knowledge);
+    // Never a gateway: "How it works" builds instructions, it doesn't run tools.
     return this.agentRuntime.requestFor(turn, request, knowledge, {
       conversationId: turn.conversationId ?? 'how-it-works',
       runId: 'how-it-works',
+      withGateway: false,
     });
   }
 
@@ -364,7 +398,7 @@ export class ChatbotEngineService {
     // keeps a rejected classifier from taking down an answer that arrived fine. The crisis check
     // runs once and exactly as before, whichever engine answers.
     const crisisCheck = settings.crisisClassifierEnabled
-      ? this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts })
+      ? this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts))
       : Promise.resolve(null);
     // A streamed reply's text waits for the crisis check too: none of it is shown before the
     // check clears the message, and none at all if it doesn't.
@@ -393,6 +427,43 @@ export class ChatbotEngineService {
     }
 
     const degradedAlert = this.degradedAlertFor(turn, crisisResult);
+
+    // The agent passed the chat to a person (chunk 3b): its `hand_over` tool already marked the
+    // chat, and the visitor gets 11a's hand-over message, as when they ask for a person. The same
+    // when the run failed after `hand_over` acted; after any other tool acted, the bot's fallback
+    // wording. v1 never answers a message whose run has already done something.
+    const acted =
+      answerResult.status === 'rejected' &&
+      answerResult.reason instanceof AgentActedError
+        ? answerResult.reason.tool
+        : null;
+    if (
+      acted === 'hand_over' ||
+      (answerResult.status === 'fulfilled' &&
+        answerResult.value.response.handover)
+    ) {
+      return {
+        handledBy: WaHandledBy.HANDOVER,
+        body: handoverMessage(handoverOf(settings), new Date()),
+        handover: 'assistant',
+        alert: degradedAlert,
+        ...(agent ? { agent } : {}),
+      };
+    }
+    if (acted) {
+      // A list write that was done (chunk 6) says so; anything else gets the fallback wording.
+      const done =
+        answerResult.status === 'rejected' &&
+        answerResult.reason instanceof AgentActedError
+          ? answerResult.reason.done
+          : undefined;
+      return {
+        handledBy: WaHandledBy.ERROR,
+        body: done ?? settings.fallbackText,
+        alert: degradedAlert,
+        ...(agent ? { agent } : {}),
+      };
+    }
 
     if (answerResult.status === 'rejected') {
       // A model or index outage is NOT "the knowledge does not cover this": fallback wording and an
@@ -633,6 +704,7 @@ export class ChatbotEngineService {
             ? [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES]
             : KNOWLEDGE_PROMPT_CODES),
           ...purposePromptCodes(turn.chatbot.purpose),
+          ...bookingPurposePromptCodes(turn.chatbot.purpose),
         ],
       });
       prompts = (rows ?? []).reduce<Record<string, unknown>>((acc, row) => {

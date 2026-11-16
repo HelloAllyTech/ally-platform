@@ -93,6 +93,8 @@ import {
   Save as CSave,
   Search as CSearch,
   Settings as CSettings,
+  Star as CStarOutline,
+  StarFilled as CStarFilled,
   SkillLevel as CSkillLevel,
   Subtract as CSubtract,
   Terminal as CTerminal,
@@ -303,6 +305,10 @@ export const McqBlock = createCarbonIcon(CRadioButtonChecked);
 export const Minus = createCarbonIcon(CSubtract);
 export const RefreshCw = createCarbonIcon(CRenew);
 export const RotateCcw = createCarbonIcon(CRestart);
+
+/** Carbon line star and filled star — the Prod Director's priority toggle. */
+export const StarOutline = createCarbonIcon(CStarOutline);
+export const StarSolid = createCarbonIcon(CStarFilled);
 export const UploadCloud = createCarbonIcon(CCloudUpload);
 export const Terminal = createCarbonIcon(CTerminal);
 export const Mobile = createCarbonIcon(CMobile);

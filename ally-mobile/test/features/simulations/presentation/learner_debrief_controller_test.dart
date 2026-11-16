@@ -216,7 +216,9 @@ void main() {
     c.dispose();
   });
 
-  test('supervisor: reads the supervisor view only, and never marks read or opened', () async {
+  test('supervisor: someone else\'s session reads the supervisor view, and never marks read or opened', () async {
+    // The learner view answers only the session's own learner.
+    when(() => repo.getDebrief('s-1')).thenThrow(Exception('403'));
     when(() => repo.getSupervisorDebrief('s-1')).thenAnswer(
       (_) async => LearnerDebriefView.fromSupervisorJson({'state': 'ready', 'cards': readyDebriefJson()['cards']}),
     );
@@ -226,8 +228,23 @@ void main() {
     await c.markRead();
     await c.markOpened();
     c.recordEvent(DebriefLearnerEvent.waited);
-    verifyNever(() => repo.getDebrief(any()));
+    verify(() => repo.getDebrief('s-1')).called(1);
     verifyNever(() => repo.recordEvent(any(), any()));
+    verifyNever(() => repo.markRead(any()));
+    verifyNever(() => repo.markOpened(any()));
+    c.dispose();
+  });
+
+  test('supervisor: the reader\'s own session reads as their debrief, still sending nothing', () async {
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async => LearnerDebriefView.fromJson(readyDebriefJson()));
+    final c = LearnerDebriefController(repository: repo, sessionId: 's-1', supervisor: true);
+    await c.load();
+    expect(c.ownView, isTrue);
+    expect(c.view?.state, LearnerDebriefState.ready);
+    expect(c.view?.supervisor, isNull);
+    await c.markRead();
+    await c.markOpened();
+    verifyNever(() => repo.getSupervisorDebrief(any()));
     verifyNever(() => repo.markRead(any()));
     verifyNever(() => repo.markOpened(any()));
     c.dispose();
@@ -281,6 +298,115 @@ void main() {
       c.flagCard(section: 'practise_next', reason: DebriefFlagReason.somethingElse),
       throwsA(isA<Conflict409>()),
     );
+    c.dispose();
+  });
+
+  // testWidgets for the fake clock.
+  testWidgets("after a flag, re-reads every 5 s until Ally's answer lands", (tester) async {
+    final stored = <Map<String, dynamic>>[];
+    var calls = 0;
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async {
+      calls++;
+      return LearnerDebriefView.fromJson({
+        ...readyDebriefJson(),
+        'feedback': {'helpful': null, 'flags': List.of(stored)},
+      });
+    });
+    when(
+      () => repo.flagCard('s-1', section: 'what_worked[0]', reason: DebriefFlagReason.didntSay, note: null),
+    ).thenAnswer((_) async {
+      stored.add({'id': 'f1', 'section': 'what_worked[0]', 'status': 'open'});
+      return (id: 'f1', undoUntil: null);
+    });
+    final c = make();
+    await c.load();
+    // Ready with no flag: no polling.
+    await tester.pump(const Duration(seconds: 30));
+    expect(calls, 1);
+
+    await c.flagCard(section: 'what_worked[0]', reason: DebriefFlagReason.didntSay);
+    await tester.pump();
+    expect(calls, 2); // the re-read straight after the flag
+    await tester.pump(const Duration(seconds: 5));
+    expect(calls, 3);
+    expect(c.view!.flags.single.answer, isNull);
+
+    stored[0] = {
+      ...stored[0],
+      'status': 'kept',
+      'answer': {'action': 'kept', 'reply': 'You did say it.'},
+    };
+    await tester.pump(const Duration(seconds: 5));
+    expect(calls, 4);
+    expect(c.view!.flags.single.answer!.reply, 'You did say it.');
+    // Answered: polling stops.
+    await tester.pump(const Duration(seconds: 30));
+    expect(calls, 4);
+    c.dispose();
+  });
+
+  testWidgets('a flag that stays open is polled for 2 minutes at most', (tester) async {
+    var calls = 0;
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async {
+      calls++;
+      return LearnerDebriefView.fromJson({
+        ...readyDebriefJson(),
+        'feedback': {
+          'helpful': null,
+          'flags': [
+            {'id': 'f1', 'section': 'what_worked[0]', 'status': 'open'},
+          ],
+        },
+      });
+    });
+    // Opening the screen on an open flag starts the window too.
+    final c = make();
+    await c.load();
+    expect(calls, 1);
+    await tester.pump(const Duration(minutes: 2));
+    expect(calls, 1 + 24);
+    await tester.pump(const Duration(minutes: 5));
+    expect(calls, 1 + 24);
+    c.dispose();
+  });
+
+  for (final state in ['working', 'on_its_way', 'taking_longer']) {
+    testWidgets('after 30 minutes $state, stops polling and falls back to today\'s debrief', (tester) async {
+      var calls = 0;
+      when(() => repo.getDebrief('s-1')).thenAnswer((_) async {
+        calls++;
+        return _view(state);
+      });
+      final c = make();
+      var notified = 0;
+      c.addListener(() => notified++);
+      await c.load();
+      expect(c.view?.state, isNotNull);
+      await tester.pump(const Duration(minutes: 29, seconds: 59));
+      expect(c.view, isNotNull);
+      expect(c.gaveUp, isFalse);
+      await tester.pump(const Duration(seconds: 1));
+      expect(c.view, isNull);
+      expect(c.gaveUp, isTrue);
+      expect(notified, greaterThan(0));
+      final after = calls;
+      await tester.pump(const Duration(minutes: 10));
+      expect(calls, after);
+      c.dispose();
+    });
+  }
+
+  testWidgets('a debrief that becomes ready before 30 minutes is never given up on', (tester) async {
+    final answers = [_view('working'), LearnerDebriefView.fromJson(readyDebriefJson())];
+    var calls = 0;
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async => answers[(calls++).clamp(0, 1)]);
+    final c = make();
+    await c.load();
+    await tester.pump(const Duration(seconds: 3));
+    expect(c.view?.state, LearnerDebriefState.ready);
+    await tester.pump(const Duration(minutes: 31));
+    expect(c.view?.state, LearnerDebriefState.ready);
+    expect(c.gaveUp, isFalse);
     c.dispose();
   });
 }

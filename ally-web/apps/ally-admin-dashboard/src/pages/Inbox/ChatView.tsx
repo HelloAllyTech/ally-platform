@@ -8,10 +8,13 @@ import {
   useAddCheckupCaseMutation,
 } from "@api";
 import type { InboxThread } from "@api";
-import { Button, PrimaryButton } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { channelLabel, fill, INBOX } from "./copy";
+import { MemoryPanel } from "./MemoryPanel";
 import { CheckupCaseEditor } from "../AssistantHome/sections/CheckupCaseEditor";
+import { Sheet } from "../AssistantHome/ui/Sheet";
 
 const errorText = (error: unknown): string =>
   (error as { data?: { message?: string } })?.data?.message ?? "Something went wrong. Try again.";
@@ -76,7 +79,9 @@ export const ChatView: React.FC<{
   me: number | null;
   /** Editors can turn a real reply into a checkup question (chunk 20d-2). */
   canAddToCheckup?: boolean;
-}> = ({ chatbotId, id, me, canAddToCheckup = false }) => {
+  /** Opens another chat of this person's, for a memory line that came from it (chunk 8a). */
+  onOpenConversation?: (conversationId: string) => void;
+}> = ({ chatbotId, id, me, canAddToCheckup = false, onOpenConversation }) => {
   const { data: thread, isLoading } = useGetInboxThreadQuery({ chatbotId, id });
   const [takeOver, taking] = useTakeOverMutation();
   const [handBack, handing] = useHandBackMutation();
@@ -88,6 +93,9 @@ export const ChatView: React.FC<{
   const [added, setAdded] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const [add, addCase] = useAddCheckupCaseMutation();
+  // What the assistant remembers (chunk 8a): beside the chat when there's room, a sheet when not.
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [highlight, setHighlight] = useState<string | null>(null);
 
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: "end" });
@@ -111,7 +119,30 @@ export const ChatView: React.FC<{
     }
   };
 
-  return (
+  // A memory line's source: this chat's message, scrolled to and marked; or the chat it came from.
+  const openSource = (conversationId: string, messageId: string) => {
+    setMemoryOpen(false);
+    if (conversationId !== id) {
+      onOpenConversation?.(conversationId);
+      return;
+    }
+    const element = document.getElementById(`inbox-msg-${messageId}`);
+    element?.scrollIntoView?.({ block: "center" });
+    element?.focus();
+    setHighlight(messageId);
+  };
+  const memory = thread.contactId ? (
+    <MemoryPanel
+      chatbotId={chatbotId}
+      contactId={thread.contactId}
+      conversationId={id}
+      canEdit={canAddToCheckup}
+      onOpenSource={openSource}
+    />
+  ) : null;
+  const memoryTitle = INBOX.memory.titleNoName;
+
+  const chat = (
     <section className="ally-inbox__chat" data-testid="inbox-chat" aria-label={thread.visitor}>
       <header className="ally-inbox__chat-head">
         <div className="ally-inbox__chat-name">
@@ -119,7 +150,9 @@ export const ChatView: React.FC<{
           {/* On the name's line, right-aligned (chunk 20d-2). */}
           {!thread.heldBy ? (
             <Button
-              className="ally-btn--sm"
+              variant={ButtonVariant.TERTIARY}
+              size="sm"
+              type="button"
               disabled={taking.isLoading}
               onClick={() => void run(() => takeOver({ chatbotId, id }).unwrap())}
             >
@@ -127,7 +160,9 @@ export const ChatView: React.FC<{
             </Button>
           ) : (
             <Button
-              className="ally-btn--sm"
+              variant={ButtonVariant.TERTIARY}
+              size="sm"
+              type="button"
               disabled={handing.isLoading}
               onClick={() => void run(() => handBack({ chatbotId, id }).unwrap())}
             >
@@ -139,6 +174,17 @@ export const ChatView: React.FC<{
           {thread.assistant} · {channelLabel(thread)}
           {thread.safety && <span className="ally-badge ally-inbox__safety">{INBOX.safety}</span>}
         </p>
+        {memory && (
+          <Button
+            variant={ButtonVariant.TEXT}
+            size="sm"
+            type="button"
+            className="ally-link ally-link--inline ally-small ally-inbox__memory-toggle"
+            onClick={() => setMemoryOpen(true)}
+          >
+            {memoryTitle}
+          </Button>
+        )}
       </header>
 
       {thread.heldBy && (
@@ -179,7 +225,9 @@ export const ChatView: React.FC<{
                 </li>
               )}
               <li
-                className={`ally-inbox__msg ally-inbox__msg--${m.role}${grouped ? " ally-inbox__msg--grouped" : ""}`}
+                id={`inbox-msg-${m.id}`}
+                tabIndex={-1}
+                className={`ally-inbox__msg ally-inbox__msg--${m.role}${grouped ? " ally-inbox__msg--grouped" : ""}${highlight === m.id ? " ally-inbox__msg--source" : ""}`}
               >
                 {!grouped && (
                   <p className="ally-small ally-inbox__author">
@@ -284,14 +332,28 @@ export const ChatView: React.FC<{
             disabled={windowClosed}
             onChange={event => setText(event.target.value)}
           />
-          <PrimaryButton
+          <Button
+            variant={ButtonVariant.PRIMARY}
             type="submit"
             disabled={!text.trim() || replying.isLoading || windowClosed}
           >
             {INBOX.send}
-          </PrimaryButton>
+          </Button>
         </form>
       )}
     </section>
+  );
+  // A chat with no person to remember (an older thread) is exactly as before 8a.
+  if (!memory) return chat;
+  return (
+    <div className="ally-inbox__with-memory">
+      {chat}
+      <div className="ally-inbox__memory-side">{memory}</div>
+      {memoryOpen && (
+        <Sheet label={memoryTitle} onClose={() => setMemoryOpen(false)} testId="memory-sheet">
+          {memory}
+        </Sheet>
+      )}
+    </div>
   );
 };

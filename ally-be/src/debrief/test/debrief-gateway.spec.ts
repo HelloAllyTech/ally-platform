@@ -133,7 +133,12 @@ function build(
     {} as any,
     {} as any,
   );
-  const controller = new DebriefGatewayController(tokens, gateway, pmTools);
+  const controller = new DebriefGatewayController(
+    tokens,
+    gateway,
+    pmTools,
+    {} as any,
+  );
   const bearer = (t = tokens.sign('run-1', 's1')) => `Bearer ${t}`;
   return {
     tokens,
@@ -330,8 +335,18 @@ describe('DebriefGatewayController', () => {
         offered: [7],
       }),
     ).toEqual({
-      cards: withPointIds(keepOfferedPractice(cards, new Set([7]))),
+      // No fallback named: "Practise this next" falls to the first option.
+      cards: withPointIds(keepOfferedPractice(cards, new Set([7]), 7)),
     });
+    const named = await controller.tool('finalise_cards', bearer(), {
+      cards: {
+        ...cards,
+        practise_next: { ...cards.practise_next, scenario_id: 999 },
+      },
+      offered: [7, 8],
+      fallback: 8,
+    });
+    expect((named as any).cards.practise_next.scenario_id).toBe(8);
   });
 
   it('progress: writes the learner’s working panel while the run is running', async () => {

@@ -378,5 +378,115 @@ describePg('ConversationService (Postgres)', () => {
       );
       expect(again.id).not.toBe(contact.id);
     });
+
+    // The agent's tool calls and its hand-over summary are as personal as the messages (chunk 3b).
+    const toolRun = (conversationId: string, chatbotId: string, at?: Date) =>
+      dataSource.query(
+        `INSERT INTO tool_runs (chatbot_id, conversation_id, run_id, step, tool, input, status, "createdAt")
+         VALUES ($1, $2, gen_random_uuid()::text, 0, 'hand_over', '{"summary":"call me"}', 'ok', $3)`,
+        [chatbotId, conversationId, at ?? new Date()],
+      );
+    const metadataOf = async (id: string) =>
+      (
+        await dataSource.query(
+          `SELECT metadata FROM chatbot_conversations WHERE id = $1`,
+          [id],
+        )
+      )[0].metadata;
+    const placeholders = { text: '[erased]', erasedPrefix: 'erased:' };
+
+    it("eraseConversations deletes the threads' tool runs and hand-over summaries, and no one else's", async () => {
+      const mine = await service.openConversation(
+        botA,
+        (await service.resolveContact({ chatbotId: botA }, WA, '9181')).id,
+        WA,
+        { idleWindowMinutes: 10 },
+      );
+      const theirs = await service.openConversation(
+        botA,
+        (await service.resolveContact({ chatbotId: botA }, WA, '9182')).id,
+        WA,
+        { idleWindowMinutes: 10 },
+      );
+      for (const c of [mine, theirs]) {
+        await service.setMetadata(c.id, {
+          intake: { name: 'A' },
+          handover: { summary: 'call me' },
+          handoverEmailedAt: 'x',
+        });
+        await toolRun(c.id, botA);
+      }
+      await toolRun('preview-1', botA);
+
+      await service.eraseConversations([mine.id], WA, placeholders);
+
+      const left = (await dataSource.query(
+        `SELECT conversation_id FROM tool_runs`,
+      )) as {
+        conversation_id: string;
+      }[];
+      expect(left.map((row) => row.conversation_id).sort()).toEqual(
+        [theirs.id, 'preview-1'].sort(),
+      );
+      expect(await metadataOf(mine.id)).toEqual({ handoverEmailedAt: 'x' });
+      expect(await metadataOf(theirs.id)).toMatchObject({
+        handover: { summary: 'call me' },
+      });
+    });
+
+    it("eraseContact (the bot page's path) deletes their tool runs and hand-over summaries", async () => {
+      const contact = await service.resolveContact(
+        { chatbotId: botB },
+        ConversationChannel.WEB,
+        'visitor-1',
+      );
+      const c = await service.openConversation(
+        botB,
+        contact.id,
+        ConversationChannel.WEB,
+        { idleWindowMinutes: 10 },
+      );
+      await service.setMetadata(c.id, { handover: { summary: 'call me' } });
+      await toolRun(c.id, botB);
+
+      await service.eraseContact(contact.id, placeholders);
+
+      expect(await dataSource.query(`SELECT 1 FROM tool_runs`)).toEqual([]);
+      expect(await metadataOf(c.id)).toEqual({});
+    });
+
+    it('blankBefore deletes tool runs and hand-over summaries past the cutoff, and keeps newer ones', async () => {
+      const old = new Date('2025-01-01T00:00:00Z');
+      const cutoff = new Date('2026-01-01T00:00:00Z');
+      const contact = await service.resolveContact(
+        { chatbotId: botA },
+        WA,
+        '9183',
+      );
+      const stale = await service.openConversation(botA, contact.id, WA, {
+        id: '6f4e1d1e-0000-4000-8000-0000000000dd',
+        now: old,
+      });
+      await service.setMetadata(stale.id, { handover: { summary: 'old' } });
+      await toolRun(stale.id, botA, old);
+      const fresh = await service.openConversation(
+        botA,
+        (await service.resolveContact({ chatbotId: botA }, WA, '9184')).id,
+        WA,
+        { idleWindowMinutes: 10 },
+      );
+      await service.setMetadata(fresh.id, { handover: { summary: 'new' } });
+      await toolRun(fresh.id, botA);
+
+      await service.blankBefore(cutoff, placeholders);
+
+      expect(
+        await dataSource.query(`SELECT conversation_id FROM tool_runs`),
+      ).toEqual([{ conversation_id: fresh.id }]);
+      expect(await metadataOf(stale.id)).toEqual({});
+      expect(await metadataOf(fresh.id)).toEqual({
+        handover: { summary: 'new' },
+      });
+    });
   });
 });

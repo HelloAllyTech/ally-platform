@@ -42,6 +42,9 @@ export interface Proposal {
 
 const REFUSAL = new SafetyLockedError('change by chat').message;
 
+/** Sent with each proposal, so an edit in Manage Prompts takes effect (chunk H0). */
+const CHANGE_PROMPT_CODES = ['ally_ai_builder_change'] as const;
+
 /**
  * Change by chat on the assistant home (chunk 20a-2): the owner asks, ally-ai proposes a before
  * and after, and nothing changes until the owner applies it. Applying goes through the home's own
@@ -65,6 +68,7 @@ export class ChangeService {
     );
     const view = await this.home.get(chatbotId);
     const f = view.fields as Record<string, { value: unknown }>;
+    const prompts = await this.prompts();
     const out = await this.ai.proposeChange({
       request,
       current: {
@@ -79,9 +83,20 @@ export class ChangeService {
         avoid_topics: (f.avoidTopics?.value as string[]) ?? [],
       },
       safety_rules: packFor(chatbot.safetyPack)?.rules ?? [],
+      ...(prompts ? { prompts } : {}),
     });
     if (out.refused) return { refused: true, message: REFUSAL, changes: [] };
     return { refused: false, message: out.reply, changes: out.changes };
+  }
+
+  private async prompts(): Promise<Record<string, unknown> | undefined> {
+    try {
+      return (await this.ai.getPromptOverrides([
+        ...CHANGE_PROMPT_CODES,
+      ])) as Record<string, unknown>;
+    } catch {
+      return undefined; // ally-ai falls back to its default prompt text
+    }
   }
 
   /** Applies a proposal. Refused as stale if a value changed since it was proposed. */

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,11 +22,207 @@ vi.mock("@api", async importOriginal => {
 });
 
 /* eslint-disable import/first */
-import { AgentLogsPage } from "../session/AgentLogsPage";
+import { AgentLogEntry } from "@types";
+
+import { Found } from "../session/AgentLogFindings";
+import { AgentLogsPage, whyItRan } from "../session/AgentLogsPage";
+import {
+  filterEntries,
+  givenItems,
+  NO_FILTERS,
+  overallOf,
+  runSummary,
+  stepOptions,
+} from "../session/agentLogParts";
 import { ok } from "./consoleFixtures";
 /* eslint-enable import/first */
 
 const WRITER_PROMPT = "You are the Writer. Write kindly.";
+
+const base = (over: Partial<AgentLogEntry>): AgentLogEntry => ({
+  seq: 0,
+  kind: "code",
+  step: "plan",
+  round: null,
+  startedAt: "2026-11-16T08:32:05Z",
+  model: null,
+  fallbackModel: null,
+  prompt: null,
+  input: {},
+  output: {},
+  tokensIn: null,
+  tokensOut: null,
+  costUsd: null,
+  ms: 10,
+  retries: 0,
+  error: null,
+  attention: false,
+  origin: "fixed",
+  planReason: null,
+  ...over,
+});
+
+const TRANSCRIPT =
+  "<transcript>\n[turn 1] CLIENT: Exams में फिर से fail हो गया।\n[turn 2] COUNSELLOR: ओह, कौन सा subject था?\n[turn 3] CLIENT: Maths.\n</transcript>";
+
+const ENTRIES: AgentLogEntry[] = [
+  base({
+    seq: 1,
+    step: "plan",
+    input: { ceilingUsd: 0.475, deadlineMs: 150000, learnerTurns: 6 },
+    output: { why: "A practice session.", next: ["safety_reader", "analyst"], recipe: "standard" },
+  }),
+  base({
+    seq: 2,
+    kind: "model",
+    step: "safety_reader",
+    model: "gemini-2.5-flash",
+    costUsd: 0.004,
+    input: `{{system_prompt}}\n\nSESSION LANGUAGE: hi-IN\n\n${TRANSCRIPT}`,
+    output: {
+      risk_cues: [
+        {
+          quote: "Kabhi kabhi lagta hai main mar jaaun",
+          category: "suicide_or_self_harm",
+          turn_index: 5,
+          learner_response: "missed",
+        },
+      ],
+      learner_distress: [],
+    },
+  }),
+  base({
+    seq: 3,
+    kind: "model",
+    step: "analyst",
+    model: "gemini-2.5-pro",
+    input: TRANSCRIPT,
+    output: {
+      behaviours: [
+        {
+          skill: "Exploring risk",
+          observation: "missed",
+          turn_index: 6,
+          quote: null,
+          note: "Ignored it.",
+        },
+        { skill: "Rapport", observation: "observed", turn_index: 2, quote: "कौन सा subject था?" },
+        { skill: "Validation", observation: "partial", turn_index: 4, quote: null },
+        { skill: "Open questions", observation: "missed", turn_index: 8, quote: null },
+      ],
+    },
+  }),
+  base({
+    seq: 4,
+    kind: "model",
+    step: "planner",
+    input: '<available_agents>\n["guidance_lookup", "history_deep"]\n</available_agents>',
+    output: {
+      actions: [
+        { agent: "guidance_lookup", why: "A missed risk moment.", focus_turns: [5, 6] },
+        { agent: "history_deep", why: "62 past debriefs.", focus_turns: [] },
+      ],
+      considered: [{ agent: "case_memory", why: "not a case" }],
+    },
+  }),
+  base({
+    seq: 5,
+    step: "guidance_lookup",
+    origin: "planned",
+    planReason: "A missed risk moment.",
+    input: { topic: "Exploring risk", situations: ["The client disclosed suicidal thoughts."] },
+    output: {
+      lookups: 3,
+      passages: [{ code: "DG-0014", title: "Ask directly.", text: "Notice it, ask about it." }],
+    },
+  }),
+  base({
+    seq: 6,
+    kind: "model",
+    step: "history_deep",
+    origin: "planned",
+    planReason: "62 past debriefs.",
+    attention: true,
+    output: {
+      findings: [
+        { kind: "missed", point: "Keeps missing risk cues.", quote: null, turn_index: null },
+      ],
+    },
+  }),
+  base({
+    seq: 7,
+    kind: "model",
+    step: "writer",
+    model: "gemini-3-flash-preview",
+    prompt: {
+      code: "debrief_writer_system",
+      version: 3,
+      href: "/manage-prompts?prompt=debrief_writer_system&version=3",
+      inlined: true,
+    },
+    input: `{{system_prompt}}\n\n${TRANSCRIPT}`,
+    output: {
+      opening: "You stayed with how tiring the exams felt.",
+      what_worked: [
+        { skill: "Empathy", lead: "Warm.", body: "It landed.", quote: "That sounds exhausting." },
+      ],
+      work_on_this: [{ skill: "Goal-setting", lead: "Ask first.", try_saying: "What would help?" }],
+      practise_next: { skill: "Collaborative goal-setting", reason: "Next step." },
+    },
+  }),
+  base({
+    seq: 8,
+    step: "checks",
+    round: 0,
+    output: {
+      advisory: ["total_too_long"],
+      failures: [{ code: "total_too_long", detail: "355 words; at most 220" }],
+    },
+  }),
+  base({
+    seq: 9,
+    kind: "model",
+    step: "evaluator",
+    round: 0,
+    output: {
+      fixes: ["Give one concrete line the learner could say."],
+      dimensions: [
+        { score: 9, dimension: "accuracy" },
+        { score: 6, dimension: "actionability" },
+      ],
+    },
+  }),
+  base({
+    seq: 10,
+    step: "score_draft",
+    round: 0,
+    input: { passScore: 8 },
+    output: { next: "decide", overall: 7.5, draftMeetsBar: false },
+  }),
+  base({
+    seq: 11,
+    step: "decide",
+    output: { why: "Published round 0: it passed every check.", status: "published" },
+  }),
+  base({
+    seq: 12,
+    kind: "model",
+    step: "judge",
+    output: {
+      dimensions: [
+        { score: 10, dimension: "accuracy" },
+        { score: 9, dimension: "personalisation" },
+      ],
+      hard_fails: [],
+    },
+  }),
+  base({
+    seq: 13,
+    step: "progress_vetoes",
+    origin: null,
+    output: { vetoed: ["skill_a"], count: 1 },
+  }),
+];
 
 const LOGS = {
   runId: "7f3a2c11-0000-0000-0000-000000000000",
@@ -37,78 +233,17 @@ const LOGS = {
     status: "published",
     recipeKey: "standard",
     releaseVersion: 5,
-    language: "en",
-    costUsd: 0.09,
-    seconds: 134,
+    language: "hi-IN",
+    costUsd: 0.114,
+    seconds: 97,
   },
-  entries: [
-    {
-      seq: 1,
-      kind: "code",
-      step: "plan",
-      round: null,
-      startedAt: "2026-11-14T08:32:05Z",
-      model: null,
-      fallbackModel: null,
-      prompt: null,
-      input: { learnerTurns: 8, ceilingUsd: 0.5, orchestratorEnabled: false },
-      output: { recipe: "standard", why: "A practice session.", next: ["safety_reader"] },
-      tokensIn: null,
-      tokensOut: null,
-      costUsd: null,
-      ms: 1,
-      retries: 0,
-      error: null,
-      attention: false,
-    },
-    {
-      seq: 2,
-      kind: "model",
-      step: "writer",
-      round: 0,
-      startedAt: "2026-11-14T08:32:53Z",
-      model: "gemini-3-flash-preview",
-      fallbackModel: null,
-      prompt: {
-        code: "debrief_writer_system",
-        version: 3,
-        href: "/manage-prompts?prompt=debrief_writer_system&version=3",
-        inlined: true,
-      },
-      input: "{{system_prompt}}\n\nSESSION LANGUAGE: en\n[turn 5] CLIENT: what's even the point",
-      output: { cards: { opening: "You built warmth quickly." }, reasoning: "Led with risk." },
-      tokensIn: 5320,
-      tokensOut: 690,
-      costUsd: 0.018,
-      ms: 15000,
-      retries: 0,
-      error: null,
-      attention: false,
-    },
-    {
-      seq: 3,
-      kind: "code",
-      step: "checks",
-      round: 0,
-      startedAt: "2026-11-14T08:33:08Z",
-      model: null,
-      fallbackModel: null,
-      prompt: null,
-      input: { language: "en" },
-      output: {
-        failures: [{ code: "quote_not_in_turn", section: "work_on_this[0]", detail: "x" }],
-      },
-      tokensIn: null,
-      tokensOut: null,
-      costUsd: null,
-      ms: 10,
-      retries: 0,
-      error: null,
-      attention: true,
-    },
-  ],
+  entries: ENTRIES,
   prompts: { "debrief_writer_system@3": WRITER_PROMPT },
 };
+
+const byStep = (step: string) => ENTRIES.find(e => e.step === step)!;
+const renderFound = (step: string) =>
+  render(<Found entry={byStep(step)} entries={ENTRIES} expandAll={false} />);
 
 const renderPage = () =>
   render(
@@ -127,128 +262,245 @@ beforeEach(() => {
   Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
 });
 
+describe("agent log parts", () => {
+  it("filters by source, step and problems together", () => {
+    expect(filterEntries(ENTRIES, NO_FILTERS)).toHaveLength(ENTRIES.length);
+    expect(filterEntries(ENTRIES, { ...NO_FILTERS, source: "planned" }).map(e => e.seq)).toEqual([
+      5, 6,
+    ]);
+    expect(filterEntries(ENTRIES, { ...NO_FILTERS, step: "evaluator" }).map(e => e.seq)).toEqual([
+      9,
+    ]);
+    expect(filterEntries(ENTRIES, { ...NO_FILTERS, onlyProblems: true }).map(e => e.seq)).toEqual([
+      6,
+    ]);
+    expect(
+      filterEntries(ENTRIES, { source: "fixed", step: "all", onlyProblems: true }),
+    ).toHaveLength(0);
+    // An entry from before sources were recorded matches only "All".
+    expect(
+      filterEntries(ENTRIES, { ...NO_FILTERS, source: "fixed" }).map(e => e.seq),
+    ).not.toContain(13);
+  });
+
+  it("lists each step once, in run order, by its plain name", () => {
+    const opts = stepOptions([...ENTRIES, base({ seq: 14, step: "evaluator", round: 1 })]);
+    expect(opts.filter(o => o.value === "evaluator")).toHaveLength(1);
+    expect(opts[0]).toEqual({ value: "plan", label: "Plan" });
+    expect(opts.find(o => o.value === "evaluator")?.label).toBe("Draft score");
+  });
+
+  it("summarises time and cost against the plan's limits, and what the planner added", () => {
+    const s = runSummary(LOGS);
+    expect(s).toMatchObject({
+      seconds: 97,
+      deadlineSeconds: 150,
+      costUsd: 0.114,
+      ceilingUsd: 0.475,
+    });
+    expect(s.plannerAdded).toHaveLength(2);
+    expect(runSummary({ ...LOGS, entries: [] })).toMatchObject({
+      deadlineSeconds: 150,
+      ceilingUsd: null,
+      plannerAdded: null,
+    });
+  });
+
+  it("splits a model's message into labelled parts, the transcript as speaker lines", () => {
+    const items = givenItems(byStep("safety_reader"));
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ label: "Transcript", count: "3 turns" });
+    expect(items[0].body).toMatchObject({
+      kind: "transcript",
+      lines: [
+        { turn: 1, speaker: "Client", text: "Exams में फिर से fail हो गया।" },
+        { turn: 2, speaker: "Learner" },
+        { turn: 3, speaker: "Client" },
+      ],
+    });
+    const planner = givenItems(byStep("planner"));
+    expect(planner[0]).toMatchObject({ label: "Agents it could add", count: "2" });
+    expect(planner[0].body).toMatchObject({ kind: "text" });
+    expect((planner[0].body as { text: string }).text).not.toContain("[");
+  });
+
+  it("an overall comes from the reply or, without one, from the dimensions", () => {
+    expect(overallOf({ overall: 9.3 })).toBe(9.3);
+    expect(overallOf(byStep("evaluator").output)).toBe(7.5);
+    expect(overallOf({})).toBeNull();
+  });
+
+  it("says why each entry ran", () => {
+    expect(whyItRan(byStep("plan"))).toBe("Always runs.");
+    expect(whyItRan(byStep("guidance_lookup"))).toBe(
+      "The planner chose it: “A missed risk moment.”",
+    );
+    expect(whyItRan(byStep("progress_vetoes"))).toMatch(/before sources were kept/);
+  });
+});
+
+describe("per-step renderers", () => {
+  it("Safety reader: a cue table", () => {
+    renderFound("safety_reader");
+    const table = within(screen.getByTestId("found-safety")).getByRole("table");
+    expect(table).toHaveTextContent("“Kabhi kabhi lagta hai main mar jaaun”");
+    expect(table).toHaveTextContent("Suicide or self harm");
+    expect(table).toHaveTextContent("Missed");
+    expect(screen.getByText(/Learner distress: none/)).toBeTruthy();
+  });
+
+  it("Analyst: three skill rows, then Show all", () => {
+    renderFound("analyst");
+    const box = screen.getByTestId("found-analyst");
+    expect(box).toHaveTextContent("Exploring risk");
+    expect(box).toHaveTextContent("Observed");
+    expect(box).not.toHaveTextContent("Open questions");
+    fireEvent.click(screen.getByRole("button", { name: /Show all 4 skills/ }));
+    expect(box).toHaveTextContent("Open questions");
+  });
+
+  it("Planner: what it added with reasons, and what it did not", () => {
+    renderFound("planner");
+    const box = screen.getByTestId("found-planner");
+    expect(box).toHaveTextContent("turns 5, 6 — A missed risk moment.");
+    expect(box).toHaveTextContent("Not added:");
+    expect(box).toHaveTextContent("(not a case)");
+  });
+
+  it("Guidance lookup: the kept passages as quotes with their codes", () => {
+    renderFound("guidance_lookup");
+    expect(screen.getByTestId("found-guidance")).toHaveTextContent("DG-0014 · Ask directly.");
+  });
+
+  it("Writer: the cards as the learner sees them", () => {
+    renderFound("writer");
+    const cards = screen.getByTestId("found-cards");
+    expect(cards).toHaveTextContent("You stayed with how tiring the exams felt.");
+    expect(cards).toHaveTextContent("What worked · Empathy");
+    expect(cards).toHaveTextContent("Try: “What would help?”");
+    expect(cards).toHaveTextContent("Practise this next · Collaborative goal-setting");
+  });
+
+  it("Rule checks: warnings and a tick", () => {
+    renderFound("checks");
+    const box = screen.getByTestId("found-checks");
+    expect(box).toHaveTextContent("! Total too long — 355 words; at most 220 (advisory)");
+    expect(box).toHaveTextContent("✓ Every other check passed");
+  });
+
+  it("Draft score: bars, the overall against the bar of 8, and the fixes", () => {
+    renderFound("evaluator");
+    const box = screen.getByTestId("found-draft-score");
+    expect(box).toHaveTextContent("Actionability");
+    expect(screen.getByTestId("draft-overall")).toHaveTextContent("Overall · bar is 87.5");
+    expect(box).toHaveTextContent("Give one concrete line the learner could say.");
+  });
+
+  it("Decision: one sentence", () => {
+    renderFound("decide");
+    expect(screen.getByTestId("found-decision")).toHaveTextContent(
+      "Published round 0: it passed every check.",
+    );
+  });
+
+  it("Quality score: the score, hard fails and the lowest dimension", () => {
+    renderFound("judge");
+    const box = screen.getByTestId("found-quality");
+    expect(box).toHaveTextContent("9.5");
+    expect(box).toHaveTextContent("No hard fails. Lowest: Personalisation 9.");
+  });
+
+  it("findings agents: one line per finding", () => {
+    renderFound("history_deep");
+    expect(screen.getByTestId("found-findings")).toHaveTextContent(
+      "MissedKeeps missing risk cues.",
+    );
+  });
+
+  it("any other step: a key/value list, never JSON", () => {
+    renderFound("progress_vetoes");
+    const kv = screen.getByTestId("found-kv");
+    expect(kv).toHaveTextContent("Vetoed");
+    expect(kv).toHaveTextContent("Skill a");
+    expect(kv.textContent).not.toMatch(/[{}"]/);
+  });
+});
+
 describe("Agent logs page", () => {
-  it("renders one card per entry in order, with plain names and the run summary", () => {
+  it("shows the summary strip, the timeline and one card per entry", () => {
     renderPage();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Agent logs");
-    expect(screen.getByRole("link", { name: /Back to the session/ })).toHaveAttribute(
-      "href",
-      "/debriefs/sessions/run-1?cat=needs",
-    );
-    const summary = screen.getByTestId("agent-logs-summary");
-    expect(summary).toHaveTextContent(
-      "Exam stress, first call · run 7f3a2c11 · version v5 · 3 entries · $0.09 · 2 min 14 s",
-    );
-    expect(summary).toHaveAttribute("title", summary.textContent);
-    const cards = screen.getAllByTestId("log-entry");
-    expect(cards.map(c => within(c).getByText(/^(Plan|Writer|Rule checks)$/).textContent)).toEqual([
-      "Plan",
-      "Writer",
-      "Rule checks",
-    ]);
-    // The model card: model, prompt link, Sent and Reply side by side.
-    const writer = cards[1];
-    expect(writer).toHaveTextContent("5,320 in / 690 out tokens");
-    expect(within(writer).getByRole("link", { name: "Writer's prompt v3" })).toHaveAttribute(
+    expect(screen.getByTestId("tile-time")).toHaveTextContent("97 s of 150 s");
+    expect(screen.getByTestId("tile-cost")).toHaveTextContent("of $0.475");
+    expect(screen.getByTestId("tile-planner")).toHaveTextContent("Planner added");
+    expect(screen.queryByText(/Outcome/)).toBeNull();
+    expect(screen.getAllByTestId("log-entry")).toHaveLength(ENTRIES.length);
+    const dots = screen.getAllByTestId("timeline-item");
+    expect(dots[4]).toHaveAttribute("data-dot", "outline");
+    expect(dots[0]).toHaveAttribute("data-dot", "filled");
+  });
+
+  it("each card has its header, why it ran, what it was given and what it found", () => {
+    renderPage();
+    const writer = screen.getAllByTestId("log-entry")[6];
+    expect(within(writer).getByTestId("log-origin")).toHaveTextContent("Fixed");
+    expect(within(writer).getByTestId("log-why")).toHaveTextContent("Why it ran: Always runs.");
+    expect(within(writer).getByTestId("log-prompt-link")).toHaveAttribute(
       "href",
       "/manage-prompts?prompt=debrief_writer_system&version=3",
     );
-    expect(within(writer).getByTestId("log-input")).toHaveTextContent(
-      "[System prompt: Writer's prompt v3]",
-    );
-    expect(within(writer).getByTestId("log-input")).toHaveTextContent("[turn 5] CLIENT");
-    expect(within(writer).getByTestId("log-output")).toHaveTextContent(
-      '"opening": "You built warmth quickly."',
-    );
-    expect(screen.getByText(/Full agent logs are kept for runs from 14 Nov 2026/)).toBeTruthy();
+    fireEvent.click(within(writer).getByRole("button", { name: /Transcript · 3 turns/ }));
+    expect(within(writer).getByTestId("given-transcript")).toHaveTextContent("Learner");
+    const old = screen.getAllByTestId("log-entry")[12];
+    expect(within(old).getByTestId("log-origin")).toHaveTextContent("Source unknown");
+    expect(within(old).getByTestId("log-meta")).toHaveTextContent("no model");
   });
 
-  it("marks entries that need attention with the left edge", () => {
+  it("planned cards get the purple edge; problems a red border", () => {
     renderPage();
     const cards = screen.getAllByTestId("log-entry");
-    expect(cards.map(c => c.dataset.attention)).toEqual(["false", "false", "true"]);
-    expect(cards[2]).toHaveTextContent("Needs attention");
-    expect(cards[2].style.borderLeft).toContain("3px solid");
+    expect(cards[4]).toHaveAttribute("data-origin", "planned");
+    expect(cards[5]).toHaveAttribute("data-attention", "true");
+    expect(within(cards[5]).getByText("Needs attention")).toBeTruthy();
+    expect(within(cards[8]).getByText("Below the bar")).toBeTruthy();
   });
 
-  it("shows no raw codes in the readable view; Raw JSON does", () => {
+  it("the exact message stays collapsed until asked for, with the prompt's text put back", () => {
     renderPage();
-    const checks = screen.getAllByTestId("log-entry")[2];
-    expect(within(checks).getByTestId("log-output")).toHaveTextContent("Quote not in turn");
-    expect(within(checks).getByTestId("log-output")).not.toHaveTextContent("quote_not_in_turn");
-    const plan = screen.getAllByTestId("log-entry")[0];
-    expect(within(plan).getByTestId("log-input")).toHaveTextContent("Learner turns: 8");
-    expect(within(plan).getByTestId("log-output")).toHaveTextContent("Next: Safety reader");
-
-    fireEvent.click(screen.getByRole("button", { name: "Raw JSON" }));
-    expect(screen.getByRole("button", { name: "Raw JSON" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(
-      within(screen.getAllByTestId("log-entry")[2]).getByTestId("log-output"),
-    ).toHaveTextContent('"code": "quote_not_in_turn"');
-    expect(
-      within(screen.getAllByTestId("log-entry")[0]).getByTestId("log-input"),
-    ).toHaveTextContent('"learnerTurns": 8');
+    expect(screen.queryByTestId("log-exact")).toBeNull();
+    expect(screen.queryByText(WRITER_PROMPT, { exact: false })).toBeNull();
+    const writer = screen.getAllByTestId("log-entry")[6];
+    fireEvent.click(within(writer).getByTestId("log-exact-toggle"));
+    expect(within(writer).getByTestId("log-exact")).toHaveTextContent(WRITER_PROMPT);
   });
 
-  it("System prompt · Show expands the version's text from the Skills Store", () => {
+  it("filters by source, step and only problems; Expand all opens what each card was given", () => {
     renderPage();
-    const writer = screen.getAllByTestId("log-entry")[1];
-    const line = within(writer).getByTestId("system-prompt");
-    expect(line).toHaveTextContent("System prompt: Writer's prompt v3 · Show");
-    expect(within(writer).queryByTestId("system-prompt-text")).toBeNull();
-    fireEvent.click(within(line).getByRole("button", { name: "Show" }));
-    expect(within(writer).getByTestId("system-prompt-text")).toHaveTextContent(WRITER_PROMPT);
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "planned" } });
+    expect(screen.getAllByTestId("log-entry")).toHaveLength(2);
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "all" } });
+    fireEvent.change(screen.getByLabelText("Step"), { target: { value: "judge" } });
+    expect(screen.getAllByTestId("log-entry")).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText("Step"), { target: { value: "all" } });
+    fireEvent.click(screen.getByLabelText("Only problems"));
+    expect(screen.getAllByTestId("log-entry")).toHaveLength(1);
+    fireEvent.click(screen.getByLabelText("Only problems"));
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "top_up" } });
+    expect(screen.getByText("No entry matches these filters")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "all" } });
+    fireEvent.click(screen.getByRole("button", { name: "Expand all" }));
+    expect(screen.getAllByTestId("given-transcript").length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: "Collapse all" })).toBeTruthy();
   });
 
-  it("search filters the entries and highlights the matches", () => {
+  it("keeps the filters on one row that never wraps", () => {
     renderPage();
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search the log" }), {
-      target: { value: "point" },
-    });
-    const cards = screen.getAllByTestId("log-entry");
-    expect(cards).toHaveLength(1);
-    expect(cards[0]).toHaveTextContent("Writer");
-    expect(within(cards[0]).getAllByTestId("log-match")[0]).toHaveTextContent("point");
-    expect(screen.getByTestId("agent-logs-toolbar")).toHaveTextContent("1 entry matches");
-
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search the log" }), {
-      target: { value: "nothing like this" },
-    });
-    expect(screen.queryAllByTestId("log-entry")).toHaveLength(0);
-    expect(screen.getByText('No entry mentions "nothing like this".')).toBeTruthy();
-  });
-
-  it("Copy puts the exact message on the clipboard, the system prompt's text put back", async () => {
-    renderPage();
-    const writer = screen.getAllByTestId("log-entry")[1];
-    await act(async () => {
-      fireEvent.click(within(writer).getByRole("button", { name: "Copy: Sent" }));
-    });
-    expect(writeText).toHaveBeenCalledWith(
-      `${WRITER_PROMPT}\n\nSESSION LANGUAGE: en\n[turn 5] CLIENT: what's even the point`,
-    );
-    expect(within(writer).getByRole("button", { name: "Copy: Sent" })).toHaveTextContent("Copied");
-    await act(async () => {
-      fireEvent.click(within(writer).getByRole("button", { name: "Copy: Reply" }));
-    });
-    expect(writeText).toHaveBeenLastCalledWith(
-      expect.stringContaining('"reasoning": "Led with risk."'),
-    );
-  });
-
-  it("keeps the toolbar on one row: search shrinks, the view switch stays, the note truncates", () => {
-    renderPage();
-    const bar = screen.getByTestId("agent-logs-toolbar");
-    expect(bar.className).toMatch(/\bsticky\b/);
-    expect(bar.className).toMatch(/\bflex-nowrap\b/);
-    expect(within(bar).getByText(/Ally team only/).className).toMatch(/\btruncate\b/);
+    expect(screen.getByTestId("agent-logs-filters").className).toContain("flex-nowrap");
+    expect(screen.getByTestId("agent-logs-strip").className).toContain("flex-nowrap");
   });
 
   it("a run from before logs were kept says from when they are", () => {
-    h.logs.mockReturnValue(ok({ ...LOGS, entries: [], prompts: {} }));
+    h.logs.mockReturnValue(ok({ ...LOGS, entries: [] }));
     renderPage();
     expect(screen.getByText("No agent logs for this run")).toBeTruthy();
     expect(screen.getByText("Full agent logs are kept for runs from 14 Nov 2026.")).toBeTruthy();

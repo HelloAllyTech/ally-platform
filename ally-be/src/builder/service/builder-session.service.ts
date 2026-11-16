@@ -315,9 +315,13 @@ export class BuilderSessionService {
       );
     }
 
-    const monthStart = new Date();
-    monthStart.setUTCDate(1);
-    monthStart.setUTCHours(0, 0, 0, 0);
+    // The month is India time, as every other monthly limit is: a session
+    // started at 20:00 UTC on the 30th counts in the next month.
+    const IST_MS = 330 * 60_000;
+    const ist = new Date(Date.now() + IST_MS);
+    const monthStart = new Date(
+      Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), 1) - IST_MS,
+    );
     const monthCount = await this.sessionRepository.count({
       where: { tenantId, createdAt: MoreThanOrEqual(monthStart) },
     });

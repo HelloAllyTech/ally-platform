@@ -16,4 +16,14 @@ void main() {
   test('empty ids are dropped', () {
     expect(simulationFeedbackLocation('s1', caseId: ''), '/simulations/feedback/s1');
   });
+
+  test('carries the course and its item', () {
+    final uri = Uri.parse(simulationFeedbackLocation('s1', trackId: 't1', trackItemId: 'i1', languageId: 2));
+    expect(uri.queryParameters, {'languageId': '2', 'trackId': 't1', 'trackItemId': 'i1'});
+  });
+
+  test('no course: no course params; an item without a course is dropped', () {
+    expect(simulationFeedbackLocation('s1', trackId: ''), '/simulations/feedback/s1');
+    expect(simulationFeedbackLocation('s1', trackItemId: 'i1'), '/simulations/feedback/s1');
+  });
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { toast } from "sonner";
 
@@ -23,6 +23,17 @@ export const CommentPopup: React.FC<{
   const [tag, setTag] = useState<ExpertCommentTag | null>(null);
   const [body, setBody] = useState("");
   const [add, { isLoading }] = useAddDebriefCommentMutation();
+  const ref = useRef<HTMLDivElement>(null);
+  // A click anywhere outside closes it, unless a comment is half-written (losing it would be worse).
+  const draft = useRef(false);
+  draft.current = body.trim().length > 0;
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node) && !draft.current) onDone();
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [onDone]);
   const post = async () => {
     try {
       await add({ runId, comment: { ...anchor, body: body.trim(), tag } }).unwrap();
@@ -34,6 +45,7 @@ export const CommentPopup: React.FC<{
   };
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-label={s.label}
       data-testid="comment-popup"

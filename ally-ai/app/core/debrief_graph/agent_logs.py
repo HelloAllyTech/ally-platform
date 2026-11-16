@@ -36,6 +36,34 @@ SYSTEM_PROMPT_MARKER = "{{system_prompt}}"
 MAX_CODE_JSON_CHARS = 60_000
 
 
+#: Where an entry came from, for the reviewer: steps the code always runs
+#: (`fixed`), agents the planner chose for this session (`planned`, with its
+#: reason), and the evidence top-up after a failed evaluation (`top_up`).
+ORIGIN_FIXED = "fixed"
+ORIGIN_PLANNED = "planned"
+ORIGIN_TOP_UP = "top_up"
+
+#: The reason the default plan gives when the planner is off or failed: code
+#: chose those steps, so they are fixed.
+DEFAULT_PLAN_REASON = "Today's recipe."
+
+
+def origin_of(state: Dict[str, Any], step: str) -> Dict[str, Any]:
+    """Where a step's entry came from, from the run's own plan: an agent the
+    planner chose is `planned` (or `top_up` when chosen in the top-up round)
+    with the planner's reason; the top-up step itself is `top_up`; anything
+    else, including the default plan's steps, is `fixed`."""
+    if step == "top_up":
+        return {"origin": ORIGIN_TOP_UP}
+    action = (state.get("actions") or {}).get(step) or {}
+    why = str(action.get("why") or "").strip()
+    if not action or why == DEFAULT_PLAN_REASON:
+        return {"origin": ORIGIN_FIXED}
+    if step in (state.get("top_up_agents") or []):
+        return {"origin": ORIGIN_TOP_UP, "planReason": why or None}
+    return {"origin": ORIGIN_PLANNED, "planReason": why or None}
+
+
 def _json_safe(value: Any) -> Any:
     try:
         text = json.dumps(value, ensure_ascii=False, default=str)
@@ -60,9 +88,11 @@ def code_log(
     round_: Optional[int] = None,
     error: Optional[str] = None,
     attention: bool = False,
+    origin: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """A code step's entry: its real inputs and results, as JSON."""
     return {
+        **(origin or {"origin": ORIGIN_FIXED}),
         "kind": "code",
         "step": step,
         "round": round_,
@@ -96,6 +126,7 @@ def model_logs(
     result: Optional[Dict[str, Any]],
     retries: int,
     error: Optional[str],
+    origin: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """One entry per model call the attempt made (normally one). An attempt
     that failed before reaching the model still gets an entry, with its error
@@ -106,6 +137,7 @@ def model_logs(
         sent = {k: v for k, v in body.items() if k != "system_prompt"}
         return [
             {
+                **(origin or {"origin": ORIGIN_FIXED}),
                 "kind": "model",
                 "step": step,
                 "round": round_,
@@ -136,6 +168,7 @@ def model_logs(
             call_error = None
         out.append(
             {
+                **(origin or {"origin": ORIGIN_FIXED}),
                 "kind": "model",
                 "step": step,
                 "round": round_,

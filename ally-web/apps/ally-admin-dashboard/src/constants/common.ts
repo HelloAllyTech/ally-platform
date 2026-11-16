@@ -410,6 +410,10 @@ export const ApiEndpoints = {
     STRATEGY_GOALS_ORDER: "/v1/product-roadmap/strategy-goals/order",
     STRATEGY_GOALS_ASSESS_MISSING: "/v1/product-roadmap/strategy-goals/assess-missing",
     RANK_WEIGHTS: "/v1/product-roadmap/rank-weights",
+    /** The Prod Director pick (GET/PUT) — a platform admin whose star boosts rank. */
+    PROD_DIRECTOR: "/v1/product-roadmap/prod-director",
+    OPPORTUNITY_DIRECTOR_STAR: (id: string) =>
+      `/v1/product-roadmap/opportunities/${id}/director-star`,
     /** The Vision & strategy page the opportunity copilot reads on every turn. */
     STRATEGY_CONTEXT: "/v1/product-roadmap/strategy-context",
     OPPORTUNITY_GOAL_IMPACT: (id: string) => `/v1/product-roadmap/opportunities/${id}/goal-impact`,
@@ -477,6 +481,7 @@ export const ApiEndpoints = {
     OVERVIEW: "/v1/debriefs/console/overview",
     SETTINGS: "/v1/debriefs/console/settings",
     METRICS: "/v1/debriefs/console/metrics",
+    NIGHTLY: "/v1/debriefs/console/metrics/nightly",
     SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
     /** Settings › Schedules (engineering only). */
     SCHEDULES: "/v1/debriefs/console/schedules",
@@ -516,6 +521,8 @@ export const ApiEndpoints = {
       `/v1/debriefs/console/comments/${id}/${action}`,
     IDEA_QUESTIONS: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/questions`,
     IDEA_START_STEP: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/start-step`,
+    IDEA_APPROVE: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/approve`,
+    IDEA_REJECT: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/reject`,
     IDEA_APPROVE_PINNED: (id: string) =>
       `/v1/debriefs/console/pm-agent/ideas/${id}/approve-pinned-rule`,
     IDEA_WITHDRAW_PINNED: (id: string) =>
@@ -535,6 +542,14 @@ export const ApiEndpoints = {
     PROMOTE_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/promote-waiting`,
     DISMISS_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/dismiss-waiting`,
     EMERGENCY_STOP: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/emergency-stop`,
+    /** v2 (docs/debrief-harness/V2_AUTONOMY.md): the home, the changes, the one PM agent thread, the score. */
+    HOME: "/v1/debriefs/console/home",
+    CHANGES: "/v1/debriefs/console/changes",
+    CHANGE: (id: string) => `/v1/debriefs/console/changes/${id}`,
+    CHANGE_ACTION: (id: string, action: "undo" | "stop") =>
+      `/v1/debriefs/console/changes/${id}/${action}`,
+    PM_CONVERSATION: "/v1/debriefs/console/pm-agent/conversation",
+    SCORE: "/v1/debriefs/console/metrics/score",
   },
   // The caller's in-app notification feed (ally-be notification-feed.controller).
   NOTIFICATIONS: {
@@ -910,6 +925,28 @@ export const ApiEndpoints = {
     HOME: (id: string) => `/v1/chatbots/${id}/home`,
     HOME_LIST: (id: string, list: string) => `/v1/chatbots/${id}/home/lists/${list}`,
     RULES: (id: string) => `/v1/chatbots/${id}/rules`,
+    LISTS: (id: string) => `/v1/chatbots/${id}/lists`,
+    USER_LIST: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}`,
+    LIST_RESTORE: (id: string, listId: string) => `/v1/chatbots/${id}/lists/${listId}/restore`,
+    LIST_FIELDS: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/fields`,
+    LIST_FIELD: (id: string, key: string, field: string) =>
+      `/v1/chatbots/${id}/lists/${key}/fields/${field}`,
+    LIST_RULES: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/rules`,
+    LIST_RULE: (id: string, key: string, ruleId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/rules/${ruleId}`,
+    LIST_ABILITIES: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/abilities`,
+    LIST_RECORDS: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/records`,
+    LIST_RECORDS_QUERY: (id: string, key: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/query`,
+    LIST_RECORDS_REPEAT: (id: string, key: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/repeat`,
+    LIST_RECORD: (id: string, key: string, recordId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/${recordId}`,
+    LIST_RECORD_RESTORE: (id: string, key: string, recordId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/${recordId}/restore`,
+    LIST_CONTACTS: (id: string) => `/v1/chatbots/${id}/lists/contacts`,
+    READY_MADE_LISTS: (id: string) => `/v1/chatbots/${id}/lists/ready-made`,
+    READY_MADE_LIST: (id: string, name: string) => `/v1/chatbots/${id}/lists/ready-made/${name}`,
     FACT_CORRECTION: (id: string, factId: string) =>
       `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,
     IMAGES: (id: string) => `/v1/chatbots/${id}/images`,
@@ -958,6 +995,15 @@ export const ApiEndpoints = {
       `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/hand-back`,
     REPLY: (chatbotId: string, id: string) =>
       `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/messages`,
+    /** What the assistant remembers about one person (chunk 8a). */
+    MEMORY: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/memory`,
+    MEMORY_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}`,
+    FORGET_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}/forget`,
+    FORGET_PERSON: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/forget`,
   },
   BOT_DRAFTS: {
     LIST: "/v1/bot-drafts",

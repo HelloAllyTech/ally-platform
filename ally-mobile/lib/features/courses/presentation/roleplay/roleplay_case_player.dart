@@ -36,9 +36,14 @@ class RoleplayCasePlayer extends ConsumerStatefulWidget {
     required this.item,
     required this.alreadyCompleted,
     required this.onLaunched,
+    this.trackId,
   });
 
   final StartItemPayload payload;
+
+  /// The course this item belongs to: carried to the roleplay's Feedback,
+  /// whose back returns here and offers "Continue the course".
+  final String? trackId;
   final TrackDetailItem item;
   final bool alreadyCompleted;
   final VoidCallback onLaunched;
@@ -87,6 +92,8 @@ class _RoleplayCasePlayerState extends ConsumerState<RoleplayCasePlayer> {
         trackItemProgressId: payload.trackItemProgressId,
         languageId: _selectedLanguage?.languageId,
         scenario: scenario,
+        trackId: widget.trackId,
+        trackItemId: widget.item.id,
       ),
     );
   }

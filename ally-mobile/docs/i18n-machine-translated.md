@@ -147,3 +147,17 @@ These keys are in `en.json` but no code in `lib/` refers to them by name. Most a
 | `postSim.debriefCards.takingLonger.checkAgain` | Check again | फिर से देखें | ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ | पुन्हा तपासा | மீண்டும் பார்க்கவும் |
 | `postSim.debriefCards.takingLonger.checking` | Checking… | देख रहे हैं… | ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ… | तपासत आहे… | பார்க்கிறது… |
 | `postSim.debriefCards.notAvailable` | A debrief isn't available for this session. | इस सेशन के लिए डीब्रीफ़ उपलब्ध नहीं है। | ಈ ಸೆಷನ್‌ಗೆ ಡೀಬ್ರೀಫ್ ಲಭ್ಯವಿಲ್ಲ. | या सत्रासाठी डीब्रीफ उपलब्ध नाही. | இந்த அமர்வுக்கு டீப்ரீஃப் கிடைக்கவில்லை. |
+
+## Debrief in a course, Ally's flag answers, Ask Ally closed (7)
+
+Added 2026-11-16 for the learner Debrief fixes (back to the course, Ally's flag answers, Ask Ally closed). Written by Claude for this app only, using the words the Debrief strings above already use (डीब्रीफ़ / ಡೀಬ್ರೀಫ್ / डीब्रीफ / டீப்ரீஃப், and Ally / ಆಲಿ / अ‍ॅली / ஆலி). Needs a native speaker's read.
+
+| Key | English | Hindi | Kannada | Marathi | Tamil |
+|---|---|---|---|---|---|
+| `postSim.course.continue` | Continue the course | कोर्स जारी रखें | ಕೋರ್ಸ್ ಮುಂದುವರಿಸಿ | कोर्स पुढे सुरू ठेवा | பாடத்தைத் தொடரவும் |
+| `postSim.course.backTo` | Back to {{title}} | {{title}} पर वापस जाएं | {{title}} ಗೆ ಹಿಂತಿರುಗಿ | {{title}} वर परत जा | {{title}} க்குத் திரும்பு |
+| `postSim.debriefCards.reply.closed` | You can't ask Ally more about this debrief right now. | अभी आप इस डीब्रीफ़ के बारे में Ally से और नहीं पूछ सकते। | ಈ ಡೀಬ್ರೀಫ್ ಬಗ್ಗೆ ಈಗ ನೀವು ಆಲಿಯನ್ನು ಇನ್ನಷ್ಟು ಕೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ. | या डीब्रीफबद्दल आत्ता तुम्ही अ‍ॅलीला आणखी विचारू शकत नाही. | இந்த டீப்ரீஃப் பற்றி இப்போது நீங்கள் ஆலியிடம் மேலும் கேட்க முடியாது. |
+| `postSim.debriefCards.corrections.removedWithReason` | We took out “{{card}}”: {{reason}} | हमने “{{card}}” हटा दिया: {{reason}} | ನಾವು “{{card}}” ಅನ್ನು ತೆಗೆದುಹಾಕಿದ್ದೇವೆ: {{reason}} | आम्ही “{{card}}” काढून टाकले: {{reason}} | “{{card}}” ஐ நீக்கினோம்: {{reason}} |
+| `postSim.debriefCards.flag.answer.label` | Ally's answer: | Ally का जवाब: | ಆಲಿಯ ಉತ್ತರ: | अ‍ॅलीचे उत्तर: | ஆலியின் பதில்: |
+| `postSim.debriefCards.flag.answer.kept` | Ally looked at this again and kept it. | Ally ने इसे फिर से देखा और इसे वैसा ही रखा। | ಆಲಿ ಇದನ್ನು ಮತ್ತೆ ನೋಡಿ ಹಾಗೆಯೇ ಉಳಿಸಿದೆ. | अ‍ॅलीने हे पुन्हा पाहिले आणि तसेच ठेवले. | ஆலி இதை மீண்டும் பார்த்து அப்படியே வைத்தது. |
+| `postSim.debriefCards.flag.answer.corrected` | Ally looked at this again and changed it. | Ally ने इसे फिर से देखा और इसे बदल दिया। | ಆಲಿ ಇದನ್ನು ಮತ್ತೆ ನೋಡಿ ಬದಲಾಯಿಸಿದೆ. | अ‍ॅलीने हे पुन्हा पाहिले आणि बदलले. | ஆலி இதை மீண்டும் பார்த்து மாற்றியது. |

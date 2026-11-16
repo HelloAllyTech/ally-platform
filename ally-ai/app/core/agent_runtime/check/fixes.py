@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from typing import Callable, Tuple
 
+from app.core.agent_runtime.check.offered_times import ground_offered_times
 from app.core.agent_runtime.check.rejections import Rejection
 from app.core.agent_runtime.check.text import (
     SENTENCE_END,
@@ -16,12 +17,14 @@ from app.core.agent_runtime.check.text import (
     repeated_crisis_wording,
     unsupported_details,
     without_details,
+    without_record_ids,
     without_repeated_crisis_wording,
     without_sentences,
     without_source_phrases,
 )
 from app.core.agent_runtime.check.verdict import CheckContext, Verdict
 from app.core.agent_runtime.schemas import AgentIntent
+from app.core.knowledge_agent.agent import resolve_citations
 from app.utils.logger import get_logger
 
 # Logged under the package name, as when this was one module.
@@ -95,7 +98,10 @@ def offers_booking(sentence: str) -> bool:
 
 def _trim_booking_offers(verdict: Verdict, ctx: CheckContext) -> None:
     """The assistant can't book, so it never offers to (chunk 20a-2). The sentence
-    is trimmed, not sent back; if nothing would be left, the reply stays."""
+    is trimmed, not sent back; if nothing would be left, the reply stays. An
+    assistant with a create tool can book (chunk 6): nothing is trimmed."""
+    if ctx.can_book:
+        return
     if offers_booking(verdict.answer):
         verdict.answer = (
             without_sentences(verdict.answer, lambda s: not offers_booking(s))
@@ -137,13 +143,65 @@ def _send_back_slot_offers(verdict: Verdict, ctx: CheckContext) -> None:
     """A Bring in customers assistant can't see or hold appointments, so it never
     presents a time as free, as a slot or as booked (chunk 20a-2). Sent back once to
     be rewritten; the sentence is taken out meanwhile, so a reply with no time left
-    for a rewrite goes out without it (and says the team will confirm)."""
+    for a rewrite goes out without it (and says the team will confirm). An
+    assistant with a create tool can (chunk 6): `_send_back_unfound_slots` instead."""
+    if ctx.can_book:
+        return
     if ctx.purpose != "enquiries" or not offers_slot(verdict.answer):
         return
     kept = without_sentences(verdict.answer, lambda s: not offers_slot(s))
     verdict.answer = f"{kept} {TEAM_WILL_CONFIRM}".strip()
     if verdict.rejection is None:
         verdict.rejection, verdict.keeps_text = Rejection.OFFERS_SLOT, True
+
+
+def _drop_record_ids(verdict: Verdict, ctx: CheckContext) -> None:
+    """A record's id is for the tools, never the person (chunk 6): the model copies
+    it from a passage's `id:` line, so it's taken out, with its label, and so is talk
+    of records and citation numbers. Only in a run with record passages, so every
+    other reply is exactly as before. Trimmed, not sent back."""
+    if not any(passage.get("record_id") for passage in ctx.passages):
+        return
+    verdict.answer = without_record_ids(verdict.answer) or verdict.answer
+
+
+def cite_offered_times(verdict: Verdict, ctx: CheckContext) -> None:
+    """Cite the records that back the times a reply offers (chunk 6): the model often
+    lists the right times without citing them. Runs before grounding, so a reply
+    whose times are all backed counts as cited."""
+    if not ctx.can_book:
+        return
+    backing, _ = ground_offered_times(verdict.answer, ctx.passages)
+    cited = {citation.get("passage_number") for citation in verdict.citations}
+    added = [number for number in backing if number not in cited]
+    if added:
+        verdict.citations = verdict.citations + resolve_citations(added, ctx.passages)
+
+
+def _ground_offered_times(verdict: Verdict, ctx: CheckContext) -> None:
+    """An assistant that can book (chunk 6) may present a time as free, or as booked,
+    only from a find or write in this run. Each offered time is matched against the
+    run's record passages: the records that back it are cited (the model often lists
+    the right times without citing them), and a sentence offering a time no record
+    backs is taken out and the draft sent back once. A day presented as free with no
+    time ("Thursday is free") must cite a record, as before."""
+    if not ctx.can_book:
+        return
+    cite_offered_times(verdict, ctx)
+    _, unfounded = ground_offered_times(verdict.answer, ctx.passages)
+    if unfounded:
+        drop = set(unfounded)
+        verdict.answer = without_sentences(
+            verdict.answer, lambda s: s.strip() not in drop
+        )
+    elif not offers_slot(verdict.answer) or any(
+        citation.get("record_id") for citation in verdict.citations
+    ):
+        return
+    else:
+        verdict.answer = without_sentences(verdict.answer, lambda s: not offers_slot(s))
+    if verdict.rejection is None:
+        verdict.rejection, verdict.keeps_text = Rejection.UNFOUND_SLOT, True
 
 
 def _trim_repeated_crisis_wording(verdict: Verdict, ctx: CheckContext) -> None:
@@ -192,11 +250,13 @@ def _decline_if_nothing_left(verdict: Verdict, ctx: CheckContext) -> None:
 
 #: Applied in this order to every reply that isn't a decline the check forced.
 WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
+    _drop_record_ids,
     _drop_unsourced_details,
     _trim_repeated_crisis_wording,
     _trim_repeated_topic_list,
     _trim_booking_offers,
     _send_back_slot_offers,
+    _ground_offered_times,
     _cut_source_phrases,
     _flag_source_talk,
     _decline_if_nothing_left,

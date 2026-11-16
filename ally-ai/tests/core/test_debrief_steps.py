@@ -9,12 +9,13 @@ from app.core.debrief.schemas import (
     BehaviourEvidence,
     DebriefCards,
     EvaluationOutput,
+    EvaluatorRiskCue,
     EvidenceMap,
     PivotalMoment,
     ProgressItem,
     ProgressReading,
 )
-from app.core.debrief_quality.schemas import DimensionScore, RiskCue
+from app.core.debrief_quality.schemas import DimensionScore
 
 TRANSCRIPT = [
     TranscriptTurn(turn_index=1, role="counselor", text="What brings you in?"),
@@ -115,6 +116,37 @@ async def test_progress_reader_keeps_three_items(dispatch_returns):
 
 
 @pytest.mark.asyncio
+async def test_progress_reader_reads_what_people_said_with_its_guide(dispatch_returns):
+    from app.core.debrief.steps import PAST_FEEDBACK_GUIDE, read_progress
+
+    calls = dispatch_returns(ProgressReading(items=[]))
+    await read_progress(
+        {"behaviours": []},
+        [
+            {
+                "point": "Ask about safety",
+                "learner_note": "She never said that",
+                "ally_decision": "kept",
+                "ally_reason": "Turn 4.",
+                "source": "debrief",
+            }
+        ],
+        "gemini-2.5-flash",
+    )
+    assert PAST_FEEDBACK_GUIDE in calls["prompt"]
+    assert "She never said that" in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_progress_reader_without_feedback_gets_no_guide(dispatch_returns):
+    from app.core.debrief.steps import PAST_FEEDBACK_GUIDE, read_progress
+
+    calls = dispatch_returns(ProgressReading(items=[]))
+    await read_progress({"behaviours": []}, [{"point": "x"}], "gemini-2.5-flash")
+    assert PAST_FEEDBACK_GUIDE not in calls["prompt"]
+
+
+@pytest.mark.asyncio
 async def test_writer_never_sees_the_rubric_and_notes_distress(dispatch_returns):
     from app.core.debrief.steps import write
 
@@ -141,7 +173,7 @@ async def test_evaluator_raises_missed_risk_cue_from_its_cue_list(dispatch_retur
     calls = dispatch_returns(
         EvaluationOutput(
             risk_cues=[
-                RiskCue(
+                EvaluatorRiskCue(
                     turn_index=2,
                     quote="I don't want to be here.",
                     addressed_by_debrief=False,

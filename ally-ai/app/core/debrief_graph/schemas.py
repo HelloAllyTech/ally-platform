@@ -18,6 +18,12 @@ class DebriefRunRequest(BaseModel):
     #: Live prompt texts by code; None = the step's default prompt.
     prompts: Dict[str, Optional[str]] = Field(default_factory=dict)
     ceiling_usd: float
+    #: Live runs: the minimum path (safety reader, writer, checks) may pass
+    #: `ceiling_usd`; optional steps still keep to it.
+    allow_over_ceiling: bool = False
+    #: A retry from the start: 0 = the first attempt; n runs on the thread
+    #: `<run_id>:retry<n>`, so it does not read back the first decision.
+    attempt: int = Field(default=0, ge=0, le=5)
     #: Per-model prices; a model left out is unpriced and never runs.
     prices: Dict[str, Dict[str, float]] = Field(default_factory=dict)
     session: Dict[str, Any] = Field(default_factory=dict)

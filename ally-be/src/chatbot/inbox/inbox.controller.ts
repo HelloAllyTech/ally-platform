@@ -1,10 +1,13 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   NotFoundException,
+  Optional,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Res,
@@ -37,6 +40,7 @@ import { SseWriter } from '../../common/sse/sse-writer';
 import { ChatbotMemberRole } from '../enum/chatbot.enum';
 import { ConversationChannel } from '../enum/conversation.enum';
 import { HandoverService } from '../handover/handover.service';
+import { MemoryService } from '../memory/memory.service';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { InboxEventsService } from './inbox-events.service';
 import {
@@ -72,6 +76,20 @@ export class InboxQueryDto {
   before?: string;
 }
 
+export class MemoryQueryDto {
+  /** The chat open beside it: its pre-chat answers and summary come too. */
+  @ApiPropertyOptional() @IsOptional() @IsUUID() conversationId?: string;
+}
+
+export class MemoryLineDto {
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(200) text!: string;
+}
+
+/** Why an edited line was refused, as the owner reads it (copy deck §28). */
+export const MEMORY_NEVER_STORE_MESSAGE =
+  "That's on the list of things your assistant never remembers.";
+export const MEMORY_INVALID_MESSAGE = 'Write it in 1 to 200 characters.';
+
 export class InboxReplyDto {
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(4000) text!: string;
 }
@@ -94,7 +112,108 @@ export class InboxController {
     private readonly events: InboxEventsService,
     private readonly access: ChatbotAccessService,
     @InjectDataSource() private readonly dataSource: DataSource,
+    @Optional() private readonly memory?: MemoryService,
   ) {}
+
+  // ──────────────────────────────── what the assistant remembers (chunk 8a)
+
+  private memoryService(): MemoryService {
+    if (!this.memory) throw new NotFoundException();
+    return this.memory;
+  }
+
+  /** The bot and a contact of it, for the caller's role; 404 for anyone else's contact. */
+  private async personOf(
+    chatbotId: string,
+    contactId: string,
+    role: ChatbotMemberRole,
+  ) {
+    const { chatbot } = await this.access.assert(chatbotId, role);
+    if (!(await this.memoryService().contactOf(chatbotId, contactId))) {
+      throw new NotFoundException();
+    }
+    return chatbot;
+  }
+
+  @Get('chatbots/:chatbotId/contacts/:contactId/memory')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
+  @ApiOperation({
+    summary:
+      'What the assistant remembers about one person, with each line’s source',
+    description:
+      '`on` is false when the assistant doesn’t remember people between chats. Lines are active ones, newest first; `sourceMessageId` and `sourceConversationId` point at the message each came from (null once it’s gone); `expiresAt` null means kept until forgotten. With `conversationId`, that chat’s pre-chat answers the assistant reads (`beforeChat`, never phone or email) and its rolling summary come too. `neverStore` is what it never keeps.',
+  })
+  async memoryOf(
+    @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
+    @Param('contactId', ParseUUIDPipe) contactId: string,
+    @Query() query: MemoryQueryDto,
+  ) {
+    const chatbot = await this.personOf(
+      chatbotId,
+      contactId,
+      ChatbotMemberRole.VIEWER,
+    );
+    return this.memoryService().forInbox(
+      chatbot,
+      contactId,
+      query.conversationId,
+    );
+  }
+
+  @Post('chatbots/:chatbotId/memory/:entryId/forget')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({ summary: 'Forget one line: deleted now' })
+  async forgetLine(
+    @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
+    @Param('entryId', ParseUUIDPipe) entryId: string,
+  ) {
+    await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
+    if (!(await this.memoryService().forget(chatbotId, entryId))) {
+      throw new NotFoundException();
+    }
+    return { forgotten: true };
+  }
+
+  @Patch('chatbots/:chatbotId/memory/:entryId')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Change a line’s text; it becomes yours (source: owner)',
+  })
+  async editLine(
+    @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
+    @Param('entryId', ParseUUIDPipe) entryId: string,
+    @Body() dto: MemoryLineDto,
+  ) {
+    const { chatbot } = await this.access.assert(
+      chatbotId,
+      ChatbotMemberRole.EDITOR,
+    );
+    const result = await this.memoryService().edit(chatbot, entryId, dto.text);
+    if (result.ok) return result.line;
+    if (result.reason === 'not_found') throw new NotFoundException();
+    throw new BadRequestException({
+      code: result.reason,
+      message:
+        result.reason === 'never_store'
+          ? MEMORY_NEVER_STORE_MESSAGE
+          : MEMORY_INVALID_MESSAGE,
+    });
+  }
+
+  @Post('chatbots/:chatbotId/contacts/:contactId/forget')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary:
+      'Forget this person: every line about them and their chats’ summaries. Messages stay.',
+  })
+  async forgetPerson(
+    @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
+    @Param('contactId', ParseUUIDPipe) contactId: string,
+  ) {
+    await this.personOf(chatbotId, contactId, ChatbotMemberRole.EDITOR);
+    const lines = await this.memoryService().forgetPerson(chatbotId, contactId);
+    return { forgotten: lines };
+  }
 
   @Get('conversations')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)

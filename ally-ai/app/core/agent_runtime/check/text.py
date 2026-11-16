@@ -170,9 +170,78 @@ _SOURCE_PHRASE = re.compile(
 )
 
 
+# Passage numbers said in words (chunk 8a): "see these details here: 1, 3, 4",
+# "(source 1)", "sources 2 and 5". The numbers are the citation contract's, never
+# the person's; a real count ("details: 3 sessions") is kept, since a word follows.
+_PASSAGE_REF = re.compile(
+    r"\s*(?:[—–-]\s*)?\(?\s*(?:see\s+)?(?:(?:these|the|those)\s+)?"
+    r"(?:details|sources?|passages?|references?)(?:\s+here)?\s*:?\s*"
+    r"\d{1,2}(?:\s*(?:,|and|&|–|-)\s*\d{1,2})*\s*\)?(?!\s*[^\W\d_%₹$])",
+    re.IGNORECASE,
+)
+
+
 def without_source_phrases(text: str) -> str:
     text = _SOURCE_PHRASE.sub("", text or "")
+    text = _PASSAGE_REF.sub("", text)
     return re.sub(r"\s+([.,;!?।])", r"\1", text)
+
+
+#: A record id, or the start of one the model shortened ("id e596c793").
+_UUID = (
+    r"(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    r"|(?<=id )[0-9a-f]{6,12}\b|(?<=id: )[0-9a-f]{6,12}\b)"
+)
+# A list record's id as the model repeats it from a passage (chunk 6). Ids are for
+# the tools, never the person. A bracket that holds one goes whole ("(slot id: …,
+# appointment id: …)"); a label that starts a clause goes with its id ("Appointment
+# id …;"); anywhere else only "id …" goes ("your appointment id … is booked").
+_ID_IN_BRACKETS = re.compile(
+    rf"\s*[(\[][^()\[\]]*{_UUID}[^()\[\]]*[)\]]", re.IGNORECASE
+)
+_LABELLED_ID = re.compile(
+    r"(?:(?<=^)|(?<=[.;,:!?—–-]\s)|(?<=\n))"
+    rf"[A-Za-z]+\s+ids?\s*(?:is\s+|:\s*|#\s*)?{_UUID}"
+    rf"|\s*\bids?\b\s*(?:is\s+|:\s*|#\s*)?{_UUID}"
+    rf"|\s*{_UUID}",
+    re.IGNORECASE | re.MULTILINE,
+)
+# Talk about the records or citations themselves: "(see record)", "Citations: 1, 2",
+# and passage numbers written into the text ("[1]").
+_RECORD_TALK = re.compile(
+    r"\s*\((?:(?:see\s+)?(?:the\s+)?(?:records?|passages?)\b[^)]*|see\s+\d[^)]*"
+    r"|citations?:[^)]*)\)"
+    r"|[;,.]?\s*\bsee\s+(?:records?\s*:?\s*)?\d+(?:\s*,\s*\d+)*(?=\s*[).;,!?]|\s*$)"
+    r"|\s*\bcitations?:\s*\[?\d+(?:\s*,\s*\d+)*\]?\.?"
+    r"|\s*\[\d+(?:\s*,\s*\d+)*\]",
+    re.IGNORECASE,
+)
+
+
+_CITATIONS_SENTENCE = re.compile(
+    r"(?:^|(?<=[.!?])[ \t]+)citations?\s*:[^\n]*?(?:[.!?](?=\s|$)|$)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def without_record_ids(text: str) -> str:
+    """The reply without record ids or talk of records and citation numbers, tidied
+    so no stray punctuation is left where they were."""
+    text = _ID_IN_BRACKETS.sub("", text or "")
+    text = _LABELLED_ID.sub("", text)
+    text = _RECORD_TALK.sub("", text)
+    # A sentence about its citations ("Citations: the slot details are in the records
+    # I used.") goes whole.
+    text = _CITATIONS_SENTENCE.sub("", text)
+    text = re.sub(r"\(\s*[,;:]?\s*\)", "", text)
+    text = re.sub(r"[ \t]+[—–][ \t]*(?=\()", " ", text)
+    text = re.sub(r"[ \t]+[—–][ \t]*(?=[.!?,;]|$)", "", text, flags=re.MULTILINE)
+    text = re.sub(r"[ \t]*[,;][ \t]*(?=[.!?]|$)", "", text, flags=re.MULTILINE)
+    text = re.sub(r"([.!?])[ \t]*[,;:]+", r"\1", text)
+    text = re.sub(r"(?<=[.!?])[ \t]*\.+", "", text)
+    text = re.sub(r"[ \t]+([.,;!?])", r"\1", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return "\n".join(line.rstrip() for line in text.split("\n")).strip()
 
 
 def detail_kinds(text: str) -> List[str]:

@@ -104,6 +104,14 @@ export interface DebriefSettings {
   riskDeadlineMs: number;
   guidancePassagesPerMoment: number;
   /**
+   * Everything one session may spend: its debrief run and every Ask Ally
+   * reply after it (Sandeep, 2026-11-16). Absent in releases made before it:
+   * `DEBRIEF_SESSION_BUDGET_DEFAULT` applies.
+   */
+  sessionBudgetUsd?: number;
+  /** Ask Ally replies one session may have. Absent: `DEBRIEF_MAX_REPLIES_DEFAULT`. */
+  maxRepliesPerSession?: number;
+  /**
    * Retired with the Knowledge Base's similarity floor: Debrief Guidance answers in relevance
    * bands, not similarities. Releases made before it still carry the value; nothing reads it.
    */
@@ -221,6 +229,15 @@ export const DEBRIEF_REFLECTION_CHECK_MODEL = {
 } as const;
 
 /** Ask Ally's default: fast first words matter more than depth for a reply. */
+/** A session's whole budget, debrief and Ask Ally together, when the release names none. */
+export const DEBRIEF_SESSION_BUDGET_DEFAULT = 1;
+/** Ask Ally replies per session when the release names none. */
+export const DEBRIEF_MAX_REPLIES_DEFAULT = 20;
+/** Below this left in the session, a reply could not finish one pass: Ask Ally stops. */
+export const DEBRIEF_MIN_REPLY_USD = 0.01;
+/** ally-ai's own ceiling for one reply (`REPLY_BUDGET_USD`, app/core/ask_ally). */
+export const DEBRIEF_REPLY_BUDGET_MAX = 0.05;
+
 export const DEBRIEF_REPLY_DEFAULT: DebriefReplyConfig = {
   provider: 'gemini',
   model: 'gemini-2.5-flash',
@@ -279,6 +296,9 @@ export const DEBRIEF_MODELS = {
   /** The prompt-only registry agents (ally-ai manifests name the same). */
   registryAgent: 'gemini-2.5-flash',
   registryAgentBackup: 'gemini-3-flash-preview',
+  /** V2_AUTONOMY F1: answering a learner's flag, the Writer's models. */
+  flagAnswer: 'gemini-3-flash-preview',
+  flagAnswerBackup: 'gemini-2.5-flash',
 } as const;
 
 const step = (
@@ -401,24 +421,12 @@ const SEED_RECIPES_BASE = {
   reply: DEBRIEF_REPLY_DEFAULT,
 };
 
-const standardSeed = SEED_RECIPES_BASE.recipes[DebriefRecipeKey.STANDARD]!;
-
-export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
-  ...SEED_RECIPES_BASE,
-  recipes: {
-    ...SEED_RECIPES_BASE.recipes,
-    [DebriefRecipeKey.CASE]: { ...standardSeed, key: DebriefRecipeKey.CASE },
-    [DebriefRecipeKey.ASSESSMENT]: {
-      ...standardSeed,
-      key: DebriefRecipeKey.ASSESSMENT,
-    },
-  },
-};
-
 /**
- * The orchestrator as a challenger release enables it: every registry agent
- * at the build's version, today's recipe models for the agents that were
- * recipe steps, the build's defaults for the rest.
+ * The orchestrator, on by default (Gopi, 2026-11-16): every registry agent at
+ * the build's version, today's recipe models for the agents that were recipe
+ * steps, the build's defaults for the rest. The planner decides per session
+ * whether to add any agent to the code-owned floor; adding none is a valid
+ * plan. Shipped off on 2026-11-11 as a precaution only.
  */
 export const DEBRIEF_ORCHESTRATOR_DEFAULT: DebriefOrchestratorConfig = {
   enabled: true,
@@ -433,10 +441,38 @@ export const DEBRIEF_ORCHESTRATOR_DEFAULT: DebriefOrchestratorConfig = {
   ).map(([id, { version }]) => ({ id, version })),
 };
 
+const standardSeed = SEED_RECIPES_BASE.recipes[DebriefRecipeKey.STANDARD]!;
+
+/**
+ * The code's defaults. A deploy that changes them makes a new live release
+ * (three-way merge over what people promoted; a conflict waits as a draft).
+ */
+export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
+  ...SEED_RECIPES_BASE,
+  prompts: {
+    ...SEED_RECIPES_BASE.prompts,
+    ...Object.fromEntries(
+      DEBRIEF_ORCHESTRATOR_PROMPT_CODES.filter(
+        (c) => !(c in SEED_RECIPES_BASE.prompts),
+      ).map((c) => [c, null]),
+    ),
+  },
+  orchestrator: DEBRIEF_ORCHESTRATOR_DEFAULT,
+  recipes: {
+    ...SEED_RECIPES_BASE.recipes,
+    [DebriefRecipeKey.CASE]: { ...standardSeed, key: DebriefRecipeKey.CASE },
+    [DebriefRecipeKey.ASSESSMENT]: {
+      ...standardSeed,
+      key: DebriefRecipeKey.ASSESSMENT,
+    },
+  },
+};
+
 /**
  * A challenger bundle (spec A11): `base` (normally the live GA bundle) with
- * the orchestrator on. Made a DRAFT release by the Console action; never the
- * seed, because a changed seed is promoted to GA at boot.
+ * the orchestrator on, as a DRAFT release from the Console action. Since
+ * 2026-11-16 the seed runs the orchestrator too; this stays for trying an
+ * orchestrator variant against the live release.
  */
 export function debriefChallengerBundle(
   base: DebriefBundle,

@@ -65,6 +65,12 @@ export interface ProgressProfile {
     point: string;
     verdict: ProgressVerdict | null;
     learner_flag: string | null;
+    /** The learner's note with their flag, and what Ally decided and why. */
+    learner_note?: string | null;
+    ally_decision?: 'kept' | 'corrected' | 'removed' | null;
+    ally_reason?: string | null;
+    /** 'expert' for an expert's comment on the learner's roleplay. */
+    source?: 'debrief' | 'expert';
   }>;
   last_report: {
     run_id: string;
@@ -109,6 +115,11 @@ export interface ProgressFlagRow {
   status: string;
   reason: string | null;
   user_id: number | string;
+  /** The learner's own words with the flag. */
+  note?: string | null;
+  /** What the Debrief agent decided: kept / corrected / removed, and why. */
+  answer_action?: string | null;
+  answer_reply?: string | null;
 }
 
 /** An expert's top-level comment that says a point is wrong, or worth keeping. */
@@ -118,6 +129,8 @@ export interface ProgressCommentRow {
   turn_index: number | string | null;
   section: string | null;
   tag: string | null;
+  /** The comment's words (a comment on the roleplay is about the learner). */
+  body?: string | null;
 }
 
 export interface ProgressVoiceRow {
@@ -418,6 +431,19 @@ export function assembleProgressProfile(input: {
     }
   }
 
+  // The learner's own words with each flag and Ally's decision (Gopi,
+  // 2026-11-16): a flag may be wrong, so the decision travels with it.
+  const flagWords = new Map<string, Map<string, ProgressFlagRow>>();
+  for (const f of input.flags) {
+    const key = cardSection(f.section);
+    if (!key || Number(f.user_id) !== input.counselorId) continue;
+    if (f.status === 'withdrawn') continue;
+    const m = flagWords.get(f.run_id) ?? new Map<string, ProgressFlagRow>();
+    if (!m.has(key)) m.set(key, f);
+    flagWords.set(f.run_id, m);
+  }
+  const decision = (a: unknown) =>
+    a === 'kept' || a === 'corrected' || a === 'removed' ? a : null;
   const pastPoints: ProgressProfile['past_points'] = [];
   for (const r of rows) {
     list(r.cards?.work_on_this).forEach((c, i) => {
@@ -430,7 +456,38 @@ export function assembleProgressProfile(input: {
         point: String(c.lead),
         verdict: verdicts.get(r.run_id)?.get(section) ?? null,
         learner_flag: learnerFlags.get(r.run_id)?.get(section) ?? null,
+        ...(() => {
+          const f = flagWords.get(r.run_id)?.get(section);
+          return f
+            ? {
+                learner_note: f.note ? String(f.note).slice(0, 300) : null,
+                ally_decision: decision(f.answer_action),
+                ally_reason: f.answer_reply
+                  ? String(f.answer_reply).slice(0, 300)
+                  : null,
+              }
+            : {};
+        })(),
+        source: 'debrief' as const,
       });
+    });
+  }
+  // An expert's comment on the learner's roleplay is about what the learner
+  // did, so the next debrief may follow it up. Comments on debrief cards are
+  // about Ally's writing and go to the PM agent only.
+  const runDate = new Map(rows.map((r) => [r.run_id, day(r.created_at)]));
+  for (const c of input.comments) {
+    const date = runDate.get(c.run_id);
+    if (!date || c.anchor_kind !== 'transcript' || !c.body?.trim()) continue;
+    const t = Number(c.turn_index);
+    pastPoints.push({
+      run_id: c.run_id,
+      date,
+      skill: '',
+      point: `${Number.isInteger(t) ? `Turn ${t}: ` : ''}${String(c.body).trim().slice(0, 300)}`,
+      verdict: null,
+      learner_flag: null,
+      source: 'expert',
     });
   }
 

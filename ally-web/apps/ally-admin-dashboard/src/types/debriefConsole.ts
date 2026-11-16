@@ -1,5 +1,6 @@
 import type { BuilderDecisionOption } from "./builder";
 import type { DebriefViewer } from "./debriefConsoleView";
+import type { DebriefSettingLastChange } from "./debriefV2";
 
 /**
  * The Debrief Console — mirrors ally-be `src/debrief/controller/debrief-console.controller.ts`.
@@ -258,6 +259,12 @@ export interface PmAgentIdeaRow {
     expectedEffect?: string;
     commentIds?: string[];
     handoff?: PmAgentHandoff;
+    /** A Builder idea's change reached production (every merged PR released). */
+    delivery?: {
+      at: string;
+      releaseTags: string[];
+      pullRequests: Array<{ repo: string; number: number }>;
+    };
     forecast?: PmAgentForecast;
     screen?: PmAgentScreen;
     /** Rung 2, the full gate test. */
@@ -480,7 +487,7 @@ export interface PmAgentLadderResult {
 /** v9 FR-60: one owner setting's spec, as ally-be sends it. */
 export interface DebriefOwnerSettingSpec {
   default: number | boolean;
-  kind: "int" | "number" | "share" | "bool";
+  kind: "int" | "number" | "share" | "bool" | "text";
   min?: number;
   max?: number;
   budget?: boolean;
@@ -497,8 +504,9 @@ export interface DebriefOwnerSettingSpec {
 }
 
 export interface DebriefSettingsView {
-  values: Record<string, number | boolean>;
-  defaults: Record<string, number | boolean>;
+  /** Text settings (v2: `slackChannel`, `safetyContact`) are strings. */
+  values: Record<string, number | boolean | string>;
+  defaults: Record<string, number | boolean | string>;
   spec: Record<string, DebriefOwnerSettingSpec>;
   changed: string[];
   baseline: {
@@ -516,6 +524,8 @@ export interface DebriefSettingsView {
   } | null;
   updatedAt: string;
   updatedBy: number | null;
+  /** Settings › Tests (v2): the last change to each setting, by the PM agent or a person. */
+  lastChanges?: Record<string, DebriefSettingLastChange>;
 }
 
 /** A rate with its counts (v9 §3.3); `value` is null when nothing was counted. */

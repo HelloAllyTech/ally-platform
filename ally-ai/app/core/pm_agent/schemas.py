@@ -51,6 +51,84 @@ class PmAgentRunResponse(BaseModel):
     error: Optional[str] = None
 
 
+# --- The console conversation (V2_AUTONOMY C1-C3) ---------------------------------
+
+
+class PmResume(BaseModel):
+    """The person's answer to the action the thread is paused on (ally-be decides
+    it: approve only for the same person's clear yes with the permission)."""
+
+    #: The LangGraph interrupt the decision answers (from the earlier `pending`).
+    interrupt_id: str
+    decision: Literal["approve", "reject"]
+    #: For reject: why, in words the agent reads (the person's own, or ally-be's).
+    message: Optional[str] = Field(None, max_length=4000)
+
+
+class PmConversationRequest(BaseModel):
+    #: ally-be's id for this turn (the person's message id): the agent token's
+    #: run id, so every action the turn takes is tied to the person's words.
+    turn_id: str
+    #: The checkpoint thread: one per console thread (`debrief-pm-conversation`,
+    #: and `debrief-pm-conversation:pinned-rules` for the clinical advisor).
+    thread_id: str = Field(
+        "debrief-pm-conversation",
+        pattern=r"^debrief-pm-conversation(:[a-z0-9-]{1,40})?$",
+    )
+    model: Optional[str] = None
+    backup_model: Optional[str] = None
+    prices: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    #: What this turn may spend: decided by ally-be from the run cap and the
+    #: learning budget.
+    budget_usd: float = Field(ge=0)
+    #: The person's new message and who they are.
+    message: str = Field(min_length=1, max_length=4000)
+    author: Optional[str] = None
+    #: What the person is looking at, with ally-be's evidence for it: the change's
+    #: evidence or the session's run summary (`{kind, id, label, evidence}`).
+    about: Optional[Dict[str, Any]] = None
+    #: Set when the thread is paused for a yes: ally-be's decision on it.
+    resume: Optional[PmResume] = None
+    #: Changes whose retry always asks a person (the retry pauses for a yes).
+    always_ask_idea_ids: List[str] = Field(default_factory=list, max_length=2000)
+    #: The live Skills Store prompts for this call
+    #: (`ally_ai_debrief_pm_conversation_system`).
+    prompts: Optional[Dict[str, Any]] = None
+    tools: List[str] = Field(default_factory=list)
+    agent_token: str
+    gateway_url: str
+
+
+class PmPendingAction(BaseModel):
+    tool: str
+    args: Dict[str, Any] = Field(default_factory=dict)
+    #: What will happen, in plain words (the model's own plan when it gave one).
+    plan: str = ""
+
+
+class PmPending(BaseModel):
+    """The action(s) the thread is paused on, waiting for the person's yes."""
+
+    interrupt_id: str
+    actions: List[PmPendingAction]
+
+
+class PmConversationResponse(BaseModel):
+    status: Literal["finished", "budget_spent", "failed"]
+    reply: Optional[str] = None
+    #: Set when the turn paused for the person's yes.
+    pending: Optional[PmPending] = None
+    thread_id: Optional[str] = None
+    #: Every string this turn's tools returned: ally-be checks that what the reply
+    #: quotes is one of these, verbatim.
+    tool_texts: List[str] = Field(default_factory=list)
+    steps: List[Dict[str, Any]] = Field(default_factory=list)
+    estimated_cost_usd: float = 0.0
+    model: Optional[str] = None
+    refusals: List[Dict[str, str]] = Field(default_factory=list)
+    error: Optional[str] = None
+
+
 # --- Builder's interview, answered by the PM agent (plan §11.5, FR-63) ------------
 
 

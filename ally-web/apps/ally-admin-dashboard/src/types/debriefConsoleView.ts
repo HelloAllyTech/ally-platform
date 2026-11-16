@@ -17,6 +17,8 @@ import {
   ExpertVerdict,
 } from "./debriefExpertReview";
 
+import type { DebriefFlagAnswer } from "./debriefV2";
+
 export type DebriefCanAction =
   | "comment"
   | "flagDecision"
@@ -96,6 +98,8 @@ export interface DebriefSessionListItem {
   reviewed: boolean;
   /** In the weekly agreement sample, waiting for a verdict. */
   agreementSample?: boolean;
+  /** Sent to a person by the nightly check, and why. */
+  nightlyReasons?: string[] | null;
   waitingSince: string | null;
 }
 
@@ -138,6 +142,8 @@ export interface DebriefSessionFlag {
   card: DebriefCardCorrection | null;
   turns: number[];
   canDecide: boolean;
+  /** The Debrief agent's answer to the flag (v2 F1); null until it answered. */
+  answer?: DebriefFlagAnswer | null;
 }
 
 export type DebriefPendingKind =
@@ -695,6 +701,45 @@ export interface DebriefProposal {
 }
 
 /** Analytics › Debriefs (`GET analytics?days=`). */
+/** One day and slice of the nightly check (`GET metrics/nightly`). */
+export interface DebriefNightlyAlert {
+  code: "length_creep" | "sameness" | "vaguer" | "evaluator_judge_gap" | "judge_drift";
+  detail: string;
+  value: number;
+  baseline: number | null;
+  /**
+   * NOT IN THE CONTRACT YET (v2, NightlyV2): where the finding went and what was done, in one
+   * line ("PM agent: testing firmer wording", "Slack: sent to the named safety contact").
+   */
+  routedTo?: string | null;
+}
+export interface DebriefNightlyRow {
+  day: string;
+  /** `all`, `language:hi`, `recipe:standard`, or `judge_drift`. */
+  slice: string;
+  metrics: {
+    runs?: number;
+    wordsP50?: number | null;
+    wordsP90?: number | null;
+    quotesPerDebrief?: number | null;
+    sameness?: number | null;
+    specificity?: number | null;
+    evaluatorJudgeGap?: number | null;
+    dataQuality?: {
+      runs: number;
+      noLanguage: number;
+      unjudged: number;
+      stuck: number;
+      failed: number;
+    };
+    /** judge_drift rows */
+    drift?: number;
+    n?: number;
+    max?: number;
+  };
+  alerts: DebriefNightlyAlert[];
+}
+
 export interface DebriefAnalyticsView {
   windowDays: number;
   tiles: {
@@ -702,6 +747,8 @@ export interface DebriefAnalyticsView {
     judgeMean: number | null;
     meetsTheBar: number | null;
     needsAPerson: number;
+    /** v2 (nothing is held): debriefs shown to the learner below the bar. */
+    shownBelowBar?: number;
     costP50Usd: number | null;
     costP90Usd: number | null;
     spentThisMonthUsd: number | null;
@@ -773,6 +820,10 @@ export interface AgentLogEntry {
   retries: number;
   error: string | null;
   attention: boolean;
+  /** Where it came from; null on entries from before it was recorded. */
+  origin?: "fixed" | "planned" | "top_up" | null;
+  /** The planner's reason, on a planned agent's entries. */
+  planReason?: string | null;
 }
 
 export interface AgentLogsView {

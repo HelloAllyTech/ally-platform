@@ -17,6 +17,7 @@ import {
   stageStyle,
   typeLabel,
 } from "./utils/stages";
+import { DirectorStarButton } from "./DirectorStarButton";
 import { VoteButton } from "./VoteButton";
 
 interface MonthOpportunityCardProps {
@@ -123,6 +124,13 @@ export const MonthOpportunityCard: React.FC<MonthOpportunityCardProps> = ({
       {/* stopPropagation on the wrapper, on BOTH events: click alone is not enough, because
           dnd-kit's PointerSensor activates on pointerdown — without it, tapping the vote button
           starts dragging the card instead of adding a vote. */}
+      <div
+        className="flex flex-col items-center gap-1"
+        onClick={event => event.stopPropagation()}
+        onPointerDown={event => event.stopPropagation()}
+      >
+        <DirectorStarButton opportunity={opportunity} />
+      </div>
       {budget && (
         <div
           onClick={event => event.stopPropagation()}

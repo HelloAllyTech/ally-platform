@@ -22,6 +22,14 @@ import {
   ProgressVoiceRow,
   ProgressWindowRow,
 } from '../util/debrief-progress.util';
+import {
+  buildExpectations,
+  CompetencyBehaviourRow,
+  DebriefCompetency,
+  resolveCustomCodes,
+  RoleplayExpectations,
+  ScenarioBehaviourRow,
+} from '../util/debrief-competencies.util';
 import { FHS_RUBRIC_VERSION } from '../../foundational-skills/constants/helping-skills-rubric.constants';
 
 export interface DebriefSessionContext {
@@ -35,13 +43,31 @@ export interface DebriefSessionContext {
   /** Null for a session whose scenario row is gone. */
   scenarioId: number | null;
   scenario: { title: string | null; description: string | null };
+  /**
+   * The roleplay's named competencies, for cohort stats and other name
+   * readers: never a custom competency's generated code.
+   */
   expectedBehaviours: string[];
+  /**
+   * What the roleplay expects (`buildExpectations`): its own SHOULD_DO /
+   * SHOULD_NOT_DO behaviours plus custom competencies' behaviours, and the
+   * named competencies as labels with their own behaviours when they have any.
+   */
+  helpfulBehaviours: string[];
+  unhelpfulBehaviours: string[];
+  competencies: DebriefCompetency[];
   /** Played for a course roleplay item in assessment mode: a graded attempt. */
   assessment: boolean;
   /** Played as one session of a case: earlier sessions are the client's memory. */
   inCase: boolean;
   /** False when the session recorded no language and `language` is only a default. */
   languageRecorded: boolean;
+  /**
+   * The roleplay's author switched its Debrief tab off
+   * (`scenarios.metadata.feedbackTabs.debrief === false`): no Debrief agent
+   * run, nothing to tell the learner.
+   */
+  debriefTabOff?: boolean;
 }
 
 /** One event the live detector watched for during the roleplay. */
@@ -83,6 +109,7 @@ export class DebriefContextRepository {
               s."scenarioId" AS scenario_id,
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
               s."caseSessionItemId" IS NOT NULL AS in_case,
+              COALESCE(sc.metadata->'feedbackTabs'->>'debrief', '') = 'false' AS debrief_tab_off,
               COALESCE((ti."completionCriteria"->>'assessmentMode')::boolean, false) AS assessment,
               -- PRD §6.1: a blank line (an empty transcription) is not a
               -- learner turn; the transcript the Writer reads skips it too.
@@ -103,12 +130,10 @@ export class DebriefContextRepository {
     const ids: string[] = Array.isArray(r.competency_ids)
       ? r.competency_ids
       : [];
-    const competencies = ids.length
-      ? await this.dataSource.query(
-          `SELECT name FROM competencies WHERE id = ANY($1::uuid[]) ORDER BY name`,
-          [ids],
-        )
-      : [];
+    const expects = await this.expectationsOf(
+      ids,
+      r.scenario_id == null ? null : Number(r.scenario_id),
+    );
     return {
       id: r.id,
       tenantId: r.tenant_id ?? null,
@@ -119,11 +144,67 @@ export class DebriefContextRepository {
       learnerTurns: Number(r.learner_turns ?? 0),
       scenarioId: r.scenario_id == null ? null : Number(r.scenario_id),
       scenario: { title: r.title ?? null, description: r.description ?? null },
-      expectedBehaviours: competencies.map((c: { name: string }) => c.name),
+      expectedBehaviours: expects.competencies.map((c) => c.name),
+      helpfulBehaviours: expects.helpful,
+      unhelpfulBehaviours: expects.unhelpful,
+      competencies: expects.competencies,
       assessment: r.assessment === true,
       inCase: r.in_case === true,
       languageRecorded: r.language_recorded === true,
+      debriefTabOff: r.debrief_tab_off === true,
     };
+  }
+
+  /**
+   * What the roleplay expects: its own SHOULD_DO / SHOULD_NOT_DO behaviours
+   * (what today's debrief reads,
+   * `ScenarioSharedService.getBehaviorInstructionsByScenarioId`), and its
+   * competencies with their HELPFUL / UNHELPFUL behaviours. Unreadable
+   * instructions never stop a debrief: it runs on what could be read.
+   */
+  async expectationsOf(
+    competencyIds: string[],
+    scenarioId: number | null,
+  ): Promise<RoleplayExpectations> {
+    const rows: CompetencyBehaviourRow[] = competencyIds.length
+      ? await this.dataSource.query(
+          `SELECT c.id, c.name, c."isCustom" AS is_custom,
+                  b.name AS behaviour, cb.type
+             FROM competencies c
+             LEFT JOIN competency_behaviors cb ON cb."competencyId" = c.id
+             LEFT JOIN behaviors b ON b.id = cb."behaviorId"
+            WHERE c.id = ANY($1::uuid[])
+            ORDER BY c.name, cb.type, b.name`,
+          [competencyIds],
+        )
+      : [];
+    let own: ScenarioBehaviourRow[] = [];
+    if (scenarioId != null) {
+      try {
+        own = await this.dataSource.query(
+          `SELECT i.category, b.name AS behaviour
+             FROM scenario_behavior_instructions i
+             JOIN scenario_behavior_instruction_behaviors ib
+               ON ib."scenarioBehaviorInstructionId" = i.id
+             JOIN behaviors b ON b.id = ib."behaviorId"
+            WHERE i."scenarioId" = $1 AND i."deletedAt" IS NULL
+            ORDER BY i.category, b.name`,
+          [scenarioId],
+        );
+      } catch {
+        own = [];
+      }
+    }
+    return buildExpectations(rows ?? [], own ?? []);
+  }
+
+  /**
+   * Each custom competency code to its first HELPFUL behaviour (null when it
+   * has none, or cannot be read), so a card that names a code can name what
+   * it means instead. Never throws: a code that cannot be resolved is dropped.
+   */
+  resolveCustomCodes(codes: string[]): Promise<Map<string, string | null>> {
+    return resolveCustomCodes(this.dataSource, codes);
   }
 
   /**
@@ -565,7 +646,9 @@ export class DebriefContextRepository {
       optional(
         () =>
           this.dataSource.query(
-            `SELECT "runId" AS run_id, section, status, reason, "userId" AS user_id
+            `SELECT "runId" AS run_id, section, status, reason, "userId" AS user_id,
+                    left(note, 300) AS note, answer->>'action' AS answer_action,
+                    left(answer->>'reply', 300) AS answer_reply
                FROM debrief_run_feedback
               WHERE "runId" = ANY($1::uuid[]) AND kind = 'flag' AND status <> 'withdrawn'`,
             [runIds],
@@ -576,10 +659,12 @@ export class DebriefContextRepository {
         () =>
           this.dataSource.query(
             `SELECT "runId" AS run_id, "anchorKind" AS anchor_kind,
-                    "turnIndex" AS turn_index, section, tag
+                    "turnIndex" AS turn_index, section, tag,
+                    left(body, 300) AS body
                FROM debrief_review_comments
               WHERE "runId" = ANY($1::uuid[]) AND "parentId" IS NULL
-                AND tag IN ('wrong_or_unsupported','good_keep_this')`,
+                AND (tag IN ('wrong_or_unsupported','good_keep_this')
+                     OR "anchorKind" = 'transcript')`,
             [runIds],
           ) as Promise<ProgressCommentRow[]>,
         [] as ProgressCommentRow[],
@@ -741,7 +826,8 @@ export class DebriefContextRepository {
   async monthToDate(): Promise<{ sessions: number; spentUsd: number }> {
     const rows = await this.dataSource.query(
       `SELECT count(*) FILTER (WHERE status <> 'skipped')::int AS sessions,
-              COALESCE(sum(COALESCE("actualCostUsd", "estimatedCostUsd")), 0)::float AS spent
+              COALESCE(sum(COALESCE("actualCostUsd", "estimatedCostUsd", 0)
+                       + COALESCE((workspace->>'askAllySpentUsd')::numeric, 0)), 0)::float AS spent
          FROM debrief_runs
         WHERE mode IN ('shadow','live')
           AND "createdAt" >= $1::timestamptz`,

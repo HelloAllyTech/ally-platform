@@ -148,6 +148,33 @@ describe('DebriefRunLogsService.record', () => {
     expect(r.inserted[0].promptCode).toBeNull();
   });
 
+  it('keeps where each entry came from; an entry without it stays unknown', async () => {
+    const r = repo();
+    const svc = new DebriefRunLogsService(r as any);
+    await svc.record({ id: 'run-1' }, [
+      { ...CODE, origin: 'fixed' },
+      {
+        ...MODEL,
+        seq: 3,
+        step: 'history_deep',
+        origin: 'planned',
+        planReason: '60 past debriefs',
+      },
+      { ...CODE, seq: 4, step: 'top_up', origin: 'top_up' },
+      { ...CODE, seq: 5, origin: 'bogus' as any },
+      { ...CODE, seq: 6 },
+    ]);
+    expect(
+      r.inserted.map((e: any) => [e.step, e.origin, e.planReason]),
+    ).toEqual([
+      ['plan', 'fixed', null],
+      ['history_deep', 'planned', '60 past debriefs'],
+      ['top_up', 'top_up', null],
+      ['plan', null, null],
+      ['plan', null, null],
+    ]);
+  });
+
   it('an error marks the entry for attention', async () => {
     const r = repo();
     const svc = new DebriefRunLogsService(r as any);
@@ -191,6 +218,7 @@ describe('DebriefRunLogsService.record', () => {
         promptCode: 'debrief_quality_judge_system',
         promptVersion: 1,
         tokensIn: 6210,
+        origin: 'fixed',
       }),
     );
   });

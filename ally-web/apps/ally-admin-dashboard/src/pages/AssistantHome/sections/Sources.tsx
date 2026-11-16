@@ -6,7 +6,8 @@ import {
   useRemoveSourceMutation,
   useRestoreSourceMutation,
 } from "@api";
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { COPY, fill } from "../../Onboarding/copy";
 import { HOME } from "../copy";
@@ -45,7 +46,8 @@ export const SourcesList: React.FC<{ botId: string; canEdit: boolean }> = ({ bot
             </span>
             {canEdit && !page.removed && (
               <Button
-                variant="ghost"
+                variant={ButtonVariant.TEXT}
+                type="button"
                 disabled={busy}
                 onClick={async () => {
                   setError(null);
@@ -66,7 +68,8 @@ export const SourcesList: React.FC<{ botId: string; canEdit: boolean }> = ({ bot
             )}
             {canEdit && page.removed && page.eventId && (
               <Button
-                variant="ghost"
+                variant={ButtonVariant.TEXT}
+                type="button"
                 disabled={busy}
                 onClick={() => void restore({ id: botId, eventId: page.eventId! })}
               >
@@ -83,7 +86,8 @@ export const SourcesList: React.FC<{ botId: string; canEdit: boolean }> = ({ bot
           </p>
           <div className="ally-btn-row">
             <Button
-              variant="primary"
+              variant={ButtonVariant.PRIMARY}
+              type="button"
               disabled={busy}
               onClick={async () => {
                 try {
@@ -96,7 +100,13 @@ export const SourcesList: React.FC<{ botId: string; canEdit: boolean }> = ({ bot
             >
               {t.remove}
             </Button>
-            <Button onClick={() => setConfirming(null)}>{t.keep}</Button>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              onClick={() => setConfirming(null)}
+            >
+              {t.keep}
+            </Button>
           </div>
         </div>
       )}

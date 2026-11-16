@@ -6,9 +6,11 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
 import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
+import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import { withPinnedPrompts } from '../util/debrief-releases.util';
 import {
   DEBRIEF_AGENT_KEY,
+  DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_PROMPT_CODES,
   DEBRIEF_SEED_BUNDLE,
   DebriefBundle,
@@ -16,6 +18,7 @@ import {
   DebriefRecipeKey,
   DebriefModelCatalog,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
+  DEBRIEF_SESSION_BUDGET_DEFAULT,
   isOrchestrated,
   orchestratorModels,
   validateDebriefBundle,
@@ -85,6 +88,14 @@ export interface RunOptions {
    * paid again.
    */
   resume?: DebriefRun | null;
+  /**
+   * Run this run again from the start, on a fresh graph thread (its first
+   * attempt ended without a draft: the safety reader or the writer failed,
+   * or it was stuck). The row is reused; `workspace.retries` says which
+   * attempt this is. The safety reader runs again, so a retried run never
+   * publishes without a safety reading.
+   */
+  retryOf?: DebriefRun | null;
   /** For tests: the clock. */
   now?: () => number;
 }
@@ -117,7 +128,8 @@ const END_WHY: Record<string, string> = {
   monthly_cap:
     'Held for a person: this month’s debrief budget is spent, so no run could start.',
   provider_not_allowed:
-    'Held for a person: a step has no model on a provider this organisation allows (Settings › Organisations).',
+    'No debrief: a step has no priced model on any provider this organisation allows (Settings › Organisations), so the learner gets today’s debrief.',
+  debrief_tab_off: 'No debrief: the roleplay’s Debrief tab is switched off.',
 };
 
 const GRAPH_STATUSES: ReadonlySet<string> = new Set([
@@ -187,6 +199,8 @@ export class DebriefRunnerService {
     @Optional()
     @InjectRepository(DebriefProgressResult)
     private readonly progressResults?: Repository<DebriefProgressResult>,
+    /** V2_AUTONOMY A9: a language pinned to another release. Absent in unit tests. */
+    @Optional() private readonly holds?: DebriefChangeHoldsService,
   ) {}
 
   /**
@@ -280,15 +294,25 @@ export class DebriefRunnerService {
    */
   async run(sessionId: string, opts: RunOptions): Promise<DebriefRun> {
     const now = opts.now ?? Date.now;
+    // V2_AUTONOMY A9: a production session whose language is pinned (a change
+    // held or undone for it, or live only for it) runs on the pinned release.
+    // A pin that cannot be read never fails the run: the release in force runs.
+    const pinned =
+      !opts.release && opts.mode !== DebriefRunMode.REPLAY
+        ? await this.holds?.releaseForSession(sessionId).catch(() => null)
+        : null;
     const { release, bundle: released } = await this.resolveRelease(
-      opts.release,
+      opts.release ?? pinned,
     );
     const bundle: DebriefBundle = {
       ...released,
       settings: { ...released.settings, ...(opts.settingOverrides ?? {}) },
     };
 
-    const created = opts.resume ?? (await this.claim(sessionId, opts, release));
+    const created =
+      opts.resume ??
+      opts.retryOf ??
+      (await this.claim(sessionId, opts, release));
     if (!created) {
       return (await this.runs.findOne({
         where: { scenarioSessionId: sessionId, mode: opts.mode },
@@ -302,9 +326,12 @@ export class DebriefRunnerService {
         now,
       });
       if ('ended' in prepared) return prepared.ended;
+      const retries = Number(run.workspace?.retries ?? 0) || 0;
       const res = await this.graph.run(
         {
           ...prepared.request,
+          // A retry starts a fresh graph thread (CONTRACT.md §1 `attempt`).
+          ...(opts.retryOf && retries > 0 ? { attempt: retries } : {}),
           // The orchestrator's data tools only for a run that may plan.
           run_token: this.tokens.sign(
             run.id,
@@ -407,6 +434,14 @@ export class DebriefRunnerService {
         }),
       };
     }
+    // The roleplay shows no Debrief tab: nobody would read the debrief.
+    if (session.debriefTabOff && opts.mode !== DebriefRunMode.REPLAY) {
+      return {
+        ended: await this.finish(run, DebriefRunStatus.SKIPPED, {
+          skipReason: 'debrief_tab_off',
+        }),
+      };
+    }
     const transcript = await this.context.transcript(sessionId);
     if (transcript.length === 0) {
       return {
@@ -441,11 +476,23 @@ export class DebriefRunnerService {
     run.recipeKey = recipe.key;
 
     // Plan §8.9 (FR-57, Q12): an organisation whose contract restricts
-    // providers gets the release with only those providers' models. A recipe
-    // with a step no allowed model can run goes to a person — never to
-    // another company.
+    // providers gets the release with only those providers' models — never
+    // another company. A step whose models are all disallowed runs on a
+    // priced model from the catalogue on an allowed provider (same tier
+    // first). Only when none exists does the run end, and the learner gets
+    // today's debrief (or "not available" when today's provider is not
+    // allowed either; DebriefAgentService.fallBackToToday).
     const allowed = await this.context.providerAllowlist(session.tenantId);
-    const restricted = restrictBundleToProviders(bundle, allowed);
+    const everyAllowed = DEBRIEF_APPROVED_PROVIDERS.every((p) =>
+      allowed.includes(p),
+    );
+    const substitutes = everyAllowed
+      ? []
+      : await orFallback(
+          async () => [...(await this.modelCatalog()).steps],
+          [] as string[],
+        );
+    const restricted = restrictBundleToProviders(bundle, allowed, substitutes);
     if (restricted.changed) {
       run.workspace = {
         ...run.workspace,
@@ -454,31 +501,55 @@ export class DebriefRunnerService {
           ...(restricted.blockedSteps.length
             ? { blockedSteps: restricted.blockedSteps }
             : {}),
+          ...(Object.keys(restricted.substitutedSteps).length
+            ? { substitutedSteps: restricted.substitutedSteps }
+            : {}),
           ...(restricted.orchestratorOff ? { orchestratorOff: true } : {}),
         },
       };
     }
     if (restricted.blockedRecipes.includes(recipe.key)) {
       return {
-        ended: await this.finish(
-          run,
-          DebriefRunStatus.NEEDS_PERSON,
-          { skipReason: 'provider_not_allowed' },
-          FallbackRung.PERSON_FINISHES,
-        ),
+        ended: await this.finish(run, DebriefRunStatus.SKIPPED, {
+          skipReason: 'provider_not_allowed',
+        }),
       };
     }
     bundle = restricted.bundle;
 
     let ceiling = settings.runCeilingUsd;
+    let spentThisMonthUsd = 0;
     if (opts.mode !== DebriefRunMode.REPLAY) {
       const mtd = await this.context.monthToDate();
+      spentThisMonthUsd = mtd.spentUsd;
       const elapsed = istMonthElapsed(new Date(now()));
       ceiling = effectiveRunCeiling(settings, {
         sessionsThisMonth: mtd.sessions,
         spentThisMonthUsd: mtd.spentUsd,
         monthElapsed: elapsed,
       });
+    }
+    // The session's whole budget covers the run and every Ask Ally reply.
+    ceiling = Math.min(
+      ceiling,
+      settings.sessionBudgetUsd ?? DEBRIEF_SESSION_BUDGET_DEFAULT,
+    );
+    // Gopi, 2026-11-16: a learner's debrief may go past the month's budget.
+    // A live run the cap (or what is left of it) would stop runs with the
+    // floor — the minimum path, writer and checks — and the owner is told
+    // once a day (DebriefAgentService.notifyOverCap). Shadow runs keep the cap.
+    if (opts.mode === DebriefRunMode.LIVE && ceiling < settings.runFloorUsd) {
+      if (spentThisMonthUsd + settings.runFloorUsd > settings.monthlyCapUsd) {
+        run.workspace = {
+          ...run.workspace,
+          overCap: true,
+          overCapSpend: {
+            spentUsd: Number(spentThisMonthUsd.toFixed(4)),
+            capUsd: settings.monthlyCapUsd,
+          },
+        };
+      }
+      ceiling = settings.runFloorUsd;
     }
     run.ceilingUsd = ceiling.toFixed(4);
     if (ceiling <= 0) {
@@ -530,7 +601,11 @@ export class DebriefRunnerService {
           )
         : Promise.resolve([]),
       orFallback(() => this.context.cohortStats(session), null),
-      this.practice.optionsFor(session.counselorId, session.tenantId),
+      this.practice.optionsFor(
+        session.counselorId,
+        session.tenantId,
+        sessionId,
+      ),
       this.prompts(bundle, opts.promptOverrides),
       // What the orchestrator's planner may build on (spec A5: presence of
       // org protocols, past debriefs, cohort and course data), cheap counts.
@@ -575,6 +650,11 @@ export class DebriefRunnerService {
         bundle,
         prompts,
         ceiling_usd: ceiling,
+        // A learner is waiting: the minimum path (safety reader, writer,
+        // checks) runs even when its estimate passes the ceiling.
+        ...(opts.mode === DebriefRunMode.LIVE
+          ? { allow_over_ceiling: true }
+          : {}),
         prices: modelPrices(models),
         session: sessionForGraph(session),
         transcript,
@@ -796,6 +876,27 @@ export class DebriefRunnerService {
   }
 
   /**
+   * Run a live run again from the start, once its first attempt ended with
+   * no draft (DebriefAgentService.retryRun claims it first). The earlier
+   * attempt's decision and error are cleared; everything else it recorded
+   * (the retry count, the cost so far) stays.
+   */
+  async retry(run: DebriefRun): Promise<DebriefRun> {
+    const { decision: _decision, ...workspace } = run.workspace ?? {};
+    void _decision;
+    run.workspace = workspace;
+    run.error = null;
+    run.skipReason = null;
+    run.cards = null;
+    return this.run(run.scenarioSessionId, {
+      mode: run.mode,
+      retryOf: run,
+      experimentId: run.experimentId ?? null,
+      arm: run.arm ?? null,
+    });
+  }
+
+  /**
    * Insert the run row. For a production mode the unique index makes this the
    * claim: a second caller for the same session gets null and reads the first.
    */
@@ -854,6 +955,9 @@ export function sessionForGraph(
     scenario_id: s.scenarioId,
     scenario: s.scenario,
     expected_behaviours: s.expectedBehaviours,
+    helpful_behaviours: s.helpfulBehaviours ?? [],
+    unhelpful_behaviours: s.unhelpfulBehaviours ?? [],
+    competencies: s.competencies ?? [],
     assessment: s.assessment,
     in_case: s.inCase,
   };

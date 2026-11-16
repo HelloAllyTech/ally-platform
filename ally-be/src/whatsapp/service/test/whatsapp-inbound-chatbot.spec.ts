@@ -23,6 +23,7 @@ import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 import { ChatbotAudienceService } from 'src/chatbot/service/chatbot-audience.service';
 import { ConnectorService } from 'src/chatbot/service/connector.service';
 import { AgentRuntimeRunner } from 'src/chatbot/engine/agent-runtime-runner.service';
+import { AGENT_GATEWAY_TEST_PROVIDERS } from 'src/chatbot/engine/test/engine.fixtures';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 import { ChatbotAudience } from 'src/chatbot/entity/chatbot-audience.entity';
@@ -270,6 +271,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
         { provide: WhatsAppIdentityService, useValue: identityService },
         ChatbotEngineService,
         AgentRuntimeRunner,
+        ...AGENT_GATEWAY_TEST_PROVIDERS,
         ChatbotAudienceService,
         { provide: ConnectorService, useValue: connectorService },
         { provide: getRepositoryToken(Chatbot), useValue: chatbotRepository },

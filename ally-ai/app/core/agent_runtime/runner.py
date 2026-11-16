@@ -18,6 +18,8 @@ from uuid import uuid4
 
 from langgraph.graph.state import CompiledStateGraph
 
+from app.core.agent_runtime.budget import RUN_DEADLINE
+from app.core.agent_runtime.gateway import AgentGatewayClient
 from app.core.agent_runtime.graph import OnEvent, run_agent
 from app.core.agent_runtime.state import AgentState
 from app.core.agent_runtime.trace import status_event
@@ -75,6 +77,7 @@ def build_response(state: AgentState, run_id: str) -> AgentRunResponse:
         **{**result, "retrieval": retrieval},
         run_id=run_id,
         trace=state.get("trace") or [],
+        memory_writes=state.get("memory_writes") or [],
     )
 
 
@@ -91,17 +94,32 @@ async def execute(
     run_id = payload.run_id or str(uuid4())
     if on_event:
         on_event("run_started", {"run_id": run_id})
-    async with asyncio.timeout(settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS):
-        state = await run_agent(
-            graph,
-            run_id=run_id,
-            conversation_id=payload.conversation_id,
-            chatbot_id=payload.chatbot_id,
-            question=payload.question,
-            history=[turn.model_dump() for turn in payload.history],
-            bot=payload.to_bot(),
-            on_event=on_event,
+    # ally-be's tool gateway (chunk 3b): one client for the run, closed with it.
+    gateway = (
+        AgentGatewayClient(
+            payload.gateway.url, payload.gateway.token.get_secret_value()
         )
+        if payload.gateway
+        else None
+    )
+    try:
+        async with asyncio.timeout(settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS) as cap:
+            # A write extends the cap (chunk 8a, budget.extend_after_write).
+            RUN_DEADLINE.set(cap)
+            state = await run_agent(
+                graph,
+                run_id=run_id,
+                conversation_id=payload.conversation_id,
+                chatbot_id=payload.chatbot_id,
+                question=payload.question,
+                history=[turn.model_dump() for turn in payload.history],
+                bot=payload.to_bot(),
+                on_event=on_event,
+                gateway=gateway,
+            )
+    finally:
+        if gateway:
+            await gateway.aclose()
     response = build_response(state, run_id)
     if on_event and response.answer:
         on_event("status", status_event("writing"))

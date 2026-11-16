@@ -68,6 +68,18 @@ const graphAnswer = (
   ...over,
 });
 
+/**
+ * A release without the orchestrator (every release before 2026-11-16, and
+ * any person may still make one): the fixed recipes. The seed runs the
+ * orchestrator since 2026-11-16.
+ */
+const FIXED_RECIPES = (() => {
+  const b = JSON.parse(JSON.stringify(DEBRIEF_SEED_BUNDLE));
+  delete b.orchestrator;
+  for (const code of DEBRIEF_ORCHESTRATOR_PROMPT_CODES) delete b.prompts[code];
+  return b;
+})();
+
 function build(
   opts: {
     learnerTurns?: number;
@@ -85,6 +97,9 @@ function build(
     owner?: Record<string, unknown>;
     progressProfile?: unknown;
     progressInsert?: Error;
+    /** The ally-ai model catalogue; the seed's models by default. */
+    catalog?: string[];
+    debriefTabOff?: boolean;
   } = {},
 ) {
   const saved: any[] = [];
@@ -134,9 +149,19 @@ function build(
             scenarioId: 41,
             scenario: { title: 'x', description: 'y' },
             expectedBehaviours: ['open questions'],
+            helpfulBehaviours: ['Uses the client name'],
+            unhelpfulBehaviours: ['Interrupts the client'],
+            competencies: [
+              {
+                name: 'open questions',
+                helpful: ['Asks open questions'],
+                unhelpful: [],
+              },
+            ],
             assessment: false,
             inCase: opts.inCase ?? false,
             languageRecorded: opts.languageRecorded ?? true,
+            debriefTabOff: opts.debriefTabOff ?? false,
           },
     ),
     caseMemory: jest.fn(async () => 'Meena told you about her exams.'),
@@ -186,7 +211,7 @@ function build(
     getGa: async () => ({
       id: 'rel',
       version: 3,
-      bundle: opts.bundle ?? DEBRIEF_SEED_BUNDLE,
+      bundle: opts.bundle ?? FIXED_RECIPES,
     }),
   };
   const practice = {
@@ -218,7 +243,9 @@ function build(
     {
       // Every model the seed names is in the catalog, as it is in prod.
       getModels: async () =>
-        Object.values(DEBRIEF_MODELS).map((model) => ({ model })),
+        (opts.catalog ?? Object.values(DEBRIEF_MODELS)).map((model) => ({
+          model,
+        })),
     } as any,
     agentLogs as any,
     ownerSettings as any,
@@ -293,6 +320,16 @@ describe('DebriefRunnerService', () => {
         learner_turns: 8,
         scenario_id: 41,
         expected_behaviours: ['open questions'],
+        // The competencies' content goes with the names (review 2026-11-16).
+        helpful_behaviours: ['Uses the client name'],
+        unhelpful_behaviours: ['Interrupts the client'],
+        competencies: [
+          {
+            name: 'open questions',
+            helpful: ['Asks open questions'],
+            unhelpful: [],
+          },
+        ],
         assessment: false,
         in_case: false,
       });
@@ -323,7 +360,7 @@ describe('DebriefRunnerService', () => {
         promptOverrides: { [DEBRIEF_PROMPT_CODES.writer]: 'challenger text' },
       });
       const prompts = request().prompts;
-      for (const code of Object.keys(DEBRIEF_SEED_BUNDLE.prompts)) {
+      for (const code of Object.keys(FIXED_RECIPES.prompts)) {
         expect(prompts).toHaveProperty(code);
       }
       expect(prompts[DEBRIEF_PROMPT_CODES.writer]).toBe('challenger text');
@@ -365,13 +402,113 @@ describe('DebriefRunnerService', () => {
       expect(run.ceilingUsd).toBe(ceiling.toFixed(4));
     });
 
-    it('holds the run for a person when no allowed provider can run a step (plan §8.9)', async () => {
+    it('ends the run (today’s debrief) when no allowed provider has a priced model for a step (plan §8.9)', async () => {
       const { svc, graph } = build({ providerAllowlist: ['openai'] });
-      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-      expect(run.status).toBe(DebriefRunStatus.NEEDS_PERSON);
+      const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(run.status).toBe(DebriefRunStatus.SKIPPED);
       expect(run.skipReason).toBe('provider_not_allowed');
       expect(run.workspace?.providerAllowlist?.allowed).toEqual(['openai']);
+      expect(run.workspace.decision.why).toMatch(/today’s debrief/);
       expect(graph.run).not.toHaveBeenCalled();
+    });
+
+    it('runs a step on a priced model of an allowed provider instead of blocking it (plan §8.9)', async () => {
+      const { svc, request } = build({
+        providerAllowlist: ['openai'],
+        catalog: [...Object.values(DEBRIEF_MODELS), 'gpt-4.1-mini', 'gpt-4.1'],
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
+      const steps = request().bundle.recipes.standard.steps as Array<{
+        step: string;
+        model: string | null;
+      }>;
+      // Never a model on a provider the organisation does not allow.
+      for (const s of steps) {
+        expect(s.model).toMatch(/^gpt-/);
+      }
+      // Same tier first: a flash step gets the mini model.
+      expect(steps.find((s) => s.step === 'safety_reader')?.model).toBe(
+        'gpt-4.1-mini',
+      );
+      const writer = steps.find((s) => s.step === 'writer')?.model;
+      const evaluator = steps.find((s) => s.step === 'evaluator')?.model;
+      expect(evaluator).not.toBe(writer);
+      expect(
+        run.workspace.providerAllowlist.substitutedSteps['standard.writer'],
+      ).toBe(writer);
+      expect(Object.keys(request().prices)).toEqual(
+        expect.arrayContaining(['gpt-4.1-mini']),
+      );
+    });
+
+    it('skips a roleplay whose Debrief tab is off, without calling the graph', async () => {
+      const { svc, graph } = build({ debriefTabOff: true });
+      const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(run.status).toBe(DebriefRunStatus.SKIPPED);
+      expect(run.skipReason).toBe('debrief_tab_off');
+      expect(graph.run).not.toHaveBeenCalled();
+    });
+
+    it('runs a live debrief past the month’s cap on the floor, marked over cap', async () => {
+      const cap = DEBRIEF_SEED_BUNDLE.settings.monthlyCapUsd;
+      const { svc, graph, request } = build({
+        monthToDate: { sessions: 10, spentUsd: cap + 3 },
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(graph.run).toHaveBeenCalled();
+      expect(request().ceiling_usd).toBe(
+        DEBRIEF_SEED_BUNDLE.settings.runFloorUsd,
+      );
+      expect(request().allow_over_ceiling).toBe(true);
+      expect(run.workspace.overCap).toBe(true);
+      expect(run.workspace.overCapSpend).toEqual({
+        spentUsd: cap + 3,
+        capUsd: cap,
+      });
+    });
+
+    it('raises a live ceiling below the floor to the floor (budget_below_minimum)', async () => {
+      const cap = DEBRIEF_SEED_BUNDLE.settings.monthlyCapUsd;
+      const floor = DEBRIEF_SEED_BUNDLE.settings.runFloorUsd;
+      const { svc, request } = build({
+        monthToDate: { sessions: 10, spentUsd: cap - floor / 2 },
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(request().ceiling_usd).toBe(floor);
+      expect(run.workspace.overCap).toBe(true);
+    });
+
+    it('sends no over-ceiling allowance for a shadow run', async () => {
+      const { svc, request } = build();
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(request().allow_over_ceiling).toBeUndefined();
+      expect(request().attempt).toBeUndefined();
+    });
+
+    it('retries a run on its own row and a fresh graph thread', async () => {
+      const { svc, request, practice } = build();
+      const failed = {
+        id: 'run-9',
+        scenarioSessionId: 's1',
+        mode: DebriefRunMode.LIVE,
+        status: DebriefRunStatus.RUNNING,
+        skipReason: 'safety_reader_failed',
+        cards: null,
+        fallbackRung: 6,
+        workspace: {
+          retries: 1,
+          decision: { status: 'needs_person', why: 'safety' },
+        },
+      } as any;
+      const run = await svc.retry(failed);
+      expect(request().run_id).toBe('run-9');
+      expect(request().attempt).toBe(1);
+      expect(request().resume).toBe(false);
+      expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
+      expect(run.skipReason).toBeNull();
+      expect(run.workspace.retries).toBe(1);
+      expect(practice.optionsFor).toHaveBeenCalledWith(7, 't1', 's1');
     });
 
     it('holds the run for a person at the monthly cap, without calling the graph', async () => {

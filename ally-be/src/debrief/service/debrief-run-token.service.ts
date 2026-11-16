@@ -77,8 +77,31 @@ export const PM_AGENT_GATEWAY_TOOLS = [
   // Plan §11.7 "Ask a question": read the open questions, post an answer.
   'questions_read',
   'question_answer',
+  // The reviewer subagent's verdict on one change, posted by ally-ai's code
+  // (never a model tool): it sets the change's confidence.
+  'change_review_record',
 ] as const;
-export type PmAgentGatewayTool = (typeof PM_AGENT_GATEWAY_TOOLS)[number];
+/**
+ * The PM agent conversation's own tools (V2_AUTONOMY C2), served by
+ * DebriefPmConversationService. Only a conversation turn's token lists them:
+ * its `agentRunId` is the person's message id, so every action is tied to
+ * that person's words and permissions. A weekly run's token never does.
+ */
+export const PM_CONVERSATION_TOOLS = [
+  'change_read',
+  'session_read',
+  'change_approve',
+  'change_turn_down',
+  'change_stop',
+  'change_undo',
+  'change_retry',
+  'change_hold_language',
+  'changes_pause',
+] as const;
+export type PmConversationTool = (typeof PM_CONVERSATION_TOOLS)[number];
+export type PmAgentGatewayTool =
+  | (typeof PM_AGENT_GATEWAY_TOOLS)[number]
+  | PmConversationTool;
 
 /** An agent token lives at most this long: a PM agent run is minutes, not hours. */
 export const AGENT_TOKEN_MAX_TTL_S = 2 * 60 * 60;
@@ -91,6 +114,18 @@ export interface DebriefAgentClaims {
   agentRunId: string;
   tools: string[];
   exp: number;
+  /**
+   * A conversation turn that resumes a paused action after the person's yes:
+   * the actions that person approved. An approval, a turn-down or an
+   * always-ask retry is carried out only with its entry here.
+   */
+  approved?: PmApprovedAction[];
+}
+
+/** One action a person said yes to (`DebriefAgentClaims.approved`). */
+export interface PmApprovedAction {
+  tool: string;
+  ideaId: string | null;
 }
 
 /** A run token lives this long: past any run's deadline, short enough to be useless later. */
@@ -158,12 +193,21 @@ export class DebriefRunTokenService {
     agentRunId: string,
     tools: readonly PmAgentGatewayTool[] = PM_AGENT_GATEWAY_TOOLS,
     ttlS = AGENT_TOKEN_MAX_TTL_S,
+    approved?: readonly PmApprovedAction[],
   ): string {
-    const allowed = tools.filter((t) =>
-      (PM_AGENT_GATEWAY_TOOLS as readonly string[]).includes(t),
+    const allowed = tools.filter(
+      (t) =>
+        (PM_AGENT_GATEWAY_TOOLS as readonly string[]).includes(t) ||
+        (PM_CONVERSATION_TOOLS as readonly string[]).includes(t),
     );
     return jwt.sign(
-      { kind: 'agent', agent: 'pm_agent', agentRunId, tools: allowed },
+      {
+        kind: 'agent',
+        agent: 'pm_agent',
+        agentRunId,
+        tools: allowed,
+        ...(approved?.length ? { approved: [...approved] } : {}),
+      },
       this.secret(),
       {
         algorithm: 'HS256',

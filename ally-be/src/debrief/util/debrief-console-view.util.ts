@@ -69,7 +69,7 @@ export function parseSessionFilters(
       : str('riskCue') === 'false'
         ? false
         : undefined;
-  const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 200);
+  const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 1000);
   const offset = Math.max(Number(q.offset) || 0, 0);
   const tenantId = str('tenantId');
   const language = str('language');
@@ -121,6 +121,8 @@ export function awaitingDecision(idea: {
     v
       ? new Date(v as string).toISOString()
       : new Date(idea.createdAt).toISOString();
+  // Stopped by a person (Stop now): nothing waits on it any more.
+  if (e.stopped) return null;
   const kind = idea.change?.ideaKind;
   if (kind === 'release' && idea.status === 'proposed') {
     // A person's proposed change: budgets go live on the owner's word; any
@@ -155,6 +157,19 @@ export function awaitingDecision(idea: {
   return null;
 }
 
+/**
+ * Does this wait run out after APPROVAL_EXPIRY_DAYS (v2 A7)? Only for the
+ * always-ask kinds: a pinned-rule proposal, a budget change, or a change the
+ * ladder stopped for a person (`evidence.ask`, A1).
+ */
+export function expiresWhileWaiting(
+  idea: Parameters<typeof awaitingDecision>[0],
+  wait: ApprovalWait,
+): boolean {
+  if (wait === 'pinned_rule' || wait === 'promote_budget') return true;
+  return !!idea.evidence?.ask && !idea.evidence?.approval;
+}
+
 export interface ApprovalState {
   wait: ApprovalWait;
   since: string;
@@ -174,8 +189,11 @@ export function approvalState(
   const w = awaitingDecision(idea);
   if (!w) return null;
   // A pinned rule's first version: a base version must exist, so it neither
-  // expires nor can be rejected; it waits until it is approved.
-  if (idea.change?.firstVersion) {
+  // expires nor can be rejected; it waits until it is approved. Debrief v2
+  // (A7): only always-ask changes expire (pinned rules, budgets, and changes
+  // the ladder stopped for, `evidence.ask`); nothing else waits on a person,
+  // so nothing else runs out.
+  if (idea.change?.firstVersion || !expiresWhileWaiting(idea, w.wait)) {
     return {
       ...w,
       expiresAt: null,
@@ -241,6 +259,9 @@ export function changeKindOf(
         : 'prompts';
     case 'registry_agent':
     case 'default_plan':
+    // A proposed change (its own draft release) climbs the same ladder
+    // (v2 A3); a pinned rule in it waits through the always-ask list.
+    case 'release':
       return 'prompts';
     default:
       return null;
@@ -323,7 +344,8 @@ export function defaultAutonomyMatrix(): AutonomyMatrix {
     quick_test: 'auto',
     gate_test: 'auto',
     paired_trial: 'auto',
-    canary: 'ask',
+    // Debrief v2 (A3): the learner try-out starts itself too.
+    canary: 'auto',
   });
   return {
     settings: row(),
@@ -346,13 +368,9 @@ export function normaliseAutonomy(
   stored: Partial<AutonomyPolicy> | null | undefined,
 ): AutonomyPolicy {
   const matrix = defaultAutonomyMatrix();
-  for (const kind of CONFIGURABLE_KINDS) {
-    for (const step of AUTONOMY_STEPS) {
-      if (LEARNER_FREE_STEPS.includes(step)) continue;
-      const v = stored?.matrix?.[kind]?.[step];
-      if (v === 'auto' || v === 'ask' || v === 'off') matrix[kind][step] = v;
-    }
-  }
+  // Debrief v2 (A3, A6): every step runs on its own, the learner try-out
+  // included, whatever an older policy stored; what waits for a person is
+  // the always-ask list (debrief-always-ask.util.ts), not this matrix.
   const orgs: AutonomyPolicy['orgs'] = {};
   for (const [org, o] of Object.entries(stored?.orgs ?? {})) {
     const clean: Partial<Record<OrgPolicyStep, OrgPolicy>> = {};
@@ -369,13 +387,8 @@ export function normaliseAutonomy(
     const v = stored?.canaryEligible?.[kind];
     if (typeof v === 'boolean') canaryEligible[kind] = v;
   }
+  // Overrides of the κ gate no longer mean anything (κ is information, A6).
   const overrides: AutonomyPolicy['overrides'] = {};
-  for (const kind of CONFIGURABLE_KINDS) {
-    const o = stored?.overrides?.[kind];
-    if (o && typeof o.at === 'string' && matrix[kind].canary === 'auto') {
-      overrides[kind] = { at: o.at, by: Number(o.by), name: o.name ?? null };
-    }
-  }
   return {
     matrix,
     orgs,
@@ -434,17 +447,18 @@ export interface AutonomyFacts {
   /** The latest monthly sealed run scored worse than the one before. */
   failedBaseline: { failed: boolean; detail: string | null };
   /**
-   * Judge drift. Measured by the nightly evaluator job, which is Release 2:
-   * until then null ("not measured") and never blocks.
+   * Judge drift: the weekly re-score of the anchor set by the nightly check
+   * (`debrief-judge-anchor`). Null while there is no recent reading, and then
+   * it never blocks.
    */
   judgeDrift: boolean | null;
 }
 
-/** Where judge drift will come from, for the UI ("measured from Release 2"). */
+/** Where judge drift comes from, for the UI. */
 export const JUDGE_DRIFT_SOURCE = {
-  measured: false,
-  from: 'release_2',
-  note: 'Judge drift is measured by the nightly evaluator job (Release 2).',
+  measured: true,
+  from: 'nightly_check',
+  note: 'A fixed set of debriefs is scored again for the quality score each week; a move beyond the limit in Settings re-locks.',
 } as const;
 
 export const RELOCK_REVERTS = 2;
@@ -461,7 +475,7 @@ export function relockReason(
   if (f.failedBaseline.failed) {
     return `the monthly baseline failed${f.failedBaseline.detail ? ` (${f.failedBaseline.detail})` : ''}`;
   }
-  if (f.judgeDrift) return 'the independent check has drifted';
+  if (f.judgeDrift) return 'the quality score has drifted';
   return null;
 }
 
@@ -526,22 +540,21 @@ export function kindEligibility(
         'Always on its own: learners never see it; paid from the learning budget.',
     };
   }
+  // Debrief v2 (A6): judge agreement and the track record are information
+  // only; they no longer hold a learner try-out back or re-lock it.
+  const notes: string[] = [];
   const relock = relockReason(kind, f);
-  if (relock) return { kind, eligible: false, reason: `Not now: ${relock}.` };
+  if (relock) notes.push(relock);
   if (!f.gate.met) {
     const low = f.gate.failing
       .map((c) => `${gateMeasureLabel(c.measure)} ${gateMeasureState(c)}`)
       .join('; ');
-    return {
-      kind,
-      eligible: false,
-      reason: `Not yet: agreement below 0.6${low ? ` (${low})` : ''}.`,
-    };
+    notes.push(`agreement below 0.6${low ? ` (${low})` : ''}`);
   }
   return {
     kind,
     eligible: true,
-    reason: 'Yes: agreement 0.6 or more, clean track record.',
+    reason: `On its own; the change is watched and undone if it hurts${notes.length ? ` (for information: ${notes.join('; ')})` : ''}.`,
   };
 }
 
@@ -585,6 +598,11 @@ export function matrixChangeRefusal(
   }
   if (!['auto', 'ask', 'off'].includes(value)) {
     return `${value} is not auto, ask or off`;
+  }
+  // Debrief v2 (A3): learner try-outs run on their own; what waits for a
+  // person is the always-ask list in Settings, not this table.
+  if (step === 'canary') {
+    return 'learner try-outs run on their own; choose what waits for a person in the always-ask list';
   }
   if (value === 'auto') {
     const e = kindEligibility(kind as ChangeKind, f, step as AutonomyStep);
@@ -910,7 +928,9 @@ export type IdeaClosedReason =
   | 'answered'
   | 'signed_off'
   | 'withdrawn'
-  | 'retired';
+  | 'retired'
+  /** Debrief v2: a person pressed Stop now while it was being tried or tested. */
+  | 'stopped';
 
 /**
  * Open: needs a person, being tested, or in canary. Closed: promoted (with
@@ -947,6 +967,10 @@ export function ideaState(idea: {
       idea.releaseId ?? e.canary?.releaseId ?? idea.change?.releaseId ?? null,
     );
   }
+  // Debrief v2: undone after going live (by the watch or Undo now), or
+  // stopped by a person while it was being tried or tested.
+  if (e.undo) return closed('reverted', e.undo.reason ?? null);
+  if (e.stopped) return closed('stopped', e.stopped.reason ?? null);
   if (idea.status === 'retired') {
     return e.withdrawn ? closed('withdrawn') : closed('retired');
   }
@@ -963,6 +987,22 @@ export function ideaState(idea: {
   }
   if (idea.status === 'approved') {
     if (idea.change?.ideaKind === 'pinned_rule') return closed('signed_off');
+    // A Builder change that reached production is being measured until its
+    // forecast is checked (PM_HOLD_DAYS after delivery): open, "Being tested".
+    if (
+      e.handoff?.status === 'filed' &&
+      e.handoff?.kind === 'builder' &&
+      e.delivery &&
+      !e.forecast?.checkedAt &&
+      e.forecast
+    ) {
+      return {
+        state: 'open',
+        closedReason: null,
+        closedWhy: null,
+        releaseId: null,
+      };
+    }
     if (e.handoff?.status === 'filed') return closed('handed_off');
     if (e.handoff?.status === 'answered') return closed('answered');
   }

@@ -34,7 +34,9 @@ import 'supervisor_note.dart';
 /// (`GET /debriefs/sessions/:id/supervisor`, v9 FR-26): the same cards with
 /// no controls, the learner's flags and outcomes under each card, their
 /// "Was this helpful?" answer and their Ask Ally thread. A 403 or
-/// `not_available` keeps the note.
+/// `not_available` keeps the note. The reader's own session (the learner
+/// view answers `ready`) shows as their debrief instead, with its
+/// "Practise this next" button (web `ownReady`).
 class DebriefTab extends ConsumerStatefulWidget {
   const DebriefTab({
     super.key,
@@ -46,7 +48,11 @@ class DebriefTab extends ConsumerStatefulWidget {
     this.onSeeQuote,
     this.readOnly = false,
     bool? supervisorView,
+    this.trackId,
   }) : supervisorView = supervisorView ?? readOnly;
+
+  /// The course this session was played in: "Practise this" keeps it.
+  final String? trackId;
 
   final AskAiChatController chat;
 
@@ -116,9 +122,16 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
     final askAlly = !widget.readOnly && view?.state == LearnerDebriefState.ready;
     widget.chat.streamPath = askAlly ? LearnerDebriefRepository.replyStreamPath(widget.sessionId) : null;
     final showing = view != null;
-    if (!mounted || showing == _showingLearnerDebrief) return;
-    setState(() => _showingLearnerDebrief = showing);
+    final askAllyOpen = view?.askAllyOpen ?? true;
+    if (!mounted || (showing == _showingLearnerDebrief && askAllyOpen == _askAllyOpen)) return;
+    setState(() {
+      _showingLearnerDebrief = showing;
+      _askAllyOpen = askAllyOpen;
+    });
   }
+
+  /// The learner view's `askAlly.open`, so a change rebuilds the composer.
+  bool _askAllyOpen = true;
 
   /// The end of Ask Ally's thread inside the cards, followed while a reply
   /// streams in.
@@ -170,6 +183,19 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
           const SizedBox(height: 12),
         ],
         SizedBox(key: _threadEndKey, height: 0),
+        // Closed by the server with no limit message in this thread: say so.
+        if (chat.limitReached == null && !(_learnerDebrief.view?.askAllyOpen ?? true)) ...[
+          Text(
+            ref.t('postSim.debriefCards.reply.closed'),
+            key: const Key('ask-ally-closed'),
+            style: const TextStyle(
+              fontFamily: AppFonts.ibmPlexSerifRegular,
+              fontSize: 13,
+              color: AppColors.mediumEmphasis,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         // v9 Q47: supervisors read this thread, and the learner is told.
         // The composer itself docks at the bottom of the screen ([_composer]).
         Padding(
@@ -188,9 +214,14 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
     );
   }
 
+  /// No more questions: the reply stream said the limit was reached (its
+  /// message stays in the thread), or the learner view says Ask Ally is
+  /// closed (`askAlly.open == false`; missing reads as open).
+  bool get _askAllyClosed => widget.chat.limitReached != null || !(_learnerDebrief.view?.askAllyOpen ?? true);
+
   /// Ask Ally's composer, docked by [DebriefCards] while the reflective
-  /// question is in view (design A5).
-  Widget _composer(AskAiChatController chat) => AskAiReplyInput(
+  /// question is in view (design A5). Null once Ask Ally is closed.
+  Widget? _composer(AskAiChatController chat) => _askAllyClosed ? null : AskAiReplyInput(
     placeholder: ref.t('postSim.debriefCards.reply.placeholder'),
     disabled: chat.isStreaming,
     onSend: chat.sendMessage,
@@ -255,6 +286,8 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
         composer: widget.readOnly ? null : _composer(chat),
         readOnly: widget.readOnly,
         onSeeQuote: widget.onSeeQuote,
+        trackId: widget.trackId,
+        thisRoleplay: widget.summary?.scenario?.id,
       );
     }
     final note = widget.summary?.supervisorNote;

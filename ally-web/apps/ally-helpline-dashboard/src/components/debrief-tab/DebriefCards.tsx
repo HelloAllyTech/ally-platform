@@ -32,6 +32,7 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import {
+  ACTIVE_TRACK_CONTEXT_KEY,
   DebriefCardsData,
   DebriefSkillWord,
   DebriefSupportLine,
@@ -140,20 +141,43 @@ const Lead: FC<{ children: ReactNode }> = ({ children }) => (
  */
 const scenarioPath = (id: number) => `/scenario/${id}`;
 
+/** `ROUTES.LEARN`, the learner's roleplays; built here for the same reason. */
+const ROLEPLAYS_PATH = "/learn";
+
+/**
+ * Inside a course a practice roleplay opens as its course item, in the course
+ * player (`/track/:trackId/item/:itemId`, as `buildTrackItemRoute`), when the
+ * learner came from that course; otherwise the roleplay's own page.
+ */
+const practicePath = (scenario: { id: number; trackItemId?: string }) => {
+  if (scenario.trackItemId) {
+    try {
+      const raw = sessionStorage.getItem(ACTIVE_TRACK_CONTEXT_KEY);
+      const trackId = raw ? (JSON.parse(raw) as { trackId?: string })?.trackId : null;
+      if (trackId) return `/track/${trackId}/item/${scenario.trackItemId}`;
+    } catch {
+      // sessionStorage unavailable: the roleplay's own page.
+    }
+  }
+  return scenarioPath(scenario.id);
+};
+
 /**
  * "Practise this next" / "Practise this": opens the roleplay's own page, so
  * its language choice and trigger warnings come first. Rendered only for a
- * roleplay the server says the learner can still open.
+ * roleplay the server says the learner can still open. `again`: a course
+ * session's "Practise this again", which opens this same course item.
  */
 const PractiseLink: FC<{
-  scenario: { id: number; title: string };
+  scenario: { id: number; title: string; trackItemId?: string };
   primary?: boolean;
+  again?: boolean;
   onClick?: () => void;
-}> = ({ scenario, primary, onClick }) => {
+}> = ({ scenario, primary, again, onClick }) => {
   const { t } = useTranslation();
   return (
     <Link
-      to={scenarioPath(scenario.id)}
+      to={practicePath(scenario)}
       onClick={onClick}
       data-testid={primary ? "debrief-practise-next" : "debrief-practise-this"}
       aria-label={t("postSim.debriefCards.practise.label", { title: scenario.title })}
@@ -163,7 +187,11 @@ const PractiseLink: FC<{
           : "inline-flex min-h-[44px] items-center gap-1 self-start rounded-md px-2 font-primary text-sm font-semibold text-primary-700 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
       }
     >
-      {primary ? t("postSim.debriefCards.practise.next") : t("postSim.debriefCards.practise.this")}
+      {again
+        ? t("postSim.debriefCards.practise.again")
+        : primary
+          ? t("postSim.debriefCards.practise.next")
+          : t("postSim.debriefCards.practise.this")}
     </Link>
   );
 };
@@ -267,6 +295,15 @@ const ReadyCards: FC<{
   // Sections keep their stored index, the one a flag and a correction name.
   const removed = new Set(corrections.filter(c => c.outcome === "removed").map(c => c.section));
   const flagFor = (section: string) => view.feedback?.flags.find(f => f.section === section);
+  // A removed card is gone; say why (the review's note, else Ally's answer
+  // to the learner's flag), once per card.
+  const removedReasons = [...removed].map(section => ({
+    section,
+    reason:
+      corrections.find(c => c.section === section && c.outcome === "removed")?.note?.trim() ||
+      flagFor(section)?.answer?.reply?.trim() ||
+      null,
+  }));
   const correctionFor = (section: string) => corrections.find(c => c.section === section);
   const flagControl = (section: string, cardLabel: string) =>
     supervisor ? (
@@ -294,6 +331,16 @@ const ReadyCards: FC<{
     .map((item, index) => ({ item, index }))
     .filter(({ index }) => !removed.has(`work_on_this[${index}]`));
   const practise = removed.has("practise_next") ? null : cards.practise_next;
+  const practiseOption = practiceFor(practise?.scenario_id);
+  const tryNext = (Array.isArray(practise?.try_next) ? practise!.try_next : [])
+    .filter((x): x is string => typeof x === "string" && !!x.trim())
+    .slice(0, 3);
+  // A course session (clinical review 2026-11-16): practise this same course
+  // item again, with what to try this time.
+  const practiseAgain = !!practiseOption?.trackItemId || tryNext.length > 0;
+  const practiseTitle = practiseAgain
+    ? t("postSim.debriefCards.practiseAgain")
+    : t("postSim.debriefCards.practiseNext");
   const progressCard = removed.has("progress_card") ? null : parseProgressCard(cards.progress_card);
 
   const momentTitle = moment?.handled_well
@@ -414,19 +461,47 @@ const ReadyCards: FC<{
           <Card
             testId="debrief-card-practise-next"
             readSection="practise_next"
-            title={t("postSim.debriefCards.practiseNext")}
+            title={practiseTitle}
             icon={<Sprout aria-hidden="true" className="h-5 w-5 text-primary-600" />}
           >
-            <Lead>{practise.skill}</Lead>
+            {practise.skill ? <Lead>{practise.skill}</Lead> : null}
             <Body>{practise.reason}</Body>
-            {practiceFor(practise.scenario_id) && (
+            {tryNext.length > 0 && (
+              <div data-testid="debrief-practise-try">
+                <p className="font-primary text-sm font-semibold text-typography-900">
+                  {t("postSim.debriefCards.practise.tryFollowing")}
+                </p>
+                <ul className="mt-1 list-disc ps-5 font-primary text-sm leading-relaxed text-typography-800">
+                  {tryNext.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {practiseOption ? (
               <PractiseLink
-                scenario={practiceFor(practise.scenario_id)!}
+                scenario={practiseOption}
                 primary
+                again={practiseAgain}
                 onClick={() => report("practise_next_click")}
               />
+            ) : (
+              // Never the card without a way to practise: with no roleplay
+              // the learner can still open, their roleplays list. A
+              // supervisor reading someone else's debrief gets the text only
+              // — it is not theirs to start.
+              !supervisor && (
+                <Link
+                  to={ROLEPLAYS_PATH}
+                  onClick={() => report("practise_next_click")}
+                  data-testid="debrief-practise-roleplays"
+                  className="inline-flex min-h-[44px] items-center justify-center self-start rounded-md bg-primary-600 px-4 font-primary text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                >
+                  {t("postSim.debriefCards.practise.roleplays")}
+                </Link>
+              )
             )}
-            {flagControl("practise_next", t("postSim.debriefCards.practiseNext"))}
+            {flagControl("practise_next", practiseTitle)}
           </Card>
         )}
 
@@ -501,10 +576,16 @@ const ReadyCards: FC<{
           )
         )}
       </ul>
-      {removed.size > 0 && (
-        <p data-testid="debrief-removed-note" className="font-primary text-xs text-typography-700">
-          {t("postSim.debriefCards.corrections.removed")}
-        </p>
+      {removedReasons.length > 0 && (
+        <ul data-testid="debrief-removed-note" className="flex flex-col gap-1">
+          {removedReasons.map(({ section, reason }) => (
+            <li key={section} className="font-primary text-xs text-typography-700">
+              {reason
+                ? t("postSim.debriefCards.corrections.removedBecause", { reason })
+                : t("postSim.debriefCards.corrections.removed")}
+            </li>
+          ))}
+        </ul>
       )}
       {supervisor ? (
         <p

@@ -26,7 +26,7 @@ from langgraph.errors import NodeError, NodeTimeoutError
 from langgraph.runtime import Runtime
 from langgraph.types import Command, RetryPolicy
 
-from app.core.debrief_graph.agent_logs import code_log, model_logs
+from app.core.debrief_graph.agent_logs import code_log, model_logs, origin_of
 from app.core.debrief_graph.budget import budget_left
 from app.core.debrief_graph.circuit import (
     models_to_try,
@@ -170,6 +170,7 @@ def make_model_step(spec: ModelStep):
                     result=None,
                     retries=attempt - 1,
                     error=note,
+                    origin=origin_of(state, spec.step),
                 )
             )
             if model:
@@ -218,6 +219,7 @@ def make_model_step(spec: ModelStep):
                             input={"read": "nothing to read"},
                             output={"modelCalled": False, "findings": []},
                             round_=rnd,
+                            origin=origin_of(state, spec.step),
                         )
                     ],
                     "steps": [
@@ -287,6 +289,7 @@ def make_model_step(spec: ModelStep):
             result=res,
             retries=attempt - 1,
             error=None,
+            origin=origin_of(state, spec.step),
         )
         update: Dict[str, Any] = {
             "steps": scratch["failed"] + [done],

@@ -320,18 +320,21 @@ describe('pinned rules: proposals', () => {
     expect(passageProblem('a b', '  ')).toBe('empty');
   });
 
-  it('tells the owner in plain words, naming the rule, not its prompt code', async () => {
+  it('tells the advisors and the owner in plain words, linking Home to the change', async () => {
     const { svc } = build();
-    const owner = jest.fn(async () => 1);
+    const pinnedRuleDeciders = jest.fn(async () => 1);
     Object.defineProperty(svc, 'notifier', {
-      value: { owner },
+      value: { pinnedRuleDeciders },
       configurable: true,
     });
-    await propose(svc, ADVISOR);
-    expect(owner).toHaveBeenCalledWith(
+    const { id } = await propose(svc, ADVISOR);
+    expect(pinnedRuleDeciders).toHaveBeenCalledWith(
       expect.objectContaining({
         body: 'Proposed change to the Safety rules: Clearer',
         excludeUserId: ADVISOR,
+        data: expect.objectContaining({
+          url: `/debriefs/pm-agent?change=${id}`,
+        }),
       }),
     );
   });

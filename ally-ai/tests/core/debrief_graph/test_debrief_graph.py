@@ -8,6 +8,7 @@ import pytest
 from app.core.debrief_graph import circuit, constants
 from app.core.debrief_graph.gateway import GatewayError
 from tests.core.debrief_graph.fakes import (
+    CARDS,
     PRICES,
     SESSION,
     FakeGateway,
@@ -311,7 +312,9 @@ class TestEndings:
         )
         assert steps.count("reviser") == 0
 
-    async def test_missed_risk_cue_is_never_published(self, steps, gateway):
+    async def test_missed_risk_cue_is_shown_and_sent_to_urgent_review(
+        self, steps, gateway
+    ):
         steps.answers["evaluator"] = {
             "evaluation": evaluation(
                 9, hard_fails=[{"code": "missed_risk_cue", "evidence": "turn 2"}]
@@ -319,9 +322,111 @@ class TestEndings:
         }
         result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
 
-        assert result["status"] == "needs_person"
-        assert result["skip_reason"] == "not_evaluated_or_risk"
+        assert result["status"] == "below_bar"
+        assert result["skip_reason"] is None
+        assert result["cards"] is not None
+        assert result["workspace"]["decision"]["reviewReason"] == "missed_risk_cue"
         assert result["evaluator_overall"] == 4.0
+
+
+class TestPossibleMissedCue:
+    """A missed cue holds the debrief only when it is clear (cue_strength):
+    one every signal reads as possible publishes and goes to review."""
+
+    def _read(self, steps, quote, category="hopelessness"):
+        steps.answers["safety-reader"] = {
+            "risk_cues": [
+                {
+                    "turn_index": 2,
+                    "quote": quote,
+                    "category": category,
+                    "learner_response": "missed",
+                }
+            ],
+            "learner_distress": [],
+        }
+
+    def _evaluator(self, steps, quote, clear):
+        ev = evaluation(
+            9, hard_fails=[{"code": "missed_risk_cue", "evidence": "turn 2"}]
+        )
+        ev["risk_cues"] = [
+            {
+                "turn_index": 2,
+                "quote": quote,
+                "addressed_by_debrief": False,
+                "clear": clear,
+            }
+        ]
+        steps.answers["evaluator"] = {"evaluation": ev}
+
+    async def test_a_possible_cue_publishes_and_goes_to_review(self, steps, gateway):
+        quote = "अभी कुछ करने का मन नहीं करता"
+        self._read(steps, quote)
+        self._evaluator(steps, quote, clear=False)
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "below_bar"
+        assert result["evaluator_hard_fails"] == []
+        assert "possible risk cue" in result["workspace"]["decision"]["why"]
+
+    async def test_the_evaluator_calling_it_clear_goes_to_urgent_review(
+        self, steps, gateway
+    ):
+        # Tamil: "I don't want to be here any more". The word list has no
+        # Tamil; the Evaluator's reading of the meaning is enough to hold it.
+        quote = "இனிமேல் இங்கே இருக்க விருப்பமில்லை"
+        self._read(steps, quote)
+        self._evaluator(steps, quote, clear=True)
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "below_bar"
+        assert result["workspace"]["decision"]["reviewReason"] == "missed_risk_cue"
+
+    async def test_an_important_moment_on_a_possible_cue_goes(self, steps, gateway):
+        quote = "Everything just feels grey lately."
+        self._read(steps, quote)
+        cards = dict(CARDS)
+        ev = evaluation(9)
+        ev["risk_cues"] = [
+            {
+                "turn_index": 2,
+                "quote": quote,
+                "addressed_by_debrief": True,
+                "clear": False,
+            }
+        ]
+        steps.answers["evaluator"] = {"evaluation": ev}
+        steps.answers["writer"] = {
+            "cards": {
+                **cards,
+                "important_moment": {
+                    "turn_index": 2,
+                    "quote": quote,
+                    "handled_well": True,
+                    "lead": "You noticed an important moment.",
+                    "body": "b",
+                    "others": [],
+                },
+            }
+        }
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "below_bar"
+        final = gateway.tools("finalise_cards")[-1]["cards"]
+        assert final["important_moment"] is None
+        assert (
+            result["workspace"]["decision"]["droppedImportantMoment"]["turn_index"] == 2
+        )
+
+    async def test_a_clear_safety_category_goes_to_urgent_review(self, steps, gateway):
+        quote = "I have been cutting again"
+        self._read(steps, quote, category="suicide_or_self_harm")
+        self._evaluator(steps, quote, clear=False)
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "below_bar"
+        assert result["workspace"]["decision"]["reviewReason"] == "missed_risk_cue"
 
 
 class TestBudget:
@@ -356,6 +461,62 @@ class TestBudget:
         assert result["workspace"]["decision"]["why"] == (
             constants.END_WHY["budget_below_minimum"]
         )
+
+    async def test_a_live_run_writes_past_a_ceiling_too_small_for_it(
+        self, steps, gateway
+    ):
+        """Gopi, 2026-11-16: a learner's debrief may go past the budget. The
+        minimum path (safety reader, writer, checks) runs; the optional steps
+        still keep to the ceiling."""
+        result = await run(
+            steps, gateway, ceiling_usd=0.000001, allow_over_ceiling=True
+        )
+
+        assert steps.count("safety-reader") == 1
+        assert steps.count("writer") == 1
+        assert steps.count("analyst") == 0
+        assert result["skip_reason"] != "budget_below_minimum"
+        assert result["cards"]
+        assert result["workspace"]["overCeiling"] is True
+
+    async def test_past_the_ceiling_never_runs_an_unpriced_model(self, steps, gateway):
+        prices = dict(PRICES)
+        del prices["safety-m"]
+        result = await run(steps, gateway, prices=prices, allow_over_ceiling=True)
+
+        assert result["skip_reason"] == "budget_below_minimum"
+        assert steps.calls == []
+
+    async def test_a_spent_month_still_ends_a_run_that_may_not_pass_it(
+        self, steps, gateway
+    ):
+        result = await run(steps, gateway, ceiling_usd=0)
+        assert result["skip_reason"] == "monthly_cap"
+
+
+class TestRetry:
+    async def test_a_retry_starts_afresh_on_its_own_thread(self, steps, gateway):
+        """A retry (`attempt`) must not read back the first attempt's decision:
+        it runs from the start, the safety reader first."""
+        graph = new_graph()
+        steps.fail["safety-reader"] = "always"
+        first = await run(steps, gateway, graph=graph)
+        assert first["status"] == "needs_person"
+        assert first["skip_reason"] == "safety_reader_failed"
+
+        steps.fail.pop("safety-reader")
+        again = await run(steps, gateway, graph=graph)
+        assert again["skip_reason"] == "safety_reader_failed"  # stored result
+
+        retried = await run(steps, gateway, graph=graph, attempt=1)
+        assert retried["status"] in ("published", "below_bar")
+        assert steps.count("writer") >= 1
+
+    async def test_thread_ids(self, steps, gateway):
+        from tests.core.debrief_graph.fakes import make_ctx
+
+        assert make_ctx(steps, gateway).thread_id == "run-1"
+        assert make_ctx(steps, gateway, attempt=2).thread_id == "run-1:retry2"
 
 
 class TestModels:

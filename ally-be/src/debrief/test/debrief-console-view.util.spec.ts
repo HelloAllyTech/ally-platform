@@ -36,7 +36,7 @@ describe('session list filters', () => {
         cost: 'hit_ceiling',
         riskCue: 'true',
         language: 'hi',
-        limit: '999',
+        limit: '5000',
       }),
     ).toEqual({
       category: 'flagged',
@@ -45,7 +45,7 @@ describe('session list filters', () => {
       riskCue: true,
       language: 'hi',
       mode: 'production',
-      limit: 200,
+      limit: 1000,
       offset: 0,
     });
     expect(
@@ -71,10 +71,27 @@ describe('approvals expire after 14 days as "no decision"', () => {
       },
       now,
     )!;
+    // v2 A7: a hand-off is not on the always-ask list, so it never runs out.
     expect(a.wait).toBe('handoff');
-    expect(a.expiresInDays).toBe(2);
-    expect(a.expiringSoon).toBe(true);
+    expect(a.expiresAt).toBeNull();
     expect(a.expired).toBe(false);
+    // An always-ask change the ladder stopped for (evidence.ask) does.
+    const asked = approvalState(
+      {
+        status: 'proposed',
+        createdAt: '2026-11-01T00:00:00Z',
+        change: { ideaKind: 'prompt_edit', promptCode: 'x' },
+        evidence: {
+          trial: { status: 'passed', decidedAt: '2026-11-08T00:00:00Z' },
+          ask: { kind: 'low_confidence', waitsBecause: 'not sure' },
+        },
+      },
+      now,
+    )!;
+    expect(asked.wait).toBe('start_canary');
+    expect(asked.expiresInDays).toBe(2);
+    expect(asked.expiringSoon).toBe(true);
+    expect(asked.expired).toBe(false);
   });
   it('expires, and nothing waits once expired or decided', () => {
     const idea = {
@@ -107,11 +124,11 @@ describe('approvals expire after 14 days as "no decision"', () => {
 });
 
 describe('PM agent autonomy policy', () => {
-  it('only the learner try-out can be set; "auto" there needs an eligible kind; pinned rules never', () => {
-    // Plan §4: the κ gate is the canary's alone; learners never see the tests.
+  it('v2: no step can be set; the learner try-out runs on its own; pinned rules never', () => {
+    // v2 A3: what waits for a person is the always-ask list, not this table.
     expect(
       matrixChangeRefusal('prompts', 'canary', 'auto', ineligible),
-    ).toMatch(/cannot run learner try-outs on its own.*0\.52/);
+    ).toMatch(/always-ask list/);
     // Quick check, pass test and side-by-side trial always run on their own:
     // not settings any more (2026-11-12).
     for (const step of ['quick_test', 'gate_test', 'paired_trial']) {
@@ -124,22 +141,9 @@ describe('PM agent autonomy policy', () => {
         matrixChangeRefusal('pinned_rules', step, 'auto', eligible),
       ).toMatch(/pinned rules/);
     }
-    expect(
-      matrixChangeRefusal('prompts', 'canary', 'ask', ineligible),
-    ).toBeNull();
-    expect(
-      matrixChangeRefusal('prompts', 'canary', 'auto', eligible),
-    ).toBeNull();
-    // A re-lock (2 reverts) blocks the try-out, even with an override.
-    expect(
-      matrixChangeRefusal(
-        'prompts',
-        'canary',
-        'auto',
-        { ...eligible, reverts: { prompts: 2 } },
-        true,
-      ),
-    ).toMatch(/Not now/);
+    expect(matrixChangeRefusal('prompts', 'canary', 'ask', ineligible)).toMatch(
+      /always-ask list/,
+    );
     expect(
       matrixChangeRefusal('pinned_rules', 'canary', 'ask', eligible),
     ).toMatch(/pinned rules/);
@@ -150,7 +154,8 @@ describe('PM agent autonomy policy', () => {
     expect(
       kindEligibility('pinned_rules', eligible, 'quick_test').eligible,
     ).toBe(false);
-    expect(kindEligibility('prompts', ineligible).eligible).toBe(false);
+    // v2 A6: κ is information only.
+    expect(kindEligibility('prompts', ineligible).eligible).toBe(true);
     expect(
       kindEligibility(
         'prompts',
@@ -165,7 +170,7 @@ describe('PM agent autonomy policy', () => {
       quick_test: { eligible: true },
       gate_test: { eligible: true },
       paired_trial: { eligible: true },
-      canary: { eligible: false, reason: expect.stringMatching(/0\.6/) },
+      canary: { eligible: true, reason: expect.stringMatching(/0\.6/) },
     });
   });
 
@@ -188,7 +193,7 @@ describe('PM agent autonomy policy', () => {
       }
     }
     expect(kindEligibility('prompts', f).reason).toBe(
-      'Not yet: agreement below 0.6 (Accuracy not measured; Evidence 0.41; Missed risk cue not measured; Some new measure not measured).',
+      'On its own; the change is watched and undone if it hurts (for information: agreement below 0.6 (Accuracy not measured; Evidence 0.41; Missed risk cue not measured; Some new measure not measured)).',
     );
   });
 
@@ -233,7 +238,8 @@ describe('PM agent autonomy policy', () => {
       quick_test: 'auto',
       gate_test: 'auto',
       paired_trial: 'auto',
-      canary: 'ask',
+      // v2 A3: the learner try-out starts itself too.
+      canary: 'auto',
     });
     // An older policy (the quick-test switch off, a step set to ask) reads as auto.
     const old = normaliseAutonomy({

@@ -8,7 +8,9 @@ import {
   type InboxChannelFilter,
   type InboxView,
 } from "@api";
-import { Button, Orb } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { Orb } from "@components/v2";
 import { useUser } from "@hooks";
 
 import { ChannelIcon } from "./ChannelIcon";
@@ -128,7 +130,8 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
             </button>
             {askNotify && (
               <Button
-                variant="ghost"
+                variant={ButtonVariant.TEXT}
+                type="button"
                 onClick={() => void askForNotifications().then(() => setAskNotify(false))}
               >
                 {INBOX.turnOnNotifications}
@@ -261,6 +264,7 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
                 (bots?.chatbots ?? []).find(b => b.id === currentBot)?.myRole !== undefined &&
                 (bots?.chatbots ?? []).find(b => b.id === currentBot)?.myRole !== "viewer"
               }
+              onOpenConversation={conversation => set("conversation", conversation)}
             />
           </>
         ) : (

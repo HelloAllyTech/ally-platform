@@ -14,7 +14,8 @@ export type SaveState = "idle" | "saving" | "saved" | "failed";
 
 /** The page's one "Changed · Undo" toast, and its save status, shared by every field. */
 export interface HomeSaves {
-  changed: (undo: () => void) => void;
+  /** Shows the toast with Undo; `message` replaces "Changed" (a deleted entry, chunk 5b). */
+  changed: (undo: () => void, message?: string) => void;
   status: (state: SaveState) => void;
 }
 

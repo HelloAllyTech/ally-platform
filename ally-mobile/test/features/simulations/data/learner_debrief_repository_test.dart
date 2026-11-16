@@ -217,6 +217,105 @@ void main() {
     });
   });
 
+  group('flag answers, Ask Ally and course practice (all optional)', () {
+    test("a flag's answer parses; an answered flag is no longer open", () {
+      final view = LearnerDebriefView.fromJson({
+        ...readyDebriefJson(),
+        'feedback': {
+          'helpful': null,
+          'flags': [
+            {'id': 'f1', 'section': 'what_worked[0]', 'status': 'open'},
+            {
+              'id': 'f2',
+              'section': 'what_worked[1]',
+              'status': 'kept',
+              'answer': {'action': 'kept', 'reply': ' You did say it at 2:10. ', 'at': '2026-11-16T10:00:00.000Z'},
+            },
+            {'id': 'f3', 'section': 'practise_next', 'status': 'open', 'answer': {'action': 'nonsense'}},
+          ],
+        },
+      });
+      final flags = view.flags;
+      expect(flags[0].answer, isNull);
+      expect(flags[0].isOpen, isTrue);
+      expect(flags[1].answer!.action, DebriefFlagAnswerAction.kept);
+      expect(flags[1].answer!.reply, 'You did say it at 2:10.');
+      expect(flags[1].answer!.at, DateTime.utc(2026, 11, 16, 10));
+      expect(flags[1].isOpen, isFalse);
+      // An unknown action is no answer at all.
+      expect(flags[2].answer, isNull);
+      expect(view.hasOpenFlag, isTrue);
+    });
+
+    test("a card Ally removed counts as removed, with Ally's reply as the reason", () {
+      final view = LearnerDebriefView.fromJson({
+        ...readyDebriefJson(),
+        'corrections': [
+          {'section': 'what_worked[0]', 'outcome': 'removed', 'note': 'That line was the client\'s.'},
+        ],
+        'feedback': {
+          'helpful': null,
+          'flags': [
+            {
+              'id': 'f1',
+              'section': 'work_on_this[0]',
+              'status': 'removed',
+              'answer': {'action': 'removed', 'reply': 'You are right, you never asked that.'},
+            },
+          ],
+        },
+      });
+      expect(view.removedSections, {'what_worked[0]', 'work_on_this[0]'});
+      expect(view.removalReason('what_worked[0]'), "That line was the client's.");
+      expect(view.removalReason('work_on_this[0]'), 'You are right, you never asked that.');
+      expect(view.removalReason('practise_next'), isNull);
+    });
+
+    test('askAlly: missing is open (older servers); open:false closes it', () {
+      expect(LearnerDebriefView.fromJson(readyDebriefJson()).askAllyOpen, isTrue);
+      final closed = LearnerDebriefView.fromJson({
+        ...readyDebriefJson(),
+        'askAlly': {'open': false, 'reason': 'month'},
+      });
+      expect(closed.askAllyOpen, isFalse);
+      expect(closed.askAlly!.reason, 'month');
+      expect(LearnerDebriefView.fromJson({...readyDebriefJson(), 'askAlly': {'open': true}}).askAllyOpen, isTrue);
+    });
+
+    test('a practice roleplay may name its course item', () {
+      final view = LearnerDebriefView.fromJson({
+        ...readyDebriefJson(),
+        'practice': [
+          {'id': 4, 'title': 'Again', 'trackItemId': 'item-7'},
+          {'id': 5, 'title': 'Standalone'},
+        ],
+      });
+      expect(view.practiceFor(4)!.trackItemId, 'item-7');
+      expect(view.practiceFor(5)!.trackItemId, isNull);
+    });
+
+    test('"Practise this next" falls back to this same roleplay, else nothing', () {
+      final view = LearnerDebriefView.fromJson({
+        ...readyDebriefJson(),
+        'practice': [
+          {'id': 5, 'title': 'This one'},
+        ],
+      });
+      expect(view.practiseNextFor(99, thisRoleplay: 5)!.id, 5);
+      expect(view.practiseNextFor(null, thisRoleplay: 5)!.id, 5);
+      expect(view.practiseNextFor(99), isNull);
+      expect(view.practiseNextFor(99, thisRoleplay: 6), isNull);
+    });
+
+    test('not_available on a disallowed provider says "not available"', () {
+      final view = LearnerDebriefView.fromJson({'state': 'not_available', 'stopped': true, 'reason': 'provider_not_allowed'});
+      expect(view.reason, LearnerDebriefView.providerNotAllowed);
+      expect(view.isShowable, isTrue);
+      // Even without `stopped`.
+      expect(LearnerDebriefView.fromJson({'state': 'not_available', 'reason': 'provider_not_allowed'}).stopped, isTrue);
+    });
+  });
+
   group('LearnerDebriefRepository', () {
     late MockDio dio;
     late LearnerDebriefRepository repository;

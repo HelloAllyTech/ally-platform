@@ -33,8 +33,10 @@ import {
   RoadmapVoteBudget,
 } from "@types";
 import { hasFeature } from "@utils";
+import { absoluteAppUrl } from "@utils/absoluteAppUrl";
 
 import { CopilotBrief } from "./CopilotBrief";
+import { DirectorStarButton } from "./DirectorStarButton";
 import { RankBreakdownPanel } from "./RankBreakdown";
 import { ReferenceImagesField } from "./ReferenceImagesField";
 import { useScoreUnit } from "./useScoreUnit";
@@ -520,7 +522,7 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
   }, [canManage, isDirty, saveFailed, save, onClose]);
 
   const copyLink = async () => {
-    const url = `${window.location.origin}${ROUTES.PRODUCT_ROADMAP}?opportunity=${opportunityId}`;
+    const url = absoluteAppUrl(`${ROUTES.PRODUCT_ROADMAP}?opportunity=${opportunityId}`);
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Link copied.");
@@ -635,6 +637,8 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
               First in the set and fenced off from the drawer-level icons by a rule: it acts on
               the opportunity, they act on the drawer.
             */}
+            {/* Renders only for the Prod Director; null (hidden) for everyone else. */}
+            {opportunity && <DirectorStarButton opportunity={opportunity} />}
             {canVote && budget && opportunity && isVotable(opportunity) && (
               <>
                 <VoteButton opportunity={opportunity} budget={budget} onSetVotes={setVotes} />

@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useState } from "react";
 
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { HOME, fill } from "./copy";
 import { HelpToggle } from "./ui/Help";
@@ -181,7 +182,13 @@ export const LinesField: React.FC<{
       ))}
       {!disabled && lines.length < max && (
         <div>
-          <Button onClick={() => update([...lines, ""])}>{addLabel}</Button>
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            type="button"
+            onClick={() => update([...lines, ""])}
+          >
+            {addLabel}
+          </Button>
         </div>
       )}
       <FieldError id={`${id}-error`} error={field.error} />
@@ -199,3 +206,55 @@ export const Collapsed: React.FC<{ summary: string; children: React.ReactNode }>
     <div className="ally-home__details-body">{children}</div>
   </details>
 );
+
+/**
+ * A group card that opens and closes (Lists' Details, Rules and What your assistant can do, chunk
+ * 5b): the home's group, with its title as a real button, so it isn't a native `<details>`.
+ */
+export const CollapsibleGroup: React.FC<{
+  title: string;
+  hint?: string;
+  summary?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+  testId?: string;
+}> = ({ title, hint, summary, defaultOpen = false, children, testId }) => {
+  const id = useId();
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="ally-card ally-home__group ally-collapsible" data-testid={testId}>
+      <h3 className="ally-home__group-title">
+        <Button
+          variant={ButtonVariant.TEXT}
+          type="button"
+          className="ally-collapsible__toggle !h-auto"
+          aria-expanded={open}
+          aria-controls={`${id}-body`}
+          onClick={() => setOpen(o => !o)}
+        >
+          <span className="ally-collapsible__title">{title}</span>
+          {summary && !open && <span className="ally-collapsible__summary">{summary}</span>}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            width="18"
+            height="18"
+            className="ally-collapsible__chevron"
+          >
+            <path
+              d="M5 8l5 5 5-5"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              fill="none"
+              strokeLinecap="round"
+            />
+          </svg>
+        </Button>
+      </h3>
+      <div id={`${id}-body`} hidden={!open} className="ally-collapsible__body">
+        {hint && <p className="ally-field__hint">{hint}</p>}
+        {open && children}
+      </div>
+    </section>
+  );
+};

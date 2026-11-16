@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ConflictException,
   ForbiddenException,
   Get,
   Param,
@@ -58,12 +59,14 @@ import { COMMENT_BODY_MAX, QUOTE_MAX } from '../util/debrief-review.util';
 import { DebriefRunMode } from '../enum/debrief-run.enum';
 import { DebriefConsoleAuditInterceptor } from '../interceptor/debrief-console-audit.interceptor';
 import { DebriefAgentService } from '../service/debrief-agent.service';
+import { DebriefPmConversationService } from '../service/debrief-pm-conversation.service';
 import { parseMetricsFilter } from '../util/debrief-metrics-filter.util';
 import { DebriefConsoleService } from '../service/debrief-console.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefPmAgentService } from '../service/debrief-pm-agent.service';
 import { DebriefPmAgentRunService } from '../service/debrief-pm-agent-run.service';
 import { DebriefPmReportsService } from '../service/debrief-pm-reports.service';
+import { DebriefNightlyService } from '../service/debrief-nightly.service';
 import { DebriefRunLogsService } from '../service/debrief-run-logs.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
@@ -334,6 +337,38 @@ class QuestionDto {
   text!: string;
 }
 
+class PmAboutDto {
+  @ApiProperty({ enum: ['change', 'session', 'page'] })
+  @IsIn(['change', 'session', 'page'])
+  kind!: 'change' | 'session' | 'page';
+
+  @ApiProperty({
+    required: false,
+    description: 'The change (idea) id or the session run id',
+  })
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(200)
+  label!: string;
+}
+
+class PmConversationDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(4000)
+  text!: string;
+
+  @ApiProperty({ required: false, type: PmAboutDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PmAboutDto)
+  about?: PmAboutDto;
+}
+
 class StartStepDto {
   @ApiProperty({ enum: ['gate_test', 'paired_trial'] })
   @IsIn(['gate_test', 'paired_trial'])
@@ -511,6 +546,19 @@ class ProposeChangeDto {
 
 type AuthedRequest = { user: { id: number } };
 
+/** A budget change in plain words: "Monthly cap to $150". */
+export function budgetTitle(settings: Record<string, number>): string {
+  const label: Record<string, (v: number) => string> = {
+    monthlyCapUsd: (v) => 'Monthly cap to $' + v,
+    runCeilingUsd: (v) => 'Most one debrief may spend to $' + v.toFixed(2),
+    passScore: (v) => 'Pass mark to ' + v,
+  };
+  const parts = Object.entries(settings).map(([k, v]) =>
+    label[k] ? label[k](v) : k + ' to ' + v,
+  );
+  return parts.length ? parts.join(', ') : 'Budget change';
+}
+
 /**
  * The Debrief Console's API (plan §12): runs and their timelines, the
  * PM agent's report and ideas with the approval layer, releases and rollback,
@@ -542,6 +590,8 @@ export class DebriefConsoleController {
     private readonly pmReports: DebriefPmReportsService,
     private readonly builderRequester: DebriefBuilderRequesterService,
     private readonly agentLogs: DebriefRunLogsService,
+    private readonly nightly: DebriefNightlyService,
+    private readonly conversation: DebriefPmConversationService,
   ) {}
 
   /** Release settings (budgets, the evaluator bar) are the owner's. */
@@ -657,6 +707,16 @@ export class DebriefConsoleController {
     );
   }
 
+  @Get('metrics/nightly')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      "The nightly check (v9 FR-49): each day's measures overall, by language and by recipe, the alerts, and the weekly judge-drift readings",
+  })
+  nightlyView(@Query('days') days?: string) {
+    return this.nightly.days(days ? Number(days) || 56 : 56);
+  }
+
   @Get('metrics')
   @DebriefRead()
   @ApiOperation({
@@ -717,6 +777,12 @@ export class DebriefConsoleController {
     const run = await this.runner.run(sessionId, {
       mode: DebriefRunMode.SHADOW,
     });
+    // The session already has a run this one could not take over.
+    if (!run) {
+      throw new ConflictException(
+        'This session already has a debrief run; open it from its session',
+      );
+    }
     if (run.cards && !run.workspace?.judge) {
       await this.judge.judge(run).catch(() => null);
     }
@@ -759,8 +825,45 @@ export class DebriefConsoleController {
     };
   }
 
-  @Get('pm-agent/reports')
+  @Get('pm-agent/conversation')
   @DebriefRead()
+  @ApiOperation({
+    summary:
+      'The one PM agent conversation, newest page oldest first: { messages, more }. `about` (a change id) narrows it to that change; the clinical advisor sees pinned-rule changes only',
+  })
+  async pmConversation(
+    @Req() req: AuthedRequest,
+    @Query('before') before?: string,
+    @Query('limit') limit?: string,
+    @Query('about') about?: string,
+  ) {
+    return this.conversation.list(await this.view.viewer(req.user.id), {
+      before: before || undefined,
+      limit: Number(limit) || 50,
+      about: about || undefined,
+    });
+  }
+
+  @Post('pm-agent/conversation')
+  // The route admits the team, the owner and the advisor; the service keeps
+  // the advisor to pinned-rule changes and checks each action's permission.
+  @DebriefAct('comment')
+  @ApiOperation({
+    summary:
+      "Talk to the PM agent: { text, about? } → { messages: [the person's, the agent's reply] }. It answers and acts; an approval waits for an explicit yes. Takes 10–30 s",
+  })
+  async pmConversationPost(
+    @Req() req: AuthedRequest,
+    @Body() body: PmConversationDto,
+  ) {
+    return this.conversation.post(await this.view.viewer(req.user.id), {
+      text: body.text,
+      about: body.about ?? null,
+    });
+  }
+
+  @Get('pm-agent/reports')
+  @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
       "The PM agent's weekly reports and monthly reviews, newest first (months with records but no review yet included)",
@@ -770,7 +873,7 @@ export class DebriefConsoleController {
   }
 
   @Get('pm-agent/reports/:kind/:period')
-  @DebriefRead()
+  @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
       "One report: what changed in the period (from the records) and the PM agent's text",
@@ -1297,23 +1400,27 @@ export class DebriefConsoleController {
   @DebriefAct('ownerSettings')
   @ApiOperation({
     summary:
-      'Owner: change the run ceiling and the monthly cap (a new live release from the current one; undo with Roll back)',
+      'Owner: change the run ceiling and the monthly cap. Budgets alone go live on this confirm, as a new release (undo with Roll back); the evaluator bar is proposed and climbs the ladder.',
   })
-  budgets(@Req() req: AuthedRequest, @Body() body: BudgetsDto) {
+  async budgets(@Req() req: AuthedRequest, @Body() body: BudgetsDto) {
     const settings: Record<string, number> = {};
     if (body.runCeilingUsd != null) settings.runCeilingUsd = body.runCeilingUsd;
     if (body.monthlyCapUsd != null) settings.monthlyCapUsd = body.monthlyCapUsd;
     if (body.passScore != null) settings.passScore = body.passScore;
-    // A proposed change carrying a draft: budgets alone go live when the
-    // owner approves it; the evaluator bar climbs the ladder.
-    return this.releaseHistory.proposeChange(
+    const proposed = await this.releaseHistory.proposeChange(
       {
-        title: `Settings: ${Object.keys(settings).join(', ')}`,
+        title: budgetTitle(settings),
         why: body.note ?? null,
         settings,
       },
       req.user.id,
     );
+    // v9: a budget change needs a person's confirmation, the owner's, and the
+    // owner just gave it. Budgets alone go live now, still as a release with
+    // its idea and audit, so Roll back undoes them.
+    if (!proposed.budgetOnly) return { ...proposed, live: false };
+    await this.pmAgent.approve(proposed.ideaId, req.user.id, body.note);
+    return { ...proposed, live: true };
   }
 
   @Post('tenants/:tenantId/emergency-stop')

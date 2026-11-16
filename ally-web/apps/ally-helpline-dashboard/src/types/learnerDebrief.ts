@@ -65,7 +65,17 @@ export interface DebriefCardsData {
   important_moment?: DebriefImportantMoment | null;
   what_worked: DebriefWhatWorked[];
   work_on_this: DebriefWorkOnThis[];
-  practise_next?: { skill: string; reason: string; scenario_id?: number | null } | null;
+  /**
+   * `try_next`: a session played in a course — "Practise this again" with up
+   * to 3 things to try. `skill` can be missing when a custom competency's
+   * code was removed from an older debrief.
+   */
+  practise_next?: {
+    skill?: string;
+    reason: string;
+    scenario_id?: number | null;
+    try_next?: string[];
+  } | null;
   skill_words: Array<{ skill: string; word: DebriefSkillWord }>;
   reflective_question: string;
   progress_note?: string | null;
@@ -105,11 +115,20 @@ export interface DebriefCorrection {
   at: string;
 }
 
+/** What the Debrief agent did with a flag, and the reply the learner reads (V2_AUTONOMY F1). */
+export interface DebriefFlagAnswer {
+  action: "kept" | "corrected" | "removed";
+  reply: string;
+  at: string;
+}
+
 export interface DebriefMyFlag {
   id: string;
   section: string;
   status: "open" | "kept" | "removed" | "corrected";
   canUndoUntil: string | null;
+  /** Ally's answer, once it has answered (usually within a minute). */
+  answer?: DebriefFlagAnswer | null;
 }
 
 /** A crisis or wellbeing line: the organisation's own, else Tele-MANAS. */
@@ -139,12 +158,25 @@ export interface LearnerDebriefView {
    * Writer judged ordinary low mood or grief).
    */
   riskCue?: boolean;
-  /** Roleplays the cards link to that the learner can still open. */
-  practice?: Array<{ id: number; title: string }>;
+  /**
+   * Roleplays the cards link to that the learner can still open. Inside a
+   * course only that course's roleplays, each with its course item.
+   */
+  practice?: Array<{ id: number; title: string; trackItemId?: string }>;
   /** Present only on a debrief picked for the pulse, with the answers so far. */
   pulse?: DebriefPulse | null;
-  /** `not_available` only: an emergency stop (FR-46) — say "not available". */
+  /**
+   * `not_available` only: say "not available" instead of today's debrief —
+   * an emergency stop (FR-46), or today's debrief runs on a provider the
+   * organisation does not allow (`reason: "provider_not_allowed"`).
+   */
   stopped?: boolean;
+  reason?: "provider_not_allowed";
+  /**
+   * `ready` only: Ask Ally stopped taking questions on this debrief
+   * (`session`) or for now (`month`): the reply box stays hidden.
+   */
+  askAlly?: { open: boolean; reason?: "session" | "month" };
 }
 
 /** One of the learner's flags, as a supervisor reads it (v9 FR-26). */

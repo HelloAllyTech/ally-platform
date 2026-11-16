@@ -18,6 +18,7 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import { useCreateRoadmapBugReportMutation, useGetBugFindingsQuery } from "@api";
 import { RoadmapBugReportContext } from "@types";
+import { absoluteAppUrl } from "@utils/absoluteAppUrl";
 
 import {
   BUG_REPORT_FREQUENCIES,
@@ -181,7 +182,7 @@ export const ReportBugModal: React.FC<ReportBugModalProps> = ({ onClose }) => {
                 {similar.map(({ finding }) => (
                   <li key={finding.id}>
                     <a
-                      href={`/bug-hunter?bug=${finding.id}`}
+                      href={absoluteAppUrl(`/bug-hunter?bug=${finding.id}`)}
                       target="_blank"
                       rel="noreferrer"
                       className="text-primary-600 underline"

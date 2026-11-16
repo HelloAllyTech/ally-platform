@@ -77,13 +77,15 @@ const renderAgreement = (agreement: unknown = ANALYTICS_AGREEMENT) =>
 describe("Analytics › Debriefs › Judge agreement (from the advisor's answers)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("shows reviews, the sample and whether try-outs may run alone", () => {
+  it("shows reviews and the sample; for information only, it gates nothing (v2 A6)", () => {
     renderAgreement();
     expect(screen.getByTestId("kpi-Reviews with answers")).toHaveTextContent("62");
     expect(screen.getByTestId("kpi-Agreement sample")).toHaveTextContent("3 this week · 2 waiting");
-    expect(screen.getByTestId("kpi-Learner try-outs on their own")).toHaveTextContent(
-      "Needs approval",
-    );
+    expect(screen.queryByTestId("kpi-Learner try-outs on their own")).toBeNull();
+    const section = screen.getByTestId("judge-agreement");
+    expect(section).toHaveTextContent("it no longer decides what the PM agent may do");
+    expect(section).not.toHaveTextContent("freedom");
+    expect(section).not.toHaveTextContent("Needs a person");
   });
 
   it("charts each measure's agreement against 0.6, with the problems caught and the table", () => {
@@ -92,7 +94,7 @@ describe("Analytics › Debriefs › Judge agreement (from the advisor's answers
     expect(accuracy).toHaveTextContent("0.72, substantial");
     expect(accuracy).toHaveTextContent("Target: ≥ 0.6");
     expect(accuracy).toHaveTextContent("On target");
-    expect(accuracy).toHaveTextContent("Independent check caught 3 of 4 problems you found");
+    expect(accuracy).toHaveTextContent("The quality score caught 3 of 4 problems you found");
     expect(screen.getByTestId("gate-chart-evidence_specificity")).toHaveTextContent(
       "Not measurable yet: every answer is the same",
     );
@@ -103,7 +105,7 @@ describe("Analytics › Debriefs › Judge agreement (from the advisor's answers
     expect(numbers.tagName).toBe("DETAILS");
     expect(numbers).toHaveTextContent("88.5%");
     expect(numbers).toHaveTextContent("12 of 50");
-    expect(within(numbers).getAllByText("Met")).toHaveLength(1);
+    expect(within(numbers).getAllByText("0.6 or more")).toHaveLength(1);
     expect(screen.getByTestId("judge-agreement")).not.toHaveTextContent("κ");
   });
 

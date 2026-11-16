@@ -161,6 +161,34 @@ class TestPlan:
         offered = {a["id"] for a in planner_body["agents"]}
         assert "language_specialist" in offered and "analyst" not in offered
 
+    async def test_agent_logs_say_where_each_entry_came_from(self, steps, gateway):
+        steps.answers["planner"] = planned("guidance_lookup", "language_specialist")
+        result = await orun(steps, gateway, bundle=orchestrated_bundle())
+        by_step: dict = {}
+        for e in result["logs"]:
+            by_step.setdefault(e["step"], []).append(e)
+        for step in ("guidance_lookup", "language_specialist"):
+            for e in by_step[step]:
+                assert e["origin"] == "planned"
+                assert e["planReason"] == f"{step} fits"
+        for step in (
+            "safety_reader",
+            "analyst",
+            "planner",
+            "writer",
+            "checks",
+            "decide",
+        ):
+            for e in by_step.get(step, []):
+                assert e["origin"] == "fixed" and "planReason" not in e
+        assert all("origin" in e for e in result["logs"])
+
+    async def test_the_default_plan_is_fixed(self, steps, gateway):
+        steps.fail["planner"] = "always"  # the planner fails: today's recipe
+        result = await orun(steps, gateway, bundle=orchestrated_bundle())
+        assert plan_of(result)["source"] == "default"
+        assert {e["origin"] for e in result["logs"]} == {"fixed"}
+
     async def test_the_writer_gets_one_findings_section_by_kind(self, steps, gateway):
         steps.answers["planner"] = planned("language_specialist")
         result = await orun(steps, gateway, bundle=orchestrated_bundle())

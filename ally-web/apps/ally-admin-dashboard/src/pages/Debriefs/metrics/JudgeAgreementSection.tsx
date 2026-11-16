@@ -50,7 +50,7 @@ export const JudgeAgreementSection: React.FC<{
         <h3 className="text-xl font-normal text-typography-900">{strings.sectionHeading}</h3>
         <p className="max-w-3xl pt-1 text-sm text-typography-700">{strings.sectionHelp}</p>
       </div>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4">
         <KpiTile
           label={strings.kpis.rated}
           description={strings.kpis.ratedHelp}
@@ -65,12 +65,6 @@ export const JudgeAgreementSection: React.FC<{
               ? strings.kpis.sampleValue(agreement.sample.thisWeek, agreement.sample.waiting)
               : "—"
           }
-          {...tileState}
-        />
-        <KpiTile
-          label={strings.kpis.gate}
-          description={strings.kpis.gateHelp}
-          value={agreement?.gate.met ? strings.kpis.met : strings.kpis.notMet}
           {...tileState}
         />
       </div>

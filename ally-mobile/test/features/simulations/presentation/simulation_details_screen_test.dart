@@ -47,6 +47,7 @@ List<GoRoute> _routes() => [
     builder: (context, state) => SimulationDetailsScreen(
       scenarioId: int.parse(state.pathParameters['scenarioId']!),
       initialScenario: state.extra as Scenario?,
+      trackId: state.uri.queryParameters['trackId'],
     ),
   ),
   GoRoute(
@@ -54,7 +55,9 @@ List<GoRoute> _routes() => [
     builder: (context, state) {
       final extra = state.extra as Map<String, Object?>;
       return Text(
-        'ROLEPLAY:${extra['liveKitServerUrl']}:${extra['accessToken']}:${extra['scenarioSessionId']}',
+        'ROLEPLAY:${extra['liveKitServerUrl']}:${extra['accessToken']}:${extra['scenarioSessionId']}'
+        // Only a roleplay opened inside a course carries one.
+        '${extra.containsKey('trackId') ? ':track=${extra['trackId']}' : ''}',
       );
     },
   ),
@@ -169,6 +172,20 @@ void main() {
       find.text('ROLEPLAY:wss://livekit.example.com:access-tok:session-99'),
       findsOneWidget,
     );
+  });
+
+  testWidgets("opened from a course's debrief, the roleplay keeps the course", (tester) async {
+    when(() => repository.startScenarioSession(scenarioId: 5)).thenAnswer(
+      (_) async => SessionData(id: 'session-99', accessToken: 'access-tok', liveKitServerUrl: 'wss://lk'),
+    );
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/simulations/5?trackId=t1',
+      routes: _routes(),
+      overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+    );
+    await _startAndConfirm(tester);
+    expect(find.text('ROLEPLAY:wss://lk:access-tok:session-99:track=t1'), findsOneWidget);
   });
 
   testWidgets('closing the pre-start modal does not start anything', (tester) async {

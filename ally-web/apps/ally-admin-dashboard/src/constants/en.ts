@@ -9488,6 +9488,312 @@ export const en = {
     noAccess:
       "Your account can't open the Debriefs console. It needs the Analytics toggle and the Ally team, clinical advisor or owner permission. Ask a platform admin.",
     title: "Debriefs",
+    /**
+     * Debrief v2, "autonomy by default" (docs/debrief-harness/V2_AUTONOMY.md, canvas row F). Answer
+     * first, plain words, one PM agent conversation as the way a person intervenes.
+     */
+    v2: {
+      /** Small number words for headlines: "one change", "two changes". */
+      count: (n: number) =>
+        ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"][n] ??
+        String(n),
+      home: {
+        healthy: "Debriefs are healthy this week",
+        noScore: "No overall score yet this week",
+        overallScore: "Overall score",
+        overallScoreHelp:
+          "One score out of 10 from four measures: quality 40%, reached the learner without a problem 25%, learners found it helpful 20%, cards flagged 15%.",
+        moved: (dir: "rose" | "fell", by: string) => ` ${dir} ${by} this week`,
+        movedUndone: "; the change behind it was undone",
+        and: ", and ",
+        needsYou: (n: number) =>
+          n === 0 ? "nothing needs you." : `${n} ${n === 1 ? "thing needs" : "things need"} you.`,
+        needsHeading: (n: number) =>
+          n === 1
+            ? "Needs you: one change the PM agent won’t make alone"
+            : `Needs you: ${n} changes the PM agent won’t make alone`,
+        yourCall: "Your call",
+        expand: (title: string) => `Open ${title}`,
+        before: "Before",
+        after: "After",
+        wholeRule: (name: string) => `The whole ${name}`,
+        wholeRuleChanged: (name: string) =>
+          `The whole ${name} after the change (the change is marked)`,
+        ruleStale:
+          "The rule has changed since this was proposed, so the passage no longer matches. Ask the PM agent to redo it.",
+        evidence: "Evidence",
+        /** The clinical advisor's home: their pending decisions only. */
+        advisorHeadline: (n: number) =>
+          n === 0
+            ? "Nothing needs your decision."
+            : `${n} ${n === 1 ? "change needs" : "changes need"} your decision.`,
+        advisorNeedsHeading: (n: number) =>
+          n === 1
+            ? "Needs you: a change only you or the owner can approve"
+            : `Needs you: ${n} changes only you or the owner can approve`,
+        thisWeek: (score: string | null, trend: string | null, live: number, undone: number) =>
+          [
+            score === null
+              ? "This week: no overall score yet"
+              : `This week: overall score ${score} of 10${trend ? `, ${trend}` : ""}`,
+            [
+              `${live} ${live === 1 ? "change" : "changes"} went live`,
+              `${undone} ${undone === 1 ? "was" : "were"} undone`,
+            ].join(", "),
+          ].join(" · "),
+        steady: "steady",
+        up: (by: string) => `up ${by}`,
+        down: (by: string) => `down ${by}`,
+        noChanges: "No changes this week.",
+        whatMakesScore: "What makes up the score",
+        changes: "PM agent",
+        flagged: "⚑ Flagged by the learner",
+        flaggedShort: "⚑ Flagged",
+        loadFailed: "Couldn't load this week's summary.",
+        empty: {
+          title: "No debriefs yet",
+          message: "Debriefs show here, newest first, as learners finish their roleplays.",
+        },
+      },
+      /** The one PM agent conversation, on Home and on Changes. */
+      conversation: {
+        heading: "PM agent",
+        you: "You",
+        agent: "PM agent",
+        about: (label: string) => `about ${label}`,
+        lookingAt: "Looking at",
+        inputLabel: "Message the PM agent",
+        aboutThisChange: "PM agent · about this change",
+        replyLabel: "Reply to the PM agent about this change",
+        replyPlaceholder: "Yes, no because…, or change it to…",
+        placeholder: "Your thoughts, or what you want done",
+        send: "Send",
+        sending: "The PM agent is replying; this can take half a minute.",
+        sendFailed: "Couldn't send your message.",
+        empty:
+          "No messages yet. Tell the PM agent what you think about anything here; it acts and says what it did.",
+        loadFailed: "Couldn't load the conversation.",
+        retry: "Try again",
+        earlier: "Show earlier messages",
+        action: {
+          done: (label: string) => `Done: ${label}`,
+          awaiting_yes: (label: string) => `Waiting for your yes: ${label}`,
+          failed: (label: string) => `Didn't work: ${label}`,
+        } as Record<string, (label: string) => string>,
+        suggestions: {
+          page: ["What changed this week?", "What needs me?"],
+          waits: ["What does it change for learners?", "Why now?"],
+          needsYou: ["What does it change for learners?", "Why now?"],
+          trying: ["Hold it for one language", "Why this change?"],
+          testing: ["Why this change?"],
+          building: ["Why does this need code?"],
+          live: ["Undo it for one language", "Is it still helping?"],
+          undone: ["Try it again for one language", "Don’t retry this kind of change this month"],
+          stopped: ["Why was it stopped?"],
+          turned_down: ["Why was it turned down?"],
+        } as Record<string, string[]>,
+      },
+      decision: {
+        approve: "Approve",
+        signOff: "Sign it off",
+        turnDown: "Turn it down",
+        confirmTurnDown: "Turn it down",
+        reasonLabel: "Why (the PM agent reads this)",
+        reasonPlaceholder: "One line is enough",
+        approved: "Approved. It goes through its tests and tries next.",
+        signedOff: "Signed off.",
+        turnedDown: "Turned down. The PM agent has your reason.",
+        failed: "That didn't go through. Try again.",
+      },
+      changes: {
+        title: "PM agent",
+        runNow: "Run the PM agent now",
+        running: "Running…",
+        tabs: { changes: "Changes", reports: "Reports", "test-sets": "Test sets" } as Record<
+          string,
+          string
+        >,
+        headline: (live: number, trying: number, waits: number) => {
+          const c = (n: number) =>
+            ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] ??
+            String(n);
+          return {
+            lead: `The PM agent is improving debriefs on its own: ${c(live)} ${live === 1 ? "change" : "changes"} went live this week, ${trying === 0 ? "none is" : `${c(trying)} ${trying === 1 ? "is" : "are"}`} being tried, and `,
+            bold:
+              waits === 0
+                ? "nothing waits for you."
+                : `${c(waits)} ${waits === 1 ? "waits" : "wait"} for you.`,
+          };
+        },
+        groups: {
+          waits: "Waits for you",
+          trying: "On some learners",
+          testing: "Being tested",
+          proposed: "Not tested yet",
+          building: "Being built",
+          live: "Live",
+          undone: "Undone",
+        } as Record<string, string>,
+        state: {
+          waits: "Waits for you",
+          trying: "On some learners",
+          testing: "Being tested",
+          proposed: "Not tested yet",
+          building: "Being built",
+          live: "Live for everyone",
+          undone: "Undone",
+          stopped: "Stopped",
+          turned_down: "Turned down",
+        } as Record<string, string>,
+        theChange: "The change",
+        why: "Why",
+        waitsShort: "Waits for your decision.",
+        allMessages: "All messages",
+        thisChangeOnly: "This change only",
+        whereItIs: "Where it is",
+        waitsNote:
+          "This kind always asks a person. Tell the PM agent what you think in the conversation: approve it, turn it down, or say what to change. For a safety change it repeats back exactly what it will do and waits for your yes.",
+        confidence: { high: "High confidence", low: "Low confidence" } as Record<string, string>,
+        languages: (list: string) => `Only ${list}`,
+        undoNow: "Undo now",
+        undoHelp: "Puts learners back on the release before this one, now. No model is involved.",
+        stopNow: "Stop now",
+        stopHelp: "Stops trying this change; it reaches no more learners. No model is involved.",
+        undone: "Undone: learners are back on the release before.",
+        stopped: "Stopped: it reaches no more learners.",
+        actionFailed: "Couldn't do that.",
+        empty: {
+          title: "No changes yet",
+          message:
+            "The PM agent proposes changes from learners' flags, comments and the overall score. They show here.",
+        },
+        pick: "Pick a change to see what it did.",
+        loadFailed: "the changes",
+        changeFailed: "Couldn't load this change.",
+      },
+      score: {
+        label: "Overall score",
+        held: (v: string) => `The overall score held at ${v} this week.`,
+        rose: (by: string, v: string) => `The overall score rose ${by} to ${v} this week.`,
+        fell: (by: string, v: string) => `The overall score fell ${by} to ${v} this week.`,
+        none: "No overall score yet: too few debriefs this week.",
+        lastWeek: (v: string, n: number) => `last week ${v} · ${n} debriefs`,
+        noLastWeek: (n: number) => `${n} debriefs`,
+        markersHelp: "Green line: a change went live. Red: a change was undone.",
+        chartLabel: "Overall score by week",
+        weight: (pct: number) => `${pct}% of the score`,
+        weightFlags: (pct: number) => `${pct}% · lower is better`,
+        gateRole: {
+          risk: "Never traded off · undoes a change",
+          cost: "Never traded off · within the session budget",
+        } as Record<string, string>,
+        gateOk: "OK",
+        gateTripped: "Tripped",
+        byLanguage: "By language",
+        byLanguageHeading: "Overall score by language",
+        byLanguageHelp:
+          "Changes are judged within each language, so a mix shift doesn’t look like a quality change (weights in Settings › Score).",
+        tooFew: (n: number) => `${n} debriefs · too few to read`,
+        debriefs: (n: number) => `${n} debriefs`,
+        loadFailedTitle: "Couldn't load the overall score",
+        loadFailedSubtitle: "The rest of the page still works. Try again in a moment.",
+        retry: "Try again",
+      },
+      autonomy: {
+        heading: "Autonomy: the PM agent ships changes on its own, except these",
+        help: (days: number) =>
+          `Every change is tested, tried on some learners, goes live when it beats the release before it, and is watched for ${days} days. Only the kinds ticked below wait for a person first.`,
+        alwaysAsks: "Always asks a person",
+        lockedHelp: "Always on: this can't be switched off.",
+        locked: [
+          { name: "Safety reader text", why: "What counts as a risk cue" },
+          { name: "Crisis lines and support copy", why: "What a learner in distress reads" },
+          {
+            name: "Pinned rules: rubric, judge and Evaluator instructions",
+            why: "The clinical advisor or owner signs these",
+          },
+          { name: "Budget increases", why: "Lower budgets go ahead on their own" },
+        ],
+        askLowConfidence: {
+          name: "Anything the PM agent is not confident about",
+          why: "It says why: few debriefs, mixed results, or a new kind of change",
+        },
+        askModels: {
+          name: "New models or providers",
+          whyOff: "Off: model changes go through the same tests as prompts",
+          whyOn: "On: a new model or provider waits for a person",
+        },
+        modelsNote:
+          "Model changes within budget never wait. An organisation's provider allowlist is always applied.",
+        rollout: "How a change goes live and comes back",
+        fields: {
+          canaryShare: "Share of learners while it is tried (%)",
+          canaryMinRuns: "Debriefs before it goes live",
+          canaryMinDays: "Days before it goes live",
+          undoMargin: "Undo when the score drops by more than",
+          watchDays: "Watched after going live (days)",
+        } as Record<string, string>,
+        rolloutNote:
+          "A new missed risk cue, or cost above the session budget, undoes a change at once whatever the score. Drops are compared within the same language and recipe.",
+        perOrg: "Per organisation",
+        perOrgHelp:
+          "An organisation can keep changes from being tried on its learners. It then gets a change only once it is live for everyone else.",
+        orgColumn: "Organisation",
+        tryColumn: "Try changes on its learners",
+        tryYes: "Yes",
+        tryNo: "No: only once live for everyone",
+        orgLive: "Live",
+        orgNotLive: "Not switched on yet",
+        orgStopped: "Stopped",
+        save: "Save",
+        loadFailed: "Couldn't load the organisations.",
+      },
+      scoreSettings: {
+        heading: "Score: what the PM agent improves, and what undoes a change",
+        help: "One score from four measures. Two checks sit outside it and are never traded off.",
+        fields: {
+          scoreWeightQuality: "Quality score (judge) (%)",
+          scoreWeightPass: "Pass rate (%)",
+          scoreWeightHelpful: "Learners found it helpful (%)",
+          scoreWeightFlags: "Cards flagged, lower is better (%)",
+          slackChannel: "Slack channel for drops and undos",
+          safetyContact: "Named safety contact",
+        } as Record<string, string>,
+        weightsOff: (total: number) => `The weights add up to ${total}%; make them add up to 100%.`,
+        neverTraded: "Never traded off",
+        gateRisk: "No new missed clear risk cue · undoes a change at once",
+        gateCost: "Cost within the session budget, for the debrief and Ask Ally together",
+        slackHelp:
+          "Posts when a change is undone, when a measure falls past its limit, and a weekly summary of what changed.",
+        safetyHelp:
+          "Gets a Slack message when a debrief is shown with a missed clear risk cue, or a learner shows distress in Ask Ally.",
+      },
+      tests: {
+        help: "How much a change must prove before it reaches learners. The PM agent tunes these from the month’s data; each change shows in Changes and can be undone there.",
+        columns: {
+          setting: "Setting",
+          now: "In force",
+          last: "Last change",
+          why: "Why",
+        },
+        lastChange: (by: string, when: string) => `${by} · ${when}`,
+        seeChange: "See change",
+      },
+      flag: {
+        marker: "⚑ Flagged by the learner",
+        summary: "What the learner said, and how Ally answered",
+        said: (reason: string, note: string | null) =>
+          note?.trim()
+            ? `They chose “${reason}” and wrote: “${note.trim()}”`
+            : `They chose “${reason}”.`,
+        answered: {
+          kept: "Ally kept the card and replied:",
+          corrected: "Ally corrected the card and replied:",
+          removed: "Ally removed the card and replied:",
+        } as Record<string, string>,
+        notYet: "Ally hasn't answered yet; it answers within a minute.",
+      },
+    },
     /** Shared words for rows of controls that overflow instead of wrapping (2026-11-13). */
     rows: {
       moreActions: "More actions",
@@ -9599,9 +9905,9 @@ export const en = {
         saved: "Verdict saved",
         failed: "Couldn't save the verdict",
         pick: "Choose Good or Needs work.",
-        judge: (score: string) => `Independent check: ${score}`,
-        agentCheck: (score: string) => `Ally's own check: ${score}`,
-        hiddenNote: "The independent check's score and other verdicts show after you submit.",
+        judge: (score: string) => `Quality score: ${score}`,
+        agentCheck: (score: string) => `Draft score: ${score}`,
+        hiddenNote: "The quality score, the draft score and other verdicts show after you submit.",
         others: (n: number) =>
           n === 0
             ? "No one else has reviewed it."
@@ -9699,6 +10005,23 @@ export const en = {
         progressWindow: "Sessions to look back over",
         progressUseFhs: "Use Foundational Skills levels as a cross-check",
         progressShowWorseToLearners: "Tell learners when a skill needs another look",
+        nightlyLengthCreepShare: "Nightly check: debriefs longer than before by",
+        nightlySamenessMax: "Nightly check: alert when debriefs read alike above",
+        nightlySpecificityDrop: "Nightly check: alert when specificity falls by (points)",
+        nightlyGapMax:
+          "Nightly check: alert when the draft score is above the quality score by (points)",
+        judgeDriftMax: "Judge drift that re-locks autonomy (points)",
+        judgeAnchorSize: "Debriefs scored again each week for the quality score",
+        scoreWeightQuality: "Overall score: weight of the quality score",
+        scoreWeightPass: "Overall score: weight of the pass rate",
+        scoreWeightHelpful: "Overall score: weight of learners finding it helpful",
+        scoreWeightFlags: "Overall score: weight of cards flagged",
+        undoMargin: "Undo when the score drops by more than",
+        watchDays: "Days a change is watched after going live",
+        askLowConfidence: "Changes the PM agent is not confident about ask a person",
+        askModels: "New models or providers ask a person",
+        slackChannel: "Slack channel for drops and undos",
+        safetyContact: "Named safety contact",
       } as Record<string, string>,
       columns: {
         setting: "Setting",
@@ -9842,10 +10165,10 @@ export const en = {
         },
         pmAgent: {
           name: "PM agent",
-          ideas: "Ideas",
+          ideas: "Changes",
           tested: "Quick-checked / pass-tested",
-          outcome: "Live for everyone / reverted / rejected / waiting",
-          held: "Changes put live that still stood 14 days later",
+          outcome: "Went live / undone / turned down / waiting",
+          held: "Still standing 14 days after going live",
         },
         planner: {
           name: "Planner",
@@ -9927,6 +10250,7 @@ export const en = {
           quote_from_gap: "Quotes a part the transcript missed",
           jargon: "Uses a term the learner wasn't taught",
           duplicate_point: "Makes the same point twice",
+          custom_code: "Shows a custom competency's code",
         } as Record<string, string>,
         plannerFallback: {
           planner_failed: "Planner failed or returned a bad plan",
@@ -10148,11 +10472,11 @@ export const en = {
         topUp: "Top-up",
         writerFailures: "Most common first-draft failures",
         judgeVersions: (v: string) => `Judge versions: ${v}`,
-        outcome: "Outcome of ideas",
+        outcome: "What happened to the changes",
         outcomes: {
-          promoted: "Live for everyone",
-          reverted: "Reverted",
-          rejected: "Rejected",
+          promoted: "Went live",
+          reverted: "Undone",
+          rejected: "Turned down",
           pending: "Waiting",
         },
         registryHeading: "Agents the planner chooses",
@@ -10197,10 +10521,17 @@ export const en = {
         "Picked at random this week so agreement isn't built only from debriefs someone chose to open. Review it as usual and answer the questions under your verdict.",
       untitled: (id: string) => `Roleplay ${id}`,
       columns: {
-        judge: "Independent check",
-        evaluator: "Ally’s own check",
+        judge: "Quality score",
+        evaluator: "Draft score",
         cost: "Cost",
         time: "Time",
+      },
+      // The two debrief scores, explained wherever they are shown.
+      scoreHelp: {
+        judge:
+          "Scored after publishing by a separate AI reviewer that never sees how the debrief was written. Below 8 goes to review.",
+        evaluator:
+          "Scored before publishing, to decide whether the debrief is good enough to go out or needs another revision.",
       },
       layoutLabel: "Layout",
       layout: { cards: "Cards", list: "List" },
@@ -10238,7 +10569,7 @@ export const en = {
         "Most urgent first: important-moment flags, then other flags, then debriefs below the bar.",
       /**
        * The same note for a viewer blind to the checks (the clinical advisor): no hint of the
-       * independent check's result before their verdict. True to the order ally-be sends them.
+       * quality score before their verdict. True to the order ally-be sends them.
        */
       queueNoteBlind: {
         needs: "Most urgent first: important-moment flags, then other flags, then held debriefs.",
@@ -10247,6 +10578,9 @@ export const en = {
       inOrder: "In order of urgency",
       today: "Today",
       yesterday: "Yesterday",
+      showing: (n: number, total: number) => `Showing ${n} of ${total} debriefs`,
+      showMore: (n: number) => `Show ${n} more`,
+      narrowFilters: "Narrow the filters to see older debriefs.",
       loadFailed: "the debriefs",
       empty: {
         needs: {
@@ -10264,7 +10598,7 @@ export const en = {
         },
         below: {
           title: "Nothing below the bar",
-          message: "Debriefs the independent check scored under the bar appear here.",
+          message: "Debriefs with a quality score under the bar appear here.",
         },
         published: {
           title: "Nothing published yet",
@@ -10336,6 +10670,21 @@ export const en = {
       readable: "Readable",
       raw: "Raw JSON",
       note: "Ally team only · contains the full transcript · deleted with the session",
+      origin: {
+        fixed: "Fixed",
+        planned: "Planned",
+        top_up: "Top-up",
+        unknown: "Source unknown",
+      } as Record<string, string>,
+      originHelp: {
+        fixed: "A step the code always runs",
+        planned: "An agent the planner chose for this session",
+        top_up: "Extra evidence after a failed evaluation",
+        unknown: "Logged before sources were recorded",
+      } as Record<string, string>,
+      why: (reason: string) => `Why: ${reason}`,
+      source: "Source",
+      allSources: "All sources",
       summary: {
         run: (id: string) => `run ${id}`,
         version: (v: string) => `version ${v}`,
@@ -10379,8 +10728,8 @@ export const en = {
         top_up: "Top-up",
         score_draft: "Scoring",
         decide: "Decision",
-        evaluator: "Ally's own check",
-        judge: "Independent check",
+        evaluator: "Draft score",
+        judge: "Quality score",
       } as Record<string, string>,
     },
     // One session's page (redesign 2026-11-12): the roleplay beside the debrief, and the review.
@@ -10423,8 +10772,8 @@ export const en = {
         organisation: "Organisation",
         recipe: "Recipe",
         language: "Language",
-        judge: "Independent check",
-        evaluator: "Ally’s own check",
+        judge: "Quality score",
+        evaluator: "Draft score",
         cost: "Cost",
         time: "Time",
         release: "Version",
@@ -10617,8 +10966,7 @@ export const en = {
         turns: (a: number, b: number) => `turns ${a}–${b} in the roleplay`,
         flaggedCard: "the flagged card",
         theirNote: "their note",
-        judgeReasons: (n: number) =>
-          `the independent check’s ${n} ${n === 1 ? "reason" : "reasons"}`,
+        judgeReasons: (n: number) => `the quality score’s ${n} ${n === 1 ? "reason" : "reasons"}`,
         urgent: (w: string) => `Urgent · ${w}.`,
         flag: (w: string) => `Learner flag · ${w}.`,
         held: (w: string) => `Held · ${w}.`,
@@ -10628,17 +10976,17 @@ export const en = {
         escalated: (w: string) => `Escalated to you · ${w}.`,
         flagBody: (card: string, reason: string) => `The learner flagged “${card}”: “${reason}”.`,
         heldBody: (judge: string) =>
-          `The independent check scored it ${judge}; the learner sees “on its way” until you decide.`,
+          `Quality score ${judge}; the learner sees “on its way” until you decide.`,
         distressBody:
           "The learner stepped out in distress. They have their debrief with the support lines; check on them.",
         belowBarBody: (judge: string) =>
-          `Already published; the independent check scored it ${judge}, below the bar.`,
+          `Already published; quality score ${judge}, below the bar.`,
         escalatedAsk: "The Ally team asks for your view.",
         escalatedNote: (by: string, note: string) => `${by} asks: “${note}”`,
         theTeam: "The Ally team",
         distressAskAlly: "The learner showed distress in Ask Ally after reading the debrief.",
         theCard: "the card",
-        judgeReasonsLink: "the independent check’s reasons",
+        judgeReasonsLink: "the quality score’s reasons",
         askAlly: "the Ask Ally conversation",
         escalate: "Escalate to clinical advisor",
         giveVerdict: "Give your verdict",
@@ -10651,13 +10999,12 @@ export const en = {
         theyAdded: (note: string) => `They added: “${note}”`,
         keepRemoveHelp:
           "Keep and Remove ask for a reason the learner reads. Correct edits the card in place.",
-        held: (judge: string, w: string) =>
-          `Held · the independent check scored it ${judge}, below the bar · ${w}`,
+        held: (judge: string, w: string) => `Held · quality score ${judge}, below the bar · ${w}`,
         heldHelp: "The learner sees “on its way” until you decide.",
         distress: (w: string) => `Learner distress · ${w}`,
         belowBar: (judge: string, w: string) =>
-          `Published, then the independent check scored it below the bar (${judge}) · ${w}`,
-        whyHeld: "Why the independent check held it",
+          `Published, then the quality score came in below the bar (${judge}) · ${w}`,
+        whyHeld: "Why the quality score held it",
         escalate: "Escalate to clinical advisor · e",
         comments: "Comments",
         commentHint: "Select words in the roleplay or the debrief to add one.",
@@ -10827,22 +11174,21 @@ export const en = {
         weeklyKicker: (written: string | null) =>
           written ? `Weekly report · written ${written}` : "Weekly report · not written yet",
         changedTitle: { weekly: "What changed this week", monthly: "What changed this month" },
-        changedNote: "Taken from the records of releases and ideas, not written by the PM agent.",
+        changedNote: "Taken from the records of changes, not written by the PM agent.",
         tiles: {
-          live: "Live for everyone",
-          reverted: "Reverted",
-          rejected: "Rejected or withdrawn",
-          tests: "Tests run",
-          builder: "Sent to Builder",
+          live: "Went live on its own",
+          liveSub: "beat the release before",
+          waited: "Waited for a person",
+          reverted: "Undone",
+          stopped: "Stopped in testing",
+          stoppedSub: "never reached learners",
+          builder: "Being built",
+          builderSub: "waits for an engineer to merge",
         },
-        allByPerson: "all approved by a person",
-        someByPerson: (n: number) => `${n} approved by a person`,
-        withReasons: "with reasons",
-        passed: (n: number) => `${n} passed`,
         lists: {
-          live: "Went live for everyone",
-          reverted: "Reverted",
-          rejected: "Rejected or withdrawn",
+          live: "Went live",
+          reverted: "Undone",
+          rejected: "Turned down or dropped",
         },
         approvedBy: (name: string) => `Approved by ${name}`,
         wentLiveAlone: "Went live on its own",
@@ -10850,7 +11196,7 @@ export const en = {
         revertedOn: (date: string) => `reverted on ${date}`,
         notYet: "not yet 14 days",
         revertedHow: {
-          try_out_reverted: () => "Reverted automatically",
+          try_out_reverted: () => "Undone automatically",
           try_out_stopped: (name: string | null) =>
             name ? `Stopped by ${name}` : "Stopped automatically",
           rolled_back: (name: string | null) => (name ? `Rolled back by ${name}` : "Rolled back"),
@@ -10858,7 +11204,7 @@ export const en = {
             name ? `Emergency stop by ${name}` : "Emergency stop",
         } as Record<string, (name: string | null) => string>,
         rejectedBy: (name: string | null) =>
-          name ? `Rejected by ${name}` : "Rejected by the PM agent",
+          name ? `Turned down by ${name}` : "Dropped by the PM agent",
         withdrawnBy: (name: string | null) =>
           name ? `Withdrawn by ${name}` : "Withdrawn by the PM agent",
         someone: "a person",
@@ -10875,7 +11221,7 @@ export const en = {
           monthly: "The PM agent's review is published on the 1st.",
         },
         download: "Download as PDF",
-        allReleases: "All releases",
+        allReleases: "All changes",
       },
       tests: "Tests",
       needsApproval: "Needs your approval",
@@ -11087,7 +11433,7 @@ export const en = {
         budget: "Budgets",
         tests: "Tests",
         autonomy: "Autonomy",
-        weights: "Steering",
+        weights: "Score",
         pinned: "Pinned rules",
         progress: "Progress",
         schedules: "Schedules",
@@ -11119,6 +11465,14 @@ export const en = {
             name: "Console alerts",
             what: "Urgent flags past their deadline and approvals about to expire",
           },
+          "debrief-change-watch": {
+            name: "Watch changes and undo",
+            what: "Every hour: undoes a live change when the score drops past the margin or a gate trips, and posts to Slack",
+          },
+          "debrief-weekly-summary": {
+            name: "Weekly summary to Slack",
+            what: "Mondays: what changed last week, posted to the Slack channel",
+          },
           "debrief-judge": {
             name: "Judge new debriefs",
             what: "The independent judge scores debriefs not judged yet",
@@ -11142,6 +11496,14 @@ export const en = {
           "debrief-agreement-sample": {
             name: "Agreement sample",
             what: "Puts a few judged debriefs, picked at random, in the clinical advisor's queue",
+          },
+          "debrief-nightly-check": {
+            name: "Nightly check",
+            what: "Measures yesterday’s debriefs against the days before and sends some to a person",
+          },
+          "debrief-judge-anchor": {
+            name: "Judge drift",
+            what: "Scores a fixed set of debriefs again for the quality score, to catch drift (learning budget)",
           },
           "debrief-pm-agent-forecasts": {
             name: "Check forecasts",
@@ -11230,7 +11592,7 @@ export const en = {
       orgsHelp:
         "Which organisations' learners read the new debrief. Once an organisation is live, switching it off is an emergency stop: its learners see “not available”, not today's debrief.",
       budgetHelp:
-        "Every change asks you to confirm. The PM agent can never change a budget. Spend and burn rate are in Analytics › Debriefs.",
+        "Every change asks you to confirm. The PM agent may propose a lower budget; a higher one always waits for you. Spend and burn rate are in Analytics › Debriefs.",
       testsHelp: "How much an idea must prove at each step before it reaches learners.",
       progressHelp:
         "How the Debrief agent reads a learner's progress across their recent sessions, and what learners are shown.",
@@ -11264,9 +11626,8 @@ export const en = {
         change: "Change",
         changeTitle: (name: string) => `Change ${name}?`,
         releaseBody:
-          "This lives in the release, so it is proposed as a change: a budgets-only change goes live when you approve it under the PM agent's Ideas. Roll back undoes it.",
-        releaseMade: (v: number) =>
-          `Proposed as release v${v}. Approve it under the PM agent's Ideas.`,
+          "This goes live as soon as you confirm, as a new release. Roll back undoes it.",
+        releaseMade: (v: number) => `Live as release v${v}.`,
       },
       autonomy: {
         columns: {
@@ -11291,7 +11652,7 @@ export const en = {
         autoNeedsAgreement: "On its own (override: asks to confirm)",
         overrideTitle: "Let learner try-outs run on their own?",
         overrideBody: (kind: string) =>
-          `The independent check hasn't been shown to agree with the clinical advisor yet. Learner try-outs for ${kind} will reach learners without approval.`,
+          `The quality score hasn't been shown to agree with the clinical advisor yet. Learner try-outs for ${kind} will reach learners without approval.`,
         overrideSafety:
           "The safety nets stay: a try-out that misses a risk cue is taken back on its own, and the system still sets it back to asks first after reverts or a failed baseline, and tells you.",
         overrideConfirm: "Let them run",
@@ -11307,7 +11668,7 @@ export const en = {
           },
           {
             lead: "Try on learners:",
-            text: "asks first until the independent check agrees with the clinical advisor’s reviews (agreement 0.6 or more on every measure). Then you’re told it can run on its own, and you switch it on here. It never switches itself on. You can also switch it on earlier; you’ll be asked to confirm and the override is recorded.",
+            text: "asks first until the quality score agrees with the clinical advisor’s reviews (agreement 0.6 or more on every measure). Then you’re told it can run on its own, and you switch it on here. It never switches itself on. You can also switch it on earlier; you’ll be asked to confirm and the override is recorded.",
           },
           {
             lead: "Taken back automatically:",
@@ -11329,7 +11690,8 @@ export const en = {
         eligibleNo: "Not yet",
         loading: "Loading…",
         loadFailed: "Couldn't load what the PM agent may do alone.",
-        driftFrom: "Judge drift: measured from Release 2.",
+        driftFrom:
+          "Judge drift: not measured yet. A fixed set of debriefs is scored again for the quality score each week.",
         drift: "Judge drift found: everything asks first.",
         noDrift: "No judge drift.",
         baselineFailed: "The monthly baseline failed: everything asks first.",
@@ -11354,7 +11716,7 @@ export const en = {
         orgLive: "Live",
         orgNotLive: "Not switched on yet · no trials or try-outs",
         orgStopped: "Stopped · no trials or try-outs",
-        // Agreement between the independent check and the clinical advisor's yes/no answers.
+        // Agreement between the quality score and the clinical advisor's yes/no answers.
         agreement: {
           heading: "Judge agreement with the clinical advisor",
           source: (sampled: number) =>
@@ -11371,11 +11733,11 @@ export const en = {
           caught: (caught: number, of: number) =>
             of === 0
               ? "No problems found yet"
-              : `Independent check caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
+              : `The quality score caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
           caughtHelp:
-            "Of the debriefs the clinical advisor answered No to, how many the independent check also marked No.",
+            "Of the debriefs the clinical advisor answered No to, how many the quality score also marked No.",
           undefinedHelp:
-            "The advisor and the independent check have only ever given the same answer, so agreement can't be worked out yet (Cohen's κ is undefined).",
+            "The advisor and the quality score have only ever given the same answer, so agreement can't be worked out yet (Cohen's κ is undefined).",
           footer: (min: number) =>
             `Line at 0.6. Each measure needs ${min} reviews and agreement of at least 0.6. If any drops below, learner try-outs go back to asking a person.`,
         },
@@ -11431,9 +11793,8 @@ export const en = {
         today: (v: string) => `Today's debrief: ${v}`,
         pass: "Meets the bar",
         passHelp: "Scored 8 or more by the judge, with no hard fail.",
-        person: "Needs a person",
-        personHelp:
-          "Runs where nothing passed the checks in time or budget. A person finishes these.",
+        person: "Shown below the bar",
+        personHelp: "Shown anyway; nothing is held.",
         cost: "Cost per debrief",
         costHelp: "Typical (p50) and expensive (p90) runs. The ceiling is shown underneath.",
         ceiling: (v: string) => `Ceiling ${v}`,
@@ -11765,6 +12126,8 @@ export const en = {
           guidance: "Marked done",
         } as Record<string, string>,
       },
+      delivered: (when: string, tags: string, until: string) =>
+        `Reached production ${when}${tags ? ` (${tags})` : ""}. Measuring whether it helped until ${until}.`,
       forecast: (metric: string, before: string, after: string, moved: string) =>
         `${metric}: ${before} before, ${after} after — ${moved}`,
       forecastMoved: {
@@ -11923,14 +12286,60 @@ export const en = {
       providersAtLeastOne: "Allow at least one provider. To stop its debriefs, use Emergency stop.",
       providersConfirm: "Save providers",
     },
-    // Analytics › Debriefs › Judge agreement: the independent check against the clinical
+    // Analytics › Debriefs › Judge agreement: the quality score against the clinical
     // advisor's yes/no answers under their verdicts (hand scoring removed 2026-11-12).
+    nightly: {
+      heading: "Nightly check",
+      help: "Every night the day's debriefs are checked for slow changes nobody would notice run by run, against the two weeks before. Anything outside the normal range goes to the PM agent, which acts on it; nobody needs to watch this page. Words are counted and lines compared the same way in every language; vagueness is the quality score's specificity part.",
+      slice: "Show",
+      all: "All debriefs",
+      language: (code: string) => `Language: ${code}`,
+      recipe: (key: string) => `Recipe: ${key}`,
+      alertsHeading: "What happened with the findings of the last 2 weeks",
+      noAlerts: "Nothing outside the normal range in the last 2 weeks.",
+      routedTo: (to: string) => `→ ${to}`,
+      empty: "No nightly check has run yet. It runs every night (Settings › Schedules).",
+      charts: {
+        words: "Words per debrief",
+        wordsHelp:
+          "Median and the longest 10%. Rising week on week means debriefs are getting longer.",
+        p50: "Median",
+        p90: "Longest 10%",
+        sameness: "How alike debriefs read",
+        samenessHelp:
+          "0 to 1: how close each debrief's lead lines come to another learner's. Rising means debriefs read the same for everyone.",
+        specificity: "Specificity (quality score)",
+        specificityHelp:
+          "The quality score's part for how specific the evidence is, 0 to 10. Falling means debriefs are getting vaguer.",
+        gap: "Draft score above quality score",
+        gapHelp:
+          "Points, on average. A growing gap means the draft score is getting easier than the quality score.",
+        drift: "Judge drift",
+        driftHelp:
+          "Each week the same debriefs are scored again for the quality score. The line is how far its scores moved; beyond the limit, the PM agent pauses changes until the judge is checked again.",
+        limit: "Limit",
+      },
+      dataQuality: (
+        runs: number,
+        noLanguage: number,
+        unjudged: number,
+        stuck: number,
+        failed: number,
+      ) =>
+        `Yesterday: ${runs} debriefs; ${noLanguage} without a language, ${unjudged} without a quality score yet, ${stuck} stuck, ${failed} failed.`,
+      reasons: {
+        judge_human_disagree: "A clinician and the quality score disagree",
+        thumbs_down_comment: "Learner said not helpful, with a comment",
+        risk_cue_disagree: "Risk cue: the checks disagree",
+      } as Record<string, string>,
+      fromNightly: "From the nightly check",
+    },
     calibration: {
       sectionHeading: "Judge agreement",
       noAgreement:
         "The clinical advisor hasn't answered the questions under a verdict yet, so there's no agreement to show.",
       sectionHelp:
-        "How closely the independent check agrees with the clinical advisor's yes/no answers under each verdict. Decides what the PM agent may do alone: learner try-outs can run on their own only once every measure reaches 0.6.",
+        "How often the quality score agrees with the clinical advisor's yes/no answers under each verdict. For information: it no longer decides what the PM agent may do.",
       agreementFailed: "agreement",
       kpis: {
         rated: "Reviews with answers",
@@ -11942,29 +12351,29 @@ export const en = {
         sampleValue: (week: number, waiting: number) => `${week} this week · ${waiting} waiting`,
         gate: "Learner try-outs on their own",
         gateHelp:
-          "Allowed only while the independent check agrees with the clinical advisor on accuracy, evidence and missed risk cues.",
+          "Allowed only while the quality score agrees with the clinical advisor on accuracy, evidence and missed risk cues.",
         met: "Allowed",
         notMet: "Needs approval",
       },
-      gateHeading: "What the PM agent's freedom depends on",
+      gateHeading: "Agreement by measure",
       gateAbout: "About agreement",
       gateHelp: (min: number) =>
-        `Agreement is Cohen's κ between the clinical advisor's answer and the independent check's on the same debrief: 1 is perfect, 0 is chance. Each measure needs ${min} reviews and 0.6 or more.`,
-      chartAxis: "Bar: agreement beyond chance, 0 to 1. Dark rule: the 0.6 each measure needs",
+        `Agreement is Cohen's κ between the clinical advisor's answer and the quality score's on the same debrief: 1 is perfect, 0 is chance. A measure is read from ${min} reviews; 0.6 is the usual line for good agreement.`,
+      chartAxis: "Bar: agreement beyond chance, 0 to 1. Dark rule: 0.6, good agreement",
       chartCaption:
-        "Agreement between the independent check and the clinical advisor, beyond what chance alone would give.",
+        "Agreement between the quality score and the clinical advisor, beyond what chance alone would give.",
       kappaWords: (k: string, words: string) => `${k}, ${words.toLowerCase()}`,
       notYet: (n: number, min: number) => `Not measured yet: ${n} of ${min} reviews`,
       reviews: (n: number, min: number) => (n < min ? `${n} of ${min}` : String(n)),
       caught: (caught: number, of: number) =>
         of === 0
           ? "No problems found yet"
-          : `Independent check caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
+          : `The quality score caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"} you found`,
       states: {
         not_enough: "Not measured yet",
         undefined: "Not measurable yet: every answer is the same",
         below: "Below 0.6",
-        met: "Met",
+        met: "0.6 or more",
       } as Record<string, string>,
       columns: {
         measure: "Measure",

@@ -2,7 +2,8 @@ import React, { useState } from "react";
 
 import { useGetHistoryQuery, useRevertEditMutation, useUndoChangeMutation } from "@api";
 import type { HistoryEntry } from "@api";
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { HOME, fill } from "./copy";
 import { when } from "./dates";
@@ -97,8 +98,9 @@ export const ChangeHistory: React.FC<{
                 <div className="ally-list__actions">
                   {entry.kind === "change" ? (
                     <Button
-                      variant="ghost"
-                      className="ally-btn--sm"
+                      variant={ButtonVariant.TEXT}
+                      size="sm"
+                      type="button"
                       disabled={undoing.isLoading}
                       onClick={() =>
                         void act(() => undoChange({ id: botId, eventId: entry.id }).unwrap())
@@ -108,8 +110,9 @@ export const ChangeHistory: React.FC<{
                     </Button>
                   ) : (
                     <Button
-                      variant="ghost"
-                      className="ally-btn--sm"
+                      variant={ButtonVariant.TEXT}
+                      size="sm"
+                      type="button"
                       disabled={reverting.isLoading}
                       onClick={() =>
                         void act(() =>

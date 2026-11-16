@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 
 import { useArchiveChatbotMutation } from "@api";
-import { Button } from "@components/v2";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
 
 import { fill, HOME } from "../copy";
 import { Sheet } from "./Sheet";
@@ -44,10 +45,12 @@ export const RemoveDialog: React.FC<{
           </p>
         )}
         <div className="ally-remove__actions">
-          <Button onClick={onClose}>{t.removeKeep}</Button>
+          <Button variant={ButtonVariant.TERTIARY} type="button" onClick={onClose}>
+            {t.removeKeep}
+          </Button>
           <Button
-            variant="primary"
-            className="ally-remove__confirm"
+            variant={ButtonVariant.DESTRUCTIVE}
+            type="button"
             disabled={isLoading}
             onClick={() => void remove()}
           >

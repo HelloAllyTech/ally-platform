@@ -10,21 +10,19 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional
 
-from deepagents.backends.utils import create_file_data
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.store.base import BaseStore
 from langsmith.run_helpers import tracing_context
 
 from app.core.debrief_graph.gateway import Gateway, HttpGateway
-from app.core.pm_agent.agent import build_pm_agent
+from app.core.pm_agent.agent import build_pm_agent, seed_memory
 from app.core.pm_agent.ledger import RunLedger
 from app.core.pm_agent.middleware import _text
 from app.core.pm_agent.models import build_models
 from app.core.pm_agent.prompt import DEFAULT_SYSTEM_PROMPT, render_inputs
 from app.core.pm_agent.schemas import PmAgentRunRequest
-from app.core.pm_agent.store import MEMORY_NAMESPACE
-from app.core.pm_agent.tools import ALL_TOOLS, make_tools
+from app.core.pm_agent.tools import ALL_TOOLS, RUN_TOOLS, make_tools
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -34,20 +32,6 @@ logger = get_logger(__name__)
 RECURSION_LIMIT = 300
 #: Each gateway tool must answer within this; the quick test only starts there.
 TOOL_TIMEOUT_S = 60.0
-
-
-MEMORY_SEED = """\
-# PM agent memory
-
-Nothing recorded yet. Keep here: what you tried and why, what happened to it, open
-hypotheses. Rewrite rather than append forever.
-"""
-
-
-async def _seed_memory(store: BaseStore) -> None:
-    """The memory file exists from the first run, so reading it never fails."""
-    if await store.aget(MEMORY_NAMESPACE, "/AGENTS.md") is None:
-        await store.aput(MEMORY_NAMESPACE, "/AGENTS.md", create_file_data(MEMORY_SEED))
 
 
 async def run_pm_agent(
@@ -87,7 +71,7 @@ async def run_pm_agent(
         if ledger.exhausted:
             return result("budget_spent", None)
         allowed = (
-            [t for t in req.tools if t in ALL_TOOLS] if req.tools else list(ALL_TOOLS)
+            [t for t in req.tools if t in ALL_TOOLS] if req.tools else list(RUN_TOOLS)
         )
         agent = build_pm_agent(
             ledger=ledger,
@@ -98,13 +82,14 @@ async def run_pm_agent(
             system_prompt=req.system_prompt or DEFAULT_SYSTEM_PROMPT,
             store=store,
             checkpointer=checkpointer,
+            gateway=gw,
         )
         config = {
             "configurable": {"thread_id": f"pm-agent:{req.agent_run_id}"},
             "recursion_limit": RECURSION_LIMIT,
             "run_name": "debrief_pm_agent",
         }
-        await _seed_memory(store)
+        await seed_memory(store)
         snapshot = await agent.aget_state(config) if checkpointer else None
         started = bool(snapshot and snapshot.values)
         graph_input = (

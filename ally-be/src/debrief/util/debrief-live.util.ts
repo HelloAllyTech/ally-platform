@@ -2,6 +2,19 @@ import { DataSource } from 'typeorm';
 import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
 
 /**
+ * Asked by the Debrief agent when a learner in a switched-on organisation
+ * gets no agent debrief (no draft after its retry, the agent or the
+ * roleplay's Debrief tab off, no run started): the session service then
+ * writes today's debrief for that session, which it otherwise skips for
+ * switched-on organisations.
+ */
+export const DEBRIEF_FALLBACK_TO_TODAY_EVENT = 'debrief.fallback_to_today';
+
+export interface DebriefFallbackToTodayEventParams {
+  scenarioSessionId: string;
+}
+
+/**
  * The keys a published live debrief writes into `summary.feedback`
  * (DebriefPublishService). A feedback object holding only these was written
  * by the Debrief agent, not by today's debrief.

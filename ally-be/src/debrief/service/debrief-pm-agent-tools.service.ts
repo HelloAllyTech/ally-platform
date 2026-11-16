@@ -59,6 +59,70 @@ const refuse = (reason: string): never => {
 };
 const text = (v: unknown, max = 2000): string =>
   typeof v === 'string' ? v.trim().slice(0, max) : '';
+/**
+ * V2_AUTONOMY A2: the confidence the PM agent states on a change, as stored in
+ * `evidence.confidence`. One the agent left out reads as low: it never skips
+ * the always-ask list by omission.
+ */
+export function changeConfidence(v: unknown): {
+  level: 'high' | 'low';
+  why: string;
+} {
+  const c = (v ?? {}) as { level?: unknown; why?: unknown };
+  const why = text(c.why, 300);
+  if (c.level === 'high' || c.level === 'low') {
+    return { level: c.level, why: why || 'No reason given.' };
+  }
+  return { level: 'low', why: 'The PM agent did not say how sure it is.' };
+}
+
+/** A change's confidence until its reviewer has answered: it waits for a person. */
+export const NOT_REVIEWED = {
+  level: 'low' as const,
+  why: 'Not reviewed yet: the reviewer has not checked it.',
+};
+
+type ReviewAnswer = { answer: 'yes' | 'no' | 'unclear'; evidence: string };
+const REVIEW_QUESTIONS = {
+  supported: ['the evidence supports it', 'the evidence may not support it'],
+  fits_everywhere: [
+    'it fits every language and organisation it reaches',
+    'it may not fit every language or organisation it reaches',
+  ],
+  safe: ['no safety risk found', 'it may touch safety'],
+} as const;
+
+/**
+ * The reviewer's verdict on a change (the reviewer subagent, posted by ally-ai's
+ * code): high only when all three answers are yes; low otherwise. This, not
+ * the PM agent's own view, is the change's `evidence.confidence`.
+ */
+export function reviewConfidence(b: Record<string, any>): {
+  confidence: { level: 'high' | 'low'; why: string };
+  answers: Record<keyof typeof REVIEW_QUESTIONS, ReviewAnswer>;
+} {
+  const answers = {} as Record<keyof typeof REVIEW_QUESTIONS, ReviewAnswer>;
+  for (const k of Object.keys(REVIEW_QUESTIONS) as Array<
+    keyof typeof REVIEW_QUESTIONS
+  >) {
+    const a = (b?.[k] ?? {}) as { answer?: unknown; evidence?: unknown };
+    answers[k] = {
+      answer: a.answer === 'yes' || a.answer === 'no' ? a.answer : 'unclear',
+      evidence: text(a.evidence, 300),
+    };
+  }
+  const weak = (
+    Object.keys(REVIEW_QUESTIONS) as Array<keyof typeof REVIEW_QUESTIONS>
+  ).filter((k) => answers[k].answer !== 'yes');
+  const why = weak.length
+    ? `Reviewer: ${weak.map((k) => `${REVIEW_QUESTIONS[k][1]}${answers[k].evidence ? ` (${answers[k].evidence})` : ''}`).join('; ')}`
+    : `Reviewer: ${(Object.keys(REVIEW_QUESTIONS) as Array<keyof typeof REVIEW_QUESTIONS>).map((k) => REVIEW_QUESTIONS[k][0]).join('; ')}.`;
+  return {
+    confidence: { level: weak.length ? 'low' : 'high', why: why.slice(0, 300) },
+    answers,
+  };
+}
+
 /** Runs counted as one change's evidence (R2-18): enough for 10 learners in 3 organisations. */
 const MAX_EVIDENCE_RUNS = 100;
 
@@ -139,6 +203,11 @@ export class DebriefPmAgentToolsService {
           return await this.questionsRead();
         case 'question_answer':
           return await this.questionAnswer(claims, b);
+        case 'change_review_record':
+          return await this.reviewRecord(claims, b);
+        default:
+          // The conversation's tools are DebriefPmConversationService's.
+          return refuse(`${tool} is not a PM agent run tool`);
       }
     } catch (e) {
       if (e instanceof Refused) {
@@ -344,6 +413,10 @@ export class DebriefPmAgentToolsService {
             baselineAt: new Date().toISOString(),
           },
           agentRunId: claims.agentRunId,
+          // V2_AUTONOMY A2: the agent's own view is advice; the change's
+          // confidence is the reviewer's verdict, low until it answers.
+          statedConfidence: changeConfidence(b.confidence),
+          confidence: NOT_REVIEWED,
         }),
         hash,
       ],
@@ -480,6 +553,14 @@ export class DebriefPmAgentToolsService {
       `UPDATE agent_lessons SET change = $2::jsonb, kind = $3, "updatedAt" = now() WHERE id = $1`,
       [idea.id, JSON.stringify(next), lessonKind],
     );
+    if (b.confidence) {
+      // Advice only: never the change's confidence (the reviewer's verdict).
+      await this.pm.writeEvidence(
+        idea.id,
+        'statedConfidence',
+        changeConfidence(b.confidence),
+      );
+    }
     await this.pm.writeEvidence(idea.id, 'draft', {
       kind,
       draftedAt: new Date().toISOString(),
@@ -849,6 +930,37 @@ export class DebriefPmAgentToolsService {
 
   // --- "Ask a question" (plan §11.7, spec C5) -------------------------------------------
 
+  /**
+   * `change_review_record`: the reviewer subagent's verdict on one change,
+   * posted by ally-ai's code after the reviewer answers (never a model tool).
+   * Sets `evidence.confidence` (read by the always-ask check), keeps the
+   * answers in `evidence.review`.
+   */
+  async reviewRecord(claims: DebriefAgentClaims, b: Record<string, any>) {
+    if (typeof b.idea_id !== 'string' || !UUID.test(b.idea_id)) {
+      refuse('idea_id is not an idea id');
+    }
+    const idea = await this.pm.getIdea(b.idea_id).catch(() => null);
+    if (!idea) refuse('no such change');
+    if (!['proposed', 'approved'].includes(idea!.status)) {
+      refuse(`the change is ${idea!.status}; a review changes nothing now`);
+    }
+    const { confidence, answers } = reviewConfidence(b);
+    await this.pm.writeEvidence(idea!.id, 'confidence', confidence);
+    await this.pm.writeEvidence(idea!.id, 'review', {
+      ...answers,
+      level: confidence.level,
+      at: new Date().toISOString(),
+      agentRunId: claims.agentRunId,
+    });
+    await this.pm.audit('pipeline_step', idea!.id, null, {
+      agentRunId: claims.agentRunId,
+      step: 'change_reviewed',
+      level: confidence.level,
+    });
+    return { ok: true, level: confidence.level, why: confidence.why };
+  }
+
   /** Questions people asked on the agent's ideas that it has not answered yet. */
   async questionsRead() {
     const questions = await this.pm.openQuestions();
@@ -889,6 +1001,29 @@ export class DebriefPmAgentToolsService {
       agentRunId: claims.agentRunId,
       step: `${handoff.kind}_handoff`,
     });
+    // V2_AUTONOMY A8: Builder and Bug Hunter start on their own; a Builder
+    // pull request still waits for an engineer to merge.
+    if (handoff.kind === 'builder' || handoff.kind === 'bug_hunter') {
+      const started = await this.pm.autoStartHandoff(idea.id);
+      return {
+        ok: true,
+        idea_id: idea.id,
+        started: started.started,
+        ...(started.started
+          ? {
+              waiting_for:
+                handoff.kind === 'builder'
+                  ? 'nobody: Builder started; its pull request waits for an engineer to merge'
+                  : 'nobody: the bug was filed for Bug Hunter',
+            }
+          : {
+              waiting_for: `a person in the Debrief Console (${started.reason})`,
+            }),
+        ...(typeof handoff.quotesRemoved === 'number'
+          ? { quotes_removed: handoff.quotesRemoved }
+          : {}),
+      };
+    }
     return {
       ok: true,
       idea_id: idea.id,

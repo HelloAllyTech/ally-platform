@@ -32,7 +32,7 @@ from langgraph.runtime import Runtime
 from langgraph.types import Command, Send
 
 from app.core.debrief_graph import inputs as body
-from app.core.debrief_graph.agent_logs import code_log
+from app.core.debrief_graph.agent_logs import code_log, origin_of
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
 from app.core.debrief_graph.constants import FallbackRung, Recipe, Step
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
@@ -778,6 +778,7 @@ async def top_up(
             ctx,
             "top_up",
             t0,
+            origin=origin_of(state, "top_up"),
             input={
                 "critique": body.critique(state["best"]) if state.get("best") else None,
                 "answered": dict(state.get("agent_ok") or {}),
@@ -879,6 +880,7 @@ def code_agent_node(m: AgentManifest) -> Dict[str, Any]:
             ctx,
             m.id,
             t0,
+            origin=origin_of(state, m.id),
             input={
                 "kind": "code agent",
                 "action": (state.get("actions") or {}).get(m.id),
@@ -918,6 +920,7 @@ def code_agent_node(m: AgentManifest) -> Dict[str, Any]:
             ctx,
             m.id,
             ctx.clock(),
+            origin=origin_of(state, m.id),
             input={
                 "kind": "code agent",
                 "action": (state.get("actions") or {}).get(m.id),

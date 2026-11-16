@@ -31,9 +31,14 @@ class SimulationDetailsScreen extends ConsumerStatefulWidget {
     super.key,
     required this.scenarioId,
     this.initialScenario,
+    this.trackId,
   });
 
   final int scenarioId;
+
+  /// Opened from a debrief inside a course ("Practise this"): the roleplay
+  /// keeps the course, so its Feedback returns there. Null otherwise.
+  final String? trackId;
 
   /// The already-fetched `Scenario` from the catalog list, when reached that
   /// way — matches RN, which never fetches this screen's data separately at
@@ -93,6 +98,7 @@ class _SimulationDetailsScreenState
             ? _selectedLanguage?.languageId
             : null,
         scenario: scenario,
+        trackId: widget.trackId,
       ),
     );
   }

@@ -266,6 +266,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
                r."createdAt", r.tenant_id AS "tenantId", t.name AS "tenantName",
                sc.title AS "scenarioTitle", s."scenarioId" AS "scenarioId",
                (r.workspace ? 'review') AS reviewed,
+               (r.workspace->'nightly'->'reasons') AS nightly_reasons,
+               (r.workspace->'decision'->>'reviewReason') AS review_reason,
                EXISTS (SELECT 1 FROM debrief_agreement_samples ags WHERE ags."runId" = r.id) AS agreement_sample,
                EXISTS (SELECT 1 FROM debrief_reviews dv WHERE dv."runId" = r.id) AS has_verdict,
                (r.workspace ? 'escalation' AND NOT (r.workspace ? 'review')) AS run_escalated,
@@ -289,11 +291,14 @@ export class DebriefConsoleViewService implements OnModuleInit {
       ), r0 AS (
         SELECT b.*,
                CASE
-                 WHEN b.mode = 'live' AND (b.urgent_open OR (b."learnerDistress" AND NOT b.reviewed)) THEN 0
+                 WHEN b.mode = 'live' AND (b.urgent_open
+                      OR (b."learnerDistress" AND NOT b.reviewed)
+                      OR (b.review_reason = 'missed_risk_cue' AND NOT b.reviewed)) THEN 0
                  WHEN b.mode = 'live' AND b.any_open THEN 1
                  WHEN b.mode = 'live' AND NOT b.reviewed
                       AND (b.status IN ('needs_person','below_bar','failed')
-                           OR (b.status = 'published' AND b.judge_below)) THEN 2
+                           OR (b.status = 'published' AND b.judge_below)
+                           OR b.nightly_reasons IS NOT NULL) THEN 2
                  ELSE 3
                END AS rank,
                (b.mode = 'live' AND (b.escalated_flag OR b.run_escalated)) AS escalated
@@ -473,6 +478,10 @@ export class DebriefConsoleViewService implements OnModuleInit {
       flagged: !!r.flagged,
       flagCount: Number(r.flag_count ?? 0),
       importantMomentFlagged: !!r.important_flagged,
+      /** "From the nightly check": why it sent this debrief to a person. */
+      nightlyReasons: Array.isArray(r.nightly_reasons)
+        ? (r.nightly_reasons as string[])
+        : null,
       escalated: !!r.escalated,
       riskCue: !!r.hasRiskCue,
       learnerDistress: !!r.learnerDistress,
@@ -665,6 +674,14 @@ export class DebriefConsoleViewService implements OnModuleInit {
       resolvedAt: iso(r.resolvedAt),
       resolvedBy: r.resolvedBy
         ? { id: Number(r.resolvedBy), name: r.resolvedByName ?? null }
+        : null,
+      // V2_AUTONOMY F1: the Debrief agent's answer, as the learner read it.
+      answer: r.answer
+        ? {
+            action: r.answer.action,
+            reply: r.answer.reply,
+            at: r.answer.at,
+          }
         : null,
       cardText:
         r.section === ASK_ALLY_SECTION ? null : sectionText(cards, r.section),
@@ -1066,7 +1083,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         count: urgent.length,
         oldestSince: iso(urgent[0].since),
         overdue: overdue(urgent[0].since),
-        message: `${urgent.length} urgent: a flag on an important moment or a learner in distress.`,
+        message: `${urgent.length} urgent: a flag on an important moment, a learner in distress, or a debrief shown with a missed risk cue.`,
         link: { page: 'session', runId: urgent[0].id },
       });
     }
@@ -1304,6 +1321,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
         judgeMean: overview.judge.mean,
         meetsTheBar: overview.judge.passRate,
         needsAPerson: Number(needs?.n ?? 0),
+        // v2: nothing is held; how many were shown below the bar (F9).
+        shownBelowBar: Number(overview.runs.belowBar ?? 0),
         costP50Usd: overview.costUsd.p50,
         costP90Usd: overview.costUsd.p90,
         spentThisMonthUsd: overview.budget.monthSpentUsd,

@@ -11,6 +11,7 @@ import '../../../../../core/localization/localization_controller.dart';
 import '../../../../../core/localization/translate_ref.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_fonts.dart';
+import '../../../../courses/presentation/course_item_player_screen.dart' show CourseItemPlayerArgs;
 import '../../../data/learner_debrief_repository.dart';
 import 'debrief_read_aloud.dart';
 import 'learner_debrief_controller.dart';
@@ -30,9 +31,20 @@ class DebriefCards extends ConsumerStatefulWidget {
     this.composer,
     this.readOnly = false,
     this.onSeeQuote,
+    this.trackId,
+    this.thisRoleplay,
   });
 
   final LearnerDebriefController controller;
+
+  /// This session's roleplay: "Practise this next" falls back to it when
+  /// the card's own roleplay can't be opened.
+  final int? thisRoleplay;
+
+  /// The course this session was played in: "Practise this" opens the
+  /// roleplay inside it, so its Feedback returns to the course. Null for a
+  /// standalone roleplay.
+  final String? trackId;
 
   /// Opened from Logs: the debrief is not marked opened. (The supervisor's
   /// view, [LearnerDebriefView.supervisor], also shows no controls.)
@@ -259,6 +271,8 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
             readEndKey: _readEndKey,
             readThroughKey: _readThroughKey,
             replyThread: widget.replyThread,
+            trackId: widget.trackId,
+            thisRoleplay: widget.thisRoleplay,
           ),
           _ => const SizedBox.shrink(),
         };
@@ -412,7 +426,7 @@ class _QuestionKeyScope extends InheritedWidget {
 List<String> readableSections(LearnerDebriefView view) {
   final cards = view.cards;
   if (cards == null) return const [];
-  final removed = {for (final c in view.corrections) if (c.removed) c.section};
+  final removed = view.removedSections;
   return [
     if (cards.importantMoment != null) 'important_moment',
     'opening',
@@ -745,9 +759,13 @@ class _ReadyCards extends ConsumerWidget {
     required this.readEndKey,
     required this.readThroughKey,
     this.replyThread,
+    this.trackId,
+    this.thisRoleplay,
   });
 
   final DebriefCardsData cards;
+  final String? trackId;
+  final int? thisRoleplay;
   final LearnerDebriefView view;
   final LearnerDebriefController controller;
   final DebriefReadAloud readAloud;
@@ -764,7 +782,7 @@ class _ReadyCards extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Sections keep their stored index, the one a flag and a correction name.
-    final removed = {for (final c in view.corrections) if (c.removed) c.section};
+    final removed = view.removedSections;
     DebriefMyFlag? flagFor(String section) => view.flags.where((f) => f.section == section).firstOrNull;
     DebriefCorrection? correctionFor(String section) =>
         view.corrections.where((c) => c.section == section).firstOrNull;
@@ -802,7 +820,12 @@ class _ReadyCards extends ConsumerWidget {
     final momentTitle = ref.t(
       moment?.handledWell ?? false ? '$_k.importantMoment.titleHandledWell' : '$_k.importantMoment.title',
     );
-    final practiseTitle = ref.t('$_k.practiseNext');
+    // A course session (clinical review 2026-11-16): practise this same
+    // course item again, with what to try this time.
+    final practiseScenario =
+        practise == null ? null : view.practiseNextFor(practise.scenarioId, thisRoleplay: thisRoleplay);
+    final practiseAgain = practiseScenario?.trackItemId != null || (practise?.tryNext.isNotEmpty ?? false);
+    final practiseTitle = ref.t(practiseAgain ? '$_k.practiseAgain' : '$_k.practiseNext');
 
     final children = <Widget>[
       if (moment != null)
@@ -870,7 +893,8 @@ class _ReadyCards extends ConsumerWidget {
                     _Quote(item.quote),
                     _Body(item.why),
                     _TrySaying(label: ref.t('$_k.trySaying'), text: item.trySaying),
-                    if (view.practiceFor(item.scenarioId) case final scenario?) _PractiseLink(scenario: scenario),
+                    if (view.practiceFor(item.scenarioId) case final scenario?)
+                      _PractiseLink(scenario: scenario, trackId: trackId),
                     flag('work_on_this[$index]', item.lead),
                   ],
                 ),
@@ -885,14 +909,30 @@ class _ReadyCards extends ConsumerWidget {
           title: practiseTitle,
           icon: Icon(Icons.eco_outlined, size: 20, color: AppColors.primary),
           children: [
-            _Lead(practise.skill),
+            if (practise.skill.isNotEmpty) _Lead(practise.skill),
             _Body(practise.reason),
-            if (view.practiceFor(practise.scenarioId) case final scenario?)
+            if (practise.tryNext.isNotEmpty)
+              Column(
+                key: const Key('debrief-practise-try'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Lead(ref.t('$_k.practise.tryFollowing')),
+                  for (final item in practise.tryNext) _Body('•  $item'),
+                ],
+              ),
+            if (practiseScenario case final scenario?)
               _PractiseLink(
                 scenario: scenario,
+                trackId: trackId,
                 primary: true,
+                again: practiseAgain,
                 onOpen: () => controller.recordEvent(DebriefLearnerEvent.practiseNextClick),
-              ),
+              )
+            // Never the card without a way to practise: with no roleplay the
+            // learner can still open, their roleplays list. A supervisor
+            // reading someone else's debrief gets the text only.
+            else if (supervisor == null)
+              _RoleplaysLink(onOpen: () => controller.recordEvent(DebriefLearnerEvent.practiseNextClick)),
             flag('practise_next', practiseTitle),
           ],
         ),
@@ -989,8 +1029,7 @@ class _ReadyCards extends ConsumerWidget {
         ],
       ),
       ),
-      if (removed.isNotEmpty)
-        Text(ref.t('$_k.corrections.removed'), key: const Key('debrief-removed-note'), style: _smallStyle),
+      ..._removedNotes(ref, removed, momentTitle, practiseTitle),
       if (supervisor != null)
         Text(
           ref.t(switch (supervisor.helpful) {
@@ -1020,6 +1059,48 @@ class _ReadyCards extends ConsumerWidget {
         for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(height: 16), children[i]],
       ],
     );
+  }
+
+  /// Why each removed card went (the review's note or Ally's reply to the
+  /// learner's flag), named by its title; the plain "a point was removed"
+  /// line only for removals with no reason.
+  List<Widget> _removedNotes(WidgetRef ref, Set<String> removed, String momentTitle, String practiseTitle) {
+    if (removed.isEmpty) return const [];
+    String label(String section) {
+      final index = int.tryParse(RegExp(r'\[(\d+)\]').firstMatch(section)?.group(1) ?? '');
+      if (section == 'important_moment') return momentTitle;
+      if (section == 'practise_next') return practiseTitle;
+      if (section == 'progress_card') return ref.t('$_k.progressCard.title', {'n': cards.progressCard?.sessions ?? 0});
+      if (section.startsWith('what_worked') && index != null && index < cards.whatWorked.length) {
+        return cards.whatWorked[index].lead;
+      }
+      if (section.startsWith('work_on_this') && index != null && index < cards.workOnThis.length) {
+        return cards.workOnThis[index].lead;
+      }
+      return '';
+    }
+
+    final withReason = <Widget>[];
+    var withoutReason = false;
+    for (final section in removed) {
+      final reason = view.removalReason(section);
+      final card = label(section);
+      if (reason == null || reason.isEmpty || card.isEmpty) {
+        withoutReason = true;
+        continue;
+      }
+      withReason.add(
+        Text(
+          ref.t('$_k.corrections.removedWithReason', {'card': card, 'reason': reason}),
+          key: ValueKey('debrief-removed-$section'),
+          style: _smallStyle,
+        ),
+      );
+    }
+    return [
+      ...withReason,
+      if (withoutReason) Text(ref.t('$_k.corrections.removed'), key: const Key('debrief-removed-note'), style: _smallStyle),
+    ];
   }
 
   /// [child] with a zero-height marker under it, so the marker's position
@@ -1199,10 +1280,18 @@ class _SupportLines extends StatelessWidget {
 /// trigger warnings come first. Only for a roleplay the server says the
 /// learner can still open.
 class _PractiseLink extends ConsumerWidget {
-  const _PractiseLink({required this.scenario, this.primary = false, this.onOpen});
+  const _PractiseLink({required this.scenario, this.trackId, this.primary = false, this.again = false, this.onOpen});
 
   final DebriefPracticeScenario scenario;
   final bool primary;
+
+  /// A course session's "Practise this again": opens this same course item.
+  final bool again;
+
+  /// Inside a course: a suggestion that is a course item opens in the
+  /// course player; any other roleplay keeps the course on its route, so
+  /// its Feedback returns to the course. Nothing is suggested client-side.
+  final String? trackId;
 
   /// Called before the roleplay opens (the `practise_next_click` event).
   final VoidCallback? onOpen;
@@ -1213,9 +1302,17 @@ class _PractiseLink extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     void open() {
       onOpen?.call();
-      context.push('/simulations/${scenario.id}');
+      final track = trackId;
+      final item = scenario.trackItemId;
+      if (track != null && item != null) {
+        context.push('/courses/item/$item', extra: CourseItemPlayerArgs(trackId: track));
+      } else if (track != null) {
+        context.push(Uri(path: '/simulations/${scenario.id}', queryParameters: {'trackId': track}).toString());
+      } else {
+        context.push('/simulations/${scenario.id}');
+      }
     }
-    final label = ref.t(primary ? '$_k.next' : '$_k.this');
+    final label = ref.t(again ? '$_k.again' : primary ? '$_k.next' : '$_k.this');
     final button = primary
         ? FilledButton(
             key: const Key('debrief-practise-next'),
@@ -1245,6 +1342,34 @@ class _PractiseLink extends ConsumerWidget {
         button: true,
         excludeSemantics: true,
         child: button,
+      ),
+    );
+  }
+}
+
+/// "Open my roleplays": the learner's roleplays list, for a "Practise this
+/// next" card with no roleplay they can open (web `debrief-practise-roleplays`).
+class _RoleplaysLink extends ConsumerWidget {
+  const _RoleplaysLink({this.onOpen});
+
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: FilledButton(
+        key: const Key('debrief-practise-roleplays'),
+        onPressed: () {
+          onOpen?.call();
+          context.push('/simulations');
+        },
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(64, 44),
+          backgroundColor: AppColors.primary,
+          textStyle: _leadStyle,
+        ),
+        child: Text(ref.t('postSim.debriefCards.practise.roleplays')),
       ),
     );
   }
@@ -1570,27 +1695,70 @@ class _CardFlagState extends ConsumerState<CardFlag> {
     if (mounted) setState(() => _undoing = false);
   }
 
+  /// Ally's reply to the learner's flag, under what it did.
+  Widget? _answerReply(DebriefFlagAnswer? answer, {String? skipIfSameAs}) {
+    final reply = answer?.reply;
+    if (reply == null || reply.isEmpty || reply == skipIfSameAs?.trim()) return null;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text.rich(
+        TextSpan(
+          text: '${ref.t('$_k.answer.label')} ',
+          style: _smallStyle.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium, color: AppColors.highEmphasis),
+          children: [TextSpan(text: reply, style: _smallStyle)],
+        ),
+        key: const Key('debrief-flag-answer-reply'),
+      ),
+    );
+  }
+
+  Widget _withReply(Widget status, Widget? reply) => reply == null
+      ? status
+      : Semantics(
+          liveRegion: true,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [status, reply]),
+        );
+
   @override
   Widget build(BuildContext context) {
     final correction = widget.correction;
+    final answer = widget.flag?.answer;
     if (correction?.outcome == DebriefCorrectionOutcome.corrected) {
       // v9 FR-31: the card already shows the new words; say when and why.
       final at = correction!.at;
       final language = ref.watch(localizationControllerProvider.notifier).currentLanguage;
-      return Text(
-        ref.t('postSim.debriefCards.corrections.corrected', {
-          'date': at == null ? '' : _mediumDate(at.toLocal(), language),
-          'note': correction.note ?? '',
-        }).trim(),
-        key: const Key('debrief-correction'),
-        style: _smallStyle,
+      return _withReply(
+        Text(
+          ref.t('postSim.debriefCards.corrections.corrected', {
+            'date': at == null ? '' : _mediumDate(at.toLocal(), language),
+            'note': correction.note ?? '',
+          }).trim(),
+          key: const Key('debrief-correction'),
+          style: _smallStyle,
+        ),
+        _answerReply(answer, skipIfSameAs: correction.note),
       );
     }
     if (correction != null && !correction.removed) {
-      return Text(
-        ref.t('postSim.debriefCards.corrections.kept', {'note': correction.note ?? ''}).trim(),
-        key: const Key('debrief-correction'),
-        style: _smallStyle,
+      return _withReply(
+        Text(
+          ref.t('postSim.debriefCards.corrections.kept', {'note': correction.note ?? ''}).trim(),
+          key: const Key('debrief-correction'),
+          style: _smallStyle,
+        ),
+        _answerReply(answer, skipIfSameAs: correction.note),
+      );
+    }
+
+    // Ally answered the flag (V2_AUTONOMY F1) and no review says more.
+    if (answer != null && answer.action != DebriefFlagAnswerAction.removed) {
+      return _withReply(
+        Text(
+          ref.t(answer.action == DebriefFlagAnswerAction.corrected ? '$_k.answer.corrected' : '$_k.answer.kept'),
+          key: const Key('debrief-flag-answer'),
+          style: _smallStyle,
+        ),
+        _answerReply(answer),
       );
     }
 

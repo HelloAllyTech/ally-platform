@@ -30,6 +30,10 @@ export interface GraphLogEntry {
   retries?: number | null;
   error?: string | null;
   attention?: boolean;
+  /** Where the entry came from (ally-ai sets it where the entry is written). */
+  origin?: 'fixed' | 'planned' | 'top_up' | null;
+  /** The planner's reason, on a planned agent's entries. */
+  planReason?: string | null;
 }
 
 /** The independent judge's call, as `POST /api/v1/debrief-quality/judge` returns it. */
@@ -77,6 +81,9 @@ export interface AgentLogEntryView {
   retries: number;
   error: string | null;
   attention: boolean;
+  /** fixed / planned / top_up; null on entries from before it was recorded (unknown). */
+  origin: 'fixed' | 'planned' | 'top_up' | null;
+  planReason: string | null;
 }
 
 export interface AgentLogsView {
@@ -195,6 +202,9 @@ export class DebriefRunLogsService {
         retries: 0,
         error: log.error ?? null,
         attention: !!log.error,
+        // The independent check runs on every published debrief.
+        origin: 'fixed',
+        planReason: null,
         startedAt: new Date(Date.now() - Number(log.ms ?? 0)),
       });
     } catch (e) {
@@ -244,6 +254,11 @@ export class DebriefRunLogsService {
       retries: e.retries ?? 0,
       error: e.error ?? null,
       attention: !!e.attention || !!e.error,
+      origin:
+        e.origin === 'fixed' || e.origin === 'planned' || e.origin === 'top_up'
+          ? e.origin
+          : null,
+      planReason: e.planReason ? String(e.planReason).slice(0, 1000) : null,
       startedAt: e.startedAt ? new Date(e.startedAt) : null,
     };
   }
@@ -317,6 +332,8 @@ export class DebriefRunLogsService {
         retries: r.retries ?? 0,
         error: r.error ?? null,
         attention: !!r.attention,
+        origin: r.origin ?? null,
+        planReason: r.planReason ?? null,
       })),
       prompts,
     };

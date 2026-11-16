@@ -13,7 +13,7 @@ export class DebriefOwnerSettings extends BaseWithoutTenantEntity {
   id!: number;
 
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
-  values!: Record<string, number | boolean>;
+  values!: Record<string, number | boolean | string>;
 
   @Column({ type: 'jsonb', nullable: true })
   proposal?: Record<string, any> | null;
@@ -31,4 +31,12 @@ export class DebriefOwnerSettings extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'jsonb', nullable: true })
   autonomy?: Record<string, any> | null;
+
+  /**
+   * Who last changed each setting (migration 1981901500000): by key,
+   * `{by, byId, at, why, changeId}`. A person's edit, or the PM agent's
+   * tuning of the test settings (v2 A10), which Settings › Tests shows.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  changes?: Record<string, any> | null;
 }

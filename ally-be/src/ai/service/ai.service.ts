@@ -63,6 +63,10 @@ import {
 import {
   AgentRunRequest,
   AgentRunResponse,
+  ConversationSummaryRequest,
+  ConversationSummaryResponse,
+  MemoryCheckRequest,
+  MemoryCheckResponse,
   AgentStreamEvent,
   CrisisCheckRequest,
   CrisisCheckResponse,
@@ -801,6 +805,33 @@ export class AiService {
    *
    * redactBody=true: the payload is the person's question.
    */
+  /**
+   * Which memory lines a health assistant may keep (chunk 8a). One attempt, 5s: it runs after the
+   * reply, and the caller keeps nothing when it fails or times out. The body is what the person
+   * said, so it is never logged.
+   */
+  async checkMemoryLines(request: MemoryCheckRequest) {
+    return this.postKnowledge<MemoryCheckResponse, MemoryCheckRequest>(
+      ENDPOINTS.AGENT_MEMORY_CHECK,
+      request,
+      { timeoutMs: 5_000, alertOnFailure: false },
+    );
+  }
+
+  /**
+   * A chat's new rolling summary (chunk 8a). One attempt, 15s, after the reply: the caller keeps
+   * the old summary when it fails, and the next reply tries again.
+   */
+  async summarizeConversation(request: ConversationSummaryRequest) {
+    return this.postKnowledge<
+      ConversationSummaryResponse,
+      ConversationSummaryRequest
+    >(ENDPOINTS.AGENT_CONVERSATION_SUMMARY, request, {
+      timeoutMs: 15_000,
+      alertOnFailure: false,
+    });
+  }
+
   /**
    * The owner's "How it works" (chunk 20d-2): the instructions a run would start from, built by
    * ally-ai's own prompt code from the same body `runAgent` sends. No model call. Additive.

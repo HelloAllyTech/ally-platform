@@ -283,7 +283,7 @@ const view = (over: Record<string, unknown> = {}) => ({
 
 const renderPage = () =>
   render(
-    <MemoryRouter initialEntries={["/debriefs/sessions/run-1?cat=needs"]}>
+    <MemoryRouter initialEntries={["/debriefs/sessions/run-1?language=en"]}>
       <Routes>
         <Route path="/debriefs/sessions/:runId" element={<DebriefSessionPage />} />
       </Routes>
@@ -311,23 +311,26 @@ const firstTurnLine = () =>
   screen.getAllByTestId("session-turn")[0].querySelector("[data-anchor]") as HTMLElement;
 
 describe("Session page", () => {
-  it("titles the page by scenario and moves through the queue in ally-be's order", () => {
+  it("titles the page by scenario; no queue, no status pills, facts are learner, organisation, language", () => {
     renderPage();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Exam stress, first call");
-    expect(screen.getByTestId("queue-position")).toHaveTextContent("1 of 2");
-    expect(screen.getByTestId("session-next")).toHaveAttribute(
-      "href",
-      "/debriefs/sessions/run-2?cat=needs",
-    );
-    // No previous run: the button stays, disabled, so the control never shifts.
-    expect(screen.getByTestId("session-prev")).toBeDisabled();
+    expect(screen.queryByTestId("queue-position")).toBeNull();
+    expect(screen.queryByTestId("session-next")).toBeNull();
+    expect(screen.queryByTestId("session-prev")).toBeNull();
     const facts = screen.getByTestId("session-facts");
-    expect(facts).toHaveTextContent("6.4 / 10");
-    // Plain words on the advisor's page: no "Judge", "Evaluator" or "Release".
-    expect(facts).toHaveTextContent("Independent check");
-    expect(facts).toHaveTextContent("Ally’s own check");
-    expect(facts).toHaveTextContent("Versionv5");
-    expect(facts).not.toHaveTextContent(/Judge|Evaluator|Release/);
+    expect(
+      within(facts)
+        .getAllByRole("term")
+        .map(t => t.textContent),
+    ).toEqual(["Learner", "Organisation", "Language"]);
+    expect(facts).toHaveTextContent("Asha");
+    expect(facts).toHaveTextContent("Sangath");
+    // No scores, cost, time or version.
+    expect(facts).not.toHaveTextContent(/Quality score|Draft score|Cost|Time|Version|6\.4/);
+    const header = screen.getByTestId("session-header");
+    for (const word of ["Urgent", "Needs a person", "Important moment", "Published"]) {
+      expect(header).not.toHaveTextContent(word);
+    }
   });
 
   describe("learner flags on a card", () => {
@@ -336,27 +339,48 @@ describe("Session page", () => {
         .getAllByTestId("session-card-block")
         .find(c => c.dataset.section === "work_on_this[0]") as HTMLElement;
 
-    it("an open flag shows its reason and the learner's note on one line, the whole note on focus", () => {
+    it("the flagged card carries ⚑ Flagged by the learner, which opens to their note and Ally's answer", () => {
+      h.session.mockReturnValue(
+        ok(
+          view({
+            flags: [
+              {
+                ...FLAG,
+                answer: {
+                  action: "kept",
+                  reply: "The client said “I don't see the point any more.”",
+                  at: "2026-11-12T09:01:00Z",
+                },
+              },
+            ],
+          }),
+        ),
+      );
       renderPage();
-      const tag = within(workCard()).getByTestId("card-flag-tag");
-      expect(tag).toHaveTextContent(
-        "Flagged: “Advice doesn't fit” · “She never said anything about harming herself.”",
+      const marker = within(workCard()).getByTestId("card-flag-marker");
+      expect(marker.tagName).toBe("DETAILS");
+      expect(marker).not.toHaveAttribute("open");
+      expect(marker).toHaveTextContent("⚑ Flagged by the learner");
+      expect(marker).toHaveTextContent("What the learner said, and how Ally answered");
+      expect(within(marker).getByTestId("card-flag-said")).toHaveTextContent(
+        "They chose “Advice doesn't fit” and wrote: “She never said anything about harming herself.”",
       );
-      expect(tag).toHaveAttribute("tabindex", "0");
-      expect(tag).toHaveAttribute(
-        "aria-label",
-        "Flagged: “Advice doesn't fit” · “She never said anything about harming herself.”",
+      expect(within(marker).getByTestId("card-flag-answer")).toHaveTextContent(
+        "Ally kept the card and replied: “The client said “I don't see the point any more.””",
       );
-      expect(within(tag).getByTestId("card-flag-note-full")).toHaveClass("group-focus:visible");
       expect(within(workCard()).queryByTestId("card-learner-outcome")).toBeNull();
     });
 
-    it("an open flag without a note shows the reason alone", () => {
-      h.session.mockReturnValue(ok(view({ flags: [{ ...FLAG, note: null }] })));
+    it("before Ally answers, the marker says it will within a minute; a flag without a note gives the reason alone", () => {
+      h.session.mockReturnValue(ok(view({ flags: [{ ...FLAG, note: null, answer: null }] })));
       renderPage();
-      const tag = within(workCard()).getByTestId("card-flag-tag");
-      expect(tag).toHaveTextContent(/^Flagged: “Advice doesn't fit”$/);
-      expect(within(tag).queryByTestId("card-flag-note-full")).toBeNull();
+      const marker = within(workCard()).getByTestId("card-flag-marker");
+      expect(within(marker).getByTestId("card-flag-said")).toHaveTextContent(
+        /^They chose “Advice doesn't fit”\.$/,
+      );
+      expect(within(marker).getByTestId("card-flag-no-answer")).toHaveTextContent(
+        "Ally hasn't answered yet; it answers within a minute.",
+      );
     });
 
     it.each([
@@ -390,35 +414,65 @@ describe("Session page", () => {
     });
   });
 
-  it("keeps the Review panel closed until asked for, with the judge's reasons inside", () => {
+  it("keeps the Review panel closed until asked for; it never offers Publish or today's debrief", () => {
     renderPage();
     expect(screen.queryByTestId("review-panel")).toBeNull();
     fireEvent.click(screen.getByTestId("review-button"));
-    expect(screen.getByTestId("judge-reasons")).toHaveTextContent("hopelessness (turn 1)");
+    const panel = screen.getByTestId("review-panel");
+    expect(within(panel).queryByRole("button", { name: "Publish as it is" })).toBeNull();
+    expect(within(panel).queryByRole("button", { name: /today's debrief/i })).toBeNull();
+    // The held item is gone; the learner's flag stays for a person to change (F3).
+    expect(within(panel).getAllByRole("button", { name: "Correct it" })).toHaveLength(1);
   });
 
   describe("waiting on you", () => {
-    it("shows each pending action, red first, with read-first links that highlight", () => {
+    const ESCALATED = {
+      kind: "escalated_flag",
+      level: "red",
+      waitingSince: "2026-11-12T09:00:00Z",
+      overdue: false,
+      title: "Escalated to you.",
+      flagId: "flag-1",
+      anchors: { turns: [1, 2], cardSection: "work_on_this[0]" },
+      decisions: ["correct", "keep", "remove"],
+    };
+
+    it("the bar shows only an escalation, with read-first links that highlight", () => {
+      h.session.mockReturnValue(
+        ok(
+          view({
+            viewer: ADVISOR,
+            pendingActions: [ESCALATED, ...TEAM_PENDING],
+            escalation: {
+              at: "2026-11-12T09:00:00Z",
+              note: "Is asking directly right for a first call?",
+              by: { id: 3, name: "Priya" },
+            },
+          }),
+        ),
+      );
       renderPage();
       const items = screen.getAllByTestId("waiting-item");
-      expect(items.map(i => i.dataset.kind)).toEqual(["urgent_flag", "held"]);
+      expect(items.map(i => i.dataset.kind)).toEqual(["escalated_flag"]);
       expect(items[0]).toHaveAttribute("role", "alert");
-      expect(items[1]).toHaveAttribute("role", "status");
+      expect(items[0]).toHaveTextContent("Is asking directly right for a first call?");
       fireEvent.click(within(items[0]).getByRole("button", { name: "the flagged card" }));
       const card = screen
         .getAllByTestId("session-card-block")
         .find(c => c.dataset.section === "work_on_this[0]") as HTMLElement;
       expect(card).toHaveAttribute("data-highlight", "true");
-      fireEvent.click(within(items[0]).getByRole("button", { name: "turns 1–2 in the roleplay" }));
-      expect(screen.getAllByTestId("session-turn")[0]).toHaveAttribute("data-highlight", "true");
-      // Escalating lives in the panel and on "e", not in the bar.
-      expect(within(items[0]).queryByRole("button", { name: /Escalate/ })).toBeNull();
+    });
+
+    it("no bar for the team's own items: a flag or a held debrief is no banner", () => {
+      renderPage();
+      expect(screen.queryByTestId("waiting-bar")).toBeNull();
     });
 
     it("Keep asks for the reason the learner reads, then turns the Review button green", async () => {
       renderPage();
+      fireEvent.click(screen.getByTestId("review-button"));
       fireEvent.click(
-        within(screen.getAllByTestId("waiting-item")[0]).getByRole("button", { name: "Keep it" }),
+        within(screen.getByTestId("review-panel")).getByRole("button", { name: "Keep it" }),
       );
       const dialog = screen.getByRole("dialog");
       const keep = within(dialog).getByRole("button", { name: "Keep it" });
@@ -434,24 +488,6 @@ describe("Session page", () => {
         expect(screen.getByTestId("review-button")).toHaveTextContent("Reviewed · kept"),
       );
       expect(screen.getByTestId("review-button")).toHaveAttribute("data-reviewed", "true");
-    });
-
-    it("Publish as it is confirms first", async () => {
-      renderPage();
-      const held = screen.getAllByTestId("waiting-item")[1];
-      fireEvent.click(within(held).getByRole("button", { name: "Publish as it is" }));
-      expect(h.act).not.toHaveBeenCalled();
-      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Publish" }));
-      await waitFor(() => expect(h.act).toHaveBeenCalledWith({ id: "run-1", action: "publish" }));
-      await waitFor(() =>
-        expect(screen.getByTestId("review-button")).toHaveTextContent("Reviewed · published"),
-      );
-    });
-
-    it("e escalates what is waiting", async () => {
-      renderPage();
-      fireEvent.keyDown(window, { key: "e" });
-      await waitFor(() => expect(h.escalate).toHaveBeenCalledWith({ kind: "flags", id: "flag-1" }));
     });
 
     it("shows no bar and no decisions to a viewer whose role can't act", () => {
@@ -476,10 +512,9 @@ describe("Session page", () => {
   describe("correct in place", () => {
     it("edits the flagged card where it sits, quote locked, and saves a new version", async () => {
       renderPage();
+      fireEvent.click(screen.getByTestId("review-button"));
       fireEvent.click(
-        within(screen.getAllByTestId("waiting-item")[0]).getByRole("button", {
-          name: "Correct it",
-        }),
+        within(screen.getByTestId("review-panel")).getByRole("button", { name: "Correct it" }),
       );
       const form = screen.getByTestId("correct-in-place");
       expect(within(form).getByTestId("correct-quote")).toHaveTextContent(
@@ -507,39 +542,6 @@ describe("Session page", () => {
       );
       await waitFor(() => expect(screen.queryByTestId("correct-in-place")).toBeNull());
       expect(screen.getByTestId("review-button")).toHaveTextContent("Reviewed · corrected");
-    });
-
-    it("corrects a held debrief's card without a flag through the run", async () => {
-      h.session.mockReturnValue(
-        ok(
-          view({
-            flags: [],
-            pendingActions: [
-              { ...TEAM_PENDING[1], anchors: { turns: [2], cardSection: "work_on_this[0]" } },
-            ],
-          }),
-        ),
-      );
-      renderPage();
-      fireEvent.click(
-        within(screen.getByTestId("waiting-item")).getByRole("button", { name: "Correct it" }),
-      );
-      const form = screen.getByTestId("correct-in-place");
-      fireEvent.change(within(form).getByLabelText("Headline"), {
-        target: { value: "Pause first" },
-      });
-      fireEvent.change(within(form).getByLabelText(/What changed/), {
-        target: { value: "Clearer." },
-      });
-      fireEvent.click(within(form).getByRole("button", { name: "Save as version 2" }));
-      await waitFor(() =>
-        expect(h.correct).toHaveBeenCalledWith({
-          id: "run-1",
-          section: "work_on_this[0]",
-          correction: { lead: "Pause first" },
-          note: "Clearer.",
-        }),
-      );
     });
   });
 
@@ -649,7 +651,6 @@ describe("Session page", () => {
       ),
     );
     renderPage();
-    expect(screen.getByTestId("session-facts")).toHaveTextContent("After your verdict");
     fireEvent.click(screen.getByTestId("review-button"));
     fireEvent.click(screen.getByLabelText(/ignores how the learner responded/));
     fireEvent.click(screen.getByRole("button", { name: "Save verdict" }));
@@ -850,33 +851,17 @@ describe("Session page", () => {
     expect(replaced).toHaveTextContent("Here is a script…");
   });
 
-  describe("the header (one row: back, title, tags; queue, Agent logs, Review)", () => {
-    it("Previous and Next are icon buttons with the shortcut in their tooltips", () => {
-      h.session.mockReturnValue(
-        ok(view({ queue: { position: 2, total: 3, previousRunId: "run-0", nextRunId: "run-2" } })),
+  describe("the header (one row: back, title; Agent logs, Review)", () => {
+    it("has no queue controls and no tags", () => {
+      renderPage();
+      expect(screen.queryByRole("group", { name: "Queue" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Previous in the queue" })).toBeNull();
+      expect(screen.queryByTestId("more-tags")).toBeNull();
+      // Back keeps the home's filters.
+      expect(screen.getByRole("link", { name: "Debriefs" })).toHaveAttribute(
+        "href",
+        "/debriefs?language=en",
       );
-      renderPage();
-      const prev = screen.getByRole("link", { name: "Previous in the queue" });
-      const next = screen.getByRole("link", { name: "Next in the queue" });
-      expect(prev).toHaveAttribute("title", "Previous in the queue (keyboard: K)");
-      expect(next).toHaveAttribute("title", "Next in the queue (keyboard: J)");
-      expect(prev).toHaveAttribute("href", "/debriefs/sessions/run-0?cat=needs");
-      expect(prev.textContent).toBe("");
-      expect(next.textContent).toBe("");
-      expect(screen.getByRole("group", { name: "Queue" })).toHaveTextContent(/^2 of 3$/);
-      expect(screen.queryByText(/Next · j|Previous · k/)).toBeNull();
-    });
-
-    it("shows at most two tags, Urgent first, the rest behind +N with a tooltip", () => {
-      renderPage();
-      const header = screen.getByTestId("session-header");
-      const tags = within(header)
-        .getAllByText(/^(Urgent|Needs a person|Important moment|\+1)$/)
-        // Tags, not the back link's label.
-        .filter(t => t.tagName === "SPAN" && !t.closest("a"))
-        .map(t => t.textContent);
-      expect(tags).toEqual(["Urgent", "Needs a person", "+1"]);
-      expect(screen.getByTestId("more-tags")).toHaveAttribute("title", "Important moment");
     });
 
     it("truncates the title, with the whole title in its tooltip", () => {
@@ -896,9 +881,8 @@ describe("Session page", () => {
       expect(actions.className).toMatch(/\bshrink-0\b/);
       expect(actions.className).toMatch(/\bflex-nowrap\b/);
       expect(actions.className).toMatch(/max-\[1055px\]:basis-full/);
-      // The actions in order: the queue, Agent logs, Review.
+      // The actions in order: Agent logs, Review.
       const order = [
-        within(actions).getByRole("group", { name: "Queue" }),
         within(actions).getByTestId("agent-logs-button"),
         within(actions).getByTestId("review-button"),
       ];
@@ -910,9 +894,6 @@ describe("Session page", () => {
     });
 
     it("between 1056 and 1311px the header drops its labels so the title keeps its room", () => {
-      h.session.mockReturnValue(
-        ok(view({ queue: { position: 2, total: 3, previousRunId: "run-0", nextRunId: "run-2" } })),
-      );
       renderPage();
       const compact = /min-\[1056px\]:max-\[1311px\]:sr-only/;
       // Agent logs becomes an icon, named and with its tooltip.
@@ -924,19 +905,17 @@ describe("Session page", () => {
       const review = screen.getByTestId("review-button");
       expect(review).toHaveAttribute("title", "Review");
       expect(within(review).getByText("Review").className).toMatch(compact);
-      // The back link's label and the queue position go to tooltips.
-      const back = screen.getByRole("link", { name: "Needs a person" });
-      expect(back).toHaveAttribute("title", "Needs a person");
-      expect(within(back).getByText("Needs a person").className).toMatch(compact);
-      expect(screen.getByRole("group", { name: "Queue" })).toHaveAttribute("title", "2 of 3");
-      expect(screen.getByTestId("queue-position").className).toMatch(compact);
+      // The back link's label goes to its tooltip.
+      const back = screen.getByRole("link", { name: "Debriefs" });
+      expect(back).toHaveAttribute("title", "Debriefs");
+      expect(within(back).getByText("Debriefs").className).toMatch(compact);
     });
 
     it("shows Agent logs to the Ally team, linking to the run's logs", () => {
       renderPage();
       expect(screen.getByRole("link", { name: "Agent logs" })).toHaveAttribute(
         "href",
-        "/debriefs/sessions/run-1/logs?cat=needs",
+        "/debriefs/sessions/run-1/logs?language=en",
       );
     });
 

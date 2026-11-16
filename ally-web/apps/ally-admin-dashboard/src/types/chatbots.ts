@@ -265,6 +265,10 @@ export interface TestChatbotResponse {
   trace: AgentTraceStep[] | null;
   /** Why the new engine failed, when v1 answered instead. */
   fallbackReason: string | null;
+  /** The run added or changed a list entry; in Try it that was checked, then not saved (5b). */
+  previewWrite?: boolean;
+  /** What the run would have remembered about the person (chunk 8a); never saved in Try it. */
+  wouldRemember?: string[];
   /** False while the new engine is turned off in Defaults. */
   runtimeAllowed: boolean;
   conversationId: string;

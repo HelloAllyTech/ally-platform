@@ -96,6 +96,14 @@ export class DebriefRunLog {
   @Column({ type: 'boolean', default: false })
   attention!: boolean;
 
+  /** fixed / planned / top_up; null on entries stored before 2026-11-16 (unknown). */
+  @Column({ type: 'varchar', length: 8, nullable: true })
+  origin!: 'fixed' | 'planned' | 'top_up' | null;
+
+  /** The planner's reason, on a planned (or top-up) agent's entries. */
+  @Column({ name: 'plan_reason', type: 'text', nullable: true })
+  planReason!: string | null;
+
   @Column({ name: 'started_at', type: 'timestamptz', nullable: true })
   startedAt?: Date | null;
 

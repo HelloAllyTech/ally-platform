@@ -20,6 +20,7 @@ import '../../../core/widgets/ask_ai_chat/ask_ai_chat.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/toast/toast_controller.dart';
 import '../../account/presentation/profile_settings_screen.dart' show RnCustomSwitch;
+import '../../courses/data/courses_repository.dart';
 import '../../reactions/data/reactions_repository.dart';
 import '../../reviews/data/review_models.dart';
 import '../../reviews/data/reviews_repository.dart';
@@ -60,6 +61,8 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
     this.pathId,
     this.caseId,
     this.languageId,
+    this.trackId,
+    this.trackItemId,
   });
 
   final String scenarioSessionId;
@@ -79,6 +82,16 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
 
   /// RN `route.params.languageId` (carried; the screen itself doesn't read it).
   final int? languageId;
+
+  /// The course this roleplay was played in (web `ActiveTrackContext`):
+  /// back returns to the course, a breadcrumb names it and "Continue the
+  /// course" opens its next item. Null for a standalone roleplay, which
+  /// keeps today's behaviour.
+  final String? trackId;
+
+  /// The course item that started this roleplay, when it was one (carried;
+  /// the next item comes from the server).
+  final String? trackItemId;
 
   @override
   ConsumerState<SimulationFeedbackScreen> createState() => _SimulationFeedbackScreenState();
@@ -274,22 +287,42 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
 
   // ── Navigation ───────────────────────────────────────────────────────
 
+  String? get _trackId {
+    final id = widget.trackId;
+    return id == null || id.isEmpty ? null : id;
+  }
+
+  /// Resets to Learn with [locations] pushed on top, in order (`push`
+  /// builds on the delegate's current stack, which `go` only replaces once
+  /// the new location is parsed — so push on the next frame).
+  void _resetToLearnThen(List<({String location, Object? extra})> locations) {
+    final router = GoRouter.of(context);
+    goToHomeTab(router, kTabLearn);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final next in locations) {
+        router.push(next.location, extra: next.extra);
+      }
+    });
+  }
+
   /// RN `handleBack`: a path/case session resets to that path/case's
-  /// details; Logs go back; a fresh session returns to Learn.
+  /// details; Logs go back; a fresh session returns to Learn. A roleplay
+  /// played inside a course returns to that course (web breadcrumb).
   void _handleBack() {
     if (!mounted) return;
+    final trackId = _trackId;
+    if (trackId != null && !widget.fromLogs) {
+      _resetToLearnThen([(location: '/courses/$trackId', extra: null)]);
+      return;
+    }
     final pathId = widget.pathId;
     final caseId = widget.caseId;
     if (pathId != null || caseId != null) {
       // RN `navigation.reset` to the details screen alone; here the shell
       // stays underneath so back from the details lands on Learn, which is
       // where RN's details screen sends a back with nothing to go back to.
-      final router = GoRouter.of(context);
       final details = pathId != null ? '/simulation-paths/$pathId' : '/cases/$caseId';
-      goToHomeTab(router, kTabLearn);
-      // `push` builds on the delegate's current stack, which `go` only
-      // replaces once the new location is parsed — push on the next frame.
-      WidgetsBinding.instance.addPostFrameCallback((_) => router.push(details));
+      _resetToLearnThen([(location: details, extra: null)]);
       return;
     }
     if (widget.fromLogs) {
@@ -297,6 +330,53 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       return;
     }
     goToHomeTab(GoRouter.of(context), kTabLearn);
+  }
+
+  bool _continuing = false;
+
+  /// "Continue the course" (web `useContinueTrack`): the server's next item,
+  /// opened over the course; the course itself once it is complete or the
+  /// lookup fails.
+  Future<void> _continueCourse() async {
+    final trackId = _trackId;
+    if (trackId == null || _continuing) return;
+    setState(() => _continuing = true);
+    final course = (location: '/courses/$trackId', extra: null as Object?);
+    var locations = [course];
+    try {
+      final result = await ref.read(coursesRepositoryProvider).getNextTrackItem(trackId);
+      final next = result.nextItem;
+      if (!result.trackCompleted && next != null) {
+        locations = [course, (location: '/courses/item/${next.id}', extra: (trackId: trackId, item: next))];
+      }
+    } catch (_) {
+      // The course itself, as the web does.
+    }
+    if (!mounted) return;
+    setState(() => _continuing = false);
+    _resetToLearnThen(locations);
+  }
+
+  /// Where leaving goes once the rating popup (asked on leave) is done with:
+  /// back by default, or on into the course.
+  VoidCallback? _afterLeave;
+
+  void _leave() {
+    final after = _afterLeave ?? _handleBack;
+    _afterLeave = null;
+    after();
+  }
+
+  /// "Continue the course", asking for a rating first as back does.
+  void _onContinuePressed() {
+    if (_popupVisible || _continuing) return;
+    if (_shouldAskOnLeave) {
+      _afterLeave = _continueCourse;
+      _popupSource = _PopupSource.leave;
+      setState(() => _popupVisible = true);
+      return;
+    }
+    _continueCourse();
   }
 
   bool get _feedbackEnabled => _summary?.feedbackEnabled ?? true;
@@ -308,6 +388,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
   void _onBackPressed() {
     if (_popupVisible) {
       if (_popupSource == _PopupSource.leave) {
+        _afterLeave = null;
         _hidePopup();
       } else {
         setState(() => _popupVisible = false);
@@ -315,6 +396,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       return;
     }
     if (_shouldAskOnLeave) {
+      _afterLeave = null;
       _popupSource = _PopupSource.leave;
       setState(() => _popupVisible = true);
       return;
@@ -331,7 +413,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         _existingFeedback = (rating: 0, tags: _existingFeedback.tags, comment: _existingFeedback.comment);
       }
     });
-    if (source == _PopupSource.leave) _handleBack();
+    if (source == _PopupSource.leave) _leave();
   }
 
   Future<void> _submitFeedback(FeedbackValue feedback) async {
@@ -357,7 +439,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     }
     // With feedback off the popup is the only surface, so submitting it
     // leaves the screen (mirrors the dismiss path).
-    if (source == _PopupSource.leave || !_feedbackEnabled) _handleBack();
+    if (source == _PopupSource.leave || !_feedbackEnabled) _leave();
   }
 
   void _onRatingSelected(int rating) {
@@ -543,6 +625,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         !widget.fromLogs &&
         widget.pathId == null &&
         widget.caseId == null &&
+        _trackId == null &&
         summary != null;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
@@ -596,6 +679,16 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
                       ],
                     ),
                   ),
+                  if (_trackId != null && !widget.fromLogs)
+                    Padding(
+                      padding: EdgeInsets.only(left: 20, right: 20, bottom: rn.vs(8)),
+                      child: _CourseRow(
+                        trackId: _trackId!,
+                        continuing: _continuing,
+                        onOpenCourse: _onBackPressed,
+                        onContinue: _onContinuePressed,
+                      ),
+                    ),
                   if (showChecklist)
                     Padding(
                       padding: EdgeInsets.only(left: 10, right: 10, bottom: rn.vs(8)),
@@ -654,7 +747,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
                   title: ref.t('callFeedback.questionText'),
                   placeholder: ref.t('callFeedback.placeholderText'),
                   initialFeedback: _existingFeedback,
-                  onClose: _feedbackEnabled ? _hidePopup : _handleBack,
+                  onClose: _feedbackEnabled ? _hidePopup : _leave,
                   onSubmit: _submitFeedback,
                 ),
               ),
@@ -798,6 +891,8 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
           // Anchors are chips only when there's a transcript to open.
           onOpenMoment: (_summary?.showTranscriptTab ?? true) ? _openMoment : null,
           onSeeQuote: (_summary?.showTranscriptTab ?? true) ? _openQuote : null,
+          // "Practise this" inside a course keeps the course.
+          trackId: widget.fromLogs ? null : _trackId,
         );
       case FeedbackTab.transcript:
         return SimulationTranscriptTab(
@@ -806,6 +901,81 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
           focusMessage: _momentRequest,
         );
     }
+  }
+}
+
+/// Inside a course (web `PostSimulationSummary` breadcrumb + footer): the
+/// course's name, which goes back to it, and "Continue the course", which
+/// opens its next item.
+class _CourseRow extends ConsumerWidget {
+  const _CourseRow({
+    required this.trackId,
+    required this.continuing,
+    required this.onOpenCourse,
+    required this.onContinue,
+  });
+
+  final String trackId;
+  final bool continuing;
+  final VoidCallback onOpenCourse;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final title = ref.watch(trackDetailProvider(trackId)).value?.title;
+    final style = TextStyle(
+      fontFamily: AppFonts.ibmPlexSerifMedium,
+      fontSize: 13,
+      height: 18 / 13,
+      color: AppColors.primary,
+    );
+    // One row, never wrapping: the course name gives way (ellipsis) before
+    // the button does.
+    return Row(
+      key: const Key('simulation-feedback-course'),
+      children: [
+        Expanded(
+          flex: 2,
+          child: Semantics(
+            button: true,
+            label: ref.t('postSim.course.backTo', {'title': title ?? ref.t('learn.choose.course')}),
+            excludeSemantics: true,
+            child: GestureDetector(
+              key: const Key('simulation-feedback-course-name'),
+              behavior: HitTestBehavior.opaque,
+              onTap: onOpenCourse,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title ?? ref.t('learn.choose.course'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: style,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          flex: 3,
+          child: FilledButton(
+            key: const Key('simulation-feedback-continue-course'),
+            onPressed: continuing ? null : onContinue,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(64, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              backgroundColor: AppColors.primary,
+              textStyle: style,
+            ),
+            child: Text(ref.t('postSim.course.continue'), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+        ),
+      ],
+    );
   }
 }
 

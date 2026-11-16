@@ -1,5 +1,11 @@
 import { ConflictException } from '@nestjs/common';
-import { DebriefPmAgentToolsService } from '../service/debrief-pm-agent-tools.service';
+import {
+  changeConfidence,
+  DebriefPmAgentToolsService,
+  NOT_REVIEWED,
+  reviewConfidence,
+} from '../service/debrief-pm-agent-tools.service';
+import { alwaysAsk } from '../util/debrief-always-ask.util';
 import {
   DebriefRunTokenService,
   PM_AGENT_GATEWAY_TOOLS,
@@ -314,6 +320,12 @@ function tools(opts: {
     ),
     writeEvidence: jest.fn(async () => undefined),
     challengerOptions: jest.fn(async () => ({})),
+    // V2_AUTONOMY A8: hand-offs start on their own.
+    autoStartHandoff: jest.fn(async () => ({
+      started: true,
+      stage: 'builder',
+      id: 'session-1',
+    })),
   };
   const reviews = {
     linkIdea: jest.fn(async () => 1),
@@ -393,6 +405,112 @@ describe('the PM agent’s gateway tools enforce the rules', () => {
       null,
       expect.objectContaining({ agentRunId: 'run-1' }),
     );
+  });
+
+  it('idea_propose keeps the stated confidence as advice: the change is low until reviewed', async () => {
+    const { svc, queries } = tools({
+      queries: {
+        'FROM debrief_review_comments WHERE id': [{ id: COMMENT }],
+        'count(*)::int AS n FROM agent_lesson_audit': [{ n: 0 }],
+        'INSERT INTO agent_lessons': [{ id: IDEA }],
+      },
+    });
+    const base = {
+      route: 'B',
+      title: 'Show the card first',
+      hypothesis: 'h',
+      problem: { title: 'p', summary: 's', comment_ids: [COMMENT] },
+      expected_effect: { metric: 'practise_click_through', direction: 'up' },
+    };
+    await svc.call('idea_propose', CLAIMS, {
+      ...base,
+      confidence: { level: 'high', why: '40 comments in 3 languages' },
+    });
+    await svc.call('idea_propose', CLAIMS, { ...base, title: 'Another' });
+    const evidence = queries
+      .filter(([sql]) => sql.includes('INSERT INTO agent_lessons'))
+      .map(([, p]) => JSON.parse(p[3]));
+    // The agent's own "high" is advice only; it never skips the always-ask list.
+    expect(evidence[0].statedConfidence).toEqual({
+      level: 'high',
+      why: '40 comments in 3 languages',
+    });
+    expect(evidence[0].confidence).toEqual(NOT_REVIEWED);
+    expect(evidence[1].statedConfidence).toMatchObject({ level: 'low' });
+    expect(evidence[1].confidence).toEqual(NOT_REVIEWED);
+    expect(changeConfidence({ level: 'sure' })).toMatchObject({ level: 'low' });
+    const settings = { askLowConfidence: true, askModels: false };
+    expect(
+      alwaysAsk({ change: {}, evidence: evidence[0] }, settings)?.kind,
+    ).toBe('low_confidence');
+  });
+
+  it('change_review_record: the reviewer’s verdict sets the confidence; any no or unclear is low', async () => {
+    const proposed = {
+      id: IDEA,
+      status: 'proposed',
+      change: { route: 'A', ideaKind: 'prompt_edit' },
+      evidence: {},
+    };
+    const yes = (evidence = 'n=40') => ({ answer: 'yes', evidence });
+    const high = tools({ idea: proposed });
+    const out = await high.svc.call('change_review_record', CLAIMS, {
+      idea_id: IDEA,
+      supported: yes(),
+      fits_everywhere: yes(),
+      safe: yes(),
+    });
+    expect(out).toMatchObject({ ok: true, level: 'high' });
+    expect(high.pm.writeEvidence).toHaveBeenCalledWith(
+      IDEA,
+      'confidence',
+      expect.objectContaining({ level: 'high' }),
+    );
+
+    for (const weak of [
+      { fits_everywhere: { answer: 'unclear', evidence: 'Tamil only' } },
+      { safe: { answer: 'no', evidence: 'touches crisis copy' } },
+      { supported: {} },
+    ]) {
+      const t = tools({ idea: proposed });
+      await t.svc.call('change_review_record', CLAIMS, {
+        idea_id: IDEA,
+        supported: yes(),
+        fits_everywhere: yes(),
+        safe: yes(),
+        ...weak,
+      });
+      const [, , confidence] = (t.pm.writeEvidence.mock.calls as any[]).find(
+        (c) => c[1] === 'confidence',
+      );
+      expect(confidence.level).toBe('low');
+      expect(confidence.why).toMatch(/^Reviewer: /);
+      // A low verdict makes the change wait for a person.
+      expect(
+        alwaysAsk(
+          { change: proposed.change, evidence: { confidence } },
+          { askLowConfidence: true, askModels: false },
+        )?.kind,
+      ).toBe('low_confidence');
+    }
+    expect(
+      reviewConfidence({
+        supported: yes(),
+        fits_everywhere: yes(),
+        safe: { answer: 'maybe' },
+      }).confidence.level,
+    ).toBe('low');
+  });
+
+  it('change_review_record on a change already decided changes nothing', async () => {
+    const t = tools({
+      idea: { id: IDEA, status: 'active', change: {}, evidence: {} },
+    });
+    const out = await t.svc.call('change_review_record', CLAIMS, {
+      idea_id: IDEA,
+    });
+    expect(out.refused).toMatch(/active/);
+    expect(t.pm.writeEvidence).not.toHaveBeenCalled();
   });
 
   it('idea_propose without evidence is refused and audited as blocked', async () => {
@@ -508,7 +626,10 @@ describe('the PM agent’s gateway tools enforce the rules', () => {
       expected_effect: 'read_through up by 0.05',
       acceptance_checks: ['Console shows card order per language'],
     });
-    expect(out).toMatchObject({ ok: true, quotes_removed: 2 });
+    expect(out).toMatchObject({ ok: true, quotes_removed: 2, started: true });
+    // A8: nobody approves it; Builder starts and the PR waits for an engineer.
+    expect(pm.autoStartHandoff).toHaveBeenCalledWith(IDEA);
+    expect(String(out.waiting_for)).toMatch(/engineer to merge/);
     const [, , key, value] = [
       null,
       null,
@@ -990,7 +1111,8 @@ describe('the scheduler packs the inputs and calls ally-ai with an agent token',
     });
     const body = svc.call.mock.calls[0][0];
     expect(body.budget_usd).toBe(2);
-    expect(body.tools).toEqual([...PM_AGENT_GATEWAY_TOOLS]);
+    expect(body.tools).toEqual([...PM_AGENT_GATEWAY_TOOLS, 'change_read']);
+    expect(body.tools).toContain('change_review_record');
     expect(body.agent_token).toBe('agent-token');
     expect(audit).toHaveBeenCalledWith(
       'curator_run',

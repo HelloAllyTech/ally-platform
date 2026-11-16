@@ -4,6 +4,7 @@ import {
   LIVE_START_DELAY_MS,
   learnerProgress,
 } from '../service/debrief-agent.service';
+import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../util/debrief-live.util';
 
 function build(opts: {
   owner?: number;
@@ -14,6 +15,11 @@ function build(opts: {
   region?: 'india' | 'outside_india';
   stoppedMinutesAgo?: number;
   feedback?: Record<string, unknown> | null;
+  learnerTurns?: number;
+  debriefTabOff?: boolean;
+  mode?: 'off' | 'shadow';
+  /** The organisation's stored provider switches. */
+  providers?: Record<string, boolean>;
 }) {
   const ended = new Date(Date.now() - (opts.endedMinutesAgo ?? 10) * 60_000);
   const dataSource = {
@@ -35,10 +41,13 @@ function build(opts: {
                   status: 'ENDED',
                   ended_at: ended,
                   feedback: opts.feedback ?? null,
+                  learner_turns: opts.learnerTurns,
+                  debrief_tab_off: opts.debriefTabOff ?? false,
                 },
               ],
     ),
   };
+  const events = { emit: jest.fn() };
   const runs = { find: jest.fn(async () => opts.runs ?? []) };
   const overrides = {
     save: jest.fn(async () => undefined),
@@ -51,7 +60,7 @@ function build(opts: {
               },
             }
           : null
-        : { values: { live: true } },
+        : { values: { live: true, ...(opts.providers ?? {}) } },
     ),
   };
   return new DebriefAgentService(
@@ -61,7 +70,7 @@ function build(opts: {
     {} as any,
     {} as any,
     overrides as any,
-    { debriefAgentMode: 'shadow' } as any,
+    { debriefAgentMode: opts.mode ?? 'shadow' } as any,
     {
       available: jest.fn(async (_u: number, _t: string, ids: number[]) =>
         ids
@@ -70,8 +79,20 @@ function build(opts: {
       ),
     } as any,
     { ready: jest.fn(async () => undefined) } as any,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    events as any,
   );
 }
+
+/** Whether the view asked the session service for today's debrief. */
+const askedForToday = (svc: DebriefAgentService) =>
+  ((svc as any).events.emit as jest.Mock).mock.calls.some(
+    ([name]) => name === DEBRIEF_FALLBACK_TO_TODAY_EVENT,
+  );
 
 describe('DebriefAgentService.learnerView', () => {
   it('refuses anyone but the learner who did the session', async () => {
@@ -170,7 +191,92 @@ describe('DebriefAgentService.learnerView', () => {
       riskCue: false,
       supportLines: expect.any(Array),
       practice: [],
+      askAlly: { open: true },
     });
+  });
+
+  it('keeps Ask Ally closed after its limit, until the month turns for the month limit', async () => {
+    const view = (askAllyLimit: Record<string, unknown>) =>
+      build({
+        runs: [
+          {
+            mode: 'live',
+            status: 'published',
+            cards: { opening: 'x' },
+            language: 'en',
+            steps: [],
+            workspace: { askAllyLimit },
+          },
+        ],
+      }).learnerView('s', 7);
+    expect(
+      (await view({ reason: 'session', at: new Date().toISOString() })).askAlly,
+    ).toEqual({ open: false, reason: 'session' });
+    expect(
+      (await view({ reason: 'month', at: new Date().toISOString() })).askAlly,
+    ).toEqual({ open: false, reason: 'month' });
+    expect(
+      (
+        await view({
+          reason: 'month',
+          at: new Date(Date.now() - 40 * 86_400_000).toISOString(),
+        })
+      ).askAlly,
+    ).toEqual({ open: true });
+  });
+
+  it('says too short at once when the learner said nothing', async () => {
+    expect(await build({ learnerTurns: 0 }).learnerView('s', 7)).toEqual({
+      state: 'too_short',
+    });
+  });
+
+  it('gives today’s debrief when the agent is off or the roleplay’s Debrief tab is off', async () => {
+    for (const o of [{ mode: 'off' as const }, { debriefTabOff: true }]) {
+      const svc = build(o);
+      expect(await svc.learnerView('s', 7)).toEqual({
+        state: 'not_available',
+      });
+      expect(askedForToday(svc)).toBe(true);
+    }
+  });
+
+  it('stops "working" 30 minutes after the session ended with no run', async () => {
+    expect(
+      (await build({ endedMinutesAgo: 20 }).learnerView('s', 7)).state,
+    ).toBe('working');
+    const late = build({ endedMinutesAgo: 31 });
+    expect(await late.learnerView('s', 7)).toEqual({ state: 'not_available' });
+    expect(askedForToday(late)).toBe(true);
+  });
+
+  it('does not ask for today’s debrief again when it is already written', async () => {
+    const svc = build({
+      endedMinutesAgo: 31,
+      feedback: { supervisorNote: 'today’s note' },
+    });
+    expect((await svc.learnerView('s', 7)).state).toBe('not_available');
+    expect(askedForToday(svc)).toBe(false);
+  });
+
+  it('says "not available" instead of today’s debrief when its provider is not allowed (FR-57)', async () => {
+    const svc = build({
+      endedMinutesAgo: 31,
+      providers: { 'providerAllowed.openai': false },
+    });
+    expect(await svc.learnerView('s', 7)).toEqual({
+      state: 'not_available',
+      stopped: true,
+      reason: 'provider_not_allowed',
+    });
+    expect(askedForToday(svc)).toBe(false);
+    // Another provider switched off: today's debrief is still allowed.
+    const ok = build({
+      endedMinutesAgo: 31,
+      providers: { 'providerAllowed.anthropic': false },
+    });
+    expect(await ok.learnerView('s', 7)).toEqual({ state: 'not_available' });
+    expect(askedForToday(ok)).toBe(true);
   });
 
   it('says when the safety reading found a risk cue, so the support lines show without an important moment', async () => {
@@ -286,29 +392,63 @@ describe('DebriefAgentService.learnerView', () => {
     ).toBe('not_available');
   });
 
-  it('a run a person must finish reads as on its way with a risk cue, else taking longer', async () => {
-    expect(
-      (
-        await build({
-          runs: [
-            {
-              mode: 'live',
-              status: 'needs_person',
-              hasRiskCue: true,
-              steps: [],
-            },
-          ],
-        }).learnerView('s', 7)
-      ).state,
-    ).toBe('on_its_way');
-    for (const status of ['needs_person', 'failed']) {
+  it('a held draft reads as on its way with a risk cue, else taking longer', async () => {
+    for (const [hasRiskCue, state] of [
+      [true, 'on_its_way'],
+      [false, 'taking_longer'],
+    ] as const) {
       expect(
         (
           await build({
-            runs: [{ mode: 'live', status, hasRiskCue: false, steps: [] }],
+            runs: [
+              {
+                mode: 'live',
+                status: 'needs_person',
+                hasRiskCue,
+                cards: { opening: 'x' },
+                steps: [],
+              },
+            ],
           }).learnerView('s', 7)
         ).state,
-      ).toBe('taking_longer');
+      ).toBe(state);
+    }
+  });
+
+  it('a run with no draft is working while its retry is due, then today’s debrief', async () => {
+    const run = (o: Record<string, unknown>) => ({
+      mode: 'live',
+      steps: [],
+      cards: null,
+      workspace: {},
+      ...o,
+    });
+    expect(
+      (
+        await build({
+          runs: [run({ status: 'needs_person', skipReason: 'writer_failed' })],
+        }).learnerView('s', 7)
+      ).state,
+    ).toBe('working');
+    expect(
+      (await build({ runs: [run({ status: 'failed' })] }).learnerView('s', 7))
+        .state,
+    ).toBe('working');
+    for (const r of [
+      run({
+        status: 'needs_person',
+        skipReason: 'safety_reader_failed',
+        hasRiskCue: true,
+        workspace: { retries: 1 },
+      }),
+      run({ status: 'failed', workspace: { retries: 1 } }),
+      run({ status: 'skipped', skipReason: 'provider_not_allowed' }),
+    ]) {
+      const svc = build({ runs: [r] });
+      expect(await svc.learnerView('s', 7)).toEqual({
+        state: 'not_available',
+      });
+      expect(askedForToday(svc)).toBe(true);
     }
   });
 });
@@ -465,5 +605,34 @@ describe('DebriefAgentService.sweepStuckRuns', () => {
     expect(sql).toContain("CASE WHEN mode = 'live' THEN $1 ELSE $2 END");
     expect(sql).toContain("interval '10 minutes'");
     expect(params).toEqual(['needs_person', 'failed', 'running']);
+  });
+});
+
+describe('DebriefAgentService.showHeldDrafts', () => {
+  it('shows a held live draft below the bar, writes it and tells the learner', async () => {
+    const run = { id: 'a', mode: 'live', status: 'below_bar', cards: {} };
+    const query = jest.fn(async () => [[{ id: 'a' }], 1]);
+    const findOne = jest.fn(async () => run);
+    const applyToSession = jest.fn(async () => true);
+    const ready = jest.fn(async () => undefined);
+    const svc = new DebriefAgentService(
+      { query } as any,
+      { findOne } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { ready } as any,
+      { applyToSession } as any,
+    );
+    expect(await svc.showHeldDrafts()).toBe(1);
+    const [sql, params] = query.mock.calls[0] as unknown as [string, string[]];
+    expect(sql).toContain('cards IS NOT NULL');
+    expect(sql).toContain("NOT (coalesce(workspace, '{}'::jsonb) ? 'review')");
+    expect(params).toEqual(['below_bar', 'needs_person']);
+    expect(applyToSession).toHaveBeenCalledWith(run);
+    expect(ready).toHaveBeenCalledWith(run);
   });
 });

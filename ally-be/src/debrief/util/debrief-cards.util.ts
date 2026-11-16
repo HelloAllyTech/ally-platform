@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { customCodesIn, withoutCustomCodes } from './debrief-competencies.util';
 /**
  * The cards a debrief is made of (the Writer's output), the rule checks every
  * draft must pass before it can be published, and the plain-text rendering
@@ -58,11 +59,23 @@ export interface DebriefCards {
     skill: string;
     reason: string;
     scenario_id?: number | null;
+    /**
+     * A session played in a course: "Try the following:", up to 3 short
+     * actions the learner missed or only partly did when they had the
+     * chance, most important first, in the session language.
+     */
+    try_next?: string[];
   } | null;
   skill_words: Array<{
     skill: string;
     word: 'strength' | 'keep_practising' | 'didnt_come_up';
   }>;
+  /**
+   * Only on a debrief not in English: each skill name the cards use, with its
+   * name in the debrief's language. The `skill` fields stay as the evidence
+   * map names them (progress and metrics match on them); readers show the label.
+   */
+  skill_labels?: Array<{ skill: string; label: string }>;
   reflective_question: string;
   progress_note?: string | null;
   /**
@@ -116,7 +129,15 @@ export enum DebriefCheckCode {
   DUPLICATE_POINT = 'duplicate_point',
   /** v9 C-4: the whole debrief before "Practise this next" is over its word budget. */
   TOTAL_TOO_LONG = 'total_too_long',
+  /**
+   * A custom competency's generated code (`478_custom_27`) in the cards: it
+   * means nothing to the learner (review 2026-11-16).
+   */
+  CUSTOM_CODE = 'custom_code',
 }
+
+/** At most this many "Try the following:" items on Practise this again. */
+export const TRY_NEXT_MAX = 3;
 
 /**
  * Recorded on the run and shown in the Console, but they neither block
@@ -241,7 +262,12 @@ export function cardTexts(
     // language the session was actually spoken in.
     push(`work_on_this[${i}]`, c.try_saying, false);
   });
-  if (cards.practise_next) push('practise_next', cards.practise_next.reason);
+  if (cards.practise_next) {
+    push('practise_next', cards.practise_next.reason);
+    (cards.practise_next.try_next ?? []).forEach((t) =>
+      push('practise_next', t),
+    );
+  }
   push('reflective_question', cards.reflective_question);
   push('progress_note', cards.progress_note);
   return out;
@@ -533,6 +559,50 @@ export function runDebriefChecks(input: {
       );
     }
   }
+  const tryNext = cards.practise_next?.try_next;
+  if (tryNext != null) {
+    if (!Array.isArray(tryNext) || tryNext.length > TRY_NEXT_MAX) {
+      fail(
+        DebriefCheckCode.STRUCTURE,
+        'practise_next',
+        `try_next has more than ${TRY_NEXT_MAX} items`,
+      );
+    }
+    (Array.isArray(tryNext) ? tryNext : []).forEach((t, i) => {
+      if (wordCount(t) > LEAD_MAX_WORDS) {
+        fail(
+          DebriefCheckCode.TOO_LONG,
+          'practise_next',
+          `try_next[${i}] is ${wordCount(t)} words`,
+        );
+      }
+    });
+  }
+  // A custom competency's code anywhere (a skill, a skill word, any text)
+  // is the Writer's to fix in revision; finaliseCards strips what is left.
+  const sections = (
+    [
+      ['opening', cards.opening],
+      ['important_moment', cards.important_moment],
+      ...worked.map((c, i) => [`what_worked[${i}]`, c]),
+      ...wot.map((c, i) => [`work_on_this[${i}]`, c]),
+      ['practise_next', cards.practise_next],
+      ['skill_words', cards.skill_words],
+      ['skill_labels', cards.skill_labels],
+      ['reflective_question', cards.reflective_question],
+      ['progress_note', cards.progress_note],
+    ] as Array<[string, unknown]>
+  ).filter(([, v]) => v != null);
+  for (const [section, value] of sections) {
+    const codes = customCodesIn(value);
+    if (codes.length) {
+      fail(
+        DebriefCheckCode.CUSTOM_CODE,
+        section,
+        `shows the code ${codes.join(', ')}; name the competency or its behaviour instead`,
+      );
+    }
+  }
   if (!hasProgress && cards.progress_note?.trim()) {
     fail(
       DebriefCheckCode.UNSUPPORTED_PROGRESS,
@@ -631,10 +701,16 @@ export function renderCards(cards: DebriefCards): string {
     lines.push('');
   }
   if (cards.practise_next) {
-    lines.push(
-      `Practise this next: ${cards.practise_next.skill}. ${cards.practise_next.reason}`,
-      '',
+    const tryNext = (cards.practise_next.try_next ?? []).filter((t) =>
+      t?.trim(),
     );
+    lines.push(
+      `${tryNext.length ? 'Practise this again' : 'Practise this next'}: ${cards.practise_next.skill}. ${cards.practise_next.reason}`,
+    );
+    if (tryNext.length) {
+      lines.push('Try the following:', ...tryNext.map((t) => `- ${t}`));
+    }
+    lines.push('');
   }
   if (cards.progress_note?.trim()) lines.push(cards.progress_note.trim(), '');
   if (cards.reflective_question?.trim()) {
@@ -646,13 +722,23 @@ export function renderCards(cards: DebriefCards): string {
 /**
  * Keep a roleplay link only when it is one of the learner's own options:
  * the Writer chose from that list, and anything else is dropped, never shown.
+ * "Practise this next" always links one when the learner has any (Gopi,
+ * 2026-11-16: never the card without a button): a missing or unoffered id
+ * becomes `fallback` — this same roleplay when it is an option (always,
+ * inside a course), else the first option — when it is offered.
  */
 export function keepOfferedPractice(
   cards: DebriefCards,
   offered: ReadonlySet<number>,
+  fallback?: number | null,
 ): DebriefCards {
   const keep = (id?: number | null) =>
     id != null && offered.has(Number(id)) ? Number(id) : null;
+  const next = (id?: number | null) =>
+    keep(id) ??
+    (fallback != null && offered.has(Number(fallback))
+      ? Number(fallback)
+      : null);
   return {
     ...cards,
     work_on_this: (cards.work_on_this ?? []).map((c) => ({
@@ -662,10 +748,33 @@ export function keepOfferedPractice(
     practise_next: cards.practise_next
       ? {
           ...cards.practise_next,
-          scenario_id: keep(cards.practise_next.scenario_id),
+          scenario_id: next(cards.practise_next.scenario_id),
         }
       : cards.practise_next,
   };
+}
+
+/**
+ * The last resort before publishing: no custom competency code reaches a
+ * learner, even when the revisions did not remove it. A skill that is a code
+ * becomes the competency's first helpful behaviour when `resolved` knows it,
+ * else the field goes; a code inside a sentence is removed. `try_next` keeps
+ * at most TRY_NEXT_MAX non-empty items.
+ */
+export function publishableCards(
+  cards: DebriefCards,
+  resolved?: ReadonlyMap<string, string | null>,
+): DebriefCards {
+  const out = withoutCustomCodes(cards, resolved);
+  const next = out.practise_next;
+  if (next && next.try_next != null) {
+    const items = (Array.isArray(next.try_next) ? next.try_next : [])
+      .filter((t) => typeof t === 'string' && t.trim())
+      .map((t) => t.trim())
+      .slice(0, TRY_NEXT_MAX);
+    return { ...out, practise_next: { ...next, try_next: items } };
+  }
+  return out;
 }
 
 /**
@@ -676,8 +785,51 @@ export function keepOfferedPractice(
 export function cardsForReader<
   T extends Record<string, any> | null | undefined,
 >(cards: T, recipeKey?: string | null): T {
-  if (!cards || recipeKey !== 'short') return cards;
-  return { ...cards, practise_next: null, skill_words: [] } as T;
+  if (!cards) return cards;
+  const labelled = withSkillLabels(cards);
+  if (recipeKey !== 'short') return labelled;
+  return { ...labelled, practise_next: null, skill_words: [] } as T;
+}
+
+/**
+ * The cards with each skill shown by its name in the debrief's language
+ * (`skill_labels`, written by the Writer for a debrief not in English), for
+ * whoever reads or hears them. A skill with no label keeps its name. The
+ * stored cards are never changed: their `skill` is the key progress and
+ * metrics match on.
+ */
+export function withSkillLabels<T extends Record<string, any>>(cards: T): T {
+  const labels = new Map<string, string>();
+  for (const l of (cards.skill_labels ?? []) as Array<{
+    skill?: unknown;
+    label?: unknown;
+  }>) {
+    const skill = typeof l?.skill === 'string' ? l.skill.trim() : '';
+    const label = typeof l?.label === 'string' ? l.label.trim() : '';
+    if (skill && label) labels.set(skill.toLowerCase(), label);
+  }
+  const rest: Record<string, any> = { ...cards };
+  delete rest.skill_labels;
+  if (!labels.size) return rest as T;
+  const name = (skill: unknown) =>
+    typeof skill === 'string'
+      ? (labels.get(skill.trim().toLowerCase()) ?? skill)
+      : skill;
+  const relabel = (c: any) =>
+    c && typeof c === 'object' ? { ...c, skill: name(c.skill) } : c;
+  return {
+    ...rest,
+    what_worked: Array.isArray(rest.what_worked)
+      ? rest.what_worked.map(relabel)
+      : rest.what_worked,
+    work_on_this: Array.isArray(rest.work_on_this)
+      ? rest.work_on_this.map(relabel)
+      : rest.work_on_this,
+    practise_next: relabel(rest.practise_next),
+    skill_words: Array.isArray(rest.skill_words)
+      ? rest.skill_words.map(relabel)
+      : rest.skill_words,
+  } as unknown as T;
 }
 
 /**

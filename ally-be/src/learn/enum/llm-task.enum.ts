@@ -149,6 +149,8 @@ export enum LlmTask {
   DEBRIEF_REFLECTION_CHECK = 'debrief_reflection_check',
   // The debrief PM agent's daily analysis; learning budget, never production.
   DEBRIEF_PM_AGENT = 'debrief_improver',
+  /** V2_AUTONOMY F1: the Debrief agent answering a learner's flag on a card. */
+  DEBRIEF_FLAG_ANSWER = 'debrief_flag_answer',
   // Thinking-filler judge in ally-ai: scores whether a filler sounded like the
   // character and fitted the turn. Its own label rather than folded into
   // LANGUAGE_JUDGE because it runs on a different cadence over a different
@@ -207,6 +209,10 @@ export enum LlmTask {
   // per loop iteration on the bot's answer model. Chatbot spend, not a learner practising, so
   // absent from TASK_AREA like the helpline's.
   WHATSAPP_AGENT_STEP = 'whatsapp_agent_step',
+  // Memory, light (chunk 8a), made by ally-ai after a chatbot's reply, never while someone waits:
+  // the memory check on health assistants, and the rolling summary of a long chat. Chatbot spend.
+  CHATBOT_MEMORY_CHECK = 'chatbot_memory_check',
+  CHATBOT_CONVERSATION_SUMMARY = 'chatbot_conversation_summary',
   // Onboarding builder (chunk 20a), made by ally-ai's /builder/*: one label per
   // sub-task, so the cost of setting up an assistant shows step by step.
   // Extraction runs once per batch of crawled pages and dominates. Customer

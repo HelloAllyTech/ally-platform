@@ -32,6 +32,9 @@ const ANSWER_QUESTIONS = 12;
 /** "Suggest more questions" offers up to this many at a time (chunk 20d-2). */
 const SUGGESTIONS = 8;
 
+/** Sent with each request for questions, so an edit in Manage Prompts takes effect (chunk H0). */
+const QUESTIONS_PROMPT_CODES = ['ally_ai_checkup_questions'] as const;
+
 const normalised = (question: string) =>
   question
     .toLowerCase()
@@ -91,6 +94,7 @@ export class DraftCheckupService {
     let written: { question: string; fact_ids: string[] }[] = [];
     if (facts.length) {
       try {
+        const prompts = await this.prompts();
         const out = await this.ai.writeCheckupQuestions({
           business: draft.draftConfig.name,
           audience: audienceOf(state.values),
@@ -101,6 +105,7 @@ export class DraftCheckupService {
             section: f.section,
             text: f.correction?.text ?? f.text,
           })),
+          ...(prompts ? { prompts } : {}),
         });
         written = out.questions;
       } catch (error) {
@@ -207,6 +212,7 @@ export class DraftCheckupService {
     const state = conversation(draft);
     let written: { question: string; fact_ids: string[] }[] = [];
     try {
+      const prompts = await this.prompts();
       const out = await this.ai.suggestCheckupQuestions({
         business: draft.draftConfig.name,
         audience: audienceOf(state.values),
@@ -218,6 +224,7 @@ export class DraftCheckupService {
           text: f.correction?.text ?? f.text,
         })),
         exclude: existing.map((c) => c.question).slice(0, 60),
+        ...(prompts ? { prompts } : {}),
       });
       written = out.questions;
     } catch (error) {
@@ -230,6 +237,16 @@ export class DraftCheckupService {
       .filter((p) => !asked.has(normalised(p.question)))
       .map((p) => ({ question: p.question, facts: p.facts, source: p.source }));
     return { suggestions };
+  }
+
+  private async prompts(): Promise<Record<string, unknown> | undefined> {
+    try {
+      return (await this.ai.getPromptOverrides([
+        ...QUESTIONS_PROMPT_CODES,
+      ])) as Record<string, unknown>;
+    } catch {
+      return undefined; // ally-ai falls back to its default prompt text
+    }
   }
 
   /** The suggestions the owner ticked, kept as questions Ally wrote (confirmed, so kept). */

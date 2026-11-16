@@ -263,6 +263,13 @@ export class RoadmapOpportunity extends BaseWithoutTenantEntity {
   effort?: RoadmapOpportunityEffort | null;
 
   /**
+   * The Prod Director's priority flag. Feeds the composite rank through roadmap_rank_weights.
+   * starWeight. NEVER serialised to anyone but the director — see toResponseList.
+   */
+  @Column({ type: 'boolean', default: false })
+  directorStarred!: boolean;
+
+  /**
    * Manual rank WITHIN a lane, ascending. Not globally meaningful — two cards in different
    * months routinely share a position.
    *

@@ -4,6 +4,8 @@ import {
   DebriefReplyService,
   REPLY_FAILED,
   REPLY_LENGTH_REMINDER,
+  REPLY_LIMIT,
+  replyAllowance,
 } from '../service/debrief-reply.service';
 
 const RUN = {
@@ -47,13 +49,23 @@ function build(opts: {
   org?: boolean;
   /** The organisation's provider allowlist (plan §8.9). */
   providers?: string[];
+  /** Release settings beyond the month's cap. */
+  settings?: Record<string, unknown>;
+  /** What the run cost and what Ask Ally has spent on it so far. */
+  runCostUsd?: string;
+  askAllySpentUsd?: number;
+  monthSpentUsd?: number;
+  /** Ally's earlier replies in the thread (default 1). */
+  priorReplies?: number;
 }) {
   const saved: any[] = [];
   const messages = {
-    find: jest.fn(async () => [
-      { senderId: 7, content: 'earlier question' },
-      { senderId: -1, content: 'earlier answer' },
-    ]),
+    find: jest.fn(async () =>
+      Array.from({ length: opts.priorReplies ?? 1 }).flatMap(() => [
+        { senderId: 7, content: 'earlier question' },
+        { senderId: -1, content: 'earlier answer' },
+      ]),
+    ),
     save: jest.fn(async (m: any) => {
       saved.push(m);
       return m;
@@ -66,6 +78,10 @@ function build(opts: {
     manager: { query: kept },
   };
   const context = {
+    monthToDate: jest.fn(async () => ({
+      sessions: 10,
+      spentUsd: opts.monthSpentUsd ?? 1,
+    })),
     providerAllowlist: jest.fn(
       async () => opts.providers ?? ['gemini', 'openai', 'anthropic'],
     ),
@@ -88,7 +104,11 @@ function build(opts: {
   };
   const runner = {
     resolveRelease: jest.fn(async () => ({
-      bundle: { prompts: {}, reply: opts.bundleReply },
+      bundle: {
+        prompts: {},
+        reply: opts.bundleReply,
+        settings: { monthlyCapUsd: 150, ...(opts.settings ?? {}) },
+      },
     })),
   };
   const agent = {
@@ -97,7 +117,14 @@ function build(opts: {
     ]),
   };
   const feedback = {
-    ownLiveRun: jest.fn(async () => RUN),
+    ownLiveRun: jest.fn(async () => ({
+      ...RUN,
+      actualCostUsd: opts.runCostUsd ?? '0.10',
+      workspace:
+        opts.askAllySpentUsd != null
+          ? { askAllySpentUsd: opts.askAllySpentUsd }
+          : {},
+    })),
     raiseChatDistress: jest.fn(async () => undefined),
   };
   const crisis = {
@@ -223,6 +250,124 @@ describe('DebriefReplyService (Ask Ally)', () => {
       provider: 'openai',
       model: 'gpt-4.1-mini',
       maxTokens: 300,
+      budgetUsd: 0.05,
+    });
+  });
+
+  describe("the session's budget (Sandeep, 2026-11-16)", () => {
+    it('gives a reply no more than the session has left', async () => {
+      const { svc, askAlly } = build({
+        runCostUsd: '0.20',
+        askAllySpentUsd: 0.78,
+      });
+      await run(svc, 'question');
+      expect(sent(askAlly).reply.budgetUsd).toBeCloseTo(0.02, 6);
+    });
+
+    it("says so in the learner's language when the session's budget is spent, and calls no model", async () => {
+      const { svc, askAlly, saved } = build({
+        runCostUsd: '0.30',
+        askAllySpentUsd: 0.695,
+      });
+      const events = await run(svc, 'one more question');
+      expect(askAlly.reply).not.toHaveBeenCalled();
+      const done = events.find((e) => e.type === 'done');
+      expect(done.content).toBe(REPLY_LIMIT.session.hi);
+      expect(done.limit).toBe('session');
+      expect(saved.map((m) => m.senderId)).toEqual([7, -1]);
+    });
+
+    it('stops at the release’s reply limit', async () => {
+      const { svc, askAlly } = build({
+        settings: { maxRepliesPerSession: 3 },
+        priorReplies: 3,
+      });
+      const events = await run(svc, 'question');
+      expect(askAlly.reply).not.toHaveBeenCalled();
+      expect(events.find((e) => e.type === 'done').limit).toBe('session');
+    });
+
+    it("stops when the month's cap is spent", async () => {
+      const { svc, askAlly } = build({ monthSpentUsd: 150 });
+      const events = await run(svc, 'question');
+      expect(askAlly.reply).not.toHaveBeenCalled();
+      const done = events.find((e) => e.type === 'done');
+      expect(done.limit).toBe('month');
+      expect(done.content).toBe(REPLY_LIMIT.month.hi);
+    });
+
+    it('marks the limit on the run, so the learner view keeps the reply box closed', async () => {
+      const { svc, kept } = build({
+        settings: { maxRepliesPerSession: 3 },
+        priorReplies: 3,
+      });
+      await run(svc, 'question');
+      await new Promise((r) => setTimeout(r, 0));
+      const marks = (kept.mock.calls as any[][]).filter(([sql]) =>
+        String(sql).includes('askAllyLimit'),
+      );
+      expect(marks).toHaveLength(1);
+      expect(marks[0][1]).toEqual([expect.any(String), 'session']);
+    });
+
+    it('marks no limit on an ordinary reply', async () => {
+      const { svc, kept } = build({});
+      await run(svc, 'question');
+      await new Promise((r) => setTimeout(r, 0));
+      expect(
+        (kept.mock.calls as any[][]).some(([sql]) =>
+          String(sql).includes('askAllyLimit'),
+        ),
+      ).toBe(false);
+    });
+
+    it('still answers a learner in crisis with the approved copy', async () => {
+      const { svc } = build({ monthSpentUsd: 150 });
+      const events = await run(svc, 'I want to kill myself');
+      expect(events.find((e) => e.type === 'done').content).toContain(
+        'APPROVED CRISIS COPY',
+      );
+    });
+
+    it("adds each reply's cost to the session's Ask Ally total", async () => {
+      const { svc, kept } = build({});
+      await run(svc, 'question');
+      await new Promise((r) => setImmediate(r));
+      const add = (kept.mock.calls as any[]).find((c) =>
+        String(c[0]).includes('askAllySpentUsd'),
+      );
+      expect(add?.[1]).toEqual(['run-1', 0.001]);
+    });
+
+    it('has every limit message in every language the other one has', () => {
+      expect(Object.keys(REPLY_LIMIT.session).sort()).toEqual(
+        Object.keys(REPLY_LIMIT.month).sort(),
+      );
+    });
+
+    it('takes the smallest of the reply, session and month budgets', () => {
+      const base = {
+        sessionBudgetUsd: 1,
+        maxReplies: 20,
+        runCostUsd: 0.1,
+        askAllySpentUsd: 0,
+        repliesSoFar: 0,
+        monthSpentUsd: 149.97,
+        monthlyCapUsd: 150,
+        replyBudgetUsd: 0.05,
+      };
+      expect(replyAllowance(base)).toEqual({
+        ok: true,
+        budgetUsd: expect.closeTo(0.03, 6),
+      });
+      expect(replyAllowance({ ...base, monthSpentUsd: 0 })).toEqual({
+        ok: true,
+        budgetUsd: 0.05,
+      });
+      expect(replyAllowance({ ...base, askAllySpentUsd: 0.895 })).toEqual({
+        ok: false,
+        reason: 'session',
+      });
     });
   });
 
@@ -248,7 +393,11 @@ describe('DebriefReplyService (Ask Ally)', () => {
     const done = events.find((e) => e.type === 'done');
     expect(done.content).toContain('APPROVED CRISIS COPY');
     expect(done.content).toContain('14416');
-    expect(feedback.raiseChatDistress).toHaveBeenCalledWith(RUN, 7, 'keyword');
+    expect(feedback.raiseChatDistress).toHaveBeenCalledWith(
+      expect.objectContaining(RUN),
+      7,
+      'keyword',
+    );
   });
 
   it('replaces a reply that fails a check instead of showing it', async () => {
@@ -334,7 +483,7 @@ describe('DebriefReplyService (Ask Ally)', () => {
     expect(done.content).toContain('अगर आप अभी किसी से बात करना चाहें:');
     expect(done.content).toContain('14416');
     expect(feedback.raiseChatDistress).toHaveBeenCalledWith(
-      RUN,
+      expect.objectContaining(RUN),
       7,
       'safety reader',
     );
@@ -411,7 +560,7 @@ describe('DebriefReplyService (Ask Ally)', () => {
       expect(done.content).toContain('That sounds hard.');
       expect(done.content).toContain('14416');
       expect(feedback.raiseChatDistress).toHaveBeenCalledWith(
-        RUN,
+        expect.objectContaining(RUN),
         7,
         'safety reader',
       );
@@ -426,7 +575,7 @@ describe('DebriefReplyService (Ask Ally)', () => {
       );
       expect(done.content).toContain('14416');
       expect(feedback.raiseChatDistress).toHaveBeenCalledWith(
-        RUN,
+        expect.objectContaining(RUN),
         7,
         'safety reader',
       );

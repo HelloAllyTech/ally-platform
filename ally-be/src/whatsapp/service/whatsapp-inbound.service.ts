@@ -41,7 +41,9 @@ import type {
   AgentRunRef,
   ChatbotDecision,
 } from 'src/chatbot/engine/chatbot-engine.types';
-import { ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
+import { AgentRuntimeUsed, ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
+import { MemoryService } from 'src/chatbot/memory/memory.service';
+import { SummaryService } from 'src/chatbot/memory/summary.service';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
 import { HandoverService } from 'src/chatbot/handover/handover.service';
 import { ConversationService } from 'src/chatbot/service/conversation.service';
@@ -163,6 +165,9 @@ export class WhatsAppInboundService {
      */
     @Optional() private readonly handover?: HandoverService,
     @Optional() private readonly conversations?: ConversationService,
+    /** Memory, light (chunk 8a): applied after the reply's copy reaches the shared store. */
+    @Optional() private readonly memory?: MemoryService,
+    @Optional() private readonly summaries?: SummaryService,
   ) {}
 
   async handle(inbound: InboundWhatsAppMessage): Promise<void> {
@@ -341,6 +346,13 @@ export class WhatsAppInboundService {
         // The Agents v2 run's thread and the message its run id is derived from.
         conversationId: conversation.id,
         providerMessageId: inbound.providerMessageId,
+        // The shared store's contact, for the run token (chunk 6): list tools act for this person.
+        contactId:
+          (await this.sharedStore?.contactIdFor(
+            settings,
+            contact,
+            chatbot.id,
+          )) ?? null,
       });
 
       // A team member has this chat (chunk 11a): the engine didn't answer, so nothing is sent.
@@ -387,7 +399,7 @@ export class WhatsAppInboundService {
           { lastLanguage: decision.language },
         );
       }
-      await this.reply(
+      const copied = await this.reply(
         identified,
         conversation,
         inboundId,
@@ -402,6 +414,7 @@ export class WhatsAppInboundService {
           agent: decision.agent,
         },
       );
+      void this.afterReply(chatbot, conversation.id, decision, copied.copied);
       if (decision.unanswered) {
         await this.recordUnanswered(
           inboundId,
@@ -777,7 +790,7 @@ export class WhatsAppInboundService {
       /** The Agents v2 run behind this reply; v1 replies leave the run columns unset. */
       agent?: AgentRunRef;
     } = {},
-  ): Promise<void> {
+  ): Promise<{ copied: Promise<boolean> | undefined }> {
     const outbound = await this.messageRepository.save(
       this.messageRepository.create({
         conversationId: conversation.id,
@@ -922,8 +935,45 @@ export class WhatsAppInboundService {
       );
     }
 
-    // After the send, in the background: both rows' final state to the shared store.
-    void this.sharedStore?.sync([inReplyToId, outbound.id], inReplyToId);
+    // After the send, in the background: both rows' final state to the shared store. Returned so
+    // memory (chunk 8a) can wait for the copy; callers that don't need it don't await it.
+    // Wrapped, so returning it never makes this method wait for the copy.
+    return {
+      copied: this.sharedStore?.sync([inReplyToId, outbound.id], inReplyToId),
+    };
+  }
+
+  /**
+   * Memory, light (chunk 8a), once the reply's copy is in the shared store: what the run asked to
+   * remember, decided from the stored reply, and the chat's rolling summary. Never throws; nobody
+   * waits for it.
+   */
+  private async afterReply(
+    chatbot: Chatbot,
+    conversationId: string,
+    decision: Pick<ChatbotDecision, 'agent'>,
+    copied: Promise<boolean> | undefined,
+  ): Promise<void> {
+    if (!copied || (!this.memory && !this.summaries)) return;
+    const repliedAt = Date.now();
+    try {
+      if (!(await copied)) return;
+      await Promise.all([
+        this.memory?.afterTurn({
+          chatbot,
+          conversationId,
+          runId: decision.agent?.runId,
+          pending:
+            decision.agent?.runtime === AgentRuntimeUsed.V2
+              ? decision.agent.memory
+              : undefined,
+          repliedAt,
+        }),
+        this.summaries?.afterTurn(chatbot, conversationId),
+      ]);
+    } catch {
+      // Each step logs its own failure; the reply has already gone out.
+    }
   }
 
   private async discard(messageId: string, reason: string): Promise<void> {

@@ -1347,7 +1347,7 @@ export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
   {
     name: 'Debrief Analyst',
     description:
-      "The debrief agent's Analyst: builds the evidence map (each behaviour's opportunity, observed/partial/missed, confidence, importance and exact quote; pivotal moments; emotional arc; AI faults). The step composes the transcript, scenario and expected behaviours around this text. Release-only: a new version reaches learners through an approved release.",
+      "The debrief agent's Analyst: builds the evidence map (each behaviour's opportunity, observed/partial/missed, confidence, importance and exact quote; pivotal moments; emotional arc; AI faults), leading with what the roleplay expects (its own helpful and unhelpful behaviours and its competencies) and adding a foundational helping skill only when it clearly shaped the session. The step composes the transcript, scenario, expected behaviours and the roleplay's expectations around this text. Release-only: a new version reaches learners through an approved release.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1386,7 +1386,7 @@ export const DEBRIEF_WRITER_SYSTEM = definePrompt(
   {
     name: 'Debrief Writer',
     description:
-      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress. Every client risk cue is covered: the most serious by the important moment, each other one in its `others`. Never sees the rubric. Release-only.",
+      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress, preferring the roleplay's own competencies and behaviours over the foundational skills. Every client risk cue is covered: the most serious by the important moment, each other one in its `others`. Never sees the rubric. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },

@@ -19,6 +19,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.core.agent_runtime.checkpointer import checkpointer_available
+from app.core.debrief.flag_answer import (
+    FlagAnswerRequest,
+    FlagAnswerResponse,
+    answer_flag,
+)
 from app.core.debrief.safety_recall import run_recall
 from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import HttpGateway
@@ -62,6 +67,8 @@ async def debrief_run(
         bundle=req.bundle,
         prompts={k: v for k, v in req.prompts.items() if v},
         ceiling_usd=req.ceiling_usd,
+        allow_over_ceiling=req.allow_over_ceiling,
+        attempt=req.attempt,
         prices=req.prices,
         session=req.session,
         transcript=req.transcript,
@@ -91,6 +98,13 @@ class SafetyRecallResponse(BaseModel):
     cases: int
     planted: int
     model: Optional[str] = None
+
+
+@router.post("/flag-answers", response_model=FlagAnswerResponse)
+async def debrief_flag_answer(req: FlagAnswerRequest) -> FlagAnswerResponse:
+    """Answer a learner's flag on one card: keep, correct or remove, with a reply
+    in the debrief's language (V2_AUTONOMY F1). ally-be applies it."""
+    return FlagAnswerResponse(**(await answer_flag(req)))
 
 
 @router.post("/safety-recall", response_model=SafetyRecallResponse)
