@@ -323,11 +323,12 @@ async def test_writer_coaches_a_missed_feeling_even_when_it_is_not_a_risk_cue(
         "gemini-3-flash-preview",
         TRANSCRIPT,
     )
-    assert (
-        "MISSED FEELINGS: the trainee passed over the client's words at turns 5, 9."
-        in calls["prompt"]
-    )
-    assert "Not a risk assessment." in calls["prompt"]
+    # Data only; what to do with the turns is the Writer prompt's rule.
+    assert "MISSED FEELINGS: turns 5, 9." in calls["prompt"]
+    from app.core.debrief.steps import DEFAULT_WRITER_SYSTEM
+
+    assert "MISSED FEELINGS. When MISSED FEELINGS lists turns" in DEFAULT_WRITER_SYSTEM
+    assert "Never a risk assessment." in DEFAULT_WRITER_SYSTEM
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write(
@@ -345,7 +346,7 @@ async def test_writer_coaches_a_missed_feeling_even_when_it_is_not_a_risk_cue(
         "gemini-3-flash-preview",
         TRANSCRIPT,
     )
-    assert "MISSED FEELINGS" not in calls["prompt"]
+    assert "MISSED FEELINGS: turns" not in calls["prompt"]
 
 
 @pytest.mark.asyncio

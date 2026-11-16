@@ -68,7 +68,10 @@ lists no behaviours and no competencies, use the foundational skills that \
 mattered. For each item: was there an opportunity, was it observed, partial \
 or missed, how confident you are, how important it was in THIS session (3 = \
 most), and the counsellor turn and exact words that show it. Quote exactly \
-as written; never invent or translate a quote.
+as written; never invent or translate a quote. Name an unhelpful behaviour by \
+what to do instead, never by the fault ("Lets the client finish", not \
+"Interrupts client"), and assess it in that form: observed when the \
+counsellor avoided the fault, missed when they did it.
 - pivotal_moments: the 3 to 5 moments that shaped the session, described in \
 your own words with no quotes.
 - emotional_arc: one or two sentences on how the client's state moved.
@@ -201,6 +204,14 @@ risk cue unless the client links it to dying, not wanting to live, or harming \
 themself or someone else. When a statement might be about death, self-harm, \
 harm to others or abuse and you cannot tell, treat it as a clear risk cue.
 
+MISSED FEELINGS. When MISSED FEELINGS lists turns, they are moments the \
+safety reading noted as possible risk cues (low mood or hopelessness with no \
+mention of death, self-harm or a means) where the trainee moved on without \
+responding to the feeling. Unless one of them is a risk cue (then it is the \
+important moment), one work_on_this point quotes one of these moments and \
+coaches staying with the feeling: reflect it and explore it before moving on. \
+Never a risk assessment.
+
 Use GUIDANCE passages only where they fit the moment; never cite them by \
 title. Lead lines at most 25 words, bodies at most 60 words. Plain words a \
 lay helper understands. When LEARNER DISTRESS is noted, open by \
@@ -311,10 +322,7 @@ def _expectations_line(
         "context of this roleplay; when you do, say so in the note and lower "
         "your confidence. Name each behaviour item (skill) by its "
         "competency's name when it belongs to one, otherwise by the behaviour "
-        "itself. Name an unhelpful behaviour by what to do instead, never by "
-        'the fault ("Lets the client finish", not "Interrupts client"), '
-        "and assess it in that form: observed when the counsellor avoided "
-        "the fault, missed when they did it. " + _NO_CODES
+        "itself. " + _NO_CODES
     ]
 
 
@@ -713,18 +721,12 @@ async def write(
             }
         )
         if missed_possible:
-            # Code-owned (review 2026-11-16): a feeling the client kept
-            # voicing and the trainee passed over is never left out, even
-            # when it is not a risk cue; it is coached as ordinary
-            # counselling, never as a risk assessment.
+            # Data only (review 2026-11-16): which turns. What to do with
+            # them is the Writer prompt's MISSED FEELINGS rule (Skills Store).
             lines.append(
-                "MISSED FEELINGS: the trainee passed over the client's words "
-                "at turns "
+                "MISSED FEELINGS: turns "
                 + ", ".join(str(t) for t in missed_possible)
-                + ". Unless one of them is a risk cue (then it is the important "
-                "moment), one work_on_this point quotes one of these moments "
-                "and coaches staying with the feeling: reflect it and explore "
-                "it before moving on. Not a risk assessment."
+                + "."
             )
     lines += _practice_instruction(practice_options)
     if case_memory:

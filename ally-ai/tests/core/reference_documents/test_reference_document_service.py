@@ -638,9 +638,7 @@ class TestSearchIsReported:
             "app.core.reference_documents.reference_document_service"
             ".emit_retrieval_log"
         ) as emit:
-            await service.search_documents(
-                "how do I de-escalate a distressed caller?"
-            )
+            await service.search_documents("how do I de-escalate a distressed caller?")
 
         kwargs = emit.call_args.kwargs
         assert kwargs["corpus"] == "reference_documents"
@@ -669,9 +667,7 @@ class TestSearchIsReported:
         assert emit.call_args.kwargs["query_sensitive"] is True
 
     @pytest.mark.asyncio
-    async def test_reports_a_whole_document_as_the_unit_of_retrieval(
-        self, service
-    ):
+    async def test_reports_a_whole_document_as_the_unit_of_retrieval(self, service):
         # There are no chunks in this collection. Both id fields carry the
         # document id, which is why the judge's selector excludes this corpus
         # rather than trying to read text for it out of kb_document_chunks.
@@ -696,9 +692,7 @@ class TestSearchIsReported:
 
     @pytest.mark.asyncio
     async def test_a_search_that_fails_reports_nothing(self, service):
-        service.vector_db.search_documents.side_effect = RuntimeError(
-            "weaviate down"
-        )
+        service.vector_db.search_documents.side_effect = RuntimeError("weaviate down")
 
         with patch(
             "app.core.reference_documents.reference_document_service"
