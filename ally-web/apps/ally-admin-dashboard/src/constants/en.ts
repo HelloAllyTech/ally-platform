@@ -9539,7 +9539,7 @@ export const en = {
             ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] ??
             String(n);
           return {
-            lead: `The PM agent is improving debriefs on its own: ${c(live)} ${live === 1 ? "change" : "changes"} went live this week, ${c(trying)} ${trying === 1 ? "is" : "are"} being tried, and `,
+            lead: `The PM agent is improving debriefs on its own: ${c(live)} ${live === 1 ? "change" : "changes"} went live this week, ${trying === 0 ? "none is" : `${c(trying)} ${trying === 1 ? "is" : "are"}`} being tried, and `,
             bold:
               waits === 0
                 ? "nothing waits for you."

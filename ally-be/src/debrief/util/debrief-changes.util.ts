@@ -251,6 +251,20 @@ export function changeSteps(
   const e = idea.evidence ?? {};
   const kind = idea.change?.ideaKind;
   const steps: DebriefChange['steps'] = [];
+  // A budget goes live on the owner's confirm; it runs no tests.
+  if (kind === 'release' && idea.change?.budgetOnly) {
+    const live = idea.status === 'active';
+    return [
+      {
+        name: "Owner's confirm",
+        state: live ? 'Done' : 'Waiting',
+        detail: live
+          ? shortDate(idea.updatedAt)
+          : 'Budgets are the owner’s to change',
+        tone: live ? 'pass' : 'wait',
+      },
+    ];
+  }
   if (kind === 'needs_code' || kind === 'defect') {
     const filed = e.handoff?.status === 'filed';
     steps.push({

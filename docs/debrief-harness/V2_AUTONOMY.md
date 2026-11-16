@@ -68,7 +68,7 @@ must be built, tested and ticked before release.
       (release pinned per language).
 - [x] A10 Test settings (Settings › Tests) are tuned by the PM agent as ordinary setting
       changes; a person no longer accepts proposals.
-- [ ] A11 "Live for everyone" per organisation (Settings › Organisations) stays a person's switch.
+- [x] A11 "Live for everyone" per organisation (Settings › Organisations) stays a person's switch.
 
 ### Slack (points 8, safety)
 - [x] K1 Owner settings: Slack channel for drops and undos; named safety contact.
@@ -88,7 +88,7 @@ must be built, tested and ticked before release.
       clinical advisor sees and posts only about pinned-rule changes. A "yes" to a pinned-rule
       change needs the advisor or the owner; to a budget increase, the owner. Otherwise the agent
       does not act, says who can, and notifies them. Every message shows its author.
-- [ ] C5 A "Needs you" item is dealt with on Home: it expands in place to what changes, why, the
+- [x] C5 A "Needs you" item is dealt with on Home: it expands in place to what changes, why, the
       wording before and after, the evidence, and the PM agent conversation scoped to that change.
       The clinical advisor has no Changes / PM agent button: they get a notification that opens
       Home with that item expanded, and their Needs you shows only pinned-rule changes.
@@ -109,21 +109,21 @@ must be built, tested and ticked before release.
       PM agent.
 
 ### Console UI (canvas row F)
-- [ ] U1 Home (F1): headline sentence; "Needs you" only for always-ask changes; "This week"
+- [x] U1 Home (F1): headline sentence; "Needs you" only for always-ask changes; "This week"
       accordion; PM agent conversation accordion; all debriefs by day, no status pills,
       "⚑ Flagged by the learner" only; Quality score only.
-- [ ] U2 Session (F2): what the learner saw (roleplay, The debrief, Ask Ally); flag marker on the
+- [x] U2 Session (F2): what the learner saw (roleplay, The debrief, Ask Ally); flag marker on the
       card with the learner's note and Ally's answer; no queue, scores or banners;
       Review = the clinical expert's review (escalations, verdict, hard fails, comments);
       Agent logs button.
-- [ ] U3 Changes (F3): groups Waits for you / On some learners / Being built / Live / Undone;
+- [x] U3 Changes (F3): groups Waits for you / On some learners / Being built / Live / Undone;
       detail with result headline, measures, steps; the conversation beside it; Undo now /
       Stop now; Reports and Test sets tabs.
-- [ ] U4 Settings (F4): Autonomy = always-ask list + rollout rules + per organisation;
+- [x] U4 Settings (F4): Autonomy = always-ask list + rollout rules + per organisation;
       Score = weights, gates, Slack; Tests = values in force + last change; Budgets copy.
-- [ ] U5 Analytics (F5): score first with its measures and change markers.
-- [ ] U6 Reports (F6), Nightly check (F7), Models (F8), Analytics › agents (F9) as drawn.
-- [ ] U7 Comment popup closes on an outside click unless a comment is half-written (built).
+- [x] U5 Analytics (F5): score first with its measures and change markers.
+- [x] U6 Reports (F6), Nightly check (F7), Models (F8), Analytics › agents (F9) as drawn.
+- [x] U7 Comment popup closes on an outside click unless a comment is half-written (built).
 
 ### Already released today
 - Session budget covering Ask Ally (be-v1.197.0); nothing held (ai-v1.42.0, be-v1.198.0);
@@ -218,3 +218,17 @@ interface DebriefScoreView {
 // Session (GET sessions/runs/:id, existing) — each learner flag gains:
 //   answer: { action: 'kept' | 'corrected' | 'removed'; reply: string; at: string } | null
 ```
+
+## Local end-to-end check (2026-11-16)
+
+Merged on `debrief-progress`, migrations applied, ally-ai, ally-be and the admin run locally.
+- Home: headline, Needs you expanding in place with the conversation (`?change=` opens it). ✔
+- PM agent conversation: real turn through ally-ai. Found and fixed: it described a rule it had not
+  read; `change_read` now carries the wording / rule text and the prompt forbids writing rules. ✔
+- Changes page (fixed: list read as `{changes}`), Settings › Autonomy (fixed: row layout),
+  Analytics score (fixed: rows wrapped), Session page with the flag marker. ✔
+- Learner flags: four answered by the Debrief agent through the sweep (kept with reasons, one
+  corrected, one in Hindi); a learner's claim not in the transcript was checked and the card kept. ✔
+- Models page (U6) is not built: the admin has no Models page and no registry endpoint yet.
+- Not exercised locally: Slack (no token), an automatic undo (needs 14 days of live data), the
+  advisor-only view (no advisor account locally); covered by unit tests.

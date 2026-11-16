@@ -36,7 +36,7 @@ describe('DebriefConsoleController.budgets', () => {
     const res = await call({ monthlyCapUsd: 150, note: 'raise the cap' });
     expect(releaseHistory.proposeChange).toHaveBeenCalledWith(
       {
-        title: 'Settings: monthlyCapUsd',
+        title: 'Monthly cap to $150',
         why: 'raise the cap',
         settings: { monthlyCapUsd: 150 },
       },
