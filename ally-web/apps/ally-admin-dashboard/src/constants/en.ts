@@ -81,6 +81,37 @@ export const en = {
     failedToSave: "Failed to save branding",
     saving: "Saving...",
   },
+  // Shared admin building blocks (ConfirmDialog, autosave indicator, bulk bar, publish blockers).
+  adminUx: {
+    confirm: {
+      cancel: "Cancel",
+      irreversibleLabel: "This cannot be undone",
+      reversibleHint: "You can undo this afterwards.",
+      acknowledge: "I understand this cannot be undone",
+    },
+    autosave: {
+      saving: "Saving…",
+      saved: "Saved",
+      savedAt: (time: string) => `Saved ${time}`,
+      failed: "Couldn't save. Retrying on your next change.",
+      restoreTitle: "Restore your unsaved draft?",
+      restoreBody: "We found changes from an earlier session that were never saved.",
+      restore: "Restore draft",
+      discard: "Discard draft",
+    },
+    bulk: {
+      selected: (n: number) => `${n} selected`,
+      clear: "Clear selection",
+      selectAll: "Select all rows",
+      selectRow: "Select row",
+    },
+    blockers: {
+      readyTitle: "Ready to publish",
+      blockedTitle: (n: number) =>
+        n === 1 ? "1 thing is blocking publish" : `${n} things are blocking publish`,
+      fix: "Fix",
+    },
+  },
   common: {
     apply: "Apply",
     search: "Search",
@@ -1147,6 +1178,8 @@ export const en = {
     mapFailed:
       "Couldn't sort memories into states, so your knowledge sources were copied over as they are. Check them below.",
     remap: "Re-map from knowledge sources",
+    remapTitle: "Re-map memories?",
+    remapAction: "Re-map",
     remapConfirm:
       "Re-map memories from your knowledge sources? This replaces every memory below, including any edits you made to them.",
     remapFailed: "Couldn't re-map memories. Your memories were left as they were.",
@@ -1592,6 +1625,8 @@ export const en = {
         assign: "Use for this chatbot",
         assigned: "Channel moved.",
         unassign: "Remove from chatbot",
+        unassignTitle: "Remove this channel?",
+        unassignAction: "Remove channel",
         unassignConfirm:
           "Remove this channel from its chatbot? It stops answering until you add it to a chatbot.",
         unassigned: "Channel removed from its chatbot.",
@@ -1789,6 +1824,8 @@ export const en = {
       subscribed: "Subscribed. Send a test message to your number.",
       subscribeFailed: "Could not subscribe the app.",
       checking: "Checking…",
+      disconnectTitle: "Disconnect this number?",
+      disconnectAction: "Disconnect",
       disconnectConfirm:
         "Disconnect this number? Its stored token and secret are deleted and messages to it stop being answered.",
       disconnected: "Number disconnected.",
