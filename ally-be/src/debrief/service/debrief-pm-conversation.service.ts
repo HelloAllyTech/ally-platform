@@ -99,6 +99,7 @@ export const CONVERSATION_TURN_TOOLS: readonly PmAgentGatewayTool[] = [
   'release_draft',
   'ladder_start_quick_test',
   'change_read',
+  'prompt_read',
   'session_read',
   'change_approve',
   'change_turn_down',
@@ -111,6 +112,7 @@ export const CONVERSATION_TURN_TOOLS: readonly PmAgentGatewayTool[] = [
 /** The clinical advisor's turn: read and decide pinned-rule changes, nothing else. */
 export const ADVISOR_TURN_TOOLS: readonly PmAgentGatewayTool[] = [
   'change_read',
+  'prompt_read',
   'change_approve',
   'change_turn_down',
 ];

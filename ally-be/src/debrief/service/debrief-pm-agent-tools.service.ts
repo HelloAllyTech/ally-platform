@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import {
   DEBRIEF_AGENT_KEY,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
+  DEBRIEF_PROMPT_CODES,
 } from '../constants/debrief-release.constants';
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
@@ -181,6 +182,8 @@ export class DebriefPmAgentToolsService {
       switch (tool) {
         case 'comments_read':
           return await this.reviews.commentsForAgent(b);
+        case 'prompt_read':
+          return await this.promptRead(b);
         case 'reporting_query':
           return (await this.reporting.query(text(b.sql, 8000))) as any;
         case 'metrics_view':
@@ -461,6 +464,31 @@ export class DebriefPmAgentToolsService {
   }
 
   // --- route A ------------------------------------------------------------------------
+
+  /**
+   * A Debrief prompt's live text, as the next run reads it: the version the
+   * live release pins, else the Skills Store's current one. Debrief prompts
+   * only; read-only (review 2026-11-16: the PM agent could not read the risk
+   * cue definition).
+   */
+  async promptRead(b: Record<string, any>) {
+    const code = text(b.code, 120);
+    const known = [
+      ...new Set([
+        ...Object.values(DEBRIEF_PROMPT_CODES),
+        // The independent judge's instructions (debrief-run-judge.service).
+        'debrief_quality_judge_system',
+      ]),
+    ];
+    if (!known.includes(code)) {
+      refuse(`unknown prompt code; known: ${known.join(', ')}`);
+    }
+    const { bundle } = await this.pm.gaBundle();
+    const pinned = bundle.prompts?.[code] ?? null;
+    const live = await this.context.promptText(code, pinned);
+    if (live == null) refuse(`${code} has no live text`);
+    return { code, version: pinned ?? 'current', text: live };
+  }
 
   async releaseDraft(claims: DebriefAgentClaims, b: Record<string, any>) {
     await this.requireOn();

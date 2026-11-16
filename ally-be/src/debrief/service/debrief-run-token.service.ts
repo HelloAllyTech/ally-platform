@@ -80,6 +80,9 @@ export const PM_AGENT_GATEWAY_TOOLS = [
   // The reviewer subagent's verdict on one change, posted by ally-ai's code
   // (never a model tool): it sets the change's confidence.
   'change_review_record',
+  // Read any Debrief prompt's live text (the risk cue definition, a pinned
+  // rule, a step's instructions): read only, so every run and turn may.
+  'prompt_read',
 ] as const;
 /**
  * The PM agent conversation's own tools (V2_AUTONOMY C2), served by

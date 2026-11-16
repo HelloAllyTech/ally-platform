@@ -26,6 +26,7 @@ READ_TOOLS = (
     "metrics_view",
     "questions_read",
     "change_read",
+    "prompt_read",
 )
 #: Tools that propose or request an action; main agent only.
 ACTION_TOOLS = (
@@ -53,7 +54,7 @@ CONVERSATION_ACTION_TOOLS = (
     "changes_pause",
 )
 CONVERSATION_TOOLS = (
-    ("change_read",) + CONVERSATION_READ_TOOLS + CONVERSATION_ACTION_TOOLS
+    ("change_read", "prompt_read") + CONVERSATION_READ_TOOLS + CONVERSATION_ACTION_TOOLS
 )
 #: Every read-only tool; the only tools a subagent is ever given.
 SUBAGENT_READ_TOOLS = READ_TOOLS + CONVERSATION_READ_TOOLS
@@ -247,6 +248,16 @@ class ChangeRef(BaseModel):
     idea_id: str = Field(description="The change's id (the idea id).")
 
 
+class PromptRef(BaseModel):
+    code: str = Field(
+        description=(
+            "A Debrief prompt code, e.g. debrief_risk_cue_definition, "
+            "debrief_safety_reader_system, debrief_writer_system, "
+            "debrief_quality_rubric, debrief_evaluator_system."
+        )
+    )
+
+
 class SessionRef(BaseModel):
     run_id: str = Field(description="The debrief run id of the session.")
 
@@ -395,6 +406,9 @@ def make_tools(
     async def change_read(**a: Any) -> str:
         return await call("change_read", ChangeRef(**a).model_dump())
 
+    async def prompt_read(**a: Any) -> str:
+        return await call("prompt_read", PromptRef(**a).model_dump())
+
     async def session_read(**a: Any) -> str:
         return await call("session_read", SessionRef(**a).model_dump())
 
@@ -509,6 +523,13 @@ def make_tools(
             ChangeRef,
             "One change in full: what it is, where it stands, its test results, "
             "confidence, languages, and what people said about it.",
+        ),
+        (
+            prompt_read,
+            PromptRef,
+            "A Debrief prompt's live text, exactly as the next debrief reads it: "
+            "the risk cue definition, a pinned rule, or a step's instructions. "
+            "Read it before you quote or describe what a prompt says.",
         ),
         (
             session_read,
