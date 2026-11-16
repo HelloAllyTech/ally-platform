@@ -20,6 +20,7 @@ import { NotificationModule } from './notification/notification.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AnalyticsAgentModule } from './analytics-agent/analytics-agent.module';
+import { BugHunterApprovalsModule } from './bug-hunter-approvals/bug-hunter-approvals.module';
 import { AnalyticsSuggestionsModule } from './analytics-suggestions/analytics-suggestions.module';
 import { BugHunterModule } from './bug-hunter/bug-hunter.module';
 import { BuilderModule } from './builder/builder.module';
@@ -112,6 +113,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     RateLimitModule,
     AnalyticsModule,
     AnalyticsAgentModule,
+    BugHunterApprovalsModule,
     AnalyticsSuggestionsModule,
     BugHunterModule,
     BuilderModule,

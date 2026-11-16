@@ -38,6 +38,8 @@ import {
   Logs,
   MobileReleases,
   BugHunter,
+  BugHunterV2ReportDetail,
+  BugHunterV2Reports,
   Builder,
   BuilderEval,
   BuilderKnowledge,
@@ -591,6 +593,23 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER}>
               <BugHunter />
+            </PrivateLayout>
+          }
+        />
+        {/* Bug Hunter v2: suggested fixes and escalations, and the verdicts that teach it. */}
+        <Route
+          path={ROUTES.BUG_HUNTER_V2}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER_V2_VERDICTS}>
+              <BugHunterV2Reports />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.BUG_HUNTER_V2_REPORT(":id")}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER_V2_VERDICTS}>
+              <BugHunterV2ReportDetail />
             </PrivateLayout>
           }
         />

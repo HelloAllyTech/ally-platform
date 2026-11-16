@@ -68,6 +68,14 @@ export const validationSchema = Joi.object({
   // TEST ACCOUNTS
   TEST_ACCOUNTS: Joi.string().optional(),
 
+  // Bug Hunter v2 dashboard: its own `bughunter` database, limited role. Optional:
+  // unset, the Bug Hunter v2 pages answer 503 and nothing else changes.
+  BUGHUNTER_DB_HOST: Joi.string().allow('').optional(),
+  BUGHUNTER_DB_PORT: Joi.number().optional(),
+  BUGHUNTER_DB_USERNAME: Joi.string().allow('').optional(),
+  BUGHUNTER_DB_PASSWORD: Joi.string().allow('').optional(),
+  BUGHUNTER_DB_DATABASE: Joi.string().allow('').optional(),
+
   // ENCRYPTION KEYS
   PHI_DATA_ENCRYPTION_KEY: Joi.string()
     .length(64)

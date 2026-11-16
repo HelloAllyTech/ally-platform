@@ -698,6 +698,13 @@ export const ApiEndpoints = {
     SCAN: "/v1/ux-signals/scan",
     SCANS: "/v1/ux-signals/scans",
   },
+  // Bug Hunter v2 (bug-hunter/ at the repo root): suggested fixes, escalations and the
+  // two-part verdict that teaches it. Separate from the old Bug Hunter's endpoints.
+  BUG_HUNTER_V2: {
+    REPORTS: "/v1/bug-hunter-approvals/reports",
+    REPORT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}`,
+    VERDICT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}/verdict`,
+  },
   BUG_HUNTER: {
     SETTINGS: "/v1/bug-hunter/settings",
     MODEL_SETTINGS: "/v1/bug-hunter/settings/models",
@@ -1189,6 +1196,8 @@ export const ROUTES = {
   AI_LAB: "/ai-lab",
   PRODUCT_ROADMAP: "/product-roadmap",
   BUG_HUNTER: "/bug-hunter",
+  BUG_HUNTER_V2: "/bug-hunter-v2",
+  BUG_HUNTER_V2_REPORT: (id: string | number) => `/bug-hunter-v2/${id}`,
   BUILDER: "/builder",
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",
@@ -1388,6 +1397,7 @@ export const TAG_TYPES = {
   // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.
   ANALYTICS_SUGGESTIONS: "analyticsSuggestions",
   ANALYTICS_CHART_PREFERENCES: "analyticsChartPreferences",
+  BUG_HUNTER_V2_REPORTS: "bugHunterV2Reports",
   BUG_HUNTER_SETTINGS: "bugHunterSettings",
   // Also registered in baseApi.ts's `tagTypes` — an unregistered tag is
   // silently ignored and its invalidation never fires.

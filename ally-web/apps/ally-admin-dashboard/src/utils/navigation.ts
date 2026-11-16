@@ -160,6 +160,11 @@ const buildNavigationItems = (): NavigationItem[] => [
     path: ROUTES.BUG_HUNTER,
   },
   {
+    id: SIDEBAR_ITEMS.BUG_HUNTER_V2,
+    label: en.bugHunterV2.tabLabel,
+    path: ROUTES.BUG_HUNTER_V2,
+  },
+  {
     id: SIDEBAR_ITEMS.BUILDER,
     label: en.builder.tabLabel,
     path: ROUTES.BUILDER,
