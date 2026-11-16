@@ -30,6 +30,8 @@ vi.mock("@components/scenario-reports-socket-provider/ScenarioReportsSocketProvi
 }));
 vi.mock("@pages/ContextLibrary/upload/UploadDock", () => ({ UploadDockHost: () => null }));
 vi.mock("@ally-ui-mono/ui-shared", () => ({ InlineLoading: () => <div>loading…</div> }));
+const pageViewSpy = vi.fn();
+vi.mock("@hooks/useAdminAnalytics", () => ({ useAdminPageView: (p: string) => pageViewSpy(p) }));
 
 import { AdminShell } from "../AdminShell";
 import { NotFound } from "../NotFound";
@@ -62,6 +64,7 @@ const renderShell = (path: string) =>
 describe("AdminShell", () => {
   beforeEach(() => {
     mounts.sidebar = 0;
+    pageViewSpy.mockClear();
     localStorage.setItem("adminIsAuthenticated", "true");
     document.title = "";
   });
@@ -70,6 +73,11 @@ describe("AdminShell", () => {
     localStorage.removeItem("adminIsAuthenticated");
     renderShell("/manage-prompts");
     expect(screen.getByText("login page")).toBeInTheDocument();
+  });
+
+  it("reports each page view to usage tracking", () => {
+    renderShell("/manage-prompts");
+    expect(pageViewSpy).toHaveBeenCalledWith("/manage-prompts");
   });
 
   it("titles each page '<Page> · Ally Admin'", () => {

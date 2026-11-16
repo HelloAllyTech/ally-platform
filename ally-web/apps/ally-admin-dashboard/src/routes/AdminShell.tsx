@@ -12,6 +12,7 @@ import ReportUploadProgressDialog from "@components/report-upload-progress-dialo
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import { Sidebar } from "@components/sidebar";
 import { LOCAL_STORAGE_KEYS, ROUTES, en } from "@constants";
+import { useAdminPageView } from "@hooks/useAdminAnalytics";
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
 
 import { PageBreadcrumbs } from "./PageBreadcrumbs";
@@ -41,6 +42,8 @@ export const AdminShell: React.FC = () => {
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
   const { pathname, search } = useLocation();
   const meta = resolveRouteMeta(pathname, search);
+  // Usage tracking: one `admin_page_viewed` per route change (route pattern only, never ids).
+  useAdminPageView(pathname);
   // A URL the table does not know is either a redirect (no title to set) or the 404, which sets its own.
   useDocumentTitle(meta.known ? meta.title : undefined, meta.known);
 
