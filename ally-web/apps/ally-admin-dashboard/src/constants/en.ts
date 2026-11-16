@@ -9627,6 +9627,13 @@ export const en = {
         progressWindow: "Sessions to look back over",
         progressUseFhs: "Use Foundational Skills levels as a cross-check",
         progressShowWorseToLearners: "Tell learners when a skill needs another look",
+        nightlyLengthCreepShare: "Nightly check: debriefs longer than before by",
+        nightlySamenessMax: "Nightly check: alert when debriefs read alike above",
+        nightlySpecificityDrop: "Nightly check: alert when specificity falls by (points)",
+        nightlyGapMax:
+          "Nightly check: alert when Ally’s own check is above the independent one by (points)",
+        judgeDriftMax: "Judge drift that re-locks autonomy (points)",
+        judgeAnchorSize: "Debriefs the independent check scores again each week",
       } as Record<string, string>,
       columns: {
         setting: "Setting",
@@ -11071,6 +11078,14 @@ export const en = {
             name: "Agreement sample",
             what: "Puts a few judged debriefs, picked at random, in the clinical advisor's queue",
           },
+          "debrief-nightly-check": {
+            name: "Nightly check",
+            what: "Measures yesterday’s debriefs against the days before and sends some to a person",
+          },
+          "debrief-judge-anchor": {
+            name: "Judge drift",
+            what: "The independent check scores a fixed set of debriefs again (learning budget)",
+          },
           "debrief-pm-agent-forecasts": {
             name: "Check forecasts",
             what: "Reads whether ideas put live moved the metric they named",
@@ -11256,7 +11271,8 @@ export const en = {
         eligibleNo: "Not yet",
         loading: "Loading…",
         loadFailed: "Couldn't load what the PM agent may do alone.",
-        driftFrom: "Judge drift: measured from Release 2.",
+        driftFrom:
+          "Judge drift: not measured yet. The independent check scores a fixed set of debriefs again each week.",
         drift: "Judge drift found: everything asks first.",
         noDrift: "No judge drift.",
         baselineFailed: "The monthly baseline failed: everything asks first.",
@@ -11692,6 +11708,8 @@ export const en = {
           guidance: "Marked done",
         } as Record<string, string>,
       },
+      delivered: (when: string, tags: string, until: string) =>
+        `Reached production ${when}${tags ? ` (${tags})` : ""}. Measuring whether it helped until ${until}.`,
       forecast: (metric: string, before: string, after: string, moved: string) =>
         `${metric}: ${before} before, ${after} after — ${moved}`,
       forecastMoved: {
@@ -11852,6 +11870,51 @@ export const en = {
     },
     // Analytics › Debriefs › Judge agreement: the independent check against the clinical
     // advisor's yes/no answers under their verdicts (hand scoring removed 2026-11-12).
+    nightly: {
+      heading: "Nightly check",
+      help: "Each night, yesterday's debriefs are measured against the two weeks before. Alerts mean something drifted. Words are counted and lines compared the same way in every language; vagueness is the independent check's own specificity score.",
+      slice: "Show",
+      all: "All debriefs",
+      language: (code: string) => `Language: ${code}`,
+      recipe: (key: string) => `Recipe: ${key}`,
+      alertsHeading: "Alerts in the last 2 weeks",
+      noAlerts: "No alerts in the last 2 weeks.",
+      empty: "No nightly check has run yet. It runs every night (Settings › Schedules).",
+      charts: {
+        words: "Words per debrief",
+        wordsHelp:
+          "Median and the longest 10%. Rising week on week means debriefs are getting longer.",
+        p50: "Median",
+        p90: "Longest 10%",
+        sameness: "How alike debriefs read",
+        samenessHelp:
+          "0 to 1: how close each debrief's lead lines come to another learner's. Rising means debriefs read the same for everyone.",
+        specificity: "Specificity (independent check)",
+        specificityHelp:
+          "The independent check's score for how specific the evidence is, 0 to 10. Falling means debriefs are getting vaguer.",
+        gap: "Ally's own check above the independent check",
+        gapHelp:
+          "Points, on average. A growing gap means Ally's own check is getting easier than the independent one.",
+        drift: "Judge drift",
+        driftHelp:
+          "Each week the independent check scores the same debriefs again. The line is how far its scores moved; beyond the limit, autonomy re-locks.",
+        limit: "Limit",
+      },
+      dataQuality: (
+        runs: number,
+        noLanguage: number,
+        unjudged: number,
+        stuck: number,
+        failed: number,
+      ) =>
+        `Yesterday: ${runs} debriefs; ${noLanguage} without a language, ${unjudged} not yet scored by the independent check, ${stuck} stuck, ${failed} failed.`,
+      reasons: {
+        judge_human_disagree: "A clinician and the independent check disagree",
+        thumbs_down_comment: "Learner said not helpful, with a comment",
+        risk_cue_disagree: "Risk cue: the checks disagree",
+      } as Record<string, string>,
+      fromNightly: "From the nightly check",
+    },
     calibration: {
       sectionHeading: "Judge agreement",
       noAgreement:

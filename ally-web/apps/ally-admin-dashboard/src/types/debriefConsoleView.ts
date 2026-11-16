@@ -96,6 +96,8 @@ export interface DebriefSessionListItem {
   reviewed: boolean;
   /** In the weekly agreement sample, waiting for a verdict. */
   agreementSample?: boolean;
+  /** Sent to a person by the nightly check, and why. */
+  nightlyReasons?: string[] | null;
   waitingSince: string | null;
 }
 
@@ -695,6 +697,40 @@ export interface DebriefProposal {
 }
 
 /** Analytics › Debriefs (`GET analytics?days=`). */
+/** One day and slice of the nightly check (`GET metrics/nightly`). */
+export interface DebriefNightlyAlert {
+  code: "length_creep" | "sameness" | "vaguer" | "evaluator_judge_gap" | "judge_drift";
+  detail: string;
+  value: number;
+  baseline: number | null;
+}
+export interface DebriefNightlyRow {
+  day: string;
+  /** `all`, `language:hi`, `recipe:standard`, or `judge_drift`. */
+  slice: string;
+  metrics: {
+    runs?: number;
+    wordsP50?: number | null;
+    wordsP90?: number | null;
+    quotesPerDebrief?: number | null;
+    sameness?: number | null;
+    specificity?: number | null;
+    evaluatorJudgeGap?: number | null;
+    dataQuality?: {
+      runs: number;
+      noLanguage: number;
+      unjudged: number;
+      stuck: number;
+      failed: number;
+    };
+    /** judge_drift rows */
+    drift?: number;
+    n?: number;
+    max?: number;
+  };
+  alerts: DebriefNightlyAlert[];
+}
+
 export interface DebriefAnalyticsView {
   windowDays: number;
   tiles: {

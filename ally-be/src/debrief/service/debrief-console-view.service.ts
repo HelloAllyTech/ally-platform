@@ -266,6 +266,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
                r."createdAt", r.tenant_id AS "tenantId", t.name AS "tenantName",
                sc.title AS "scenarioTitle", s."scenarioId" AS "scenarioId",
                (r.workspace ? 'review') AS reviewed,
+               (r.workspace->'nightly'->'reasons') AS nightly_reasons,
                EXISTS (SELECT 1 FROM debrief_agreement_samples ags WHERE ags."runId" = r.id) AS agreement_sample,
                EXISTS (SELECT 1 FROM debrief_reviews dv WHERE dv."runId" = r.id) AS has_verdict,
                (r.workspace ? 'escalation' AND NOT (r.workspace ? 'review')) AS run_escalated,
@@ -293,7 +294,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
                  WHEN b.mode = 'live' AND b.any_open THEN 1
                  WHEN b.mode = 'live' AND NOT b.reviewed
                       AND (b.status IN ('needs_person','below_bar','failed')
-                           OR (b.status = 'published' AND b.judge_below)) THEN 2
+                           OR (b.status = 'published' AND b.judge_below)
+                           OR b.nightly_reasons IS NOT NULL) THEN 2
                  ELSE 3
                END AS rank,
                (b.mode = 'live' AND (b.escalated_flag OR b.run_escalated)) AS escalated
@@ -473,6 +475,10 @@ export class DebriefConsoleViewService implements OnModuleInit {
       flagged: !!r.flagged,
       flagCount: Number(r.flag_count ?? 0),
       importantMomentFlagged: !!r.important_flagged,
+      /** "From the nightly check": why it sent this debrief to a person. */
+      nightlyReasons: Array.isArray(r.nightly_reasons)
+        ? (r.nightly_reasons as string[])
+        : null,
       escalated: !!r.escalated,
       riskCue: !!r.hasRiskCue,
       learnerDistress: !!r.learnerDistress,

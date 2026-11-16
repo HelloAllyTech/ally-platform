@@ -190,6 +190,50 @@ export const OWNER_SETTINGS_SPEC = {
     kind: 'bool',
     group: 'progress',
   },
+  // The nightly check (v9 FR-49): when a day's debriefs count as drifting.
+  nightlyLengthCreepShare: {
+    default: 0.2,
+    kind: 'share',
+    min: 0.05,
+    max: 1,
+    group: 'metrics',
+  },
+  nightlySamenessMax: {
+    default: 0.6,
+    kind: 'share',
+    min: 0.2,
+    max: 0.95,
+    group: 'metrics',
+  },
+  nightlySpecificityDrop: {
+    default: 0.5,
+    kind: 'number',
+    min: 0.1,
+    max: 3,
+    group: 'metrics',
+  },
+  nightlyGapMax: {
+    default: 1,
+    kind: 'number',
+    min: 0.2,
+    max: 5,
+    group: 'metrics',
+  },
+  // The weekly re-score of the anchor set: drift beyond this re-locks autonomy.
+  judgeDriftMax: {
+    default: 0.3,
+    kind: 'number',
+    min: 0.1,
+    max: 2,
+    group: 'metrics',
+  },
+  judgeAnchorSize: {
+    default: 40,
+    kind: 'int',
+    min: 10,
+    max: 200,
+    group: 'metrics',
+  },
 } as const satisfies Record<string, OwnerSettingSpec>;
 
 export type OwnerSettingKey = keyof typeof OWNER_SETTINGS_SPEC;

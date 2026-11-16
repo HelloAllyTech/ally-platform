@@ -759,7 +759,7 @@ describe("What the PM agent may do alone", () => {
     expect(intro).toHaveTextContent("The system only tightens, never loosens.");
     expect(intro).toHaveTextContent("Live for everyone: always a person approves");
     expect(within(intro).getByRole("link", { name: "Pinned rules" })).toBeInTheDocument();
-    expect(screen.getByTestId("autonomy-facts")).toHaveTextContent("measured from Release 2");
+    expect(screen.getByTestId("autonomy-facts")).toHaveTextContent("Judge drift: not measured yet");
     // Someone who isn't the owner sees the same dropdown, disabled.
     expect(
       within(screen.getByTestId("autonomy-settings-canary")).getByRole("combobox"),

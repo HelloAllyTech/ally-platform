@@ -258,6 +258,12 @@ export interface PmAgentIdeaRow {
     expectedEffect?: string;
     commentIds?: string[];
     handoff?: PmAgentHandoff;
+    /** A Builder idea's change reached production (every merged PR released). */
+    delivery?: {
+      at: string;
+      releaseTags: string[];
+      pullRequests: Array<{ repo: string; number: number }>;
+    };
     forecast?: PmAgentForecast;
     screen?: PmAgentScreen;
     /** Rung 2, the full gate test. */

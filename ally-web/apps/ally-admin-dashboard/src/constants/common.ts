@@ -477,6 +477,7 @@ export const ApiEndpoints = {
     OVERVIEW: "/v1/debriefs/console/overview",
     SETTINGS: "/v1/debriefs/console/settings",
     METRICS: "/v1/debriefs/console/metrics",
+    NIGHTLY: "/v1/debriefs/console/metrics/nightly",
     SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
     /** Settings › Schedules (engineering only). */
     SCHEDULES: "/v1/debriefs/console/schedules",

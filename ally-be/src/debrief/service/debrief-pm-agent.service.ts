@@ -72,7 +72,11 @@ import { DebriefSettingsService } from './debrief-settings.service';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefRunnerService, RunOptions } from './debrief-runner.service';
 import { DebriefGraphClient } from './debrief-graph.client';
-import { BuilderAnswerer } from '../util/debrief-builder-progress.util';
+import {
+  BuilderAnswerer,
+  builderDelivery,
+  BuilderPullRequestDelivery,
+} from '../util/debrief-builder-progress.util';
 import { DEBRIEF_PM_AGENT_REQUESTER } from '../../builder/util/builder-requesters.registry';
 import {
   DebriefTestSet,
@@ -138,10 +142,13 @@ export class DebriefPmAgentService
     // When these run is set in Debrief › Settings › Schedules (debrief_schedules).
     scheduledTaskRegistry.registerConfigurable(
       'debrief-pm-agent-forecasts',
-      () =>
-        this.checkForecasts().then(
-          (n) => `${n} forecast${n === 1 ? '' : 's'} checked`,
-        ),
+      async () => {
+        // A Builder idea's change counts as live once every merged pull
+        // request reached production; then its forecast is measured like any.
+        const delivered = await this.trackBuilderDeliveries();
+        const n = await this.checkForecasts();
+        return `${n} forecast${n === 1 ? '' : 's'} checked${delivered ? `, ${delivered} Builder change${delivered === 1 ? '' : 's'} delivered` : ''}`;
+      },
     );
     // Plan §11.7: an approval unanswered for 14 days expires as "no decision".
     scheduledTaskRegistry.registerConfigurable('debrief-pm-agent-expiry', () =>
@@ -645,7 +652,8 @@ export class DebriefPmAgentService
       | 'signoff'
       | 'withdrawn'
       | 'rejection'
-      | 'builder',
+      | 'builder'
+      | 'delivery',
     value: Record<string, unknown>,
   ): Promise<void> {
     await this.dataSource.query(
@@ -1718,7 +1726,16 @@ export class DebriefPmAgentService
         WHERE l."agentKey" = $1 AND l.status = 'active'
           AND l.evidence ? 'forecast' AND NOT (l.evidence->'forecast' ? 'checkedAt')
           AND rel."promotedAt" IS NOT NULL
-          AND rel."promotedAt" <= $2::timestamp - make_interval(days => $3)`,
+          AND rel."promotedAt" <= $2::timestamp - make_interval(days => $3)
+       UNION ALL
+       -- Builder ideas: live from the moment their change reached production.
+       SELECT l.id, l.evidence, (l.evidence->'delivery'->>'at')::timestamptz AS promoted_at
+         FROM agent_lessons l
+        WHERE l."agentKey" = $1 AND l.status = 'approved'
+          AND l.evidence ? 'delivery'
+          AND l.evidence ? 'forecast' AND NOT (l.evidence->'forecast' ? 'checkedAt')
+          AND (l.evidence->'delivery'->>'at')::timestamptz
+                <= $2::timestamptz - make_interval(days => $3)`,
       [DEBRIEF_AGENT_KEY, now.toISOString(), PM_HOLD_DAYS],
     );
     if (!due.length) return 0;
@@ -1741,6 +1758,44 @@ export class DebriefPmAgentService
       });
     }
     return due.length;
+  }
+
+  /**
+   * Builder ideas whose change reached production: once every pull request
+   * of the idea's Builder session is merged and released (`builderDelivery`),
+   * record when, so the forecast check measures it after PM_HOLD_DAYS. Once
+   * per idea. Returns how many were delivered now.
+   */
+  async trackBuilderDeliveries(): Promise<number> {
+    const handed: Array<{ id: string; session: string }> =
+      await this.dataSource.query(
+        `SELECT id, evidence->'handoff'->>'filedId' AS session FROM agent_lessons
+          WHERE "agentKey" = $1 AND status = 'approved'
+            AND evidence->'handoff'->>'kind' = 'builder'
+            AND evidence->'handoff'->>'status' = 'filed'
+            AND NOT (evidence ? 'delivery')`,
+        [DEBRIEF_AGENT_KEY],
+      );
+    let delivered = 0;
+    for (const idea of handed) {
+      if (!idea.session) continue;
+      const prs: BuilderPullRequestDelivery[] = await this.dataSource.query(
+        `SELECT repo, "prNumber", merged, state, "mergedAt", "releaseState",
+                "releasedAt", "releaseTag"
+           FROM builder_pull_requests WHERE "sessionId"::text = $1`,
+        [idea.session],
+      );
+      const d = builderDelivery(prs);
+      if (!d) continue;
+      await this.writeEvidence(idea.id, 'delivery', { ...d });
+      await this.audit('pipeline_step', idea.id, null, {
+        step: 'builder_delivered',
+        at: d.at,
+        releaseTags: d.releaseTags,
+      });
+      delivered += 1;
+    }
+    return delivered;
   }
 
   async reject(ideaId: string, userId: number, reason?: string): Promise<void> {

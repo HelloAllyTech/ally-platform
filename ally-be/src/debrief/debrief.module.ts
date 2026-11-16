@@ -42,6 +42,7 @@ import { DebriefPmAgentRunService } from './service/debrief-pm-agent-run.service
 import { DebriefBuilderRequesterService } from './service/debrief-builder-requester.service';
 import { DebriefPmAgentToolsService } from './service/debrief-pm-agent-tools.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
+import { DebriefNightlyService } from './service/debrief-nightly.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
@@ -175,6 +176,7 @@ import { DebriefAdvisorsService } from './service/debrief-advisors.service';
     DebriefConsoleAuditInterceptor,
     DebriefAudioService,
     DebriefNotifier,
+    DebriefNightlyService,
     DebriefReviewService,
     GuideCrisisService,
     // Runs the debrief / PM agent jobs when their stored schedule says.

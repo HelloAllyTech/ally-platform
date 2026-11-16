@@ -64,6 +64,7 @@ import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefPmAgentService } from '../service/debrief-pm-agent.service';
 import { DebriefPmAgentRunService } from '../service/debrief-pm-agent-run.service';
 import { DebriefPmReportsService } from '../service/debrief-pm-reports.service';
+import { DebriefNightlyService } from '../service/debrief-nightly.service';
 import { DebriefRunLogsService } from '../service/debrief-run-logs.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
@@ -542,6 +543,7 @@ export class DebriefConsoleController {
     private readonly pmReports: DebriefPmReportsService,
     private readonly builderRequester: DebriefBuilderRequesterService,
     private readonly agentLogs: DebriefRunLogsService,
+    private readonly nightly: DebriefNightlyService,
   ) {}
 
   /** Release settings (budgets, the evaluator bar) are the owner's. */
@@ -655,6 +657,16 @@ export class DebriefConsoleController {
     return this.console.overview(
       Number.isInteger(d) && d > 0 && d <= 90 ? d : 7,
     );
+  }
+
+  @Get('metrics/nightly')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      "The nightly check (v9 FR-49): each day's measures overall, by language and by recipe, the alerts, and the weekly judge-drift readings",
+  })
+  nightlyView(@Query('days') days?: string) {
+    return this.nightly.days(days ? Number(days) || 56 : 56);
   }
 
   @Get('metrics')

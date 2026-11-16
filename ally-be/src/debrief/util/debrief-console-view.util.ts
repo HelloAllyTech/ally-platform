@@ -434,17 +434,18 @@ export interface AutonomyFacts {
   /** The latest monthly sealed run scored worse than the one before. */
   failedBaseline: { failed: boolean; detail: string | null };
   /**
-   * Judge drift. Measured by the nightly evaluator job, which is Release 2:
-   * until then null ("not measured") and never blocks.
+   * Judge drift: the weekly re-score of the anchor set by the nightly check
+   * (`debrief-judge-anchor`). Null while there is no recent reading, and then
+   * it never blocks.
    */
   judgeDrift: boolean | null;
 }
 
-/** Where judge drift will come from, for the UI ("measured from Release 2"). */
+/** Where judge drift comes from, for the UI. */
 export const JUDGE_DRIFT_SOURCE = {
-  measured: false,
-  from: 'release_2',
-  note: 'Judge drift is measured by the nightly evaluator job (Release 2).',
+  measured: true,
+  from: 'nightly_check',
+  note: 'The independent check scores a fixed set of debriefs again each week; a move beyond the limit in Settings re-locks.',
 } as const;
 
 export const RELOCK_REVERTS = 2;
@@ -963,6 +964,22 @@ export function ideaState(idea: {
   }
   if (idea.status === 'approved') {
     if (idea.change?.ideaKind === 'pinned_rule') return closed('signed_off');
+    // A Builder change that reached production is being measured until its
+    // forecast is checked (PM_HOLD_DAYS after delivery): open, "Being tested".
+    if (
+      e.handoff?.status === 'filed' &&
+      e.handoff?.kind === 'builder' &&
+      e.delivery &&
+      !e.forecast?.checkedAt &&
+      e.forecast
+    ) {
+      return {
+        state: 'open',
+        closedReason: null,
+        closedWhy: null,
+        releaseId: null,
+      };
+    }
     if (e.handoff?.status === 'filed') return closed('handed_off');
     if (e.handoff?.status === 'answered') return closed('answered');
   }

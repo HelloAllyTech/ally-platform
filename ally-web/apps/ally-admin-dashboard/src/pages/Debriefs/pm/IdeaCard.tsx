@@ -338,6 +338,20 @@ export const IdeaCard: React.FC<{
           </div>
         </div>
       )}
+      {idea.evidence.delivery && !idea.evidence.forecast?.checkedAt && (
+        <p className="text-sm text-typography-700" data-testid="idea-delivery">
+          {s.delivered(
+            new Date(idea.evidence.delivery.at).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+            }),
+            idea.evidence.delivery.releaseTags.join(", "),
+            new Date(
+              new Date(idea.evidence.delivery.at).getTime() + 14 * 86_400_000,
+            ).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+          )}
+        </p>
+      )}
       {idea.evidence.forecast?.checkedAt && (
         <p className="text-sm" data-testid="idea-forecast">
           {s.forecast(

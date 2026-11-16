@@ -16,6 +16,7 @@ import {
   PmAgentBuilderAnswerer,
   PmAgentBuilderProgress,
   DebriefAnalyticsView,
+  DebriefNightlyRow,
   DebriefAttention,
   DebriefAutonomyKind,
   DebriefAutonomyStep,
@@ -487,6 +488,14 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    getDebriefNightly: builder.query<DebriefNightlyRow[], { days?: number }>({
+      query: ({ days }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.NIGHTLY,
+        method: HttpMethod.GET,
+        params: days ? { days } : undefined,
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     getDebriefAnalytics: builder.query<DebriefAnalyticsView, { days?: number }>({
       query: ({ days }) => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.ANALYTICS,
@@ -561,4 +570,5 @@ export const {
   usePromoteWaitingReleaseMutation,
   useDismissWaitingReleaseMutation,
   useGetDebriefAnalyticsQuery,
+  useGetDebriefNightlyQuery,
 } = debriefConsoleAPI;

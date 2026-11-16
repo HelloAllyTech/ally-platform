@@ -51,6 +51,15 @@ const Tags: React.FC<{ item: SessionItem; short?: boolean }> = ({ item, short })
           <ConsoleTag tone="info">{h.agreementSampleTag}</ConsoleTag>
         </span>
       )}
+      {item.nightlyReasons && item.nightlyReasons.length > 0 && (
+        <span
+          title={item.nightlyReasons.map(r => en.debriefs.nightly.reasons[r] ?? r).join(" · ")}
+          className="inline-flex"
+          data-testid="nightly-tag"
+        >
+          <ConsoleTag tone="info">{en.debriefs.nightly.fromNightly}</ConsoleTag>
+        </span>
+      )}
     </>
   );
 };
