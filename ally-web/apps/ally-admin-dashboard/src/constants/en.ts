@@ -4470,6 +4470,7 @@ export const en = {
       tabTitle: (count: number) =>
         count ? `(${count}) Builder · Ally Admin` : "Builder · Ally Admin",
       more: "More Builder pages",
+      subPages: "Builder pages",
       principlesLink: "Principles",
       principlesLinkLabel: "Open First Principles in the Context Library",
       overflow: {
