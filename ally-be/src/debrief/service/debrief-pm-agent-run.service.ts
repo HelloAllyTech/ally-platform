@@ -25,6 +25,7 @@ import { modelPrices } from '../util/debrief-budget.util';
 import {
   PM_AGENT_GATEWAY_TOOLS,
   DebriefRunTokenService,
+  PmAgentGatewayTool,
 } from './debrief-run-token.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefFeedbackService } from './debrief-feedback.service';
@@ -36,6 +37,14 @@ import { DebriefNightlyService } from './debrief-nightly.service';
 import { DebriefSettingsService } from './debrief-settings.service';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
 
+/**
+ * A weekly or monthly run's tools: the PM agent's, and `change_read` so its
+ * reviewer subagent reads the one change it reviews (as the Ally team would).
+ */
+export const WEEKLY_RUN_TOOLS: readonly PmAgentGatewayTool[] = [
+  ...PM_AGENT_GATEWAY_TOOLS,
+  'change_read',
+];
 /** An answer-only run (plan §11.7 "Ask a question") never spends more than this. */
 export const ANSWER_RUN_CAP_USD = 0.5;
 /** The tools an answer-only run gets: read, and answer; nothing that proposes or acts. */
@@ -317,8 +326,8 @@ export class DebriefPmAgentRunService implements OnModuleInit {
         null,
       ),
       inputs,
-      tools: [...PM_AGENT_GATEWAY_TOOLS],
-      agent_token: this.tokens.signAgent(agentRunId),
+      tools: [...WEEKLY_RUN_TOOLS],
+      agent_token: this.tokens.signAgent(agentRunId, WEEKLY_RUN_TOOLS),
       gateway_url: this.tokens.gatewayUrl(),
     };
     let res: PmAgentRunResponse;

@@ -1,6 +1,7 @@
 import type { DebriefAction, DebriefCan } from './debrief-console-roles.util';
 import { alwaysAsk } from './debrief-always-ask.util';
 import { changeKindOf } from './debrief-console-view.util';
+import { normaliseForQuote, unmatchedQuotes } from './debrief-cards.util';
 import type {
   DebriefPmMessage,
   PmAbout,
@@ -128,4 +129,61 @@ export function toPmMessage(m: DebriefPmMessage): PmMessageView {
 export function changeName(idea: { text?: string | null }): string {
   const t = (idea.text ?? '').trim();
   return t ? `“${t.slice(0, 120)}”` : 'this change';
+}
+
+/**
+ * Every string in a tool answer or an evidence object: the texts a reply may
+ * quote from (`pmReplyUnmatched`).
+ */
+export function textLeaves(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') {
+    if (value.trim()) out.push(value);
+  } else if (Array.isArray(value)) {
+    for (const v of value) textLeaves(v, out);
+  } else if (value && typeof value === 'object') {
+    for (const v of Object.values(value)) textLeaves(v, out);
+  }
+  return out;
+}
+
+/** What introduces a change's wording or a rule's text, verbatim, after a colon. */
+const LEAD =
+  '(?:new wording|old wording|wording|rule text|rule|new text|old text|before|after|replacement|it reads|reads|it says|says)';
+const PRESENTED = new RegExp(
+  `\\b${LEAD}\\s*:\\s*([^\\n]+?)(?=\\s+${LEAD}\\s*:|\\n|$)`,
+  'gi',
+);
+/** A block-quoted line ("> …"). */
+const BLOCK_QUOTE = /^\s*>\s*(.+)$/gm;
+/** Fragments shorter than this are not checked (as in Ask Ally's quote check). */
+const SHORTEST_CHECKED = 12;
+
+/**
+ * What a PM agent reply quotes, or presents as a change's wording or a rule's
+ * text, that none of the turn's sources holds verbatim (whitespace and quote
+ * marks normalised): Ask Ally's check (`unmatchedQuotes`) for quoted text,
+ * plus text after "wording:", "rule:", "before:", "after:", "reads:" and
+ * block quotes. Shorter fragments are not checked.
+ */
+export function pmReplyUnmatched(reply: string, sources: string[]): string[] {
+  const said = sources.map(normaliseForQuote);
+  const out = unmatchedQuotes(reply, sources);
+  const presented = [
+    ...[...reply.matchAll(PRESENTED)].map((m) => m[1]),
+    ...[...reply.matchAll(BLOCK_QUOTE)].map((m) => m[1]),
+  ]
+    // A quoted passage is checked above, as a quote.
+    .filter((t) => !/[“"][^”"]{12,}[”"]/.test(t))
+    .map((t) => t.trim());
+  for (const t of presented) {
+    const n = normaliseForQuote(t);
+    if (
+      n.length >= SHORTEST_CHECKED &&
+      !said.some((src) => src.includes(n)) &&
+      !out.includes(t)
+    ) {
+      out.push(t);
+    }
+  }
+  return out;
 }

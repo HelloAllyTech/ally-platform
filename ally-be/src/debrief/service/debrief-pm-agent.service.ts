@@ -782,6 +782,9 @@ export class DebriefPmAgentService
       // V2_AUTONOMY A2, A8, A9 (the conversation): confidence, an automatic
       // hand-off, an undo or retry for some languages.
       | 'confidence'
+      // The PM agent's own view (advice only) and the reviewer's verdict.
+      | 'statedConfidence'
+      | 'review'
       | 'undone'
       | 'retried'
       | 'autoStart',

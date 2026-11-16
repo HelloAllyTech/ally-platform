@@ -46,9 +46,20 @@ async def pm_agent_run(req: PmAgentRunRequest) -> PmAgentRunResponse:
 @router.post("/conversation", response_model=PmConversationResponse)
 async def pm_agent_conversation(req: PmConversationRequest) -> PmConversationResponse:
     """Answer one message in the Debrief console's PM agent conversation, acting
-    through the gateway when the person asks (V2_AUTONOMY C2). No checkpointer:
-    the thread lives in ally-be and comes in the request."""
-    result = await run_conversation(req, default_model=settings.DEBRIEF.PM_AGENT_MODEL)
+    through the gateway when the person asks (V2_AUTONOMY C2), or resume a turn
+    paused for the person's yes. The thread is a checkpoint thread (`thread_id`);
+    memory is the weekly run's store namespace."""
+    if not runtime_checkpointer.checkpointer_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="agent checkpoints are unavailable",
+        )
+    result = await run_conversation(
+        req,
+        store=get_pm_agent_store(),
+        checkpointer=runtime_checkpointer.get_checkpointer(),
+        default_model=settings.DEBRIEF.PM_AGENT_MODEL,
+    )
     return PmConversationResponse(**result)
 
 

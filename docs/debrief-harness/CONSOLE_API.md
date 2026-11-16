@@ -621,14 +621,23 @@ the agent).
   (`comment` action at the route; the service checks the rest) → `{ messages: [the person's, the
   agent's reply] }`, 10–30 s. The advisor may post only with `about` a pinned-rule change (403
   otherwise, "Open the change from Home"). The agent's `action` is the turn's last action as the
-  gateway recorded it: `awaiting_yes` (a plan to repeat back), `done`, or `failed` (a refusal or a
-  missing permission).
-- Approve / turn down never act at once: the reply repeats the plan and asks for "yes"; the same
-  person's next message, an explicit yes (`isExplicitYes`), carries it out as them. Pinned rules
-  (and the Safety reader) need `approvePinnedRule`, a budget increase `ownerSettings`, everything
-  else `pmAgent`. Without it the agent does not act, answers "Only the clinical advisor or the owner
-  can approve this; I've asked them." and notifies those people in-app (a pinned rule:
+  gateway recorded it: `awaiting_yes` (the turn is paused for a yes), `done`, or `failed` (a refusal
+  or a missing permission). The request and response shapes are unchanged by the 2026-11-16 rebuild.
+- Approve / turn down (and a retry of a change that always asks) never act at once: the agent's turn
+  pauses (ally-ai, LangGraph human-in-the-loop; CONTRACT.md §7c) and the reply states the plan and
+  asks for "yes". The thread's next message resolves the pause: the same person's explicit yes
+  (`isExplicitYes`) within a day carries it out as them; anything else (not a yes, someone else,
+  lapsed) turns it down and the agent answers what they wrote. Pinned rules (and the Safety reader)
+  need `approvePinnedRule`, a budget increase `ownerSettings`, everything else `pmAgent`. Without it
+  the agent does not act, answers "Only the clinical advisor or the owner can approve this; I've
+  asked them." in the same reply and notifies those people in-app (a pinned rule:
   `DebriefNotifier.pinnedRuleDeciders`, link `/debriefs?change=<id>`; a budget: the owner).
+- The agent quotes only what its tools returned in the turn: a reply that quotes, or presents as a
+  change's wording or a rule's text, anything else is not shown; the message reads "I don't have
+  that text, so I can't quote it. Ask me to read the change first." (the withheld reply is in the
+  audit for the Ally team).
+- The agent keeps one memory with its weekly runs: what a person tells it here that should shape
+  later work is noted there, and the weekly run reads it.
 - Stop / undo call the Changes buttons' own code (`DebriefChangesService.stop` / `undo`) as the
   person who asked. Undo or hold for named languages, retry for named languages, and pauses are the
   conversation's own (V2_AUTONOMY A9; `debrief_change_holds`).

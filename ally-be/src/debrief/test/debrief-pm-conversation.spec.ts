@@ -1,10 +1,18 @@
 import { ForbiddenException } from '@nestjs/common';
-import { DebriefPmConversationService } from '../service/debrief-pm-conversation.service';
+import axios from 'axios';
+import {
+  DebriefPmConversationService,
+  PM_CONVERSATION_ADVISOR_THREAD,
+  PM_CONVERSATION_THREAD,
+  QUOTE_CHECK_REPLY,
+} from '../service/debrief-pm-conversation.service';
 import { debriefCan } from '../util/debrief-console-roles.util';
 import {
   conversationAccess,
   isExplicitYes,
+  pmReplyUnmatched,
   requiredAction,
+  textLeaves,
   toPmMessage,
 } from '../util/debrief-pm-conversation.util';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
@@ -17,6 +25,10 @@ const PROMPT = '22222222-2222-2222-2222-222222222222';
 const BUDGET = '33333333-3333-3333-3333-333333333333';
 const LIVE = '44444444-4444-4444-4444-444444444444';
 const TURN = '55555555-5555-5555-5555-555555555555';
+
+jest.mock('axios');
+const post = axios.post as jest.Mock;
+beforeEach(() => post.mockReset());
 
 const viewer = (userId: number, perms: string[]) => ({
   userId,
@@ -81,7 +93,10 @@ function build(opts: {
     authorName?: string;
   };
   perms: Record<number, string[]>;
-  pendingPlan?: Record<string, any> | null;
+  /** The pause the thread waits on (an agent message's `plan`). */
+  paused?: Record<string, any> | null;
+  /** ally-ai's answers, in order. */
+  replies?: Array<Record<string, any>>;
 }) {
   const person = {
     id: opts.person.id ?? TURN,
@@ -103,16 +118,19 @@ function build(opts: {
           change: i.change,
         }));
       }
+      if (sql.includes(`SELECT id, change, evidence FROM agent_lessons`)) {
+        return Object.values(ideas);
+      }
       return [];
     }),
   };
   const messages = {
-    findOne: jest.fn(async () => person),
+    findOne: jest.fn(async () => ({ ...person, actions: actions() })),
     createQueryBuilder: jest.fn(() =>
       qb(
         {
-          one: opts.pendingPlan
-            ? { id: 'agent-msg', who: 'agent', plan: opts.pendingPlan }
+          one: opts.paused
+            ? { id: 'agent-msg', who: 'agent', plan: opts.paused }
             : null,
           many: [],
         },
@@ -135,7 +153,15 @@ function build(opts: {
     audit: jest.fn(async () => undefined),
     writeEvidence: jest.fn(async () => undefined),
     screen: jest.fn(async () => ({ status: 'running' })),
+    learningBudgetThisMonth: jest.fn(async () => 50),
+    learningSpentThisMonth: jest.fn(async () => 0),
   };
+  for (const r of opts.replies ?? []) post.mockResolvedValueOnce({ data: r });
+  const tokens = {
+    signAgent: jest.fn(() => 'tok'),
+    gatewayUrl: jest.fn(() => 'http://be/gw'),
+  };
+  const config = { ai: { apiUrl: 'http://ai', outboundApiKey: 'k' } };
   const holds = {
     languagesFor: jest.fn(async () => ({ languages: null, heldLanguages: [] })),
     pin: jest.fn(async () => ({})),
@@ -168,8 +194,8 @@ function build(opts: {
   const svc = new DebriefPmConversationService(
     dataSource as any,
     messages as any,
-    {} as any,
-    {} as any,
+    config as any,
+    tokens as any,
     pm as any,
     holds as any,
     view as any,
@@ -179,12 +205,19 @@ function build(opts: {
     changes as any,
     notifier as any,
   );
-  const actions = () =>
-    queries
+  function actions() {
+    return queries
       .filter(([sql]) => sql.includes('SET actions = actions ||'))
       .map(([, p]) => JSON.parse(p[1]));
-  const planWrites = () =>
-    queries.filter(([sql]) => sql.includes('SET plan = $2::jsonb'));
+  }
+  /** Pauses resolved: [agent message id, decision]. */
+  const usedPlans = () =>
+    queries
+      .filter(([sql]) => sql.includes(`jsonb_build_object('usedAt'`))
+      .map(([, p]) => p);
+  const posts = () => post.mock.calls.map((c) => c[1]);
+  const signed = () => tokens.signAgent.mock.calls as any[];
+  const saved = () => messages.save.mock.calls.map((c: any[]) => c[0]);
   return {
     svc,
     pm,
@@ -195,7 +228,10 @@ function build(opts: {
     queries,
     qbCalls,
     actions,
-    planWrites,
+    usedPlans,
+    posts,
+    signed,
+    saved,
   };
 }
 
@@ -303,92 +339,50 @@ describe('PM agent conversation: who may read and post', () => {
   });
 });
 
-describe('PM agent conversation: approvals wait for a yes, from someone allowed', () => {
-  it('a team member asking to approve a pinned rule: not acted on; the advisor and owner are asked', async () => {
-    const t = build({
-      person: { authorUserId: 1, text: 'Approve the safety change' },
-      perms: { 1: TEAM },
-    });
-    const out = await t.svc.callTool('change_approve', CLAIMS, {
-      idea_id: PINNED,
-      plan: 'Approve it.',
-    });
-    expect(out.refused).toBe(
-      "Only the clinical advisor or the owner can approve this; I've asked them.",
-    );
-    expect(t.notifier.pinnedRuleDeciders).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ url: `/debriefs?change=${PINNED}` }),
-      }),
-    );
-    expect(t.planWrites()).toHaveLength(0);
-    expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
-    expect(t.actions().map((a) => a.status)).toEqual(['failed']);
+describe('PM agent conversation: approvals pause for a yes, from someone allowed', () => {
+  const approved = (tool: string, ideaId: string) => ({
+    ...CLAIMS,
+    approved: [{ tool, ideaId }],
   });
 
-  it('a budget increase is the owner’s: the team is told so', async () => {
-    const t = build({
-      person: { authorUserId: 1, text: 'Approve the budget raise' },
-      perms: { 1: TEAM },
-    });
-    const out = await t.svc.callTool('change_approve', CLAIMS, {
-      idea_id: BUDGET,
-      plan: 'Raise it.',
-    });
-    expect(out.refused).toMatch(/^Only the owner can approve this/);
-    expect(t.notifier.owner).toHaveBeenCalled();
-  });
-
-  it('the advisor asks: a plan, awaiting yes; nothing acted', async () => {
+  it('approving without the person’s yes in the token does nothing', async () => {
     const t = build({
       person: { authorUserId: 9, text: 'Approve it' },
       perms: { 9: ADVISOR },
     });
     const out = await t.svc.callTool('change_approve', CLAIMS, {
       idea_id: PINNED,
-      plan: 'Approve the Safety rules change; a draft release is made.',
+      plan: 'Approve it.',
     });
-    expect(out).toMatchObject({ status: 'awaiting_yes' });
-    expect(t.planWrites()).toHaveLength(1);
-    expect(t.actions()[0]).toMatchObject({
-      status: 'awaiting_yes',
-      ideaId: PINNED,
-    });
+    expect(out.refused).toMatch(/waits for the person’s yes/);
+    expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
+    // A yes to one change never carries out another.
+    const other = await t.svc.callTool(
+      'change_approve',
+      approved('change_approve', PROMPT),
+      { idea_id: PINNED },
+    );
+    expect(other.refused).toMatch(/waits for the person’s yes/);
     expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
   });
 
-  const plan = (over: Record<string, any> = {}) => ({
-    id: 'plan-1',
-    tool: 'change_approve',
-    ideaId: PINNED,
-    args: {},
-    text: 'Approve it.',
-    label: 'Approve “Safety rules: name the moment”',
-    askedUserId: 9,
-    at: new Date().toISOString(),
-    usedAt: null,
-    ...over,
-  });
-
-  it('a later yes from the same, allowed person carries it out as them', async () => {
+  it('a resumed approval carries it out as the person who said yes', async () => {
     const t = build({
       person: { authorUserId: 9, text: 'Yes, go ahead.' },
       perms: { 9: ADVISOR },
-      pendingPlan: plan(),
     });
-    const out = await t.svc.callTool('confirm_plan', CLAIMS, {
-      plan_id: 'plan-1',
-    });
+    const out = await t.svc.callTool(
+      'change_approve',
+      approved('change_approve', PINNED),
+      { idea_id: PINNED, plan: 'Approve it.' },
+    );
     expect(out).toMatchObject({ ok: true });
     expect(t.pm.approvePinnedRule).toHaveBeenCalledWith(
       PINNED,
       9,
       expect.stringContaining('Yes, go ahead.'),
     );
-    expect(t.actions().pop()).toMatchObject({
-      status: 'done',
-      planId: 'plan-1',
-    });
+    expect(t.actions().pop()).toMatchObject({ status: 'done', ideaId: PINNED });
     // The person's words are on the change.
     expect(
       t.queries.some(
@@ -398,44 +392,45 @@ describe('PM agent conversation: approvals wait for a yes, from someone allowed'
     ).toBe(true);
   });
 
-  it('anything but a clear yes does nothing', async () => {
-    const t = build({
-      person: { authorUserId: 9, text: 'yes but only for Hindi' },
-      perms: { 9: ADVISOR },
-      pendingPlan: plan(),
-    });
-    const out = await t.svc.callTool('confirm_plan', CLAIMS, {
-      plan_id: 'plan-1',
-    });
-    expect(out.refused).toMatch(/did not say a clear yes/);
-    expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
-  });
-
-  it('only the person who was asked can say yes', async () => {
-    const t = build({
-      person: { authorUserId: 7, text: 'yes' },
-      perms: { 7: OWNER },
-      pendingPlan: plan(),
-    });
-    const out = await t.svc.callTool('confirm_plan', CLAIMS, {
-      plan_id: 'plan-1',
-    });
-    expect(out.refused).toMatch(/only the person who was asked/);
-    expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
-  });
-
-  it('a yes from someone who lost the permission is refused and the deciders asked', async () => {
+  it('a resumed approval by someone without the permission is refused and the deciders asked', async () => {
     const t = build({
       person: { authorUserId: 1, text: 'yes' },
       perms: { 1: TEAM },
-      pendingPlan: plan({ askedUserId: 1 }),
     });
-    const out = await t.svc.callTool('confirm_plan', CLAIMS, {
-      plan_id: 'plan-1',
-    });
-    expect(out.refused).toMatch(/clinical advisor or the owner/);
+    const out = await t.svc.callTool(
+      'change_approve',
+      approved('change_approve', PINNED),
+      { idea_id: PINNED },
+    );
+    expect(out.refused).toBe(
+      "Only the clinical advisor or the owner can approve this; I've asked them.",
+    );
     expect(t.notifier.pinnedRuleDeciders).toHaveBeenCalled();
     expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
+  });
+
+  it('a turn-down needs a reason the PM agent reads', async () => {
+    const t = build({
+      person: { authorUserId: 1, text: 'yes' },
+      perms: { 1: TEAM },
+    });
+    const out = await t.svc.callTool(
+      'change_turn_down',
+      approved('change_turn_down', PROMPT),
+      { idea_id: PROMPT },
+    );
+    expect(out.refused).toMatch(/say why/);
+    expect(t.pm.reject).not.toHaveBeenCalled();
+    await t.svc.callTool(
+      'change_turn_down',
+      approved('change_turn_down', PROMPT),
+      { idea_id: PROMPT, reason: 'Too long for Tamil learners' },
+    );
+    expect(t.pm.reject).toHaveBeenCalledWith(
+      PROMPT,
+      1,
+      'Too long for Tamil learners',
+    );
   });
 
   it('the advisor cannot stop, undo or pause anything', async () => {
@@ -446,6 +441,329 @@ describe('PM agent conversation: approvals wait for a yes, from someone allowed'
     const out = await t.svc.callTool('change_undo', CLAIMS, { idea_id: LIVE });
     expect(out.refused).toMatch(/pinned-rule changes only/);
     expect(t.releases.makeGa).not.toHaveBeenCalled();
+  });
+});
+
+describe('PM agent conversation: a turn, paused and resumed (ally-ai human-in-the-loop)', () => {
+  const pending = (tool = 'change_approve', ideaId = PINNED, extra = {}) => ({
+    interrupt_id: 'int-1',
+    actions: [
+      {
+        tool,
+        args: {
+          idea_id: ideaId,
+          plan: 'Approve the Safety rules change.',
+          ...extra,
+        },
+        plan: 'Approve the Safety rules change.',
+      },
+    ],
+  });
+  const reply = (over: Record<string, any> = {}) => ({
+    status: 'finished',
+    reply:
+      'Approve the Safety rules change. Shall I go ahead? Reply yes to confirm.',
+    pending: null,
+    tool_texts: [],
+    estimated_cost_usd: 0.01,
+    model: 'gemini-2.5-pro',
+    ...over,
+  });
+  const paused = (over: Record<string, any> = {}) => ({
+    id: 'int-1',
+    threadId: PM_CONVERSATION_THREAD,
+    actions: [
+      {
+        tool: 'change_approve',
+        ideaId: PINNED,
+        args: {},
+        label: 'Approve “Safety rules: name the moment”',
+      },
+    ],
+    text: 'Approve the Safety rules change.',
+    label: 'Approve “Safety rules: name the moment”',
+    askedUserId: 9,
+    at: new Date().toISOString(),
+    usedAt: null,
+    ...over,
+  });
+
+  it('the advisor asks: the pause is kept with the plan, nothing acted, on the advisor’s own thread', async () => {
+    const t = build({
+      person: { authorUserId: 9, text: 'Approve it' },
+      perms: { 9: ADVISOR },
+      replies: [reply({ pending: pending() })],
+    });
+    const { messages } = await t.svc.post(viewer(9, ADVISOR), {
+      text: 'Approve it',
+      about: { kind: 'change', id: PINNED, label: 'Safety' },
+    });
+    const body = t.posts()[0];
+    expect(body.thread_id).toBe(PM_CONVERSATION_ADVISOR_THREAD);
+    expect(body.resume).toBeNull();
+    expect(body).not.toHaveProperty('history');
+    expect(body.tools).not.toContain('confirm_plan');
+    expect(messages[1].action).toEqual({
+      label: 'Waiting for your yes: approve “Safety rules: name the moment”',
+      status: 'awaiting_yes',
+    });
+    const saved = t.saved().find((m) => m.who === 'agent');
+    expect(saved.plan).toMatchObject({
+      id: 'int-1',
+      threadId: PM_CONVERSATION_ADVISOR_THREAD,
+      askedUserId: 9,
+      actions: [{ tool: 'change_approve', ideaId: PINNED }],
+    });
+    expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
+  });
+
+  it('the same allowed person’s clear yes resumes with approve and a token for them', async () => {
+    const t = build({
+      person: { authorUserId: 9, text: 'Yes, go ahead.' },
+      perms: { 9: ADVISOR },
+      paused: paused({ threadId: PM_CONVERSATION_ADVISOR_THREAD }),
+      replies: [reply({ reply: 'Approved the Safety rules change.' })],
+    });
+    await t.svc.post(viewer(9, ADVISOR), {
+      text: 'Yes, go ahead.',
+      about: { kind: 'change', id: PINNED, label: 'Safety' },
+    });
+    const body = t.posts()[0];
+    expect(body.resume).toEqual({ interrupt_id: 'int-1', decision: 'approve' });
+    expect(t.signed()[0]).toEqual([
+      'saved', // the person's new message (the turn id)
+      expect.any(Array),
+      900,
+      [{ tool: 'change_approve', ideaId: PINNED }],
+    ]);
+    expect(t.usedPlans()).toEqual([['agent-msg', 'approve']]);
+  });
+
+  it.each([
+    [
+      'anything but a clear yes',
+      9,
+      'yes but only for Hindi',
+      /did not say yes/,
+    ],
+    [
+      'someone other than the person asked',
+      7,
+      'yes',
+      /only the person who was asked/,
+    ],
+  ])(
+    '%s resumes with reject, with their words, and nothing is carried out',
+    async (_label, userId, text, why) => {
+      const t = build({
+        person: { authorUserId: userId, text },
+        perms: { 9: ADVISOR, 7: OWNER },
+        paused: paused(),
+        replies: [reply({ reply: 'Nothing was done.' })],
+      });
+      await t.svc.post(viewer(userId, userId === 9 ? ADVISOR : OWNER), {
+        text,
+        about: { kind: 'change', id: PINNED, label: 'Safety' },
+      });
+      const { resume } = t.posts()[0];
+      expect(resume).toMatchObject({
+        interrupt_id: 'int-1',
+        decision: 'reject',
+      });
+      expect(resume.message).toMatch(why);
+      expect(resume.message).toContain(text);
+      expect(t.signed()[0][3]).toEqual([]);
+      expect(t.usedPlans()).toEqual([['agent-msg', 'reject']]);
+    },
+  );
+
+  it('a lapsed pause is turned down', async () => {
+    const t = build({
+      person: { authorUserId: 9, text: 'yes' },
+      perms: { 9: ADVISOR },
+      paused: paused({
+        at: new Date(Date.now() - 25 * 3600_000).toISOString(),
+      }),
+      replies: [reply({ reply: 'That lapsed.' })],
+    });
+    await t.svc.post(viewer(9, ADVISOR), {
+      text: 'yes',
+      about: { kind: 'change', id: PINNED, label: 'Safety' },
+    });
+    expect(t.posts()[0].resume.message).toMatch(/lapsed/);
+  });
+
+  it('a yes from someone who lost the permission is turned down and the deciders asked', async () => {
+    const t = build({
+      person: { authorUserId: 1, text: 'yes' },
+      perms: { 1: TEAM },
+      paused: paused({ askedUserId: 1 }),
+      replies: [
+        reply({ reply: 'Only the clinical advisor or the owner can.' }),
+      ],
+    });
+    await t.svc.post(viewer(1, TEAM), { text: 'yes' });
+    const { resume } = t.posts()[0];
+    expect(resume.decision).toBe('reject');
+    expect(resume.message).toMatch(/clinical advisor or the owner/);
+    expect(t.notifier.pinnedRuleDeciders).toHaveBeenCalled();
+  });
+
+  it('a pause the person could never say yes to is turned down in the same turn', async () => {
+    const t = build({
+      person: { authorUserId: 1, text: 'Approve the safety change' },
+      perms: { 1: TEAM },
+      replies: [
+        reply({ pending: pending(), estimated_cost_usd: 0.02 }),
+        reply({
+          reply:
+            "Only the clinical advisor or the owner can approve this; I've asked them.",
+          estimated_cost_usd: 0.01,
+        }),
+      ],
+    });
+    const { messages } = await t.svc.post(viewer(1, TEAM), {
+      text: 'Approve the safety change',
+    });
+    const [, second] = t.posts();
+    expect(second.resume).toMatchObject({
+      interrupt_id: 'int-1',
+      decision: 'reject',
+    });
+    expect(second.resume.message).toMatch(/clinical advisor or the owner/);
+    expect(t.notifier.pinnedRuleDeciders).toHaveBeenCalled();
+    expect(messages[1].action).toMatchObject({ status: 'failed' });
+    const saved = t.saved().find((m) => m.who === 'agent');
+    expect(saved.plan).toBeNull();
+    expect(saved.costUsd).toBe('0.03');
+  });
+
+  it('an always-ask retry pauses in ally-ai; the gateway refuses one without a yes', async () => {
+    const id = '66666666-6666-6666-6666-666666666666';
+    ideas[id] = {
+      ...ideas[PROMPT],
+      id,
+      status: 'rejected',
+      evidence: { ...ideas[PROMPT].evidence, stopped: { at: 'x' } },
+    };
+    const t = build({
+      person: { authorUserId: 1, text: 'Try it again' },
+      perms: { 1: TEAM },
+      replies: [reply({ pending: pending('change_retry', id) })],
+    });
+    await t.svc.post(viewer(1, TEAM), { text: 'Try it again' });
+    expect(t.posts()[0].always_ask_idea_ids).toContain(id);
+    const saved = t.saved().find((m) => m.who === 'agent');
+    expect(saved.plan.actions[0]).toMatchObject({
+      tool: 'change_retry',
+      ideaId: id,
+    });
+    const out = await t.svc.callTool('change_retry', CLAIMS, { idea_id: id });
+    expect(out.refused).toMatch(/waits for their yes/);
+    expect(t.pm.screen).not.toHaveBeenCalled();
+    await t.svc.callTool(
+      'change_retry',
+      { ...CLAIMS, approved: [{ tool: 'change_retry', ideaId: id }] },
+      { idea_id: id },
+    );
+    expect(t.pm.screen).toHaveBeenCalledWith(id);
+  });
+});
+
+describe('PM agent conversation: the quote check', () => {
+  const RULE = 'Name the moment the learner noticed risk, in their own words.';
+
+  it('a reply quoting text no tool returned is not shown, and kept for the Ally team', async () => {
+    const t = build({
+      person: { authorUserId: 1, text: 'What does the rule say?' },
+      perms: { 1: TEAM },
+      replies: [
+        {
+          status: 'finished',
+          reply:
+            'The new rule reads: “Always ask the learner how they felt first.”',
+          tool_texts: [RULE],
+        },
+      ],
+    });
+    const { messages } = await t.svc.post(viewer(1, TEAM), {
+      text: 'What does the rule say?',
+    });
+    expect(messages[1].text).toBe(QUOTE_CHECK_REPLY);
+    expect(t.pm.audit).toHaveBeenCalledWith(
+      'blocked',
+      null,
+      1,
+      expect.objectContaining({
+        step: 'conversation_quote_check',
+        withheldReply: expect.stringContaining('Always ask the learner'),
+      }),
+    );
+  });
+
+  it('a reply quoting what change_read returned is shown', async () => {
+    const t = build({
+      person: { authorUserId: 1, text: 'What does the rule say?' },
+      perms: { 1: TEAM },
+      replies: [
+        {
+          status: 'finished',
+          reply: `The rule says: “${RULE}”`,
+          tool_texts: ['Safety rules', RULE],
+        },
+      ],
+    });
+    const { messages } = await t.svc.post(viewer(1, TEAM), {
+      text: 'What does the rule say?',
+    });
+    expect(messages[1].text).toContain(RULE);
+  });
+
+  it('a pause whose reply fails the check is not kept', async () => {
+    const t = build({
+      person: { authorUserId: 9, text: 'Approve it' },
+      perms: { 9: ADVISOR },
+      replies: [
+        {
+          status: 'finished',
+          reply:
+            'Wording: "Learners must always be told they did well first." Reply yes.',
+          pending: {
+            interrupt_id: 'int-1',
+            actions: [
+              { tool: 'change_approve', args: { idea_id: PINNED }, plan: 'x' },
+            ],
+          },
+          tool_texts: [],
+        },
+      ],
+    });
+    const { messages } = await t.svc.post(viewer(9, ADVISOR), {
+      text: 'Approve it',
+      about: { kind: 'change', id: PINNED, label: 'Safety' },
+    });
+    expect(messages[1].text).toBe(QUOTE_CHECK_REPLY);
+    expect(t.saved().find((m) => m.who === 'agent').plan).toBeNull();
+  });
+
+  it('checks quotes and presented wording, not summaries', () => {
+    const src = ['Keep each card under 40 words for Tamil learners.'];
+    expect(
+      pmReplyUnmatched('It shortens the Tamil cards (n=40).', src),
+    ).toEqual([]);
+    expect(
+      pmReplyUnmatched(
+        'After: “Keep each card under 40 words for Tamil learners.”',
+        src,
+      ),
+    ).toEqual([]);
+    expect(
+      pmReplyUnmatched('After: Keep each card under 30 words for Tamil.', src),
+    ).toEqual(['Keep each card under 30 words for Tamil.']);
+    expect(
+      pmReplyUnmatched('> Cards must open with praise for the learner', src),
+    ).toEqual(['Cards must open with praise for the learner']);
+    expect(textLeaves({ a: ['x', { b: 'y' }], c: 3 })).toEqual(['x', 'y']);
   });
 });
 
@@ -481,27 +799,6 @@ describe('PM agent conversation: actions that act at once', () => {
     expect(t.releases.makeGa).not.toHaveBeenCalled();
   });
 
-  it('a retry of a change that always asks waits for a yes', async () => {
-    const stopped = {
-      ...ideas[PROMPT],
-      status: 'rejected',
-      evidence: { ...ideas[PROMPT].evidence, stopped: { at: 'x' } },
-    };
-    ideas['66666666-6666-6666-6666-666666666666'] = {
-      ...stopped,
-      id: '66666666-6666-6666-6666-666666666666',
-    };
-    const t = build({
-      person: { authorUserId: 1, text: 'Try it again' },
-      perms: { 1: TEAM },
-    });
-    const out = await t.svc.callTool('change_retry', CLAIMS, {
-      idea_id: '66666666-6666-6666-6666-666666666666',
-    });
-    expect(out).toMatchObject({ status: 'awaiting_yes' });
-    expect(t.pm.screen).not.toHaveBeenCalled();
-  });
-
   it('stop is the console’s Stop now', async () => {
     const t = build({
       person: { authorUserId: 1, text: 'Stop the Tamil change' },
@@ -519,7 +816,7 @@ describe('PM agent conversation: actions that act at once', () => {
     );
   });
 
-  it('a turn token that names no person message acts on nothing', async () => {
+  it('a turn token that names no person message acts on nothing; a run reads one change', async () => {
     const t = build({
       person: { authorUserId: 1, text: 'x' },
       perms: { 1: TEAM },
@@ -527,5 +824,13 @@ describe('PM agent conversation: actions that act at once', () => {
     (t.svc as any).messages.findOne = jest.fn(async () => null);
     const out = await t.svc.callTool('change_undo', CLAIMS, { idea_id: LIVE });
     expect(out.refused).toMatch(/not known/);
+    // A weekly run's reviewer reads the change it reviews.
+    const read = await t.svc.callTool('change_read', CLAIMS, {
+      idea_id: PINNED,
+    });
+    expect(read).toMatchObject({
+      id: PINNED,
+      title: 'Safety rules: name the moment',
+    });
   });
 });

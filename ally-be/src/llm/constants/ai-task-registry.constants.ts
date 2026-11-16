@@ -1112,7 +1112,10 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'The PM agent, one Deep Agent in ally-ai (app/core/pm_agent): reads expert comments, metric failure points ' +
       'and redacted reporting views (never transcripts), plans, investigates with read-only subagents, and proposes ' +
       'ideas routed to itself, Builder, Bug Hunter or a person through ally-be gateway tools that refuse the ' +
-      'never-list. Every model call (main agent and subagents) is one row. Falls back to ' +
+      'never-list. A reviewer subagent (fresh context, read-only tools, structured verdict) checks each proposed ' +
+      'change: does the evidence support it, does it fit every language and organisation it reaches, could it hurt ' +
+      'safety; ally-ai code posts the verdict (change_review_record) and it sets the change’s confidence (high only ' +
+      'on three yeses), which the always-ask check reads. Every model call (main agent and subagents) is one row. Falls back to ' +
       'DEBRIEF_MODELS.pmAgentBackup. Paid from the learning budget, capped per run (pmAgentRunCapUsd). ' +
       'Also answers Builder interview questions for a handed-over idea (R2-20, POST /pm-agent/builder-answers): ' +
       'one structured call from the idea brief alone (no tools, no learner text), at most $0.10 each, ' +
@@ -1133,9 +1136,13 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     trigger:
       'A person posts in the Debrief console’s PM agent conversation (POST v1/debriefs/console/pm-agent/conversation)',
     detail:
-      'The PM agent answering one message (V2_AUTONOMY C1–C3, POST /pm-agent/conversation): a LangChain create_agent ' +
-      'loop over the PM agent’s gateway tools (read changes, sessions and metrics; propose; stop, undo, retry, hold a ' +
-      'language, pause a kind of change; approve or turn down only after the person’s explicit yes). No transcripts, ' +
+      'The PM agent answering one message (V2_AUTONOMY C1–C3, POST /pm-agent/conversation): the same Deep Agent ' +
+      'harness as the weekly run (shared /memories/ store namespace, read-only skills, investigator and reviewer ' +
+      'subagents) on a Postgres checkpoint thread per console thread, over the conversation’s gateway tools (read ' +
+      'changes, sessions and metrics; propose; stop, undo, retry, hold a language, pause a kind of change). Approve, ' +
+      'turn down and an always-ask retry pause with LangGraph human-in-the-loop; ally-be resumes approve only on the ' +
+      'same person’s explicit yes with the permission, else reject (a second call in the same turn when the person ' +
+      'could never say yes). Every reply passes a code quote check against the turn’s tool texts. No transcripts, ' +
       'no learner words. Same task label and learning budget as the weekly run: each turn at most ' +
       'min(pmAgentRunCapUsd, $0.25, learning budget left). Its instructions are the Skills Store prompt ' +
       'ally_ai_debrief_pm_conversation_system (not pinned); its model is DEBRIEF_MODELS.pmAgent with pmAgentBackup.',

@@ -29,6 +29,8 @@ class RunLedger:
     idea_ids: List[str] = field(default_factory=list)
     refusals: List[Dict[str, str]] = field(default_factory=list)
     models_used: List[str] = field(default_factory=list)
+    #: Every string the tools returned (for ally-be's quote check on a reply).
+    tool_texts: List[str] = field(default_factory=list)
     stopped_for_budget: bool = False
 
     @property

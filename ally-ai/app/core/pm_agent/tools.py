@@ -17,12 +17,15 @@ from app.core.debrief_graph.gateway import Gateway, GatewayError
 from app.core.pm_agent.ledger import RunLedger
 from app.core.pm_agent.quotes import strip_quotes
 
-#: Tools that only read; the investigator subagents get these and nothing else.
+#: Tools that only read; the investigator and reviewer subagents get these (and
+#: `session_read` in a conversation) and nothing else. `change_read` is how the
+#: reviewer sees one proposed change and its evidence.
 READ_TOOLS = (
     "reporting_query",
     "comments_read",
     "metrics_view",
     "questions_read",
+    "change_read",
 )
 #: Tools that propose or request an action; main agent only.
 ACTION_TOOLS = (
@@ -35,10 +38,11 @@ ACTION_TOOLS = (
     "guidance_propose",
     "question_answer",
 )
-#: The conversation's own tools (V2_AUTONOMY C2): reading one change or session,
-#: and acting on changes for the person who asked. ally-be keeps every rule: an
-#: approval or a turn-down only ever waits for the person's "yes" (`confirm_plan`).
-CONVERSATION_READ_TOOLS = ("change_read", "session_read")
+#: The conversation's own tools (V2_AUTONOMY C2): reading one session, and acting
+#: on changes for the person who asked. ally-be keeps every rule; an approval, a
+#: turn-down and an always-ask retry pause the turn for the person's yes
+#: (LangGraph human-in-the-loop, `conversation.INTERRUPT_ON`).
+CONVERSATION_READ_TOOLS = ("session_read",)
 CONVERSATION_ACTION_TOOLS = (
     "change_approve",
     "change_turn_down",
@@ -47,12 +51,15 @@ CONVERSATION_ACTION_TOOLS = (
     "change_retry",
     "change_hold_language",
     "changes_pause",
-    "confirm_plan",
 )
-CONVERSATION_TOOLS = CONVERSATION_READ_TOOLS + CONVERSATION_ACTION_TOOLS
+CONVERSATION_TOOLS = (
+    ("change_read",) + CONVERSATION_READ_TOOLS + CONVERSATION_ACTION_TOOLS
+)
+#: Every read-only tool; the only tools a subagent is ever given.
+SUBAGENT_READ_TOOLS = READ_TOOLS + CONVERSATION_READ_TOOLS
 #: What a weekly, monthly or questions run may be given.
 RUN_TOOLS = READ_TOOLS + ACTION_TOOLS
-ALL_TOOLS = RUN_TOOLS + CONVERSATION_TOOLS
+ALL_TOOLS = RUN_TOOLS + CONVERSATION_READ_TOOLS + CONVERSATION_ACTION_TOOLS
 
 #: Longest tool answer handed back to the model, in characters.
 MAX_ANSWER_CHARS = 20_000
@@ -266,6 +273,11 @@ class ChangeLanguagesArgs(BaseModel):
         "leave out for every language.",
     )
     reason: str = Field("", description="Why, in the person's words.")
+    plan: Optional[str] = Field(
+        None,
+        description="For a retry of a change that always asks a person: exactly "
+        "what will happen, in one or two plain sentences, as you repeat it back.",
+    )
 
 
 class ChangeHoldLanguageArgs(BaseModel):
@@ -283,10 +295,20 @@ class ChangesPauseArgs(BaseModel):
     reason: str = ""
 
 
-class ConfirmPlanArgs(BaseModel):
-    plan_id: str = Field(
-        description="The plan id from the earlier awaiting_yes answer."
-    )
+def text_leaves(value: Any, out: Optional[List[str]] = None) -> List[str]:
+    """Every string in a tool's answer: what the turn's tools returned, for
+    ally-be's quote check (a quote in the reply must be one of these, verbatim)."""
+    out = [] if out is None else out
+    if isinstance(value, str):
+        if value.strip():
+            out.append(value)
+    elif isinstance(value, dict):
+        for v in value.values():
+            text_leaves(v, out)
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            text_leaves(v, out)
+    return out
 
 
 def _answer(res: Dict[str, Any]) -> str:
@@ -312,6 +334,7 @@ def make_tools(
             raise ToolException(f"Refused by ally-be: {reason}")
         if name == "idea_propose" and isinstance(res, dict) and res.get("idea_id"):
             ledger.idea_ids.append(str(res["idea_id"]))
+        text_leaves(res, ledger.tool_texts)
         return _answer(res)
 
     async def reporting_query(**a: Any) -> str:
@@ -403,9 +426,6 @@ def make_tools(
 
     async def changes_pause(**a: Any) -> str:
         return await call("changes_pause", ChangesPauseArgs(**a).model_dump())
-
-    async def confirm_plan(**a: Any) -> str:
-        return await call("confirm_plan", ConfirmPlanArgs(**a).model_dump())
 
     specs = [
         (
@@ -499,15 +519,15 @@ def make_tools(
         (
             change_approve,
             ChangeApproveArgs,
-            "Approve a change that waits for a person. Never acts at once: it "
-            "returns awaiting_yes and a plan id. Repeat the plan back word for word "
-            "and ask for a yes; after the person says yes, call confirm_plan.",
+            "Approve a change that waits for a person. The call pauses until the "
+            "person says yes: in the same message, state the plan exactly and ask "
+            "them to reply yes. If they say anything else, it is not carried out.",
         ),
         (
             change_turn_down,
             ChangeTurnDownArgs,
             "Turn down a change that waits for a person. Like change_approve it "
-            "waits for the person's yes (confirm_plan).",
+            "pauses for the person's yes; state the plan in the same message.",
         ),
         (
             change_stop,
@@ -525,7 +545,8 @@ def make_tools(
             change_retry,
             ChangeLanguagesArgs,
             "Try a stopped or undone change again, optionally only for some "
-            "languages. A change of a kind that always asks a person waits for a yes.",
+            "languages. A change of a kind that always asks a person pauses for "
+            "their yes: give the plan and state it in the same message.",
         ),
         (
             change_hold_language,
@@ -538,12 +559,6 @@ def make_tools(
             ChangesPauseArgs,
             "Pause a kind of change until a date: nothing of that kind is tried or "
             "handed over until then. Acts at once.",
-        ),
-        (
-            confirm_plan,
-            ConfirmPlanArgs,
-            "Carry out a plan you repeated back, once the person's latest message "
-            "is an explicit yes to it. Refused otherwise.",
         ),
     ]
     tools: List[BaseTool] = []

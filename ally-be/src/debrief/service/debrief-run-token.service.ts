@@ -77,6 +77,9 @@ export const PM_AGENT_GATEWAY_TOOLS = [
   // Plan §11.7 "Ask a question": read the open questions, post an answer.
   'questions_read',
   'question_answer',
+  // The reviewer subagent's verdict on one change, posted by ally-ai's code
+  // (never a model tool): it sets the change's confidence.
+  'change_review_record',
 ] as const;
 /**
  * The PM agent conversation's own tools (V2_AUTONOMY C2), served by
@@ -94,7 +97,6 @@ export const PM_CONVERSATION_TOOLS = [
   'change_retry',
   'change_hold_language',
   'changes_pause',
-  'confirm_plan',
 ] as const;
 export type PmConversationTool = (typeof PM_CONVERSATION_TOOLS)[number];
 export type PmAgentGatewayTool =
@@ -112,6 +114,18 @@ export interface DebriefAgentClaims {
   agentRunId: string;
   tools: string[];
   exp: number;
+  /**
+   * A conversation turn that resumes a paused action after the person's yes:
+   * the actions that person approved. An approval, a turn-down or an
+   * always-ask retry is carried out only with its entry here.
+   */
+  approved?: PmApprovedAction[];
+}
+
+/** One action a person said yes to (`DebriefAgentClaims.approved`). */
+export interface PmApprovedAction {
+  tool: string;
+  ideaId: string | null;
 }
 
 /** A run token lives this long: past any run's deadline, short enough to be useless later. */
@@ -179,6 +193,7 @@ export class DebriefRunTokenService {
     agentRunId: string,
     tools: readonly PmAgentGatewayTool[] = PM_AGENT_GATEWAY_TOOLS,
     ttlS = AGENT_TOKEN_MAX_TTL_S,
+    approved?: readonly PmApprovedAction[],
   ): string {
     const allowed = tools.filter(
       (t) =>
@@ -186,7 +201,13 @@ export class DebriefRunTokenService {
         (PM_CONVERSATION_TOOLS as readonly string[]).includes(t),
     );
     return jwt.sign(
-      { kind: 'agent', agent: 'pm_agent', agentRunId, tools: allowed },
+      {
+        kind: 'agent',
+        agent: 'pm_agent',
+        agentRunId,
+        tools: allowed,
+        ...(approved?.length ? { approved: [...approved] } : {}),
+      },
       this.secret(),
       {
         algorithm: 'HS256',
