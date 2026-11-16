@@ -7,8 +7,12 @@ import { configureStore } from "@reduxjs/toolkit";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../SttConfigs/SttConfigs", () => ({ SttConfigs: () => <div>SttPane</div> }));
-vi.mock("../../LlmModelCatalog/LlmModelCatalog", () => ({ LlmModelCatalog: () => <div>LlmPane</div> }));
-vi.mock("../../ScenarioVoices/ScenarioVoices", () => ({ ScenarioVoices: () => <div>VoicesPane</div> }));
+vi.mock("../../LlmModelCatalog/LlmModelCatalog", () => ({
+  LlmModelCatalog: () => <div>LlmPane</div>,
+}));
+vi.mock("../../ScenarioVoices/ScenarioVoices", () => ({
+  ScenarioVoices: () => <div>VoicesPane</div>,
+}));
 
 import { Providers } from "../Providers";
 

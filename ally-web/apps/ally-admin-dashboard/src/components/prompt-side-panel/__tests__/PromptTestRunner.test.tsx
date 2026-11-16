@@ -50,7 +50,14 @@ describe("PromptTestRunner", () => {
 
   it("shows the provider's own words when the model rejects the call", async () => {
     runTest.mockReturnValue({
-      unwrap: () => Promise.resolve({ ok: false, text: "", latencyMs: 5, error: "deprecated", configName: "Mini" }),
+      unwrap: () =>
+        Promise.resolve({
+          ok: false,
+          text: "",
+          latencyMs: 5,
+          error: "deprecated",
+          configName: "Mini",
+        }),
     });
     render(<PromptTestRunner promptText="x" />);
     fireEvent.click(screen.getByRole("button", { name: "Run test" }));

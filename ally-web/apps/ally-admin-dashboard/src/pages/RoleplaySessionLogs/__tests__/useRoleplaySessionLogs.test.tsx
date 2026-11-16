@@ -15,9 +15,11 @@ vi.mock("@api", () => ({
 
 import { useRoleplaySessionLogs } from "../useRoleplaySessionLogs";
 
-const at = (url: string) => ({ children }: { children: React.ReactNode }) => (
-  <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>
-);
+const at =
+  (url: string) =>
+  ({ children }: { children: React.ReactNode }) => (
+    <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>
+  );
 
 describe("useRoleplaySessionLogs scenario filter", () => {
   it("reads ?scenarioId= into the query and counts as an active filter", () => {
