@@ -269,6 +269,48 @@ describe("a choice typed but not added", () => {
   });
 });
 
+describe("Make it yours after Back", () => {
+  it("shows the owner's saved choices, not the examples again", async () => {
+    h.results.install = () => {
+      h.lists.current = [SLOTS, APPOINTMENTS];
+      return Promise.resolve({ lists: [SLOTS, APPOINTMENTS] });
+    };
+    h.results.updateField = () => {
+      h.lists.current = [
+        SLOTS,
+        {
+          ...APPOINTMENTS,
+          fields: APPOINTMENTS.fields.map(f =>
+            f.key === "service" ? { ...f, options: { values: ["Consultation", "Thali"] } } : f,
+          ),
+        },
+      ];
+      return Promise.resolve({});
+    };
+    const props = { bot: BOT, home: {} as never, canEdit: true, canManage: true, go: vi.fn() };
+    const view = render(<ListsSection {...props} tryIt={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.empty.readyMade) }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: `${t.setup.use}: Appointments` }));
+    });
+    view.rerender(<ListsSection {...props} tryIt={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Follow-up" }));
+    fireEvent.change(screen.getByPlaceholderText("Add a service"), { target: { value: "Thali" } });
+    fireEvent.click(screen.getByRole("button", { name: t.setup.addChoice }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: t.setup.next }));
+    });
+    view.rerender(<ListsSection {...props} tryIt={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: t.setup.back }));
+
+    const choices = within(screen.getByTestId("choices"));
+    expect(choices.getByText("Thali")).toBeTruthy();
+    expect(choices.queryByText("Follow-up")).toBeNull();
+    // Only the example still kept is marked as one.
+    expect(choices.getAllByText(t.setup.example)).toHaveLength(1);
+  });
+});
+
 describe("the entries table", () => {
   const table = () =>
     withSaves(<EntriesTable bot={BOT} list={APPOINTMENTS} lists={[SLOTS, APPOINTMENTS]} canEdit />);
