@@ -31,7 +31,7 @@ export const NewIdeaButton: React.FC<{ compact?: boolean }> = ({ compact = false
       >
         <OverflowMenuItem
           itemText={copy.reportBug}
-          onClick={() => navigate(`${ROUTES.PRODUCT_ROADMAP}?tab=bugs`)}
+          onClick={() => navigate(ROUTES.ROADMAP_BUGS)}
         />
       </OverflowMenu>
     </span>

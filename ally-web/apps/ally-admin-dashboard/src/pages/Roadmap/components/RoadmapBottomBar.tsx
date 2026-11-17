@@ -90,7 +90,7 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
         </li>
         <li className="flex flex-1">
           <Link
-            to={`${ROUTES.PRODUCT_ROADMAP}?tab=bugs`}
+            to={ROUTES.ROADMAP_BUGS}
             className={`${item} text-typography-secondary`}
             tabIndex={hidden ? -1 : 0}
           >

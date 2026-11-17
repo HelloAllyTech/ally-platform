@@ -42,10 +42,16 @@ import {
   AILab,
   ProductRoadmap,
   RoadmapDraftsPage,
+  RoadmapAgentPage,
+  RoadmapBugsPage,
+  RoadmapFrame,
   RoadmapGate,
   RoadmapNewIdeaPage,
   RoadmapIdeaPage,
+  RoadmapLegacyRedirect,
   RoadmapQueuePage,
+  RoadmapSettingsPage,
+  UserInterviewsPage,
   Settings,
   Logs,
   MobileReleases,
@@ -570,7 +576,10 @@ export const RouteLayout: React.FC = () => {
                 requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
                 requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
               >
-                <ProductRoadmap />
+                {/* With roadmap_v2 on, old links land on the Roadmap (§5.7). */}
+                <RoadmapLegacyRedirect from="productRoadmap">
+                  <ProductRoadmap />
+                </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
           />
@@ -587,7 +596,9 @@ export const RouteLayout: React.FC = () => {
                 fullBleed
               >
                 <RoadmapGate fallback={<NotFound />}>
-                  <RoadmapQueuePage />
+                  <RoadmapFrame>
+                    <RoadmapQueuePage />
+                  </RoadmapFrame>
                 </RoadmapGate>
               </PrivateLayout>
             }
@@ -601,7 +612,9 @@ export const RouteLayout: React.FC = () => {
                 fullBleed
               >
                 <RoadmapGate fallback={<NotFound />}>
-                  <RoadmapDraftsPage />
+                  <RoadmapFrame>
+                    <RoadmapDraftsPage />
+                  </RoadmapFrame>
                 </RoadmapGate>
               </PrivateLayout>
             }
@@ -615,7 +628,9 @@ export const RouteLayout: React.FC = () => {
                 fullBleed
               >
                 <RoadmapGate fallback={<NotFound />}>
-                  <RoadmapNewIdeaPage />
+                  <RoadmapFrame>
+                    <RoadmapNewIdeaPage />
+                  </RoadmapFrame>
                 </RoadmapGate>
               </PrivateLayout>
             }
@@ -629,7 +644,78 @@ export const RouteLayout: React.FC = () => {
                 fullBleed
               >
                 <RoadmapGate fallback={<NotFound />}>
-                  <RoadmapIdeaPage />
+                  <RoadmapFrame>
+                    <RoadmapIdeaPage />
+                  </RoadmapFrame>
+                </RoadmapGate>
+              </PrivateLayout>
+            }
+          />
+          {/* Agent (Builders read, Owners edit), Settings (Owners) and Bugs: each page checks the
+            role itself and sends anyone else to the Queue. */}
+          {[ROUTES.ROADMAP_AGENT, ROUTES.ROADMAP_AGENT_SECTION(":section")].map(path => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <PrivateLayout
+                  requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                  requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+                  fullBleed
+                >
+                  <RoadmapGate fallback={<NotFound />}>
+                    <RoadmapFrame>
+                      <RoadmapAgentPage />
+                    </RoadmapFrame>
+                  </RoadmapGate>
+                </PrivateLayout>
+              }
+            />
+          ))}
+          <Route
+            path={ROUTES.ROADMAP_SETTINGS}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+                fullBleed
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapFrame>
+                    <RoadmapSettingsPage />
+                  </RoadmapFrame>
+                </RoadmapGate>
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.ROADMAP_BUGS}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+                fullBleed
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapFrame>
+                    <RoadmapBugsPage />
+                  </RoadmapFrame>
+                </RoadmapGate>
+              </PrivateLayout>
+            }
+          />
+          {/* User Interviews, out of the Roadmap into its own entry (D14), once roadmap_v2 is on. */}
+          <Route
+            path={ROUTES.USER_INTERVIEWS}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapFrame>
+                    <UserInterviewsPage />
+                  </RoadmapFrame>
                 </RoadmapGate>
               </PrivateLayout>
             }
@@ -695,7 +781,9 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.BUILDER}
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-                <BuilderRoom />
+                <RoadmapLegacyRedirect from="builder">
+                  <BuilderRoom />
+                </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
           />
@@ -703,7 +791,9 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.BUILDER_ALL_SESSIONS}
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-                <Builder />
+                <RoadmapLegacyRedirect from="builder">
+                  <Builder />
+                </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
           />
@@ -711,7 +801,9 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.BUILDER_SESSION(":sessionId")}
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-                <BuilderSession />
+                <RoadmapLegacyRedirect from="builder">
+                  <BuilderSession />
+                </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
           />
@@ -723,7 +815,9 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.BUILDER_SETTINGS}
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-                <BuilderSettings />
+                <RoadmapLegacyRedirect from="builder">
+                  <BuilderSettings />
+                </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
           />
@@ -731,7 +825,9 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.BUILDER_PIPELINE}
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-                <BuilderPipeline />
+                <RoadmapLegacyRedirect from="builder">
+                  <BuilderPipeline />
+                </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
           />
@@ -739,7 +835,9 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.BUILDER_SCOREBOARD}
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-                <BuilderScoreboard />
+                <RoadmapLegacyRedirect from="builder">
+                  <BuilderScoreboard />
+                </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
           />
@@ -747,7 +845,9 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.BUILDER_KNOWLEDGE}
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-                <BuilderKnowledge />
+                <RoadmapLegacyRedirect from="builder">
+                  <BuilderKnowledge />
+                </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
           />
@@ -755,7 +855,9 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.BUILDER_EVAL}
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-                <BuilderEval />
+                <RoadmapLegacyRedirect from="builder">
+                  <BuilderEval />
+                </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
           />

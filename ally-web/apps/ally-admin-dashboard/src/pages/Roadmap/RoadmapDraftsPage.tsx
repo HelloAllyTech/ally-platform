@@ -59,7 +59,7 @@ export const RoadmapDraftsPage: React.FC = () => {
                   {copy.mobile.drafts}
                 </span>
                 <Link
-                  to={`${ROUTES.PRODUCT_ROADMAP}?tab=bugs`}
+                  to={ROUTES.ROADMAP_BUGS}
                   className="text-typography-secondary hover:underline"
                 >
                   {copy.mobile.bugs}

@@ -94,6 +94,13 @@ vi.mock("@pages", () => ({
   RoadmapIdeaPage: () => <div>RoadmapIdeaPage</div>,
   RoadmapDraftsPage: () => <div>RoadmapDraftsPage</div>,
   RoadmapNewIdeaPage: () => <div>RoadmapNewIdeaPage</div>,
+  RoadmapFrame: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  // Pass-through: the redirect's own mapping is covered in pages/Roadmap/__tests__.
+  RoadmapLegacyRedirect: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  RoadmapAgentPage: () => <div>RoadmapAgentPage</div>,
+  RoadmapSettingsPage: () => <div>RoadmapSettingsPage</div>,
+  RoadmapBugsPage: () => <div>RoadmapBugsPage</div>,
+  UserInterviewsPage: () => <div>UserInterviewsPage</div>,
   EvaluateLogin: () => <div>EvaluateLoginPage</div>,
   EvaluateRecords: () => <div>EvaluateRecordsPage</div>,
   EvaluateRecordDetail: () => <div>EvaluateRecordDetailPage</div>,

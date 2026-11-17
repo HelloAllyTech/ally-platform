@@ -31,6 +31,7 @@ import { NewIdeaButton } from "./components/NewIdeaButton";
 import { QueueBoard } from "./components/QueueBoard";
 import { QueueList } from "./components/QueueList";
 import { QuickOpen } from "./components/QuickOpen";
+import { RoadmapHelpMenu, RoadmapRoleTabs } from "./components/RoadmapAreaNav";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import {
@@ -439,12 +440,13 @@ export const RoadmapQueuePage: React.FC = () => {
                   {copy.mobile.drafts}
                 </Link>
                 <Link
-                  to={`${ROUTES.PRODUCT_ROADMAP}?tab=bugs`}
+                  to={ROUTES.ROADMAP_BUGS}
                   className="text-typography-secondary hover:underline"
                 >
                   {copy.mobile.bugs}
                 </Link>
-                {/* TODO(P4): Agent (Builders, Owners) and Settings (Owners) tabs. */}
+                <RoadmapRoleTabs role={role} />
+                <RoadmapHelpMenu />
               </nav>
             )}
           </div>
