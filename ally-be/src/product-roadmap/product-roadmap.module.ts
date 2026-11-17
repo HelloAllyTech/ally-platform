@@ -107,6 +107,8 @@ import { BuilderPullRequest } from 'src/builder/entity/builder-pull-request.enti
 import { GithubModule } from 'src/github/github.module';
 import { ReleaseModule } from 'src/release/release.module';
 import { ReleasePolicyLog } from './entity/release-policy-log.entity';
+import { RoadmapReleaseController } from './controller/roadmap-release.controller';
+import { RoadmapV2EnabledGuard } from './guard/roadmap-v2-enabled.guard';
 import { ReleasePlanService } from './service/release-plan.service';
 import { ReleasePolicyService } from './service/release-policy.service';
 import { ReleasePolicySettingsService } from './service/release-policy-settings.service';
@@ -227,6 +229,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapIdeaDraftController,
     RoadmapPlanController,
     RoadmapItemReleaseController,
+    RoadmapReleaseController,
   ],
   providers: [
     RoadmapItemLookupService,
@@ -302,6 +305,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
       useClass: LoggingReleasePolicyOwnerNotifier,
     },
     ReleasePolicySchedulerRegistrationService,
+    RoadmapV2EnabledGuard,
     // Classifies a reported bug's repo at intake (RoadmapOpportunityService.create).
     // Provided directly rather than importing BugHunterModule: it constructs
     // itself from AppConfigService (global), PromptSharedService and
