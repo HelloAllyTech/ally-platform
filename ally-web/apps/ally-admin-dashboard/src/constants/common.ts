@@ -729,6 +729,8 @@ export const ApiEndpoints = {
     SETTINGS: "/v1/pm-agent/settings",
     MEMORY: "/v1/pm-agent/memory",
     MEMORY_BY_ID: (id: string) => `/v1/pm-agent/memory/${id}`,
+    LESSON_CONFIRM: (id: string) => `/v1/pm-agent/lessons/${id}/confirm`,
+    LESSONS_RUN: "/v1/pm-agent/lessons/run",
     HISTORY: "/v1/pm-agent/history",
     HEALTH: "/v1/pm-agent/health",
   },

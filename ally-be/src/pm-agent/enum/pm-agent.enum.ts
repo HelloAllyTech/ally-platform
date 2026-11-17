@@ -122,6 +122,23 @@ export enum PmMemorySource {
   REJECTION = 'rejection',
   FEEDBACK = 'feedback',
   MANUAL = 'manual',
+  /** A lesson derived by the weekly lessons job (src/pm-agent/lessons/). */
+  WEEKLY_JOB = 'weekly_job',
+}
+
+/** A lesson's lifecycle (migration 1982000000600). Facts leave it NULL. */
+export enum PmLessonStatus {
+  PROPOSED = 'proposed',
+  ACTIVE = 'active',
+  EXPIRED = 'expired',
+  REMOVED = 'removed',
+}
+
+/** What a lesson applies to; stored in pm_agent_memory.scope. */
+export enum PmLessonScope {
+  GLOBAL = 'global',
+  CATEGORY = 'category',
+  LANE = 'lane',
 }
 
 export enum PmFeedbackStatus {

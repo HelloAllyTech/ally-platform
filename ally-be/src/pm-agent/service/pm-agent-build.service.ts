@@ -27,6 +27,7 @@ import {
 import { compilePlan, RecommendationPayload } from '../util/compile-plan';
 import { PmAgentBuilderPort } from './pm-agent-builder-port.service';
 import { PmAgentEventsService } from './pm-agent-events.service';
+import { PmAgentImpactService } from '../impact/pm-agent-impact.service';
 
 /** A step's verdict: move on, park and retry later, or stop in front of a person. */
 type StepResult =
@@ -81,6 +82,7 @@ export class PmAgentBuildService {
     private readonly builder: PmAgentBuilderPort,
     private readonly events: PmAgentEventsService,
     @Optional() private readonly slack?: SlackService,
+    @Optional() private readonly impact?: PmAgentImpactService,
   ) {}
 
   // ── outbox worker ─────────────────────────────────────────────────────────
@@ -590,6 +592,11 @@ export class PmAgentBuildService {
         await this.laneStats
           .bump(PmLaneStatDimension.CATEGORY, card.category, 'shipped')
           .catch(() => undefined);
+        // Impact checks: baseline now, reads at +14 / +30 d. Idempotent and never throws.
+        await this.impact?.onReleased(
+          card,
+          PmAgentBuildService.releasedAt(prs),
+        );
         break;
       case PmCardStatus.MERGED_NOT_RELEASED:
         await this.outcomes.flag(card.id, {
@@ -610,6 +617,14 @@ export class PmAgentBuildService {
         break;
     }
     return true;
+  }
+
+  /** When the change reached production: the last PR's release time (now if unrecorded). */
+  static releasedAt(prs: { releasedAt?: Date | null }[]): Date {
+    const times = prs
+      .map((pr) => (pr.releasedAt ? new Date(pr.releasedAt).getTime() : NaN))
+      .filter((time) => Number.isFinite(time));
+    return times.length ? new Date(Math.max(...times)) : new Date();
   }
 
   /** Count a failed build; the third in a row trips the breaker. */

@@ -25,6 +25,7 @@ import {
   PmRepo,
   PmRiskLevel,
 } from '../enum/pm-agent.enum';
+import { metricRefProblems, PmMetricRef } from '../impact/metric-catalog';
 
 /**
  * The card payload contract (docs/pm-agent.md "Card payload", schemaVersion 1).
@@ -82,6 +83,28 @@ export function ContainsNumber(options?: ValidationOptions) {
       validator: {
         validate: (value: unknown) =>
           typeof value === 'string' && /\d/.test(value),
+      },
+    });
+}
+
+/**
+ * A valid `metricRef` (impact checks): source in the measurable-metric catalog, params
+ * shape-checked against the entry, betterWhen up|down, unit (when sent) the entry's own.
+ */
+export function IsPmMetricRef(options?: ValidationOptions) {
+  return (object: object, propertyName: string) =>
+    registerDecorator({
+      name: 'isPmMetricRef',
+      target: object.constructor,
+      propertyName,
+      options: {
+        message: (args) =>
+          metricRefProblems(args.value).join('; ') ||
+          `${propertyName} is invalid`,
+        ...options,
+      },
+      validator: {
+        validate: (value: unknown) => metricRefProblems(value).length === 0,
       },
     });
 }
@@ -180,6 +203,14 @@ export class PmRecommendationPayloadDto {
   @ValidateNested()
   @Type(() => PmImpactMetricDto)
   impactMetric!: PmImpactMetricDto;
+
+  /**
+   * Optional, additive (v1.1): the catalog metric the impact checks read. Absent = the card
+   * is shown as "impact not measurable".
+   */
+  @IsOptional()
+  @IsPmMetricRef()
+  metricRef?: PmMetricRef;
 
   @IsArray()
   @ArrayMaxSize(PM_CARD_LIMITS.LIST_MAX)

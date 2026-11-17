@@ -57,6 +57,20 @@ import { PmLaneToolsService } from './lane/pm-lane-tools.service';
 import { PmAgentSchedulerService } from './service/pm-agent-scheduler.service';
 import { PmAgentSettingsService } from './service/pm-agent-settings.service';
 import { PmAgentStateService } from './service/pm-agent-state.service';
+import {
+  PM_IMPACT_STORE,
+  PM_METRIC_SOURCES,
+  PmAgentImpactService,
+} from './impact/pm-agent-impact.service';
+import { PmAgentImpactScheduler } from './impact/pm-agent-impact.scheduler';
+import { PmAgentLessonsController } from './lessons/pm-lessons.controller';
+import {
+  PmAgentLessonsScheduler,
+  PmAgentLessonsService,
+} from './lessons/pm-lessons.service';
+import { PmLessonsSqlStore } from './lessons/pm-lessons.store';
+import { PmImpactStore } from './impact/pm-impact.store';
+import { PmMetricSourcesService } from './impact/pm-metric-sources.service';
 
 /**
  * PM Agent (docs/pm-agent.md): the admin AI product manager. This module is the
@@ -102,7 +116,7 @@ import { PmAgentStateService } from './service/pm-agent-state.service';
     LlmAgentModule,
     LlmUsageModule,
   ],
-  controllers: [PmAgentController],
+  controllers: [PmAgentController, PmAgentLessonsController],
   providers: [
     PmAgentSettingsRepository,
     PmAgentRunRepository,
@@ -133,6 +147,17 @@ import { PmAgentStateService } from './service/pm-agent-state.service';
     PmAgentRunService,
     PmAgentRunSchedulerService,
     { provide: PM_AGENT_RUN_TRIGGER, useExisting: PmAgentRunService },
+    // Impact checks (+14 / +30 d): impact/.
+    PmImpactStore,
+    PmMetricSourcesService,
+    { provide: PM_IMPACT_STORE, useExisting: PmImpactStore },
+    { provide: PM_METRIC_SOURCES, useExisting: PmMetricSourcesService },
+    PmAgentImpactService,
+    PmAgentImpactScheduler,
+    // Weekly lessons: lessons/.
+    PmLessonsSqlStore,
+    PmAgentLessonsService,
+    PmAgentLessonsScheduler,
   ],
   exports: [
     PmAgentSettingsRepository,

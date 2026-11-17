@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { BuilderPullRequest } from 'src/builder/entity/builder-pull-request.entity';
@@ -14,6 +14,7 @@ import {
   PmDelivery,
   PmNeedsYou,
 } from '../dto/pm-agent.dto';
+import { PmAgentImpactService } from '../impact/pm-agent-impact.service';
 
 const iso = (value?: Date | string | null): string | null =>
   value ? new Date(value).toISOString() : null;
@@ -37,18 +38,25 @@ export class PmAgentPresenterService {
     private readonly pullRequests: Repository<BuilderPullRequest>,
     @InjectRepository(BuilderSession)
     private readonly sessions: Repository<BuilderSession>,
+    @Optional() private readonly impact?: PmAgentImpactService,
   ) {}
 
   async present(cards: PmAgentCard[]): Promise<PmCardResponse[]> {
-    const deliveries = await this.deliveries(cards);
-    return cards.map((card) =>
-      PmAgentPresenterService.toResponse(
+    const [deliveries, impacts] = await Promise.all([
+      this.deliveries(cards),
+      this.impact ? this.impact.views(cards) : new Map(),
+    ]);
+    return cards.map((card) => {
+      const delivery = card.builderSessionId
+        ? deliveries.get(card.builderSessionId)
+        : undefined;
+      const impact = impacts.get(card.id);
+      return PmAgentPresenterService.toResponse(
         card,
-        card.builderSessionId
-          ? deliveries.get(card.builderSessionId)
-          : undefined,
-      ),
-    );
+        // `delivery.impact` rides on the delivery (a copy: deliveries are shared per session).
+        delivery && impact ? { ...delivery, impact } : delivery,
+      );
+    });
   }
 
   async presentOne(card: PmAgentCard): Promise<PmCardResponse> {

@@ -6,6 +6,8 @@ import {
   PmCardsResponse,
   PmFeedbackInput,
   PmHealth,
+  PmLesson,
+  PmLessonsRunResponse,
   PmMemoryFact,
   PmMemoryResponse,
   PmReasonChip,
@@ -182,6 +184,16 @@ export const pmAgentAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.PM_AGENT_MEMORY],
     }),
 
+    confirmPmAgentLesson: builder.mutation<PmLesson, string>({
+      query: id => ({ url: ApiEndpoints.PM_AGENT.LESSON_CONFIRM(id), method: HttpMethod.POST }),
+      invalidatesTags: [TAG_TYPES.PM_AGENT_MEMORY, TAG_TYPES.PM_AGENT_HEALTH],
+    }),
+
+    runPmAgentLessons: builder.mutation<PmLessonsRunResponse, void>({
+      query: () => ({ url: ApiEndpoints.PM_AGENT.LESSONS_RUN, method: HttpMethod.POST }),
+      invalidatesTags: [TAG_TYPES.PM_AGENT_MEMORY, TAG_TYPES.PM_AGENT_HEALTH],
+    }),
+
     getPmAgentHistory: builder.query<{ cards: PmCard[] }, { limit?: number } | void>({
       query: arg => ({
         url: ApiEndpoints.PM_AGENT.HISTORY,
@@ -220,6 +232,8 @@ export const {
   useGetPmAgentMemoryQuery,
   useUpdatePmAgentMemoryMutation,
   useDeletePmAgentMemoryMutation,
+  useConfirmPmAgentLessonMutation,
+  useRunPmAgentLessonsMutation,
   useGetPmAgentHistoryQuery,
   useGetPmAgentHealthQuery,
 } = pmAgentAPI;

@@ -57,4 +57,20 @@ export class PmAgentSettings extends BaseWithoutTenantEntity {
 
   @Column({ type: 'int', nullable: true })
   updatedBy?: number | null;
+
+  /** Weekly lessons job switch (migration 1982000000600); also needs `enabled`. */
+  @Column({ type: 'boolean', default: true })
+  lessonsEnabled!: boolean;
+
+  /** IST weekday of the lessons job, 0 = Sunday … 6 = Saturday (default Monday). */
+  @Column({ type: 'int', default: 1 })
+  lessonsWeekday!: number;
+
+  /** IST date the scheduled lessons job last claimed (once per weekday). */
+  @Column({ type: 'date', nullable: true })
+  lessonsLastRunDate?: string | null;
+
+  /** Summary of the last lessons job (counts, spend, stop reason). */
+  @Column({ type: 'jsonb', nullable: true })
+  lessonsLastRun?: Record<string, string | number | null> | null;
 }
