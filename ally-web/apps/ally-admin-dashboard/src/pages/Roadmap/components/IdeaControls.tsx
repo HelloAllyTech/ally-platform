@@ -15,6 +15,7 @@ import type { RoadmapItemDetail, RoadmapWatchLevel } from "@types";
 
 import { VoteControl } from "./VoteControl";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
+import { IdeaFlowAction, hasIdeaFlowAction } from "../triage/ReviewActions";
 import { quietLine } from "../utils/copy";
 import { PRIMARY_ACTIONS_BUILT, primaryActionFor } from "../utils/primaryAction";
 
@@ -303,19 +304,21 @@ export const PrimaryAction: React.FC<{
   fullWidth?: boolean;
 }> = ({ item, onApproveDesign, fullWidth }) => {
   const action = primaryActionFor(item);
+  // Accept, Pick a lead, Start planning, and a declined idea's Reopen / New idea (P3, P3b).
+  if (hasIdeaFlowAction(item)) return <IdeaFlowAction item={item} fullWidth={fullWidth} />;
   if (!action) {
     return <p className="text-sm text-typography-secondary">{quietLine(item)}</p>;
   }
   if (!PRIMARY_ACTIONS_BUILT.includes(action)) {
     switch (action) {
       case "accept":
-        // TODO(P3): Accept / Decline (with the reason box) for the Owner.
+        // Rendered by IdeaFlowAction above (P3).
         return null;
       case "pickLead":
-        // TODO(P3): Pick a lead, with the suggested Builder first.
+        // Rendered by IdeaFlowAction above (P3).
         return null;
       case "startPlanning":
-        // TODO(P3b): Start planning, for the lead or an Owner.
+        // Rendered by IdeaFlowAction above (P3b).
         return null;
       case "build":
         // TODO(P4): Build ▾ — Build here · Open in Claude Code · Copy brief · Download brief.
