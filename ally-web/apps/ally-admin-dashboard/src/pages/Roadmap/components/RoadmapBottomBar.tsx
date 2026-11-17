@@ -1,12 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 
-import { Debug, Document, List, Plus } from "@icons";
+import { Debug, Document, List, Plus, ThreeDot } from "@icons";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
 import { ROUTES, en } from "@constants";
 
+import { BottomSheet } from "./BottomSheet";
+import { MoreSheetContent } from "./RoadmapAreaNav";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
+import { useRoadmapRole } from "../RoadmapGate";
 
 interface RoadmapBottomBarProps {
   /** Slides away while scrolling down, back on scroll up (§4.17). */
@@ -21,8 +24,8 @@ interface RoadmapBottomBarProps {
  * The phone's bottom bar, within thumb reach: Queue · Drafts · ＋ New idea · Bugs · ⋯. It hides
  * while the keyboard is open (the caller passes `hidden`) and keeps clear of the home indicator.
  *
- * Drafts is Roadmap's own tab; ＋ is New idea, raised and 56 px. Bugs opens the existing page.
- * TODO(P4): ⋯ with Agent and Settings, for the roles that have them.
+ * Drafts is Roadmap's own tab; ＋ is New idea, raised and 56 px.
+ * ⋯ opens Agent and Settings for the roles that have them, plus the weekly email and What moved.
  */
 export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
   hidden,
@@ -31,6 +34,8 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
 }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.mobile;
+  const { role } = useRoadmapRole();
+  const [moreOpen, setMoreOpen] = useState(false);
   const item = "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs";
   return (
     <motion.nav
@@ -85,7 +90,7 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
         </li>
         <li className="flex flex-1">
           <Link
-            to={`${ROUTES.PRODUCT_ROADMAP}?tab=bugs`}
+            to={ROUTES.ROADMAP_BUGS}
             className={`${item} text-typography-secondary`}
             tabIndex={hidden ? -1 : 0}
           >
@@ -93,7 +98,27 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
             {copy.bugs}
           </Link>
         </li>
+        <li className="flex flex-1">
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className={`${item} text-typography-secondary`}
+            tabIndex={hidden ? -1 : 0}
+            aria-haspopup="dialog"
+          >
+            <ThreeDot size={20} aria-hidden />
+            {en.roadmapV2Tools.tabs.more}
+          </button>
+        </li>
       </ul>
+      <BottomSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        title={en.roadmapV2Tools.tabs.moreTitle}
+        closeLabel={copy.close}
+      >
+        <MoreSheetContent role={role} onNavigate={() => setMoreOpen(false)} />
+      </BottomSheet>
     </motion.nav>
   );
 };

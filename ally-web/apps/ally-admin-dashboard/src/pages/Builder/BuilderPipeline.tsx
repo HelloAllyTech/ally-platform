@@ -17,6 +17,7 @@ import {
 import { useGetBuilderPipelineHealthQuery } from "@api";
 import { en, ROUTES } from "@constants";
 
+import { useAgentEmbed } from "./agentEmbed";
 import {
   formatCount,
   formatDurationMs,
@@ -71,6 +72,7 @@ const SplitBar: React.FC<{ apiPercent: number; toolPercent: number; label: strin
 export const BuilderPipeline: React.FC = () => {
   const strings = en.builder.pipeline;
   const navigate = useNavigate();
+  const { embedded } = useAgentEmbed();
 
   const [windowDays, setWindowDays] = useState<(typeof WINDOW_OPTIONS)[number]>(30);
   const { data, isLoading, isError, refetch } = useGetBuilderPipelineHealthQuery({ windowDays });
@@ -91,9 +93,11 @@ export const BuilderPipeline: React.FC = () => {
     <div className="mx-auto flex h-full max-w-6xl flex-col gap-6 overflow-y-auto md:p-6">
       <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER)}>
-            ← {strings.backToBuilder}
-          </Button>
+          {!embedded && (
+            <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER)}>
+              ← {strings.backToBuilder}
+            </Button>
+          )}
           <h1 className="mt-2 text-xl font-semibold text-typography-900">{strings.title}</h1>
           <p className="mt-1 text-sm text-typography-600">{strings.subtitle}</p>
         </div>

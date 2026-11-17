@@ -188,6 +188,18 @@ const buildTable = (): RouteMetaEntry[] => {
       parent: ROUTES.ROADMAP,
       fullBleed: true,
     },
+    ...[
+      { path: ROUTES.ROADMAP_AGENT, title: p.roadmapAgent },
+      { path: ROUTES.ROADMAP_AGENT_SECTION(":section"), title: p.roadmapAgent },
+      { path: ROUTES.ROADMAP_SETTINGS, title: p.roadmapSettings },
+      { path: ROUTES.ROADMAP_BUGS, title: p.roadmapBugs },
+    ].map(entry => ({
+      ...entry,
+      section: "product" as const,
+      parent: ROUTES.ROADMAP,
+      fullBleed: true,
+    })),
+    { path: ROUTES.USER_INTERVIEWS, title: i.userInterviews, section: "product" },
     { path: ROUTES.BUG_HUNTER, title: i.bugHunter, section: "product" },
     { path: ROUTES.BUILDER, title: i.builder, section: "product" },
     {

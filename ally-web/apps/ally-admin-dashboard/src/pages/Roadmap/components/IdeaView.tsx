@@ -22,6 +22,7 @@ import {
   useMarkRoadmapItemReadMutation,
 } from "@api";
 import { ROUTES, en } from "@constants";
+import { useUser } from "@hooks";
 import type { RoadmapItemDetail } from "@types";
 
 import { BottomSheet } from "./BottomSheet";
@@ -35,6 +36,8 @@ import {
   PrimaryAction,
 } from "./IdeaControls";
 import { IdeaPanelContent } from "./IdeaPanels";
+import { PeopleChips } from "./PeopleChips";
+import { ShippedCard } from "./ShippedCard";
 import { Tracker } from "./Tracker";
 import { motionTransition, paneVariants, useReducedMotionPreference } from "../../../motion";
 import { DraftView } from "../drafts/DraftView";
@@ -136,6 +139,7 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
 }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
+  const { user } = useUser();
   const {
     data: item,
     isLoading,
@@ -302,18 +306,27 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   );
 
   const conversation = (
-    <Conversation
-      item={item}
-      messages={session?.messages}
-      isLoading={!!sessionId && sessionLoading}
-      isError={!!sessionId && sessionError}
-      showAgentWork={showAgentWork}
-      onShowAgentWorkChange={onShowAgentWork}
-    />
+    <>
+      <ShippedCard item={item} currentUserId={user?.id} />
+      <Conversation
+        item={item}
+        messages={session?.messages}
+        isLoading={!!sessionId && sessionLoading}
+        isError={!!sessionId && sessionError}
+        showAgentWork={showAgentWork}
+        onShowAgentWorkChange={onShowAgentWork}
+      />
+    </>
   );
 
   const primary = (
-    <PrimaryAction item={item} onApproveDesign={() => openDetails("design")} fullWidth={isPhone} />
+    <PrimaryAction
+      item={item}
+      onApproveDesign={() => openDetails("design")}
+      onOpenDetails={openDetails}
+      fullWidth={isPhone}
+      phone={isPhone}
+    />
   );
 
   // ── header ──────────────────────────────────────────────────────────────────────────────────
@@ -375,7 +388,7 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
       <FirstSubmitNote code={item.code} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col">
-          {people && <p className="m-0 text-xs text-typography-secondary">{people}</p>}
+          {people && <PeopleChips item={item} />}
           <Presence presence={presence} />
         </div>
         <div className="flex items-center gap-2">

@@ -64,6 +64,7 @@ export const en = {
       roadmap: "Roadmap",
       // Roadmap v2, dark behind `roadmap_v2`. Shown beside the old entry until cutover (P6).
       roadmapV2: "Roadmap (new)",
+      userInterviews: "User Interviews",
       bugHunter: "Bug Hunter",
       builder: "Builder",
       mobileReleases: "Mobile Releases",
@@ -89,6 +90,9 @@ export const en = {
       languageGlossary: "Glossary",
       builderSession: "Session",
       roadmapIdea: "Idea",
+      roadmapAgent: "Agent",
+      roadmapSettings: "Settings",
+      roadmapBugs: "Bugs",
       builderSessions: "All sessions",
       builderSettings: "Settings",
       builderPipeline: "Pipeline",
@@ -8545,6 +8549,289 @@ export const en = {
    * else: idea (never opportunity), Submitted · Accepted · Planning · Building · Shipped, Declined,
    * lead, For you · Leading · To triage · All ideas, Owner.
    */
+  /**
+   * Roadmap v2 P4 (plans/roadmap-builder-merge §4.1, §4.5b, §4.14, §4.15, §4.17, §4.18): the Agent
+   * and Settings tabs, Build ▾ and the build brief, Release, the Roadmap role radio, switch day and
+   * the earned moments. Words follow the §4.9 list.
+   */
+  roadmapV2Tools: {
+    tabs: {
+      queue: "Queue",
+      agent: "Agent",
+      settings: "Settings",
+      more: "More",
+      moreTitle: "More in Roadmap",
+      help: "Help",
+    },
+    help: {
+      shortcuts: "Keyboard shortcuts",
+      whatMoved: "What moved",
+      digest: "Email me about my ideas each week",
+      digestHelp:
+        '"Your ideas this week", on Monday mornings. Only weeks where something happened to your ideas send.',
+      digestOn: "You'll get a weekly email about your ideas.",
+      digestOff: "Weekly email turned off.",
+      digestFailed: "Couldn't change your email setting.",
+    },
+    agent: {
+      title: "Agent",
+      intro: "What the Builder agent costs, how well it does, and the rules it follows.",
+      readOnly: "You can read everything here. Owners change it.",
+      sectionsLabel: "Agent pages",
+      sections: {
+        pipeline: "Cost per run",
+        scoreboard: "Scoreboard",
+        history: "History",
+        rules: "Rules",
+        knowledge: "Knowledge",
+        evals: "Evals",
+      } as Record<string, string>,
+      historyIntro: "Every decision the agent asked about or was told, newest first.",
+      rulesIntro: "The product's taste, written down. The agent follows these on every build.",
+      cardMore: "More",
+      cardLess: "Less",
+    },
+    settings: {
+      title: "Settings",
+      intro: "How the Roadmap ranks ideas, and how the Builder agent builds and releases them.",
+      groups: {
+        emergency: "Emergency",
+        roadmap: "Roadmap",
+        agent: "Agent",
+      },
+      groupHelp: {
+        emergency: "The two switches people reach for in an incident.",
+        roadmap: "Strategy, product goals and how ideas rank.",
+        agent: "Autonomy, release policy, models, budgets and concurrency.",
+      },
+      roadmapSections: {
+        strategy: "Vision and strategy",
+        goals: "Product goals",
+        ranking: "Strategy and ranking",
+      },
+      killSwitch: "Builds",
+      killSwitchOn: "Builds run",
+      killSwitchOff: "Builds paused",
+      killSwitchHelp:
+        "Off pauses every build here. Planning carries on, and Open in Claude Code still works.",
+      killSwitchConfirmTitle: "Let builds run again?",
+      killSwitchConfirmBody:
+        "The Builder agent starts writing code and opening pull requests for ideas that are waiting to build.",
+      killSwitchConfirm: "Let builds run",
+      killSwitchSaved: (on: boolean) => (on ? "Builds run again." : "Builds paused."),
+      killSwitchFailed: "Couldn't change the build switch. Nothing changed.",
+      breaker: "Auto-release",
+      breakerRunning: "Auto-release is running.",
+      breakerPaused: (date: string, reason: string) =>
+        reason
+          ? `Auto-release paused after 2 failures on ${date}: ${reason}`
+          : `Auto-release paused after 2 failures on ${date}.`,
+      resume: "Resume auto-release",
+      resumed: "Auto-release resumed.",
+      resumeNothing: "Auto-release was already running.",
+      resumeFailed: "Couldn't resume auto-release.",
+      roadmapFlag: "Roadmap (one tab for ideas and builds)",
+      roadmapFlagHelp:
+        "On, everyone with Roadmap access uses the new Roadmap, and old Product Roadmap and Builder links land on it. Off, they go back to the old pages.",
+      roadmapFlagOnTitle: "Switch everyone to the new Roadmap?",
+      roadmapFlagOnBody:
+        "Everyone with Roadmap access sees it the next time they load a page, and old links redirect to it.",
+      roadmapFlagOffTitle: "Switch everyone back to the old pages?",
+      roadmapFlagOffBody:
+        "The Roadmap disappears for everyone, including this page. Product Roadmap and Builder come back as they were.",
+      roadmapFlagConfirmOn: "Switch everyone",
+      roadmapFlagConfirmOff: "Switch back",
+      roadmapFlagFailed: "Couldn't change the Roadmap switch.",
+      release: "Release policy",
+      releaseWindow: "Release window",
+      releaseWindowHelp:
+        "When auto-release may start. A Release click works at any time. An end before the start runs past midnight.",
+      releaseWindowAnyTime: "Any time",
+      releaseWindowSet: "Only in a window",
+      releaseDays: "Days",
+      releaseStart: "From",
+      releaseEnd: "Until",
+      releaseTimeZone: "Time zone",
+      days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      heldPaths: "Held paths",
+      heldPathsHelp:
+        "A release touching any of these waits for someone to press Release. One pattern per line; ** crosses folders. Empty restores the defaults (migrations, auth and permissions, payments and billing).",
+      heldPathsDefault: "Using the defaults",
+      limits: "Limits",
+      inProgressLimit: "Ideas one lead can have open",
+      inProgressLimitHelp: "Pick a lead counts free slots against this.",
+      maxLeadCeiling: "Most a lead can raise an idea's ceiling to (USD)",
+      maxLeadCeilingHelp: "An Owner can set any amount.",
+      amberDays: "Working days before a review wait turns amber",
+      amberDaysHelp: "In To triage, and the author sees how long it has waited.",
+      save: "Save",
+      saved: "Settings saved.",
+      saveFailed: "Couldn't save the settings.",
+      invalidWindow: "Pick at least one day, and two different hours.",
+      invalidNumbers: "Check the limits: whole numbers in range.",
+      hour: (h: number) => `${String(h % 24).padStart(2, "0")}:00`,
+      loadFailed: "Couldn't load the settings.",
+      builderAgent: "Builder agent",
+    },
+    roles: {
+      title: "Roadmap role",
+      help: "Roles nest: a Builder can do everything an Idea person can, and an Owner everything a Builder can.",
+      options: {
+        none: "None",
+        idea: "Idea",
+        builder: "Builder",
+        owner: "Owner",
+      } as Record<string, string>,
+      optionHelp: {
+        none: "No Roadmap.",
+        idea: "Writes and submits ideas, votes, answers questions, reads everything.",
+        builder: "Also leads ideas the Owner assigns: plans, builds, merges and releases them.",
+        owner: "Also reviews every idea, picks leads, stars, and changes settings.",
+      } as Record<string, string>,
+      restricted: "Restricted to organisations, so a Viewer whatever is picked here.",
+      yourself: "You can't change your own role.",
+      saved: (name: string, role: string) => `${name} is now ${role}.`,
+      failed: "Couldn't change the role. Nothing changed.",
+    },
+    build: {
+      button: "Build",
+      menu: "More ways to build",
+      buildHere: "Build here",
+      buildHereHelp: (budget: string) => `With the Builder agent, from this idea's ${budget}`,
+      buildHereHelpNoBudget: "With the Builder agent",
+      buildHereConfirmTitle: "Build here instead?",
+      buildHereConfirmBody: (name: string) =>
+        `${name} sent the brief to Claude Code. Building here starts the Builder agent as well.`,
+      buildHereConfirm: "Build here",
+      buildPaused: "Builds are paused by an Owner. Planning continues; builds wait.",
+      openInClaudeCode: "Open in Claude Code",
+      openInClaudeCodeHelp: "The desktop app, with the brief filled in",
+      copyBrief: "Copy brief",
+      downloadBrief: "Download brief",
+      previewBrief: "Preview brief",
+      phoneHint:
+        "Open in Claude Code needs the desktop app. Open this idea on your computer to send it.",
+      briefLoading: "Getting the brief…",
+      briefFailed: "Couldn't get the brief. Try again.",
+      copied: "Brief copied.",
+      copyFailed: "Couldn't copy the brief.",
+      downloaded: (filename: string) => `Downloaded ${filename}.`,
+      sentFailed: "The brief went, but the idea couldn't record it. Refresh to see.",
+      didNotOpen: "Claude Code didn't open?",
+      copyInstead: "Copy brief",
+      longBrief: (filename: string) =>
+        `The brief is long, so it downloaded as ${filename} and the prompt points at it.`,
+      shortPrompt: (b: { code: string; filename: string; branch: string; prTitle: string }) =>
+        `Build ${b.code}. Read ~/Downloads/${b.filename} for the full brief. Use branch ${b.branch}; put "${b.prTitle}" as the PR title.`,
+      folderTitle: "Your ally-platform folder",
+      folderBody:
+        "Claude Code opens in this folder. It's kept in this browser, so you're only asked once.",
+      folderLabel: "Folder",
+      folderPlaceholder: "/Users/you/code/ally-platform",
+      folderInvalid: "Use the full path, starting with / or ~/.",
+      folderSave: "Open in Claude Code",
+      folderCancel: "Cancel",
+      changeFolder: "Change folder",
+      previewTitle: (code: string) => `Brief for ${code}`,
+      previewIntro:
+        "This is everything that leaves the page. No strategy text, ranking reasons, spend or conversation.",
+      previewLength: (chars: number) => `${chars.toLocaleString("en-GB")} characters`,
+      previewClose: "Close",
+    },
+    ship: {
+      merge: "Merge",
+      release: "Release",
+      releaseTitle: (service: string) => `Release ${service}`,
+      service: "Service",
+      loading: "Reading what would ship…",
+      loadFailed: "Couldn't read what would ship.",
+      retry: "Try again",
+      nothing: "Nothing new to release here.",
+      willShip: (count: number, tag: string) =>
+        tag
+          ? `${count === 1 ? "1 change" : `${count} changes`} ship as ${tag}`
+          : count === 1
+            ? "1 change ships"
+            : `${count} changes ship`,
+      fromTag: (tag: string) => `Since ${tag}`,
+      othersNote:
+        "Everything merged since the last release goes out, including other people's work.",
+      held: "Held",
+      heldBecause: (file: string, rule: string) => `${file} (${rule})`,
+      heldIntro: "These need someone to press Release:",
+      unknown: (why: string) => `Couldn't read everything this release would ship (${why}).`,
+      breakerOpen: "Auto-release paused after 2 failures. Release still works.",
+      cannotRelease: "Only an Owner, or the lead of an idea in this release, can release it.",
+      confirm: "Release",
+      slide: "Slide to release",
+      slideDone: "Releasing…",
+      released: (tag: string) => `Releasing ${tag}.`,
+      failed: "Couldn't start the release.",
+      prLink: (number: number) => `#${number}`,
+      cancel: "Cancel",
+      services: {
+        be: "Backend",
+        ai: "AI service",
+        learn: "Voice agent",
+        frontend: "Admin and helpline",
+      } as Record<string, string>,
+    },
+    moved: {
+      from: { productRoadmap: "Product Roadmap", builder: "Builder" } as Record<string, string>,
+      landed: {
+        forYou: "For you",
+        allIdeas: "All ideas",
+        idea: "this idea",
+        bugs: "Bugs",
+        interviews: "User Interviews",
+        settings: "Settings",
+        pipeline: "Agent",
+        scoreboard: "Agent · Scoreboard",
+        history: "Agent · History",
+        rules: "Agent · Rules",
+        knowledge: "Agent · Knowledge",
+        evals: "Agent · Evals",
+      } as Record<string, string>,
+      banner: (from: string, landed: string) => `${from} is now Roadmap → ${landed}`,
+      dismiss: "Dismiss",
+      whatMovedTitle: "What moved",
+      whatMovedLines: [
+        "Product Roadmap and Builder are now one tab: Roadmap.",
+        "Your drafts are in My drafts.",
+        "Builder's Now page is For you.",
+        "User Interviews has its own entry.",
+      ],
+      whatMovedLater: "You can open this again from ? → What moved.",
+      gotIt: "Got it",
+      shortcutsIntro: "Tip: press ? to see the keyboard shortcuts. J and K move between ideas.",
+      shortcutsShow: "Show shortcuts",
+    },
+    shipped: {
+      title: "Shipped!",
+      liveSince: (date: string) => `Live since ${date}`,
+      inApps: (apps: string) => `in ${apps}`,
+      backers: (count: number) =>
+        count === 1 ? "▲1 person backed this" : `▲${count} people backed this`,
+      outcome: "Outcome",
+      verdicts: { hit: "Hit target", partial: "Partly hit", miss: "Missed target" } as Record<
+        string,
+        string
+      >,
+    },
+    people: {
+      ideasShipped: (count: number) => `ideas shipped: ${count}`,
+      label: "People on this idea",
+      wroteIt: "wrote it",
+      leadsIt: "leads",
+    },
+    interviews: {
+      title: "User Interviews",
+      intro: "What people told us, and why. Votes say what; these notes say why.",
+    },
+    slide: {
+      hint: "Slide all the way to confirm",
+    },
+  },
   roadmapV2: {
     title: "Roadmap",
     views: {

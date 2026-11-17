@@ -486,6 +486,18 @@ export const ApiEndpoints = {
    * Roadmap v2 (plans/roadmap-builder-merge §5.2, P2 contract). Every route answers 404 while the
    * `roadmap_v2` flag is off, which is how the frontend learns the flag: `ME_ROLE` succeeding.
    */
+  /** Roadmap v2 P4: build brief, roles, preferences; P5: the release policy. 404 while the flag is off. */
+  ROADMAP_V2_OPS: {
+    ITEM_BRIEF: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/brief`,
+    ITEM_EXTERNAL_BUILD: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/external-build`,
+    ROLES: "/v1/roadmap/roles",
+    ROLE: (userId: number) => `/v1/roadmap/roles/${userId}`,
+    MY_PREFERENCES: "/v1/roadmap/me/preferences",
+    RELEASE_PLAN: "/v1/roadmap/release/plan",
+    RELEASE: "/v1/roadmap/release",
+    RELEASE_RESUME: "/v1/roadmap/release/resume",
+  },
   ROADMAP_V2: {
     ME_ROLE: "/v1/roadmap/me/role",
     ITEMS: "/v1/roadmap/items",
@@ -1340,6 +1352,15 @@ export const ROUTES = {
   BUILDER_PIPELINE: "/builder/pipeline",
   BUILDER_KNOWLEDGE: "/builder/knowledge",
   BUILDER_EVAL: "/builder/eval",
+  /** Roadmap v2's Agent tab: Builder's pages, mounted under the Roadmap (§4.1). */
+  ROADMAP_AGENT: "/roadmap/agent",
+  ROADMAP_AGENT_SECTION: (section: string) => `/roadmap/agent/${section}`,
+  /** Roadmap v2's Settings tab (Owner). */
+  ROADMAP_SETTINGS: "/roadmap/settings",
+  /** Roadmap v2's Bugs tab: Bug Hunter's table, read-only. */
+  ROADMAP_BUGS: "/roadmap/bugs",
+  /** User Interviews, out of the Roadmap into its own sidebar entry (D14). */
+  USER_INTERVIEWS: "/user-interviews",
   COURSE_COPILOT: "/course-copilot",
   // Registered before the session route in RouteLayout: "new" would otherwise match `:sessionId`.
   // Optional `?trackId=` binds the session to an existing course (EDIT mode).
@@ -1526,6 +1547,9 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
   // Roadmap v2 (also registered in baseApi.ts's `tagTypes`).
+  ROADMAP_V2_ROLES: "roadmapV2Roles",
+  ROADMAP_V2_PREFERENCES: "roadmapV2Preferences",
+  ROADMAP_V2_RELEASE: "roadmapV2Release",
   ROADMAP_V2_ROLE: "roadmapV2Role",
   ROADMAP_V2_ITEMS: "roadmapV2Items",
   // PM Agent (also registered in baseApi.ts's `tagTypes`).
