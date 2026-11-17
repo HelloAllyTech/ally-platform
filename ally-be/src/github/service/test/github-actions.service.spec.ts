@@ -643,3 +643,129 @@ describe('GithubActionsService in the monorepo (2026-10-23 cutover)', () => {
     expect(pr?.baseRepoArchived).toBe(true);
   });
 });
+
+describe('GithubActionsService release-tracking reads (Roadmap v2 P1)', () => {
+  let service: GithubActionsService;
+  const configService = {
+    githubToken: 'gh-token',
+    githubOrg: 'HelloAllyTech',
+    githubMonorepo: 'ally-platform',
+  } as unknown as AppConfigService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new GithubActionsService(configService);
+  });
+
+  it('compareStatus asks the monorepo and returns only the status', async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: { status: 'behind', commits: [] },
+    });
+
+    expect(await service.compareStatus('ally-be', 'be-v1.2.1', 'abc')).toBe(
+      'behind',
+    );
+    expect(mockedAxios.get).toHaveBeenCalledWith(
+      'https://api.github.com/repos/HelloAllyTech/ally-platform/compare/be-v1.2.1...abc',
+      expect.objectContaining({ params: { per_page: 1 } }),
+    );
+  });
+
+  it('compareStatus encodes a slash in a tag name', async () => {
+    mockedAxios.get.mockResolvedValue({ data: { status: 'identical' } });
+
+    await service.compareStatus('ally-mobile', 'auto-release/1.2.3', 'abc');
+
+    expect(mockedAxios.get.mock.calls[0][0]).toContain(
+      'compare/auto-release%2F1.2.3...abc',
+    );
+  });
+
+  it('compareStatus is null, not "not contained", when GitHub cannot answer', async () => {
+    mockedAxios.get.mockRejectedValue(new Error('404'));
+
+    expect(await service.compareStatus('ally-be', 'be-v1', 'abc')).toBeNull();
+  });
+
+  it('listCompletedRuns keeps every conclusion, newest first', async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        workflow_runs: [
+          {
+            id: 1,
+            status: 'completed',
+            conclusion: 'success',
+            created_at: '2026-11-10T10:00:00Z',
+            run_started_at: '2026-11-10T10:00:00Z',
+            updated_at: '2026-11-10T10:20:00Z',
+            head_sha: 'a',
+            display_title: 'x',
+          },
+          {
+            id: 2,
+            status: 'completed',
+            conclusion: 'failure',
+            created_at: '2026-11-11T10:00:00Z',
+            run_started_at: '2026-11-11T10:00:00Z',
+            updated_at: '2026-11-11T10:20:00Z',
+            head_sha: 'b',
+            display_title: 'y',
+          },
+        ],
+      },
+    });
+
+    const runs = await service.listCompletedRuns({
+      repo: 'ally-be',
+      workflow: 'production-release-ally-be.yaml',
+    });
+
+    expect(runs?.map((run) => [run.id, run.conclusion, run.headSha])).toEqual([
+      ['2', 'failure', 'b'],
+      ['1', 'success', 'a'],
+    ]);
+  });
+
+  it('listTagRefs is null rather than partial when GitHub keeps paging', async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: [{ ref: 'refs/tags/be-v1.0.0', object: { sha: 's', type: 'tag' } }],
+      headers: { link: '<https://api.github.com/next>; rel="next"' },
+    });
+
+    expect(await service.listTagRefs('ally-be', 'be-v')).toBeNull();
+  });
+
+  it('resolveTag reads an annotated tag’s commit and tagger date', async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        object: { sha: 'commit-1', type: 'commit' },
+        tagger: { date: '2026-11-10T10:00:30Z' },
+      },
+    });
+
+    expect(
+      await service.resolveTag('ally-be', {
+        name: 'be-v1.0.0',
+        sha: 'tag-1',
+        type: 'tag',
+      }),
+    ).toEqual({
+      commitSha: 'commit-1',
+      at: new Date('2026-11-10T10:00:30Z'),
+    });
+  });
+
+  it('resolveTag dates a lightweight tag by its commit', async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: { committer: { date: '2026-11-10T05:00:00Z' } },
+    });
+
+    expect(
+      await service.resolveTag('ally-mobile', {
+        name: 'auto-release/1.0.0',
+        sha: 'c',
+        type: 'commit',
+      }),
+    ).toEqual({ commitSha: 'c', at: new Date('2026-11-10T05:00:00Z') });
+  });
+});

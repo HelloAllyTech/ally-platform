@@ -1,5 +1,14 @@
 import { readdirSync, readFileSync } from 'fs';
 import {
+  ItemLinkSource,
+  ItemLinkState,
+  ItemReleaseState,
+} from '../../product-roadmap/enum/item-release.enum';
+import {
+  NO_RELEASE_SERVICE,
+  RELEASE_SERVICE_KEYS,
+} from '../../release/constants/release-services.constants';
+import {
   DebriefFeedbackKind,
   DebriefFeedbackStatus,
   DebriefFlagReason,
@@ -505,6 +514,14 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_bot_drafts_step', Object.values(BotDraftStep)],
     ['CHK_bot_drafts_safety_pack', Object.values(SafetyPackId)],
     ['CHK_chatbots_safety_pack', Object.values(SafetyPackId)],
+    // Roadmap release tracking (Roadmap v2, P1).
+    ['CHK_item_linked_prs_source', Object.values(ItemLinkSource)],
+    ['CHK_item_linked_prs_state', Object.values(ItemLinkState)],
+    ['CHK_item_releases_state', Object.values(ItemReleaseState)],
+    [
+      'CHK_item_releases_service',
+      [...RELEASE_SERVICE_KEYS, NO_RELEASE_SERVICE],
+    ],
   ])('%s accepts every enum value', (constraint, values) => {
     const allowed = allowedValues(constraint as string);
     const missing = (values as string[]).filter((v) => !allowed.includes(v));
