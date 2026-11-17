@@ -68,6 +68,7 @@ const renderShell = (path: string) =>
           <Route path="/manage-tooltips" element={<div>tooltips</div>} />
           <Route path="/create-simulation/edit/:id" element={<div>editor</div>} />
           <Route path="/assistants" element={<div>assistants</div>} />
+          <Route path="/assistants/new" element={<div>new assistant</div>} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
@@ -162,6 +163,12 @@ describe("AdminShell", () => {
       expect(screen.getByText("assistants")).toBeInTheDocument();
       expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
       expect(screen.getByTestId("assistant-only-header")).toBeInTheDocument();
+    });
+
+    it("can open New assistant: that page checks the Assistants switch itself", () => {
+      renderShell("/assistants/new");
+      expect(screen.getByText("new assistant")).toBeInTheDocument();
+      expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
     });
 
     it("is sent back to their assistants from any other page", () => {

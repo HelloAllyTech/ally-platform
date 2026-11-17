@@ -23,10 +23,6 @@ import { resolveRouteMeta } from "./routeMeta";
 import { ShellContext } from "./ShellContext";
 import { useDocumentTitle } from "./useDocumentTitle";
 
-/** Creating an assistant needs the Chatbots switch; someone who only has theirs can't. */
-const isOnboarding = (pathname: string): boolean =>
-  pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/new`);
-
 /** What a lazy page shows while its chunk loads, inside the shell (the sidebar never blinks). */
 export const PageFallback: React.FC = () => (
   <div
@@ -77,7 +73,9 @@ export const AdminShell: React.FC = () => {
 
   // Someone whose only way in is an assistant's team (chunk 6b): their assistant and nothing else.
   if (assistantOnly) {
-    if (!pathname.startsWith(ROUTES.WHATSAPP_BOT) || isOnboarding(pathname)) {
+    // Every assistants page stays open, New assistant included: that page checks the Assistants
+    // switch itself, so someone with it can create one and someone without it is told so.
+    if (!pathname.startsWith(ROUTES.WHATSAPP_BOT)) {
       return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
     }
     return (
