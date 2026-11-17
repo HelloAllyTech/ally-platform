@@ -85,7 +85,7 @@ Shehbaz noticed many unwanted API calls, and that **when one thing changes, the 
 
 ## Part 3 — Make it understandable
 
-- **`ally-ai/ARCHITECTURE.md`:** the graph as a diagram (Mermaid), each node in one paragraph, the state and its reducers, how a run flows from ally-be's request to the reply, where checks happen, how tools and the gateway work, how streaming and the steps work, how to add a tool, a purpose or a prompt section. Short enough to read in 15 minutes.
+- **`ally-ai/ARCHITECTURE.md`:** the graph as a diagram (Mermaid), each node in one paragraph, the state and its reducers, how a run flows from ally-be's request to the reply, where checks happen, how tools and the gateway work, how streaming and the steps work, how to add a tool, a purpose or a prompt section. Short enough to read in 15 minutes. <!-- docs-path-lint: planned -->
 - **Docstrings** on every node and every public function in the runtime: what, not how.
 - **A "where things live" table** in `CONTEXT.md` for the three repos' agent code.
 
@@ -98,7 +98,7 @@ Shehbaz noticed many unwanted API calls, and that **when one thing changes, the 
 
 - [ ] `R2-REVIEW.md` reviewed at the stop; the approved changes made
 - [ ] Every eval and checkup the same before and after; prompts byte-identical
-- [ ] `ally-ai/ARCHITECTURE.md`; docstrings; the "where things live" table
+- [ ] `ally-ai/ARCHITECTURE.md`; docstrings; the "where things live" table <!-- docs-path-lint: planned -->
 - [ ] The checkpointer decision made and the unused path removed
 - [ ] Error tracking on in ally-ai and ally-be (off without a key), with no personal data in reports
 - [ ] The request counts before and after for every action in D, with no duplicate requests left and each save refetching only what it changed

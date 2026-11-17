@@ -32,13 +32,7 @@ from dataclasses import dataclass, field
 from typing import Annotated, Any, Callable, Dict, List, Optional, Sequence
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import (
-    AIMessage,
-    AnyMessage,
-    HumanMessage,
-    SystemMessage,
-    ToolMessage,
-)
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import StructuredTool
 from langgraph.graph import END, START, StateGraph
@@ -206,9 +200,7 @@ def make_tools(box: GuidanceCalls) -> List[StructuredTool]:
         )
 
     async def get_guidance(codes: List[str]) -> str:
-        wanted = list(dict.fromkeys(str(c) for c in codes or []))[
-            :MAX_CODES_PER_FETCH
-        ]
+        wanted = list(dict.fromkeys(str(c) for c in codes or []))[:MAX_CODES_PER_FETCH]
         return await box.run("guidance_fetch", {"codes": wanted}, wanted)
 
     tools: List[StructuredTool] = []
@@ -694,11 +686,7 @@ def phase_update(
         "why": (
             "Decides which practice guidance to read for the "
             f"{res.moments} pivotal moment(s), from the guidance index."
-            + (
-                ""
-                if res.step == Step.GUIDANCE_AGENT
-                else f" Called by the {res.step}."
-            )
+            + ("" if res.step == Step.GUIDANCE_AGENT else f" Called by the {res.step}.")
         ),
         "inputs": [
             "the guidance index",
@@ -737,9 +725,7 @@ def phase_update(
                 },
                 output={
                     "calls": calls,
-                    "passages": [
-                        {**p, **c} for p, c in zip(res.added, res.citations)
-                    ],
+                    "passages": [{**p, **c} for p, c in zip(res.added, res.citations)],
                     "reasoning": res.reasoning,
                 },
                 error=res.error,
