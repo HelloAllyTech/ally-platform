@@ -58,3 +58,4 @@ export * from "./allyGuidePipeline";
 export * from "./allyGuideAnalytics";
 export * from "./contextLibrary";
 export * from "./debriefRoleplayOptions";
+export * from "./roadmapV2";

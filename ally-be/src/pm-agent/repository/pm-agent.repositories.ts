@@ -44,40 +44,6 @@ export class PmAgentSettingsRepository extends Repository<PmAgentSettings> {
     await this.update({ id: 1 }, patch);
     return this.getSingleton();
   }
-
-  /**
-   * Atomic failure counter for the circuit breaker: returns the new count. Never a
-   * read-modify-write — two reconcile ticks counting the same failure twice is the
-   * bug this avoids, so the caller only counts transitions it won.
-   */
-  async incrementBuildFailures(): Promise<number> {
-    const rows: { consecutiveBuildFailures: number }[] = await this.query(
-      `UPDATE "pm_agent_settings" SET "consecutiveBuildFailures" = "consecutiveBuildFailures" + 1,
-              "updatedAt" = now()
-        WHERE id = 1 RETURNING "consecutiveBuildFailures"`,
-    );
-    const row = Array.isArray(rows?.[0]) ? (rows[0] as any)[0] : rows?.[0];
-    return Number(row?.consecutiveBuildFailures ?? 0);
-  }
-
-  async resetBuildFailures(): Promise<void> {
-    await this.update({ id: 1 }, { consecutiveBuildFailures: 0 });
-  }
-
-  /** Trips the breaker once: true when this call is the one that paused it. */
-  async tripBreaker(reason: string): Promise<boolean> {
-    const result = await this.createQueryBuilder()
-      .update(PmAgentSettings)
-      .set({
-        autoBuildPaused: true,
-        autoBuildPausedReason: reason.slice(0, 300),
-        autoBuildPausedAt: () => 'now()',
-      })
-      .where('id = 1')
-      .andWhere('"autoBuildPaused" = false')
-      .execute();
-    return Boolean(result.affected);
-  }
 }
 
 @Injectable()
@@ -183,7 +149,7 @@ export class PmAgentFeedbackRepository extends Repository<PmAgentFeedback> {
 }
 
 /**
- * The accept outbox. Rows are claimed with a conditional UPDATE that sets a lease
+ * The accept outbox (one `file_roadmap` row per accepted card). Rows are claimed with a conditional UPDATE that sets a lease
  * (`lockedUntil`), so two workers never run one row at once; a crashed worker's lease
  * expires and the row is retaken at the step it had reached.
  */
@@ -198,9 +164,9 @@ export class PmAgentOutboxRepository extends Repository<PmAgentOutbox> {
     row: Partial<PmAgentOutbox>,
   ): Promise<unknown> {
     return manager.getRepository(PmAgentOutbox).insert({
-      action: PmOutboxAction.BUILD,
+      action: PmOutboxAction.FILE_ROADMAP,
       status: PmOutboxStatus.PENDING,
-      step: PmOutboxStep.CREATE_SESSION,
+      step: PmOutboxStep.FILE_ROADMAP,
       attempts: 0,
       ...row,
     });
@@ -213,14 +179,14 @@ export class PmAgentOutboxRepository extends Repository<PmAgentOutbox> {
   ): Promise<{ affected?: number | null }> {
     return manager.getRepository(PmAgentOutbox).delete({
       cardId,
-      action: PmOutboxAction.BUILD,
+      action: PmOutboxAction.FILE_ROADMAP,
       status: PmOutboxStatus.PENDING,
     });
   }
 
   findForCard(cardId: string): Promise<PmAgentOutbox | null> {
     return this.findOne({
-      where: { cardId, action: PmOutboxAction.BUILD },
+      where: { cardId, action: PmOutboxAction.FILE_ROADMAP },
     });
   }
 
@@ -283,7 +249,13 @@ export class PmAgentOutboxRepository extends Repository<PmAgentOutbox> {
        ON CONFLICT ("cardId", "action") DO UPDATE
          SET status = EXCLUDED.status, step = EXCLUDED.step, "dueAt" = now(),
              attempts = 0, "lastError" = NULL, "lockedUntil" = NULL, "updatedAt" = now()`,
-      [cardId, PmOutboxAction.BUILD, PmOutboxStatus.PENDING, step, createdBy],
+      [
+        cardId,
+        PmOutboxAction.FILE_ROADMAP,
+        PmOutboxStatus.PENDING,
+        step,
+        createdBy,
+      ],
     );
   }
 }
@@ -316,7 +288,9 @@ export class PmAgentOutcomeRepository extends Repository<PmAgentOutcome> {
           'undone',
           'impactMetricName',
         ],
-        ['cardId'],
+        // The decision row is (cardId, 'decision', 0): the insert leaves kind/day to their
+        // defaults, and the conflict target is the UNIQUE triple (migration 1982000000500).
+        ['cardId', 'kind', 'day'],
       )
       .execute();
   }
@@ -335,10 +309,11 @@ export class PmAgentOutcomeRepository extends Repository<PmAgentOutcome> {
         | 'released'
         | 'reverted'
         | 'healthCheckFailed'
+        | 'roadmapArchived'
       >
     > & { buildCostUsd?: string | null; reasonChip?: string | null },
   ): Promise<void> {
-    await this.update({ cardId }, flags);
+    await this.update({ cardId, kind: 'decision' }, flags);
   }
 }
 

@@ -26,6 +26,8 @@ import {
   recCandidate,
   researchThenSubmit,
   Script,
+  READY,
+  recFor,
   settingsRow,
   submitTurn,
   verdictTurn,
@@ -53,6 +55,8 @@ function harness(script: Script) {
         mandate: settings.mandate,
         strategy: 'Grow learner retention.',
         productMap: 'Roleplay, Scribe, Courses',
+        roadmap: '',
+        productGoals: ['Engagement', 'Quality'],
       }),
     },
     events: {
@@ -451,6 +455,7 @@ describe('Persister idempotency (PmAgentPipelineStore.persistCard)', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
     return { store, saved };
   }
@@ -518,5 +523,94 @@ describe('stale-run window', () => {
     expect(PM_PIPELINE.STALE_RUN_MS).toBeGreaterThan(longestLiveRunMs);
     // A deploy mid-run leaves the page showing "Running" until this passes.
     expect(PM_PIPELINE.STALE_RUN_MS).toBeLessThanOrEqual(30 * 60_000);
+  });
+});
+
+describe('filing to the roadmap: what a card must be before an admin sees it', () => {
+  /** One lane's worth: a single recommendation, critic verdicts scripted per test. */
+  const oneRec = (verdict: Record<string, any>) =>
+    ((request) => {
+      if (request.kind === 'critic')
+        return verdictTurn([{ index: 0, ...verdict }]);
+      const ids = evidenceIdsIn(request);
+      if (!ids.length) {
+        const tool =
+          request.tools.find((t) => t.name !== 'submit_candidates')?.name ??
+          'submit_candidates';
+        return callTool(tool, {});
+      }
+      return submitTurn([recCandidate(request.lane.length, ids)]);
+    }) as Script;
+
+  it('a passed recommendation is stored with its readiness grading against the live checklist', async () => {
+    const h = harness(oneRec({ pass: true, reasons: [] }));
+    await h.run();
+    const recs = h.store.cards.filter(
+      (c) => c.kind === PmCardKind.RECOMMENDATION,
+    );
+    expect(recs.length).toBeGreaterThan(0);
+    for (const card of recs) {
+      expect(card.roadmapFiling?.readiness).toMatchObject({
+        criteria: Object.keys(READY),
+        failed: [],
+      });
+    }
+  });
+
+  it('the critic passing the rubric is not enough: one unmet readiness item drops the card', async () => {
+    const h = harness(
+      oneRec({
+        pass: true,
+        reasons: [],
+        roadmapReadiness: { ...READY, who_it_affects: false },
+      }),
+    );
+    await h.run();
+    expect(
+      h.store.cards.filter((c) => c.kind === PmCardKind.RECOMMENDATION),
+    ).toHaveLength(0);
+  });
+
+  it('a missing readiness answer fails closed', async () => {
+    const h = harness(
+      oneRec({ pass: true, reasons: [], roadmapReadiness: {} }),
+    );
+    await h.run();
+    expect(
+      h.store.cards.filter((c) => c.kind === PmCardKind.RECOMMENDATION),
+    ).toHaveLength(0);
+  });
+
+  it('a roadmap entry under a product goal the roadmap does not have never reaches the critic', async () => {
+    const h = harness(oneRec({ pass: true, reasons: [] }));
+    h.store.productGoals = ['Quality'];
+    await h.run();
+    expect(h.store.cards).toHaveLength(0);
+    expect(h.llm.calls.some((call) => call.kind === 'critic')).toBe(false);
+  });
+
+  it('an idea already on the roadmap, archived included, is dropped before the critic', async () => {
+    const h = harness(oneRec({ pass: true, reasons: [] }));
+    const lanes = [
+      'analytics',
+      'ux_signals',
+      'code_health',
+      'infra_cost',
+      'strategy_content',
+    ];
+    h.store.corpus = lanes.map((lane, i) => {
+      const idea = recFor(lane.length, []);
+      return {
+        type: 'opportunity' as const,
+        id: `opp-${i}`,
+        label: `OPP-000${i}`,
+        stage: i % 2 ? 'archived' : 'new',
+        text: idea.opportunity.description,
+      };
+    });
+    await h.run();
+    expect(
+      h.store.cards.filter((c) => c.kind === PmCardKind.RECOMMENDATION),
+    ).toHaveLength(0);
   });
 });

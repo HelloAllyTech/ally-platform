@@ -207,7 +207,13 @@ describe('TrackProgressService — roleplay assessment mode', () => {
 
       expect(result.completed).toBe(false);
       const [, update] = trackItemProgressRepository.update.mock.calls[0];
-      expect(update).toEqual({ attemptCount: 1 });
+      expect(update.attemptCount).toBe(1);
+      expect(update).not.toHaveProperty('score');
+      // Not submitted; only the missed-gate record for the learner is kept.
+      expect(update.meta).not.toHaveProperty('assessmentSubmittedAt');
+      expect(update.meta.lastRoleplayAttempt.failureReasons).toEqual([
+        'INSUFFICIENT_SCORE',
+      ]);
     });
 
     it('leaves a practice roleplay unstamped', async () => {
@@ -221,7 +227,13 @@ describe('TrackProgressService — roleplay assessment mode', () => {
       });
 
       const [, update] = trackItemProgressRepository.update.mock.calls[0];
-      expect(update).toEqual({ attemptCount: 1 });
+      expect(update.attemptCount).toBe(1);
+      expect(update).not.toHaveProperty('score');
+      // Not submitted; only the missed-gate record for the learner is kept.
+      expect(update.meta).not.toHaveProperty('assessmentSubmittedAt');
+      expect(update.meta.lastRoleplayAttempt.failureReasons).toEqual([
+        'INSUFFICIENT_SCORE',
+      ]);
     });
   });
 

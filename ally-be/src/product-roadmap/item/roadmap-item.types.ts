@@ -1,0 +1,137 @@
+import type {
+  ItemStatusParts,
+  ShownStage,
+} from 'src/product-planning/util/plan-stage.util';
+import type {
+  RoadmapCapabilities,
+  RoadmapEditCapabilities,
+  RoadmapRole,
+} from 'src/product-planning/util/roadmap-role.util';
+import type { RoadmapWatchLevel } from 'src/product-planning/enum/product-planning.enum';
+
+/**
+ * The Roadmap v2 read model's wire shapes (plans/roadmap-v2-build/P2-contract.md,
+ * the frontend's source of truth). Data, never copy: the frontend words it.
+ */
+
+export type ItemRelation = 'author' | 'lead' | 'owner' | 'builder' | 'idea';
+
+export interface PersonRef {
+  id: number;
+  name: string;
+  role: RoadmapRole;
+  relation?: ItemRelation;
+}
+
+export type ItemCan = RoadmapCapabilities & RoadmapEditCapabilities;
+
+export type WhyHereDecision =
+  | 'approveDesign'
+  | 'merge'
+  | 'release'
+  | 'budget'
+  | 'settleAnswer'
+  | 'startBuild'
+  | 'unblock';
+
+/** Why a row is in a view. */
+export type WhyHere =
+  | {
+      kind: 'agentQuestion';
+      phase: 'idea' | 'plan';
+      questionPreview: string;
+      since: string;
+    }
+  | { kind: 'mention'; by: PersonRef; since: string }
+  | { kind: 'decision'; decision: WhyHereDecision; since: string }
+  | { kind: 'awaitingReview'; since: string }
+  | { kind: 'needsLead'; since: string }
+  | { kind: 'reassign'; idleDays: number }
+  | { kind: 'progress' }
+  | { kind: 'shipped'; at: string };
+
+export interface ItemRow {
+  /** The opportunity uuid: what the existing vote endpoint takes. */
+  id: string;
+  code: string;
+  title: string;
+  shownStage: ShownStage;
+  statusParts: ItemStatusParts;
+  author: PersonRef;
+  lead?: PersonRef;
+  votes: number;
+  votedByMe: boolean;
+  starred: boolean;
+  starredBy?: PersonRef;
+  unread: boolean;
+  whyHere?: WhyHere;
+  goal?: { id: string; name: string };
+  updatedAt: string;
+  stageSince: string;
+}
+
+export type ItemDesignState =
+  | 'none'
+  | 'draft'
+  | 'awaitingApproval'
+  | 'approved';
+
+export interface ItemDetail extends ItemRow {
+  summary: {
+    problem?: string;
+    who?: string;
+    outcome?: string;
+    whyRanks?: unknown;
+    images?: string[];
+  };
+  sessionId?: string;
+  prd?: { readinessPct: number; versionNumber: number };
+  design?: { state: ItemDesignState };
+  runs: Array<{ id: string; phase: string; state: string; costUsd: number }>;
+  prs: Array<{
+    repo: string;
+    number: number;
+    url: string;
+    state: 'open' | 'merged' | 'closed';
+    ci?: 'pending' | 'passing' | 'failing';
+  }>;
+  releases: Array<{
+    service: string;
+    state: 'pending' | 'live' | 'failed';
+    tag?: string;
+    releasedAt?: string;
+    repo: string;
+    prNumber: number;
+  }>;
+  outcome?: { review?: unknown };
+  spend?: { spentUsd: number; ceilingUsd: number };
+  people: PersonRef[];
+  can: ItemCan;
+  watchLevel: RoadmapWatchLevel;
+  reviewState?: 'pending' | 'accepted' | 'declined';
+  /** Present only for the author and Owners (D10, [FP-0992]). */
+  declineReason?: string;
+}
+
+export interface ForYouSections {
+  needsYou: ItemRow[];
+  yourIdeas: ItemRow[];
+  watching: ItemRow[];
+  recentlyShipped: ItemRow[];
+}
+
+export interface ToTriageSections {
+  awaitingReview: ItemRow[];
+  needsLead: ItemRow[];
+  reassign: ItemRow[];
+}
+
+export type ItemListResponse =
+  | { sections: ForYouSections }
+  | { sections: ToTriageSections }
+  | { rows: ItemRow[]; nextCursor?: string; total: number };
+
+export interface ItemSearchResponse {
+  items: ItemRow[];
+  recent: ItemRow[];
+}

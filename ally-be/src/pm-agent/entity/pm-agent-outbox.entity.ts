@@ -9,8 +9,8 @@ import {
 /**
  * The accept outbox: written in the same transaction as the card's move to
  * `accepted_pending`, not due until the undo window closes. UNIQUE (cardId, action) makes
- * a double accept impossible at the database. The worker advances `step` one durable step
- * at a time, so a crash resumes rather than repeats.
+ * a double accept impossible at the database. Since 2026-11-17 every row is `file_roadmap`
+ * (FILE_ROADMAP → DONE); `build` rows are the removed Accept → Builder chain.
  */
 @Entity('pm_agent_outbox')
 @Index('idx_pm_agent_outbox_due', ['status', 'dueAt'])
@@ -21,7 +21,11 @@ export class PmAgentOutbox extends BaseWithoutTenantEntity {
   @Column({ type: 'uuid' })
   cardId!: string;
 
-  @Column({ type: 'varchar', length: 16, default: PmOutboxAction.BUILD })
+  @Column({
+    type: 'varchar',
+    length: 16,
+    default: PmOutboxAction.FILE_ROADMAP,
+  })
   action!: PmOutboxAction;
 
   @Column({ type: 'varchar', length: 16, default: PmOutboxStatus.PENDING })
@@ -30,7 +34,7 @@ export class PmAgentOutbox extends BaseWithoutTenantEntity {
   @Column({
     type: 'varchar',
     length: 24,
-    default: PmOutboxStep.CREATE_SESSION,
+    default: PmOutboxStep.FILE_ROADMAP,
   })
   step!: PmOutboxStep;
 

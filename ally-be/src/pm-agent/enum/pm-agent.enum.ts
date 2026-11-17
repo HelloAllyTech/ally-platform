@@ -23,7 +23,17 @@ export enum PmCardStatus {
   DRAFT = 'draft',
   OPEN = 'open',
   ACCEPTED_PENDING = 'accepted_pending',
+  /** Accepted, undo window closed, being filed to the roadmap (was: waiting for Builder). */
   QUEUED = 'queued',
+  /** On the roadmap as an opportunity, filed by the Product Manager Agent. */
+  FILED = 'filed',
+  /** Its roadmap opportunity was archived or removed. A soft negative for learning. */
+  ROADMAP_ARCHIVED = 'roadmap_archived',
+  /*
+   * Legacy (Accept → Builder, removed 2026-11-17 by migration 1982100000100): designing,
+   * building, pr_open, merged, merged_not_released, failed and handed_off are never written
+   * any more; they stay so rows written before then still read.
+   */
   DESIGNING = 'designing',
   BUILDING = 'building',
   PR_OPEN = 'pr_open',
@@ -62,12 +72,13 @@ export enum PmCardSize {
   M = 'M',
 }
 
-/** Repos a card may target: each has a release pipeline (not ally-mobile). */
+/** Repos an idea touches (context for whoever picks the opportunity up). */
 export enum PmRepo {
   ALLY_BE = 'ally-be',
   ALLY_WEB = 'ally-web',
   ALLY_AI = 'ally-ai',
   ALLY_AI_LEARN = 'ally-ai-learn',
+  ALLY_MOBILE = 'ally-mobile',
 }
 
 export enum PmQuestionScope {
@@ -77,7 +88,11 @@ export enum PmQuestionScope {
 }
 
 export enum PmAcceptPath {
+  /** File the card to the roadmap as a Product Manager Agent opportunity. The only path now. */
+  ROADMAP = 'roadmap',
+  /** Legacy, read-only: accepted into Builder before 2026-11-17. */
   BUILDER = 'builder',
+  /** Legacy, read-only: plan.md handed off before 2026-11-17. */
   DOWNLOAD = 'download',
 }
 
@@ -122,6 +137,23 @@ export enum PmMemorySource {
   REJECTION = 'rejection',
   FEEDBACK = 'feedback',
   MANUAL = 'manual',
+  /** A lesson derived by the weekly lessons job (src/pm-agent/lessons/). */
+  WEEKLY_JOB = 'weekly_job',
+}
+
+/** A lesson's lifecycle (migration 1982000000600). Facts leave it NULL. */
+export enum PmLessonStatus {
+  PROPOSED = 'proposed',
+  ACTIVE = 'active',
+  EXPIRED = 'expired',
+  REMOVED = 'removed',
+}
+
+/** What a lesson applies to; stored in pm_agent_memory.scope. */
+export enum PmLessonScope {
+  GLOBAL = 'global',
+  CATEGORY = 'category',
+  LANE = 'lane',
 }
 
 export enum PmFeedbackStatus {
@@ -132,7 +164,9 @@ export enum PmFeedbackStatus {
 }
 
 export enum PmOutboxAction {
+  /** Legacy: Accept → Builder. Migration 1982100000100 cancelled every open row. */
   BUILD = 'build',
+  FILE_ROADMAP = 'file_roadmap',
 }
 
 export enum PmOutboxStatus {
@@ -145,7 +179,10 @@ export enum PmOutboxStatus {
   CANCELLED = 'cancelled',
 }
 
-/** The Accept → Builder chain, one durable step at a time (docs/pm-agent.md). */
+/**
+ * Outbox steps. A `file_roadmap` row runs FILE_ROADMAP → DONE; the rest are the legacy
+ * Accept → Builder chain, kept so old rows still read.
+ */
 export enum PmOutboxStep {
   CREATE_SESSION = 'create_session',
   FILE_ROADMAP = 'file_roadmap',

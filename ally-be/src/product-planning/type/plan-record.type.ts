@@ -61,6 +61,12 @@ export interface PlanRecord {
   /** Review dates and how many reviews are done (P8). */
   reviews?: { dueDates: string[]; done: number } | null;
 
+  /**
+   * This plan's own spend ceiling in USD, once a lead or an Owner raised it
+   * (Roadmap v2, §5.6). Absent means the settings ceiling (planCeilingUsd).
+   */
+  ceilingUsd?: number | null;
+
   /** Last stage written, with when — mirrors the planStage column. */
   lastStage?: PlanStage;
 }

@@ -449,6 +449,19 @@ export const ApiEndpoints = {
       `/v1/product-roadmap/opportunities/${opportunityId}/builder-session`,
     ADMIN_REINDEX: "/v1/product-roadmap/admin/reindex",
   },
+  /**
+   * Roadmap v2 (plans/roadmap-builder-merge §5.2, P2 contract). Every route answers 404 while the
+   * `roadmap_v2` flag is off, which is how the frontend learns the flag: `ME_ROLE` succeeding.
+   */
+  ROADMAP_V2: {
+    ME_ROLE: "/v1/roadmap/me/role",
+    ITEMS: "/v1/roadmap/items",
+    ITEM: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}`,
+    ITEM_READ: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/read`,
+    ITEM_WATCH: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/watch`,
+    ITEM_STAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/star`,
+    SEARCH: "/v1/roadmap/search",
+  },
   AI_LAB: {
     SKILLS: "/v1/lab/skills",
     SKILL_BY_ID: (id: string) => `/v1/lab/skills/${id}`,
@@ -732,8 +745,8 @@ export const ApiEndpoints = {
     FEEDBACK: (id: string) => `/v1/pm-agent/cards/${id}/feedback`,
     ANSWER: (id: string) => `/v1/pm-agent/cards/${id}/answer`,
     SKIP: (id: string) => `/v1/pm-agent/cards/${id}/skip`,
-    PLAN_MD: (id: string) => `/v1/pm-agent/cards/${id}/plan.md`,
     RETRY: (id: string) => `/v1/pm-agent/cards/${id}/retry`,
+    FILE_ANYWAY: (id: string) => `/v1/pm-agent/cards/${id}/file-anyway`,
     DISMISS: (id: string) => `/v1/pm-agent/cards/${id}/dismiss`,
     TRACKING: "/v1/pm-agent/tracking",
     RUN: "/v1/pm-agent/run",
@@ -741,6 +754,8 @@ export const ApiEndpoints = {
     SETTINGS: "/v1/pm-agent/settings",
     MEMORY: "/v1/pm-agent/memory",
     MEMORY_BY_ID: (id: string) => `/v1/pm-agent/memory/${id}`,
+    LESSON_CONFIRM: (id: string) => `/v1/pm-agent/lessons/${id}/confirm`,
+    LESSONS_RUN: "/v1/pm-agent/lessons/run",
     HISTORY: "/v1/pm-agent/history",
     HEALTH: "/v1/pm-agent/health",
   },
@@ -1271,6 +1286,10 @@ export const ROUTES = {
   PRODUCT_UPDATES: "/product-updates",
   AI_LAB: "/ai-lab",
   PRODUCT_ROADMAP: "/product-roadmap",
+  /** Roadmap v2's Queue (dark behind `roadmap_v2`; the old pages stay as they are). */
+  ROADMAP: "/roadmap",
+  /** One idea's page, by code (OPP-388). The read model also accepts the uuid. */
+  ROADMAP_IDEA: (code: string) => `/roadmap/i/${code}`,
   BUG_HUNTER: "/bug-hunter",
   PM_AGENT: "/pm-agent",
   BUILDER: "/builder",
@@ -1469,6 +1488,9 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_IDEA_DRAFTS: "productRoadmapIdeaDrafts",
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
+  // Roadmap v2 (also registered in baseApi.ts's `tagTypes`).
+  ROADMAP_V2_ROLE: "roadmapV2Role",
+  ROADMAP_V2_ITEMS: "roadmapV2Items",
   // PM Agent (also registered in baseApi.ts's `tagTypes`).
   PM_AGENT_STATE: "pmAgentState",
   PM_AGENT_CARDS: "pmAgentCards",

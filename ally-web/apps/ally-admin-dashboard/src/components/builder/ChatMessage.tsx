@@ -8,7 +8,7 @@ import {
   builderTransition,
   prefersReducedMotion,
   staggerDelayMs,
-} from "../../pages/Builder/builderMotion";
+} from "../../motion/builderMotion";
 import { ChatMessage as AgentChatMessage } from "../agent-chat/ChatMessage";
 import { AgentAnswerPayload } from "../agent-chat/QuestionCard";
 

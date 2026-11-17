@@ -20,6 +20,8 @@ export type PmCardStatus =
   | "open"
   | "accepted_pending"
   | "queued"
+  | "filed"
+  | "roadmap_archived"
   | "designing"
   | "building"
   | "pr_open"
@@ -48,7 +50,16 @@ export type PmAgentRunState =
 export type PmRiskLevel = "low" | "medium" | "high";
 export type PmCardSize = "S" | "M";
 export type PmQuestionScope = "global" | "feature" | "tenant";
-export type PmRepo = "ally-be" | "ally-web" | "ally-ai" | "ally-ai-learn";
+export type PmRepo = "ally-be" | "ally-web" | "ally-ai" | "ally-ai-learn" | "ally-mobile";
+export type PmRoadmapEffort = "s" | "m" | "l" | "xl" | "xxl";
+
+/** The roadmap entry an accepted card is filed as, exactly as written. */
+export interface PmOpportunityDraft {
+  description: string;
+  /** A roadmap product goal name. */
+  productGoal: string;
+  effort: PmRoadmapEffort;
+}
 export type PmReasonChip =
   | "not_priority"
   | "already_planned"
@@ -77,6 +88,8 @@ export interface PmRecommendationPayload {
   alternativesDropped: string[];
   repos: PmRepo[];
   evidenceIds: string[];
+  /** Absent on cards written before roadmap filing (2026-11-17); those cannot be accepted. */
+  opportunity?: PmOpportunityDraft;
 }
 
 export interface PmQuestionOption {
@@ -103,17 +116,58 @@ export interface PmPullRequest {
   releaseTag?: string | null;
 }
 
-export interface PmDelivery {
-  status: string;
-  prs: PmPullRequest[];
-  costUsd?: number | null;
+export type PmImpactVerdict = "improved" | "flat" | "worse";
+export type PmImpactCheckStatus = "pending" | "measured" | "insufficient_data" | "unavailable";
+
+export interface PmImpactCheck {
+  day: 14 | 30;
+  status: PmImpactCheckStatus;
+  value?: number;
+  readAt?: string;
+  dueAt: string;
+  verdict?: PmImpactVerdict;
 }
 
-/** An item that needs a person: a failed build, a merged-but-not-released change. */
+/** Impact checks at +14 / +30 days after release. Absent when the card has no `metricRef`. */
+export interface PmImpactSummary {
+  metricName: string;
+  direction: string;
+  unit?: "percent" | "count" | "ms" | "usd" | "ratio";
+  baseline?: number;
+  checks: PmImpactCheck[];
+  summary?: string;
+}
+
+/** Where an accepted card sits on the roadmap. */
+export interface PmRoadmapDelivery {
+  opportunityId: string;
+  code: string | null;
+  stage: "new" | "prioritised" | "released" | "archived" | null;
+  removed: boolean;
+}
+
+export interface PmDelivery {
+  status: string | null;
+  /** Legacy (Builder): empty for a card filed to the roadmap. */
+  prs: PmPullRequest[];
+  costUsd?: number | null;
+  roadmap?: PmRoadmapDelivery;
+  impact?: PmImpactSummary | null;
+}
+
+export interface PmRoadmapDuplicate {
+  id: string;
+  code: string | null;
+  reason: string;
+}
+
+/** An item that needs a person: filing to the roadmap stopped. */
 export interface PmNeedsYou {
   reason: string;
-  /** Action keys the backend offers, e.g. `retry`, `dismiss`; `open_pr` is also derived from `delivery`. */
+  /** Action keys the backend offers: `retry`, `file_anyway` (a duplicate stop), `dismiss`. */
   actions: string[];
+  /** What the roadmap's duplicate check matched, when that is why the card stopped. */
+  duplicates?: PmRoadmapDuplicate[];
 }
 
 export interface PmEvidence {
@@ -166,6 +220,9 @@ export interface PmSettings {
   mandate: string;
   pauseAutoBuild: boolean;
   slackNotify: boolean;
+  /** Added in v1.1; absent on an older backend. */
+  lessonsEnabled?: boolean;
+  lessonsWeekday?: number;
   categoryWeights?: Record<string, number> | null;
 }
 
@@ -190,7 +247,8 @@ export interface PmAgentStateResponse {
   queue: { open: number; cap: number; needsYou: number };
   lastRun?: PmRun | null;
   nextRunAt?: string | null;
-  autoBuildPaused: boolean;
+  /** Legacy: always false since 2026-11-17 (nothing is built). */
+  autoBuildPaused?: boolean;
 }
 
 export interface PmCardsResponse {
@@ -210,6 +268,11 @@ export interface PmRunNowResponse {
   reason?: string;
 }
 
+export interface PmLessonsRunResponse {
+  started: boolean;
+  reason?: string;
+}
+
 export interface PmMemoryFact {
   id: string;
   value: string;
@@ -220,19 +283,35 @@ export interface PmMemoryFact {
   [key: string]: unknown;
 }
 
+export type PmLessonStatus = "proposed" | "active" | "expired" | "removed";
+
+export interface PmLessonEval {
+  passed: boolean;
+  agreementBefore: number;
+  agreementAfter: number;
+  sampleSize: number;
+}
+
 export interface PmLesson {
-  id?: string;
-  text?: string;
-  lesson?: string;
-  summary?: string;
+  id: string;
+  text: string;
+  scope: "global" | "category" | "lane";
   category?: string;
+  status: PmLessonStatus;
+  source: "weekly_job" | "manual";
+  supportCount: number;
+  supportRatio: number;
+  evidenceCardIds?: string[];
+  evalResult?: PmLessonEval | null;
+  requiresConfirm: boolean;
   createdAt?: string;
-  [key: string]: unknown;
+  lastSupportedAt?: string;
+  expiresAt?: string | null;
 }
 
 export interface PmMemoryResponse {
   facts: PmMemoryFact[];
-  lessons: PmLesson[];
+  lessons?: PmLesson[];
 }
 
 export interface PmHealth {
@@ -242,6 +321,11 @@ export interface PmHealth {
   costPerAcceptedCardUsd?: number | null;
   spendByLane?: Record<string, number> | null;
   repeatedRejectionRate?: number | null;
+  impactMeasuredCount?: number | null;
+  impactImprovedRate?: number | null;
+  activeLessons?: number | null;
+  proposedLessons?: number | null;
+  lessonAgreementDelta?: number | null;
 }
 
 export interface PmDecisionInput {

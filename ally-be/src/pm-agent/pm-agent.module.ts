@@ -1,9 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BuilderSession } from 'src/builder/entity/builder-session.entity';
-import { BuilderSettings } from 'src/builder/entity/builder-settings.entity';
-import { BuilderPullRequest } from 'src/builder/entity/builder-pull-request.entity';
-import { NotificationModule } from 'src/notification/notification.module';
 import { AnalyticsModule } from 'src/analytics/analytics.module';
 import { LlmUsageModule } from 'src/analytics/llm-usage.module';
 import { AppConfigModule } from 'src/config/config.module';
@@ -39,8 +35,8 @@ import {
   PmAgentSignalRepository,
 } from './repository/pm-agent.repositories';
 import { PmAgentBudgetService } from './service/pm-agent-budget.service';
-import { PmAgentBuilderPort } from './service/pm-agent-builder-port.service';
-import { PmAgentBuildService } from './service/pm-agent-build.service';
+import { PmAgentRoadmapPort } from './service/pm-agent-roadmap-port.service';
+import { PmAgentFilingService } from './service/pm-agent-filing.service';
 import { PmAgentCardService } from './service/pm-agent-card.service';
 import { PmAgentEventsService } from './service/pm-agent-events.service';
 import { PmAgentMemoryService } from './service/pm-agent-memory.service';
@@ -57,18 +53,32 @@ import { PmLaneToolsService } from './lane/pm-lane-tools.service';
 import { PmAgentSchedulerService } from './service/pm-agent-scheduler.service';
 import { PmAgentSettingsService } from './service/pm-agent-settings.service';
 import { PmAgentStateService } from './service/pm-agent-state.service';
+import {
+  PM_IMPACT_STORE,
+  PM_METRIC_SOURCES,
+  PmAgentImpactService,
+} from './impact/pm-agent-impact.service';
+import { PmAgentImpactScheduler } from './impact/pm-agent-impact.scheduler';
+import { PmAgentLessonsController } from './lessons/pm-lessons.controller';
+import {
+  PmAgentLessonsScheduler,
+  PmAgentLessonsService,
+} from './lessons/pm-lessons.service';
+import { PmLessonsSqlStore } from './lessons/pm-lessons.store';
+import { PmImpactStore } from './impact/pm-impact.store';
+import { PmMetricSourcesService } from './impact/pm-metric-sources.service';
 
 /**
- * PM Agent (docs/pm-agent.md): the admin AI product manager. This module is the
- * deterministic half — state, queue, budget read-out, the card state machine, the accept
- * outbox and Builder wiring, the realtime feed — and the generation pipeline (lanes, gate,
- * critic, ranker, Persister, daily scheduler: pipeline/, lane/, gate/, learning/), which
- * provides PM_AGENT_RUN_TRIGGER through PmAgentRunService.
+ * PM Agent (docs/pm-agent.md): the admin AI product manager. It proposes; it never builds.
+ * This module is the deterministic half — state, queue, budget read-out, the card state
+ * machine, the accept outbox that files accepted cards to the roadmap, the realtime feed —
+ * and the generation pipeline (lanes, gate, critic, ranker, Persister, daily scheduler:
+ * pipeline/, lane/, gate/, learning/), which provides PM_AGENT_RUN_TRIGGER through
+ * PmAgentRunService.
  *
- * Builder is reached lazily through ModuleRef (PmAgentBuilderPort), never imported: Builder's
- * module graph reaches UX Signals and much else, and Builder must not depend on us either —
- * the `pm_agent` requester registers itself at init, as the Debrief PM agent's does. Builder's
- * tables are read directly (TypeOrmModule.forFeature), writes go through its services.
+ * The roadmap is the only thing it writes outside its own tables, and only through the
+ * roadmap's own services (PmAgentRoadmapPort). Builder is no longer called; the no-op
+ * `pm_agent` requester stays registered for sessions created before 2026-11-17.
  */
 @Module({
   imports: [
@@ -85,14 +95,10 @@ import { PmAgentStateService } from './service/pm-agent-state.service';
       PmAgentSignal,
       PmAgentOutcome,
       PmAgentLaneStat,
-      BuilderSession,
-      BuilderSettings,
-      BuilderPullRequest,
     ]),
-    // RoadmapOpportunityRepository + RoadmapProductGoalRepository (already exported).
+    // RoadmapOpportunityRepository + RoadmapProductGoalRepository (already exported); the
+    // roadmap's create, readiness-token and duplicate services via ModuleRef (PmAgentRoadmapPort).
     ProductRoadmapModule,
-    // SlackService, for the circuit breaker's one notification.
-    NotificationModule,
     // The pipeline: the 15 exported analytics read services (lane tools), prompts, model
     // resolution + provider adapters, and llm_usage metering.
     AppConfigModule,
@@ -102,7 +108,7 @@ import { PmAgentStateService } from './service/pm-agent-state.service';
     LlmAgentModule,
     LlmUsageModule,
   ],
-  controllers: [PmAgentController],
+  controllers: [PmAgentController, PmAgentLessonsController],
   providers: [
     PmAgentSettingsRepository,
     PmAgentRunRepository,
@@ -122,8 +128,8 @@ import { PmAgentStateService } from './service/pm-agent-state.service';
     PmAgentCardService,
     PmAgentMemoryService,
     PmAgentStateService,
-    PmAgentBuilderPort,
-    PmAgentBuildService,
+    PmAgentRoadmapPort,
+    PmAgentFilingService,
     PmAgentSchedulerService,
     PmAgentGateway,
     PmAgentLlmService,
@@ -133,6 +139,17 @@ import { PmAgentStateService } from './service/pm-agent-state.service';
     PmAgentRunService,
     PmAgentRunSchedulerService,
     { provide: PM_AGENT_RUN_TRIGGER, useExisting: PmAgentRunService },
+    // Impact checks (+14 / +30 d): impact/.
+    PmImpactStore,
+    PmMetricSourcesService,
+    { provide: PM_IMPACT_STORE, useExisting: PmImpactStore },
+    { provide: PM_METRIC_SOURCES, useExisting: PmMetricSourcesService },
+    PmAgentImpactService,
+    PmAgentImpactScheduler,
+    // Weekly lessons: lessons/.
+    PmLessonsSqlStore,
+    PmAgentLessonsService,
+    PmAgentLessonsScheduler,
   ],
   exports: [
     PmAgentSettingsRepository,

@@ -18,7 +18,7 @@ import {
   PM_TASK_IDS,
   PmStopReason,
 } from '../constants/pm-agent-pipeline.constants';
-import { PmCritic } from '../gate/pm-critic';
+import { PM_ROADMAP_READINESS_IDS, PmCritic } from '../gate/pm-critic';
 import { dedupeBatch, dedupeGate, deterministicGate } from '../gate/pm-gate';
 import { baseScore, rankCandidates } from '../gate/pm-ranker';
 import { PM_LANES } from '../lane/pm-lane-definitions';
@@ -30,6 +30,13 @@ import {
   sharedContextBlock,
   topMemory,
 } from '../learning/pm-context';
+import { metricCatalogBlock } from '../impact/metric-catalog';
+import {
+  isActiveLesson,
+  lessonCategoriesFor,
+  lessonsBlock,
+  topLessons,
+} from '../lessons/pm-lessons-context';
 import {
   computeLearnedStats,
   effectiveCategoryWeights,
@@ -211,6 +218,8 @@ export class PmRunPipeline {
       const facts = memory.filter(
         (m) => m.kind === PmMemoryKind.FACT && m.active,
       );
+      // Active weekly lessons (lessons/): guidance, fenced; never above the hard gates.
+      const lessons = memory.filter((m) => isActiveLesson(m, now));
       const runEvidence = new Map<string, PmEvidenceRef>();
       const runner = new PmLaneRunner(this.deps.llm, this.deps.toolbox);
       const candidates: PmCandidate[] = [];
@@ -311,7 +320,16 @@ export class PmRunPipeline {
             {
               text: [
                 memoryBlock(topMemory(facts, definition.topic, now)),
+                lessonsBlock(
+                  topLessons(lessons, now, {
+                    lane,
+                    categories: lessonCategoriesFor(lane),
+                  }),
+                ),
                 exemplarBlock(picked),
+                // Code-injected (not a template variable), so it never drifts from the
+                // catalog and needs no prompt-variable release order.
+                metricCatalogBlock(),
               ].join('\n\n'),
             },
           ],
@@ -390,9 +408,14 @@ export class PmRunPipeline {
         ledger,
         shared,
         facts: facts.length,
-        memoryText: memoryBlock(
-          topMemory(facts, 'scope risk decision strategy rejected', now),
-        ),
+        memoryText: [
+          memoryBlock(
+            topMemory(facts, 'scope risk decision strategy rejected', now),
+          ),
+          lessonsBlock(topLessons(lessons, now)),
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
         log,
         stats,
         onBudget: () => {
@@ -575,16 +598,22 @@ export class PmRunPipeline {
     const { store } = this.deps;
     const { run, runEvidence } = input;
     const now = this.now();
-    const [tenantNames, corpus] = await Promise.all([
+    const [tenantNames, corpus, productGoals] = await Promise.all([
       store.tenantNames(),
       store.dedupeCorpus(),
+      store.productGoalNames(),
     ]);
 
     const layer12 = async (pool: PmCandidate[], layer: string) => {
       const passed: PmCandidate[] = [];
       const failed: { title: string; reasons: string[] }[] = [];
       for (const candidate of pool) {
-        const one = deterministicGate(candidate, runEvidence, tenantNames);
+        const one = deterministicGate(
+          candidate,
+          runEvidence,
+          tenantNames,
+          productGoals,
+        );
         let reasons = one.reasons;
         if (
           one.pass &&
@@ -656,7 +685,23 @@ export class PmRunPipeline {
       const passIdx = new Set(
         review.verdicts.filter((v) => v.pass).map((v) => v.index),
       );
-      approved = pool.filter((_, index) => passIdx.has(index));
+      const gradedAt = this.now().toISOString();
+      // A recommendation only passes with every readiness item met, so its stored grading is
+      // "all met" against the checklist in force now — which is what filing will check.
+      approved = pool
+        .filter((_, index) => passIdx.has(index))
+        .map((candidate) =>
+          candidate.kind === PmCardKind.RECOMMENDATION
+            ? {
+                ...candidate,
+                roadmapReadiness: {
+                  criteria: [...PM_ROADMAP_READINESS_IDS],
+                  failed: [],
+                  gradedAt,
+                },
+              }
+            : candidate,
+        );
       const spawned = review.questions.length
         ? await layer12(dedupeBatch(review.questions).kept, 'critic-questions')
         : [];

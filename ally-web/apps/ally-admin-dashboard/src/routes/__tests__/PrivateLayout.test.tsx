@@ -67,6 +67,7 @@ vi.mock("@api", () => ({
     refetch: refetchSpy,
   })),
   useGetCharacterLibraryEnabledQuery: vi.fn(() => ({ data: false, isLoading: false })),
+  useGetRoadmapMeRoleQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
   useGetUserPreferencesQuery: () => ({ data: undefined, isLoading: false }),
   useLazyGetUserQuery: () => [vi.fn().mockResolvedValue({ data: { id: 1 } }), { isLoading: false }],
   useLazyGetPermissionsQuery: () => [

@@ -566,6 +566,8 @@ class StartItemPayload {
     this.bucketSortBestFirstTryPct,
     this.scenarioId,
     this.roleplayAssessmentMode = false,
+    this.roleplayGate,
+    this.lastRoleplayAttempt,
     this.assessmentSubmittedAt,
     this.caseId,
   });
@@ -694,6 +696,10 @@ class StartItemPayload {
       roleplayAssessmentMode:
           type == 'ROLEPLAY' &&
           (json['completionCriteria'] as Map<String, dynamic>?)?['assessmentMode'] == true,
+      roleplayGate: type == 'ROLEPLAY' ? RoleplayGate.tryParse(json['roleplayGate']) : null,
+      lastRoleplayAttempt: type == 'ROLEPLAY'
+          ? LastRoleplayAttempt.tryParse(json['lastRoleplayAttempt'])
+          : null,
       assessmentSubmittedAt: type == 'ROLEPLAY' ? json['assessmentSubmittedAt'] as String? : null,
       caseId: type == 'CASE' ? json['caseId'] as String? : null,
     );
@@ -707,6 +713,12 @@ class StartItemPayload {
 
   /// `completionCriteria.assessmentMode`: one attempt, locked once submitted.
   final bool roleplayAssessmentMode;
+
+  /// Effective rule (platform default applied); null on older backends.
+  final RoleplayGate? roleplayGate;
+
+  /// Latest attempt that missed a gate; null once completed.
+  final LastRoleplayAttempt? lastRoleplayAttempt;
 
   /// Assessment roleplay: when the one attempt was submitted; null while open.
   final String? assessmentSubmittedAt;

@@ -14,8 +14,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * `status`: draft (its creator's), awaiting_approval (a clinical advisor decides), approved
  * (selectable by every roleplay) or retired (no new roleplay may pick it; ones using it keep it).
  */
-export class CreateDebriefRiskCueOptions1982100000000 implements MigrationInterface {
-  name = 'CreateDebriefRiskCueOptions1982100000000';
+export class CreateDebriefRiskCueOptions1983600000000 implements MigrationInterface {
+  name = 'CreateDebriefRiskCueOptions1983600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

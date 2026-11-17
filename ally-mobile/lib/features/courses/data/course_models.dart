@@ -113,17 +113,95 @@ class TrackListItem {
   final String? trackEnrollmentId;
 }
 
+/// Roleplay completion logic. Absent or unknown reads as
+/// [scoreAndDuration] (the backend default).
+enum RoleplayCompletionLogic { score, duration, scoreAndDuration, participation }
+
+RoleplayCompletionLogic? roleplayCompletionLogicFromJson(Object? value) => switch (value) {
+  'SCORE' => RoleplayCompletionLogic.score,
+  'DURATION' => RoleplayCompletionLogic.duration,
+  'SCORE_AND_DURATION' => RoleplayCompletionLogic.scoreAndDuration,
+  'PARTICIPATION' => RoleplayCompletionLogic.participation,
+  _ => null,
+};
+
+/// The effective roleplay rule (`roleplayGate`) with the platform default
+/// already applied; a null threshold means that gate is off.
+class RoleplayGate {
+  const RoleplayGate({required this.completionLogic, this.minScore, this.minDurationSeconds});
+
+  /// Null for a missing/malformed gate (older backend: show no requirement).
+  static RoleplayGate? tryParse(Object? json) {
+    if (json is! Map) return null;
+    return RoleplayGate(
+      completionLogic:
+          roleplayCompletionLogicFromJson(json['completionLogic']) ?? RoleplayCompletionLogic.scoreAndDuration,
+      minScore: (json['minScore'] is num) ? (json['minScore'] as num).toDouble() : null,
+      minDurationSeconds: (json['minDurationSeconds'] is num)
+          ? (json['minDurationSeconds'] as num).toInt()
+          : null,
+    );
+  }
+
+  final RoleplayCompletionLogic completionLogic;
+  final double? minScore;
+  final int? minDurationSeconds;
+}
+
+enum RoleplayFailureReason { insufficientScore, insufficientDuration }
+
+/// `lastRoleplayAttempt`: the latest attempt that missed a gate.
+class LastRoleplayAttempt {
+  const LastRoleplayAttempt({
+    required this.failureReasons,
+    this.score,
+    this.durationSeconds = 0,
+    this.requiredScore,
+    this.requiredDurationSeconds,
+  });
+
+  /// Null when absent, malformed, or no known reason is present.
+  static LastRoleplayAttempt? tryParse(Object? json) {
+    if (json is! Map) return null;
+    final reasons = <RoleplayFailureReason>[
+      for (final r in (json['failureReasons'] is List ? json['failureReasons'] as List : const []))
+        if (r == 'INSUFFICIENT_SCORE')
+          RoleplayFailureReason.insufficientScore
+        else if (r == 'INSUFFICIENT_DURATION')
+          RoleplayFailureReason.insufficientDuration,
+    ];
+    if (reasons.isEmpty) return null;
+    double? d(Object? v) => v is num ? v.toDouble() : null;
+    return LastRoleplayAttempt(
+      failureReasons: reasons,
+      score: d(json['score']),
+      durationSeconds: (json['durationSeconds'] is num) ? (json['durationSeconds'] as num).toInt() : 0,
+      requiredScore: d(json['requiredScore']),
+      requiredDurationSeconds: (json['requiredDurationSeconds'] is num)
+          ? (json['requiredDurationSeconds'] as num).toInt()
+          : null,
+    );
+  }
+
+  final List<RoleplayFailureReason> failureReasons;
+  final double? score;
+  final int durationSeconds;
+  final double? requiredScore;
+  final int? requiredDurationSeconds;
+}
+
 /// Mirrors RN's `TrackCompletionCriteria` (`src/types/courses.ts:58-66`) —
 /// only the two fields `getTrackItemMeta`'s QUIZ/ROLEPLAY branches actually
 /// read.
 class TrackCompletionCriteria {
-  TrackCompletionCriteria({this.minScore, this.passScore, this.assessmentMode = false});
+  TrackCompletionCriteria({this.minScore, this.passScore, this.assessmentMode = false, this.completionLogic});
 
   factory TrackCompletionCriteria.fromJson(Map<String, dynamic> json) =>
       TrackCompletionCriteria(
         minScore: (json['minScore'] as num?)?.toDouble(),
         passScore: (json['passScore'] as num?)?.toDouble(),
         assessmentMode: json['assessmentMode'] as bool? ?? false,
+        completionLogic: roleplayCompletionLogicFromJson(json['completionLogic']),
       );
 
   final double? minScore;
@@ -131,6 +209,9 @@ class TrackCompletionCriteria {
 
   /// Roleplay: one attempt only, locked once submitted.
   final bool assessmentMode;
+
+  /// Roleplay only; null = absent (reads as score and duration).
+  final RoleplayCompletionLogic? completionLogic;
 }
 
 /// Mirrors RN's `TrackItemContentMeta` (`src/types/courses.ts:69-80`) — only
@@ -172,6 +253,8 @@ class TrackDetailItem {
     this.startedAt,
     this.contentMeta,
     this.completionCriteria,
+    this.roleplayGate,
+    this.lastRoleplayAttempt,
     this.languageFallbackReason,
     this.completedAt,
   });
@@ -197,6 +280,8 @@ class TrackDetailItem {
                 json['completionCriteria'] as Map<String, dynamic>,
               )
             : null,
+        roleplayGate: RoleplayGate.tryParse(json['roleplayGate']),
+        lastRoleplayAttempt: LastRoleplayAttempt.tryParse(json['lastRoleplayAttempt']),
         // Lenient on purpose (RN: an unknown reason reads as "no notice").
         languageFallbackReason: const {
           'VIDEO_NOT_LOCALISED',
@@ -222,6 +307,12 @@ class TrackDetailItem {
   final String? startedAt;
   final TrackItemContentMeta? contentMeta;
   final TrackCompletionCriteria? completionCriteria;
+
+  /// Effective roleplay rule; null on older backends or non-roleplay items.
+  final RoleplayGate? roleplayGate;
+
+  /// Latest roleplay attempt that missed a gate; null once completed.
+  final LastRoleplayAttempt? lastRoleplayAttempt;
 
   /// RN's `TrackLanguageFallbackReason` (why this component reads in
   /// English), or null.

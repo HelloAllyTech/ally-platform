@@ -713,6 +713,20 @@ export class ScenarioSessionService {
         ...startScenarioSessionDtoData,
       });
 
+    if (startScenarioSessionDto.trackItemProgressId) {
+      // A "Participation only" track roleplay completes on launch. Never let
+      // progression block the session itself from starting.
+      try {
+        await this.trackProgressService.handleRoleplayLaunch(
+          startScenarioSessionDto.trackItemProgressId,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Track participation completion failed for ${startScenarioSessionDto.trackItemProgressId}: ${error}`,
+        );
+      }
+    }
+
     try {
       // Best-effort: record WHICH main-agent prompt was selected and the
       // effective language variant. The prompt versions that ran are recorded

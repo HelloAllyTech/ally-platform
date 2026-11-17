@@ -17,7 +17,6 @@ import {
 import { useGetBuilderPipelineHealthQuery } from "@api";
 import { en, ROUTES } from "@constants";
 
-import { BUILDER_RUN_STATUS_TAG_TYPE } from "./builderMotion";
 import {
   formatCount,
   formatDurationMs,
@@ -26,6 +25,7 @@ import {
   sortPhasesByCostDesc,
   timeSplit,
 } from "./pipelineFormat";
+import { BUILDER_RUN_STATUS_TAG_TYPE } from "../../motion/builderMotion";
 
 const WINDOW_OPTIONS = [7, 30, 90] as const;
 

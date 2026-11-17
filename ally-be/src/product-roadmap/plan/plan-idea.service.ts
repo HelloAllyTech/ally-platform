@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
@@ -15,6 +16,7 @@ import {
 import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
 import { PlanSpendService } from 'src/product-planning/service/plan-spend.service';
+import { PlanCeilingService } from 'src/product-planning/service/plan-ceiling.service';
 import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { PlanNotificationService } from 'src/product-planning/service/plan-notification.service';
 import {
@@ -87,6 +89,9 @@ export class PlanIdeaService {
     private readonly opportunities: Repository<RoadmapOpportunity>,
     @InjectRepository(RoadmapIdeaDraft)
     private readonly drafts: Repository<RoadmapIdeaDraft>,
+    /** Roadmap v2's one ceiling per idea; a no-op while the flag is off. */
+    @Optional()
+    private readonly ceiling?: PlanCeilingService,
   ) {}
 
   /** Park it (`park: true`, no AI) or work it up: either way a private plan session. */
@@ -143,6 +148,8 @@ export class PlanIdeaService {
     const plan = await this.editableDraft(sessionId, userId);
     const content = (text ?? '').trim();
     if (!content) throw new BadRequestException('Write something first.');
+    // Before anything is written, so a refused turn leaves the draft as it was.
+    await this.ceiling?.assertWithinCeiling(sessionId, 'copilot_turn');
 
     await this.messages.appendMessage(sessionId, {
       role: BuilderMessageRole.USER,

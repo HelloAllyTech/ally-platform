@@ -17,6 +17,7 @@ vi.mock("@api", () => ({
   useGetPmAgentFeedStateQuery: () => ({ data: stateOf() }),
   useRetryPmAgentCardMutation: () => [vi.fn(), {}],
   useDismissPmAgentCardMutation: () => [vi.fn(), {}],
+  useFileAnywayPmAgentCardMutation: () => [vi.fn(), {}],
   useRunPmAgentNowMutation: () => [vi.fn(), { isLoading: false }],
   useUpdatePmAgentSettingsMutation: () => [vi.fn(), { isLoading: false }],
 }));
@@ -24,39 +25,55 @@ vi.mock("@api", () => ({
 import { TrackingView } from "../TrackingView";
 
 describe("TrackingView", () => {
-  it("groups cards, shows the stepper, PR links and cost, and has no Revert", () => {
+  it("groups cards by where they are on the roadmap, links each to its opportunity, and has no Revert", () => {
     data.current = {
       needsYou: [
         recCard("n", {
-          status: "failed",
-          needsYou: { reason: "Build failed", actions: ["retry"] },
+          status: "needs_attention",
+          needsYou: { reason: "The roadmap refused the filing.", actions: ["retry", "dismiss"] },
         }),
       ],
       inProgress: [
         recCard("p", {
-          status: "pr_open",
+          status: "filed",
           delivery: {
-            status: "pr_open",
-            prs: [{ url: "https://github.com/x/y/pull/1" }],
-            costUsd: 1.5,
+            status: "prioritised",
+            prs: [],
+            roadmap: {
+              opportunityId: "opp-1",
+              code: "OPP-0901",
+              stage: "prioritised",
+              removed: false,
+            },
           },
         }),
       ],
       shipped: [recCard("s", { status: "released" })],
-      other: [recCard("h", { status: "handed_off" })],
+      other: [
+        recCard("x", {
+          status: "roadmap_archived",
+          delivery: {
+            status: null,
+            prs: [],
+            roadmap: { opportunityId: "opp-2", code: "OPP-0902", stage: null, removed: true },
+          },
+        }),
+      ],
     };
     render(<TrackingView />);
     expect(screen.getByRole("region", { name: "Needs you" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "In progress" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Shipped" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Handed off and other" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "PR 1" })).toHaveAttribute(
+    expect(screen.getByRole("region", { name: "On the roadmap" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Released" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Archived and other" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "OPP-0901" })).toHaveAttribute(
       "href",
-      "https://github.com/x/y/pull/1",
+      "/product-roadmap?opportunity=opp-1",
     );
-    expect(screen.getByText("Build cost $1.50")).toBeInTheDocument();
-    expect(screen.getAllByRole("list", { name: "Build progress" }).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/revert/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Prioritised$/, { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText("OPP-0902 was removed from the roadmap.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getAllByRole("list", { name: "Roadmap progress" }).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/revert|build cost/i)).not.toBeInTheDocument();
   });
 
   it("shows an empty message when nothing was accepted", () => {

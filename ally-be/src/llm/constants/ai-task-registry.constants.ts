@@ -1982,7 +1982,9 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       detail:
         `PM Agent ${lane} lane: a read-only tool loop over ${reads}, at most 6 passes of ` +
         '4,000 output tokens, ending in one submit_candidates call (one repair retry). ' +
-        'Mandate, strategy page and product map ride in a cached system block.',
+        'Mandate, strategy page, product map, the roadmap filing checklist and a digest of what ' +
+        'the roadmap already holds ride in a cached system block. It proposes; an accepted card ' +
+        'is filed to the roadmap, never built.',
       kind: AiTaskKind.COMPLETION,
       provider: 'openai',
       defaultModel: 'gpt-5-mini',
@@ -1998,8 +2000,10 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     trigger:
       'A PM Agent run has candidate cards that passed the deterministic and dedupe gates',
     detail:
-      'One call per run reviews up to 12 candidates against a written rubric (submit_verdicts, ' +
-      '3,000 output tokens). Fail-closed: if it cannot run, no card reaches the feed. Its ' +
+      'One call per run reviews up to 12 candidates against a written rubric and grades each ' +
+      "recommendation's roadmap entry against the roadmap's readiness checklist (submit_verdicts, " +
+      '3,000 output tokens). Fail-closed: if it cannot run, or any readiness item is not met, the ' +
+      'card does not reach the feed. Its ' +
       'share of the run budget is held back from the lanes. Pick a different model family ' +
       'from the lanes in Skills Store to reduce correlated blind spots.',
     kind: AiTaskKind.COMPLETION,
@@ -2007,6 +2011,26 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-5-mini',
     configuredBy: 'LLM_REASONING_MODEL',
     promptOverride: 'pm_agent_critic',
+  },
+  {
+    id: 'pm-agent-lessons',
+    task: LlmTask.PM_AGENT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Weekly on the PM Agent’s lessons weekday at its run hour (IST), or Run lessons now, while ' +
+      'the agent and lessons are enabled and the month has budget',
+    detail:
+      'One reflection call over an anonymised pack of the last 90 days of card decisions and ' +
+      'outcomes (submit_lessons, 3,000 output tokens, one repair). Each surviving candidate is ' +
+      'then evaluated by replaying the pm-agent-critic row (same prompt and model) over up to 20 ' +
+      'past decided cards: one baseline call plus one per candidate, all counted in llm_usage ' +
+      'and the monthly budget; the eval share (60% of the job cap) is held back from the reflection.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'pm_agent_lessons',
   },
   {
     id: 'foundational-skills-judge',
@@ -2169,12 +2193,16 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger:
-      'The roadmap board classifies, de-duplicates or assesses an opportunity',
+      'The roadmap board classifies, de-duplicates or assesses an opportunity (including one the PM Agent files)',
     detail:
       "Goal classification, the duplicate check's confirmation pass, goal-impact assessment, " +
+      '(the PM Agent runs the duplicate check once per accepted card before filing it, and its ' +
+      "filing is assessed like any other; that spend is the roadmap's, not the PM Agent budget), " +
       "interview-note summaries, Claude-prompt generation, and the Builder drawer's split/merge " +
       'guard. Filing itself moved to the opportunity copilot (its own row). The standalone ' +
-      'readiness check, review and enhance calls were removed with the blank filing form.',
+      'readiness check, review and enhance calls were removed with the blank filing form. ' +
+      "Goal-impact assessment re-runs when an idea's text changes, whether from the drawer or " +
+      "from Roadmap v2's inline edit (PATCH /v1/roadmap/items/:code), which reuses the same update path.",
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
@@ -2384,7 +2412,8 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'before (at most two rejections, then a pass offered only edit and turn-ending tools). Off, ' +
       'the prior streamed loop runs. A session opened from a roadmap opportunity also carries ' +
       "the opportunity's hand-off (description, copilot brief, filing interview) as a third " +
-      'cached system block on every turn.',
+      'cached system block on every turn. With roadmap_v2 on, a plan session past its one idea ' +
+      'ceiling (ledger + runner spend) does not start a turn at all (PlanCeilingService).',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',

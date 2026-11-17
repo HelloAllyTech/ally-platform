@@ -38,6 +38,56 @@ export interface CompletedRun {
   title: string;
 }
 
+/** A completed run of any conclusion, for reading a release history. */
+export interface CompletedWorkflowRun {
+  id: string;
+  htmlUrl: string;
+  /** success / failure / cancelled / timed_out / … */
+  conclusion: string | null;
+  createdAt: Date;
+  /** The latest attempt's start (`run_started_at`). */
+  startedAt: Date;
+  finishedAt: Date;
+  /** The branch head when the run was dispatched. */
+  headSha: string | null;
+  title: string;
+}
+
+/** One commit of a range, with the graph edges the release policy walks. */
+export interface GraphCommit {
+  sha: string;
+  /** Parent shas, first parent first. Two or more for a merge commit. */
+  parents: string[];
+  /** The whole message; its first line is the title. */
+  message: string;
+  authorLogin: string | null;
+  /** The committer's date: for a merge commit, when the pull request merged. */
+  committedAt: Date;
+}
+
+/** `base...head` as a commit graph, oldest first (GitHub's order). */
+export interface CommitGraph {
+  status: 'ahead' | 'behind' | 'identical' | 'diverged' | null;
+  commits: GraphCommit[];
+  /** GitHub lists at most 250 commits of a comparison without paging. */
+  truncated: boolean;
+}
+
+/** The files one commit changed, renamed-from paths included. */
+export interface CommitFiles {
+  files: string[];
+  /** GitHub lists at most 300 files of a commit. */
+  truncated: boolean;
+}
+
+/** A tag ref: its name and the object it points at. */
+export interface TagRef {
+  name: string;
+  sha: string;
+  /** `tag` (annotated) or `commit` (lightweight). */
+  type: string;
+}
+
 /**
  * What a merged pull request was about: its words, not its merge state.
  * Separate from `PullRequestInfo` so the Bug Hunter/Builder polling paths keep
@@ -1764,6 +1814,336 @@ export class GithubActionsService {
       this.noteAuthOutcome(error);
       this.logger.warn(
         `Could not list the release history of ${params.workflow} in ${params.repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * The newest completed runs of a workflow, whatever their conclusion,
+   * newest first — one page, which for a release workflow is weeks.
+   *
+   * Release tracking needs both halves of the history in one read: the newest
+   * success says what is live, and a failure after a merge says the merge is
+   * waiting on a release that did not happen. Null when GitHub cannot be read.
+   */
+  async listCompletedRuns(params: {
+    repo: string;
+    workflow: string;
+    perPage?: number;
+  }): Promise<CompletedWorkflowRun[] | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(
+        this.url(params.repo, `actions/workflows/${params.workflow}/runs`),
+        {
+          headers: this.headers,
+          params: { status: 'completed', per_page: params.perPage ?? 50 },
+          timeout: 15_000,
+        },
+      );
+      this.noteAuthOutcome();
+      return ((data?.workflow_runs ?? []) as any[])
+        .filter((run) => run?.status === 'completed')
+        .map((run) => ({
+          id: String(run.id),
+          htmlUrl: String(run.html_url ?? ''),
+          conclusion: run.conclusion ?? null,
+          createdAt: new Date(run.created_at),
+          startedAt: new Date(run.run_started_at ?? run.created_at),
+          finishedAt: new Date(run.updated_at ?? run.created_at),
+          headSha: run.head_sha ? String(run.head_sha) : null,
+          title: String(run.display_title ?? run.name ?? ''),
+        }))
+        .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not list completed runs of ${params.workflow} in ${params.repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Every tag starting with `prefix`, as refs: the name and the object it
+   * points at (`tag` for an annotated tag, `commit` for a lightweight one).
+   * Unordered. Null when GitHub cannot be read, or has more pages than this
+   * reads — a partial list must not pass for the newest tags.
+   */
+  async listTagRefs(repo: string, prefix: string): Promise<TagRef[] | null> {
+    this.requireConfigured();
+    try {
+      const refs: TagRef[] = [];
+      let next: string | null = this.url(
+        repo,
+        `git/matching-refs/tags/${prefix}`,
+      );
+      for (let page = 0; next && page < 20; page += 1) {
+        const response = await axios.get(next, {
+          headers: this.headers,
+          timeout: 15_000,
+        });
+        for (const ref of (response.data ?? []) as any[]) {
+          const name = String(ref?.ref ?? '').replace(/^refs\/tags\//, '');
+          if (!name.startsWith(prefix) || !ref?.object?.sha) continue;
+          refs.push({
+            name,
+            sha: String(ref.object.sha),
+            type: String(ref.object.type ?? 'commit'),
+          });
+        }
+        next = GithubActionsService.nextLink(response.headers?.link);
+      }
+      this.noteAuthOutcome();
+      return next ? null : refs;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not list ${prefix}* tags in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * The commit a tag names and when the tag was made: the tagger's date for
+   * an annotated tag, the commit's own date for a lightweight one (whose only
+   * clock is the commit it points at). Null when GitHub cannot be read.
+   */
+  async resolveTag(
+    repo: string,
+    ref: TagRef,
+  ): Promise<{ commitSha: string; at: Date } | null> {
+    this.requireConfigured();
+    try {
+      if (ref.type === 'tag') {
+        const { data } = await axios.get(
+          this.url(repo, `git/tags/${ref.sha}`),
+          {
+            headers: this.headers,
+            timeout: 15_000,
+          },
+        );
+        this.noteAuthOutcome();
+        const commitSha = data?.object?.sha ? String(data.object.sha) : null;
+        const at = data?.tagger?.date ? new Date(data.tagger.date) : null;
+        return commitSha && at ? { commitSha, at } : null;
+      }
+      const { data } = await axios.get(
+        this.url(repo, `git/commits/${ref.sha}`),
+        { headers: this.headers, timeout: 15_000 },
+      );
+      this.noteAuthOutcome();
+      const at = data?.committer?.date ? new Date(data.committer.date) : null;
+      return at ? { commitSha: ref.sha, at } : null;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read tag ${ref.name} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * How `head` relates to `base`: GitHub's compare status. `behind` or
+   * `identical` means `head` is already contained in `base` — the ancestor
+   * test release tracking rests on. One commit per page: only the status is
+   * wanted, not the diff. Null when GitHub cannot answer (unknown commit,
+   * unreadable repo), which is "unknown", never "not contained".
+   */
+  async compareStatus(
+    repo: string,
+    base: string,
+    head: string,
+  ): Promise<'ahead' | 'behind' | 'identical' | 'diverged' | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(
+        this.url(
+          repo,
+          `compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`,
+        ),
+        { headers: this.headers, params: { per_page: 1 }, timeout: 20_000 },
+      );
+      this.noteAuthOutcome();
+      const status = String(data?.status ?? '');
+      return status === 'ahead' ||
+        status === 'behind' ||
+        status === 'identical' ||
+        status === 'diverged'
+        ? status
+        : null;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not compare ${base}...${head} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Runs of a workflow that are queued or in progress. A release dispatched
+   * while another is running takes the NEXT patch number (the running one has
+   * already made its tag), which burns a version on an identical build. Null
+   * when GitHub cannot be read, which a caller must treat as "maybe".
+   */
+  async countActiveRuns(
+    repo: string,
+    workflow: string,
+  ): Promise<number | null> {
+    this.requireConfigured();
+    try {
+      let active = 0;
+      for (const status of ['in_progress', 'queued']) {
+        const { data } = await axios.get(
+          this.url(repo, `actions/workflows/${workflow}/runs`),
+          {
+            headers: this.headers,
+            params: { status, per_page: 1 },
+            timeout: 15_000,
+          },
+        );
+        active += Number(data?.total_count ?? 0);
+      }
+      this.noteAuthOutcome();
+      return active;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not list active runs of ${workflow} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * The commit a branch points at now. The release policy reads master once
+   * per pass and compares every service against that one commit, so master
+   * moving mid-pass cannot give two services two different heads. Null when
+   * GitHub cannot be read.
+   */
+  async getBranchSha(repo: string, branch: string): Promise<string | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(
+        this.url(repo, `git/ref/heads/${encodeURIComponent(branch)}`),
+        { headers: this.headers, timeout: 15_000 },
+      );
+      this.noteAuthOutcome();
+      return data?.object?.sha ? String(data.object.sha) : null;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read ${branch} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * `base...head` as a commit graph: every commit `head` has that `base` does
+   * not, oldest first, with parents. The release policy walks the parents to
+   * tell which pull request brought each commit in, and reads each commit's
+   * files separately (`getCommitFiles`): GitHub's comparison lists the files
+   * of the whole range, not of each commit. Null when GitHub cannot answer.
+   */
+  async compareCommitGraph(
+    repo: string,
+    base: string,
+    head: string,
+  ): Promise<CommitGraph | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(
+        this.url(
+          repo,
+          `compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`,
+        ),
+        { headers: this.headers, timeout: 20_000 },
+      );
+      this.noteAuthOutcome();
+      const commits: GraphCommit[] = ((data?.commits ?? []) as any[])
+        .filter((commit) => commit?.sha)
+        .map((commit) => ({
+          sha: String(commit.sha),
+          parents: Array.isArray(commit.parents)
+            ? commit.parents
+                .map((parent: { sha?: string }) => String(parent?.sha ?? ''))
+                .filter(Boolean)
+            : [],
+          message: String(commit.commit?.message ?? ''),
+          authorLogin: commit.author?.login
+            ? String(commit.author.login)
+            : null,
+          committedAt: new Date(
+            commit.commit?.committer?.date ?? commit.commit?.author?.date ?? 0,
+          ),
+        }));
+      const status = String(data?.status ?? '');
+      const totalCommits = Number(data?.total_commits ?? commits.length);
+      return {
+        status:
+          status === 'ahead' ||
+          status === 'behind' ||
+          status === 'identical' ||
+          status === 'diverged'
+            ? status
+            : null,
+        commits,
+        truncated: commits.length < totalCommits,
+      };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not compare ${base}...${head} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * The files one commit changed, with the old path of a rename beside the
+   * new one: moving a file out of a held folder is a change to that folder.
+   * Null when GitHub cannot be read — "unknown", never "touched nothing".
+   */
+  async getCommitFiles(repo: string, sha: string): Promise<CommitFiles | null> {
+    this.requireConfigured();
+    try {
+      const { data } = await axios.get(this.url(repo, `commits/${sha}`), {
+        headers: this.headers,
+        timeout: 15_000,
+      });
+      this.noteAuthOutcome();
+      const listed = (data?.files ?? []) as any[];
+      const files = new Set<string>();
+      for (const file of listed) {
+        if (file?.filename) files.add(String(file.filename));
+        if (file?.previous_filename) files.add(String(file.previous_filename));
+      }
+      return { files: [...files], truncated: listed.length >= 300 };
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not read the files of ${repo}@${sha}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );

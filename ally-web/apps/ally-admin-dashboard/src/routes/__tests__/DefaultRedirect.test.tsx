@@ -24,6 +24,7 @@ vi.mock("@api", () => ({
   useGetPermissionsQuery: vi.fn(),
   useGetUserPreferencesQuery: vi.fn(),
   useGetCharacterLibraryEnabledQuery: vi.fn(() => ({ data: false, isLoading: false })),
+  useGetRoadmapMeRoleQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
   // Feature-gated tabs can be the landing tab, so this screen fetches the
   // per-user toggles. Default to content_management on, matching the backfill
   // every platform admin gets, plus the per-tab toggles ally-be grants by default.

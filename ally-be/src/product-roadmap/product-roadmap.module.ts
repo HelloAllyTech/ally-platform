@@ -67,6 +67,10 @@ import { RoadmapUpNextController } from './controller/roadmap-up-next.controller
 import { BuilderModule } from 'src/builder/builder.module';
 import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
 import { RoadmapPlanController } from './controller/roadmap-plan.controller';
+import { RoadmapItemController } from './item/roadmap-item.controller';
+import { RoadmapItemLookupService } from './item/roadmap-item-lookup.service';
+import { RoadmapItemReadService } from './item/roadmap-item-read.service';
+import { RoadmapItemEditService } from './item/roadmap-item-edit.service';
 import { PlanSessionStore } from './plan/plan-session.store';
 import { PlanStageService } from './plan/plan-stage.service';
 import { PlanReadinessService } from './plan/plan-readiness.service';
@@ -96,6 +100,26 @@ import { RoadmapAdminController } from './controller/roadmap-admin.controller';
 import { RoadmapCollaborationController } from './controller/roadmap-collaboration.controller';
 import { RoadmapOpportunityController } from './controller/roadmap-opportunity.controller';
 import { RoadmapGateway } from './gateway/roadmap.gateway';
+import { RoadmapItemReleaseController } from './controller/roadmap-item-release.controller';
+import { ItemReleaseService } from './service/item-release.service';
+import { ItemReleaseSchedulerRegistrationService } from './service/item-release-scheduler-registration.service';
+import { ItemLinkedPr } from './entity/item-linked-pr.entity';
+import { ItemRelease } from './entity/item-release.entity';
+import { BuilderPullRequest } from 'src/builder/entity/builder-pull-request.entity';
+import { GithubModule } from 'src/github/github.module';
+import { ReleaseModule } from 'src/release/release.module';
+import { ReleasePolicyLog } from './entity/release-policy-log.entity';
+import { RoadmapReleaseController } from './controller/roadmap-release.controller';
+import { RoadmapV2EnabledGuard } from './guard/roadmap-v2-enabled.guard';
+import { ReleasePlanService } from './service/release-plan.service';
+import { ReleasePolicyService } from './service/release-policy.service';
+import { ReleasePolicySettingsService } from './service/release-policy-settings.service';
+import { ReleasePolicyAccessService } from './service/release-policy-access.service';
+import {
+  LoggingReleasePolicyOwnerNotifier,
+  ReleasePolicyOwnerNotifier,
+} from './service/release-policy-notifier';
+import { ReleasePolicySchedulerRegistrationService } from './service/release-policy-scheduler-registration.service';
 import { AwsModule } from 'src/aws/aws.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 
@@ -155,7 +179,20 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
       // entity rather than SettingsModule, for the same reason as BugFinding above: one row
       // read and written by one service needs no module graph behind it.
       GlobalSettings,
+      // Release tracking (ItemReleaseService): its own two tables, and Builder's pull requests
+      // read (never written) to link an opportunity's Builder work. The entity rather than a
+      // Builder repository export, the same treatment BugFinding gets above.
+      ItemLinkedPr,
+      ItemRelease,
+      BuilderPullRequest,
+      // The auto-release policy's shadow log (Roadmap v2, P5).
+      ReleasePolicyLog,
     ]),
+    // GithubActionsService — release tracking's compare / runs / tags reads, on the shared
+    // client and token. Builder imports it too but does not re-export it.
+    GithubModule,
+    // ProductionReleaseService — a Release click on the Roadmap (P5). Imports only GithubModule.
+    ReleaseModule,
     // AiService — the Weaviate client for duplicate detection.
     AiModule,
     // PromptSharedService — resolves src/prompts/roadmap/*.txt (with any dashboard override)
@@ -185,14 +222,22 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     AwsModule,
   ],
   controllers: [
+    // Roadmap v2 (plans/roadmap-builder-merge): 404 while roadmap_v2 is off.
+    RoadmapItemController,
     RoadmapOpportunityController,
     RoadmapCollaborationController,
     RoadmapAdminController,
     RoadmapUpNextController,
     RoadmapIdeaDraftController,
     RoadmapPlanController,
+    RoadmapItemReleaseController,
+    RoadmapReleaseController,
   ],
   providers: [
+    RoadmapItemLookupService,
+    // Roadmap v2's read model and its inline edits (P2).
+    RoadmapItemReadService,
+    RoadmapItemEditService,
     // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
     PlanSessionStore,
     PlanStageService,
@@ -251,6 +296,21 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapCopilotService,
     RoadmapVoteGrantSchedulerRegistrationService,
     RoadmapBuilderSchedulerRegistrationService,
+    // Release tracking: Released from what is actually in production (Roadmap v2, P1).
+    ItemReleaseService,
+    ItemReleaseSchedulerRegistrationService,
+    // The auto-release policy, shadow mode only (Roadmap v2, P5). The settings,
+    // access and notifier providers are the seams P0 rewires.
+    ReleasePlanService,
+    ReleasePolicyService,
+    ReleasePolicySettingsService,
+    ReleasePolicyAccessService,
+    {
+      provide: ReleasePolicyOwnerNotifier,
+      useClass: LoggingReleasePolicyOwnerNotifier,
+    },
+    ReleasePolicySchedulerRegistrationService,
+    RoadmapV2EnabledGuard,
     // Classifies a reported bug's repo at intake (RoadmapOpportunityService.create).
     // Provided directly rather than importing BugHunterModule: it constructs
     // itself from AppConfigService (global), PromptSharedService and

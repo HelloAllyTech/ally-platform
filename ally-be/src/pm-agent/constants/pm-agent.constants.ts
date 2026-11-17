@@ -1,6 +1,6 @@
 import { PmCardStatus } from '../enum/pm-agent.enum';
 
-/** The 10-second undo window after Accept & build (plan §2.3). */
+/** The 10-second undo window after Accept (plan §2.3); the card is filed when it closes. */
 export const PM_UNDO_WINDOW_MS = 10_000;
 
 /** A reason may be added or replaced this long after a reject (the reason toast). */
@@ -9,10 +9,7 @@ export const PM_REJECT_REASON_WINDOW_MS = 30_000;
 /** A skipped question is not asked again for this long. */
 export const PM_SKIP_SUPPRESSION_MS = 14 * 24 * 60 * 60 * 1000;
 
-/** Circuit breaker: this many consecutive failed builds pause auto-build. */
-export const PM_CIRCUIT_BREAKER_FAILURES = 3;
-
-/** How long a parked outbox row (Builder busy / paused / design drafting) waits. */
+/** How long a parked outbox row (a transient filing failure) waits before the next try. */
 export const PM_OUTBOX_RETRY_MS = 5 * 60 * 1000;
 
 /** A claimed outbox row is locked this long; a crashed worker's row is retaken after. */
@@ -27,6 +24,8 @@ export const PM_SETTINGS_LIMITS = {
   QUEUE_CAP_MAX: 10,
   RUN_HOUR_MIN: 0,
   RUN_HOUR_MAX: 23,
+  LESSONS_WEEKDAY_MIN: 0,
+  LESSONS_WEEKDAY_MAX: 6,
   MANDATE_MAX: 4000,
   MEMORY_VALUE_MAX: 2000,
   FEEDBACK_TEXT_MAX: 2000,
@@ -43,37 +42,26 @@ export const PM_PLATFORM_USER_ID = 0;
 /** The open review queue: what counts towards the cap. */
 export const PM_QUEUE_STATUSES: PmCardStatus[] = [PmCardStatus.OPEN];
 
-/** Accepted work still moving. */
+/** Accepted work still moving: waiting out the undo window, being filed, or on the roadmap. */
 export const PM_IN_PROGRESS_STATUSES: PmCardStatus[] = [
   PmCardStatus.ACCEPTED_PENDING,
   PmCardStatus.QUEUED,
-  PmCardStatus.DESIGNING,
-  PmCardStatus.BUILDING,
-  PmCardStatus.PR_OPEN,
-  PmCardStatus.MERGED,
+  PmCardStatus.FILED,
 ];
 
-/** Accepted work that stopped in front of a person (unless dismissed). */
+/**
+ * Accepted work that stopped in front of a person (unless dismissed). FAILED and
+ * MERGED_NOT_RELEASED are legacy Builder statuses; migration 1982100000100 moved every such
+ * card to handed_off, so in practice this is NEEDS_ATTENTION.
+ */
 export const PM_NEEDS_YOU_STATUSES: PmCardStatus[] = [
   PmCardStatus.FAILED,
   PmCardStatus.NEEDS_ATTENTION,
   PmCardStatus.MERGED_NOT_RELEASED,
 ];
 
-/**
- * Statuses the reconcile job re-reads from Builder. FAILED and NEEDS_ATTENTION are
- * included because Builder can recover on its own (a person answers Builder's question,
- * a failed run's pull requests turn green, a failed release is shipped by hand).
- */
-export const PM_RECONCILED_STATUSES: PmCardStatus[] = [
-  PmCardStatus.DESIGNING,
-  PmCardStatus.BUILDING,
-  PmCardStatus.PR_OPEN,
-  PmCardStatus.MERGED,
-  PmCardStatus.MERGED_NOT_RELEASED,
-  PmCardStatus.FAILED,
-  PmCardStatus.NEEDS_ATTENTION,
-];
+/** Statuses the reconcile job re-reads from the roadmap: a filed card follows its opportunity. */
+export const PM_RECONCILED_STATUSES: PmCardStatus[] = [PmCardStatus.FILED];
 
 /** The Agent › History view. */
 export const PM_HISTORY_STATUSES: PmCardStatus[] = [

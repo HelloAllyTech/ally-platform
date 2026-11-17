@@ -7,6 +7,7 @@ import {
   IsBoolean,
   IsEnum,
   IsIn,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -25,6 +26,8 @@ import {
   PmRepo,
   PmRiskLevel,
 } from '../enum/pm-agent.enum';
+import { metricRefProblems, PmMetricRef } from '../impact/metric-catalog';
+import { ROADMAP_FILEABLE_EFFORTS } from 'src/product-roadmap/constants/product-roadmap.constants';
 
 /**
  * The card payload contract (docs/pm-agent.md "Card payload", schemaVersion 1).
@@ -44,6 +47,10 @@ export const PM_CARD_LIMITS = {
   TEXT_MAX: 2000,
   LINE_MAX: 300,
   LIST_MAX: 20,
+  /** The roadmap's own description cap (ROADMAP_LIMITS.DESCRIPTION_MAX). */
+  OPPORTUNITY_MAX: 1000,
+  OPPORTUNITY_MIN: 80,
+  GOAL_MAX: 120,
 } as const;
 
 const wordCount = (value: string) =>
@@ -82,6 +89,28 @@ export function ContainsNumber(options?: ValidationOptions) {
       validator: {
         validate: (value: unknown) =>
           typeof value === 'string' && /\d/.test(value),
+      },
+    });
+}
+
+/**
+ * A valid `metricRef` (impact checks): source in the measurable-metric catalog, params
+ * shape-checked against the entry, betterWhen up|down, unit (when sent) the entry's own.
+ */
+export function IsPmMetricRef(options?: ValidationOptions) {
+  return (object: object, propertyName: string) =>
+    registerDecorator({
+      name: 'isPmMetricRef',
+      target: object.constructor,
+      propertyName,
+      options: {
+        message: (args) =>
+          metricRefProblems(args.value).join('; ') ||
+          `${propertyName} is invalid`,
+        ...options,
+      },
+      validator: {
+        validate: (value: unknown) => metricRefProblems(value).length === 0,
       },
     });
 }
@@ -128,6 +157,29 @@ export class PmImpactMetricDto {
 
   @IsIn(['up', 'down'])
   direction!: 'up' | 'down';
+}
+
+/**
+ * The roadmap entry an accepted recommendation is filed as (docs/pm-agent.md "Filing to the
+ * roadmap"). Written by the lane in the roadmap's own shape, so what the admin accepts is
+ * exactly what lands on the board: `description` is the opportunity text, `productGoal` one
+ * of the roadmap's product goal NAMES (checked against the live list by gate layer 1), and
+ * `effort` the roadmap's shirt size. The critic grades `description` against the roadmap's
+ * readiness checklist (ROADMAP_READINESS_CRITERIA) before the card is ever shown.
+ */
+export class PmOpportunityDraftDto {
+  @IsString()
+  @MinLength(PM_CARD_LIMITS.OPPORTUNITY_MIN)
+  @MaxLength(PM_CARD_LIMITS.OPPORTUNITY_MAX)
+  description!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(PM_CARD_LIMITS.GOAL_MAX)
+  productGoal!: string;
+
+  @IsIn([...ROADMAP_FILEABLE_EFFORTS])
+  effort!: (typeof ROADMAP_FILEABLE_EFFORTS)[number];
 }
 
 export class PmRecommendationPayloadDto {
@@ -181,6 +233,14 @@ export class PmRecommendationPayloadDto {
   @Type(() => PmImpactMetricDto)
   impactMetric!: PmImpactMetricDto;
 
+  /**
+   * Optional, additive (v1.1): the catalog metric the impact checks read. Absent = the card
+   * is shown as "impact not measurable".
+   */
+  @IsOptional()
+  @IsPmMetricRef()
+  metricRef?: PmMetricRef;
+
   @IsArray()
   @ArrayMaxSize(PM_CARD_LIMITS.LIST_MAX)
   @IsString({ each: true })
@@ -191,6 +251,15 @@ export class PmRecommendationPayloadDto {
   @ArrayMinSize(1)
   @IsEnum(PmRepo, { each: true })
   repos!: PmRepo[];
+
+  /**
+   * Required since 2026-11-17: what Accept files to the roadmap. IsObject because
+   * ValidateNested alone lets a missing value through.
+   */
+  @IsObject()
+  @ValidateNested()
+  @Type(() => PmOpportunityDraftDto)
+  opportunity!: PmOpportunityDraftDto;
 
   @IsArray()
   @ArrayMinSize(1)

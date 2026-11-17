@@ -9,8 +9,8 @@ import { en, ROUTES } from "@constants";
 import { BuilderExemplar } from "@types";
 import { asAgentTextList } from "@utils";
 
-import { BUILDER_OUTCOME_TAG_TYPE } from "./builderMotion";
 import { formatHours, formatScoreboardCost } from "./scoreboardChart";
+import { BUILDER_OUTCOME_TAG_TYPE } from "../../motion/builderMotion";
 
 /** The Context Library collection Builder's lessons live in (PLAN §2.2, phase 5). */
 export const BUILDER_LESSONS_COLLECTION = "builder_lessons";

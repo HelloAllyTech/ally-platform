@@ -17,11 +17,12 @@ import {
   useLazyGetUserPreferencesQuery,
   useUpdateUserPreferencesMutation,
   useGetCharacterLibraryEnabledQuery,
+  useGetRoadmapMeRoleQuery,
 } from "@api";
-import { LOCAL_STORAGE_KEYS, OrgToggle, Permissions } from "@constants";
+import { FeatureToggleKey, LOCAL_STORAGE_KEYS, OrgToggle, Permissions } from "@constants";
 import { setUser, authenticate, unauthenticate, setPermissions, setFeatures } from "@reducer";
 import { RootState, store } from "@store";
-import { deriveNavigationItems, hasPermissions } from "@utils";
+import { deriveNavigationItems, hasFeature, hasPermissions } from "@utils";
 
 export const useUser = () => {
   const isAuthenticated = useSelector((state: RootState) => state.user.isAuthenticated);
@@ -148,6 +149,16 @@ export const useUser = () => {
     skip: !isAuthenticated,
   });
 
+  // Roadmap v2 (dark behind `roadmap_v2`): its routes answer 404 while the flag is off, so a
+  // successful role read is the flag check. Asked only by people who can see the board at all,
+  // so nobody else issues a request that could only fail.
+  const canSeeRoadmap =
+    isAuthenticated &&
+    hasPermissions(permissions, [Permissions.VIEW_PRODUCT_ROADMAP]) &&
+    hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP);
+  const { data: roadmapRole } = useGetRoadmapMeRoleQuery(undefined, { skip: !canSeeRoadmap });
+  const isRoadmapV2On = canSeeRoadmap && !!roadmapRole && roadmapRole.role !== "none";
+
   const filteredNavigationItems = useMemo(
     () =>
       deriveNavigationItems({
@@ -157,8 +168,9 @@ export const useUser = () => {
         orgToggles: {
           [OrgToggle.CHARACTER_LIBRARY]: Boolean(isCharacterLibraryOrgEnabled),
         },
+        roadmapV2: isRoadmapV2On,
       }),
-    [permissions, features, adminSidebarOrder, isCharacterLibraryOrgEnabled],
+    [permissions, features, adminSidebarOrder, isCharacterLibraryOrgEnabled, isRoadmapV2On],
   );
 
   /**

@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -15,7 +14,6 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiProduces,
   ApiResponse,
   ApiSecurity,
   ApiTags,
@@ -31,6 +29,7 @@ import {
   PmCardDetailResponse,
   PmCardResponse,
   PmHealthResponse,
+  PmLessonResponse,
   PmMemoryResponse,
   PmRunNowResponse,
   PmRunResponse,
@@ -105,25 +104,13 @@ export class PmAgentController {
     return this.cardService.getDetail(id);
   }
 
-  @Get('cards/:id/plan.md')
-  @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
-  @Header('Content-Type', 'text/markdown; charset=utf-8')
-  @ApiProduces('text/markdown')
-  @ApiOperation({
-    summary: 'The compiled plan (same text Builder gets), anonymised',
-  })
-  @ApiResponse(INVALID)
-  getPlan(@Param('id', ParseUUIDPipe) id: string): Promise<string> {
-    return this.cardService.planMarkdown(id);
-  }
-
   @Post('cards/:id/accept')
   @HttpCode(200)
   @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
   @ApiOperation({
-    summary: 'Accept a recommendation',
+    summary: 'Accept a recommendation: file it to the roadmap',
     description:
-      '`builder`: status accepted_pending with undoUntil = now + 10 s; the build starts after the window. `download`: handed_off.',
+      'Status accepted_pending with undoUntil = now + 10 s; the card is filed to the roadmap as a Product Manager Agent opportunity after the window. `path` is ignored (legacy).',
   })
   @ApiResponse(CONFLICT)
   @ApiResponse(INVALID)
@@ -218,13 +205,28 @@ export class PmAgentController {
   @Post('cards/:id/retry')
   @HttpCode(200)
   @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
-  @ApiOperation({ summary: 'Retry a failed / needs-attention build' })
+  @ApiOperation({ summary: 'Retry filing a needs-attention card' })
   @ApiResponse(CONFLICT)
   retry(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: AuthedRequest,
   ): Promise<PmCardResponse> {
     return this.cardService.retry(req.user.id, id);
+  }
+
+  @Post('cards/:id/file-anyway')
+  @HttpCode(200)
+  @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
+  @ApiOperation({
+    summary:
+      'File a card the roadmap duplicate check stopped, over that check (every other check still runs)',
+  })
+  @ApiResponse(CONFLICT)
+  fileAnyway(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ): Promise<PmCardResponse> {
+    return this.cardService.fileAnyway(req.user.id, id);
   }
 
   @Post('cards/:id/dismiss')
@@ -291,7 +293,7 @@ export class PmAgentController {
   @ApiOperation({ summary: 'Memory facts and lessons' })
   memory(): Promise<{
     facts: PmMemoryResponse[];
-    lessons: PmMemoryResponse[];
+    lessons: PmLessonResponse[];
   }> {
     return this.memoryService.list();
   }
@@ -303,17 +305,20 @@ export class PmAgentController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateMemoryDto,
     @Req() req: AuthedRequest,
-  ): Promise<PmMemoryResponse> {
+  ): Promise<PmMemoryResponse | PmLessonResponse> {
     return this.memoryService.update(req.user.id, id, body);
   }
 
   @Delete('memory/:id')
   @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
-  @ApiOperation({ summary: 'Delete a memory item' })
+  @ApiOperation({
+    summary: 'Delete a memory item (a lesson is marked removed, not deleted)',
+  })
   deleteMemory(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<PmMemoryResponse> {
-    return this.memoryService.remove(id);
+    @Req() req: AuthedRequest,
+  ): Promise<PmMemoryResponse | PmLessonResponse> {
+    return this.memoryService.remove(id, req.user?.id ?? null);
   }
 
   @Get('history')

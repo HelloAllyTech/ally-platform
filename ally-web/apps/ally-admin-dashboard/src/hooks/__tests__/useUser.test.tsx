@@ -83,6 +83,7 @@ vi.mock("@api", () => ({
   useLazyGetUserPreferencesQuery: () => [vi.fn(), { isLoading: false }],
   useUpdateUserPreferencesMutation: () => [vi.fn()],
   useGetCharacterLibraryEnabledQuery: () => ({ data: false, isLoading: false }),
+  useGetRoadmapMeRoleQuery: () => ({ data: undefined, isLoading: false }),
   baseAPI: {
     injectEndpoints: vi.fn(() => ({})),
     reducerPath: "api",

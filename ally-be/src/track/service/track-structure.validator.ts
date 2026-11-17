@@ -1382,6 +1382,30 @@ function validateOpenEnded(
 }
 
 /**
+ * A roleplay's completion rule — completionLogic, minScore, minDurationSeconds
+ * — is left out of the structural signature, so a trainer can change it on a
+ * course learners are already enrolled in (e.g. turn a trial roleplay that is
+ * trapping learners into "Participation only"). It is safe to change live:
+ * the rule is read fresh when each attempt ends, completion is never undone,
+ * and a learner's stored last-attempt reasons are re-checked against the
+ * current rule before they are shown (TrackEnrollmentService). assessmentMode
+ * stays in: it decides whether a learner may start a second session at all.
+ */
+const ROLEPLAY_LIVE_EDITABLE_CRITERIA = [
+  'completionLogic',
+  'minScore',
+  'minDurationSeconds',
+] as const;
+
+function signatureCriteria(item: UpsertTrackItemDto) {
+  const criteria = item.completionCriteria ?? null;
+  if (item.type !== TrackItemType.ROLEPLAY || !criteria) return criteria;
+  const locked: Record<string, unknown> = { ...criteria };
+  for (const key of ROLEPLAY_LIVE_EDITABLE_CRITERIA) delete locked[key];
+  return Object.keys(locked).length > 0 ? locked : null;
+}
+
+/**
  * Structural signature used to enforce the publish-lock rule: while a track
  * has enrollments, edits that change this signature are rejected (content-safe
  * edits — titles, article html, explanations, prompt text — do not change it).
@@ -1411,7 +1435,7 @@ export function computeStructuralSignature(
           branching: branchingStructuralSignature(item),
           bucketSort: bucketSortStructuralSignature(item),
           video: videoStructuralSignature(item),
-          completionCriteria: item.completionCriteria ?? null,
+          completionCriteria: signatureCriteria(item),
         })),
     }));
   return JSON.stringify(signature);

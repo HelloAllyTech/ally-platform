@@ -118,6 +118,7 @@ describe('BlueprintPlannerSpecialist', () => {
     );
     // Slot 1 has no minScore and the roleplay is the capstone → assessment threshold.
     expect(blueprint.sections[0].items[1].completionCriteria).toEqual({
+      completionLogic: 'SCORE_AND_DURATION',
       minScore: 65,
     });
     expect(blueprint.estimatedDurationMinutes).toBe(6 + 12 + 4);
