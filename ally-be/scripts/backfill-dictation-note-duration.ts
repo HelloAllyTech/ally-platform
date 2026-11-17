@@ -58,7 +58,10 @@ function buildDataSource(): DataSource {
     database,
     entities: [],
     synchronize: false,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl:
+      process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: false }
+        : false,
     logging: false,
   });
 }
@@ -67,7 +70,9 @@ function buildDataSource(): DataSource {
 function decrypt(encryptedData: string, keyHex: string): string {
   const key = Buffer.from(keyHex, 'hex');
   if (key.length !== 32) {
-    throw new Error('PHI_DATA_ENCRYPTION_KEY must be 32 bytes (hex-encoded 64 chars)');
+    throw new Error(
+      'PHI_DATA_ENCRYPTION_KEY must be 32 bytes (hex-encoded 64 chars)',
+    );
   }
   const combined = Buffer.from(encryptedData, 'base64');
   const iv = combined.subarray(0, 12);
@@ -86,7 +91,9 @@ function estimateSeconds(transcript: string, wpm: number): number {
 async function main() {
   const encryptionKey = process.env.PHI_DATA_ENCRYPTION_KEY;
   if (!encryptionKey) {
-    throw new Error('PHI_DATA_ENCRYPTION_KEY is not set — did you load your .env file?');
+    throw new Error(
+      'PHI_DATA_ENCRYPTION_KEY is not set — did you load your .env file?',
+    );
   }
 
   const ds = buildDataSource();

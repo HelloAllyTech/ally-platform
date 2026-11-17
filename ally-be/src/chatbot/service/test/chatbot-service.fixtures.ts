@@ -74,6 +74,7 @@ export function buildChatbotService({
     {
       resolveTenantIds: jest.fn(async () => ['org-a']),
     } as never,
+    { hasToggle: jest.fn(async () => true) } as never,
   );
   const settings = () => ({
     ...DEFAULT_WHATSAPP_SETTINGS,

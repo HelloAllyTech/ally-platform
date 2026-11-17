@@ -9,7 +9,7 @@ import type { Chatbot, ReadyMadeCatalogue, ReadyMadeItem, UserList } from "@type
 
 import { HOME, fill } from "../copy";
 import { AssistantBlock } from "./AssistantBlock";
-import { datedField, human, lower } from "./format";
+import { datedField, human, lower, withTyped } from "./format";
 import { RepeatWeekly } from "./RepeatWeekly";
 
 const t = () => HOME.userLists;
@@ -300,8 +300,13 @@ const MakeItYours: React.FC<{
 }> = ({ bot, item, lists, heading, onNext, onBack }) => {
   const need = item.needs_options[0];
   const list = lists.find(l => l.key === need.list);
-  const [values, setValues] = useState<string[]>(need.examples);
-  const [examples, setExamples] = useState<string[]>(need.examples);
+  // Start from what is saved (after Back, the owner's own choices), not from the examples again.
+  const saved = list?.fields.find(f => f.key === need.field)?.options.values ?? [];
+  const start = saved.length ? saved : need.examples;
+  const [values, setValues] = useState<string[]>(start);
+  const [examples, setExamples] = useState<string[]>(() =>
+    need.examples.filter(v => start.includes(v)),
+  );
   const [typed, setTyped] = useState("");
   const [save, { isLoading }] = useUpdateListFieldMutation();
   const [failed, setFailed] = useState(false);
@@ -314,13 +319,19 @@ const MakeItYours: React.FC<{
 
   const next = async () => {
     setFailed(false);
+    // A choice typed but not added with Add is kept, not dropped.
+    const final = withTyped(values, typed);
+    if (final !== values) {
+      setValues(final);
+      setTyped("");
+    }
     try {
-      if (list && JSON.stringify(values) !== JSON.stringify(need.examples)) {
+      if (list && JSON.stringify(final) !== JSON.stringify(need.examples)) {
         await save({
           id: bot.id,
           key: list.key,
           field: need.field,
-          change: { options: { values } },
+          change: { options: { values: final } },
         }).unwrap();
       }
       onNext();

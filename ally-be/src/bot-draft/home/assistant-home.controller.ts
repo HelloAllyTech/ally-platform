@@ -35,6 +35,8 @@ import {
   SourceUrlDto,
   CorrectFactDto,
 } from '../dto/assistant-home.dto';
+import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
+import { ChatbotRole } from '../../chatbot/access/chatbot-role.decorator';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -65,6 +67,7 @@ export class AssistantHomeController {
 
   // Quick replies first: their own permissions, and `:list` below would match them otherwise.
   @Get(':id/home/lists/quickReplies')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW_REPLIES)
   @ApiOperation({ summary: 'Quick replies, with the list version' })
   readReplies(@Param('id', ParseUUIDPipe) id: string) {
@@ -72,6 +75,7 @@ export class AssistantHomeController {
   }
 
   @Patch(':id/home/lists/quickReplies')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT_REPLIES)
   @ApiOperation({
     summary: 'Add, reword, switch off, remove or reorder a quick reply',
@@ -86,6 +90,7 @@ export class AssistantHomeController {
   }
 
   @Get(':id/home/lists/:list')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary:
@@ -99,6 +104,7 @@ export class AssistantHomeController {
   }
 
   @Patch(':id/home/lists/:list')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Add, edit or remove one entry of a home list',
@@ -118,6 +124,7 @@ export class AssistantHomeController {
   }
 
   @Get(':id/sources')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
   @ApiOperation({
     summary: 'The pages it learned from, with how many details each gave',
@@ -127,6 +134,7 @@ export class AssistantHomeController {
   }
 
   @Post(':id/sources/preview')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'How many details removing a page would take (nothing is removed)',
@@ -139,6 +147,7 @@ export class AssistantHomeController {
   }
 
   @Post(':id/sources/remove')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -152,6 +161,7 @@ export class AssistantHomeController {
   }
 
   @Post(':id/sources/:eventId/restore')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Undo removing a page' })
   restoreSource(
@@ -162,6 +172,7 @@ export class AssistantHomeController {
   }
 
   @Post(':id/changes/propose')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Change by chat: a proposed before and after (nothing is applied)',
@@ -174,6 +185,7 @@ export class AssistantHomeController {
   }
 
   @Post(':id/changes/apply')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -184,6 +196,7 @@ export class AssistantHomeController {
   }
 
   @Post(':id/changes/:eventId/undo')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Undo a change made by chat' })
   undo(
@@ -194,6 +207,7 @@ export class AssistantHomeController {
   }
 
   @Get(':id/home/numbers')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: "The Overview's numbers over the last 7 or 30 days (default 30)",
@@ -206,6 +220,7 @@ export class AssistantHomeController {
   }
 
   @Get(':id/how-it-works')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary:
@@ -216,6 +231,7 @@ export class AssistantHomeController {
   }
 
   @Get(':id/history')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary:
@@ -226,6 +242,7 @@ export class AssistantHomeController {
   }
 
   @Post(':id/history/:eventId/undo')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Undo an edit made by hand (its before comes back)',
@@ -238,6 +255,7 @@ export class AssistantHomeController {
   }
 
   @Post(':id/history/:eventId/restore')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Restore what a field said after an earlier edit' })
   restoreEdit(
@@ -248,6 +266,7 @@ export class AssistantHomeController {
   }
 
   @Get(':id/home')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary:
@@ -258,6 +277,7 @@ export class AssistantHomeController {
   }
 
   @Patch(':id/home')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Save one field',
@@ -272,6 +292,7 @@ export class AssistantHomeController {
   }
 
   @Patch(':id/rules')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -288,6 +309,7 @@ export class AssistantHomeController {
   }
 
   @Post(':id/facts/:factId/correction')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:

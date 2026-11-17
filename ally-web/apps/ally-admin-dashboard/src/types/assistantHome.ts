@@ -194,13 +194,13 @@ export interface HomeListChange {
   ids?: string[];
 }
 
-/** "How it works" (chunk 20d-2): the instructions as ally-ai builds them for a run. */
+/**
+ * "How it works" (chunk 20d-2): the instructions as ally-ai builds them for a run. Ally's own
+ * layers come with no text (17 Nov 2026): only the owner's parts carry their exact words.
+ */
 export interface HowItWorks {
-  /** The whole text, as the assistant receives it. */
-  full: string;
-  /** The text in order, each part labelled with its layer; joined, they are `full`. */
+  /** The layers in order; `text` is empty for Ally's. */
   parts: { layer: HowLayer; text: string; owner: boolean }[];
-  placeholders: { question: string; passages: string };
   search: {
     top_k: number;
     max_passages: number;
@@ -212,6 +212,8 @@ export interface HowItWorks {
   safetyPack: string | null;
   /** Lists the assistant books into: Add is Do it (chunk 5b). */
   bookingLists?: string[];
+  /** What it can do with each list, where the ability is Do it. */
+  tools?: { list: string; can: ("find" | "create" | "update")[] }[];
 }
 
 export type HowLayer =

@@ -44,6 +44,7 @@ import { DraftCheckupService } from '../checkup/draft-checkup.service';
 import { CheckupCasesService } from '../checkup/checkup-cases.service';
 import { SourcesService } from '../home/sources.service';
 import { SseWriter } from './sse';
+import { AssistantScope } from '../../chatbot/access/chatbot-role.decorator';
 
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
 
@@ -72,6 +73,7 @@ export class BotDraftController {
   ) {}
 
   @Post()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Start setting up an assistant, from a website or a description',
@@ -123,6 +125,7 @@ export class BotDraftController {
   }
 
   @Post(':id/documents')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Read an uploaded document into "What we learned"',
@@ -145,6 +148,7 @@ export class BotDraftController {
   }
 
   @Post(':id/description')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Read a description into "What we learned"',
@@ -167,6 +171,7 @@ export class BotDraftController {
   }
 
   @Get('current')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'The caller’s setup in progress, if any (the resume banner)',
@@ -177,12 +182,14 @@ export class BotDraftController {
   }
 
   @Get(':id')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   async get(@Param('id', ParseUUIDPipe) id: string) {
     return draftView(await this.drafts.get(id));
   }
 
   @Get(':id/events')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Live canvas events (SSE)',
@@ -208,6 +215,7 @@ export class BotDraftController {
   }
 
   @Post(':id/messages/stream')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Send the builder a message or quick reply (SSE)',
@@ -250,6 +258,7 @@ export class BotDraftController {
   }
 
   @Patch(':id')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Edit the draft on the canvas (a JSON Patch)',
@@ -279,6 +288,7 @@ export class BotDraftController {
   }
 
   @Post(':id/undo')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   async undo(
     @Param('id', ParseUUIDPipe) id: string,
@@ -290,6 +300,7 @@ export class BotDraftController {
   }
 
   @Post(':id/back')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Go back a step; answers and edits are kept' })
   async back(@Param('id', ParseUUIDPipe) id: string) {
@@ -297,6 +308,7 @@ export class BotDraftController {
   }
 
   @Post(':id/publish')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Publish the assistant with its bot page',
@@ -323,6 +335,7 @@ export class BotDraftController {
   }
 
   @Get(':id/pages/found')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -333,6 +346,7 @@ export class BotDraftController {
   }
 
   @Post(':id/pages')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Choose which pages it reads',
@@ -347,6 +361,7 @@ export class BotDraftController {
   }
 
   @Post(':id/pages/:eventId/undo')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Put back the pages a choice took away' })
   undoPages(
@@ -357,6 +372,7 @@ export class BotDraftController {
   }
 
   @Post(':id/checkup')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Run the checkup on the assistant this setup built',
@@ -368,6 +384,7 @@ export class BotDraftController {
   }
 
   @Post(':id/abandon')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Leave this setup for good (its draft assistant stays a draft)',

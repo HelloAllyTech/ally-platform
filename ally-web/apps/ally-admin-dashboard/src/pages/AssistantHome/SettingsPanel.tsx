@@ -9,8 +9,8 @@ import { ChatbotSettingsTab } from "../WhatsAppBot/ChatbotSettingsTab";
 
 /**
  * This assistant's own engine settings (WhatsApp replies on or off, typing, consent, the crisis
- * check, helpline numbers, limits and retrieval): platform admins only, from the header's `···`
- * menu. The classic Settings tab, moved as is when the classic view went (CL1); Defaults sets the
+ * check, helpline numbers, limits and retrieval): the assistant's owners (A1; platform admins
+ * before), from the header's `···` menu. The classic Settings tab, moved as is when the classic view went (CL1); Defaults sets the
  * same values for every assistant at once.
  */
 export const SettingsPanel: React.FC<{ bot: Chatbot; onClose: () => void }> = ({
@@ -28,6 +28,7 @@ export const SettingsPanel: React.FC<{ bot: Chatbot; onClose: () => void }> = ({
       </Button>
     </div>
     <div className="ally-home__classic">
+      {/* Owners change Show typing too: it moved from platform admins to owners in A1. */}
       <ChatbotSettingsTab chatbotId={bot.id} chatbotName={bot.name} canEdit isPlatformAdmin />
     </div>
   </div>

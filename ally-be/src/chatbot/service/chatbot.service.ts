@@ -230,9 +230,9 @@ export class ChatbotService {
 
   async list(): Promise<ChatbotSummary[]> {
     const ids = await this.access.accessibleChatbotIds();
-    if (ids !== null && !ids.length) return [];
+    if (!ids.length) return [];
     const bots = await this.chatbotRepository.find({
-      where: { archivedAt: IsNull(), ...(ids ? { id: In(ids) } : {}) },
+      where: { archivedAt: IsNull(), id: In(ids) },
       order: { createdAt: 'ASC' },
     });
     return this.summarise(bots);
@@ -241,9 +241,9 @@ export class ChatbotService {
   /** Removed (archived) bots the caller can see, most recently removed first: read-only. */
   async listArchived(): Promise<ChatbotSummary[]> {
     const ids = await this.access.accessibleChatbotIds();
-    if (ids !== null && !ids.length) return [];
+    if (!ids.length) return [];
     const bots = await this.chatbotRepository.find({
-      where: { archivedAt: Not(IsNull()), ...(ids ? { id: In(ids) } : {}) },
+      where: { archivedAt: Not(IsNull()), id: In(ids) },
       order: { archivedAt: 'DESC' },
       take: 200,
     });
@@ -428,7 +428,7 @@ export class ChatbotService {
   // ───────────────────────────────────────────────────────────── write
 
   async create(dto: CreateChatbotDto): Promise<ChatbotSummary> {
-    await this.access.assertPlatformAdmin();
+    await this.access.assertCanCreate();
     const userId = currentUserId();
     const bot = await this.chatbotRepository.save(
       this.chatbotRepository.create({
@@ -444,8 +444,7 @@ export class ChatbotService {
         updatedBy: userId,
       }),
     );
-    // The creator is its first owner, so the team list is never empty and they keep the bot if
-    // their platform-wide access is ever narrowed.
+    // The creator is its first owner: nobody else sees the bot until they are added to its team.
     if (userId) {
       await this.memberRepository.save(
         this.memberRepository.create({

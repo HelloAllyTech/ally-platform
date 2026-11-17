@@ -259,7 +259,7 @@ export const MemoryPanel: React.FC<{
     const notes =
       !data.on && !data.lines.length ? (
         <p className="ally-small" data-testid="memory-off">
-          {t.off} <Link to={`/chatbots/${chatbotId}?section=lists&tool=memory`}>{t.turnOn}</Link>
+          {t.off} <Link to={`/assistants/${chatbotId}?section=lists&tool=memory`}>{t.turnOn}</Link>
         </p>
       ) : !data.lines.length ? (
         <p className="ally-small">{t.empty}</p>
@@ -339,7 +339,7 @@ export const MemoryPanel: React.FC<{
                 </li>
               ))}
             </ul>
-            <Link className="ally-small" to={`/chatbots/${chatbotId}?section=lists&tool=memory`}>
+            <Link className="ally-small" to={`/assistants/${chatbotId}?section=lists&tool=memory`}>
               {t.changeNever}
             </Link>
           </section>

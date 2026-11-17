@@ -336,6 +336,11 @@ export interface WaBusinessNumber {
  */
 export interface WaOrgSettings {
   enabled?: boolean;
+  /**
+   * What the agent may do on this bot, by tool name (chunk 3b): `hand_over`, `create_<list>`… A
+   * bot's own override only; owners change it (A1).
+   */
+  abilities?: Partial<Record<string, "do_it" | "never">>;
   helplineNumbers?: string;
   disclaimerText?: string;
   crisisEscalationText?: string;

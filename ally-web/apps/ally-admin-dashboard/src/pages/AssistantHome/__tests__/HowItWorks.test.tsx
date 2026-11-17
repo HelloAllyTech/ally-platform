@@ -8,7 +8,7 @@ import "@constants";
 
 /**
  * How it works, the History and Why this answer (chunk 20d-2): layers in the order they apply,
- * the owner's parts editable and the rest locked, the full text with the owner's parts marked;
+ * the owner's parts editable with their exact text, Ally's as summaries with no text; the tools;
  * Undo and Restore; and the "Topics to avoid" line only for a decline on that topic.
  */
 const h = vi.hoisted(() => ({
@@ -65,15 +65,14 @@ const props = (canEdit = true) =>
 beforeEach(() => {
   vi.clearAllMocks();
   h.how.current = {
-    full: '# Who you are\nYou are Asha.\nYour tone: warm.\n"""\nGreet people by name.\n"""\n# Safety\n- Never diagnose.\n\nBASE RULES',
     parts: [
       { layer: "business", text: "# Who you are\nYou are Asha.\n", owner: true },
       { layer: "tone", text: "Your tone: warm.\n", owner: true },
       { layer: "instructions", text: '"""\nGreet people by name.\n"""\n', owner: true },
-      { layer: "safety", text: "# Safety\n- Never diagnose.\n\n", owner: false },
-      { layer: "base", text: "BASE RULES", owner: false },
+      // Ally's layers arrive with no text (17 Nov 2026).
+      { layer: "safety", text: "", owner: false },
+      { layer: "base", text: "", owner: false },
     ],
-    placeholders: { question: "(the visitor's message)", passages: "" },
     search: { top_k: 8, max_passages: 5, min_similarity: 0.35, searches: 2, documents: 4 },
     purpose: null,
     safetyPack: "mental_health",
@@ -100,16 +99,30 @@ describe("How it works", () => {
     expect(screen.getByTestId("how-search").textContent).toContain("from 4 documents");
   });
 
-  it("shows a layer's exact text on request, and the whole text with the owner's parts marked", () => {
+  it("shows the owner's exact text on request; Ally's layers are summaries with no text", () => {
     render(<HowItWorksSection {...props()} />);
-    const safety = screen.getByTestId("how-safety");
-    fireEvent.click(safety.querySelector("button")!);
-    expect(safety.querySelector("pre")!.textContent).toContain("Never diagnose.");
-    fireEvent.click(screen.getByRole("button", { name: t.showFull }));
-    const full = screen.getByTestId("how-full");
-    const marked = [...full.querySelectorAll("mark")].map(m => m.textContent ?? "");
-    expect(marked.some(text => text.includes("Greet people by name."))).toBe(true);
-    expect(marked.some(text => text.includes("Never diagnose."))).toBe(false);
+    const mine = screen.getByTestId("how-instructions");
+    fireEvent.click(screen.getAllByRole("button", { name: t.showText })[0]);
+    expect(document.querySelector("pre")!.textContent).toContain("You are Asha.");
+    for (const layer of ["how-safety", "how-base"]) {
+      const card = screen.getByTestId(layer);
+      expect(card.textContent).toContain(t.byAlly);
+      expect(card.textContent).not.toContain(t.showText);
+    }
+    expect(mine.textContent).toContain(t.showText);
+    // No whole-prompt view any more.
+    expect(screen.queryByText(/full instructions/)).toBeNull();
+  });
+
+  it("lists what it can do with each list under How it finds answers", () => {
+    (h.how.current as { tools: unknown }).tools = [
+      { list: "Leads", can: ["find", "create", "update"] },
+      { list: "Menu", can: ["find"] },
+    ];
+    render(<HowItWorksSection {...props()} />);
+    const tools = screen.getByTestId("how-tools");
+    expect(tools.textContent).toContain("Leads: look up, add and change entries.");
+    expect(tools.textContent).toContain("Menu: look up entries.");
   });
 
   it("edits the owner's instructions in place, with a counter, and saves them", async () => {

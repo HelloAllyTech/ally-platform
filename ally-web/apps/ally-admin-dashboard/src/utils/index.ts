@@ -22,3 +22,4 @@ export * from "./userTurnText";
 export * from "./builderReceipt";
 export * from "./builderBrief";
 export * from "./brandColour";
+export * from "./loginRedirect";

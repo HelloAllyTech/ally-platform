@@ -71,7 +71,7 @@ export const StepFrame: React.FC<{
           <div className="ally-frame__brand">
             <a
               className="ally-frame__logo"
-              href={absoluteAppUrl("/chatbots")}
+              href={absoluteAppUrl("/assistants")}
               onClick={event => {
                 if (!onLeave) return;
                 event.preventDefault();

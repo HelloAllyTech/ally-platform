@@ -186,7 +186,9 @@ describe("useUxSignalScan", () => {
     render(<Probe />);
 
     expect(toast.success).not.toHaveBeenCalled();
-    expect(screen.getByTestId("last-scan")).toHaveTextContent(/7 bugs, 2 improvement signals filed/);
+    expect(screen.getByTestId("last-scan")).toHaveTextContent(
+      /7 bugs, 2 improvement signals filed/,
+    );
   });
 
   it("stops waiting on a scan that died mid-run instead of spinning forever", () => {

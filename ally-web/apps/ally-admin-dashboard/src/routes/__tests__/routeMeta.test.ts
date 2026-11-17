@@ -26,7 +26,7 @@ describe("resolveRouteMeta", () => {
     expect(resolveRouteMeta(ROUTES.BUILDER_SETTINGS).title).toBe("Settings");
     expect(resolveRouteMeta(ROUTES.BUILDER_SESSION("abc")).title).toBe("Session");
     expect(resolveRouteMeta(ROUTES.CHATBOT_NEW).title).toBe("New assistant");
-    expect(resolveRouteMeta("/chatbots/bot-1").title).toBe("Assistant");
+    expect(resolveRouteMeta("/assistants/bot-1").title).toBe("Assistant");
   });
 
   it("tolerates a trailing slash", () => {

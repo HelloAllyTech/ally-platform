@@ -329,11 +329,54 @@ export class AssistantHomeService {
     const request = await this.chatbots.agentRequestFor(chatbotId);
     const instructions = await this.ai.agentInstructions(request);
     return {
-      ...instructions,
+      // Ally's own layers go out as a layer name only: their text, the whole prompt and its
+      // placeholders stay on the server, for everyone (Shehbaz, 17 Nov 2026). The owner's own
+      // parts keep their exact text.
+      parts: (instructions.parts ?? []).map((part) =>
+        part.owner ? part : { ...part, text: '' },
+      ),
+      search: instructions.search,
       purpose: chatbot.purpose ?? null,
       safetyPack: chatbot.safetyPack ?? null,
       bookingLists: await this.bookingLists(chatbotId, chatbot.settings),
+      tools: await this.listTools(chatbotId, chatbot.settings),
     };
+  }
+
+  /**
+   * What the assistant can do with each list, as the tools a run is offered: find when the list
+   * lets it read, add and change when it lets it write, each only when its ability is Do it.
+   */
+  private async listTools(
+    chatbotId: string,
+    stored: ChatbotSettingsOverride | null | undefined,
+  ): Promise<{ list: string; can: ('find' | 'create' | 'update')[] }[]> {
+    const lists: {
+      key: string;
+      name: string;
+      agent_read: boolean;
+      agent_write: boolean;
+    }[] = await this.dataSource.query(
+      `SELECT key, name, agent_read, agent_write FROM collections
+        WHERE chatbot_id = $1 AND deleted_at IS NULL
+        ORDER BY "createdAt"`,
+      [chatbotId],
+    );
+    return lists
+      .map((list) => {
+        const kinds: ('find' | 'create' | 'update')[] = [
+          ...(list.agent_read ? (['find'] as const) : []),
+          ...(list.agent_write ? (['create', 'update'] as const) : []),
+        ];
+        return {
+          list: list.name,
+          can: kinds.filter(
+            (kind) =>
+              abilityFor(stored, listToolName(kind, list.key)) === 'do_it',
+          ),
+        };
+      })
+      .filter((tool) => tool.can.length > 0);
   }
 
   /**
