@@ -84,9 +84,7 @@ describe("Risk-cue option dialog", () => {
     h.create.mockReturnValue(ok(draft()));
     render(<RiskCueDialog optionId={null} onClose={() => undefined} />);
     fill();
-    fireEvent.click(
-      screen.getByLabelText("Part of the practice: assessed in the coaching cards, no alarm card"),
-    );
+    fireEvent.click(screen.getByLabelText(/^Part of the practice: the reader decides/));
     fireEvent.click(screen.getByLabelText("Show the support lines after the character's risk cue"));
     fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
     await waitFor(() => expect(h.create).toHaveBeenCalledTimes(1));
@@ -98,6 +96,27 @@ describe("Risk-cue option dialog", () => {
       supportLinesOnCue: false,
       examples: { cues: ["I want to end it", "I can't go on"], nonCues: ["I am tired today"] },
     });
+  });
+
+  it("sends handling alarm by default, with Alarm chosen and no list of kinds", async () => {
+    h.create.mockReturnValue(ok(draft()));
+    render(<RiskCueDialog optionId={null} onClose={() => undefined} />);
+    expect(screen.getByText("How a risk cue is handled")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Alarm: every risk cue gets an important moment in the debrief"),
+    ).toBeChecked();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await waitFor(() => expect(h.create).toHaveBeenCalledTimes(1));
+    expect(h.create.mock.calls[0][0].handling).toBe("alarm");
+    expect(h.create.mock.calls[0][0]).not.toHaveProperty("assessedCategories");
+  });
+
+  it("opens a saved option with its handling chosen", () => {
+    h.options = [draft({ handling: "assessed" })];
+    render(<RiskCueDialog optionId="d1" onClose={() => undefined} />);
+    expect(screen.getByLabelText(/^Part of the practice: the reader decides/)).toBeChecked();
   });
 
   it("shows the server's message and problems", async () => {

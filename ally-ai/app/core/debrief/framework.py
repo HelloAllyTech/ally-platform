@@ -201,6 +201,12 @@ def risk_cue_of(session: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return out
 
 
+def is_practice_cue(cue: Mapping[str, Any]) -> bool:
+    """A reader cue the Safety reader marked as part of what this roleplay
+    practises (null or absent = not)."""
+    return cue.get("part_of_practice") is True
+
+
 def speaker_labels_of(session: Optional[Mapping[str, Any]]) -> str:
     """``neutral`` or ``legacy`` (the default, and for any other value)."""
     value = _session_value(session, "speaker_labels")

@@ -23,6 +23,7 @@ from app.core.debrief.framework import (
     ASSESSED,
     area_names,
     areas_of,
+    is_practice_cue,
     normalise_framework,
     risk_cue_of,
     skill_framework_text,
@@ -302,7 +303,8 @@ this roleplay's competencies or behaviours.
 or didnt_come_up.
 - reflective_question: one open question for the learner to think about.
 - progress_note: only when a PROGRESS reading is given, one or two sentences \
-following up on past points. Otherwise leave it empty.
+following up on past points. Otherwise leave it empty. Never call \
+anything a consistent strength or pattern unless PROGRESS says so.
 
 RISK CUES. Clear and possible risk cues are as defined in RISK CUE \
 DEFINITION. Only a clear risk cue is a risk cue for the cards. A possible \
@@ -520,6 +522,21 @@ def _pass_bar(pass_score: float) -> str:
     return str(int(n) if n.is_integer() else n)
 
 
+def progress_claims_text(progress: Optional[Dict[str, Any]] = None) -> str:
+    """Code-owned input for the in-graph Evaluator: the progress reading the
+    Writer was given (or none), and the rule for claims over time."""
+    return "\n".join(
+        [
+            "PROGRESS (what the debrief may claim about the learner over time):",
+            block("progress", progress) if progress else NONE,
+            "UNSUPPORTED PROGRESS CLAIM: report unsupported_progress_claim as "
+            "a hard fail when a card claims a pattern, strength or change over "
+            "time that PROGRESS does not support, including calling something "
+            "a consistent strength.",
+        ]
+    )
+
+
 def evaluator_fix_text(
     fix_system: Optional[str] = None,
     pass_score: float = 8,
@@ -609,12 +626,15 @@ def _transcript_text(
 
 
 #: The instruction for a roleplay whose risk cues are assessed, not alarmed.
+#: Which cues are part of the practice is the Safety reader's call, cue by cue
+#: (`part_of_practice` in the SAFETY READING).
 ASSESSED_RISK_HANDLING = (
     "Risk cues in this roleplay are part of what the learner is practising. "
-    "Do not write an important_moment card for them. Assess how the learner "
-    "handled each clear risk cue inside what_worked or work_on_this cards, "
-    "anchored at the learner's response turn, and say plainly when a cue was "
-    "missed."
+    "For a clear risk cue the SAFETY READING marks part_of_practice true, do "
+    "not write an important_moment card: assess how the learner handled it "
+    "inside what_worked or work_on_this cards, anchored at the learner's "
+    "response turn, and say plainly when a cue was missed. Any other clear "
+    "risk cue still gets the important_moment card as usual."
 )
 
 
@@ -645,11 +665,7 @@ def _coverage_rule(framework: Dict[str, Any]) -> Optional[str]:
     if not areas:
         return None
     names = [a["name"] for a in areas]
-    listed = (
-        names[0]
-        if len(names) == 1
-        else ", ".join(names[:-1]) + " or " + names[-1]
-    )
+    listed = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " or " + names[-1]
     described = "; ".join(
         f"{a['name']} ({a['description']})" for a in areas if a["description"]
     )
@@ -989,16 +1005,37 @@ def risk_cues_to_cover(
     clear = risk_cue_turns(safety)[0]
     if not clear:
         return NONE
-    if risk_cue_of({"risk_cue": risk_cue})["handling"] == ASSESSED:
-        return (
-            _turns(clear)
-            + " Cover each in a what_worked or work_on_this card anchored at "
-            "the learner's response turn; no important_moment card."
-        )
-    return (
-        _turns(clear)
+    cues = (safety or {}).get("risk_cues", []) or []
+    practised = risk_cue_of({"risk_cue": risk_cue})["handling"] == ASSESSED
+    # A turn is covered by the cards only when no clear cue on it needs the
+    # important moment: the reader's own per-cue part_of_practice decides.
+    alarm_turns = sorted(
+        {
+            c.get("turn_index")
+            for c in cues
+            if is_clear(c) and not (practised and is_practice_cue(c))
+        }
+    )
+    practised_turns = [t for t in clear if t not in alarm_turns]
+    alarm_text = (
+        _turns(alarm_turns)
         + " The important_moment card covers the most serious one; list every "
         "other one in important_moment.others."
+    )
+    practised_text = (
+        " Cover each in a what_worked or work_on_this card anchored at "
+        "the learner's response turn; no important_moment card."
+    )
+    if not practised_turns:
+        return alarm_text
+    if not alarm_turns:
+        return _turns(practised_turns) + practised_text
+    return (
+        alarm_text
+        + " Separately, "
+        + _turns(practised_turns)[:-1]
+        + " are practised risk cues:"
+        + practised_text
     )
 
 
@@ -1087,9 +1124,7 @@ async def write(
         "evidence_map": block("evidence_map", evidence),
         "safety_reading": block("safety_reading", safety),
         "practice_options": (
-            block("practice_options", practice_options)
-            if practice_options
-            else NONE
+            block("practice_options", practice_options) if practice_options else NONE
         ),
         "guidance": block("guidance", passages) if passages else NONE,
         "progress": block("progress", progress) if progress else NONE,
@@ -1125,6 +1160,7 @@ async def evaluate(
     system: Optional[str] = None,
     fix_system: Optional[str] = None,
     pass_score: float = 8,
+    progress: Optional[Dict[str, Any]] = None,
     risk_cue: Optional[Dict[str, Any]] = None,
     speaker_labels: Optional[str] = None,
     roleplay_expectations: Optional[Dict[str, Any]] = None,
@@ -1151,7 +1187,11 @@ async def evaluate(
     )
     output, meta = await _call(
         EvaluationOutputReasoned,
-        prompt + "\n\n" + evaluator_fix_text(fix_system, pass_score, risk_cue),
+        prompt
+        + "\n\n"
+        + progress_claims_text(progress)
+        + "\n\n"
+        + evaluator_fix_text(fix_system, pass_score, risk_cue),
         LLMTask.DEBRIEF_EVALUATOR.value,
         model,
         scenario_session_id,

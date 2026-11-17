@@ -7,6 +7,7 @@ import { en } from "@constants";
 import { RiskCueOption } from "@types";
 
 import { RiskCueDialog } from "./RiskCueDialog";
+import { riskCueHandlingText } from "./riskCueHandlingText";
 import { useDebriefOptionsVisible } from "./useDebriefOptionsVisible";
 
 const STANDARD_KEY = "standard";
@@ -101,9 +102,12 @@ export const DebriefRiskCueField: React.FC<{
           }}
         />
       )}
-      {selected?.option.description && (
-        <p className="truncate text-[13px] text-typography-600" title={selected.option.description}>
-          {selected.option.description}
+      {selected && (
+        <p
+          className="truncate text-[13px] text-typography-600"
+          title={selected.option.description || riskCueHandlingText(selected.option)}
+        >
+          {selected.option.description || riskCueHandlingText(selected.option)}
         </p>
       )}
       {!readOnly && (

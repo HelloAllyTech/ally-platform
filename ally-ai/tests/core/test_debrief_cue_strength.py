@@ -233,30 +233,54 @@ class TestDropPossibleImportantMoment:
 # --- word_list_raises (roleplay risk cue contract) ---------------------------
 
 
-def test_word_list_off_never_raises_a_cue():
+def test_word_list_off_means_the_readers_own_judgement_decides():
     from app.core.debrief.cue_strength import cue_strength
 
-    cue = {"category": "hopelessness", "quote": "I want to die"}
-    assert cue_strength(cue) == "clear"
-    assert cue_strength(cue, word_list_raises=False) == "possible"
-
-
-def test_word_list_off_never_lowers_a_cue():
-    from app.core.debrief.cue_strength import cue_strength
-
-    for cue in (
-        {"category": "hopelessness", "quote": "x", "strength": "clear"},
-        {"category": "suicide_or_self_harm", "quote": "x", "strength": "possible"},
-        {"category": "harm_to_others", "quote": "x"},
-        {"category": "something_new", "quote": "x"},
-    ):
-        assert cue_strength(cue, word_list_raises=False) == "clear"
+    # Default: today's behaviour exactly.
+    assert cue_strength({"category": "hopelessness", "quote": "I want to die"}) == (
+        "clear"
+    )
+    harmful = {"category": "suicide_or_self_harm", "strength": "possible"}
+    assert cue_strength(harmful) == "clear"
+    off = {"word_list_raises": False}
+    # No word list, no always-clear categories: the reader's strength.
+    assert (
+        cue_strength({"category": "hopelessness", "quote": "I want to die"}, **off)
+        == "clear"
+    )  # the reader gave no strength: clear, as before
+    assert (
+        cue_strength(
+            {
+                "category": "hopelessness",
+                "quote": "I want to die",
+                "strength": "possible",
+            },
+            **off,
+        )
+        == "possible"
+    )
+    assert (
+        cue_strength(
+            {"category": "suicide_or_self_harm", "strength": "possible"}, **off
+        )
+        == "possible"
+    )
+    assert cue_strength({"category": "harm_to_others", "strength": "clear"}, **off) == (
+        "clear"
+    )
+    assert cue_strength({"category": "something_new"}, **off) == "clear"
 
 
 def test_with_strength_threads_the_flag():
     from app.core.debrief.cue_strength import with_strength
 
-    cues = [{"category": "hopelessness", "quote": "I want to die"}]
+    cues = [
+        {
+            "category": "suicide_or_self_harm",
+            "quote": "I want to die",
+            "strength": "possible",
+        }
+    ]
     assert with_strength(cues)[0]["strength"] == "clear"
     assert with_strength(cues, False)[0]["strength"] == "possible"
 

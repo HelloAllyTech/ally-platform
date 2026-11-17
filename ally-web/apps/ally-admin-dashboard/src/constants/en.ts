@@ -9647,6 +9647,9 @@ export const en = {
       awaiting_approval: "Waiting for a clinical advisor",
       retired: "Retired",
     } as Record<string, string>,
+    handlingAlarm: "Every kind of risk cue is an alarm: an important moment and the support lines.",
+    handlingAssessed:
+      "The reader decides, cue by cue, which risk cues are the skill being practised. Those are assessed in the coaching cards; any other cue is still an alarm.",
     createLink: "Create a risk-cue option",
     editLink: "Edit",
     dialog: {
@@ -9656,8 +9659,9 @@ export const en = {
       wording: "What counts as a risk cue here",
       wordingMin: "Write at least 60 characters.",
       handling: "How a risk cue is handled",
-      alarm: "Alarm: it gets an important moment in the debrief",
-      assessed: "Part of the practice: assessed in the coaching cards, no alarm card",
+      alarm: "Alarm: every risk cue gets an important moment in the debrief",
+      assessed:
+        "Part of the practice: the reader decides which cues are the skill being practised; those are assessed in the coaching cards, and any other cue still raises the alarm",
       wordListRaises: "Let the safety word list mark cues as clear",
       supportLines: "Show the support lines after the character's risk cue",
       cues: "Lines that ARE a risk cue here",
@@ -11729,8 +11733,6 @@ export const en = {
         standardWording: "The standard definition",
         wording: "What counts as a risk cue",
         behaviour: "What it does",
-        alarmBehaviour: "A risk cue gets an important moment in the debrief.",
-        assessedBehaviour: "A risk cue is assessed in the coaching cards, with no alarm card.",
         wordListOn: "The safety word list can mark cues as clear.",
         wordListOff: "The safety word list does not mark cues as clear.",
         supportOn: "The support lines show after the character's risk cue.",

@@ -81,12 +81,17 @@ describe("Settings › Risk-cue options", () => {
     fireEvent.click(screen.getByTestId("risk-cue-row-waiting"));
     const d = screen.getByTestId("risk-cue-detail");
     expect(d).toHaveTextContent(WORDING);
-    expect(d).toHaveTextContent("assessed in the coaching cards, with no alarm card");
+    expect(d).toHaveTextContent(
+      "The reader decides, cue by cue, which risk cues are the skill being practised.",
+    );
     expect(d).toHaveTextContent("The safety word list does not mark cues as clear.");
     expect(d).toHaveTextContent("I want to end it");
     expect(d).toHaveTextContent("I am tired today");
     expect(d).toHaveTextContent("Passed on version 3.");
     fireEvent.click(screen.getByTestId("risk-cue-row-standard"));
+    expect(screen.getByTestId("risk-cue-detail")).toHaveTextContent(
+      "Every kind of risk cue is an alarm",
+    );
     expect(screen.getByTestId("risk-cue-detail")).toHaveTextContent("The standard definition");
     expect(screen.getByTestId("risk-cue-detail")).toHaveTextContent("Not tested yet.");
   });

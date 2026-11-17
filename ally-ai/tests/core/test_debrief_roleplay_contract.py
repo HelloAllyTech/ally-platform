@@ -172,7 +172,12 @@ async def test_neutral_labels_in_every_transcript(dispatch_returns):  # noqa: F8
     await steps.revise({}, [], {}, TRANSCRIPT, "en", "m", speaker_labels="neutral")
     assert "[turn 1] LEARNER:" in calls["prompt"]
     await steps.find(
-        "debrief_x", "{{transcript}} {{findings_rules}}", {}, TRANSCRIPT, "en", "m",
+        "debrief_x",
+        "{{transcript}} {{findings_rules}}",
+        {},
+        TRANSCRIPT,
+        "en",
+        "m",
         speaker_labels="neutral",
     )
     assert "[turn 2] CHARACTER:" in calls["prompt"]
@@ -205,14 +210,17 @@ def test_risk_handling_text_and_cues_to_cover():
     assert risk_handling_text(None) == "none"
     assert risk_handling_text({"handling": "alarm"}) == "none"
     assert risk_handling_text({"handling": "assessed"}) == ASSESSED_RISK_HANDLING
-    assert "Do not write an important_moment card" in ASSESSED_RISK_HANDLING
+    assert "do not write an important_moment card" in ASSESSED_RISK_HANDLING
     today = risk_cues_to_cover(safety)
     assert today == (
         "turns 2. The important_moment card covers the most serious one; list "
         "every other one in important_moment.others."
     )
     assert risk_cues_to_cover(safety, {"handling": "alarm"}) == today
-    assessed = risk_cues_to_cover(safety, {"handling": "assessed"})
+    flagged = {
+        "risk_cues": [{"turn_index": 2, "strength": "clear", "part_of_practice": True}]
+    }
+    assessed = risk_cues_to_cover(flagged, {"handling": "assessed"})
     assert "important_moment" in assessed and "no important_moment card" in assessed
     assert risk_cues_to_cover({}, {"handling": "assessed"}) == "none"
 
@@ -247,7 +255,12 @@ async def test_assessed_instruction_is_not_lost_when_the_live_text_lacks_it(
     live = "Write. {{risk_cue_turns}} {{risk_cue_definition}} {{safety_reading}}"
     live += " {{transcript}} {{checked_rules}}"
     await steps.write(
-        {}, {}, "en", "m", TRANSCRIPT, system=live,
+        {},
+        {},
+        "en",
+        "m",
+        TRANSCRIPT,
+        system=live,
         risk_cue={"handling": "assessed"},
     )
     assert steps.ASSESSED_RISK_HANDLING in calls["prompt"]
@@ -357,11 +370,7 @@ async def test_progress_keys_and_fhs_gating(dispatch_returns):  # noqa: F811
 
 
 def test_vetoes_with_competency_keys_and_fhs_gating():
-    from app.core.debrief_graph.progress_vetoes import (
-        OTHER,
-        apply_vetoes,
-        skill_key,
-    )
+    from app.core.debrief_graph.progress_vetoes import OTHER, apply_vetoes, skill_key
     from tests.core.debrief_graph.fakes import obs
 
     names = {"competency:calm": "Staying calm"}
@@ -442,8 +451,8 @@ def test_agent_input_uses_the_mapping():
 
 # --- graph ------------------------------------------------------------------
 
-from tests.core.debrief_graph import fakes  # noqa: E402
 from app.core.debrief_graph import circuit  # noqa: E402
+from tests.core.debrief_graph import fakes  # noqa: E402
 
 
 @pytest.fixture
@@ -469,6 +478,7 @@ async def test_graph_absent_contract_reports_alarm_and_sends_no_new_body_keys(
         "word_list_raises": True,
     }
     assert result["workspace"]["speaker_labels"] == "legacy"
+    assert result["has_alarm_risk_cue"] is result["has_risk_cue"]
     assert result["workspace"]["framework"]["foundational"] is True
     assert gateway.tools("run_checks")[0]["risk_handling"] == "alarm"
     for call in steps.calls:
@@ -503,13 +513,17 @@ async def test_graph_threads_the_contract_to_the_steps(closed):
     assert bodies["writer"]["risk_cue"]["handling"] == "assessed"
     # The word list is off: the quote alone does not make the cue clear.
     sent = gateway.tools("run_checks")[0]
-    assert sent["safety"]["risk_cues"][0]["strength"] == "possible"
+    # Safety net off: the reader's own judgement decides (clear when it gave
+    # none), not the word list.
+    assert sent["safety"]["risk_cues"][0]["strength"] == "clear"
     assert sent["risk_handling"] == "assessed"
     assert result["workspace"]["risk_cue"] == {
         "key": "rc",
         "handling": "assessed",
         "word_list_raises": False,
     }
+    # The reader did not mark the cue as part of the practice: it alarms.
+    assert result["has_risk_cue"] is True and result["has_alarm_risk_cue"] is True
     assert result["workspace"]["framework"]["id"] == "fw-1"
     assert result["workspace"]["speaker_labels"] == "neutral"
 
@@ -536,3 +550,216 @@ async def test_graph_word_list_on_still_raises(closed):
 
 def test_unused_import_guard():
     assert TranscriptTurn
+
+
+# --- per-cue part_of_practice (the Safety reader decides) ------------------------
+
+ASSESSED = {"handling": "assessed"}
+
+
+def test_assessed_handling_text_points_at_the_readers_flag():
+    from app.core.debrief.steps import ASSESSED_RISK_HANDLING, risk_handling_text
+
+    assert risk_handling_text(ASSESSED) == ASSESSED_RISK_HANDLING
+    assert "part_of_practice true" in ASSESSED_RISK_HANDLING
+    assert "Any other clear risk cue still gets the important_moment" in (
+        ASSESSED_RISK_HANDLING
+    )
+    assert "categor" not in ASSESSED_RISK_HANDLING
+
+
+def test_cues_to_cover_follow_the_per_cue_flag():
+    from app.core.debrief.steps import risk_cues_to_cover
+
+    def cue(turn, practice=None, strength="clear"):
+        c = {"turn_index": turn, "strength": strength, "category": "x"}
+        if practice is not None:
+            c["part_of_practice"] = practice
+        return c
+
+    safety = {"risk_cues": [cue(2, True), cue(4, False), cue(6, True, "possible")]}
+    text = risk_cues_to_cover(safety, ASSESSED)
+    assert text.startswith("turns 4. The important_moment card covers")
+    assert "Separately, turns 2 are practised risk cues:" in text
+    assert "no important_moment card" in text
+    assert risk_cues_to_cover({"risk_cues": [cue(2, True)]}, ASSESSED).startswith(
+        "turns 2. Cover each"
+    )
+    # Unflagged (null) cues keep the alarm even when the roleplay assesses.
+    only_null = {"risk_cues": [cue(2)]}
+    assert risk_cues_to_cover(only_null, ASSESSED) == risk_cues_to_cover(only_null)
+    # Under alarm a stray flag changes nothing.
+    flagged = {"risk_cues": [cue(2, True)]}
+    assert risk_cues_to_cover(flagged) == risk_cues_to_cover(only_null)
+    assert risk_cues_to_cover({}, ASSESSED) == "none"
+    both = {"risk_cues": [cue(2, True), cue(2, False)]}
+    assert risk_cues_to_cover(both, ASSESSED).startswith("turns 2. The important")
+
+
+@pytest.mark.asyncio
+async def test_safety_reader_asks_for_part_of_practice_only_when_assessed(
+    dispatch_returns,  # noqa: F811
+):
+    from app.core.debrief.safety_reader import RiskCue, SafetyReading, read_safety
+
+    cue = RiskCue(
+        turn_index=2,
+        quote="q",
+        category="hopelessness",
+        learner_response="explored",
+        part_of_practice=True,
+    )
+    calls = dispatch_returns(SafetyReading(risk_cues=[cue]))
+    out, _ = await read_safety(TRANSCRIPT, "en", model="m")
+    assert "PRACTICE." not in calls["prompt"]
+    assert out.risk_cues[0].part_of_practice is None
+    cue.part_of_practice = True
+    out, _ = await read_safety(
+        TRANSCRIPT,
+        "en",
+        model="m",
+        risk_cue=ASSESSED,
+        scenario={"title": "Suicide prevention"},
+        roleplay_expectations={"helpful_behaviours": ["Asks directly"]},
+    )
+    p = calls["prompt"]
+    assert "This roleplay is designed to practise responding to risk cues" in p
+    assert "set it false for any other risk cue" in p and "When unsure, false." in p
+    assert "Suicide prevention" in p and "Asks directly" in p
+    assert out.risk_cues[0].part_of_practice is True
+
+
+@pytest.mark.asyncio
+async def test_graph_part_of_practice_flows_through_the_state(closed):
+    steps, gateway = fakes.FakeSteps(), fakes.FakeGateway()
+
+    def cue(turn, flag):
+        c = {
+            "turn_index": turn,
+            "quote": "x",
+            "category": "hopelessness",
+            "learner_response": "explored",
+        }
+        if flag is not None:
+            c["part_of_practice"] = flag
+        return c
+
+    steps.answers["safety-reader"] = {"risk_cues": [cue(2, True)]}
+    session = _session(risk_cue=ASSESSED)
+    result = await fakes.run(steps, gateway, session=session)
+    assert result["workspace"]["safety"]["risk_cues"][0]["part_of_practice"] is True
+    assert (
+        gateway.tools("run_checks")[0]["safety"]["risk_cues"][0]["part_of_practice"]
+        is True
+    )
+    assert result["has_risk_cue"] is True and result["has_alarm_risk_cue"] is False
+    body = {c["path"]: c["body"] for c in steps.calls}["safety-reader"]
+    assert body["scenario"] and "roleplay_expectations" in body
+    sent = gateway.tools("run_checks")[0]
+    assert "assessed_categories" not in sent and "progress_supported" not in sent
+    assert result["workspace"]["risk_cue"] == {
+        "key": None,
+        "handling": "assessed",
+        "word_list_raises": True,
+    }
+
+    steps, gateway = fakes.FakeSteps(), fakes.FakeGateway()
+    steps.answers["safety-reader"] = {"risk_cues": [cue(2, True), cue(4, False)]}
+    result = await fakes.run(steps, gateway, session=_session(risk_cue=ASSESSED))
+    assert result["has_alarm_risk_cue"] is True
+
+    # Alarm: no flag asked for, no extra body keys, and every cue alarms.
+    steps, gateway = fakes.FakeSteps(), fakes.FakeGateway()
+    steps.answers["safety-reader"] = {"risk_cues": [cue(2, None)]}
+    result = await fakes.run(steps, gateway)
+    body = {c["path"]: c["body"] for c in steps.calls}["safety-reader"]
+    assert "scenario" not in body and "risk_cue" not in body
+    assert result["has_alarm_risk_cue"] is True
+
+
+# --- progress claims are the Evaluator's job ------------------------------------
+
+
+def test_progress_claims_text():
+    from app.core.debrief.steps import progress_claims_text
+
+    none = progress_claims_text(None)
+    assert "PROGRESS (what the debrief may claim" in none and "\nnone\n" in none
+    assert "report unsupported_progress_claim as a hard fail" in none
+    assert "calling something a consistent strength" in none
+    with_p = progress_claims_text({"items": [{"skill": "Empathy"}]})
+    assert "<progress>" in with_p and "Empathy" in with_p
+
+
+@pytest.mark.asyncio
+async def test_evaluator_input_carries_progress(dispatch_returns):  # noqa: F811
+    from app.core.debrief import steps
+
+    calls = dispatch_returns(None)
+    await steps.evaluate(
+        TRANSCRIPT, "d", "en", "m", progress={"items": [{"skill": "Pacing"}]}
+    )
+    assert "<progress>" in calls["prompt"] and "Pacing" in calls["prompt"]
+    assert "unsupported_progress_claim as a hard fail" in calls["prompt"]
+    await steps.evaluate(TRANSCRIPT, "d", "en", "m")
+    assert "PROGRESS (what the debrief may claim" in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_graph_sends_the_progress_reading_to_the_evaluator(closed):
+    steps, gateway = fakes.FakeSteps(), fakes.FakeGateway()
+    await fakes.run(steps, gateway)
+    body = {c["path"]: c["body"] for c in steps.calls}["evaluator"]
+    assert "progress" in body
+
+
+def test_writer_default_says_progress_claims_need_progress():
+    from app.core.debrief.steps import DEFAULT_WRITER_SYSTEM
+
+    assert "consistent strength or pattern unless PROGRESS says so" in (
+        DEFAULT_WRITER_SYSTEM.replace("\\\n", "").replace("\n", " ")
+    )
+
+
+# --- judge: neutral legend and the practice note ----------------------------------
+
+
+def test_judge_neutral_replaces_the_legacy_legend_and_legacy_is_unchanged():
+    from app.core.debrief_quality.prompt import DEFAULT_JUDGE_RUBRIC, build_judge_prompt
+
+    t = [{"role": "client", "turn_index": 1, "text": "yo"}]
+    legacy = build_judge_prompt(t, "d", "en")
+    assert "AI_CLIENT is the AI, COUNSELLOR the trainee" in legacy
+    assert "The COUNSELLOR is the human trainee" in legacy
+    assert build_judge_prompt(t, "d", "en", speaker_labels="legacy") == legacy
+    n = build_judge_prompt(t, "d", "en", speaker_labels="neutral")
+    for word in ("AI_CLIENT", "COUNSELLOR"):
+        assert word not in n
+    assert "CHARACTER is the AI, LEARNER the trainee" in n
+    assert "The LEARNER is the human trainee" in n
+    assert "The CHARACTER is played by an AI" in n
+    assert "[turn 1] CHARACTER: yo" in n
+    assert "COUNSELLOR" in DEFAULT_JUDGE_RUBRIC  # the stored default is untouched
+    custom = build_judge_prompt(
+        t,
+        "d",
+        "en",
+        rubric="{{transcript}}{{debrief}}{{risk_cue_definition}} " "COUNSELLOR",
+        instructions="AI_CLIENT",
+        speaker_labels="neutral",
+    )
+    assert "COUNSELLOR" not in custom and custom.endswith("CHARACTER")
+
+
+def test_judge_note_says_roleplay_expectations_decide():
+    from app.core.debrief_quality.prompt import build_judge_prompt
+
+    exp = {"helpful_behaviours": ["Gives advice"]}
+    p = build_judge_prompt([], "d", "en", roleplay_expectations=exp)
+    assert (
+        "the roleplay's expectations decide: following them is not a "
+        "contradiction. An ORGANISATION PROTOCOL always applies." in p
+    )
+    assert "ORGANISATION PROTOCOL always applies" not in build_judge_prompt(
+        [], "d", "en"
+    )

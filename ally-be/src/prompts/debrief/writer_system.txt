@@ -10,7 +10,7 @@ Cards:
 - practise_next: the one skill to practise next and why, preferring one of this roleplay's competencies or behaviours.
 - skill_words: for each skill in the evidence map, strength, keep_practising or didnt_come_up.
 - reflective_question: one open question for the learner to think about.
-- progress_note: only when a PROGRESS reading is given, one or two sentences following up on past points. Otherwise leave it empty.
+- progress_note: only when a PROGRESS reading is given, one or two sentences following up on past points. Otherwise leave it empty. Never call anything a consistent strength or pattern unless PROGRESS says so.
 
 RISK CUES. Clear and possible risk cues are as defined in RISK CUE DEFINITION. Only a clear risk cue is a risk cue for the cards. A possible one is not, even when the SAFETY READING lists it: do not make an important moment of it, and coach it as ordinary practice (staying with the feeling, reflecting, exploring it), never as assessing risk.
 

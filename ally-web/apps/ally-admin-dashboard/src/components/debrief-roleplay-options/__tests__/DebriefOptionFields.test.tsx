@@ -140,6 +140,25 @@ describe("Simulation editor › Risk cues in this roleplay", () => {
     expect(form?.getValues("debriefRiskCueOption")).toBe("peer");
   });
 
+  it("falls back to the handling in words when an option has no description", () => {
+    h.options = [
+      riskCue({ description: "" }),
+      riskCue({
+        id: "z",
+        key: "z",
+        name: "Z",
+        description: "",
+        handling: "assessed",
+      }),
+    ];
+    render(<Host which="risk" initial={{ debriefRiskCueOption: "z" }} />);
+    expect(
+      screen.getByText(
+        "The reader decides, cue by cue, which risk cues are the skill being practised. Those are assessed in the coaching cards; any other cue is still an alarm.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("offers to create one and to open your own drafts", () => {
     render(<Host which="risk" />);
     expect(screen.getByRole("button", { name: "Create a risk-cue option" })).toBeInTheDocument();

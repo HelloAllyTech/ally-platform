@@ -90,9 +90,14 @@ Response:
 skills wherever the graph named them: the Analyst's `{{skill_framework}}`, the progress agent's allowed keys (with
 `context.progress_profile.skill_names`, which adds the roleplay's named competencies), the SKILL COVERAGE areas and the
 Foundational Skills levels (used only when `framework.foundational`). `session.risk_cue` sets `word_list_raises` (the word
-list may raise a cue to clear; nothing ever lowers one) and `handling`: under `assessed` the Writer, Reviser and
-Evaluator's fix notes get `{{risk_handling}}` (no important-moment card; the learner's handling is assessed in the
-coaching cards), and `POST /gateway/checks` carries `risk_handling` so ally-be does not require an important moment. The
+list may raise a cue to clear; nothing ever lowers one; `false` leaves the Safety reader's own `strength` as the only
+judgement, no word list and no always-clear categories) and `handling`: under `assessed` the Safety reader also returns
+`part_of_practice` for each cue (its own judgement of whether the cue is the skill being practised; under `alarm` it is
+ignored). Cues it marks true are handled in the coaching cards (no important-moment card, no uncovered-cue check, no support
+lines), every other cue keeps the alarm path. The Writer, Reviser and Evaluator's fix notes get `{{risk_handling}}`, and
+`POST /gateway/checks` carries `risk_handling` and each cue's `part_of_practice`. The response's `has_alarm_risk_cue` says
+whether any cue stayed on the alarm path. The Evaluator also judges progress claims against `PROGRESS` (an unsupported
+"consistent strength" is a hard fail; no keyword list). The
 option's wording still arrives through `prompts["debrief_risk_cue_definition"]`. The run records
 `workspace.frameworkUsed` (id, name, area names) and `workspace.riskCueOption` (key, version, handling, support-lines flag, wording); the graph adds its own `workspace.framework`, `risk_cue` and `speaker_labels`.
 

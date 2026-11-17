@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional, Protocol
 
 from pydantic import TypeAdapter
 
-from app.core.debrief.render import PromptVariableMissing
 from app.core.config import settings
 from app.core.debrief import steps
+from app.core.debrief.render import PromptVariableMissing
 from app.core.debrief.safety_reader import (
     LearnerDistress,
     RiskCue,
@@ -107,12 +107,21 @@ class InProcessSteps:
             model=model,
             risk_cue_definition=body.get("risk_cue_definition"),
             speaker_labels=body.get("speaker_labels"),
+            risk_cue=body.get("risk_cue"),
+            scenario=body.get("scenario"),
+            roleplay_expectations=body.get("roleplay_expectations"),
         )
         if reading is None:
             return None
+        cues = _dump(List[RiskCue], reading.risk_cues)
+        for c in cues:
+            # Null (not asked for) stays out, so a run that does not assess
+            # risk cues keeps today's cue objects.
+            if c.get("part_of_practice") is None:
+                c.pop("part_of_practice", None)
         return {
             "model": ran,
-            "risk_cues": _dump(List[RiskCue], reading.risk_cues),
+            "risk_cues": cues,
             "learner_distress": _dump(List[LearnerDistress], reading.learner_distress),
         }
 
@@ -223,6 +232,7 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             fix_system=body.get("fix_prompt"),
             pass_score=body.get("pass_score") or 8,
+            progress=body.get("progress"),
             risk_cue=body.get("risk_cue"),
             speaker_labels=body.get("speaker_labels"),
             roleplay_expectations=body.get("roleplay_expectations"),

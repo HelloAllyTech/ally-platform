@@ -108,6 +108,12 @@ export interface SafetyReading {
      * Absent means clear.
      */
     strength?: 'clear' | 'possible';
+    /**
+     * Set by the Safety reader (an agent) only when the roleplay's risk-cue option assesses cues
+     * as part of the practice: true when this cue is the kind the roleplay is meant to practise.
+     * Null or absent: an alarm.
+     */
+    part_of_practice?: boolean | null;
   }>;
   learner_distress: Array<{ turn_index: number; quote: string }>;
 }
@@ -335,9 +341,11 @@ export function runDebriefChecks(input: {
   shortForm: boolean;
   hasProgress: boolean;
   /**
-   * How the roleplay handles a risk cue (its risk-cue option). `assessed`: the cue is what the
-   * roleplay practises, so no important-moment card is required for it (its handling is judged in
-   * the coaching cards, and a missed clear cue is still the judge's hard fail). Absent: alarm.
+   * How the roleplay handles a risk cue (its risk-cue option). `assessed`: the Safety reader
+   * decides, cue by cue (`part_of_practice` on the cue), which cues are the skill the roleplay
+   * practises. A clear cue it marks so needs no important-moment card (it is judged in the
+   * coaching cards, and a missed clear cue is still the judge's hard fail); every other clear cue
+   * does. Absent: alarm, and the mark is ignored.
    */
   riskHandling?: 'alarm' | 'assessed';
   /** The clinical lists for this language; the defaults when absent. */
@@ -515,14 +523,16 @@ export function runDebriefChecks(input: {
   // A `possible` cue is the Writer's call (low mood or grief is coached as
   // ordinary counselling), so leaving it out is not a failure; a cue without a
   // strength counts as clear.
+  const practised = (c: { part_of_practice?: boolean | null }) =>
+    input.riskHandling === 'assessed' && c.part_of_practice === true;
   const cueTurns = [
     ...new Set(
       safety.risk_cues
-        .filter((c) => c.strength !== 'possible')
+        .filter((c) => c.strength !== 'possible' && !practised(c))
         .map((c) => c.turn_index),
     ),
   ];
-  if (cueTurns.length > 0 && input.riskHandling !== 'assessed') {
+  if (cueTurns.length > 0) {
     if (!cards.important_moment) {
       fail(
         DebriefCheckCode.RISK_CUE_UNCOVERED,

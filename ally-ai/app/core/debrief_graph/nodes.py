@@ -339,9 +339,7 @@ async def after_reading(
             "risk_cue": {
                 k: ctx.risk_cue[k] for k in ("key", "handling", "word_list_raises")
             },
-            "framework": {
-                k: ctx.framework[k] for k in ("id", "name", "foundational")
-            },
+            "framework": {k: ctx.framework[k] for k in ("id", "name", "foundational")},
             "speaker_labels": ctx.speaker_labels,
         },
         "progress": None,
@@ -609,7 +607,8 @@ async def checks(
         "language": ctx.language,
         "short_form": bool(recipe.get("shortForm")),
         "has_progress": bool(state.get("progress")),
-        # Under `assessed`, ally-be does not require an important_moment card.
+        # Under `assessed`, a cue the reader marked part_of_practice needs no
+        # important_moment card (the cue objects in `safety` carry the flag).
         "risk_handling": ctx.risk_cue["handling"],
     }
     answer = await ctx.gateway.call("run_checks", check_input)

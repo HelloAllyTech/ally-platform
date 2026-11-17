@@ -4,3 +4,4 @@ export * from "./RiskCueDialog";
 export * from "./RiskCueTestView";
 export * from "./riskCueErrors";
 export * from "./useDebriefOptionsVisible";
+export * from "./riskCueHandlingText";

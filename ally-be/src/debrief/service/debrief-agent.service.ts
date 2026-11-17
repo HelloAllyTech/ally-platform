@@ -297,6 +297,29 @@ export function withoutPractice<
   } as unknown as T;
 }
 
+/**
+ * Whether the character's risk cue(s) bring the support lines on their own: there is a cue, the
+ * run's option lets an alarm bring them, and at least one cue is an alarm. Under an option that
+ * assesses cues as part of the practice, the Safety reader marks the cues that are that practice
+ * (`part_of_practice`): those never bring the lines, every other cue still does. A run with no
+ * record of an option (every run before them) behaves as it always did.
+ */
+export function cueBringsSupportLines(run: {
+  hasRiskCue?: boolean | null;
+  workspace?: Record<string, any> | null;
+}): boolean {
+  if (run.hasRiskCue !== true) return false;
+  const option = run.workspace?.riskCueOption;
+  if (!option) return true;
+  if (option.supportLinesOnCue === false) return false;
+  if (option.handling !== 'assessed') return true;
+  const cues = run.workspace?.safety?.risk_cues;
+  if (!Array.isArray(cues) || !cues.length) return true;
+  return cues.some(
+    (c: { part_of_practice?: unknown }) => c?.part_of_practice !== true,
+  );
+}
+
 /** The roleplays a debrief's cards link to, once each. */
 function practiceIds(cards?: Record<string, any> | null): number[] {
   const ids = [
@@ -1294,11 +1317,9 @@ export class DebriefAgentService implements OnModuleInit {
           // The safety reading found something. The apps show the support
           // lines on their own when the Writer judged it ordinary low mood or
           // grief and wrote no important moment.
-          // The roleplay's risk-cue option decides whether a character's cue brings the support
-          // lines (recorded on the run); the learner's own distress always does.
-          riskCue:
-            run.hasRiskCue === true &&
-            run.workspace?.riskCueOption?.supportLinesOnCue !== false,
+          // Whether a character's cue brings the support lines follows the roleplay's risk-cue
+          // option (recorded on the run); the learner's own distress always does.
+          riskCue: cueBringsSupportLines(run),
           supportLines: await this.supportLines(s.tenant_id, run.language),
           practice: available.filter((p) => linked.has(p.id)),
           askAlly: askAllyState(run),

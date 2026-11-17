@@ -209,10 +209,11 @@ export const RiskCueDialog: React.FC<{ optionId: string | null; onClose: () => v
           <fieldset className="flex flex-col gap-1">
             <legend className="pb-1 text-sm text-typography-700">{s.handling}</legend>
             {(["alarm", "assessed"] as const).map(h => (
-              <label key={h} className="flex items-center gap-2 text-sm">
+              <label key={h} className="flex items-start gap-2 text-sm">
                 <input
                   type="radio"
                   name="risk-cue-handling"
+                  className="mt-1"
                   checked={form.handling === h}
                   onChange={() => set("handling", h)}
                 />

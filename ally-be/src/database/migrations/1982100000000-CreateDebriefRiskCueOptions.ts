@@ -55,8 +55,8 @@ export class CreateDebriefRiskCueOptions1982100000000 implements MigrationInterf
           'Counselling roleplays: a risk cue is an alarm. It gets an important moment, and the support lines show.',
           NULL, 'alarm', true, true, 'approved', now()),
          ('part_of_practice', 'Part of the practice',
-          'The risk cue is the skill being practised (for example suicide prevention): still detected and never lowered, assessed in the coaching cards, with no alarm card and no helplines.',
-          NULL, 'assessed', true, false, 'approved', now())
+          'The risk cue is the skill being practised (for example suicide prevention). The reader decides, cue by cue, which cues are that skill: those are still detected and never lowered, and are assessed in the coaching cards with no alarm card. Any other cue is still an alarm.',
+          NULL, 'assessed', true, true, 'approved', now())
        ON CONFLICT ("key") DO NOTHING`,
     );
   }

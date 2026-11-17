@@ -20,12 +20,13 @@ text, and stores what comes back.
 
 from __future__ import annotations
 
-from typing import List, Literal, Optional, Tuple
+import json
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.core.debrief.framework import speaker
+from app.core.debrief.framework import ASSESSED, risk_cue_of, speaker
 from app.core.debrief.render import render
 from app.core.debrief.risk_cue_definition import definition_block
 from app.utils.logger import get_logger
@@ -50,7 +51,9 @@ LearnerResponse = Literal[
 
 class RiskCue(BaseModel):
     turn_index: int
-    quote: str = Field(description="The character's words, exactly as in the transcript.")
+    quote: str = Field(
+        description="The character's words, exactly as in the transcript."
+    )
     category: RiskCategory
     learner_response: LearnerResponse
     response_turn_index: Optional[int] = Field(
@@ -62,6 +65,14 @@ class RiskCue(BaseModel):
         description=(
             "clear or possible, as defined in RISK CUE DEFINITION. When "
             "unsure, clear."
+        ),
+    )
+    part_of_practice: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Only when PRACTICE is asked for: true when this is the kind of "
+            "risk cue the roleplay is meant to practise, false for any other. "
+            "Null otherwise."
         ),
     )
 
@@ -147,6 +158,9 @@ def build_prompt(
     system: Optional[str] = None,
     risk_cue_definition: Optional[str] = None,
     speaker_labels: Optional[str] = None,
+    risk_cue: Optional[Dict[str, Any]] = None,
+    scenario: Optional[Dict[str, Any]] = None,
+    roleplay_expectations: Optional[Dict[str, Any]] = None,
 ) -> str:
     lines = ["<transcript>"]
     for t in transcript:
@@ -154,7 +168,7 @@ def build_prompt(
             f"[turn {t.turn_index}] {speaker(t.role, speaker_labels)}: {t.text}"
         )
     lines.append("</transcript>")
-    return render(
+    text = render(
         SAFETY_READER_CODE,
         system or DEFAULT_SAFETY_READER_SYSTEM,
         {
@@ -164,6 +178,38 @@ def build_prompt(
             "transcript": "\n".join(lines),
         },
         required=("transcript", "risk_cue_definition"),
+    )
+    if risk_cue_of({"risk_cue": risk_cue})["handling"] == ASSESSED:
+        text = text.rstrip() + "\n\n" + practice_block(scenario, roleplay_expectations)
+    return text
+
+
+def practice_block(
+    scenario: Optional[Dict[str, Any]],
+    roleplay_expectations: Optional[Dict[str, Any]],
+) -> str:
+    """Code-owned: for a roleplay that practises risk cues, the reader says
+    cue by cue whether it is part of the practice."""
+    data = [
+        "<scenario>",
+        json.dumps(scenario or {}, ensure_ascii=False, indent=1),
+        "</scenario>",
+        "ROLEPLAY EXPECTATIONS:",
+        "<roleplay_expectations>",
+        json.dumps(roleplay_expectations or {}, ensure_ascii=False, indent=1),
+        "</roleplay_expectations>",
+    ]
+    return "\n".join(
+        [
+            "PRACTICE. This roleplay is designed to practise responding to "
+            "risk cues. For each risk cue set part_of_practice true when it is "
+            "the kind of cue this roleplay is meant to practise (see the "
+            "scenario and ROLEPLAY EXPECTATIONS); set it false for any other "
+            "risk cue the roleplay is not about (for example a disclosure of "
+            "abuse, or of intent to harm someone else, in a suicide-prevention "
+            "roleplay): those still raise the full alarm. When unsure, false.",
+            *data,
+        ]
     )
 
 
@@ -175,6 +221,9 @@ async def read_safety(
     model: Optional[str] = None,
     risk_cue_definition: Optional[str] = None,
     speaker_labels: Optional[str] = None,
+    risk_cue: Optional[Dict[str, Any]] = None,
+    scenario: Optional[Dict[str, Any]] = None,
+    roleplay_expectations: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[SafetyReading], str]:
     """One safety reading of a whole session.
 
@@ -197,7 +246,14 @@ async def read_safety(
     output, meta = await generate_structured(
         schema=SafetyReading,
         prompt=build_prompt(
-            transcript, language, system, risk_cue_definition, speaker_labels
+            transcript,
+            language,
+            system,
+            risk_cue_definition,
+            speaker_labels,
+            risk_cue,
+            scenario,
+            roleplay_expectations,
         ),
         task=LLMTask.DEBRIEF_SAFETY_READER.value,
         provider=infer_provider_from_model(model) or PROVIDER_GEMINI,
@@ -212,6 +268,10 @@ async def read_safety(
 
     # A cue pointing at a turn that does not exist, or at a learner turn, is
     # not evidence of anything; drop it rather than surface a phantom moment.
+    if risk_cue_of({"risk_cue": risk_cue})["handling"] != ASSESSED:
+        # Only asked for when the risk cues are assessed.
+        for c in output.risk_cues:
+            c.part_of_practice = None
     roles = {t.turn_index: t.role for t in transcript}
     output.risk_cues = [
         c for c in output.risk_cues if roles.get(c.turn_index) == "client"

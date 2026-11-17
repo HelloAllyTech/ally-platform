@@ -11,7 +11,11 @@ import {
   useReviewTestRiskCueOptionMutation,
 } from "@api";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
-import { riskCueErrorMessage, RiskCueTestView } from "@components/debrief-roleplay-options";
+import {
+  riskCueErrorMessage,
+  riskCueHandlingText,
+  RiskCueTestView,
+} from "@components/debrief-roleplay-options";
 import { en } from "@constants";
 import { RiskCueOption } from "@types";
 
@@ -69,7 +73,7 @@ export const RiskCueOptionsSection: React.FC<{ canReview: boolean }> = ({ canRev
   };
 
   const behaviour = (o: RiskCueOption) => [
-    o.handling === "alarm" ? s.alarmBehaviour : s.assessedBehaviour,
+    riskCueHandlingText(o),
     o.wordListRaises ? s.wordListOn : s.wordListOff,
     o.supportLinesOnCue ? s.supportOn : s.supportOff,
   ];

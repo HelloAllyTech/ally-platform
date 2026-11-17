@@ -9,6 +9,7 @@ import { runDebriefChecks } from '../util/debrief-cards.util';
 import { toScoredRun } from '../service/debrief-score.service';
 import { expectationsFor } from '../service/debrief-run-judge.service';
 import { DebriefGatewayService } from '../service/debrief-gateway.service';
+import { cueBringsSupportLines } from '../service/debrief-agent.service';
 
 const GOOD = {
   name: 'End-of-life conversation',
@@ -284,19 +285,36 @@ describe('what an option changes elsewhere', () => {
     shortForm: true,
     hasProgress: false,
   };
-  const uncovered = (riskHandling?: 'alarm' | 'assessed') =>
-    runDebriefChecks({ ...base, riskHandling }).filter(
-      (f) => f.code === 'risk_cue_uncovered',
-    );
+  const uncovered = (
+    riskHandling?: 'alarm' | 'assessed',
+    practised?: boolean,
+  ) =>
+    runDebriefChecks({
+      ...base,
+      safety: {
+        risk_cues: [{ ...clearCue, part_of_practice: practised ?? null }],
+        learner_distress: [],
+      },
+      riskHandling,
+    }).filter((f) => f.code === 'risk_cue_uncovered');
 
-  it('requires an important moment for a clear cue under alarm (today), and not under assessed', () => {
+  it('requires an important moment for a clear cue under alarm (today), and not for one the reader marked part of the practice under assessed', () => {
     expect(uncovered()).toHaveLength(1);
     expect(uncovered('alarm')).toHaveLength(1);
-    expect(uncovered('assessed')).toHaveLength(0);
+    // The mark is ignored under alarm.
+    expect(uncovered('alarm', true)).toHaveLength(1);
+    // Assessed, but the reader did not mark this cue as the practised kind: it is an alarm.
+    expect(uncovered('assessed')).toHaveLength(1);
+    expect(uncovered('assessed', false)).toHaveLength(1);
+    expect(uncovered('assessed', true)).toHaveLength(0);
   });
 
   it('counts the risk gate on the judge’s missed cue alone under assessed, and on the cards too under alarm', () => {
-    const row = (handling: string | null, judge: unknown[] = []) =>
+    const row = (
+      handling: string | null,
+      judge: unknown[] = [],
+      practised: boolean | null = null,
+    ) =>
       toScoredRun({
         id: 'r',
         createdAt: '2026-11-17T00:00:00Z',
@@ -306,13 +324,15 @@ describe('what an option changes elsewhere', () => {
         quality: 9,
         hard_fails: judge,
         shown: true,
-        risk_cues: [clearCue],
+        risk_cues: [{ ...clearCue, part_of_practice: practised }],
         important_moment: null,
         risk_handling: handling,
       });
     expect(row(null).missedClearRiskCue).toBe(true);
     expect(row('alarm').missedClearRiskCue).toBe(true);
-    expect(row('assessed').missedClearRiskCue).toBe(false);
+    expect(row('alarm', [], true).missedClearRiskCue).toBe(true);
+    expect(row('assessed').missedClearRiskCue).toBe(true);
+    expect(row('assessed', [], true).missedClearRiskCue).toBe(false);
     expect(
       row('assessed', [{ code: 'missed_risk_cue' }]).missedClearRiskCue,
     ).toBe(true);
@@ -362,10 +382,15 @@ describe('the checks gateway applies the roleplay’s handling', () => {
       work_on_this: [],
       skill_words: [],
     } as any,
-    safety: { risk_cues: [cue], learner_distress: [] } as any,
+    safety: {
+      risk_cues: [{ ...cue, part_of_practice: extra.practised === true }],
+      learner_distress: [],
+    } as any,
     language: 'en',
     short_form: true,
-    ...extra,
+    ...Object.fromEntries(
+      Object.entries(extra as any).filter(([k]) => k !== 'practised'),
+    ),
   });
   const gateway = () => {
     const svc = Object.create(DebriefGatewayService.prototype) as any;
@@ -384,19 +409,67 @@ describe('the checks gateway applies the roleplay’s handling', () => {
       )
     ).failures.filter((f) => f.code === 'risk_cue_uncovered');
 
-  it('reads the handling the graph sends, else the one recorded on the run, else alarm', async () => {
+  it('reads the handling the graph sends, else the one recorded on the run, else alarm; only a cue the reader marked part of the practice is excused', async () => {
     expect(await uncovered({})).toHaveLength(1);
+    const assessed = { workspace: { riskCueOption: { handling: 'assessed' } } };
+    // Assessed, but the reader did not mark the cue as the practised kind: still an alarm.
+    expect(await uncovered(assessed)).toHaveLength(1);
+    expect(await uncovered(assessed, { practised: true })).toHaveLength(0);
     expect(
-      await uncovered({
-        workspace: { riskCueOption: { handling: 'assessed' } },
-      }),
+      await uncovered({}, { risk_handling: 'assessed', practised: true }),
     ).toHaveLength(0);
-    expect(await uncovered({}, { risk_handling: 'assessed' })).toHaveLength(0);
+    // The graph's word wins over the record, and the mark is ignored under alarm.
     expect(
-      await uncovered(
-        { workspace: { riskCueOption: { handling: 'assessed' } } },
-        { risk_handling: 'alarm' },
-      ),
+      await uncovered(assessed, { risk_handling: 'alarm', practised: true }),
     ).toHaveLength(1);
+  });
+});
+
+describe('the support lines follow the kind of cue (the reader decides which cues are the practice)', () => {
+  const cue = (practised: boolean | null) => ({
+    category: 'any',
+    part_of_practice: practised,
+  });
+  const run = (
+    cues: any[],
+    opt: Record<string, unknown> | null,
+    hasRiskCue = true,
+  ) => ({
+    hasRiskCue,
+    workspace: {
+      safety: { risk_cues: cues },
+      ...(opt ? { riskCueOption: opt } : {}),
+    },
+  });
+  const practice = { handling: 'assessed', supportLinesOnCue: true };
+
+  it('never for cues that are all the practice, but yes as soon as one cue is an alarm', () => {
+    expect(cueBringsSupportLines(run([cue(true)], practice))).toBe(false);
+    expect(cueBringsSupportLines(run([cue(true), cue(false)], practice))).toBe(
+      true,
+    );
+    expect(cueBringsSupportLines(run([cue(true), cue(null)], practice))).toBe(
+      true,
+    );
+  });
+
+  it('keeps today’s behaviour under alarm, with no option on the run, and with no cue', () => {
+    expect(
+      cueBringsSupportLines(
+        run([cue(true)], { handling: 'alarm', supportLinesOnCue: true }),
+      ),
+    ).toBe(true);
+    expect(cueBringsSupportLines(run([cue(null)], null))).toBe(true);
+    expect(cueBringsSupportLines(run([cue(false)], practice, false))).toBe(
+      false,
+    );
+  });
+
+  it('is switched off by an option that does not let an alarm bring them', () => {
+    expect(
+      cueBringsSupportLines(
+        run([cue(false)], { ...practice, supportLinesOnCue: false }),
+      ),
+    ).toBe(false);
   });
 });

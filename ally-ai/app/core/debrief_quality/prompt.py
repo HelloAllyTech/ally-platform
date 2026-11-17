@@ -11,6 +11,7 @@ is their fallback, the same way. Keep both defaults identical to ally-be's files
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional, TypedDict
 
 
@@ -110,8 +111,22 @@ PRACTICE_ALIGNMENT_EXPECTED = (
 PRACTICE_ALIGNMENT_NOTE = (
     "For practice_alignment, judge the debrief as "
     + PRACTICE_ALIGNMENT_EXPECTED
-    + ", and any guidance or protocol supplied; it recommends nothing unsafe."
+    + ", and any guidance or protocol supplied; it recommends nothing unsafe. "
+    "When this roleplay's own expectations ask for something that general "
+    "guidance for the learner's level discourages, the roleplay's "
+    "expectations decide: following them is not a contradiction. An "
+    "ORGANISATION PROTOCOL always applies."
 )
+
+
+def neutral_speakers(text: str) -> str:
+    """The rubric or instruction text with the legacy speaker words replaced
+    by the neutral ones (AI_CLIENT, then COUNSELLOR and CLIENT in capitals)."""
+    return re.sub(
+        r"\bCLIENT\b",
+        "CHARACTER",
+        text.replace("AI_CLIENT", "CHARACTER").replace("COUNSELLOR", "LEARNER"),
+    )
 
 
 def _expectations(raw: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -120,9 +135,7 @@ def _expectations(raw: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         return None
     out = {
         "helpful_behaviours": [b for b in raw.get("helpful_behaviours") or [] if b],
-        "unhelpful_behaviours": [
-            b for b in raw.get("unhelpful_behaviours") or [] if b
-        ],
+        "unhelpful_behaviours": [b for b in raw.get("unhelpful_behaviours") or [] if b],
         "competencies": [
             c
             for c in raw.get("competencies") or []
@@ -167,7 +180,7 @@ def build_judge_prompt(
     rubric with the session filled in, then the closing instructions. With
     ``roleplay_expectations`` the roleplay's own expectations join the
     prompt and practice_alignment is judged against them as well."""
-    from app.core.debrief.framework import speaker
+    from app.core.debrief.framework import NEUTRAL, normalise_labels, speaker
     from app.core.debrief.render import NONE, block, render
     from app.core.debrief.risk_cue_definition import definition_block
 
@@ -178,9 +191,13 @@ def build_judge_prompt(
         tag = f"[turn {idx}] " if idx is not None else ""
         lines.append(f"{tag}{who}: {turn.get('text', '')}")
     lines.append("</transcript>")
+    neutral = normalise_labels(speaker_labels) == NEUTRAL
+    template = rubric or DEFAULT_JUDGE_RUBRIC
+    if neutral:
+        template = neutral_speakers(template)
     body = render(
         RUBRIC_CODE,
-        rubric or DEFAULT_JUDGE_RUBRIC,
+        template,
         {
             # The rubric's risk list and its missed_risk_cue hard fail point to it.
             "risk_cue_definition": definition_block(risk_cue_definition)[1],
@@ -202,6 +219,8 @@ def build_judge_prompt(
         required=RUBRIC_REQUIRED,
     )
     closing = (instructions or "").strip() or DEFAULT_JUDGE_INSTRUCTIONS
+    if neutral:
+        closing = neutral_speakers(closing)
     expectations = _expectations(roleplay_expectations)
     if expectations is None:
         return body.rstrip() + "\n\n" + closing

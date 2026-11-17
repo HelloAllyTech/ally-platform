@@ -26,9 +26,7 @@ def contract_extras(ctx: Ctx, *keys: str) -> Dict[str, Any]:
         "speaker_labels": framework.speaker_labels_of,
     }
     session = getattr(ctx, "session", None) or {}
-    return {
-        k: getters[k](session) for k in keys if framework.session_has(session, k)
-    }
+    return {k: getters[k](session) for k in keys if framework.session_has(session, k)}
 
 
 def recipe(state: State, ctx: Ctx) -> Dict[str, Any]:
@@ -76,7 +74,19 @@ def safety_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "language": ctx.language,
         "system_prompt": ctx.prompt(PROMPT_CODES["safety_reader"]),
         "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
-        **contract_extras(ctx, "speaker_labels"),
+        **contract_extras(ctx, "risk_cue", "speaker_labels"),
+        **practice_context(ctx),
+    }
+
+
+def practice_context(ctx: Ctx) -> Dict[str, Any]:
+    """What the Safety reader needs to say which cues are part of the practice:
+    only for a roleplay whose risk cues are assessed."""
+    if ctx.risk_cue["handling"] != "assessed":
+        return {}
+    return {
+        "scenario": ctx.sess("scenario") or {},
+        "roleplay_expectations": roleplay_expectations(ctx) or {},
     }
 
 
@@ -203,6 +213,8 @@ def evaluator_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "system_prompt": ctx.prompt(PROMPT_CODES["evaluator"]),
         "fix_prompt": ctx.prompt(PROMPT_CODES["evaluator_fix"]),
         "pass_score": ctx.setting("passScore", 8),
+        # What the debrief may claim over time (null: nothing).
+        "progress": state.get("progress"),
         **contract_extras(ctx, "risk_cue", "speaker_labels"),
         **(
             {"roleplay_expectations": exp}

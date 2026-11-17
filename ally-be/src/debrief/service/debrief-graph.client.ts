@@ -76,6 +76,8 @@ export interface DebriefGraphResponse {
   estimated_cost_usd?: number;
   fallback_rung?: number;
   has_risk_cue?: boolean;
+  /** Any risk cue the roleplay does not treat as its practice: the full alarm applies. */
+  has_alarm_risk_cue?: boolean;
   learner_distress?: boolean;
   revision_rounds?: number;
   evaluator_overall?: number | null;

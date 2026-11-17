@@ -154,10 +154,11 @@ def cue_strength(cue: Dict[str, Any], word_list_raises: bool = True) -> str:
     matches its quote. Nothing here lowers a cue: a reader's ``possible`` on
     a clear category or with clear words stays clear, and a cue the reader
     gave no strength is read as before (hopelessness without clear words is
-    possible). With ``word_list_raises`` False (a roleplay whose risk cues
-    are assessed, not alarmed) the word list is not consulted: it neither
-    raises nor lowers anything, and the reader's own category and strength
-    decide."""
+    possible). With ``word_list_raises`` False the reader's own judgement
+    decides: its ``strength`` (clear when it gave none), with neither the word
+    list nor the always-clear categories applied."""
+    if not word_list_raises:
+        return POSSIBLE if cue.get("strength") == POSSIBLE else CLEAR
     if cue.get("strength") == CLEAR:
         return CLEAR
     if cue.get("category") in CLEAR_CATEGORIES:
@@ -165,8 +166,6 @@ def cue_strength(cue: Dict[str, Any], word_list_raises: bool = True) -> str:
     if cue.get("category") != "hopelessness":
         # An unknown category is not ours to discount.
         return CLEAR
-    if not word_list_raises:
-        return POSSIBLE
     return CLEAR if _CLEAR_WORDS.search(str(cue.get("quote") or "")) else POSSIBLE
 
 
