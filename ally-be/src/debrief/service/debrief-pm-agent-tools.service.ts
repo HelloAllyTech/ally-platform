@@ -38,6 +38,7 @@ import {
   PmAgentGatewayTool,
 } from './debrief-run-token.service';
 import { DebriefContextRepository } from './debrief-context.repository';
+import { DebriefGuidanceMetricsService } from './debrief-guidance-metrics.service';
 import { DebriefMetricsService } from './debrief-metrics.service';
 import { DebriefPmAgentService } from './debrief-pm-agent.service';
 import { DebriefReportingService } from './debrief-reporting.service';
@@ -174,6 +175,8 @@ export class DebriefPmAgentToolsService {
     /** What the agent may do alone per kind and step (PRD §12). */
     @Optional() private readonly autonomy?: DebriefAutonomyService,
     @Optional() private readonly notifier?: DebriefNotifier,
+    @Optional()
+    private readonly guidanceMetrics?: DebriefGuidanceMetricsService,
   ) {}
 
   async call(
@@ -192,6 +195,8 @@ export class DebriefPmAgentToolsService {
           return (await this.reporting.query(text(b.sql, 8000))) as any;
         case 'metrics_view':
           return await this.metricsView(b);
+        case 'guidance_report':
+          return await this.guidanceReport(b);
         case 'idea_propose':
           return await this.ideaPropose(claims, b);
         case 'release_draft':
@@ -273,6 +278,18 @@ export class DebriefPmAgentToolsService {
       metric_names: Object.keys(PM_AGENT_METRICS),
       note: 'Thin samples are left out. Cite a point by its name (and segment).',
     };
+  }
+
+  /**
+   * Debrief Guidance analytics (lookup and guidance agent): the Console's
+   * `guidance-metrics` payload. Counts, timings and entry titles only.
+   */
+  async guidanceReport(b: Record<string, any>) {
+    if (!this.guidanceMetrics) refuse('guidance analytics are not available');
+    return (await this.guidanceMetrics!.report({
+      days: b.days,
+      mode: b.mode,
+    })) as unknown as Record<string, unknown>;
   }
 
   // --- ideas ------------------------------------------------------------------------

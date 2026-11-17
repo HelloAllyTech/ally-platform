@@ -38,6 +38,10 @@ def build_result(
             "why": END_WHY.get(ended)
             or (FAILED_WHY if status == Status.FAILED else ended),
         }
+    # Guidance analytics: present on every result (none when nothing ran).
+    workspace.setdefault("guidanceMode", "none")
+    workspace.setdefault("guidanceGiven", [])
+    workspace.setdefault("guidanceTimings", {"lookupMs": None, "agentMs": None})
     if ctx.resumed:
         workspace["resumes"] = workspace.get("resumes") or 1
     patch = state.get("patch") or {}

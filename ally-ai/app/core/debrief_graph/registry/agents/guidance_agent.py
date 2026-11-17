@@ -13,10 +13,19 @@ from app.core.debrief_graph.findings import agent_findings
 from app.core.debrief_graph.registry.manifest import AgentManifest, register
 
 
+def lookup_off(ctx: Ctx) -> bool:
+    """The per-moment lookup is disabled (`guidancePassagesPerMoment` 0)."""
+    return int(ctx.setting("guidancePassagesPerMoment", 0) or 0) == 0
+
+
 def offered(ctx: Ctx) -> bool:
-    """Only with a call cap, a tool enabled for this step and a release model."""
+    """Only with a call cap, a tool enabled for this step and a release model;
+    and never when the lookup is off, because the agent is then the guidance
+    mechanism and runs as the fixed step after dispatch, not at the planner's
+    choice."""
     return (
-        toolbox.phase_wanted(ctx, Step.GUIDANCE_AGENT)
+        not lookup_off(ctx)
+        and toolbox.phase_wanted(ctx, Step.GUIDANCE_AGENT)
         and toolbox.agent_model(ctx) is not None
     )
 

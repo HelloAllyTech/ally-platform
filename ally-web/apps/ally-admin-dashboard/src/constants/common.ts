@@ -566,6 +566,8 @@ export const ApiEndpoints = {
     SETTINGS: "/v1/debriefs/console/settings",
     METRICS: "/v1/debriefs/console/metrics",
     NIGHTLY: "/v1/debriefs/console/metrics/nightly",
+    /** Analytics › Debriefs › Guidance. */
+    GUIDANCE_METRICS: "/v1/debriefs/console/guidance-metrics",
     SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
     /** Settings › Schedules (engineering only). */
     SCHEDULES: "/v1/debriefs/console/schedules",

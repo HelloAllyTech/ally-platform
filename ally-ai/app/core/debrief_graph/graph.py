@@ -26,7 +26,12 @@ Writer reads the vetoed report in the old ProgressReading shape.
 
 `guidance_agent` (both paths) is a bounded tool-calling loop: it runs only when
 the release sets `guidanceAgentMaxCalls` > 0 and its recipe lists the step, and
-it never stops a debrief (see guidance_agent.py).
+it never stops a debrief (see guidance_agent.py). The lookup's per-moment
+searches run concurrently. With `guidancePassagesPerMoment` 0 (the lookup off)
+the agent is the guidance mechanism: it is not offered to the planner (nor is
+the lookup) and runs as the fixed step after dispatch; with it above 0 the
+planner may choose or skip it. `workspace.guidanceMode` / `guidanceGiven` /
+`guidanceTimings` record which mechanism produced the passages.
 
 The loop ends: every pass through `revise_gate` that reaches the reviser adds a
 round, and `score_draft` stops at the recipe's `maxRevisionRounds`.

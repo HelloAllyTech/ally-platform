@@ -33,9 +33,11 @@ async def guidance_agent(
         and STEP in (state.get("offered") or [])
         and not state.get("guidance_agent_selected")
     ):
-        # The release lists it and the planner was offered it: it runs only if
-        # the planner selected it (the registry agent's marker); a skip is
-        # honoured. Not listed by the release: it runs, as on the fixed path.
+        # Offered to the planner (only while the lookup is ENABLED): it runs
+        # only if the planner selected it (the registry agent's marker); a
+        # skip is honoured. With the lookup off the registry agent is never
+        # offered (registry/agents/guidance_agent.offered), so this hop is the
+        # guidance mechanism and always runs, as it does when not listed.
         return {}
     res = await toolbox.run_phase(
         state, ctx, config, STEP, toolbox.agent_model(ctx, state)

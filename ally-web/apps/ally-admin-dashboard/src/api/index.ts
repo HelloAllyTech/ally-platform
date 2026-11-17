@@ -65,4 +65,5 @@ export * from "./roadmapV2";
 export * from "./debriefAgents";
 export * from "./roadmapV2Cutover";
 export * from "./roadmapV2Ops";
+export * from "./debriefGuidanceMetrics";
 export * from "./roadmapV2Measures";

@@ -10,6 +10,11 @@ from app.core.debrief_graph.findings import agent_findings
 from app.core.debrief_graph.registry.manifest import AgentManifest, register
 
 
+def offered(ctx: Ctx) -> bool:
+    """Not with the lookup off: it would only waste a planner slot."""
+    return int(ctx.setting("guidancePassagesPerMoment", 0) or 0) > 0
+
+
 async def run(state, runtime: Runtime[Ctx]):
     update = await nodes.guidance_lookup(state, runtime)
     found = [
@@ -55,6 +60,7 @@ MANIFEST = register(
         latency_estimate_ms=4_000,
         eval_suite_id="debrief-guidance",
         writer_has_own_block=True,
+        offered_when=offered,
         run=run,
     )
 )

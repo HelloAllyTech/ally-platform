@@ -7,6 +7,7 @@ routes with a typed `Command` or follows its static edge.
 
 from __future__ import annotations
 
+import asyncio
 import math
 from typing import Any, Dict, List, Literal, Optional
 
@@ -39,6 +40,7 @@ from app.core.debrief_graph.drafts import (
     meets_bar,
     passes_checks,
 )
+from app.core.debrief_graph.guidance_toolbox import guidance_record
 from app.core.debrief_graph.narration import n
 from app.core.debrief_graph.records import iso, js_len, progress_event, skipped
 from app.core.debrief_graph.registry import (  # noqa: F401 - registers them
@@ -403,7 +405,12 @@ def _passage(p: Dict[str, Any]) -> Dict[str, str]:
     title = p.get("title") or (
         citation.get("title") if isinstance(citation, dict) else citation
     )
-    return {"title": str(title or p.get("code") or ""), "text": p.get("text") or ""}
+    return {
+        "title": str(title or p.get("code") or ""),
+        "text": p.get("text") or "",
+        "code": str(p.get("code") or ""),
+        "via": "lookup",
+    }
 
 
 async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
@@ -437,6 +444,9 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
         citations: List[Dict[str, str]] = []
         lookups = 0
         stopped: Optional[str] = None
+        # The time guard runs per moment before anything starts (as it did
+        # between sequential calls); the searches then run concurrently.
+        todo: List[Dict[str, Any]] = []
         for m in moments:
             if not (m or {}).get("summary"):
                 continue
@@ -446,14 +456,21 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
                 update["rung"] = int(FallbackRung.ONE_GUIDANCE_LOOKUP)
                 stopped = "Stopped early to keep time for writing."
                 break
-            lookups += 1
+            todo.append(m)
+
+        async def search(m: Dict[str, Any]) -> Dict[str, Any]:
             try:
-                found = await ctx.gateway.call(
+                return await ctx.gateway.call(
                     "guidance_search",
                     {"topics": [{"situation": m["summary"]}], "per_moment": per_moment},
                 )
             except Exception:  # noqa: BLE001 - guidance never stops a debrief
-                found = {"unavailable": True, "passages": []}
+                return {"unavailable": True, "passages": []}
+
+        # Results come back in moment order; the first unreachable gateway ends
+        # the walk, so the later moments' answers are dropped as before.
+        for found in await asyncio.gather(*(search(m) for m in todo)):
+            lookups += 1
             # "No confident match" is nothing, not a weak passage to lean on.
             for p in (
                 [] if found.get("no_confident_match") else found.get("passages") or []
@@ -537,7 +554,16 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
             )
         ]
         update["passages"] = passages
-        update["workspace"] = {"passages": seen}
+        update["workspace"] = {
+            "passages": seen,
+            **guidance_record(
+                passages,
+                {
+                    **(((state.get("workspace") or {}).get("guidanceTimings")) or {}),
+                    "lookupMs": round(ctx.clock() - t0),
+                },
+            ),
+        }
     if state.get("progress"):
         update["workspace"] = {
             **update.get("workspace", {}),
