@@ -41,6 +41,11 @@ import { PlanView, PlanViewService } from './plan-view.service';
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const NUDGE_AFTER_DAYS = 7;
 export const RELEASE_AFTER_DAYS = 14;
+/**
+ * How the idle hand-back's note starts. P8's Measures counts idle-lead
+ * releases by it (`plan_events.detail.note`), so keep the two together.
+ */
+export const IDLE_RELEASE_NOTE_PREFIX = 'No activity for';
 
 /** A row of the Needs a lead queue. */
 export interface PlanQueueItem {
@@ -222,7 +227,7 @@ export class PlanLeadService {
           plan,
           null,
           PlanEventKind.AUTO_RELEASED,
-          `No activity for ${RELEASE_AFTER_DAYS} days.`,
+          `${IDLE_RELEASE_NOTE_PREFIX} ${RELEASE_AFTER_DAYS} days.`,
         );
         released++;
       } else if (quietDays >= NUDGE_AFTER_DAYS && !plan.plan?.nudgedAt) {
