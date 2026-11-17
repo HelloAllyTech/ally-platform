@@ -196,6 +196,10 @@ export class PlanLeadService {
   ): Promise<{ nudged: number; released: number }> {
     const settings = await this.settings.get();
     if (!settings.enabled) return { nudged: 0, released: 0 };
+    // Roadmap v2 (D11, plan §4.10): the Owner assigns the lead, so nothing is unassigned
+    // automatically. An idle lead shows as "Reassign?" in the Owner's To triage instead, and
+    // the old Lead toggle no longer decides who may lead (a Builder may not hold it).
+    const ownerAssigns = (await this.settings.getRoadmapV2()).enabled;
     const led = await this.store.repository
       .createQueryBuilder('s')
       .addSelect('s.plan')
@@ -211,7 +215,10 @@ export class PlanLeadService {
         plan.status === BuilderSessionStatus.BUILDING ||
         plan.status === BuilderSessionStatus.WAITING_FOR_INPUT;
       if (live || plan.plan?.closed) continue;
-      if (!(await this.access.canLead(plan.leadUserId as number))) {
+      if (
+        !ownerAssigns &&
+        !(await this.access.canLead(plan.leadUserId as number))
+      ) {
         await this.release(
           plan,
           null,
@@ -222,7 +229,7 @@ export class PlanLeadService {
         continue;
       }
       const quietDays = (now.getTime() - plan.updatedAt.getTime()) / DAY_MS;
-      if (quietDays >= RELEASE_AFTER_DAYS) {
+      if (quietDays >= RELEASE_AFTER_DAYS && !ownerAssigns) {
         await this.release(
           plan,
           null,

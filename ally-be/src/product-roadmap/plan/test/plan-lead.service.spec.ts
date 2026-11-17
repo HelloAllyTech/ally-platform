@@ -60,6 +60,7 @@ function build(
     settings: {
       assertEnabled: jest.fn(),
       get: jest.fn(async () => ({ enabled: true, closeConfirmVotes: 10 })),
+      getRoadmapV2: jest.fn(async () => ({ enabled: false })),
     },
     spend: { summarize: jest.fn(async () => ({ totalUsd: 0 })) },
     dataSource: {
@@ -219,6 +220,33 @@ describe('PlanLeadService', () => {
     const { service, deps } = build({}, { led: [lead] });
     deps.access.canLead.mockResolvedValue(false);
     expect((await service.sweepLeads()).released).toBe(1);
+  });
+
+  it('with roadmap_v2 on, nudges but never hands a plan back (D11)', async () => {
+    const now = new Date('2026-11-17T00:00:00Z');
+    const plan = (id: string, days: number) => ({
+      id,
+      title: id,
+      createdBy: 1,
+      leadUserId: 4,
+      status: 'PRD_READY',
+      updatedAt: new Date(now.getTime() - days * DAY),
+      plan: {},
+    });
+    const { service, deps } = build({}, { led: [plan('a', 8), plan('b', 15)] });
+    deps.settings.getRoadmapV2.mockResolvedValue({ enabled: true });
+    deps.access.canLead.mockResolvedValue(false);
+    const result = await service.sweepLeads(now);
+    expect(result.released).toBe(0);
+    expect(deps.events.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'auto_released' }),
+    );
+    expect(deps.notifications.notify).toHaveBeenCalledWith(
+      4,
+      'a',
+      'nudge',
+      expect.any(String),
+    );
   });
 
   it('lets only the author answer, and only a question that was asked', async () => {
