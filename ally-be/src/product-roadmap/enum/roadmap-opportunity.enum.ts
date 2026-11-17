@@ -129,3 +129,18 @@ export enum RoadmapReferenceImageContentType {
   WEBP = 'image/webp',
   GIF = 'image/gif',
 }
+
+/**
+ * The Owner's review of a submitted idea (plans/roadmap-builder-merge D10, §2.1a).
+ * A fact on the opportunity, not a stage: deriveItemStage reads it.
+ *
+ * NULL is a legal, permanent state for rows nobody has reviewed through Roadmap v2:
+ * migration 1983000000100 backfilled every row that existed then to ACCEPTED, and a row
+ * filed through the old doors afterwards (flag off) is read as accepted too, the same as
+ * the legacy ideas the plan says count as already accepted.
+ */
+export enum RoadmapReviewState {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  DECLINED = 'declined',
+}

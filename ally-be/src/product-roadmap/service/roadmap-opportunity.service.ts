@@ -166,6 +166,9 @@ export class RoadmapOpportunityService {
     if (!existing) throw new NotFoundException(`Opportunity ${id} not found`);
     await this.opportunityRepository.update(id, {
       directorStarred: starred,
+      // Who gave the star (Roadmap v2, D16). Written beside the flag so the attribution the
+      // P0 migration backfilled stays true until the Owner star replaces this route.
+      starredByUserId: starred ? userId : null,
       updatedBy: userId,
     });
     this.strategyGoalService.invalidate(userId);
