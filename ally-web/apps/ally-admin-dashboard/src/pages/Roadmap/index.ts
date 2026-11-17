@@ -6,5 +6,6 @@ export { RoadmapNewIdeaPage } from "./RoadmapNewIdeaPage";
 export { RoadmapFrame } from "./RoadmapFrame";
 export { RoadmapAgentPage } from "./RoadmapAgentPage";
 export { RoadmapSettingsPage } from "./RoadmapSettingsPage";
+export { RoadmapMeasuresPage } from "./RoadmapMeasuresPage";
 export { RoadmapBugsPage, UserInterviewsPage } from "./RoadmapAreaPages";
 export { RoadmapLegacyRedirect } from "./RoadmapLegacyRedirect";
