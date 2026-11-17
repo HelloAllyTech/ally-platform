@@ -4,8 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PostHog } from 'posthog-node';
 import { Repository } from 'typeorm';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { LoggerService } from 'src/logger/logger.service';
+import { userDistinctId } from 'src/posthog/posthog.util';
+import { SESSION_BOOKMARKS_ANALYTICS_EVENTS } from '../constants/session-bookmarks-analytics.constants';
 import {
   CreateSessionBookmarkDto,
   SessionBookmarkDto,
@@ -16,9 +20,12 @@ const MAX_BOOKMARKS_PER_USER = 200;
 
 @Injectable()
 export class SessionBookmarksService {
+  private readonly logger = LoggerService.getInstance(SessionBookmarksService.name);
+
   constructor(
     @InjectRepository(SessionBookmark)
     private readonly bookmarks: Repository<SessionBookmark>,
+    private readonly posthog: PostHog,
   ) {}
 
   async create(dto: CreateSessionBookmarkDto): Promise<SessionBookmarkDto> {
@@ -50,6 +57,12 @@ export class SessionBookmarksService {
         source: dto.source ?? 'web',
       }),
     );
+    this.captureBookmarkEvent(
+      userId,
+      SESSION_BOOKMARKS_ANALYTICS_EVENTS.CREATED,
+      saved.sessionId,
+      saved.source,
+    );
     return this.toDto(saved);
   }
 
@@ -65,9 +78,34 @@ export class SessionBookmarksService {
 
   async remove(id: string): Promise<void> {
     const userId = Number(ExecutionManager.getUserId());
-    const result = await this.bookmarks.delete({ id, userId });
-    if (!result.affected)
-      throw new NotFoundException('Saved session not found');
+    const bookmark = await this.bookmarks.findOne({ where: { id, userId } });
+    if (!bookmark) throw new NotFoundException('Saved session not found');
+
+    await this.bookmarks.remove(bookmark);
+    this.captureBookmarkEvent(
+      userId,
+      SESSION_BOOKMARKS_ANALYTICS_EVENTS.REMOVED,
+      bookmark.sessionId,
+      bookmark.source,
+    );
+  }
+
+  /** Analytics must never fail the request. */
+  private captureBookmarkEvent(
+    userId: number,
+    event: (typeof SESSION_BOOKMARKS_ANALYTICS_EVENTS)[keyof typeof SESSION_BOOKMARKS_ANALYTICS_EVENTS],
+    sessionId: string,
+    source: string,
+  ): void {
+    try {
+      this.posthog.capture({
+        distinctId: userDistinctId(userId),
+        event,
+        properties: { session_id: sessionId, source },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to capture ${event} in PostHog: ${error}`);
+    }
   }
 
   private toDto(row: SessionBookmark): SessionBookmarkDto {
