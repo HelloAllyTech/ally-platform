@@ -1,5 +1,5 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 
 export class RecordExternalBuildDto {
   @ApiPropertyOptional({
@@ -9,4 +9,23 @@ export class RecordExternalBuildDto {
   @IsOptional()
   @IsIn(['claude_code'])
   tool?: 'claude_code';
+}
+
+export class SetRoadmapRoleDto {
+  @ApiProperty({
+    enum: ['none', 'idea', 'builder', 'owner'],
+    description:
+      'The Users screen radio. Writes product_roadmap, builder and product_roadmap_manage together.',
+  })
+  @IsIn(['none', 'idea', 'builder', 'owner'])
+  role!: 'none' | 'idea' | 'builder' | 'owner';
+}
+
+export class SetRoadmapPreferencesDto {
+  @ApiPropertyOptional({
+    description: '"Your ideas this week" by email on Mondays. Off by default.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  weeklyDigest?: boolean;
 }
