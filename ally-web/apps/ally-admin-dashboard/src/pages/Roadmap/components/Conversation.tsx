@@ -16,6 +16,11 @@ import type {
 import { CodeText } from "./CodeChip";
 import { mapServerMessagesToFeed } from "../../../hooks/useBuilderStream";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
+import { useRoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
+import { CommentBox, CommentItem } from "../session/CommentBox";
+import { QuestionCard } from "../session/QuestionCard";
+import { commentAnchors, isPlanPost, planStartFeedIndex } from "../session/sessionFeed";
+import { useSessionAnswers } from "../session/useSessionAnswers";
 import { personLabel, shortDate, stageWord } from "../utils/copy";
 
 const noop = () => undefined;
@@ -77,8 +82,11 @@ interface ConversationProps {
  * expands one step in place). Built from Builder's own transcript pieces: the server rows go
  * through `mapServerMessagesToFeed` and agent turns render with `ChatMessage`.
  *
- * Read-only in P2: TODO(P3b) question cards get their own answer box (options 1–9, "Use this
- * answer"), and the comment box to people with @mentions sits under the feed.
+ * P3b (§4.5a): each agent question is a card with its own answer box, answers from several people
+ * with "Use this answer" for the settler; comments to people sit in the feed by time, and the
+ * comment box with @mentions sits under it (on a phone it's the 💬 sheet instead). Answers and
+ * comments arrive in the transcript as `metadata.planPost` rows; they render as those cards, never
+ * as the lead's own messages.
  */
 export const Conversation: React.FC<ConversationProps> = ({
   item,
@@ -92,7 +100,12 @@ export const Conversation: React.FC<ConversationProps> = ({
   const reduced = useReducedMotionPreference();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
-  const serverMessages = useMemo(() => (Array.isArray(messages) ? messages : []), [messages]);
+  const serverMessages = useMemo(
+    () => (Array.isArray(messages) ? messages : []).filter(m => !isPlanPost(m)),
+    [messages],
+  );
+  const session = useSessionAnswers(item);
+  const isPhone = useRoadmapBreakpoint() === "phone";
   const feed = useMemo(() => mapServerMessagesToFeed(serverMessages), [serverMessages]);
   // Who wrote each human turn (builder_messages.createdBy) and when, by server row id.
   const meta = useMemo(() => {
@@ -123,6 +136,16 @@ export const Conversation: React.FC<ConversationProps> = ({
   const currentMarker = copy.phaseMarker(stageWord(item.shownStage), shortDate(item.stageSince));
   const submittedMarker = copy.phases.submitted(item.author?.name ?? copy.unknownPerson);
 
+  const anchors = useMemo(
+    () => commentAnchors(feed, meta, session.comments),
+    [feed, meta, session.comments],
+  );
+  const planStart = useMemo(() => planStartFeedIndex(feed, serverMessages), [feed, serverMessages]);
+  const latestQuestionId = useMemo(() => {
+    for (let i = feed.length - 1; i >= 0; i -= 1) if (feed[i].question) return feed[i].question!.id;
+    return undefined;
+  }, [feed]);
+
   const toggleStep = (id: string) =>
     setExpanded(prev => {
       const next = new Set(prev);
@@ -146,19 +169,16 @@ export const Conversation: React.FC<ConversationProps> = ({
       );
     }
     if (message.question) {
-      // TODO(P3b): the question card with its own answer box. Until then, the question reads as text.
       return (
-        <li key={message.id} className="flex flex-col gap-0.5 py-2">
-          <span className="text-xs font-semibold text-typography-secondary">{agentName}</span>
-          <p className="m-0 text-sm text-typography-primary">
-            <CodeText text={message.question.prompt} />
-          </p>
-          {message.answeredWith && (
-            <p className="m-0 text-xs text-typography-secondary">
-              {copy.answered(message.answeredWith)}
-            </p>
-          )}
-        </li>
+        <QuestionCard
+          key={message.id}
+          question={message.question}
+          legacyAnswer={message.answeredWith}
+          item={item}
+          session={session}
+          agentName={agentName}
+          latest={message.question.id === latestQuestionId}
+        />
       );
     }
     const open = showAgentWork || expanded.has(message.id);
@@ -260,14 +280,26 @@ export const Conversation: React.FC<ConversationProps> = ({
         )}
         {feed.map((message, index) => (
           <React.Fragment key={message.id}>
+            {index === planStart && <PhaseMarker label={en.roadmapV2.session.phasePlan} />}
             {index === markerIndex && <PhaseMarker label={currentMarker} />}
+            {(anchors.get(message.id) ?? []).map(post => (
+              <CommentItem key={post.id} post={post} />
+            ))}
             {renderMessage(message, index)}
           </React.Fragment>
+        ))}
+        {(anchors.get(null) ?? []).map(post => (
+          <CommentItem key={post.id} post={post} />
         ))}
         {markerIndex === -1 && item.shownStage !== "submitted" && !isLoading && (
           <PhaseMarker label={currentMarker} />
         )}
       </ol>
+      {!isPhone && (
+        <div className="pt-3">
+          <CommentBox item={item} session={session} />
+        </div>
+      )}
     </section>
   );
 };

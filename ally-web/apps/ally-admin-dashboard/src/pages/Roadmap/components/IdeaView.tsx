@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Close, DockToRight, Maximize } from "@icons";
+import { Chat, Close, DockToRight, Maximize } from "@icons";
 import { AnimatePresence, PanInfo, motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
@@ -41,7 +41,9 @@ import { DraftView } from "../drafts/DraftView";
 import { RoadmapBreakpoint, sidePanelMode } from "../hooks/useRoadmapBreakpoint";
 import { PresenceEntry } from "../hooks/useRoadmapRealtime";
 import { useKeyboardInset } from "../hooks/useVisualViewport";
+import { CommentBox } from "../session/CommentBox";
 import { FirstSubmitNote } from "../session/FirstSubmitNote";
+import { useSessionAnswers } from "../session/useSessionAnswers";
 import {
   IDEA_PANEL_TABS,
   IdeaPanelTab,
@@ -480,6 +482,7 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
             paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))",
           }}
         >
+          <PhoneCommentButton item={item} />
           <div className="min-w-0 flex-1">{primary}</div>
         </div>
       </div>
@@ -622,3 +625,30 @@ const PhoneHeader: React.FC<{
   );
 };
 
+/** The phone's 💬: the comment sheet, with the 56 px mic and @mentions (§4.17). */
+const PhoneCommentButton: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
+  const copy = en.roadmapV2.session;
+  const session = useSessionAnswers(item);
+  const [open, setOpen] = useState(false);
+  if (!item.can?.comment || !session.enabled) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={copy.commentOpen}
+        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border-light"
+      >
+        <Chat size={20} aria-hidden />
+      </button>
+      <BottomSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={copy.commentSheet}
+        closeLabel={en.roadmapV2.mobile.close}
+      >
+        <CommentBox item={item} session={session} large autoFocus onSent={() => setOpen(false)} />
+      </BottomSheet>
+    </>
+  );
+};
