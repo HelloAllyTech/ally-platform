@@ -2088,6 +2088,84 @@ describe('BuilderPullRequestService', () => {
       expect(notificationService.prReadyToMerge).toHaveBeenCalled();
     });
 
+    /**
+     * The PM Agent's sessions carry the per-session override `auto`: they merge with
+     * auto-merge off globally, every other session does not, and the global kill switch
+     * still wins. The other safeguards are the same tests above, unchanged.
+     */
+    describe('a session with the auto override', () => {
+      beforeEach(() => {
+        settingsService.get.mockResolvedValue(
+          on({
+            autoMergeEnabled: false,
+            autoReviewEnabled: false,
+            autoApproveEnabled: false,
+            autoFixEnabled: false,
+          }),
+        );
+      });
+
+      it('merges although auto-merge is off globally', async () => {
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockResolvedValue('auto');
+
+        await tick();
+
+        expect(sessionRepository.findAutonomyOverride).toHaveBeenCalledWith(
+          'session-1',
+        );
+        expect(github.mergePullRequest).toHaveBeenCalled();
+      });
+
+      it('leaves every other session on the global switches', async () => {
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockResolvedValue(null);
+
+        await tick();
+
+        expect(github.mergePullRequest).not.toHaveBeenCalled();
+      });
+
+      it('still honours the global kill switch', async () => {
+        settingsService.get.mockResolvedValue(on({ enabled: false }));
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockResolvedValue('auto');
+
+        await tick();
+
+        expect(github.mergePullRequest).not.toHaveBeenCalled();
+      });
+
+      it('still needs a review that passed on this exact head', async () => {
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockResolvedValue('auto');
+        const attempted = openPr({
+          headSha: 'abc1234def',
+          reviewedSha: 'abc1234def',
+          reviewPassedSha: null,
+        });
+        repository.findOne.mockResolvedValue(attempted);
+
+        await tick({}, attempted);
+
+        expect(github.mergePullRequest).not.toHaveBeenCalled();
+      });
+
+      it('falls back to the global settings when the override cannot be read', async () => {
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockRejectedValue(new Error('db down'));
+
+        await tick();
+
+        expect(github.mergePullRequest).not.toHaveBeenCalled();
+      });
+    });
+
     /** What a reader acts on differs, so the sentence differs. */
     it('says whether a release is on the way', async () => {
       settingsService.get.mockResolvedValue(on({ autoReleaseEnabled: true }));
@@ -2338,6 +2416,37 @@ describe('BuilderPullRequestService', () => {
         autoReleaseEnabled: false,
         maxFixRunsPerPr: 3,
       });
+
+      await merge();
+
+      expect(releaseService.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('releases a PM Agent session (override auto) with auto-release off globally', async () => {
+      settingsService.get.mockResolvedValue({
+        enabled: true,
+        autoReleaseEnabled: false,
+        maxFixRunsPerPr: 3,
+      });
+      sessionRepository.findAutonomyOverride = jest
+        .fn()
+        .mockResolvedValue('auto');
+
+      await merge();
+
+      expect(releaseService.dispatch).toHaveBeenCalled();
+    });
+
+    it('does not release an override session while the release health hold is on', async () => {
+      settingsService.get.mockResolvedValue({
+        enabled: true,
+        autoReleaseEnabled: false,
+        maxFixRunsPerPr: 3,
+      });
+      sessionRepository.findAutonomyOverride = jest
+        .fn()
+        .mockResolvedValue('auto');
+      repository.count.mockResolvedValue(1); // a release is unhealthy
 
       await merge();
 

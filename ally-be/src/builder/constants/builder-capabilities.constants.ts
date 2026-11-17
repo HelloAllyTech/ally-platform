@@ -1118,6 +1118,29 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     modules: ['ally-be:src/github'],
     keywords: ['github', 'workflow', 'pull request', 'release tag'],
   },
+  {
+    id: 'pm-agent',
+    name: 'PM Agent (AI product manager)',
+    whatItIs:
+      'An admin feed of at most N recommendation or question cards drafted from analytics, code ' +
+      'and strategy; accepting a recommendation compiles it into a Builder session that builds, ' +
+      'merges and releases it.',
+    reuseWhen:
+      'A request wants the platform to suggest what to build next, to queue cards for an admin ' +
+      'to accept or reject, or to hand an accepted idea to Builder automatically.',
+    extendVia:
+      'PM_AGENT_RUN_TRIGGER (the generation pipeline) and PmAgentCardRepository for new cards.',
+    modules: ['ally-be:src/pm-agent'],
+    docs: ['ally-be:docs/pm-agent.md'],
+    adminRoute: '/pm-agent',
+    keywords: [
+      'pm agent',
+      'product manager',
+      'recommendation',
+      'suggestion',
+      'what to build',
+    ],
+  },
 ];
 
 /**

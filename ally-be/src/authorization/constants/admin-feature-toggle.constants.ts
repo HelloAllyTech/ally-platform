@@ -151,6 +151,11 @@ export enum FeatureToggleKey {
   // Builder: the PRD-interview + coding agent that opens PRs
   BUILDER = 'builder',
 
+  // PM Agent (docs/pm-agent.md): the admin AI product manager whose accepted
+  // recommendations are built by Builder. Backfilled ON for the platform tier by
+  // migration 1982000000000; the agent itself ships switched off.
+  PM_AGENT = 'pm_agent',
+
   // Course Copilot: the agent that interviews a trainer and builds a whole
   // DRAFT course (Track 2.0) from the answers, then edits it on request.
   COURSE_COPILOT = 'course_copilot',
@@ -562,6 +567,17 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Interview an agent into a PRD, then have it build the feature and open pull requests for review — from the Builder tab or from a Product Roadmap card.',
     legacyGrants: SUPER_ADMIN_TIER,
+  },
+  {
+    key: FeatureToggleKey.PM_AGENT,
+    label: 'PM Agent',
+    description:
+      "Review the AI product manager's recommendations and questions, accept them into Builder builds that merge and release automatically, and configure its budget, queue and memory.",
+    // Backfilled ON for platform-tier admins by 1982000000000-CreatePmAgent; inert like
+    // every key added after the role-collapse cutover.
+    legacyGrants: SUPER_ADMIN_TIER,
+    // Reads every organisation's aggregates and ships platform-wide changes.
+    platformOnly: true,
   },
   {
     key: FeatureToggleKey.CONTEXT_LIBRARY,

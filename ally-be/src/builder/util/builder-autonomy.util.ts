@@ -71,3 +71,29 @@ export const nextAutonomyLevel = (
   level: BuilderAutonomyLevel | 'custom',
 ): 'auto_merge' | 'auto' | null =>
   level === 'assist' ? 'auto_merge' : level === 'auto_merge' ? 'auto' : null;
+
+/**
+ * A per-session autonomy override (BuilderSession.autonomyOverride). Only `auto` exists: the
+ * PM Agent's sessions merge and release on their own while every other session keeps the
+ * global switches. Stored as a column so it is visible and auditable on the session row.
+ */
+export type BuilderAutonomyOverride = 'auto';
+export const BUILDER_AUTONOMY_OVERRIDES: BuilderAutonomyOverride[] = ['auto'];
+
+/**
+ * The switches that govern ONE session: the global settings, with the session's override
+ * applied on top.
+ *
+ * The global kill switch always wins — an override never turns a disabled Builder back on,
+ * and with `enabled` false the settings come back untouched. Every other field (spend caps,
+ * fix-run ceiling, models) is the global value; only the five autonomy switches move.
+ */
+export const effectiveAutonomySettings = <
+  T extends AutonomySwitches & { enabled: boolean },
+>(
+  settings: T,
+  override: string | null | undefined,
+): T => {
+  if (!settings.enabled || override !== 'auto') return settings;
+  return { ...settings, ...switchesForAutonomyLevel('auto') };
+};

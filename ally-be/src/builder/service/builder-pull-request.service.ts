@@ -23,6 +23,7 @@ import {
   BuilderPullRequestRepository,
 } from '../repository/builder-build.repository';
 import { BuilderSessionRepository } from '../repository/builder-session.repository';
+import { effectiveAutonomySettings } from '../util/builder-autonomy.util';
 import { BuilderNotificationService } from './builder-notification.service';
 import { BuilderSettingsService } from './builder-settings.service';
 import { BuilderBuildService } from './builder-build.service';
@@ -693,7 +694,7 @@ export class BuilderPullRequestService {
       headSha?: string | null;
     },
   ): Promise<boolean> {
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoMergeEnabled) return false;
     if (await this.releaseIsUnhealthy()) return false;
 
@@ -749,6 +750,28 @@ export class BuilderPullRequestService {
         }`,
       );
       return false;
+    }
+  }
+
+  /**
+   * The Builder settings that govern this pull request's session: the global row with the
+   * session's autonomy override applied (effectiveAutonomySettings). Today only PM Agent
+   * sessions carry one (`auto`); for every other session this is exactly the global row.
+   *
+   * The global kill switch still wins, and every other safeguard on the paths that read this
+   * — a review passed on the exact head, `mergeable_state` clean, nothing actionable, the
+   * post-release health hold — is unchanged. An override that cannot be read falls back to
+   * the global settings: failing closed to the stricter answer.
+   */
+  private async settingsForSession(sessionId: string) {
+    const settings = await this.settingsService.get();
+    if (!settings.enabled) return settings;
+    try {
+      const override =
+        await this.sessionRepository.findAutonomyOverride(sessionId);
+      return effectiveAutonomySettings(settings, override);
+    } catch {
+      return settings;
     }
   }
 
@@ -958,7 +981,7 @@ export class BuilderPullRequestService {
   ): Promise<void> {
     if (pullRequest.releaseState) return;
 
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoReleaseEnabled) return;
     if (await this.releaseIsUnhealthy()) return;
 
@@ -1628,7 +1651,7 @@ export class BuilderPullRequestService {
     headSha: string | null,
     rollup: CheckRollup | null,
   ): Promise<boolean> {
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoReviewEnabled) return false;
 
     // Only opencode pull requests are reviewed, in their own repo's Actions.
@@ -1829,7 +1852,7 @@ export class BuilderPullRequestService {
     // Waiting on a person: a review that was already in flight must not
     // approve it behind their back.
     if (pullRequest.needsHumanAt) return;
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoApproveEnabled) return;
 
     // The approve call posts a new review every time it is made, and this now
@@ -2113,7 +2136,7 @@ export class BuilderPullRequestService {
       return;
     }
 
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoFixEnabled) return;
     const pending = await this.feedbackRepository.countPending(pullRequest.id);
     const ceiling = settings.maxFixRunsPerPr ?? 0;

@@ -68,6 +68,8 @@ export const FeatureToggleKey = {
   /** Debriefs › Settings › Schedules: engineering, granted person by person. Mirrors ally-be. */
   DEBRIEF_SCHEDULES: "debrief_schedules",
   BUILDER: "builder",
+  // PM Agent: the daily AI product manager. Ships off; mirrors ally-be FeatureToggleKey.PM_AGENT.
+  PM_AGENT: "pm_agent",
   // The Context Library page: documents, entries and use-case grants. Mirrors ally-be.
   CONTEXT_LIBRARY: "context_library",
   COURSE_COPILOT: "course_copilot",
@@ -144,6 +146,7 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.WHATSAPP_BOT, FeatureToggleKey.WHATSAPP_BOT],
     [sidebarItems.BUG_HUNTER, FeatureToggleKey.BUG_HUNTER],
     [sidebarItems.BUILDER, FeatureToggleKey.BUILDER],
+    [sidebarItems.PM_AGENT, FeatureToggleKey.PM_AGENT],
     [sidebarItems.ANALYTICS, FeatureToggleKey.ANALYTICS],
     // DEBRIEFS is not here: the Analytics toggle OR the clinical advisor's, with a console
     // permission (utils/navigation.ts), as the console's routes require.
@@ -214,6 +217,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.OPERATIONAL_ADMIN_ACTIONS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BUG_HUNTER]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BUILDER]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
+  [FeatureToggleKey.PM_AGENT]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.CONTEXT_LIBRARY]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.COURSE_COPILOT]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.ALLY_GUIDE]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,

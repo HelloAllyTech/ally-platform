@@ -182,6 +182,11 @@ export enum LlmTask {
   // own label because the input is telemetry aggregates rather than an
   // analytics window, so its token profile tracks detector count, not date range.
   UX_SIGNALS = 'ux_signals',
+  // PM Agent (src/pm-agent, docs/pm-agent.md): the admin AI product manager's own
+  // analysis — lanes, critic, ranker. Its own label because the agent's monthly budget is
+  // read from llm_usage rows carrying it (PmAgentBudgetService, IST month). The pipeline
+  // may add finer `pm_agent_*` labels per lane; the budget sums those too.
+  PM_AGENT = 'pm_agent',
   // Foundational helping skills (src/foundational-skills): one call per
   // 5,000-character cut of a learner's roleplay speech, scoring it against the
   // fixed foundational helping skills rubric. Scheduled, never on a request path. Its own

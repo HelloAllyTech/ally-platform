@@ -3840,6 +3840,9 @@ export const en = {
     drawerCopyLinkFailed: "Couldn't copy the link.",
   },
 
+  pmAgent: {
+    tabLabel: "PM Agent",
+  },
   builder: {
     tabLabel: "Builder",
     // ── Voice ────────────────────────────────────────────────────────────

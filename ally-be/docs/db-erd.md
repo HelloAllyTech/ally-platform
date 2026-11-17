@@ -357,6 +357,29 @@ erDiagram
 
 ---
 
+## 9. PM Agent (`src/pm-agent`)
+
+Real FK constraints here (migration `1982000000000`). `pm_agent_settings` and `pm_agent_lane_stats`
+stand alone. See `docs/pm-agent.md`.
+
+```mermaid
+erDiagram
+    pm_agent_runs ||--o{ pm_agent_run_steps : "runId"
+    pm_agent_runs ||--o{ pm_agent_evidence : "runId"
+    pm_agent_runs ||--o{ pm_agent_cards : "runId"
+    pm_agent_cards ||--o{ pm_agent_cards : "revisedFromCardId"
+    pm_agent_cards ||--o{ pm_agent_card_events : "cardId"
+    pm_agent_cards ||--o{ pm_agent_feedback : "cardId"
+    pm_agent_cards ||--o| pm_agent_outbox : "cardId"
+    pm_agent_cards ||--o| pm_agent_outcomes : "cardId"
+    pm_agent_cards ||--o{ pm_agent_memory : "sourceCardId"
+    pm_agent_cards ||--o{ pm_agent_signals : "cardId"
+    builder_sessions ||--o| pm_agent_cards : "builderSessionId"
+    roadmap_opportunities ||--o{ pm_agent_cards : "roadmapOpportunityId"
+```
+
+---
+
 ## Standalone tables (no `*Id` references either way)
 
 `analytics_quality_thresholds`, `eval_experiments`, `cloud_telephony_integrations`, `blogs`,

@@ -34,6 +34,7 @@ export * from "./analyticsSuggestions";
 export * from "./bugHunter";
 export * from "./uxSignals";
 export * from "./builder";
+export * from "./pmAgent";
 export * from "./whatsappBot";
 export * from "./chatbots";
 export * from "./botPage";

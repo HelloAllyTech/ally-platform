@@ -1956,6 +1956,23 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     promptOverride: 'ux_signals_triage',
   },
   {
+    id: 'pm-agent',
+    task: LlmTask.PM_AGENT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Scheduled daily (or Run now) while the PM Agent is enabled and its queue has free slots',
+    detail:
+      "The admin PM Agent's bounded analysis lanes, critic and ranker, producing at most " +
+      'queueCap recommendation/question cards. Spend is capped by the monthly budget in ' +
+      'pm_agent_settings (reserve-before-spend, IST month); a full queue costs nothing. ' +
+      'Per-lane rows are added with the pipeline.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+  },
+  {
     id: 'foundational-skills-judge',
     task: LlmTask.FOUNDATIONAL_SKILLS_ASSESSMENT,
     runtime: LlmRuntime.ALLY_BE,

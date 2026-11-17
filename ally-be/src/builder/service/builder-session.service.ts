@@ -34,7 +34,10 @@ import {
   BuilderSessionStatus,
 } from '../enum/builder.enum';
 import { BuilderPrdReadiness } from '../type/builder-prd.type';
-import { builderRequesters } from '../util/builder-requesters.registry';
+import {
+  builderRequesters,
+  PM_AGENT_REQUESTER,
+} from '../util/builder-requesters.registry';
 
 export type BuilderSessionListItem = BuilderSession & {
   createdByName: string | null;
@@ -170,6 +173,10 @@ export class BuilderSessionService {
         handoffContext: this.boundHandoff(params.handoffContext),
         requestedBy: params.requestedBy ?? null,
         requestRef: params.requestRef ?? null,
+        // The PM Agent's builds merge and release on their own (docs/pm-agent.md); every
+        // other session keeps the global switches.
+        autonomyOverride:
+          params.requestedBy === PM_AGENT_REQUESTER ? 'auto' : null,
         createdBy: userId,
         updatedBy: userId,
       }),

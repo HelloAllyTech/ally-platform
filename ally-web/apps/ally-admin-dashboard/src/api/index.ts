@@ -33,6 +33,7 @@ export * from "./blog";
 export * from "./productUpdates";
 export * from "./aiLab";
 export * from "./builder";
+export * from "./pmAgent";
 export * from "./builderEval";
 export * from "./evaluatorPortal";
 export * from "./productRoadmap";
