@@ -1,18 +1,14 @@
 import { UxSignalReadService } from '../ux-signal-read.service';
 import { BugFindingSource } from 'src/bug-hunter/enum/bug-finding.enum';
-import {
-  AnalyticsSuggestionSource,
-  AnalyticsSuggestionStatus,
-} from 'src/analytics-suggestions/enum/analytics-suggestion.enum';
+import { PmSignalStatus } from 'src/pm-agent/enum/pm-agent.enum';
 import { UX_SIGNAL_EVIDENCE_LIMITS } from '../../constants/ux-signals.constants';
 
 /**
  * The read side's three load-bearing properties, each of which fails silently
  * if it regresses:
  *
- *  1. A rejected suggestion never comes back. The queue's own anti-repetition
- *     rule exists because re-proposing a decided card is how a review queue
- *     loses its readers; laundering one through a PRD is the same failure.
+ *  1. A dismissed signal never comes back. Anti-repetition exists because
+ *     re-proposing a decided item is how a review queue loses its readers; laundering one through a PRD is the same failure.
  *  2. The scan window survives the projection. Friction with no dates gets
  *     stated in the present tense.
  *  3. "Nothing has looked" and "nothing is wrong" stay distinguishable.
@@ -67,7 +63,7 @@ describe('UxSignalReadService', () => {
     );
   });
 
-  it('never returns a rejected suggestion', async () => {
+  it('never returns a dismissed signal', async () => {
     const { service, suggestionBuilder } = build();
 
     await service.frictionEvidence();
@@ -76,19 +72,17 @@ describe('UxSignalReadService', () => {
       call.sql.includes('s.status'),
     );
     expect(statusClause.params.statuses).toEqual([
-      AnalyticsSuggestionStatus.PENDING,
-      AnalyticsSuggestionStatus.ACCEPTED,
+      PmSignalStatus.NEW,
+      PmSignalStatus.USED,
     ]);
     expect(statusClause.params.statuses).not.toContain(
-      AnalyticsSuggestionStatus.REJECTED,
+      PmSignalStatus.DISMISSED,
     );
 
     const sourceClause = suggestionBuilder.calls.find((call: any) =>
       call.sql.includes('s.source'),
     );
-    expect(sourceClause.params.source).toBe(
-      AnalyticsSuggestionSource.UX_SIGNAL,
-    );
+    expect(sourceClause.params.source).toBe('ux_signals');
   });
 
   it('carries the scan window and splits the route back out of the symbol', async () => {

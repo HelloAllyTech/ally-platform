@@ -700,20 +700,37 @@ export const ApiEndpoints = {
     ASK: "/v1/analytics/agent/ask",
     CATALOG: "/v1/analytics/agent/catalog",
   },
-  // Analytics Suggestions — its own namespace for the same reason as the agent's:
-  // the elevated super-duper-admin tier, because accepting a suggestion writes
-  // onto the product roadmap rather than only reading a chart.
-  ANALYTICS_SUGGESTIONS: {
-    LIST: "/v1/analytics/suggestions",
-    GENERATE: "/v1/analytics/suggestions/generate",
-    ACCEPT: (id: string) => `/v1/analytics/suggestions/${id}/accept`,
-    REJECT: (id: string) => `/v1/analytics/suggestions/${id}/reject`,
-  },
-  // UX Signals — the PostHog scan that files into Bug Hunter and the Suggestions
-  // queue. Its own namespace because it is a producer for both, owned by neither.
+  // UX Signals — the PostHog scan that files bugs into Bug Hunter and improvement
+  // signals for the PM Agent. Its own namespace because it is a producer for both,
+  // owned by neither.
   UX_SIGNALS: {
     SCAN: "/v1/ux-signals/scan",
     SCANS: "/v1/ux-signals/scans",
+  },
+  // PM Agent: the daily AI product manager's card feed (ally-be `docs/pm-agent.md`). Not to be
+  // confused with DEBRIEF_CONSOLE.PM_AGENT, which is the debrief console's own idea agent.
+  PM_AGENT: {
+    STATE: "/v1/pm-agent/state",
+    CARDS: "/v1/pm-agent/cards",
+    CARD: (id: string) => `/v1/pm-agent/cards/${id}`,
+    ACCEPT: (id: string) => `/v1/pm-agent/cards/${id}/accept`,
+    UNDO: (id: string) => `/v1/pm-agent/cards/${id}/undo`,
+    REJECT: (id: string) => `/v1/pm-agent/cards/${id}/reject`,
+    REASON: (id: string) => `/v1/pm-agent/cards/${id}/reason`,
+    FEEDBACK: (id: string) => `/v1/pm-agent/cards/${id}/feedback`,
+    ANSWER: (id: string) => `/v1/pm-agent/cards/${id}/answer`,
+    SKIP: (id: string) => `/v1/pm-agent/cards/${id}/skip`,
+    PLAN_MD: (id: string) => `/v1/pm-agent/cards/${id}/plan.md`,
+    RETRY: (id: string) => `/v1/pm-agent/cards/${id}/retry`,
+    DISMISS: (id: string) => `/v1/pm-agent/cards/${id}/dismiss`,
+    TRACKING: "/v1/pm-agent/tracking",
+    RUN: "/v1/pm-agent/run",
+    RUNS: "/v1/pm-agent/runs",
+    SETTINGS: "/v1/pm-agent/settings",
+    MEMORY: "/v1/pm-agent/memory",
+    MEMORY_BY_ID: (id: string) => `/v1/pm-agent/memory/${id}`,
+    HISTORY: "/v1/pm-agent/history",
+    HEALTH: "/v1/pm-agent/health",
   },
   BUG_HUNTER: {
     SETTINGS: "/v1/bug-hunter/settings",
@@ -1237,6 +1254,7 @@ export const ROUTES = {
   AI_LAB: "/ai-lab",
   PRODUCT_ROADMAP: "/product-roadmap",
   BUG_HUNTER: "/bug-hunter",
+  PM_AGENT: "/pm-agent",
   BUILDER: "/builder",
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",
@@ -1433,8 +1451,14 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_IDEA_DRAFTS: "productRoadmapIdeaDrafts",
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
-  // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.
-  ANALYTICS_SUGGESTIONS: "analyticsSuggestions",
+  // PM Agent (also registered in baseApi.ts's `tagTypes`).
+  PM_AGENT_STATE: "pmAgentState",
+  PM_AGENT_CARDS: "pmAgentCards",
+  PM_AGENT_TRACKING: "pmAgentTracking",
+  PM_AGENT_SETTINGS: "pmAgentSettings",
+  PM_AGENT_MEMORY: "pmAgentMemory",
+  PM_AGENT_HISTORY: "pmAgentHistory",
+  PM_AGENT_HEALTH: "pmAgentHealth",
   ANALYTICS_CHART_PREFERENCES: "analyticsChartPreferences",
   BUG_HUNTER_SETTINGS: "bugHunterSettings",
   // Also registered in baseApi.ts's `tagTypes` — an unregistered tag is

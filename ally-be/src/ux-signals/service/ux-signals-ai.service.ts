@@ -22,7 +22,7 @@ const AI_TASK_ID = 'ux-signals';
  * The one LLM call in a scan: threshold-crossing signals in, clustered and
  * classified items out.
  *
- * Mirrors AnalyticsSuggestionsAiService deliberately — same prompt-file-as-system
+ * Follows the conventions of the other single-call LLM services deliberately — same prompt-file-as-system
  * -prompt convention, same defensive JSON parsing, same mandatory metering. The
  * two are near-identical because the platform has no shared agent-runner
  * abstraction; when one is written, both should move to it together.

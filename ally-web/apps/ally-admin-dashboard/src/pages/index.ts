@@ -34,6 +34,7 @@ export * from "./Logs/Logs";
 export * from "./MobileReleases/MobileReleases";
 export * from "./BugHunter";
 export * from "./Builder";
+export * from "./PmAgent";
 export * from "./CourseCopilot";
 export * from "./Onboarding";
 export * from "./AgentTestCases/AgentTestCases";

@@ -370,7 +370,7 @@ import { TenantModule } from 'src/tenant/tenant.module';
     DashboardRepository,
   ],
   /**
-   * The per-chart aggregate services, exported for AnalyticsSuggestionsModule.
+   * The per-chart aggregate services, exported for the PM Agent and the dashboard.
    *
    * Only the `getX(query)` read services are exported — never the repositories,
    * the judges, or the backfill schedulers. A consumer that wants a figure gets

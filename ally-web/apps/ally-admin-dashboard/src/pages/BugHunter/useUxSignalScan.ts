@@ -137,16 +137,11 @@ export const useUxSignalScan = (): UxSignalScanControl => {
     setWatchedScanId(null);
     announce(lastScan);
 
-    // The findings and suggestions exist *now*, which is why the invalidation is
+    // The findings and signals exist *now*, which is why the invalidation is
     // here and not on the mutation: at the moment the scan was started there was
     // nothing new to fetch.
     if (lastScan.status === UxSignalScanStatus.COMPLETED) {
-      dispatch(
-        baseAPI.util.invalidateTags([
-          { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
-          { type: TAG_TYPES.ANALYTICS_SUGGESTIONS, id: "LIST" },
-        ]),
-      );
+      dispatch(baseAPI.util.invalidateTags([{ type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" }]));
     }
   }, [lastScan, watchedScanId, dispatch]);
 

@@ -194,6 +194,10 @@ describe('Builder session visibility — every reader is accounted for', () => {
       'plan reads by id; every list scopes its own WHERE to the author or to shared plans (product-roadmap/plan/*)',
     'builder/service/builder-pull-request.service.ts':
       'by id for a pull request, and the failed-run sweep; returns nothing to a viewer',
+    'pm-agent/service/pm-agent-builder-port.service.ts':
+      "by id (and by requester + card id) for the PM Agent's own pm_agent sessions; never lists, returns status only",
+    'pm-agent/service/pm-agent-presenter.service.ts':
+      "status and cost of the PM Agent's own linked sessions, by id; never lists",
   };
 
   const root = join(__dirname, '..', '..', '..');

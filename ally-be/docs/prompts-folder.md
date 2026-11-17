@@ -292,7 +292,7 @@ over accepting whatever arrived.
 
 ### Code-read one-shot prompts
 
-A third shape sits between the two: a folder like `analytics_suggestions/`, `ux_signals/`,
+A third shape sits between the two: a folder like `ux_signals/`,
 `bug_hunter/` or `product_updates/` holds the system prompt for a **single** call that a feature
 makes on demand or on a schedule, read through `getPromptByCode` like an agent prompt but not
 driving a conversation. `bug_hunter/classify_repo.txt`, `bug_hunter/classify_miss.txt`, `bug_hunter/decide.txt` and `bug_hunter/review_study.txt` (a second model reads a fix session's study of the feature, including who else reads the value it changes, before any code changes) are the
@@ -307,6 +307,15 @@ and code enforces what the prompt asks — public text carrying jargon is capped
 the team digest flags it — rather than trusting the model to comply. Since 2026-10-01 public is the
 default audience, staff-tool work included; internal is kept for work of no value to anyone, and a
 wrong call is corrected from the admin console's audience toggle.
+
+`pm_agent/` holds the PM Agent's system prompts ([pm-agent.md](pm-agent.md)): one per analysis lane
+(`lane_analytics.txt`, `lane_ux_signals.txt`, `lane_code_health.txt`, `lane_infra_cost.txt`,
+`lane_strategy_content.txt`, `lane_revisions.txt`) and `critic.txt`. They are agent-shaped (a read-only
+tool loop) but their answer is a single closing tool call (`submit_candidates`, `submit_verdicts`)
+that code validates field by field against the card contract; anything that fails is repaired once,
+then discarded. None has runtime variables: the run's data arrives as fenced tool results. Each lane
+prompt repeats the card rules on purpose — the limits are enforced in code either way, and a lane
+edited alone in the Skills Store must still read whole.
 
 `skill_experiment/` (`judge.txt`, `designer.txt`, `challenger_generator.txt`) is the same shape: the judge, the prompt
 designer and the challenger generator behind auto-improve ([skill-experiments.md](skill-experiments.md)). Their payload — a rubric
