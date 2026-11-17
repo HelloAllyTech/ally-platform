@@ -63,6 +63,11 @@ export enum PlanEventKind {
   PLANNING_STARTED = 'planning_started',
   /** "Use this answer": the settler chose between conflicting answers (D13). */
   ANSWER_SETTLED = 'answer_settled',
+  /**
+   * The build brief went to Claude Code (D18, §4.5b). `detail` is { tool }.
+   * The idea's PRs carrying its code then drive release (linkDrivesRelease).
+   */
+  EXTERNAL_BUILD = 'external_build',
 }
 
 /** What a plan notification says (plan_notifications.kind). */
