@@ -275,6 +275,101 @@ describe('BuilderBuildService', () => {
     });
   });
 
+  describe('a retry while an earlier run’s pull request is still open', () => {
+    it('picks up that pull request instead of raising a second issue', async () => {
+      pullRequestRepository.findOne.mockResolvedValue({
+        prNumber: 277,
+        prUrl: 'https://github.com/o/ally-platform/pull/277',
+        branch: 'opencode/issue274-20261117055235',
+        repo: 'ally-be',
+        merged: false,
+        state: 'open',
+      });
+
+      const run = await service.startBuild(
+        readySession({ status: BuilderSessionStatus.FAILED }) as any,
+        1,
+      );
+
+      expect(github.createIssue).not.toHaveBeenCalled();
+      expect(runRepository.update).toHaveBeenCalledWith(
+        { id: run.id },
+        expect.objectContaining({
+          issueNumber: 274,
+          issueUrl: 'https://github.com/o/ally-platform/issues/274',
+          status: 'RUNNING',
+        }),
+      );
+    });
+
+    it('raises a new issue when nothing is open', async () => {
+      pullRequestRepository.findOne.mockResolvedValue(null);
+
+      await service.startBuild(readySession() as any, 1);
+
+      expect(github.createIssue).toHaveBeenCalled();
+    });
+  });
+
+  describe('reviving a failed issue build whose pull request went green', () => {
+    const failedRun = (overrides: Record<string, any> = {}) =>
+      ({
+        id: 'run-3',
+        sessionId: 'session-1',
+        status: 'FAILED',
+        mode: 'build',
+        issueNumber: 274,
+        milestoneId: 'm1',
+        repos: ['ally-be'],
+        dispatchedAt: new Date(),
+        ...overrides,
+      }) as any;
+
+    beforeEach(() => {
+      sessionRepository.findOne.mockResolvedValue(
+        readySession({ status: BuilderSessionStatus.FAILED }),
+      );
+      runRepository.isLatestForSession.mockResolvedValue(true);
+      epicService.listBySession.mockResolvedValue([
+        { id: 'm1', status: 'FAILED' },
+      ]);
+    });
+
+    it('reopens the session and settles the run SUCCEEDED', async () => {
+      const settle = jest.spyOn(service, 'settleRun').mockResolvedValue();
+
+      await expect(service.reviveIssueRun(failedRun())).resolves.toBe(true);
+
+      expect(sessionRepository.update).toHaveBeenCalledWith(
+        { id: 'session-1' },
+        expect.objectContaining({ status: BuilderSessionStatus.BUILDING }),
+      );
+      expect(settle).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'run-3' }),
+        'SUCCEEDED',
+        null,
+      );
+    });
+
+    it('leaves a session that has moved on alone', async () => {
+      const settle = jest.spyOn(service, 'settleRun').mockResolvedValue();
+      runRepository.isLatestForSession.mockResolvedValue(false);
+
+      await expect(service.reviveIssueRun(failedRun())).resolves.toBe(false);
+      expect(settle).not.toHaveBeenCalled();
+    });
+
+    it('leaves a session a person stopped alone', async () => {
+      const settle = jest.spyOn(service, 'settleRun').mockResolvedValue();
+      sessionRepository.findOne.mockResolvedValue(
+        readySession({ status: BuilderSessionStatus.CANCELLED }),
+      );
+
+      await expect(service.reviveIssueRun(failedRun())).resolves.toBe(false);
+      expect(settle).not.toHaveBeenCalled();
+    });
+  });
+
   describe('issue dispatch — what does not apply to it', () => {
     it("ignores Builder's model catalog, runner-minute ceiling and spend ceiling", async () => {
       // opencode uses the repo's BUILDER_MODEL on the repo's own Actions.

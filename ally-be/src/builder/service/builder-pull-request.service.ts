@@ -74,6 +74,37 @@ const ISSUE_BUILD_WORKFLOW = 'builder.yml';
 const ISSUE_BUILD_TIMEOUT_MS = 60 * 60_000;
 /** `/oc` fix requests Builder makes on red CI before failing the build. */
 const ISSUE_FIX_REQUESTS = 2;
+/** How far back a FAILED issue build is still watched for its PR going green. */
+const ISSUE_RECOVERY_WINDOW_MS = 3 * 24 * 60 * 60_000;
+
+/**
+ * The `/oc` comment asking opencode to fix red CI on its pull request.
+ *
+ * Carries each failing job's log tail, because the check's name alone does
+ * not say what is wrong, and tells opencode to follow the repository's own
+ * rules (AGENTS.md and the docs it links) rather than satisfy a guard
+ * mechanically — a guard check is a rule, not an obstacle.
+ */
+export function renderIssueFixRequest(
+  failed: string[],
+  excerpts: Record<string, string>,
+): string {
+  const parts = [
+    `/oc CI failed on this pull request: ${failed.join(', ') || 'see the checks'}. ` +
+      'Read the failing checks, fix the cause on this branch, and keep every check passing. ' +
+      'Do not change a test to make it pass unless the test itself is wrong, and say so if it is.',
+    'When a check enforces a repository rule (prompt files, docs map, AI task registry and the like), ' +
+      'read the rule in AGENTS.md and the doc it links, and do what the rule asks. ' +
+      'Do not edit unrelated files only to make the check pass.',
+  ];
+  for (const name of failed) {
+    const excerpt = excerpts[name];
+    if (!excerpt) continue;
+    parts.push(`Output of "${name}":\n\n\`\`\`\n${excerpt}\n\`\`\``);
+  }
+  return parts.join('\n\n');
+}
+
 /** How long a `/oc` request on feedback may go unanswered before it is retried. */
 const OC_FIX_TIMEOUT_MS = 60 * 60_000;
 
@@ -399,6 +430,70 @@ export class BuilderPullRequestService {
         );
       }
     }
+    // Best-effort: a failure listing these must not stop the rest of the tick.
+    const since = new Date(Date.now() - ISSUE_RECOVERY_WINDOW_MS);
+    const recoverable = await Promise.resolve()
+      .then(() => this.buildService.listRecoverableIssueRuns(since))
+      .catch((error) => {
+        this.logger.warn(
+          `Could not list failed issue builds to re-check: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return [] as BuilderBuildRun[];
+      });
+    for (const run of recoverable) {
+      try {
+        await this.recoverIssueRun(run);
+      } catch (error) {
+        this.logger.warn(
+          `Could not re-check failed issue build ${run.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+  }
+
+  /** The open pull request opencode raised for this run's issue, if any. */
+  private async findIssuePullRequest(githubRepo: string, issueNumber: number) {
+    const prefix = `opencode/issue${issueNumber}-`;
+    return ((await this.github.listPullRequests(githubRepo)) ?? []).find(
+      (candidate) => candidate.headRef?.startsWith(prefix),
+    );
+  }
+
+  /**
+   * A FAILED issue build whose pull request has since gone green — the PR
+   * loop kept working it after the run gave up — is a success after all.
+   * Only CI green on the current head counts; anything else leaves it failed.
+   */
+  private async recoverIssueRun(run: BuilderBuildRun): Promise<void> {
+    const repo = run.repos?.[0];
+    const githubRepo = issueRepoOf(run);
+    if (!repo || !githubRepo || !run.issueNumber) return;
+    const pr = await this.findIssuePullRequest(githubRepo, run.issueNumber);
+    if (!pr?.number || !pr.headSha) return;
+    const rollup = await this.github.getCheckRollup(githubRepo, pr.headSha);
+    if (rollup?.state !== 'success') return;
+    const revived = await this.buildService.reviveIssueRun(run);
+    if (!revived) return;
+    await this.buildService.recordIssueMilestone(
+      run,
+      `ci-pass:${pr.headSha}`,
+      `CI passed on ${pr.headSha.slice(0, 7)} after the build had given up. ${pr.htmlUrl} is ready for review.`,
+      undefined,
+      {
+        ci: {
+          repo,
+          prNumber: pr.number,
+          prUrl: pr.htmlUrl,
+          sha: pr.headSha,
+          state: 'success',
+          failed: [],
+        },
+      },
+    );
   }
 
   private async reconcileIssueRun(run: BuilderBuildRun): Promise<void> {
@@ -409,10 +504,7 @@ export class BuilderPullRequestService {
     const repo = run.repos?.[0];
     const githubRepo = issueRepoOf(run);
     if (!repo || !githubRepo || !run.issueNumber) return;
-    const prefix = `opencode/issue${run.issueNumber}-`;
-    const pr = ((await this.github.listPullRequests(githubRepo)) ?? []).find(
-      (candidate) => candidate.headRef?.startsWith(prefix),
-    );
+    const pr = await this.findIssuePullRequest(githubRepo, run.issueNumber);
 
     if (!pr?.number) {
       const workflowRun = await this.github.findRunSince({
@@ -520,12 +612,16 @@ export class BuilderPullRequestService {
       );
       return;
     }
+    // The failing step's own output, not just the check's name. Run 3 of
+    // 6ce1a354 (2026-11-17) got "CI failed: check" twice, chased Jest, and
+    // never saw that the prompt guard had rejected its `.txt` edits.
+    const excerpts = await this.github
+      .failedCheckExcerpts(githubRepo, pr.headSha)
+      .catch(() => ({}) as Record<string, string>);
     await this.github.createIssueComment(
       githubRepo,
       pr.number,
-      `/oc CI failed on this pull request: ${rollup.failed.join(', ') || 'see the checks'}. ` +
-        'Read the failing checks, fix the cause on this branch, and keep every check passing. ' +
-        'Do not change a test to make it pass unless the test itself is wrong, and say so if it is.',
+      renderIssueFixRequest(rollup.failed, excerpts),
     );
     await this.buildService.recordIssueFixRequest(run, pr.headSha);
     await this.buildService.recordIssueMilestone(

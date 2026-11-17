@@ -123,6 +123,8 @@ describe('BuilderPullRequestService', () => {
     buildService = {
       dispatchReviewRun: jest.fn().mockResolvedValue({ id: 'run-3' }),
       listActiveIssueRuns: jest.fn().mockResolvedValue([]),
+      listRecoverableIssueRuns: jest.fn().mockResolvedValue([]),
+      reviveIssueRun: jest.fn().mockResolvedValue(true),
       recentReviewOutcomes: jest.fn().mockResolvedValue([]),
       settleRun: jest.fn(),
       recordIssueFixRequest: jest.fn(),
@@ -264,6 +266,85 @@ describe('BuilderPullRequestService', () => {
       await service.reconcileOpenPullRequests();
       expect(github.createIssueComment).not.toHaveBeenCalled();
       expect(buildService.settleRun).not.toHaveBeenCalled();
+    });
+
+    it("puts the failing job's output in the fix request, and points at the repo's rules", async () => {
+      buildService.listActiveIssueRuns.mockResolvedValue([issueRun()]);
+      github.getCheckRollup.mockResolvedValue({
+        state: 'failure',
+        failed: ['check'],
+        total: 1,
+      });
+      github.failedCheckExcerpts.mockResolvedValue({
+        check:
+          'Prompt check failed (1):\n  - ally-be/src/prompts/x.txt: Live prompt text belongs in the Skills Store',
+      });
+
+      await service.reconcileOpenPullRequests();
+
+      expect(github.failedCheckExcerpts).toHaveBeenCalledWith(
+        'o/ally-be',
+        'sha-1',
+      );
+      const body = github.createIssueComment.mock.calls[0][2] as string;
+      expect(body).toContain('Output of "check"');
+      expect(body).toContain('belongs in the Skills Store');
+      expect(body).toContain('AGENTS.md');
+    });
+
+    describe('a failed build whose pull request went green later', () => {
+      beforeEach(() => {
+        buildService.listRecoverableIssueRuns.mockResolvedValue([
+          issueRun({ status: 'FAILED' }),
+        ]);
+      });
+
+      it('is revived and recorded as passed', async () => {
+        github.getCheckRollup.mockResolvedValue({
+          state: 'success',
+          failed: [],
+          total: 3,
+        });
+
+        await service.reconcileOpenPullRequests();
+
+        expect(buildService.reviveIssueRun).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'run-9' }),
+        );
+        expect(buildService.recordIssueMilestone).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'run-9' }),
+          'ci-pass:sha-1',
+          expect.stringMatching(/after the build had given up/),
+          undefined,
+          expect.anything(),
+        );
+      });
+
+      it('stays failed while CI is not green', async () => {
+        github.getCheckRollup.mockResolvedValue({
+          state: 'failure',
+          failed: ['check'],
+          total: 3,
+        });
+
+        await service.reconcileOpenPullRequests();
+
+        expect(buildService.reviveIssueRun).not.toHaveBeenCalled();
+        expect(github.createIssueComment).not.toHaveBeenCalled();
+      });
+
+      it('records nothing when the session has moved on', async () => {
+        github.getCheckRollup.mockResolvedValue({
+          state: 'success',
+          failed: [],
+          total: 3,
+        });
+        buildService.reviveIssueRun.mockResolvedValue(false);
+
+        await service.reconcileOpenPullRequests();
+
+        expect(buildService.recordIssueMilestone).not.toHaveBeenCalled();
+      });
     });
 
     it('fails the build when fix requests run out', async () => {
