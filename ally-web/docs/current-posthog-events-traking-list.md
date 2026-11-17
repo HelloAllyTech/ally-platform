@@ -356,9 +356,9 @@ detectors:
 | `IDEA_CAPTURE_SESSION_STARTED`   | `idea_capture_session_started`   | Admin opened the Idea Capture overlay from the header mic-and-bulb button (the mic starts with it)                                | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
 | `IDEA_CAPTURE_DRAFT_SAVED`       | `idea_capture_draft_saved`       | An idea was saved to My drafts, after the save succeeds. Carries `capture_mode` (`voice` if any of it was dictated, else `typed`) | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
 | `IDEA_CAPTURE_SESSION_ABANDONED` | `idea_capture_session_abandoned` | The overlay was closed with words in it and nothing saved (Discard on the leave prompt). Carries `capture_mode`                   | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
-| `ADMIN_PAGE_VIEWED` | `admin_page_viewed` | Admin opened a screen. Sends `route` (route pattern, no ids), `user_role`, `tenant_tier` (`platform` or `tenant`) | `apps/ally-admin-dashboard/src/hooks/useAdminAnalytics.ts` |
-| `ADMIN_ACTION` | `admin_action` | Admin performed a named action on a screen. Sends `screen`, `action` | `apps/ally-admin-dashboard/src/hooks/useAdminAnalytics.ts` |
-| `ADMIN_SEARCH_USED` | `admin_search_used` | Admin typed a search/filter query on a screen. Sends `screen` and `query_length` only, never the text | `apps/ally-admin-dashboard/src/hooks/useAdminAnalytics.ts` |
+| `ADMIN_PAGE_VIEWED`              | `admin_page_viewed`              | Admin opened a screen. Sends `route` (route pattern, no ids), `user_role`, `tenant_tier` (`platform` or `tenant`)                 | `apps/ally-admin-dashboard/src/hooks/useAdminAnalytics.ts`              |
+| `ADMIN_ACTION`                   | `admin_action`                   | Admin performed a named action on a screen. Sends `screen`, `action`                                                              | `apps/ally-admin-dashboard/src/hooks/useAdminAnalytics.ts`              |
+| `ADMIN_SEARCH_USED`              | `admin_search_used`              | Admin typed a search/filter query on a screen. Sends `screen` and `query_length` only, never the text                             | `apps/ally-admin-dashboard/src/hooks/useAdminAnalytics.ts`              |
 
 The three `idea_capture_*` events measure the save rate of voice-initiated idea captures:
 `idea_capture_draft_saved` over `idea_capture_session_started`, filtered to

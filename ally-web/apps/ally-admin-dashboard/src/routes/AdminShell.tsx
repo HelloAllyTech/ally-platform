@@ -11,9 +11,10 @@ import { NotificationBell } from "@components/notification-bell/NotificationBell
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import { Sidebar } from "@components/sidebar";
-import { LOCAL_STORAGE_KEYS, ROUTES, en } from "@constants";
+import { LOCAL_STORAGE_KEYS, en } from "@constants";
 import { useAdminPageView } from "@hooks/useAdminAnalytics";
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
+import { loginPathWithNext } from "@utils/loginRedirect";
 
 import { PageBreadcrumbs } from "./PageBreadcrumbs";
 import { resolveRouteMeta } from "./routeMeta";
@@ -40,7 +41,7 @@ export const PageFallback: React.FC = () => (
 export const AdminShell: React.FC = () => {
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
-  const { pathname, search } = useLocation();
+  const { pathname, search, hash } = useLocation();
   const meta = resolveRouteMeta(pathname, search);
   // Usage tracking: one `admin_page_viewed` per route change (route pattern only, never ids).
   useAdminPageView(pathname);
@@ -63,7 +64,8 @@ export const AdminShell: React.FC = () => {
   }, [isMobileNavOpen]);
 
   if (!isAuthenticated) {
-    return <Navigate to={ROUTES.LOGIN} replace />;
+    // Back here after logging in (A1): `/login?next=<this page>`, as `PrivateLayout` does.
+    return <Navigate to={loginPathWithNext(pathname, search, hash)} replace />;
   }
 
   return (

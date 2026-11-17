@@ -6,7 +6,7 @@ import { LlmUsageModule } from 'src/analytics/llm-usage.module';
 import { PromptModule } from 'src/prompt/prompt.module';
 import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
 import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import { AnalyticsSuggestion } from 'src/analytics-suggestions/entity/analytics-suggestion.entity';
+import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
 import { RoadmapProductGoal } from 'src/product-roadmap/entity/roadmap-product-goal.entity';
 import { RoadmapProductGoalRepository } from 'src/product-roadmap/repository/roadmap-taxonomy.repository';
 
@@ -27,15 +27,15 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
  *
  * The platform's PostHog integration was write-only: the frontends captured
  * events and nothing ever read them back. This module is the reader, and it
- * closes the loop into the two review queues that already exist rather than
- * building a third one.
+ * closes the loop into the Bug Hunter queue and the PM Agent's signal store rather
+ * than building a review queue of its own.
  *
  * ## Why it owns no review UI
  * A scan produces two kinds of artefact and files each where its audience already
  * works: bug-shaped items become `bug_findings` rows in the Bug Hunter queue,
- * improvement-shaped ones become pending `analytics_suggestions` reviewed in the
- * Analytics Suggestions tab. Neither destination is modified — the existing
- * approve and accept/reject gates are the gates. The pipeline proposes; people
+ * improvement-shaped ones become `pm_agent_signals` rows (source `ux_signals`) that
+ * the PM Agent's ux_signals lane reads as evidence. Neither destination is
+ * modified — the existing gates are the gates. The pipeline proposes; people
  * decide, and nothing here can dispatch a fix session or file a roadmap item.
  *
  * ## Why it writes through raw repositories
@@ -63,7 +63,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     TypeOrmModule.forFeature([
       UxSignalScan,
       BugFinding,
-      AnalyticsSuggestion,
+      PmAgentSignal,
       RoadmapProductGoal,
     ]),
     AppConfigModule,

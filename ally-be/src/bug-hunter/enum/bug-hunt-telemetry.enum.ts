@@ -9,7 +9,7 @@
  * whichever protocol asked it, and a per-phase chart should not split it.
  *
  * Stored as `character varying` with a CHECK constraint, per repo convention
- * (not a Postgres enum — see AnalyticsSuggestionStatus for why). Adding a
+ * (not a Postgres enum). Adding a
  * value here means extending `CHK_bug_hunt_phases_phase` in a migration AND
  * the row in `check-constraints-cover-enums.spec.ts`.
  */

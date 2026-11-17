@@ -44,6 +44,15 @@ export class BuilderSessionRepository extends Repository<BuilderSession> {
    * verdict nobody has looked at in weeks is not what this is for, and an
    * unbounded scan on every tick is how a cheap sweep becomes a slow one.
    */
+  /** The session's autonomy override, or null (also for a session that no longer exists). */
+  async findAutonomyOverride(sessionId: string): Promise<string | null> {
+    const row = await this.findOne({
+      where: { id: sessionId },
+      select: { id: true, autonomyOverride: true },
+    });
+    return row?.autonomyOverride ?? null;
+  }
+
   listRecentlyFailed(take = 50): Promise<BuilderSession[]> {
     return this.find({
       where: { status: BuilderSessionStatus.FAILED },

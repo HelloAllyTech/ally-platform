@@ -1,16 +1,18 @@
 import React, { useEffect, useRef } from "react";
 
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { useVerifyMagicLinkMutation } from "@api";
 import { LOCAL_STORAGE_KEYS, ROUTES, en } from "@constants";
 import { useUser } from "@hooks";
+import { afterLoginPath } from "@utils";
 
 export const MagicLinkVerify: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const token = searchParams.get("token");
 
   const [verifyMagicLink, { isLoading, isSuccess, data, error }] = useVerifyMagicLinkMutation();
@@ -48,7 +50,7 @@ export const MagicLinkVerify: React.FC = () => {
 
         const userData = await checkAuth();
         if (userData) {
-          navigate("/");
+          navigate(afterLoginPath(location.search), { replace: true });
         }
       }
     })();

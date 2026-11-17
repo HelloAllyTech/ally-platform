@@ -1,6 +1,13 @@
 import React, { lazy, Suspense } from "react";
 
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 
 import { Permissions, ROUTES, FeatureToggleKey, OrgToggle } from "@constants";
 import {
@@ -55,6 +62,7 @@ import {
   DebriefSessionPage,
   AgentLogsPage,
   PmAgentPage,
+  PmAgentFeed,
   DebriefSettingsPage,
   RoleplaySessionLogs,
   RoleplaySessionLogDetail,
@@ -91,6 +99,16 @@ const InboxRedirect: React.FC = () => {
   const next = new URLSearchParams(params);
   next.set("tab", "inbox");
   return <Navigate to={`${ROUTES.WHATSAPP_BOT}?${next.toString()}`} replace />;
+};
+
+/**
+ * Links from before A1 (`/chatbots`, `/chatbots/:id?section=tools`, `/chatbots/new/…`, emails and
+ * bookmarks): the same place under `/assistants`, with its query and hash.
+ */
+export const ChatbotsLegacyRedirect: React.FC = () => {
+  const { pathname, search, hash } = useLocation();
+  const rest = pathname.replace(/^\/chatbots/, "");
+  return <Navigate to={`${ROUTES.WHATSAPP_BOT}${rest}${search}${hash}`} replace />;
 };
 
 /**
@@ -598,6 +616,14 @@ export const RouteLayout: React.FC = () => {
               </PrivateLayout>
             }
           />
+          <Route
+            path={ROUTES.PM_AGENT}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.PM_AGENT}>
+                <PmAgentFeed />
+              </PrivateLayout>
+            }
+          />
           {/* The Builder tab: Now · Rules · History. Mission control's full list moved to
             /builder/sessions, and /builder/decisions (linked from Slack) lands here. */}
           <Route
@@ -776,6 +802,8 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.WHATSAPP_BOT_LEGACY}
             element={<Navigate to={ROUTES.WHATSAPP_BOT} replace />}
           />
+          <Route path={ROUTES.CHATBOTS_LEGACY} element={<ChatbotsLegacyRedirect />} />
+          <Route path={`${ROUTES.CHATBOTS_LEGACY}/*`} element={<ChatbotsLegacyRedirect />} />
           <Route
             path={ROUTES.DEBRIEFS}
             element={
@@ -852,6 +880,9 @@ export const RouteLayout: React.FC = () => {
           <Route path="*" element={<NotFound />} />
         </Route>
         <Route path="/" element={<DefaultRedirect />} />
+        {/* No sign-up (A1): accounts are made by Ally admin or an owner's invite. */}
+        <Route path={ROUTES.SIGN_UP} element={<Navigate to={ROUTES.LOGIN} replace />} />
+        <Route path={ROUTES.SIGN_UP_ALT} element={<Navigate to={ROUTES.LOGIN} replace />} />
       </Routes>
     </BrowserRouter>
   );

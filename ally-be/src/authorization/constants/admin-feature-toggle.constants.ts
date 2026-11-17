@@ -85,7 +85,6 @@ export enum FeatureToggleKey {
   // Analytics (route itself is SUPER_ADMIN-tier; two sub-tabs are SDA-only)
   ANALYTICS = 'analytics',
   ANALYTICS_AGENT = 'analytics_agent',
-  ANALYTICS_SUGGESTIONS = 'analytics_suggestions',
   UX_SIGNALS = 'ux_signals',
 
   // Platform config (formerly SUPER_DUPER_ADMIN-only)
@@ -150,6 +149,11 @@ export enum FeatureToggleKey {
 
   // Builder: the PRD-interview + coding agent that opens PRs
   BUILDER = 'builder',
+
+  // PM Agent (docs/pm-agent.md): the admin AI product manager whose accepted
+  // recommendations are built by Builder. Backfilled ON for the platform tier by
+  // migration 1982000000000; the agent itself ships switched off.
+  PM_AGENT = 'pm_agent',
 
   // Course Copilot: the agent that interviews a trainer and builds a whole
   // DRAFT course (Track 2.0) from the answers, then edits it on request.
@@ -359,20 +363,11 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     platformOnly: true,
   },
   {
-    key: FeatureToggleKey.ANALYTICS_SUGGESTIONS,
-    label: 'Analytics — Suggestions',
-    description:
-      'The Analytics Suggestions sub-tab, on top of general Analytics access.',
-    legacyGrants: SDA_ONLY,
-    // Built from platform-wide analytics.
-    platformOnly: true,
-  },
-  {
     key: FeatureToggleKey.UX_SIGNALS,
     label: 'UX Signals',
     description:
-      'The PostHog UX scan that files findings to Bug Hunter and suggestions ' +
-      'to the Analytics Suggestions queue, plus its "Scan now" control.',
+      'The PostHog UX scan that files findings to Bug Hunter and improvement ' +
+      'signals for the PM Agent, plus its "Scan now" control.',
     legacyGrants: SDA_ONLY,
     // Scans every user's PostHog sessions across the platform.
     platformOnly: true,
@@ -562,6 +557,17 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Interview an agent into a PRD, then have it build the feature and open pull requests for review — from the Builder tab or from a Product Roadmap card.',
     legacyGrants: SUPER_ADMIN_TIER,
+  },
+  {
+    key: FeatureToggleKey.PM_AGENT,
+    label: 'PM Agent',
+    description:
+      "Review the AI product manager's recommendations and questions, accept them into Builder builds that merge and release automatically, and configure its budget, queue and memory.",
+    // Backfilled ON for platform-tier admins by 1982000000000-CreatePmAgent; inert like
+    // every key added after the role-collapse cutover.
+    legacyGrants: SUPER_ADMIN_TIER,
+    // Reads every organisation's aggregates and ships platform-wide changes.
+    platformOnly: true,
   },
   {
     key: FeatureToggleKey.CONTEXT_LIBRARY,

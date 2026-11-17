@@ -39,6 +39,8 @@ import { CHECKUP_LIMITS, CheckupService, SuiteCase } from './checkup.service';
 import { DraftCheckupService } from './draft-checkup.service';
 import { CheckupCasesService } from './checkup-cases.service';
 import { ADDED_FROM, OUTCOMES } from './checkup-cases';
+import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
+import { ChatbotRole } from '../../chatbot/access/chatbot-role.decorator';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -235,6 +237,7 @@ export class CheckupController {
   // ── The owner's questions (chunk 20d-2) ─────────────────────────────────
 
   @Get(':id/checkup/cases')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: "The checkup's questions, each with its last 5 results",
@@ -244,6 +247,7 @@ export class CheckupController {
   }
 
   @Post(':id/checkup/cases')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Add a question' })
   addCase(@Param('id', ParseUUIDPipe) id: string, @Body() dto: NewCaseDto) {
@@ -251,6 +255,7 @@ export class CheckupController {
   }
 
   @Patch(':id/checkup/cases/:caseId')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Edit a question, or turn it off or on',
@@ -266,6 +271,7 @@ export class CheckupController {
   }
 
   @Delete(':id/checkup/cases/:caseId')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Delete a question (restore is Undo); safety questions stay',
@@ -279,6 +285,7 @@ export class CheckupController {
   }
 
   @Post(':id/checkup/cases/:caseId/restore')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Undo deleting a question' })
   restoreCase(
@@ -289,6 +296,7 @@ export class CheckupController {
   }
 
   @Post(':id/checkup/cases/:caseId/try')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: '"Try this one": ask one question now and wait for its result',
@@ -301,6 +309,7 @@ export class CheckupController {
   }
 
   @Post(':id/checkup/suggestions')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Suggest more questions from the pages (nothing is added)',
@@ -310,6 +319,7 @@ export class CheckupController {
   }
 
   @Post(':id/checkup/suggestions/keep')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Keep the suggested questions the owner ticked' })
   keep(
@@ -320,6 +330,7 @@ export class CheckupController {
   }
 
   @Get(':id/checkup')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: 'The checkup: the latest run, the trend, and the wording it needs',
@@ -329,6 +340,7 @@ export class CheckupController {
   }
 
   @Post(':id/checkup/cases/:caseId/answer')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Answer a question it couldn’t: added to the Owner notes',
@@ -342,6 +354,7 @@ export class CheckupController {
   }
 
   @Post(':id/checkup/cases/:caseId/not-offered')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: '"We don’t offer this": noted, and kept as a decline',
@@ -354,6 +367,7 @@ export class CheckupController {
   }
 
   @Post(':id/checkup/suites')
+  @ChatbotRole(ChatbotMemberRole.OWNER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: "Add or update an eval suite's questions (platform admins)",
@@ -366,6 +380,7 @@ export class CheckupController {
   }
 
   @Post(':id/checkup/runs')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Start a checkup run',
@@ -382,6 +397,7 @@ export class CheckupController {
   }
 
   @Get(':id/checkup/runs/:runId')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'A checkup run with its results and numbers' })
   getRun(

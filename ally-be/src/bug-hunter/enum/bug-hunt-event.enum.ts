@@ -1,7 +1,7 @@
 /**
  * One value per pipeline step the workflow can report. Stored as
  * `character varying` with a CHECK constraint (repo convention, not a
- * Postgres enum — see AnalyticsSuggestionStatus for why).
+ * Postgres enum).
  *
  * `SKIPPED_DISABLED` and `SETTINGS_CHANGED` are not pipeline steps: the first
  * is the whole content of a run that found the kill switch off, and the

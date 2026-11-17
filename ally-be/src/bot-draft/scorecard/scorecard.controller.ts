@@ -26,6 +26,8 @@ import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decor
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { ScorecardService } from './scorecard.service';
+import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
+import { ChatbotRole } from '../../chatbot/access/chatbot-role.decorator';
 
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
 
@@ -57,6 +59,7 @@ export class ScorecardController {
   constructor(private readonly scorecard: ScorecardService) {}
 
   @Get(':id/scorecard')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
   @ApiOperation({
     summary: 'This week and last, in plain words, with what needs the owner',
@@ -66,6 +69,7 @@ export class ScorecardController {
   }
 
   @Post(':id/scorecard/unanswered/:questionId/answer')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Answer it: an owner note and a checkup question from the answer',
@@ -84,6 +88,7 @@ export class ScorecardController {
   }
 
   @Post(':id/scorecard/feedback/:feedbackId/correct')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -103,6 +108,7 @@ export class ScorecardController {
   }
 
   @Post(':id/scorecard/feedback/:feedbackId/fine')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'It was fine: take the thumbs-down off the list' })
   fine(

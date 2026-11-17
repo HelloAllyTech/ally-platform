@@ -151,6 +151,7 @@ const buildNavigationItems = (): NavigationItem[] => {
     // Product
     { id: S.PRODUCT_ROADMAP, label: l.roadmap, path: ROUTES.PRODUCT_ROADMAP, section: "product" },
     { id: S.BUG_HUNTER, label: l.bugHunter, path: ROUTES.BUG_HUNTER, section: "product" },
+    { id: S.PM_AGENT, label: en.pmAgent.tabLabel, path: ROUTES.PM_AGENT, section: "product" },
     { id: S.BUILDER, label: l.builder, path: ROUTES.BUILDER, section: "product" },
     {
       id: S.MOBILE_RELEASES,
@@ -165,7 +166,13 @@ const buildNavigationItems = (): NavigationItem[] => {
       section: "product",
     },
     // The inbox lives inside this page (its Inbox tab); its unread count badges this item.
-    { id: S.WHATSAPP_BOT, label: l.aiChatbots, path: ROUTES.WHATSAPP_BOT, section: "product" },
+    // "Assistants" since A1, as the area is named.
+    {
+      id: S.WHATSAPP_BOT,
+      label: en.whatsappBot.navLabel,
+      path: ROUTES.WHATSAPP_BOT,
+      section: "product",
+    },
     { id: S.ALLY_GUIDE, label: l.allyConsole, path: ROUTES.ALLY_CONSOLE, section: "product" },
     // Settings & Logs
     { id: S.SETTINGS, label: l.settings, path: ROUTES.SETTINGS, section: "settings-logs" },
@@ -226,6 +233,14 @@ export const isNavItemActive = (item: NavigationItem, pathname: string, search =
 };
 
 /**
+ * A login whose only feature is Chatbots, as a custom login with just Chatbots ticked is. It holds
+ * the platform-admin role's permissions, so the permission-gated tabs would otherwise show; its
+ * sidebar is the one Assistants item, and it lands there after login.
+ */
+export const isChatbotsOnly = (features: string[] | undefined): boolean =>
+  Boolean(features?.length) && features!.every(key => key === FeatureToggleKey.WHATSAPP_BOT);
+
+/**
  * Returns `items` reordered to follow `savedOrder` (a list of item ids).
  * Ids in `savedOrder` that aren't currently visible are skipped, and visible
  * items missing from `savedOrder` (e.g. newly added tabs) are appended in their
@@ -283,6 +298,9 @@ export const deriveNavigationItems = ({
   orgToggles?: Partial<Record<OrgToggle, boolean>>;
 }): NavigationItem[] => {
   const navigationItems = buildNavigationItems();
+  if (isChatbotsOnly(features)) {
+    return navigationItems.filter(item => item.id === SIDEBAR_ITEMS.WHATSAPP_BOT);
+  }
   const featureGatedItems = buildSidebarItemFeatureKeyMap(SIDEBAR_ITEMS);
   const orgGatedItems = buildSidebarItemOrgToggleMap(SIDEBAR_ITEMS);
   const hasPermissions = Boolean(permissions && permissions.length > 0);

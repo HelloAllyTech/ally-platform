@@ -104,6 +104,11 @@ describe("BotPageApp", () => {
     expect(api.session).toHaveBeenLastCalledWith("sunrise-mind", { email: "asha@example.com" });
 
     await screen.findByRole("heading", { name: "Enter your code" });
+    // Points someone without access to another address, without saying this one has none.
+    expect(
+      screen.getByText(/^No code\? .*Try the email address you were given access with\.$/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use a different email" })).toBeInTheDocument();
     await user.type(screen.getByLabelText("6-digit code"), "123456");
     await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(api.verify).toHaveBeenCalledWith("sunrise-mind", "asha@example.com", "123456");

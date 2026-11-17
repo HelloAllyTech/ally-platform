@@ -8,6 +8,7 @@ import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.servi
 import { changes } from '../service/bot-draft-view';
 import { BotDraftService } from '../service/bot-draft.service';
 import { teamNames } from '../service/team-names';
+import { ChatbotRole } from '../../chatbot/access/chatbot-role.decorator';
 
 /** A chatbot's change history, from the draft that built it (20a-2 shows it with Undo). */
 @ApiTags('Onboarding')
@@ -21,6 +22,7 @@ export class ChatbotChangesController {
   ) {}
 
   @Get(':id/changes')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -31,6 +33,7 @@ export class ChatbotChangesController {
   }
 
   @Get(':id/team-names')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })

@@ -112,6 +112,29 @@ describe('BuilderSessionService', () => {
       );
     });
 
+    it("gives PM Agent sessions the 'auto' autonomy override, and nobody else", async () => {
+      await service.createSession(1, {
+        requestedBy: 'pm_agent',
+        requestRef: 'card-1',
+      });
+      expect(sessionRepository.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ autonomyOverride: 'auto' }),
+      );
+
+      await service.createSession(1, {
+        requestedBy: 'debrief_pm_agent',
+        requestRef: 'idea-1',
+      });
+      expect(sessionRepository.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ autonomyOverride: null }),
+      );
+
+      await service.createSession(1, {});
+      expect(sessionRepository.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ autonomyOverride: null }),
+      );
+    });
+
     it('titles an untitled session "New build"', async () => {
       await service.createSession(1, {});
 

@@ -51,6 +51,7 @@ import { LIST_LIMITS } from './list-limits';
 import { ListAbilities, ListOwnerService } from './list-owner.service';
 import { ListRecordsService } from './list-records.service';
 import type { ListActor, ListFilter, ListQuery } from './list-types';
+import { ChatbotRole } from '../access/chatbot-role.decorator';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -95,6 +96,7 @@ export class ListController {
   // ---- lists ----------------------------------------------------------------------------------
 
   @Get(':id/lists')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary:
@@ -116,6 +118,7 @@ export class ListController {
   // ---- chunk 5b: ready-made lists, people, the assistant's switches ----------------------------
 
   @Get(':id/lists/ready-made')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'The ready-made lists an owner can add, grouped' })
   async readyMadeCatalogue(@Param('id', ParseUUIDPipe) id: string) {
@@ -124,6 +127,7 @@ export class ListController {
   }
 
   @Post(':id/lists/ready-made/:name')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -141,6 +145,7 @@ export class ListController {
   }
 
   @Get(':id/lists/contacts')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: "This bot's people, for an entry linked to a person",
@@ -161,11 +166,12 @@ export class ListController {
   }
 
   @Put(':id/lists/:key/abilities')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'What the assistant may do with this list: Do it or Never',
     description:
-      "Changes only this list's find_, create_ and update_ abilities (hand_over stays platform-admin only), and the list's agent switches with them.",
+      "Changes only this list's find_, create_ and update_ abilities (hand_over is in the bot's settings, owners only), and the list's agent switches with them.",
   })
   async setAbilities(
     @Param('id', ParseUUIDPipe) id: string,
@@ -182,6 +188,7 @@ export class ListController {
 
   @Post(':id/lists/:key/records/repeat')
   @HttpCode(200)
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Repeat weekly until: add an entry for each day and time',
@@ -198,6 +205,7 @@ export class ListController {
   }
 
   @Post(':id/lists')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Create a list, optionally with its fields' })
   async createList(
@@ -212,6 +220,7 @@ export class ListController {
   }
 
   @Get(':id/lists/:key')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: 'One list, with its fields (archived ones too) and rules',
@@ -228,6 +237,7 @@ export class ListController {
   }
 
   @Patch(':id/lists/:key')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: "Change a list's name, settings or agent switches" })
   async updateList(
@@ -243,6 +253,7 @@ export class ListController {
   }
 
   @Delete(':id/lists/:key')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Delete a list (restorable for 30 days)',
@@ -265,6 +276,7 @@ export class ListController {
 
   @Post(':id/lists/:listId/restore')
   @HttpCode(200)
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Restore a deleted list, by its id, within 30 days',
@@ -283,6 +295,7 @@ export class ListController {
   // ---- fields ---------------------------------------------------------------------------------
 
   @Post(':id/lists/:key/fields')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Add a field' })
   async addField(
@@ -298,6 +311,7 @@ export class ListController {
   }
 
   @Patch(':id/lists/:key/fields/:field')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Change a field',
@@ -318,6 +332,7 @@ export class ListController {
   }
 
   @Delete(':id/lists/:key/fields/:field')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Archive a field: hidden, and its values kept' })
   async archiveField(
@@ -335,6 +350,7 @@ export class ListController {
   // ---- rules ----------------------------------------------------------------------------------
 
   @Post(':id/lists/:key/rules')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Add a rule',
@@ -354,6 +370,7 @@ export class ListController {
   }
 
   @Delete(':id/lists/:key/rules/:ruleId')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Remove a rule' })
   async removeRule(
@@ -371,6 +388,7 @@ export class ListController {
   // ---- records --------------------------------------------------------------------------------
 
   @Get(':id/lists/:key/records')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: 'Entries, with simple filters',
@@ -401,6 +419,7 @@ export class ListController {
 
   @Post(':id/lists/:key/records/query')
   @HttpCode(200)
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: 'Entries: filters, sort, cursor, limit, and a count or sum',
@@ -423,6 +442,7 @@ export class ListController {
   }
 
   @Get(':id/lists/:key/records/:recordId')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'One entry' })
   async getRecord(
@@ -435,6 +455,7 @@ export class ListController {
   }
 
   @Post(':id/lists/:key/records')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Add an entry; every rule is checked' })
   async createRecord(
@@ -447,6 +468,7 @@ export class ListController {
   }
 
   @Patch(':id/lists/:key/records/:recordId')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Change an entry; send the version you read' })
   async updateRecord(
@@ -467,6 +489,7 @@ export class ListController {
   }
 
   @Delete(':id/lists/:key/records/:recordId')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Delete an entry (restorable)' })
   async deleteRecord(
@@ -480,6 +503,7 @@ export class ListController {
 
   @Post(':id/lists/:key/records/:recordId/restore')
   @HttpCode(200)
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Restore a deleted entry, if every rule still holds',
@@ -497,6 +521,7 @@ export class ListController {
 
   /** Editors only: it's every person's entries in one file. */
   @Get(':id/lists/:key/export.csv')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'The list as CSV (editors)' })
   async exportCsv(
@@ -513,6 +538,7 @@ export class ListController {
 
   @Post(':id/lists/:key/import')
   @HttpCode(200)
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiConsumes('multipart/form-data')
   @ApiOperation({

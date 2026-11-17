@@ -220,7 +220,12 @@ const buildTable = (): RouteMetaEntry[] => {
     },
     { path: ROUTES.MOBILE_RELEASES, title: i.mobileReleases, section: "product" },
     { path: ROUTES.CONTEXT_LIBRARY, title: i.contextLibrary, section: "product" },
-    { path: ROUTES.WHATSAPP_BOT, title: i.aiChatbots, section: "product", fullBleed: true },
+    {
+      path: ROUTES.WHATSAPP_BOT,
+      title: en.whatsappBot.navLabel,
+      section: "product",
+      fullBleed: true,
+    },
     {
       path: ROUTES.CHATBOT_NEW,
       title: p.chatbotNew,

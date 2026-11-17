@@ -3,6 +3,7 @@ import {
   istDay,
   retryPending,
   withPractiseNextFallback,
+  withoutPractice,
 } from '../service/debrief-agent.service';
 import { keepOfferedPractice } from '../util/debrief-cards.util';
 import { DebriefPracticeService } from '../service/debrief-practice.service';
@@ -253,18 +254,9 @@ describe('Practise this again inside a course (clinical review 2026-11-16)', () 
     { id: 3, title: 'This one', course: 'Basics', track_item_id: 'i3' },
   ];
 
-  it('offers only this same roleplay, as its course item; never another roleplay', async () => {
+  it('offers nothing inside a course: the course decides what comes next', async () => {
     const { svc, scenarios } = practice(thisOne);
-    expect(await svc.optionsFor(7, 't1', 's1')).toEqual([
-      {
-        id: 3,
-        title: 'This one',
-        skills: [],
-        course: 'Basics',
-        this_roleplay: true,
-        trackItemId: 'i3',
-      },
-    ]);
+    expect(await svc.optionsFor(7, 't1', 's1')).toEqual([]);
     expect(scenarios.getScenariosV2).not.toHaveBeenCalled();
   });
 
@@ -282,12 +274,27 @@ describe('Practise this again inside a course (clinical review 2026-11-16)', () 
     ]);
   });
 
-  it('shows a practise button only for this same course item', async () => {
+  it('shows no practise button inside a course, not even for this same roleplay', async () => {
     const { svc } = practice(thisOne);
-    expect(await svc.available(7, 't1', [3, 4, 99], 's1')).toEqual([
-      { id: 3, title: 'This one', trackItemId: 'i3' },
-    ]);
-    expect(await svc.available(7, 't1', [4, 99], 's1')).toEqual([]);
+    expect(await svc.available(7, 't1', [3, 4, 99], 's1')).toEqual([]);
+  });
+
+  it('strips the practise card and every roleplay link from a course debrief', () => {
+    const cards = {
+      opening: 'Hi',
+      practise_next: {
+        skill: 'Empathy',
+        reason: 'r',
+        scenario_id: 3,
+        try_next: ['a'],
+      },
+      work_on_this: [{ point: 'p', scenario_id: 3 }],
+    };
+    const out = withoutPractice(cards) as any;
+    expect(out.practise_next).toBeUndefined();
+    expect(out.work_on_this).toEqual([{ point: 'p', scenario_id: null }]);
+    expect(out.opening).toBe('Hi');
+    expect(withoutPractice(null)).toBeNull();
   });
 });
 
@@ -401,6 +408,7 @@ describe('"Practise this next" never loses its button', () => {
       ]),
     };
     const practice = {
+      inCourse: jest.fn(async () => false),
       available: jest.fn(async (_u: number, _t: string, ids: number[]) =>
         ids.includes(3)
           ? [{ id: 3, title: 'This one', trackItemId: 'i3' }]

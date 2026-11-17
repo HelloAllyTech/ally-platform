@@ -18,7 +18,7 @@ vi.mock("../../Analytics/chartKit", () => ({
 }));
 
 /* eslint-disable import/first */
-import { ScoreSection, scoreHeadline } from "../metrics/ScoreSection";
+import { ScoreByLanguage } from "../metrics/ScoreSection";
 import { ok } from "./consoleFixtures";
 /* eslint-enable import/first */
 
@@ -67,54 +67,25 @@ const VIEW = {
 
 beforeEach(() => h.score.mockReset());
 
-describe("Analytics › Debriefs › Overall score (v2, U5)", () => {
-  it("leads with the answer: held, rose or fell", () => {
-    expect(scoreHeadline({ current: 7.8, previous: 7.8 })).toBe(
-      "The overall score held at 7.8 this week.",
-    );
-    expect(scoreHeadline({ current: 8.1, previous: 7.8 })).toBe(
-      "The overall score rose 0.3 to 8.1 this week.",
-    );
-    expect(scoreHeadline({ current: 7.4, previous: 7.8 })).toBe(
-      "The overall score fell 0.4 to 7.4 this week.",
-    );
-    expect(scoreHeadline({ current: null, previous: 7.8 })).toMatch(/No overall score yet/);
-  });
-
-  it("shows the score, its weekly line with change markers, the measures and the two gates", () => {
+describe("Analytics › Debriefs › More detail › Overall score by language", () => {
+  it("shows only the score by language; the score, its parts and the gates lead the page", () => {
     h.score.mockReturnValue(ok(VIEW));
-    render(<ScoreSection />);
+    render(<ScoreByLanguage />);
     expect(h.score).toHaveBeenCalledWith({ days: 84 });
-    const s = screen.getByTestId("score-section");
-    expect(within(s).getByRole("heading", { level: 2 })).toHaveTextContent(
-      "The overall score held at 7.8 this week.",
-    );
-    expect(s).toHaveTextContent("Overall score");
-    expect(s).toHaveTextContent("last week 7.8 · 128 debriefs");
-    const markers = screen.getAllByTestId("score-marker");
-    expect(markers.map(m => m.getAttribute("data-kind"))).toEqual(["live", "undone"]);
-    expect(s).toHaveTextContent("Green line: a change went live. Red: a change was undone.");
-    expect(screen.getByTestId("score-measure-quality")).toHaveTextContent(
-      "Quality score (judge)40% of the score7.9+0.1",
-    );
-    expect(screen.getByTestId("score-measure-flags")).toHaveTextContent("15% · lower is better");
-    // A check reads as one sentence, what it is underneath, then OK / Tripped.
-    expect(screen.getByTestId("score-measure-risk")).toHaveTextContent(
-      "0New missed clear risk cues · Never traded off · undoes a changeOK",
-    );
-    expect(screen.getByTestId("score-measure-cost")).toHaveTextContent("Tripped");
     const byLang = screen.getByTestId("score-by-language");
     expect(byLang).toHaveTextContent("English");
     expect(byLang).toHaveTextContent("12 debriefs · too few to read");
+    expect(screen.queryByTestId("score-measure-quality")).toBeNull();
+    expect(screen.queryByTestId("score-chart")).toBeNull();
   });
 
   it("loading and errors use the page's chart card", () => {
     h.score.mockReturnValue({ data: undefined, isError: false });
-    const { unmount } = render(<ScoreSection />);
-    expect(screen.getByTestId("chart-Overall score")).toHaveTextContent("loading");
+    const { unmount } = render(<ScoreByLanguage />);
+    expect(screen.getByTestId("chart-Overall score by language")).toHaveTextContent("loading");
     unmount();
     h.score.mockReturnValue({ data: undefined, isError: true, refetch: vi.fn() });
-    render(<ScoreSection />);
-    expect(screen.getByTestId("chart-Overall score")).toHaveTextContent("error");
+    render(<ScoreByLanguage />);
+    expect(screen.getByTestId("chart-Overall score by language")).toHaveTextContent("error");
   });
 });

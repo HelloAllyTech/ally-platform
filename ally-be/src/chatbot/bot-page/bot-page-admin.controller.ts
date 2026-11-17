@@ -31,6 +31,7 @@ import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { BotPageAccessService } from './bot-page-access.service';
 import { BotPageRateLimitService } from './bot-page-rate-limit.service';
 import { BotPageService } from './bot-page.service';
+import { ChatbotRole } from '../access/chatbot-role.decorator';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -53,6 +54,7 @@ export class BotPageAdminController {
   ) {}
 
   @Get(':id/page')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: 'The bot page, or its defaults before the first save',
@@ -70,6 +72,7 @@ export class BotPageAdminController {
   }
 
   @Put(':id/page')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Save the bot page',
@@ -85,6 +88,7 @@ export class BotPageAdminController {
   }
 
   @Get(':id/page/slug-available')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'Whether a link is valid and free for this bot' })
   async slugAvailable(
@@ -108,6 +112,7 @@ export class BotPageAdminController {
   }
 
   @Post(':id/page/logo-url')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'An upload link for the page logo (PNG, JPEG or WebP, 2 MB)',
@@ -123,6 +128,7 @@ export class BotPageAdminController {
   // ── who may open it ───────────────────────────────────────────────────
 
   @Get(':id/page/access')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'Invited emails and allowed organisations' })
   async listAccess(@Param('id', ParseUUIDPipe) id: string) {
@@ -132,6 +138,7 @@ export class BotPageAdminController {
   }
 
   @Post(':id/page/access')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Add invited emails or organisations; existing ones are skipped',
@@ -147,6 +154,7 @@ export class BotPageAdminController {
 
   @Delete(':id/page/access/:entryId')
   @HttpCode(204)
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   async removeAccess(
     @Param('id', ParseUUIDPipe) id: string,

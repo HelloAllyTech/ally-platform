@@ -7,8 +7,10 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import { toast } from "sonner";
 
-import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS, ROUTES, TAG_TYPES, en } from "@constants";
+import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS, TAG_TYPES, en } from "@constants";
 import { RefreshResponse } from "@types";
+
+import { loginPathWithNext } from "../utils/loginRedirect";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -18,8 +20,12 @@ const handleLogout = () => {
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED);
 
   // Raw window.location bypasses the router basename - prefix the Vite base
-  // (the app lives under /admin in production, / everywhere else).
-  window.location.href = import.meta.env.BASE_URL.replace(/\/$/, "") + ROUTES.LOGIN;
+  // (the app lives under /admin in production, / everywhere else). `next` brings them back to
+  // the page they were on once they log in again (A1).
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const { pathname, search, hash } = window.location;
+  const inApp = base && pathname.startsWith(base) ? pathname.slice(base.length) || "/" : pathname;
+  window.location.href = base + loginPathWithNext(inApp, search, hash);
 };
 
 const baseQuery = fetchBaseQuery({
@@ -221,7 +227,13 @@ export const baseAPI = createApi({
     TAG_TYPES.AI_LAB_ASSIGNMENTS,
     TAG_TYPES.AI_LAB_AUTO_EVALS,
     TAG_TYPES.AI_LAB_QUESTION_SETS,
-    TAG_TYPES.ANALYTICS_SUGGESTIONS,
+    TAG_TYPES.PM_AGENT_STATE,
+    TAG_TYPES.PM_AGENT_CARDS,
+    TAG_TYPES.PM_AGENT_TRACKING,
+    TAG_TYPES.PM_AGENT_SETTINGS,
+    TAG_TYPES.PM_AGENT_MEMORY,
+    TAG_TYPES.PM_AGENT_HISTORY,
+    TAG_TYPES.PM_AGENT_HEALTH,
     TAG_TYPES.ANALYTICS_CHART_PREFERENCES,
     TAG_TYPES.BUG_HUNTER_SETTINGS,
     TAG_TYPES.BUG_HUNTER_MODEL_SETTINGS,

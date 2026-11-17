@@ -28,6 +28,7 @@ import {
 } from '../dto/whatsapp-business-number.dto';
 import { WhatsAppBusinessNumberService } from '../service/whatsapp-business-number.service';
 import { WhatsAppConnectionCheck } from '../type/whatsapp-provider.interface';
+import { AssistantScope } from '../../chatbot/access/chatbot-role.decorator';
 
 /**
  * WhatsApp numbers — the WhatsApp connector type's own routes (connect, check, subscribe).
@@ -44,6 +45,7 @@ export class WhatsAppBusinessNumberController {
   constructor(private readonly service: WhatsAppBusinessNumberService) {}
 
   @Get()
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -59,6 +61,7 @@ export class WhatsAppBusinessNumberController {
   }
 
   @Get(':id')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -70,6 +73,7 @@ export class WhatsAppBusinessNumberController {
   }
 
   @Post('manual')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -87,6 +91,7 @@ export class WhatsAppBusinessNumberController {
   }
 
   @Post(':id/check')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -100,6 +105,7 @@ export class WhatsAppBusinessNumberController {
   }
 
   @Post(':id/subscribe')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -117,6 +123,7 @@ export class WhatsAppBusinessNumberController {
   }
 
   @Delete(':id')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })

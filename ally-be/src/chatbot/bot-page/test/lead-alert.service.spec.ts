@@ -114,7 +114,7 @@ describe('LeadAlertService', () => {
     const { subject, body } = sendLeadAlert.mock.calls[0][0];
     expect(subject).toBe('New enquiry from your assistant');
     expect(body).toBe(
-      'Asha Rao asked about Couples therapy. Phone: 98200 11111. Open the conversation: https://admin.example/chatbots/bot-1?section=conversations',
+      'Asha Rao asked about Couples therapy. Phone: 98200 11111. Open the conversation: https://admin.example/assistants/bot-1?section=conversations',
     );
     expect(body).not.toContain('low');
     // Nothing they gave reaches a log line.

@@ -863,7 +863,7 @@ export class RoadmapOpportunityService {
    * The shared assets bucket, the same one blog headers and badge icons live in.
    *
    * Resolved per call rather than in the constructor: reading configuration at construction time
-   * is module-load-time work, and this module is imported by AnalyticsSuggestions — a missing
+   * is module-load-time work, and this module is imported by other feature modules — a missing
    * env var would take down suites that never touch an image. Failing here fails only the
    * request that actually needed a bucket.
    */

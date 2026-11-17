@@ -9,10 +9,10 @@ import type { HowItWorks, HowLayer } from "@types";
 import { TONES, toneOf } from "../../Onboarding/MakeItYours";
 import { AvoidTopics } from "../AvoidTopics";
 import { HOME, fill } from "../copy";
-import { Group, SectionHead, TextField } from "../fields";
+import { SectionHead, TextField } from "../fields";
 import { ListSkeleton } from "../ui/List";
 import { useHomeField } from "../useHomeField";
-import { purposeLimit } from "../userLists/format";
+import { joinAnd, purposeLimit } from "../userLists/format";
 
 import type { SectionId } from "../sections";
 import type { SectionProps } from "./props";
@@ -98,9 +98,10 @@ const Layer: React.FC<{
 
 /**
  * How it works (chunk 20d-2): everything the assistant follows, as layers in the order they
- * apply, each with a plain summary, its exact text, and, for the owner's own layers, the control
- * to change it here. The text is the runtime's own (ally-be asks ally-ai to build it from the
- * request a run sends), so it can't drift from what the assistant really does.
+ * apply, each with a plain summary and, for the owner's own layers, their exact text and the
+ * control to change it here. Ally's layers are summaries only: their text never leaves the server
+ * (17 Nov 2026). The owner's text is the runtime's own, so it can't drift from what the assistant
+ * really does.
  */
 export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, go }) => {
   const { data: view, isLoading, isError, refetch } = useGetHowItWorksQuery(bot.id);
@@ -109,7 +110,6 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
   const name = useHomeField(bot.id, "assistantName", f.assistantName, failed);
   const tone = useHomeField(bot.id, "tone", f.tone, failed);
   const instructions = useHomeField(bot.id, "instructions", f.instructions, failed);
-  const [full, setFull] = useState(false);
   const readOnly = !canEdit;
 
   const head = <SectionHead title={HOME.sections.how} subtitle={t.intro} help={HOME.help.how} />;
@@ -196,6 +196,22 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
       </p>
     );
   }
+  // What it can do with each list, under How it finds answers.
+  const tools = (view.tools ?? []).filter(tool => tool.can.length);
+  if (tools.length) {
+    controls.search = (
+      <ul className="ally-small ally-how__tools" data-testid="how-tools">
+        {tools.map(tool => (
+          <li key={tool.list}>
+            {fill(t.tools.line, {
+              list: tool.list,
+              can: joinAnd(tool.can.map(kind => t.tools[kind])),
+            })}
+          </li>
+        ))}
+      </ul>
+    );
+  }
   // A purpose only appears when one was chosen; the others always apply.
   const shown = ORDER.filter(layer => layer !== "purpose" || textOf(view, "purpose"));
 
@@ -224,49 +240,6 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
           <Link to={{ search: "?section=lists&tool=memory" }}>{HOME.memory.openTools}</Link>
         </p>
       )}
-
-      <Group>
-        <button
-          type="button"
-          className="ally-link"
-          aria-expanded={full}
-          onClick={() => setFull(v => !v)}
-        >
-          {full ? t.hideFull : t.showFull}
-        </button>
-        {full && (
-          <>
-            <p className="ally-small">
-              {fill(t.fullHint, { question: view.placeholders.question })}
-            </p>
-            <pre className="ally-how__text ally-how__full" data-testid="how-full">
-              {view.parts.map((part, index) =>
-                part.owner ? (
-                  <mark key={index} className="ally-how__mine">
-                    {part.text}
-                    {canEdit && (
-                      <button
-                        type="button"
-                        className="ally-how__edit"
-                        onClick={() =>
-                          document
-                            .getElementById(`how-${part.layer}`)
-                            ?.querySelector<HTMLElement>("input, textarea, button")
-                            ?.focus()
-                        }
-                      >
-                        {t.editHere}
-                      </button>
-                    )}
-                  </mark>
-                ) : (
-                  <React.Fragment key={index}>{part.text}</React.Fragment>
-                ),
-              )}
-            </pre>
-          </>
-        )}
-      </Group>
     </>
   );
 };

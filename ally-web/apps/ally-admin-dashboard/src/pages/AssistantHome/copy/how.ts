@@ -9,11 +9,6 @@ export const HOW = {
   byAlly: "Set by Ally",
   showText: "Show exact text",
   hideText: "Hide exact text",
-  showFull: "Show the full instructions",
-  hideFull: "Hide the full instructions",
-  fullHint:
-    "This is the whole text your assistant gets, with your parts highlighted. Where it says {question}, it gets the visitor's message; the parts of your pages it finds go in for each question.",
-  editHere: "Edit",
   editIn: "Edit in {section}",
   counter: "{n} of {max} characters",
   warning:
@@ -55,6 +50,13 @@ export const HOW = {
       summary:
         "Searches your pages up to {searches} times a question and uses the best {passages} parts it finds, from {documents} documents.",
     },
+  },
+  /** What it can do with each list, under How it finds answers: "Leads: look up, add and change entries." */
+  tools: {
+    line: "{list}: {can} entries.",
+    find: "look up",
+    create: "add",
+    update: "change",
   },
   packAny: "your kind of practice",
   purposeNone: "answering questions",

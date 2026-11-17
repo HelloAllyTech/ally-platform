@@ -862,14 +862,6 @@ export class AppConfigService {
     return {
       apiKey: this.configService.get<string>('ANTHROPIC_API_KEY'),
       autofillModel,
-      // Analytics Suggestions (admin Analytics -> Suggestions tab). Defaults to
-      // the autofill model so there is one model to upgrade, but overridable on
-      // its own: this call carries a whole analytics window in its prompt and is
-      // the one place where a larger model may be worth the latency.
-      suggestionsModel: this.configService.get<string>(
-        'ANTHROPIC_SUGGESTIONS_MODEL',
-        autofillModel,
-      ),
     };
   }
 

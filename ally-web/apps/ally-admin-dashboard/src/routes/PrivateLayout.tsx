@@ -17,7 +17,6 @@ import ReportUploadProgressDialog from "@components/report-upload-progress-dialo
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import {
   LOCAL_STORAGE_KEYS,
-  ROUTES,
   OrgToggle,
   Permissions,
   en,
@@ -25,7 +24,7 @@ import {
 } from "@constants";
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
 import { setUser, setPermissions, setFeatures } from "@reducer";
-import { hasPermissions, hasFeature } from "@utils";
+import { hasPermissions, hasFeature, loginPathWithNext } from "@utils";
 
 import { ShellContext } from "./ShellContext";
 
@@ -115,7 +114,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   // Only used to reset the crash barrier below: React Router reuses this
   // element position across routes, so without a per-route key a page that
   // crashed would keep showing its error panel on the next page you opened.
-  const { pathname } = useLocation();
+  const { pathname, search, hash } = useLocation();
 
   // Phone-only nav drawer (the Sidebar is an in-flow rail from md up). It
   // covers the page, so any navigation and Escape close it.
@@ -139,7 +138,8 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   }, [userData, permissions, features]);
 
   if (!isAuthenticated) {
-    return <Navigate to={ROUTES.LOGIN} replace />;
+    // Back here after logging in (A1): `/login?next=<this page>`.
+    return <Navigate to={loginPathWithNext(pathname, search, hash)} replace />;
   }
 
   // Check if user has permission to access current route
@@ -278,7 +278,6 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   );
 
   if (inShell) return <>{gateContent}</>;
-
   // The preview routes render bare, with no shell to preserve — but a crash
   // there used to blank the page just the same, so they get the barrier too.
   if (hasAccess && isPreview) return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;

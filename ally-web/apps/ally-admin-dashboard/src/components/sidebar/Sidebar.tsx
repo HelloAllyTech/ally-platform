@@ -34,7 +34,7 @@ import {
   Terminal,
   Tools,
 } from "@icons";
-import { ChevronDown, ChevronRight, LibraryBig, TrendingUp } from "lucide-react";
+import { ChevronDown, ChevronRight, Compass, LibraryBig, TrendingUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -74,6 +74,7 @@ import { useClickOutside, useUser } from "@hooks";
 import { groupNavigationItems, isNavItemActive } from "@utils/navigation";
 
 import { BuilderNavBadge } from "./BuilderNavBadge";
+import { PmAgentNavBadge } from "./PmAgentNavBadge";
 import { SortableNavItem } from "./SortableNavItem";
 import { useCollapsedSections } from "./useCollapsedSections";
 import { FeatureToggleKey } from "../../constants/featureToggles";
@@ -336,6 +337,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Chemistry size={20} />;
       case SIDEBAR_ITEMS.BUILDER:
         return <Tools size={20} />;
+      case SIDEBAR_ITEMS.PM_AGENT:
+        return <Compass size={20} strokeWidth={1.5} aria-hidden />;
       // Sparkles, the same glyph the autofill buttons use for "the AI writes this for you" — and
       // not Builder's Tools, since the two agents sit side by side in the nav.
       case SIDEBAR_ITEMS.COURSE_COPILOT:
@@ -387,6 +390,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     switch (id) {
       case SIDEBAR_ITEMS.BUILDER:
         return <BuilderNavBadge />;
+      case SIDEBAR_ITEMS.PM_AGENT:
+        return <PmAgentNavBadge />;
       // The inbox lives in AI Chatbots (chunk 11a): its unread chats show on that tab.
       case SIDEBAR_ITEMS.WHATSAPP_BOT:
         return <InboxNavBadge />;

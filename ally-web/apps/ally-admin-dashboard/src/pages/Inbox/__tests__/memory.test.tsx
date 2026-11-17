@@ -156,7 +156,7 @@ describe("What your assistant remembers", () => {
     );
     expect(screen.getByText("Payment details")).toBeTruthy();
     expect(screen.getByRole("link", { name: t.changeNever }).getAttribute("href")).toBe(
-      "/chatbots/b1?section=lists&tool=memory",
+      "/assistants/b1?section=lists&tool=memory",
     );
   });
 
@@ -228,7 +228,7 @@ describe("What your assistant remembers", () => {
     panel();
     expect(screen.getByTestId("memory-off").textContent).toContain(t.off);
     expect(screen.getByRole("link", { name: t.turnOn }).getAttribute("href")).toBe(
-      "/chatbots/b1?section=lists&tool=memory",
+      "/assistants/b1?section=lists&tool=memory",
     );
     expect(screen.getByRole("heading", { name: t.titleNoName })).toBeTruthy();
   });

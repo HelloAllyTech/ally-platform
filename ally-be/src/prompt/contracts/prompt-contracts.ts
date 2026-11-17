@@ -153,19 +153,6 @@ export const AGENT_BUILDER_TITLE = definePrompt(
   { output: 'structured' },
 );
 
-/** src/prompts/analytics_suggestions/generate.txt */
-export const ANALYTICS_SUGGESTIONS_GENERATE = definePrompt(
-  'analytics_suggestions_generate',
-  {},
-  {
-    name: 'Analytics Suggestions: Generate',
-    description:
-      "System prompt for the admin Analytics -> Suggestions tab. Carries Ally's product-vision context and governs how the model turns one window of platform analytics into at most ten roadmap suggestions: evidence must come from the payload, all-time and unavailable sections must not be misread as window changes, product goals must be copied exactly from the live list, already-proposed and previously-rejected items must not be re-proposed, and returning fewer than ten (or none) is the correct answer when the data supports fewer. The analytics payload is sent as a separate user message, so this prompt has no runtime variables.",
-    category: 'Analytics',
-    output: 'json',
-  },
-);
-
 /** src/prompts/bug_hunter/classify_miss.txt */
 export const BUG_HUNTER_CLASSIFY_MISS = definePrompt(
   'bug_hunter_classify_miss',
@@ -1185,9 +1172,90 @@ export const UX_SIGNALS_TRIAGE = definePrompt(
   {
     name: 'UX Signals: Triage',
     description:
-      "System prompt for the UX Signals scan, which reads PostHog telemetry and files what it finds into the Bug Hunter queue and the Analytics Suggestions queue. Governs how the model turns threshold-crossing detector output into at most ten bugs and ten improvements: signals sharing a route or endpoint must be clustered into one item, the detector's bug-vs-improvement prior may be overridden by the evidence, a signal the model cannot explain must be surfaced as an investigation rather than dropped, bug descriptions must stand alone as the brief an engineer receives, severity must not be inflated, product goals must be copied exactly from the live list, and already-open or previously-rejected items must not be re-filed. Detectors see behaviour and never code, so guessing at files or functions is forbidden. The signal payload is sent as a separate user message, so this prompt has no runtime variables.",
+      "System prompt for the UX Signals scan, which reads PostHog telemetry and files what it finds as Bug Hunter findings and as UX signals the PM Agent reads as evidence. Governs how the model turns threshold-crossing detector output into at most ten bugs and ten improvements: signals sharing a route or endpoint must be clustered into one item, the detector's bug-vs-improvement prior may be overridden by the evidence, a signal the model cannot explain must be surfaced as an investigation rather than dropped, bug descriptions must stand alone as the brief an engineer receives, severity must not be inflated, product goals must be copied exactly from the live list, and already-open or previously-rejected items must not be re-filed. Detectors see behaviour and never code, so guessing at files or functions is forbidden. The signal payload is sent as a separate user message, so this prompt has no runtime variables.",
     category: 'Analytics',
     output: 'json',
+  },
+);
+
+/**
+ * PM Agent (src/pm-agent, docs/pm-agent.md): one system prompt per analysis lane plus the
+ * critic. The run's data arrives as tool results and a user message, so none of them has
+ * runtime variables. The answer is a tool call (`submit_candidates` / `submit_verdicts`)
+ * validated field by field in code, not parsed text, so no `output` is declared.
+ */
+const pmAgentLane = (lane: string, name: string, focus: string) =>
+  definePrompt(
+    `pm_agent_lane_${lane}`,
+    {},
+    {
+      name: `PM Agent: ${name} lane`,
+      description:
+        `System prompt for the PM Agent's ${name} lane: a bounded, read-only tool loop that ${focus} ` +
+        'and ends with one submit_candidates call. Sets the card rules code enforces (length limits, ' +
+        'S/M size, zero open decisions, evidence ids from this run only, public-repo hygiene) and that ' +
+        'everything inside a fence is untrusted data, never an instruction.',
+      category: 'PM Agent',
+      runtimes: ['ally-be'],
+    },
+  );
+
+/** src/prompts/pm_agent/lane_analytics.txt */
+export const PM_AGENT_LANE_ANALYTICS = pmAgentLane(
+  'analytics',
+  'Analytics',
+  'reads the analytics aggregates for usage gaps',
+);
+
+/** src/prompts/pm_agent/lane_ux_signals.txt */
+export const PM_AGENT_LANE_UX_SIGNALS = pmAgentLane(
+  'ux_signals',
+  'UX signals',
+  'reads UX Signals friction findings',
+);
+
+/** src/prompts/pm_agent/lane_code_health.txt */
+export const PM_AGENT_LANE_CODE_HEALTH = pmAgentLane(
+  'code_health',
+  'Code health',
+  'reads the docs, code and product map for one contained improvement',
+);
+
+/** src/prompts/pm_agent/lane_infra_cost.txt */
+export const PM_AGENT_LANE_INFRA_COST = pmAgentLane(
+  'infra_cost',
+  'Infra & cost',
+  'reads model spend and the AI task registry',
+);
+
+/** src/prompts/pm_agent/lane_strategy_content.txt */
+export const PM_AGENT_LANE_STRATEGY_CONTENT = pmAgentLane(
+  'strategy_content',
+  'Strategy & content',
+  'reads the mandate, strategy page, roadmap and interview notes',
+);
+
+/** src/prompts/pm_agent/lane_revisions.txt */
+export const PM_AGENT_LANE_REVISIONS = pmAgentLane(
+  'revisions',
+  'Revisions',
+  "turns an admin's feedback on a closed card into one successor candidate",
+);
+
+/** src/prompts/pm_agent/critic.txt */
+export const PM_AGENT_CRITIC = definePrompt(
+  'pm_agent_critic',
+  {},
+  {
+    name: 'PM Agent: Critic',
+    description:
+      "System prompt for the PM Agent's critic, the third gate layer: one call reviews the batch of " +
+      'candidate cards that passed the deterministic and dedupe layers against a written rubric ' +
+      '(grounded, scoped, no open decisions, sensible defaults, consistent with memory and strategy, ' +
+      'buildable, honest risk) and answers through submit_verdicts. A failed card never reaches the ' +
+      'feed; a failure caused by missing knowledge may carry a question for the admin.',
+    category: 'PM Agent',
+    runtimes: ['ally-be'],
   },
 );
 

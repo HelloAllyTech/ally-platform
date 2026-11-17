@@ -5,7 +5,7 @@ import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import { AppConfigService } from 'src/config/config.service';
 import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
 import { BugFindingSeverity } from 'src/bug-hunter/enum/bug-finding.enum';
-import { AnalyticsSuggestion } from 'src/analytics-suggestions/entity/analytics-suggestion.entity';
+import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
 import { RoadmapProductGoalRepository } from 'src/product-roadmap/repository/roadmap-taxonomy.repository';
 
 import { UxSignalsService } from '../ux-signals.service';
@@ -101,7 +101,7 @@ describe('UxSignalsService', () => {
           },
         },
         {
-          provide: getRepositoryToken(AnalyticsSuggestion),
+          provide: getRepositoryToken(PmAgentSignal),
           useValue: { find: jest.fn().mockResolvedValue([]) },
         },
         {

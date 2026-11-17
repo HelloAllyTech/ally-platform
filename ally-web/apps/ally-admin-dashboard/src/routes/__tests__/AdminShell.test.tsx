@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Link, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Link, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mounts = vi.hoisted(() => ({ sidebar: 0 }));
@@ -36,11 +36,17 @@ vi.mock("@hooks/useAdminAnalytics", () => ({ useAdminPageView: (p: string) => pa
 import { AdminShell } from "../AdminShell";
 import { NotFound } from "../NotFound";
 
+/** The login page, showing where it was sent from, so the deep link can be checked. */
+const LoginPage: React.FC = () => {
+  const { search } = useLocation();
+  return <div data-search={search}>login page</div>;
+};
+
 const renderShell = (path: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/login" element={<div>login page</div>} />
+        <Route path="/login" element={<LoginPage />} />
         <Route element={<AdminShell />}>
           <Route
             path="/prompts-page"
@@ -54,7 +60,7 @@ const renderShell = (path: string) =>
           <Route path="/manage-prompts" element={<div>prompts</div>} />
           <Route path="/manage-tooltips" element={<div>tooltips</div>} />
           <Route path="/create-simulation/edit/:id" element={<div>editor</div>} />
-          <Route path="/chatbots" element={<div>assistants</div>} />
+          <Route path="/assistants" element={<div>assistants</div>} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
@@ -73,6 +79,15 @@ describe("AdminShell", () => {
     localStorage.removeItem("adminIsAuthenticated");
     renderShell("/manage-prompts");
     expect(screen.getByText("login page")).toBeInTheDocument();
+  });
+
+  it("keeps the page a signed-out visitor asked for, to return to after login (A1)", () => {
+    localStorage.removeItem("adminIsAuthenticated");
+    renderShell("/assistants?section=tools#lists");
+    const login = screen.getByText("login page");
+    expect(new URLSearchParams(login.getAttribute("data-search") ?? "").get("next")).toBe(
+      "/assistants?section=tools#lists",
+    );
   });
 
   it("reports each page view to usage tracking", () => {
@@ -107,7 +122,7 @@ describe("AdminShell", () => {
   });
 
   it("gives full-bleed pages no padding and no breadcrumb bar", () => {
-    const { container } = renderShell("/chatbots");
+    const { container } = renderShell("/assistants");
     expect(screen.queryByTestId("admin-breadcrumbs")).not.toBeInTheDocument();
     expect(container.querySelector(".p-4")).toBeNull();
   });

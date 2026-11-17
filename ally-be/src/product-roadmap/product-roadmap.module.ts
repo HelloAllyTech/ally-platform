@@ -170,7 +170,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
      * The whole module rather than the entity (the treatment BugFinding gets above) because
      * creating a session is real logic: slug allocation, the default budget ceiling and the
      * tenant caps all live in that service, and a roadmap-side INSERT would silently skip them.
-     * Safe to import: nothing in Builder's graph reaches back here — only AnalyticsSuggestions
+     * Safe to import: nothing in Builder's graph reaches back here — only PmAgentModule
      * imports ProductRoadmapModule.
      */
     BuilderModule,
@@ -265,8 +265,8 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapGateway,
   ],
   /**
-   * RoadmapOpportunityService is exported so AnalyticsSuggestionsModule can file
-   * an accepted suggestion through THE SAME create() path a person filing by
+   * RoadmapOpportunityService is exported so the PM Agent can file
+   * an accepted card through THE SAME create() path a person filing by
    * hand uses. Writing the row through the exported repository instead would
    * skip the vector index and the realtime notify, which is how an opportunity
    * ends up invisible to duplicate detection and absent from an open board.

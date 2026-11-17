@@ -164,6 +164,7 @@ export enum BugFindingSource {
   CODE_REVIEW = "code_review",
   PRODUCTION_LOG = "production_log",
   REPORTED_BUG = "reported_bug",
+  /** Historical rows only: the Analytics Suggestions queue was retired; nothing writes this now. */
   ANALYTICS_SUGGESTION = "analytics_suggestion",
   UX_SIGNAL = "ux_signal",
   /** The sweep workflow's own locale-file check, a script and not a model (OPP-0782). */
@@ -396,6 +397,7 @@ export interface BugHuntEvent {
   stage: BugHuntEventStage;
   summary: string;
   payload: Record<string, unknown> | null;
+  /** Historical: referenced the retired Analytics Suggestions queue. */
   suggestionId: string | null;
   findingId: string | null;
   createdAt: string;

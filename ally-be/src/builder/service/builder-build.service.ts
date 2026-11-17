@@ -6,7 +6,7 @@ import {
   ServiceUnavailableException,
   forwardRef,
 } from '@nestjs/common';
-import { In, IsNull, Like } from 'typeorm';
+import { In, IsNull, Like, MoreThanOrEqual, Not } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { RedisService } from 'src/redis/service/redis.service';
@@ -1424,6 +1424,68 @@ export class BuilderBuildService {
    * reconcile tick (reconcileIssueRun). One repo per build: a design spanning
    * several repos is a chain of repo milestones, each its own issue.
    */
+  /**
+   * A retry of a repo whose earlier issue build left an open pull request
+   * follows that pull request instead of raising a new issue.
+   *
+   * Raising one meant a second opencode job building the same feature from
+   * scratch beside the first one's PR (6ce1a354 run 4, 2026-11-17, while PR
+   * 277 was already green and being merged up to master). The run takes over
+   * the earlier issue, so the PR tick checks its CI and asks for fixes with a
+   * fresh budget. A person who wants a clean start closes the PR first.
+   */
+  private async adoptOpenIssuePullRequest(
+    session: BuilderSession,
+    run: BuilderBuildRun,
+    repo: string,
+  ): Promise<boolean> {
+    // State is NULL until the reconcile tick first reads the PR; that is open.
+    const base = {
+      sessionId: session.id,
+      repo,
+      merged: false,
+      branch: Like('opencode/issue%'),
+    };
+    const open = await this.pullRequestRepository.findOne({
+      where: [
+        { ...base, state: Not('closed') },
+        { ...base, state: IsNull() },
+      ],
+      order: { createdAt: 'DESC' },
+    });
+    const issueNumber = Number(
+      /^opencode\/issue(\d+)-/.exec(open?.branch ?? '')?.[1],
+    );
+    if (!open || !Number.isInteger(issueNumber) || issueNumber <= 0) {
+      return false;
+    }
+    const issueUrl = open.prUrl.replace(
+      /\/pull\/\d+$/,
+      `/issues/${issueNumber}`,
+    );
+    await this.runRepository.update(
+      { id: run.id },
+      {
+        issueNumber,
+        issueUrl,
+        githubRunUrl: issueUrl,
+        status: BuilderRunStatus.RUNNING,
+        startedAt: new Date(),
+      },
+    );
+    await this.recordIssueMilestone(
+      { ...run, issueNumber, issueUrl } as BuilderBuildRun,
+      `adopt:${open.prNumber}`,
+      `${open.prUrl} from an earlier run is still open, so this run picks it up instead of raising a new issue. ` +
+        'Close that pull request first for a fresh start.',
+      BuilderStage.GATE,
+    );
+    this.logger.info(
+      `Builder run ${run.id} adopted open ${repo} PR ${open.prUrl} (issue #${issueNumber}) for session ${session.id}.`,
+    );
+    return true;
+  }
+
   private async dispatchAsIssue(
     session: BuilderSession,
     run: BuilderBuildRun,
@@ -1435,6 +1497,7 @@ export class BuilderBuildService {
       );
     }
     const [repo] = repos;
+    if (await this.adoptOpenIssuePullRequest(session, run, repo)) return;
     // Nothing private in the issue: ally-be, ally-web and ally-ai are public
     // repos, and the PRD and design are not. The workflow fetches them from
     // GET /builder/pipeline/runs/:runId/spec with the Builder API key, cut to
@@ -1988,6 +2051,62 @@ export class BuilderBuildService {
     return (await this.runRepository.listActive()).filter((run) =>
       Boolean(run.issueNumber),
     );
+  }
+
+  /**
+   * Issue builds that failed recently and may still come good, newest first.
+   *
+   * A build fails after its fix requests run out, but its pull request stays
+   * open and the PR loop keeps working it (review feedback, conflicts). On
+   * 2026-11-17 PR 277 went green twelve minutes after its run was failed, and
+   * nothing ever looked at the run again.
+   */
+  async listRecoverableIssueRuns(since: Date): Promise<BuilderBuildRun[]> {
+    return this.runRepository.find({
+      where: {
+        status: BuilderRunStatus.FAILED,
+        mode: BuilderRunMode.BUILD,
+        completedAt: MoreThanOrEqual(since),
+        issueNumber: Not(IsNull()),
+      },
+      order: { completedAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Bring a FAILED issue build back to life because its pull request is now
+   * green, and settle it SUCCEEDED so the chain moves to the next repo.
+   *
+   * Narrow on purpose: only the session's latest run, only while the session
+   * is still FAILED from it, and only while its milestone is FAILED. A session
+   * that has moved on — a retry, a stop, another milestone — is left alone.
+   */
+  async reviveIssueRun(run: BuilderBuildRun): Promise<boolean> {
+    if (run.status !== BuilderRunStatus.FAILED || !run.issueNumber) {
+      return false;
+    }
+    const session = await this.sessionRepository.findOne({
+      where: { id: run.sessionId },
+    });
+    if (session?.status !== BuilderSessionStatus.FAILED) return false;
+    if (!(await this.runRepository.isLatestForSession(run.id, session.id))) {
+      return false;
+    }
+    if (run.milestoneId) {
+      const milestone = (await this.epicService.listBySession(session.id)).find(
+        (candidate) => candidate.id === run.milestoneId,
+      );
+      if (milestone?.status !== BuilderMilestoneStatus.FAILED) return false;
+    }
+    await this.sessionRepository.update(
+      { id: session.id },
+      { status: BuilderSessionStatus.BUILDING, error: null },
+    );
+    this.logger.info(
+      `Builder run ${run.id} failed earlier, but its pull request is now green; settling it SUCCEEDED.`,
+    );
+    await this.settleRun(run, BuilderRunStatus.SUCCEEDED, null);
+    return true;
   }
 
   private async reconcileRun(run: BuilderBuildRun): Promise<void> {

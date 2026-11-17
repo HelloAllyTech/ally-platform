@@ -97,15 +97,15 @@ test("a viewer sees everything and can change nothing", async ({ page }) => {
   await expect(page.getByText("Changes save as you go")).toHaveCount(0);
 });
 
-// Chunk 20d-2: How it answers is in the ··· menu, for Ally staff only. CL1 removed Classic view and
-// put this assistant's own Settings beside it.
-test("only platform admins see How it answers and Settings", async ({ page }) => {
-  await mockAssistantHome(page);
+// Chunk 20d-2: How it answers is in the ··· menu. CL1 removed Classic view and put this assistant's
+// own Settings beside it. Since A1 both are the owner's, not Ally staff's.
+test("only owners see How it answers and Settings", async ({ page }) => {
+  await mockAssistantHome(page, { role: "viewer" });
   await open(page, "overview");
   await expect(page.getByRole("button", { name: "More" })).toHaveCount(
     (page.viewportSize()?.width ?? 1440) < 960 ? 1 : 0,
   );
-  await mockAssistantHome(page, { admin: true });
+  await mockAssistantHome(page);
   await page.reload();
   await page.getByRole("button", { name: "More" }).click();
   await expect(page.getByRole("menuitem", { name: "How it answers" })).toBeVisible();

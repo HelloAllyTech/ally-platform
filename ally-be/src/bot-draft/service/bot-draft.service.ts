@@ -217,14 +217,11 @@ export class BotDraftService {
     });
   }
 
-  /** The draft, if the caller owns it (or is a platform admin); 404 otherwise. */
+  /** The draft, if the caller started it; 404 otherwise (platform admins included). */
   async get(draftId: string): Promise<BotDraftEntity> {
     const draft = await this.drafts.findOne({ where: { id: draftId } });
     if (!draft) throw new NotFoundException('That setup was not found.');
-    if (
-      draft.ownerUserId !== currentUserId() &&
-      !(await this.access.isPlatformAdmin())
-    ) {
+    if (draft.ownerUserId !== currentUserId()) {
       throw new NotFoundException('That setup was not found.');
     }
     return draft;

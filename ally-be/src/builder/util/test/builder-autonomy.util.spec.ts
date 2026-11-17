@@ -1,5 +1,6 @@
 import {
   autonomyLevelOf,
+  effectiveAutonomySettings,
   nextAutonomyLevel,
   switchesForAutonomyLevel,
 } from '../builder-autonomy.util';
@@ -35,5 +36,30 @@ describe('builder autonomy levels', () => {
     expect(nextAutonomyLevel('auto_merge')).toBe('auto');
     expect(nextAutonomyLevel('auto')).toBeNull();
     expect(nextAutonomyLevel('custom')).toBeNull();
+  });
+});
+
+describe('per-session autonomy override (PM Agent sessions)', () => {
+  const global = {
+    enabled: true,
+    maxFixRunsPerPr: 3,
+    ...switchesForAutonomyLevel('off'),
+  };
+
+  it("'auto' turns every switch on for that session, keeping the other settings", () => {
+    expect(effectiveAutonomySettings(global, 'auto')).toEqual({
+      ...global,
+      ...switchesForAutonomyLevel('auto'),
+    });
+  });
+
+  it('no override (or an unknown one) leaves the global settings untouched', () => {
+    expect(effectiveAutonomySettings(global, null)).toBe(global);
+    expect(effectiveAutonomySettings(global, 'assist')).toBe(global);
+  });
+
+  it('never overrides the global kill switch', () => {
+    const off = { ...global, enabled: false };
+    expect(effectiveAutonomySettings(off, 'auto')).toBe(off);
   });
 });

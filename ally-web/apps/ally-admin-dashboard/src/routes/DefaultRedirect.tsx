@@ -13,7 +13,9 @@ import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle, en } from "@constants";
 // Import the specific module rather than the "@utils" barrel: the barrel pulls
 // in Redux-logger and component dependencies that this root-path redirect has no
 // need for, and would otherwise bloat its chunk.
-import { deriveNavigationItems } from "@utils/navigation";
+import { deriveNavigationItems, isChatbotsOnly } from "@utils/navigation";
+
+import { FeatureToggleKey } from "../constants/featureToggles";
 
 /**
  * Resolves the post-login landing route to the current user's FIRST sidebar tab
@@ -117,6 +119,11 @@ export const DefaultRedirect: React.FC = () => {
     );
   }
 
+  // A login whose only feature is Chatbots (a custom login, A1) lands on its assistants, as does
+  // anyone with Chatbots and nothing else in the navigation.
+  const enabledFeatures = features ?? [];
+  if (isChatbotsOnly(enabledFeatures)) return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
+
   const items = deriveNavigationItems({
     permissions: permissions ?? [],
     features: features ?? [],
@@ -125,6 +132,10 @@ export const DefaultRedirect: React.FC = () => {
       [OrgToggle.CHARACTER_LIBRARY]: Boolean(isCharacterLibraryOrgEnabled),
     },
   });
+
+  if (!items.length && enabledFeatures.includes(FeatureToggleKey.WHATSAPP_BOT)) {
+    return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
+  }
 
   // Nothing this account can open (a clinical advisor before their toggle, say): a clear
   // message, not Simulation Studio's "This page is not accessible" beside an empty sidebar.

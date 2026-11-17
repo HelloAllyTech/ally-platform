@@ -325,15 +325,39 @@ describe("deriveNavigationItems", () => {
     expect(ids).not.toContain(SIDEBAR_ITEMS.DEBRIEFS);
   });
 
-  it("shows WhatsApp Bot to a holder of the whatsapp_bot toggle", () => {
-    const result = deriveNavigationItems({
+  it("shows PM Agent only to a holder of the pm_agent toggle", () => {
+    const withToggle = deriveNavigationItems({
       permissions: [],
+      features: [FeatureToggleKey.PM_AGENT],
+      savedOrder: undefined,
+    });
+    const item = withToggle.find(i => i.id === SIDEBAR_ITEMS.PM_AGENT);
+    expect(item?.path).toBe(ROUTES.PM_AGENT);
+    const without = deriveNavigationItems({ permissions: [], features: [], savedOrder: undefined });
+    expect(without.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.PM_AGENT);
+  });
+
+  it("shows a Chatbots-only login (a custom login) just the Assistants item", () => {
+    // It holds the platform-admin role's permissions, which would otherwise surface every
+    // permission-gated tab.
+    const result = deriveNavigationItems({
+      permissions: Object.values(Permissions),
       features: [FeatureToggleKey.WHATSAPP_BOT],
       savedOrder: undefined,
     });
-    const item = result.find(i => i.id === SIDEBAR_ITEMS.WHATSAPP_BOT);
-    expect(item).toBeDefined();
-    expect(item?.path).toBe(ROUTES.WHATSAPP_BOT);
+    expect(result.map(i => [i.id, i.path, i.label])).toEqual([
+      [SIDEBAR_ITEMS.WHATSAPP_BOT, ROUTES.WHATSAPP_BOT, "Assistants"],
+    ]);
+  });
+
+  it("adds Assistants to everything else for a holder of Chatbots and other features", () => {
+    const ids = deriveNavigationItems({
+      permissions: Object.values(Permissions),
+      features: [FeatureToggleKey.WHATSAPP_BOT, FeatureToggleKey.ANALYTICS],
+      savedOrder: undefined,
+    }).map(i => i.id);
+    expect(ids).toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
+    expect(ids).toContain(SIDEBAR_ITEMS.ANALYTICS);
   });
 
   // Both halves are required, like Simulation Studio: Course Copilot is deliberately not in
@@ -633,6 +657,6 @@ describe("isNavItemActive", () => {
     expect(
       isNavItemActive(find(SIDEBAR_ITEMS.SIMULATION_STUDIO), "/create-simulation/edit/3"),
     ).toBe(true);
-    expect(isNavItemActive(find(SIDEBAR_ITEMS.WHATSAPP_BOT), "/chatbots/42")).toBe(true);
+    expect(isNavItemActive(find(SIDEBAR_ITEMS.WHATSAPP_BOT), "/assistants/42")).toBe(true);
   });
 });

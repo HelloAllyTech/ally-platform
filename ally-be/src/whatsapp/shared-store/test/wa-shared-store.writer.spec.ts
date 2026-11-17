@@ -206,13 +206,24 @@ describe('Retention and erasure over the shared store', () => {
         findOne: async () => ({ id: 'contact-1', phoneE164: '9198' }),
         update: jest.fn(),
       } as never,
-      { find: async () => [{ id: 'conv-1' }, { id: 'conv-2' }] } as never,
+      {
+        find: async () => [{ id: 'conv-1' }, { id: 'conv-2' }],
+        // The caller is on the contact's bot (A1: nobody sees every contact).
+        createQueryBuilder: () => {
+          const qb = {
+            where: () => qb,
+            andWhere: () => qb,
+            getCount: async () => 1,
+          };
+          return qb;
+        },
+      } as never,
       { update: jest.fn() } as never,
       { update: jest.fn() } as never,
       {} as never,
       {} as never,
       {} as never,
-      { accessibleChatbotIds: async () => null } as never,
+      { accessibleChatbotIds: async () => ['bot-1'] } as never,
       store as ConversationService,
     );
   }

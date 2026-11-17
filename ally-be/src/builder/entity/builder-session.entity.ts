@@ -170,6 +170,16 @@ export class BuilderSession extends BaseWithoutTenantEntity {
   requestRef?: string | null;
 
   /**
+   * Per-session autonomy override; null = the global Builder settings apply. Only `auto`
+   * exists (CHECK in migration 1982000000100): review, fix, approve, merge and release run on
+   * their own for THIS session while `builder_settings.enabled` is on. Set at creation for
+   * sessions requested by the PM Agent (`requestedBy = 'pm_agent'`); see
+   * effectiveAutonomySettings and BuilderPullRequestService.settingsForSession.
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  autonomyOverride?: string | null;
+
+  /**
    * Set when someone archives the session. Null = active. Sessions are shared,
    * so archiving hides it from every Builder user's default feed view — it does not touch status, and never cascades to the PRD,
    * transcript, runs, events, PRs or reports underneath it.

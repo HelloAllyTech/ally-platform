@@ -52,7 +52,7 @@ export enum Permissions {
   // nothing to show without the chat), but both grants exist so the backend can tier them later.
   VIEW_COURSE_COPILOT = "view:admin:course-copilot",
   EDIT_COURSE_COPILOT = "edit:admin:course-copilot",
-  // AI Chatbots: onboarding (/chatbots/new) needs the edit grant, as ally-be checks it.
+  // AI Chatbots: onboarding (/assistants/new) needs the edit grant, as ally-be checks it.
   EDIT_WHATSAPP_BOT = "edit:whatsapp-bot",
   // Ally guide (Ally Console + org Ally tab). Transcripts need their own
   // permission AND the per-person ally_guide_transcripts toggle.
@@ -127,6 +127,7 @@ export const SIDEBAR_ITEMS = {
   MOBILE_RELEASES: "mobile-releases",
   WHATSAPP_BOT: "whatsapp-bot",
   BUG_HUNTER: "bug-hunter",
+  PM_AGENT: "pm-agent",
   BUILDER: "builder",
   CONTEXT_LIBRARY: "context-library",
   COURSE_COPILOT: "course-copilot",

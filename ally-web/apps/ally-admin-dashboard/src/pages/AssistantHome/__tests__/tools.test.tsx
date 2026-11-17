@@ -70,6 +70,10 @@ vi.mock("@api", async importOriginal => ({
   useRestoreListEntryMutation: mutation("restore"),
   useRepeatWeeklyMutation: mutation("repeat"),
   useSaveHomeFieldMutation: mutation("saveField"),
+  useGetChatbotSettingsQuery: () => ({
+    data: { overrides: { showTyping: false, abilities: { create_appointments: "do_it" } } },
+  }),
+  useUpdateChatbotSettingsMutation: mutation("updateSettings"),
 }));
 vi.mock("react-redux", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -109,10 +113,10 @@ const strings = (value: unknown): string[] =>
 
 const changed = vi.fn();
 const go = vi.fn();
-const show = (canEdit = true) =>
+const show = (canEdit = true, canManage = canEdit) =>
   render(
     <HomeSavesContext.Provider value={{ changed }}>
-      <ListsSection bot={BOT} home={HOME_VIEW} canEdit={canEdit} canManage={canEdit} go={go} />
+      <ListsSection bot={BOT} home={HOME_VIEW} canEdit={canEdit} canManage={canManage} go={go} />
     </HomeSavesContext.Provider>,
   );
 
@@ -159,6 +163,33 @@ describe("Tools", () => {
     expect(screen.getByText(t.tools.handoverBody)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: t.tools.handoverChange }));
     expect(go).toHaveBeenCalledWith("share");
+  });
+
+  it("lets an owner switch hand over on, keeping the bot's other settings (A1)", () => {
+    const updateSettings = vi.fn();
+    (
+      globalThis as unknown as { __tools: { calls: Record<string, unknown> } }
+    ).__tools.calls.updateSettings = updateSettings;
+    show(true, true);
+    fireEvent.click(screen.getByRole("tab", { name: /Hand over/ }));
+    const toggle = screen.getByRole("switch", { name: /hand a chat to your team/ });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(toggle);
+    expect(updateSettings).toHaveBeenCalledWith({
+      id: "bot-1",
+      settings: {
+        showTyping: false,
+        abilities: { create_appointments: "do_it", hand_over: "do_it" },
+      },
+    });
+  });
+
+  it("shows hand over to an editor without letting them change it (owners only, A1)", () => {
+    show(true, false);
+    fireEvent.click(screen.getByRole("tab", { name: /Hand over/ }));
+    const toggle = screen.getByRole("switch", { name: /hand a chat to your team/ });
+    expect((toggle as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(t.tools.handoverAbilityOwners)).toBeTruthy();
   });
 
   it("keeps a list's choices in view, not its statuses", () => {

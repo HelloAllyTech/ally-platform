@@ -36,6 +36,7 @@ import {
 } from '../dto/whatsapp.dto';
 import { WaTemplateKind } from '../enum/whatsapp.enum';
 import { WhatsAppAdminService } from '../service/whatsapp-admin.service';
+import { AssistantScope } from '../../chatbot/access/chatbot-role.decorator';
 
 /**
  * Admin surface for the WhatsApp Q&A bot. SUPER_DUPER_ADMIN only
@@ -74,6 +75,7 @@ export class WhatsAppAdminController {
 
   @Get('templates')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_TEMPLATES],
   })
@@ -98,6 +100,7 @@ export class WhatsAppAdminController {
 
   @Post('templates')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -116,6 +119,7 @@ export class WhatsAppAdminController {
 
   @Post('templates/:id/customise')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -140,6 +144,7 @@ export class WhatsAppAdminController {
 
   @Patch('templates/:id')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -167,6 +172,7 @@ export class WhatsAppAdminController {
 
   @Post('templates/:id/archive')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -188,6 +194,7 @@ export class WhatsAppAdminController {
 
   @Post('templates/reorder')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -210,6 +217,7 @@ export class WhatsAppAdminController {
 
   @Post('templates/test')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_TEMPLATES],
   })
@@ -233,6 +241,7 @@ export class WhatsAppAdminController {
   // ── settings ──────────────────────────────────────────────────────────
 
   @Get('settings')
+  @AssistantScope('platform')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -242,6 +251,7 @@ export class WhatsAppAdminController {
   }
 
   @Put('settings')
+  @AssistantScope('platform')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -265,6 +275,7 @@ export class WhatsAppAdminController {
   }
 
   @Get('settings/provider-health')
+  @AssistantScope('platform')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -280,6 +291,7 @@ export class WhatsAppAdminController {
 
   @Post('settings/provider-check')
   @HttpCode(HttpStatus.OK)
+  @AssistantScope('platform')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -297,6 +309,7 @@ export class WhatsAppAdminController {
 
   @Post('settings/provider-register')
   @HttpCode(HttpStatus.OK)
+  @AssistantScope('platform')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -311,6 +324,7 @@ export class WhatsAppAdminController {
 
   @Post('settings/provider-subscribe')
   @HttpCode(HttpStatus.OK)
+  @AssistantScope('platform')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -327,6 +341,7 @@ export class WhatsAppAdminController {
   // ── preview console ───────────────────────────────────────────────────
 
   @Post('preview/ask')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })

@@ -128,7 +128,7 @@ describe("useUxSignalScan", () => {
 
     await waitFor(() =>
       expect(toast.success).toHaveBeenCalledWith(
-        "Scan complete: 7 bugs and 2 suggestions filed.",
+        "Scan complete: 7 bugs and 2 improvement signals filed.",
         expect.objectContaining({
           description: "9 signals crossed a threshold; 1 were already known.",
         }),
@@ -186,7 +186,9 @@ describe("useUxSignalScan", () => {
     render(<Probe />);
 
     expect(toast.success).not.toHaveBeenCalled();
-    expect(screen.getByTestId("last-scan")).toHaveTextContent(/7 bugs, 2 suggestions filed/);
+    expect(screen.getByTestId("last-scan")).toHaveTextContent(
+      /7 bugs, 2 improvement signals filed/,
+    );
   });
 
   it("stops waiting on a scan that died mid-run instead of spinning forever", () => {

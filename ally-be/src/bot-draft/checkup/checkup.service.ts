@@ -159,8 +159,8 @@ export class CheckupService {
     suite: string,
     items: SuiteCase[],
   ): Promise<{ added: number; updated: number }> {
-    await this.access.assertPlatformAdmin();
-    await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
+    // Suites belong to the bot's owners (A1; was platform admins).
+    await this.access.assert(chatbotId, ChatbotMemberRole.OWNER);
     const pages = await this.pageDocuments(chatbotId);
     const existing = await this.cases.find({ where: { chatbotId, suite } });
     const byId = new Map(existing.map((row) => [row.externalId, row]));
@@ -287,7 +287,8 @@ export class CheckupService {
       CHECKUP_LIMITS.maxAttempts,
     );
     if (options.trigger === 'eval' || (options.attempts ?? 1) > 1) {
-      await this.access.assertPlatformAdmin();
+      // Eval and multi-attempt runs belong to the bot's owners (A1; was platform admins).
+      await this.access.assert(chatbotId, ChatbotMemberRole.OWNER);
     } else {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const today = await this.runs.count({
