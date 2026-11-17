@@ -29,10 +29,7 @@ export const NewIdeaButton: React.FC<{ compact?: boolean }> = ({ compact = false
         flipped
         size="sm"
       >
-        <OverflowMenuItem
-          itemText={copy.reportBug}
-          onClick={() => navigate(ROUTES.ROADMAP_BUGS)}
-        />
+        <OverflowMenuItem itemText={copy.reportBug} onClick={() => navigate(ROUTES.ROADMAP_BUGS)} />
       </OverflowMenu>
     </span>
   );
