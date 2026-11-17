@@ -358,12 +358,12 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   },
   {
     id: 'debrief-agent',
-    name: 'Debrief agent and its PM agent (admin Debriefs)',
+    name: 'Debrief agent and its Debrief PM agent (admin Debriefs)',
     whatItIs:
       'Writes the debrief a learner reads after a roleplay by following a recipe of steps ' +
       '(Safety reader, Analyst, Progress reader, Guidance lookup, Writer, rule checks, Evaluator, ' +
       'Reviser) under a budget and deadline, with a fallback ladder; runs in shadow beside ' +
-      "today's debrief and live for organisations switched on. The PM agent reads aggregate " +
+      "today's debrief and live for organisations switched on. The Debrief PM agent reads aggregate " +
       'signals daily, proposes prompt and setting changes, tries them on test sets built from ' +
       'real sessions, and a person approves each new release. Runs on the agent harness ' +
       '(agentKey debrief).',

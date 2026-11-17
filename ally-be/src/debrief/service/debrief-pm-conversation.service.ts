@@ -220,7 +220,9 @@ export class DebriefPmConversationService {
   ): Promise<{ messages: PmMessageView[]; more: boolean }> {
     const access = conversationAccess(viewer.can);
     if (access === 'none') {
-      throw new ForbiddenException('You cannot read the PM agent conversation');
+      throw new ForbiddenException(
+        'You cannot read the Debrief PM agent conversation',
+      );
     }
     const limit = Math.max(1, Math.min(100, Number(opts.limit) || 50));
     const qb = this.messages.createQueryBuilder('m');
@@ -301,7 +303,7 @@ export class DebriefPmConversationService {
     const about = await this.cleanAbout(input.about);
     const access = conversationAccess(viewer.can);
     if (access === 'none') {
-      throw new ForbiddenException('You cannot talk to the PM agent');
+      throw new ForbiddenException('You cannot talk to the Debrief PM agent');
     }
     if (access === 'pinned_rules') {
       const idea =
@@ -310,7 +312,7 @@ export class DebriefPmConversationService {
           : null;
       if (!idea || !isPinnedRuleChange(idea)) {
         throw new ForbiddenException(
-          'The clinical advisor talks to the PM agent about pinned-rule changes only. Open the change from Home.',
+          'The clinical advisor talks to the Debrief PM agent about pinned-rule changes only. Open the change from Home.',
         );
       }
     }
@@ -432,7 +434,9 @@ export class DebriefPmConversationService {
           );
         }
         if (a.tool === 'change_turn_down' && !String(b.reason ?? '').trim()) {
-          refuse('say why it is turned down; the PM agent reads the reason');
+          refuse(
+            'say why it is turned down; the Debrief PM agent reads the reason',
+          );
         }
         await this.requirePermission(
           person,
@@ -1070,7 +1074,7 @@ export class DebriefPmConversationService {
     const who = whoDecides(action);
     const alert = {
       title: `Debriefs: ${what} needs your decision`,
-      body: `${person.authorName ?? 'Someone'} asked the PM agent to ${what} ${changeName(idea)}. Only ${who} can.`,
+      body: `${person.authorName ?? 'Someone'} asked the Debrief PM agent to ${what} ${changeName(idea)}. Only ${who} can.`,
       data: { ideaId: idea.id, url: `/debriefs/pm-agent?change=${idea.id}` },
       excludeUserId: person.authorUserId ?? undefined,
     };
@@ -1125,7 +1129,7 @@ export class DebriefPmConversationService {
       requiredAction(idea, true),
       verb(tool),
     );
-    const note = `From the PM agent conversation: “${person.text.slice(0, 200)}”`;
+    const note = `From the Debrief PM agent conversation: “${person.text.slice(0, 200)}”`;
     const userId = person.authorUserId!;
     let label: string;
     if (tool === 'change_approve') {
@@ -1140,7 +1144,9 @@ export class DebriefPmConversationService {
         .trim()
         .slice(0, 500);
       if (!reason) {
-        refuse('say why it is turned down; the PM agent reads the reason');
+        refuse(
+          'say why it is turned down; the Debrief PM agent reads the reason',
+        );
       }
       if (isPinnedRuleChange(idea)) {
         await this.pm.rejectPinnedRule(idea.id, userId, reason);

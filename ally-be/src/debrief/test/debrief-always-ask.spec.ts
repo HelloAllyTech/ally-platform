@@ -83,7 +83,8 @@ describe('"Always asks a person" (v2 A1)', () => {
     expect(alwaysAsk(low, on)).toEqual({
       kind: 'low_confidence',
       locked: false,
-      waitsBecause: 'The PM agent is not sure about it: only 4 comments',
+      waitsBecause:
+        'The Debrief PM agent is not sure about it: only 4 comments',
     });
     expect(alwaysAsk(low, { ...on, askLowConfidence: false })).toBeNull();
     expect(alwaysAsk({ ...low, evidence: {} }, on)).toBeNull();
@@ -186,7 +187,7 @@ describe('v2 owner settings (A1, A4, K1, S1)', () => {
     expect(
       lastChangesOf({
         gateCases: {
-          by: 'PM agent',
+          by: 'Debrief PM agent',
           byId: null,
           at: '2026-11-16T00:00:00Z',
           why: 'Volume doubled',
@@ -197,7 +198,7 @@ describe('v2 owner settings (A1, A4, K1, S1)', () => {
       }),
     ).toEqual({
       gateCases: {
-        lastChangedBy: 'PM agent',
+        lastChangedBy: 'Debrief PM agent',
         lastChangedById: null,
         lastChangedAt: '2026-11-16T00:00:00Z',
         why: 'Volume doubled',

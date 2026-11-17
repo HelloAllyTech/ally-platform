@@ -177,7 +177,7 @@ describe('expert review anchors', () => {
   });
 });
 
-describe('comments for the PM agent', () => {
+describe('comments for the Debrief PM agent', () => {
   it('threads replies under their comment, with the idea status and no reviewer identity', () => {
     const out = toGatewayComments(
       [
@@ -438,7 +438,7 @@ describe('DebriefReviewService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('reads comments for the PM agent with the filters it asked for', async () => {
+  it('reads comments for the Debrief PM agent with the filters it asked for', async () => {
     const { service, dataSource } = buildService();
     await service.commentsForAgent({
       since: '2026-11-01T00:00:00Z',

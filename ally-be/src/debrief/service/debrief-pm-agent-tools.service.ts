@@ -74,7 +74,10 @@ export function changeConfidence(v: unknown): {
   if (c.level === 'high' || c.level === 'low') {
     return { level: c.level, why: why || 'No reason given.' };
   }
-  return { level: 'low', why: 'The PM agent did not say how sure it is.' };
+  return {
+    level: 'low',
+    why: 'The Debrief PM agent did not say how sure it is.',
+  };
 }
 
 /** A change's confidence until its reviewer has answered: it waits for a person. */
@@ -210,7 +213,7 @@ export class DebriefPmAgentToolsService {
           return await this.reviewRecord(claims, b);
         default:
           // The conversation's tools are DebriefPmConversationService's.
-          return refuse(`${tool} is not a PM agent run tool`);
+          return refuse(`${tool} is not a Debrief PM agent run tool`);
       }
     } catch (e) {
       if (e instanceof Refused) {
@@ -293,7 +296,7 @@ export class DebriefPmAgentToolsService {
 
   private async requireOn(): Promise<void> {
     if (pmAgentAutonomy(await this.ownerSettings.get()) === 'off') {
-      refuse('the PM agent is switched off (autonomy mode off)');
+      refuse('the Debrief PM agent is switched off (autonomy mode off)');
     }
   }
 
@@ -704,7 +707,7 @@ export class DebriefPmAgentToolsService {
   async quickTest(claims: DebriefAgentClaims, b: Record<string, any>) {
     const mode = pmAgentAutonomy(await this.ownerSettings.get());
     if (mode === 'off')
-      refuse('the PM agent is switched off (autonomy mode off)');
+      refuse('the Debrief PM agent is switched off (autonomy mode off)');
     const idea = await this.idea(claims, b.idea_id, 'A');
     const kind = idea.change?.ideaKind;
     if (kind === 'registry_agent') {
@@ -862,7 +865,7 @@ export class DebriefPmAgentToolsService {
     });
     // FR-54: every route-D proposal tells the owner.
     await this.notifier?.owner({
-      title: 'Debriefs: the PM agent has a question for a person',
+      title: 'Debriefs: the Debrief PM agent has a question for a person',
       body: `${idea.text} (${topic})`,
       data: { ideaId: idea.id },
     });
@@ -946,7 +949,7 @@ export class DebriefPmAgentToolsService {
     });
     // FR-54: every route-D proposal tells the owner.
     await this.notifier?.owner({
-      title: 'Debriefs: the PM agent proposes a Debrief Guidance entry',
+      title: 'Debriefs: the Debrief PM agent proposes a Debrief Guidance entry',
       body: `${action === 'change' ? `A change to ${existing!.code}` : 'A new entry'}: ${title}`,
       data: { ideaId: idea.id },
     });

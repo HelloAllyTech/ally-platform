@@ -245,7 +245,7 @@ export const PINNED_RULE_PROMPTS: ReadonlyArray<{
   { code: 'debrief_quality_judge_system', label: "Judge's instructions" },
   {
     code: DEBRIEF_PROMPT_CODES.pmReviewer,
-    label: "PM agent's reviewer (what counts as a safe change)",
+    label: "Debrief PM agent's reviewer (what counts as a safe change)",
   },
   {
     code: DEBRIEF_PROMPT_CODES.evaluator,

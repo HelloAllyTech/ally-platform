@@ -431,8 +431,8 @@ export class DebriefNightlyService implements OnModuleInit {
         ...a,
         routedTo:
           a.code === 'judge_drift'
-            ? 'PM agent: scores since then are read with care until the judge is checked again'
-            : 'PM agent: read as evidence for its next changes',
+            ? 'Debrief PM agent: scores since then are read with care until the judge is checked again'
+            : 'Debrief PM agent: read as evidence for its next changes',
       })),
     }));
   }

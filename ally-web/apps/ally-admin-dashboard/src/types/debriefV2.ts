@@ -167,7 +167,7 @@ export interface DebriefFlagAnswer {
 
 /** Settings › Tests: the last change to one setting (by the PM agent or a person). */
 export interface DebriefSettingLastChange {
-  lastChangedBy: "PM agent" | string;
+  lastChangedBy: "Debrief PM agent" | string;
   /** The person's user id; absent or null when the PM agent made the change. */
   lastChangedById?: number | null;
   lastChangedAt: string;

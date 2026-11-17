@@ -33,11 +33,6 @@ vi.mock("@api", async importOriginal => ({
   useGetTenantsQuery: () => ({ data: undefined }),
 }));
 
-// The tab's own behaviour is covered in DebriefAccess.test.tsx; here only whether it shows.
-vi.mock("../../DebriefAccess/DebriefAccess", () => ({
-  DebriefAccess: () => <div data-testid="debrief-access-tab" />,
-}));
-
 // Mock components
 vi.mock("@components", () => ({
   useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true), dialog: null }),
@@ -744,38 +739,29 @@ describe("UserManagement", () => {
     });
   });
 
-  // Debrief access (formerly Clinical advisors) sits next to Ally admins and is gated exactly
-  // like it.
-  describe("Debrief access tab", () => {
+  // Debrief access (formerly Clinical advisors) moved into Ally admins as per-person switches.
+  describe("Debrief access", () => {
     const withToggle = () =>
       mockUserState(
         [Permissions.EDIT_USER],
         [FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT],
       );
 
-    it("shows next to Ally admins with Admin User Management", () => {
+    it("is no tab of its own: Debrief roles are switches on an Ally admin's page", () => {
       withToggle();
-      renderUserManagement([`/?tab=${TabType.DEBRIEF_ACCESS}`]);
+      renderUserManagement(["/"]);
       const tabs = screen.getAllByRole("button").map(b => b.textContent ?? "");
-      const ally = tabs.findIndex(t => t.startsWith("Ally admins"));
-      expect(ally).toBeGreaterThan(-1);
-      expect(tabs[ally + 1]).toMatch(/^Debrief access/);
-      expect(tabs.some(t => t.startsWith("Clinical advisors"))).toBe(false);
-      expect(screen.getByTestId("debrief-access-tab")).toBeInTheDocument();
+      expect(tabs.some(t => t.startsWith("Ally admins"))).toBe(true);
+      expect(tabs.some(t => t.startsWith("Debrief access"))).toBe(false);
     });
 
-    it("still opens from the old clinical-advisors link", () => {
-      withToggle();
-      renderUserManagement(["/?tab=clinical-advisors"]);
-      expect(screen.getByTestId("debrief-access-tab")).toBeInTheDocument();
-    });
-
-    it("is hidden without it, and a deep link falls back to Users", () => {
-      mockUserState([Permissions.EDIT_USER], [FeatureToggleKey.USERS]);
+    it("opens Ally admins from the old Debrief access and Clinical advisors links", () => {
       for (const id of [TabType.DEBRIEF_ACCESS, TabType.CLINICAL_ADVISORS]) {
+        withToggle();
         const { unmount } = renderUserManagement([`/?tab=${id}`]);
-        expect(screen.queryByText(/^Debrief access/)).not.toBeInTheDocument();
-        expect(screen.queryByTestId("debrief-access-tab")).not.toBeInTheDocument();
+        // The open tab is the one with the underline.
+        expect(screen.getByTestId("tab-super-admins").querySelector("span")).not.toBeNull();
+        expect(screen.getByTestId("tab-users").querySelector("span")).toBeNull();
         unmount();
       }
     });

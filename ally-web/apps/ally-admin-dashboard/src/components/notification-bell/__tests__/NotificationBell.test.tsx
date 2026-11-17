@@ -86,7 +86,7 @@ describe("NotificationBell", () => {
     expect(h.readAll).toHaveBeenCalled();
   });
 
-  it("links debrief alerts to the session, the change on the PM agent page, or the PM agent", () => {
+  it("links debrief alerts to the session, the change on the Debrief PM agent page, or the Debrief PM agent", () => {
     expect(notificationHref(N() as never)).toBe("/debriefs/sessions/run-7");
     expect(notificationHref(N({ data: { screen: "DebriefConsole", ideaId: "i9" } }) as never)).toBe(
       "/debriefs/pm-agent?change=i9",

@@ -83,7 +83,7 @@ describe("Analytics › Debriefs › Judge agreement (from the advisor's answers
     expect(screen.getByTestId("kpi-Agreement sample")).toHaveTextContent("3 this week · 2 waiting");
     expect(screen.queryByTestId("kpi-Learner try-outs on their own")).toBeNull();
     const section = screen.getByTestId("judge-agreement");
-    expect(section).toHaveTextContent("it no longer decides what the PM agent may do");
+    expect(section).toHaveTextContent("it no longer decides what the Debrief PM agent may do");
     expect(section).not.toHaveTextContent("freedom");
     expect(section).not.toHaveTextContent("Needs a person");
   });

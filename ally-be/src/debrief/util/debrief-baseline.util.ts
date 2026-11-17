@@ -189,7 +189,7 @@ export function proposeOwnerSettings(
     put(
       'learningBudgetUsd',
       budget,
-      `${ideas} ideas a month through the quick check, the pass test and a side-by-side trial at $${perRun.toFixed(3)} a judged debrief ($${perIdea.toFixed(2)} each), the monthly sealed run ($${sealed.toFixed(2)}) and the PM agent's own calls (~$10).`,
+      `${ideas} ideas a month through the quick check, the pass test and a side-by-side trial at $${perRun.toFixed(3)} a judged debrief ($${perIdea.toFixed(2)} each), the monthly sealed run ($${sealed.toFixed(2)}) and the Debrief PM agent's own calls (~$10).`,
     );
   }
   return out;

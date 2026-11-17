@@ -676,7 +676,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     },
     lastChanges: {
       gateCases: {
-        lastChangedBy: "PM agent",
+        lastChangedBy: "Debrief PM agent",
         lastChangedAt: "2026-11-12T00:00:00Z",
         why: "Was 30: 4 changes passed here and then failed the next test",
         changeId: "c-tests",
@@ -703,7 +703,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     h.permissions = ["manage:admin:debrief-settings"];
     renderPage("#autonomy");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Autonomy: the PM agent ships changes on its own, except these",
+      "Autonomy: the Debrief PM agent ships changes on its own, except these",
     );
     expect(screen.getByTestId("autonomy-v2")).toHaveTextContent("watched for 14 days");
     const rows = within(screen.getByTestId("always-asks")).getAllByTestId("always-asks-row");
@@ -712,7 +712,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
       "Crisis lines and support copy",
       "Pinned rules: rubric, judge and Evaluator instructions",
       "Budget increases",
-      "Anything the PM agent is not confident about",
+      "Anything the Debrief PM agent is not confident about",
       "New models or providers",
     ]);
     for (const r of rows.slice(0, 4)) {
@@ -776,7 +776,9 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     h.permissions = ["manage:admin:debrief-settings"];
     renderPage("#weights");
     const page = screen.getByTestId("score-settings");
-    expect(page).toHaveTextContent("Score: what the PM agent improves, and what undoes a change");
+    expect(page).toHaveTextContent(
+      "Score: what the Debrief PM agent improves, and what undoes a change",
+    );
     expect(page).toHaveTextContent("No new missed clear risk cue · undoes a change at once");
     expect(page).toHaveTextContent("Cost within the session budget");
     expect(screen.getByLabelText("Quality score (judge) (%)")).toHaveValue(40);
@@ -798,7 +800,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     renderPage("#tests");
     const row = screen.getByTestId("test-setting-gateCases");
     expect(row).toHaveTextContent("100");
-    expect(row).toHaveTextContent("PM agent ·");
+    expect(row).toHaveTextContent("Debrief PM agent ·");
     expect(row).toHaveTextContent("Was 30: 4 changes passed here and then failed the next test");
     expect(within(row).getByRole("link", { name: "See change" })).toHaveAttribute(
       "href",
@@ -813,7 +815,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     h.permissions = [];
     renderPage("#budget");
     expect(screen.getByTestId("settings-section-budget")).toHaveTextContent(
-      "The PM agent may propose a lower budget; a higher one always waits for you.",
+      "The Debrief PM agent may propose a lower budget; a higher one always waits for you.",
     );
   });
 });

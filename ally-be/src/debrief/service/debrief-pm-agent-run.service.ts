@@ -108,7 +108,7 @@ export function pmRunSummary(o: PmAgentRunOutcome): string {
   const n = o.ideas.length;
   const cost = o.costUsd != null ? `, $${o.costUsd.toFixed(2)}` : '';
   const spent = o.status === 'budget_spent' ? ' (budget spent)' : '';
-  return `PM agent: ${n} idea${n === 1 ? '' : 's'}${cost}${spent}`;
+  return `Debrief PM agent: ${n} idea${n === 1 ? '' : 's'}${cost}${spent}`;
 }
 
 /**
@@ -159,7 +159,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
   /** The Console's "Run now": starts a run and answers at once; the report lands when it finishes. */
   async start(actorUserId: number): Promise<PmAgentRunOutcome> {
     if (this.running)
-      throw new ConflictException('the PM agent is already running');
+      throw new ConflictException('the Debrief PM agent is already running');
     const pre = await this.precheck();
     if (pre) return { report: null, ideas: [], skipped: pre };
     void this.run({ review: 'weekly', actorUserId }).catch((e) =>
@@ -171,7 +171,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
   private async precheck(): Promise<string | null> {
     const settings = await this.ownerSettings.get();
     if (pmAgentAutonomy(settings) === 'off')
-      return 'the PM agent is switched off';
+      return 'the Debrief PM agent is switched off';
     const spent = await this.pm.learningSpentThisMonth();
     if (spent >= (await this.pm.learningBudgetThisMonth())) {
       return 'learning budget spent';

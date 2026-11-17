@@ -6,6 +6,23 @@ import { SuperAdmins } from "../SuperAdmins";
 const mockAssignPlatformAdmin = vi.fn();
 const mockRemovePlatformAdmin = vi.fn();
 const mockSetUserFeatureToggles = vi.fn();
+const mockAddAdvisor = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
+const mockRemoveAdvisor = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
+const mockAddOwner = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
+const mockRemoveOwner = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
+// Admin 2 is a clinical advisor; admin 1 holds no Debrief role.
+const debriefPeople = [
+  {
+    userId: 2,
+    name: "Other Admin",
+    email: "other@helloally.ai",
+    organisation: null,
+    roles: ["PLATFORM_ADMIN", "CLINICAL_ADVISOR"],
+    advisor: true,
+    owner: false,
+    signOff: true,
+  },
+];
 
 // `createdAt` and `roleGrantedAt` are deliberately months apart on every
 // fixture: the "Added on" column must show the role grant, and rendering the
@@ -142,6 +159,11 @@ vi.mock("@api", () => ({
   useSetUserFeatureTogglesMutation: () => [mockSetUserFeatureToggles],
   useGetTenantsQuery: () => ({ data: { data: [], count: 0 } }),
   useGetAdminTenantsQuery: () => ({ data: { data: [], count: adminTenantCount } }),
+  useListClinicalAdvisorsQuery: () => ({ data: debriefPeople, isLoading: false, isError: false }),
+  useAddClinicalAdvisorMutation: () => [mockAddAdvisor],
+  useRemoveClinicalAdvisorMutation: () => [mockRemoveAdvisor],
+  useAddDebriefOwnerMutation: () => [mockAddOwner],
+  useRemoveDebriefOwnerMutation: () => [mockRemoveOwner],
 }));
 
 vi.mock("react-redux", () => ({
@@ -260,5 +282,30 @@ describe("SuperAdmins", () => {
 
     fireEvent.click(screen.getAllByText("Back to platform admins")[0]);
     expect(screen.getAllByTestId("sa-row")).toHaveLength(2);
+  });
+
+  it("shows each admin's Debrief roles as badges beside the name", () => {
+    render(<SuperAdmins />);
+    const badges = screen.getAllByTestId("sa-debrief-role");
+    expect(badges.map(b => b.textContent)).toEqual(["Clinical advisor"]);
+  });
+
+  it("switches an admin's Debrief roles on their page, at once", () => {
+    render(<SuperAdmins />);
+    fireEvent.click(screen.getByText("Other Admin"));
+    const advisor = screen.getByTestId("admin-debrief-role-advisor");
+    const owner = screen.getByTestId("admin-debrief-role-owner");
+    expect(advisor).toHaveTextContent("Clinical advisor");
+    expect(owner).toHaveTextContent("Debrief owner");
+    // Advisor is on, so the switch removes it; owner is off, so it grants it.
+    fireEvent.click(advisor.querySelector("button")!);
+    expect(mockRemoveAdvisor).toHaveBeenCalledWith(2);
+  });
+
+  it("grants the Debrief owner role from its switch", () => {
+    render(<SuperAdmins />);
+    fireEvent.click(screen.getByText("Current Admin"));
+    fireEvent.click(screen.getByTestId("admin-debrief-role-owner").querySelector("button")!);
+    expect(mockAddOwner).toHaveBeenCalledWith(1);
   });
 });

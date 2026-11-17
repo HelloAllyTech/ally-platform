@@ -258,11 +258,11 @@ export class DebriefBuilderRequesterService implements OnModuleInit {
   /** Why the PM agent may not answer now, or null when it may. */
   private async cannotAnswer(record: BuilderRecord): Promise<string | null> {
     if (record.answers.length >= BUILDER_ANSWERS_PER_SESSION) {
-      return `The PM agent has answered ${BUILDER_ANSWERS_PER_SESSION} questions on this session; the rest come to you.`;
+      return `The Debrief PM agent has answered ${BUILDER_ANSWERS_PER_SESSION} questions on this session; the rest come to you.`;
     }
     const settings = await this.ownerSettings.get();
     if (pmAgentAutonomy(settings) === 'off') {
-      return 'The PM agent is switched off.';
+      return 'The Debrief PM agent is switched off.';
     }
     if ((await this.budgetUsd()) <= 0) {
       return "This month's learning budget is spent.";
@@ -367,7 +367,7 @@ export class DebriefBuilderRequesterService implements OnModuleInit {
         res.status === 'budget_spent'
           ? "This month's learning budget is spent."
           : res.status === 'failed'
-            ? 'The PM agent could not answer just now.'
+            ? 'The Debrief PM agent could not answer just now.'
             : stripped.removed > 0
               ? 'The answer quoted someone, so it was not sent.'
               : stripQuotes(got?.reason ?? '', known).text.trim() ||
@@ -375,7 +375,7 @@ export class DebriefBuilderRequesterService implements OnModuleInit {
       await this.escalate(idea.id, record, question, reason);
       return;
     }
-    const message = text ? `From the PM agent: ${text}` : '';
+    const message = text ? `From the Debrief PM agent: ${text}` : '';
     const labels = (question.options ?? [])
       .filter((o) => picked.includes(o.id))
       .map((o) => o.label);

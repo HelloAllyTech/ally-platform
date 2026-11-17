@@ -13,6 +13,7 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import {
   useAssignPlatformAdminMutation,
+  useListClinicalAdvisorsQuery,
   useListEligiblePlatformAdminsQuery,
   useListPlatformAdminsQuery,
   useRemovePlatformAdminMutation,
@@ -61,6 +62,20 @@ export const SuperAdmins: React.FC = () => {
   const listParams = search ? { search } : undefined;
   const { data: platformAdminsData, isLoading: isPlatformAdminsLoading } =
     useListPlatformAdminsQuery(listParams);
+  // Each admin's Debrief roles, as badges beside the name (switched on the admin's own page).
+  const { data: debriefPeople } = useListClinicalAdvisorsQuery();
+  const debriefRoles = useMemo(
+    () =>
+      new Map(
+        (debriefPeople ?? []).map(p => [
+          p.userId,
+          [p.advisor ? strings.debriefAdvisor : null, p.owner ? strings.debriefOwner : null].filter(
+            (x): x is string => !!x,
+          ),
+        ]),
+      ),
+    [debriefPeople],
+  );
   const { data: candidatesData, isFetching: isCandidatesFetching } =
     useListEligiblePlatformAdminsQuery(candidateSearch ? { search: candidateSearch } : undefined, {
       skip: !isAddPanelOpen,
@@ -174,7 +189,20 @@ export const SuperAdmins: React.FC = () => {
               data-testid="sa-row"
               onClick={() => setSelectedAdmin(admin)}
             >
-              <TableCell className="py-3 pr-4">{admin.name || admin.email}</TableCell>
+              <TableCell className="py-3 pr-4">
+                <div className="flex min-w-0 flex-nowrap items-center gap-2">
+                  <span className="truncate">{admin.name || admin.email}</span>
+                  {(debriefRoles.get(admin.id) ?? []).map(role => (
+                    <span
+                      key={role}
+                      data-testid="sa-debrief-role"
+                      className="shrink-0 whitespace-nowrap rounded-sm bg-primary-50 px-2 py-0.5 text-xs text-primary-700"
+                    >
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              </TableCell>
               <TableCell className="py-3 pr-4">{admin.email}</TableCell>
               <TableCell className="py-3 pr-4">
                 <StatusBadge status={admin.status} />

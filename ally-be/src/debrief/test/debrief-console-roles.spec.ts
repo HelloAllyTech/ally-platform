@@ -67,7 +67,7 @@ describe('Debrief console role gating', () => {
     expect(await allowed(ADVISOR, C, 'stillHappening')).toBe(true);
   });
 
-  it('held debriefs, escalation and the PM agent: Ally team or owner, never the advisor alone', async () => {
+  it('held debriefs, escalation and the Debrief PM agent: Ally team or owner, never the advisor alone', async () => {
     const C = DebriefConsoleController;
     for (const h of [
       'publishRun',

@@ -98,7 +98,7 @@ export const en = {
       chatbotDetail: "Assistant",
       debriefSession: "Session",
       debriefSessionLogs: "Agent logs",
-      debriefPmAgent: "PM agent",
+      debriefPmAgent: "Debrief PM agent",
       debriefSettings: "Settings",
       roleplayLogDetail: "Session",
       notFound: "Page not found",
@@ -895,7 +895,7 @@ export const en = {
   debriefAccess: {
     title: "Debrief access",
     intro:
-      "People who review or run debriefs across every organisation. Clinical advisors review debriefs and receive escalations; the Debrief owner manages debrief settings, releases and the PM agent. Adding a role gives only that access; everything else a person holds stays as it is.",
+      "People who review or run debriefs across every organisation. Clinical advisors review debriefs and receive escalations; the Debrief owner manages debrief settings, releases and the Debrief PM agent. Adding a role gives only that access; everything else a person holds stays as it is.",
     loadFailed: "Couldn't load who has debrief access",
     loadFailedHelp: "Reload the page to try again.",
     none: "No one has debrief access yet",
@@ -1086,6 +1086,13 @@ export const en = {
     platformOnlyWhileRestricted:
       "Off while this admin is restricted to organizations — it spans every organization. The setting is kept for when the restriction is lifted.",
     loadingToggles: "Loading feature access...",
+    debriefsSection: "Debriefs",
+    debriefAdvisor: "Clinical advisor",
+    debriefAdvisorHelp:
+      "Reviews debriefs from every organisation, signs off safety rules and receives escalations.",
+    debriefOwner: "Debrief owner",
+    debriefOwnerHelp: "Manages Debrief settings, releases and the Debrief PM agent.",
+    debriefRolesLoadFailed: "Couldn't load this person's Debrief roles.",
   },
   userManagement: {
     bulkSuspend: "Suspend",
@@ -4385,7 +4392,10 @@ export const en = {
     showMineOnlyLabel: "Only sessions I started",
     startedBy: (name: string) => `Started by ${name}`,
     /** A session an agent requested ("Hand to Builder" on a Debrief PM agent idea). */
-    requestedFor: { debrief_pm_agent: "Requested for the PM agent" } as Record<string, string>,
+    requestedFor: { debrief_pm_agent: "Requested for the Debrief PM agent" } as Record<
+      string,
+      string
+    >,
     archiveAction: "Archive",
     unarchiveAction: "Unarchive",
     archiveSuccess: "Build archived.",
@@ -4875,7 +4885,7 @@ export const en = {
           you: "You",
           rule: "Your rule",
           slack: "Slack",
-          requester: "The PM agent",
+          requester: "The Debrief PM agent",
         },
         started: "Started from Up next",
         asked: "Asked:",
@@ -9647,8 +9657,8 @@ export const en = {
           n === 0 ? "nothing needs you." : `${n} ${n === 1 ? "thing needs" : "things need"} you.`,
         needsHeading: (n: number) =>
           n === 1
-            ? "Needs you: one change the PM agent won’t make alone"
-            : `Needs you: ${n} changes the PM agent won’t make alone`,
+            ? "Needs you: one change the Debrief PM agent won’t make alone"
+            : `Needs you: ${n} changes the Debrief PM agent won’t make alone`,
         yourCall: "Your call",
         expand: (title: string) => `Open ${title}`,
         before: "Before",
@@ -9657,7 +9667,7 @@ export const en = {
         wholeRuleChanged: (name: string) =>
           `The whole ${name} after the change (the change is marked)`,
         ruleStale:
-          "The rule has changed since this was proposed, so the passage no longer matches. Ask the PM agent to redo it.",
+          "The rule has changed since this was proposed, so the passage no longer matches. Ask the Debrief PM agent to redo it.",
         evidence: "Evidence",
         /** The clinical advisor's home: their pending decisions only. */
         advisorHeadline: (n: number) =>
@@ -9683,7 +9693,7 @@ export const en = {
         down: (by: string) => `down ${by}`,
         noChanges: "No changes this week.",
         whatMakesScore: "What makes up the score",
-        changes: "PM agent",
+        changes: "Debrief PM agent",
         flagged: "⚑ Flagged by the learner",
         flaggedShort: "⚑ Flagged",
         loadFailed: "Couldn't load this week's summary.",
@@ -9694,21 +9704,21 @@ export const en = {
       },
       /** The one PM agent conversation, on Home and on Changes. */
       conversation: {
-        heading: "PM agent",
+        heading: "Debrief PM agent",
         you: "You",
-        agent: "PM agent",
+        agent: "Debrief PM agent",
         about: (label: string) => `about ${label}`,
         lookingAt: "Looking at",
-        inputLabel: "Message the PM agent",
-        aboutThisChange: "PM agent · about this change",
-        replyLabel: "Reply to the PM agent about this change",
+        inputLabel: "Message the Debrief PM agent",
+        aboutThisChange: "Debrief PM agent · about this change",
+        replyLabel: "Reply to the Debrief PM agent about this change",
         replyPlaceholder: "Yes, no because…, or change it to…",
         placeholder: "Your thoughts, or what you want done",
         send: "Send",
-        sending: "The PM agent is replying; this can take half a minute.",
+        sending: "The Debrief PM agent is replying; this can take half a minute.",
         sendFailed: "Couldn't send your message.",
         empty:
-          "No messages yet. Tell the PM agent what you think about anything here; it acts and says what it did.",
+          "No messages yet. Tell the Debrief PM agent what you think about anything here; it acts and says what it did.",
         loadFailed: "Couldn't load the conversation.",
         retry: "Try again",
         earlier: "Show earlier messages",
@@ -9735,17 +9745,17 @@ export const en = {
         signOff: "Sign it off",
         turnDown: "Turn it down",
         confirmTurnDown: "Turn it down",
-        reasonLabel: "Why (the PM agent reads this)",
+        reasonLabel: "Why (the Debrief PM agent reads this)",
         reasonPlaceholder: "One line is enough",
         approved: "Approved. It goes through its tests and tries next.",
         approvedLive: "Approved. It is live for everyone now.",
         signedOff: "Signed off.",
-        turnedDown: "Turned down. The PM agent has your reason.",
+        turnedDown: "Turned down. The Debrief PM agent has your reason.",
         failed: "That didn't go through. Try again.",
       },
       changes: {
-        title: "PM agent",
-        runNow: "Run the PM agent now",
+        title: "Debrief PM agent",
+        runNow: "Run the Debrief PM agent now",
         running: "Running…",
         tabs: { changes: "Changes", reports: "Reports", "test-sets": "Test sets" } as Record<
           string,
@@ -9756,7 +9766,7 @@ export const en = {
             ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] ??
             String(n);
           return {
-            lead: `The PM agent is improving debriefs on its own: ${c(live)} ${live === 1 ? "change" : "changes"} went live this week, ${trying === 0 ? "none is" : `${c(trying)} ${trying === 1 ? "is" : "are"}`} being tried, and `,
+            lead: `The Debrief PM agent is improving debriefs on its own: ${c(live)} ${live === 1 ? "change" : "changes"} went live this week, ${trying === 0 ? "none is" : `${c(trying)} ${trying === 1 ? "is" : "are"}`} being tried, and `,
             bold:
               waits === 0
                 ? "nothing waits for you."
@@ -9790,7 +9800,7 @@ export const en = {
         thisChangeOnly: "This change only",
         whereItIs: "Where it is",
         waitsNote:
-          "This kind always asks a person. Tell the PM agent what you think in the conversation: approve it, turn it down, or say what to change. For a safety change it repeats back exactly what it will do and waits for your yes.",
+          "This kind always asks a person. Tell the Debrief PM agent what you think in the conversation: approve it, turn it down, or say what to change. For a safety change it repeats back exactly what it will do and waits for your yes.",
         confidence: { high: "High confidence", low: "Low confidence" } as Record<string, string>,
         languages: (list: string) => `Only ${list}`,
         undoNow: "Undo now",
@@ -9803,7 +9813,7 @@ export const en = {
         empty: {
           title: "No changes yet",
           message:
-            "The PM agent proposes changes from learners' flags, comments and the overall score. They show here.",
+            "The Debrief PM agent proposes changes from learners' flags, comments and the overall score. They show here.",
         },
         pick: "Pick a change to see what it did.",
         loadFailed: "the changes",
@@ -9887,7 +9897,7 @@ export const en = {
         retry: "Try again",
       },
       autonomy: {
-        heading: "Autonomy: the PM agent ships changes on its own, except these",
+        heading: "Autonomy: the Debrief PM agent ships changes on its own, except these",
         help: (days: number) =>
           `Every change is tested, tried on some learners, goes live when it beats the release before it, and is watched for ${days} days. Only the kinds ticked below wait for a person first.`,
         alwaysAsks: "Always asks a person",
@@ -9902,7 +9912,7 @@ export const en = {
           { name: "Budget increases", why: "Lower budgets go ahead on their own" },
         ],
         askLowConfidence: {
-          name: "Anything the PM agent is not confident about",
+          name: "Anything the Debrief PM agent is not confident about",
           why: "It says why: few debriefs, mixed results, or a new kind of change",
         },
         askModels: {
@@ -9936,7 +9946,7 @@ export const en = {
         loadFailed: "Couldn't load the organisations.",
       },
       scoreSettings: {
-        heading: "Score: what the PM agent improves, and what undoes a change",
+        heading: "Score: what the Debrief PM agent improves, and what undoes a change",
         help: "One score from four measures. Two checks sit outside it and are never traded off.",
         fields: {
           scoreWeightQuality: "Quality score (judge) (%)",
@@ -9956,7 +9966,7 @@ export const en = {
           "Gets a Slack message when a debrief is shown with a missed clear risk cue, or a learner shows distress in Ask Ally.",
       },
       tests: {
-        help: "How much a change must prove before it reaches learners. The PM agent tunes these from the month’s data; each change shows in Changes and can be undone there.",
+        help: "How much a change must prove before it reaches learners. The Debrief PM agent tunes these from the month’s data; each change shows in Changes and can be undone there.",
         columns: {
           setting: "Setting",
           now: "In force",
@@ -9992,11 +10002,11 @@ export const en = {
       keyboard: "Keyboard shortcuts",
     },
     intro:
-      "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the PM agent is changing, and which organisations have it.",
+      "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the Debrief PM agent is changing, and which organisations have it.",
     // Expert review (debrief orchestrator spec Part B): clinical experts comment on exact lines.
     expertReview: {
       heading: "Expert review",
-      help: "Read the roleplay and the debrief side by side. Select words in a turn or a card to comment on them, then say whether the debrief is good. Your comments are what the PM agent learns from; learners never see them.",
+      help: "Read the roleplay and the debrief side by side. Select words in a turn or a card to comment on them, then say whether the debrief is good. Your comments are what the Debrief PM agent learns from; learners never see them.",
       loadFailed: "the debriefs to review",
       reasons: {
         risk_cue: "Risk cue",
@@ -10138,7 +10148,7 @@ export const en = {
       howItWasMade: "How this debrief was made",
       mine: {
         heading: "Your comments",
-        help: "Each comment you've made and what the PM agent did with it. If a problem you raised shows up again in the debrief you're reviewing, mark it still happening.",
+        help: "Each comment you've made and what the Debrief PM agent did with it. If a problem you raised shows up again in the debrief you're reviewing, mark it still happening.",
         empty: "You haven't commented on a debrief yet.",
         loadFailed: "your comments",
         stillHappening: "Still happening here",
@@ -10159,7 +10169,7 @@ export const en = {
         sealed: "5 · Sealed sessions (monthly)",
         budget: "Learning budget",
         metrics: "Metrics",
-        agent: "The PM agent",
+        agent: "The Debrief PM agent",
         progress: "Learner progress",
       } as Record<string, string>,
       names: {
@@ -10185,8 +10195,8 @@ export const en = {
         steeringWeightPractise: "Steering score: weight of Practise-next click-through",
         steeringWeightThumbs: "Steering score: weight of thumbs-up",
         flagReviewSlaHours: "Hours to review a learner's flag",
-        pmAgentEnabled: "PM agent runs",
-        pmAgentRunCapUsd: "Most one PM agent run may spend ($)",
+        pmAgentEnabled: "Debrief PM agent runs",
+        pmAgentRunCapUsd: "Most one Debrief PM agent run may spend ($)",
         progressOn: "Learner progress",
         progressCardEvery: "Show the progress card every … sessions",
         progressWindow: "Sessions to look back over",
@@ -10205,7 +10215,7 @@ export const en = {
         scoreWeightFlags: "Overall score: weight of cards flagged",
         undoMargin: "Undo when the score drops by more than",
         watchDays: "Days a change is watched after going live",
-        askLowConfidence: "Changes the PM agent is not confident about ask a person",
+        askLowConfidence: "Changes the Debrief PM agent is not confident about ask a person",
         askModels: "New models or providers ask a person",
         slackChannel: "Slack channel for drops and undos",
         safetyContact: "Named safety contact",
@@ -10236,7 +10246,7 @@ export const en = {
         `Proposed ${when} from ${perDay} debriefs a day; judge median ${median}, re-judging moves scores by ${noise}; typical cost ${cost}.`,
       budgetTitle: "Change the learning budget?",
       budgetBody:
-        "Budget settings decide how much the PM agent may spend on tests each month. The change is recorded with your name.",
+        "Budget settings decide how much the Debrief PM agent may spend on tests each month. The change is recorded with your name.",
       budgetConfirm: "Change the budget",
       cancel: "Cancel",
       yes: "Yes",
@@ -10253,7 +10263,7 @@ export const en = {
       help: "How the debrief is doing for learners in switched-on organisations, week by week. Each number is shown with how many debriefs it counts; below 20 it is marked as too few to read.",
       steering: {
         heading: "Steering score",
-        help: "The weekly score the PM agent steers by (v9 §3.3): the judge's score, Practise-next click-through and thumbs-up rate, weighted in Settings. When a part has no data that week the others are re-weighted, and the week is marked.",
+        help: "The weekly score the Debrief PM agent steers by (v9 §3.3): the judge's score, Practise-next click-through and thumbs-up rate, weighted in Settings. When a part has no data that week the others are re-weighted, and the week is marked.",
         weights: (j: number, p: number, t: number) =>
           `Judge ${Math.round(j * 100)}% · Practise next ${Math.round(p * 100)}% · Thumbs-up ${Math.round(t * 100)}%`,
         series: {
@@ -10289,7 +10299,7 @@ export const en = {
       } as Record<string, string>,
       agents: {
         heading: "Each agent",
-        help: "Live numbers for every agent in the debrief, so a failure can be traced to the step that caused it. Numbers that need answers known in advance (recall on planted risk cues, the judge's catch rate on planted faults, the PM agent's accuracy on planted ideas) come from the offline checks and evals, not from here.",
+        help: "Live numbers for every agent in the debrief, so a failure can be traced to the step that caused it. Numbers that need answers known in advance (recall on planted risk cues, the judge's catch rate on planted faults, the Debrief PM agent's accuracy on planted ideas) come from the offline checks and evals, not from here.",
         cols: { agent: "Agent", measure: "Measure", value: "Value" },
         time: (p50: string, p90: string) => `${p50} / ${p90}`,
         seconds: (s: number) => `${Math.round(s / 100) / 10}s`,
@@ -10356,7 +10366,7 @@ export const en = {
             `${spend} across ${replies} ${replies === 1 ? "reply" : "replies"}`,
         },
         pmAgent: {
-          name: "PM agent",
+          name: "Debrief PM agent",
           ideas: "Changes",
           tested: "Quick-checked / pass-tested",
           outcome: "Went live / undone / turned down / waiting",
@@ -10458,7 +10468,7 @@ export const en = {
       },
       filters: {
         heading: "Filters",
-        help: "Every number on this page follows these filters, except the baselines, uptake lift and the PM agent, which always read across everything. The evals use the same filters.",
+        help: "Every number on this page follows these filters, except the baselines, uptake lift and the Debrief PM agent, which always read across everything. The evals use the same filters.",
         all: "All",
         organisation: "Organisation",
         language: "Language",
@@ -10487,7 +10497,7 @@ export const en = {
           case: "Case",
           assessment: "Assessment",
         } as Record<string, string>,
-        unfilteredNote: "Not filtered: baselines, uptake lift and the PM agent.",
+        unfilteredNote: "Not filtered: baselines, uptake lift and the Debrief PM agent.",
       },
       quality: {
         heading: "Pass rate",
@@ -10730,7 +10740,7 @@ export const en = {
       layoutLabel: "Layout",
       layout: { cards: "Cards", list: "List" },
       analytics: "Analytics",
-      pmAgent: "PM agent",
+      pmAgent: "Debrief PM agent",
       needsYouCount: (n: number) => `${n} ${n === 1 ? "needs" : "need"} you`,
       settings: "Settings",
       filters: {
@@ -11207,7 +11217,7 @@ export const en = {
         commentsReadOnly: "Reviewers and the clinical advisor add comments.",
         earlier: "From this learner's earlier debriefs",
         earlierHelp:
-          "Comments on this learner's earlier debriefs of the same scenario. If the problem happened again here, mark it: the thread re-opens and the PM agent sees it recur.",
+          "Comments on this learner's earlier debriefs of the same scenario. If the problem happened again here, mark it: the thread re-opens and the Debrief PM agent sees it recur.",
         earlierOn: (when: string) => `On the debrief from ${when}`,
         stillHappening: "Still happening here",
         stillHappeningDone: "Marked as still happening on this debrief.",
@@ -11217,7 +11227,7 @@ export const en = {
     },
     // The PM agent page (redesign 2026-11-12): Ideas, Releases and Test sets.
     pmPage: {
-      title: "PM agent",
+      title: "Debrief PM agent",
       tabs: {
         ideas: "Ideas",
         releases: "Releases",
@@ -11231,7 +11241,8 @@ export const en = {
       learningBudget: "Learning budget",
       ofThisMonth: (budget: string) => `of ${budget} this month`,
       actsAlone: "Changes without asking a person:",
-      actsAloneHint: "What the PM agent may change without asking a person. Hover a chip for why.",
+      actsAloneHint:
+        "What the Debrief PM agent may change without asking a person. Hover a chip for why.",
       openClosed: "Open or closed",
       open: "Open",
       closed: "Closed",
@@ -11253,7 +11264,7 @@ export const en = {
       propose: {
         button: "Propose a change",
         title: "Propose a change",
-        help: "Your change becomes an idea with its own draft release, copied from the live one. It climbs the same tests as the PM agent's ideas before it reaches learners; the live release is never edited. Budget changes the owner proposes go live directly.",
+        help: "Your change becomes an idea with its own draft release, copied from the live one. It climbs the same tests as the Debrief PM agent's ideas before it reaches learners; the live release is never edited. Budget changes the owner proposes go live directly.",
         titleLabel: "What it is, in a few words",
         whyLabel: "Why (optional)",
         cols: {
@@ -11299,13 +11310,14 @@ export const en = {
         ask: "Ask a question",
         askAnother: "Ask another question",
         label: "Your question",
-        help: "The PM agent reads it on its next run. Asking doesn't stop the 14-day clock.",
+        help: "The Debrief PM agent reads it on its next run. Asking doesn't stop the 14-day clock.",
         send: "Send",
-        sent: "Sent. The PM agent reads it on its next run.",
-        agent: "PM agent",
+        sent: "Sent. The Debrief PM agent reads it on its next run.",
+        agent: "Debrief PM agent",
         someone: "Someone",
         person: "A person",
-        noAnswerYet: "The PM agent answers in a short run of its own; its reply appears here.",
+        noAnswerYet:
+          "The Debrief PM agent answers in a short run of its own; its reply appears here.",
       },
       autonomyKinds: {
         settings: "Settings",
@@ -11354,8 +11366,8 @@ export const en = {
       monthReview: (month: string) => `${month} review`,
       reports: {
         title: "Reports",
-        none: "The PM agent hasn't written a report yet. Weekly reports appear after its first weekly run.",
-        loadFailed: "the PM agent's reports",
+        none: "The Debrief PM agent hasn't written a report yet. Weekly reports appear after its first weekly run.",
+        loadFailed: "the Debrief PM agent's reports",
         toolbar: "Choose a report",
         kind: "Kind",
         weekly: "Weekly",
@@ -11370,7 +11382,7 @@ export const en = {
         weeklyKicker: (written: string | null) =>
           written ? `Weekly report · written ${written}` : "Weekly report · not written yet",
         changedTitle: { weekly: "What changed this week", monthly: "What changed this month" },
-        changedNote: "Taken from the records of changes, not written by the PM agent.",
+        changedNote: "Taken from the records of changes, not written by the Debrief PM agent.",
         tiles: {
           live: "Went live on its own",
           liveSub: "beat the release before",
@@ -11400,21 +11412,24 @@ export const en = {
             name ? `Emergency stop by ${name}` : "Emergency stop",
         } as Record<string, (name: string | null) => string>,
         rejectedBy: (name: string | null) =>
-          name ? `Turned down by ${name}` : "Dropped by the PM agent",
+          name ? `Turned down by ${name}` : "Dropped by the Debrief PM agent",
         withdrawnBy: (name: string | null) =>
-          name ? `Withdrawn by ${name}` : "Withdrawn by the PM agent",
+          name ? `Withdrawn by ${name}` : "Withdrawn by the Debrief PM agent",
         someone: "a person",
         budget: "Learning budget",
         budgetLine: (spent: string, cap: string, tests: string, pmAgent: string) =>
-          `${spent} of ${cap} spent: tests ${tests}, PM agent runs ${pmAgent}`,
-        reviewTitle: { weekly: "The PM agent's report", monthly: "The PM agent's review" },
+          `${spent} of ${cap} spent: tests ${tests}, Debrief PM agent runs ${pmAgent}`,
+        reviewTitle: {
+          weekly: "The Debrief PM agent's report",
+          monthly: "The Debrief PM agent's review",
+        },
         reviewNote: {
-          weekly: "Written by the PM agent from the week's evidence.",
-          monthly: "Written by the PM agent from the month's evidence.",
+          weekly: "Written by the Debrief PM agent from the week's evidence.",
+          monthly: "Written by the Debrief PM agent from the month's evidence.",
         },
         reviewPending: {
-          weekly: "The PM agent's report is written on Monday.",
-          monthly: "The PM agent's review is published on the 1st.",
+          weekly: "The Debrief PM agent's report is written on Monday.",
+          monthly: "The Debrief PM agent's review is published on the 1st.",
         },
         download: "Download as PDF",
         allReleases: "All changes",
@@ -11460,7 +11475,8 @@ export const en = {
         withdrawBody: "It closes as withdrawn. You can propose a change to the rule again later.",
         withdrawDone: "Withdrawn",
         rejectTitle: "Reject this change?",
-        rejectBody: "The PM agent reads your reason before it proposes anything like this again.",
+        rejectBody:
+          "The Debrief PM agent reads your reason before it proposes anything like this again.",
         reasonLabel: "Why are you rejecting it?",
         reasonRequired: "Say why you are rejecting it.",
         rejectDone: "Rejected",
@@ -11475,7 +11491,7 @@ export const en = {
           whyHelp: "The person who approves it reads this.",
           submit: "Send for approval",
           cancel: "Cancel",
-          sent: "Sent. It waits in PM agent › Ideas for the clinical advisor or the owner.",
+          sent: "Sent. It waits in Debrief PM agent › Ideas for the clinical advisor or the owner.",
           empty: "Select the passage to change in the rule, or paste it.",
           notFound:
             "That passage is not in the current rule. Select it in the text, or paste it exactly as it reads.",
@@ -11494,9 +11510,9 @@ export const en = {
       previous: "Previous",
       next: "Next",
       setHelp: {
-        debrief_open: "The PM agent tries ideas here",
+        debrief_open: "The Debrief PM agent tries ideas here",
         debrief_gate: "Decides whether a change may go further",
-        debrief_sealed: "Never shown to the PM agent",
+        debrief_sealed: "Never shown to the Debrief PM agent",
       } as Record<string, string>,
       releases: {
         explainer:
@@ -11509,7 +11525,7 @@ export const en = {
         since: (when: string) => `live since ${when}`,
         liveFromTo: (from: string, to: string) => `live ${from} – ${to}`,
         origin: {
-          agentIdea: (t: string) => `From the PM agent's idea “${t}”`,
+          agentIdea: (t: string) => `From the Debrief PM agent's idea “${t}”`,
           personIdea: (t: string) => `From a person's proposal “${t}”`,
           code: "A code release",
           codeTag: (tag: string) => `Code · ${tag}`,
@@ -11663,7 +11679,7 @@ export const en = {
         viewOnly: "Only the clinical advisor or the owner can change these.",
       },
       schedulesHelp:
-        "The jobs the Debrief agent and the PM agent run on their own. Times are India time. Jobs that keep debriefs flowing can’t be switched off and only allow a safe range. To test, set a job to run often (every 1 min where offered) and set it back after. The PM agent page keeps its own “Run the PM agent now”.",
+        "The jobs the Debrief agent and the Debrief PM agent run on their own. Times are India time. Jobs that keep debriefs flowing can’t be switched off and only allow a safe range. To test, set a job to run often (every 1 min where offered) and set it back after. The Debrief PM agent page keeps its own “Run the Debrief PM agent now”.",
       schedules: {
         loading: "Loading schedules…",
         loadFailed: "Couldn't load the schedules. Reload to try again.",
@@ -11733,11 +11749,11 @@ export const en = {
             what: "Reads whether ideas put live moved the metric they named",
           },
           "debrief-pm-agent": {
-            name: "PM agent analysis",
+            name: "Debrief PM agent analysis",
             what: "Reads the week’s signals and proposes ideas (learning budget)",
           },
           "debrief-pm-agent-review": {
-            name: "PM agent monthly review",
+            name: "Debrief PM agent monthly review",
             what: "Looks back over the month and what stood",
           },
           "debrief-baseline": {
@@ -11815,14 +11831,14 @@ export const en = {
       orgsHelp:
         "Which organisations' learners read the new debrief. Once an organisation is live, switching it off is an emergency stop: its learners see “not available”, not today's debrief.",
       budgetHelp:
-        "Every change asks you to confirm. The PM agent may propose a lower budget; a higher one always waits for you. Spend and burn rate are in Analytics › Debriefs.",
+        "Every change asks you to confirm. The Debrief PM agent may propose a lower budget; a higher one always waits for you. Spend and burn rate are in Analytics › Debriefs.",
       testsHelp: "How much an idea must prove at each step before it reaches learners.",
       progressHelp:
         "How the Debrief agent reads a learner's progress across their recent sessions, and what learners are shown.",
       weightsHelp:
         "How the weekly steering score weighs each signal, and how soon a learner's flag should be reviewed.",
       pinnedHelp:
-        "Apply to every organisation and change rarely. A change arrives as a proposal in the PM agent's “Needs you” list, and only the clinical advisor or the owner can approve it.",
+        "Apply to every organisation and change rarely. A change arrives as a proposal in the Debrief PM agent's “Needs you” list, and only the clinical advisor or the owner can approve it.",
       orgs: {
         change: "change",
         supportLine: (line: string) => `Support line: ${line}`,
@@ -11843,7 +11859,7 @@ export const en = {
         cap: "Monthly cap for debriefs",
         capSub: (spent: string) => `${spent} spent this month`,
         learning: "Fixed learning budget",
-        learningSub: "A month, for the PM agent",
+        learningSub: "A month, for the Debrief PM agent",
         share: "Learning share",
         shareSub: "Of each debrief's unspent budget",
         change: "Change",
@@ -11887,7 +11903,7 @@ export const en = {
         intro: [
           {
             lead: "Quick check, pass test, side-by-side trial:",
-            text: "learners never see these, so the PM agent always runs them on its own, paid from the learning budget. There’s nothing to set; each organisation can still keep side-by-side trials off its sessions (below).",
+            text: "learners never see these, so the Debrief PM agent always runs them on its own, paid from the learning budget. There’s nothing to set; each organisation can still keep side-by-side trials off its sessions (below).",
           },
           {
             lead: "Try on learners:",
@@ -11903,7 +11919,7 @@ export const en = {
           },
           {
             lead: "Pinned rules",
-            text: "(safety rules, rubric, judge’s instructions) aren’t in this table: the clinical advisor or owner always approves them, and the PM agent can only suggest a change. Their status is under",
+            text: "(safety rules, rubric, judge’s instructions) aren’t in this table: the clinical advisor or owner always approves them, and the Debrief PM agent can only suggest a change. Their status is under",
             link: "Pinned rules",
           },
         ],
@@ -11912,7 +11928,7 @@ export const en = {
         eligibleYes: "Yes",
         eligibleNo: "Not yet",
         loading: "Loading…",
-        loadFailed: "Couldn't load what the PM agent may do alone.",
+        loadFailed: "Couldn't load what the Debrief PM agent may do alone.",
         driftFrom:
           "Judge drift: not measured yet. A fixed set of debriefs is scored again for the quality score each week.",
         drift: "Judge drift found: everything asks first.",
@@ -11920,7 +11936,7 @@ export const en = {
         baselineFailed: "The monthly baseline failed: everything asks first.",
         perOrg: "Per organisation",
         perOrgHelp:
-          "Two things use an organisation’s own learners, so each organisation can limit them here, never widen them: side-by-side trials, where a changed version writes a second debrief for its learners’ real sessions in the background and the two are compared (learners only ever see the current one); and learner try-outs, where some of its learners (up to 30% of new debriefs) actually receive the changed version before it goes live for everyone. Prompts and the rubric are shared by every organisation, so they’re set only above. The PM agent never edits guidance (Context Library) or budgets; model trials arrive in Release 2.",
+          "Two things use an organisation’s own learners, so each organisation can limit them here, never widen them: side-by-side trials, where a changed version writes a second debrief for its learners’ real sessions in the background and the two are compared (learners only ever see the current one); and learner try-outs, where some of its learners (up to 30% of new debriefs) actually receive the changed version before it goes live for everyone. Prompts and the rubric are shared by every organisation, so they’re set only above. The Debrief PM agent never edits guidance (Context Library) or budgets; model trials arrive in Release 2.",
         orgColumns: {
           org: "Organisation",
           trials: "Side-by-side trials on its learners",
@@ -11989,7 +12005,7 @@ export const en = {
         pools: "Budgets",
         poolsCaption: "What each pool has spent of its size this month, and the burn rate.",
         debriefPool: "Debriefs (monthly cap)",
-        learningPool: "PM agent (learning budget)",
+        learningPool: "Debrief PM agent (learning budget)",
         poolLine: (spent: string, of: string, left: string) => `${spent} of ${of} · ${left} left`,
         burn: (perDay: string, monthEnd: string, cap: string) =>
           `Burn rate ${perDay} a day: about ${monthEnd} by the end of the month, against a ${cap} cap.`,
@@ -12022,7 +12038,7 @@ export const en = {
         costHelp: "Typical (p50) and expensive (p90) runs. The ceiling is shown underneath.",
         ceiling: (v: string) => `Ceiling ${v}`,
         month: "Spent this month",
-        monthHelp: "Production debriefs only. The PM agent's learning budget is separate.",
+        monthHelp: "Production debriefs only. The Debrief PM agent's learning budget is separate.",
         cap: (v: string) => `Monthly cap: ${v}.`,
       },
       openLabel: (id: string) => `Open run ${id}`,
@@ -12141,22 +12157,22 @@ export const en = {
       } as Record<string, string>,
     },
     pmAgent: {
-      heading: "The PM agent",
-      help: "Each week the PM agent reads how debriefs are doing, writes a short report and proposes changes, and once a month it takes a longer look. Each change climbs a ladder of tests on its own (a quick check, the pass test, then a side-by-side trial on real sessions) and reaches learners only after a person approves trying it on some learners and puts it live for everyone here.",
-      loadFailed: "the PM agent",
+      heading: "The Debrief PM agent",
+      help: "Each week the Debrief PM agent reads how debriefs are doing, writes a short report and proposes changes, and once a month it takes a longer look. Each change climbs a ladder of tests on its own (a quick check, the pass test, then a side-by-side trial on real sessions) and reaches learners only after a person approves trying it on some learners and puts it live for everyone here.",
+      loadFailed: "the Debrief PM agent",
       report: "Latest report",
       noReport:
-        "The PM agent has not written a report yet. It runs once there are debrief runs to read.",
-      runNow: "Run the PM agent now",
+        "The Debrief PM agent has not written a report yet. It runs once there are debrief runs to read.",
+      runNow: "Run the Debrief PM agent now",
       running: "Running…",
-      ran: "The PM agent has started. Its report appears here when it finishes.",
-      skipped: (why: string) => `The PM agent did not run: ${why}`,
-      runFailed: "The PM agent could not run",
+      ran: "The Debrief PM agent has started. Its report appears here when it finishes.",
+      skipped: (why: string) => `The Debrief PM agent did not run: ${why}`,
+      runFailed: "The Debrief PM agent could not run",
       budget: (spent: string, of: string) =>
         `Learning budget: ${spent} spent of ${of} set aside this month (see Settings)`,
       testSets: "Test sets",
       testSetsHelp:
-        "Real sessions, split three ways. The PM agent tries ideas on the practice sessions; the test sessions decide what goes further; the sealed sessions are never shown to it.",
+        "Real sessions, split three ways. The Debrief PM agent tries ideas on the practice sessions; the test sessions decide what goes further; the sealed sessions are never shown to it.",
       sets: {
         debrief_open: "Practice sessions",
         debrief_gate: "Test sessions",
@@ -12169,7 +12185,7 @@ export const en = {
       ideas: "Ideas",
       noIdeas: "No ideas yet.",
       noIdeasMessage:
-        "The PM agent proposes ideas when it runs and finds something worth changing. Run it now, or wait for its weekly run.",
+        "The Debrief PM agent proposes ideas when it runs and finds something worth changing. Run it now, or wait for its weekly run.",
       retry: "Try again",
       settingChange: (name: string, value: string) => `${name}: change to ${value}`,
       // ally-be debrief-metric-failures.util `metricValues`.
@@ -12210,7 +12226,7 @@ export const en = {
         debrief_reviser_system: "Reviser's prompt",
         debrief_quality_rubric: "Quality rubric",
         debrief_quality_judge_system: "Judge's instructions",
-        debrief_improver_system: "PM agent's prompt",
+        debrief_improver_system: "Debrief PM agent's prompt",
         debrief_reply_system: "Ask Ally's prompt",
         debrief_planner_system: "Planner's prompt",
         debrief_protocol_check_system: "Protocol check's prompt",
@@ -12244,7 +12260,7 @@ export const en = {
         guidanceEvidence: (learners: number, tenants: number, platform: boolean) =>
           `From ${learners} learners in ${tenants} ${tenants === 1 ? "organisation" : "organisations"} · ${platform ? "for every organisation" : "for this organisation"}`,
         guidanceNotWritten:
-          "The PM agent has not written anything to the Context Library. If you agree, add or edit the entry there yourself, then mark this done.",
+          "The Debrief PM agent has not written anything to the Context Library. If you agree, add or edit the entry there yourself, then mark this done.",
         checks: "Acceptance checks",
         runs: "Debrief runs",
         forWhom: { owner: "For the owner", clinical_advisor: "For the clinical advisor" } as Record<
@@ -12273,9 +12289,9 @@ export const en = {
             "Builder gets a new session with this brief as its starting context. You are its author; a person still reviews and merges whatever it builds.",
           bug_hunter:
             "This files a bug report with this summary and the debrief run ids. Bug Hunter triages it like any other report.",
-          person: "The PM agent will see the question as answered on its next run.",
+          person: "The Debrief PM agent will see the question as answered on its next run.",
           guidance:
-            "Nothing is added to the Context Library from here. Add or edit the entry there if you agree; the PM agent sees this proposal as decided on its next run.",
+            "Nothing is added to the Context Library from here. Add or edit the entry there if you agree; the Debrief PM agent sees this proposal as decided on its next run.",
         } as Record<string, string>,
         /** "Hand to Builder" (R2-20): the For Builder idea card, before and after the hand-off. */
         toBuilder: {
@@ -12283,7 +12299,7 @@ export const en = {
           what: "What Builder should build",
           how: "How we’ll know it worked",
           who: "Who answers Builder’s questions?",
-          pmAgent: "The PM agent",
+          pmAgent: "The Debrief PM agent",
           recommended: "(recommended)",
           pmAgentHelp:
             "It answers from this idea and its evidence, and sends you only what it can’t answer.",
@@ -12291,7 +12307,7 @@ export const en = {
           meHelp: "Opens a Builder session with this idea filled in.",
           note: "Builder never sees learners’ words: only the summary above and run ids. A person reviews and merges the code.",
           button: "Hand to Builder",
-          handedPmAgent: "Handed to Builder. The PM agent is answering its questions.",
+          handedPmAgent: "Handed to Builder. The Debrief PM agent is answering its questions.",
           handedMe: "Handed to Builder. Its questions come to you there.",
           inBuilder: (stage: string) => `In Builder: ${stage}`,
           stage: {
@@ -12308,7 +12324,7 @@ export const en = {
             pr: "Pull request",
           },
           step: {
-            pmAnswered: (n: number) => `PM agent answered ${n}`,
+            pmAnswered: (n: number) => `Debrief PM agent answered ${n}`,
             inProgress: "In progress",
             done: "Done",
             doneAnswers: (n: number) => `Done · ${n} ${n === 1 ? "answer" : "answers"}`,
@@ -12323,18 +12339,19 @@ export const en = {
           },
           question: "Builder asks you one question.",
           pmAgentCount: (answered: number) =>
-            `The PM agent answered ${answered} of ${answered + 1}.`,
+            `The Debrief PM agent answered ${answered} of ${answered + 1}.`,
           whyYou: (reason: string) => `Why it came to you: ${reason}`,
           answerLabel: "Your answer",
           somethingElse: "Something else",
           pickSeveral: "Pick all that apply.",
           send: "Send to Builder",
           sent: "Sent to Builder",
-          seeAnswers: (n: number) => `See the PM agent’s ${n} ${n === 1 ? "answer" : "answers"}`,
-          hideAnswers: "Hide the PM agent’s answers",
+          seeAnswers: (n: number) =>
+            `See the Debrief PM agent’s ${n} ${n === 1 ? "answer" : "answers"}`,
+          hideAnswers: "Hide the Debrief PM agent’s answers",
           brief:
             "Builder wants you to confirm what it found in the code before it asks anything else.",
-          pmAgentAnswering: "The PM agent is answering Builder’s question.",
+          pmAgentAnswering: "The Debrief PM agent is answering Builder’s question.",
           openSession: "Open the Builder session",
           prOpen: "Builder opened a pull request. Waiting for a person to review and merge.",
           openPr: "Open the pull request",
@@ -12420,7 +12437,7 @@ export const en = {
       noLongerLive: "No longer live",
       rejectTitle: "Reject this idea?",
       rejectBody:
-        "The PM agent will see it was rejected and will not propose it again unless the numbers change.",
+        "The Debrief PM agent will see it was rejected and will not propose it again unless the numbers change.",
       rejectConfirm: "Reject",
       cancel: "Cancel",
       rejected: "Idea rejected",
@@ -12514,7 +12531,7 @@ export const en = {
     // advisor's yes/no answers under their verdicts (hand scoring removed 2026-11-12).
     nightly: {
       heading: "Nightly check",
-      help: "Every night the day's debriefs are checked for slow changes nobody would notice run by run, against the two weeks before. Anything outside the normal range goes to the PM agent, which acts on it; nobody needs to watch this page. Words are counted and lines compared the same way in every language; vagueness is the quality score's specificity part.",
+      help: "Every night the day's debriefs are checked for slow changes nobody would notice run by run, against the two weeks before. Anything outside the normal range goes to the Debrief PM agent, which acts on it; nobody needs to watch this page. Words are counted and lines compared the same way in every language; vagueness is the quality score's specificity part.",
       slice: "Show",
       all: "All debriefs",
       language: (code: string) => `Language: ${code}`,
@@ -12540,7 +12557,7 @@ export const en = {
           "Points, on average. A growing gap means the draft score is getting easier than the quality score.",
         drift: "Judge drift",
         driftHelp:
-          "Each week the same debriefs are scored again for the quality score. The line is how far its scores moved; beyond the limit, the PM agent pauses changes until the judge is checked again.",
+          "Each week the same debriefs are scored again for the quality score. The line is how far its scores moved; beyond the limit, the Debrief PM agent pauses changes until the judge is checked again.",
         limit: "Limit",
       },
       dataQuality: (
@@ -12563,7 +12580,7 @@ export const en = {
       noAgreement:
         "The clinical advisor hasn't answered the questions under a verdict yet, so there's no agreement to show.",
       sectionHelp:
-        "How often the quality score agrees with the clinical advisor's yes/no answers under each verdict. For information: it no longer decides what the PM agent may do.",
+        "How often the quality score agrees with the clinical advisor's yes/no answers under each verdict. For information: it no longer decides what the Debrief PM agent may do.",
       agreementFailed: "agreement",
       kpis: {
         rated: "Reviews with answers",

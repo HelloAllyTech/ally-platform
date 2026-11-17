@@ -32,17 +32,17 @@ export type NeverListArea =
 
 const NEVER: Record<NeverListArea, string> = {
   context_library:
-    'Context Library chunks are never changed by the PM agent (never-list); ask a person (route D)',
+    'Context Library chunks are never changed by the Debrief PM agent (never-list); ask a person (route D)',
   judge:
-    "the judge's rubric and model are the fixed yardstick, never changed by the PM agent (never-list); ask a person (route D)",
+    "the judge's rubric and model are the fixed yardstick, never changed by the Debrief PM agent (never-list); ask a person (route D)",
   safety:
-    "safety rules and the Safety reader's instructions are never changed by the PM agent (never-list); ask a person (route D)",
+    "safety rules and the Safety reader's instructions are never changed by the Debrief PM agent (never-list); ask a person (route D)",
   budgets:
-    'budgets are never changed by the PM agent (never-list); ask the owner (route D)',
+    'budgets are never changed by the Debrief PM agent (never-list); ask the owner (route D)',
   data_access:
-    'data access and scopes are never changed by the PM agent (never-list); ask the owner (route D)',
+    'data access and scopes are never changed by the Debrief PM agent (never-list); ask the owner (route D)',
   approval_list:
-    'what needs a person’s approval is never changed by the PM agent (never-list); ask the owner (route D)',
+    'what needs a person’s approval is never changed by the Debrief PM agent (never-list); ask the owner (route D)',
 };
 
 const never = (area: NeverListArea): Refusal => ({

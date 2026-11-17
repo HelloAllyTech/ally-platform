@@ -542,7 +542,7 @@ export function changeResult(
       ].includes(String(idea.change?.ideaKind));
       return drafted
         ? 'Not tested yet: its first check starts on the next hourly run.'
-        : 'An idea, not a change yet: the PM agent drafts it on its next run.';
+        : 'An idea, not a change yet: the Debrief PM agent drafts it on its next run.';
     }
     case 'testing':
     default: {

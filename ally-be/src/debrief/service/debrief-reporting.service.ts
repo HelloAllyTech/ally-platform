@@ -21,7 +21,7 @@ export const DEBRIEF_REPORTING_VIEWS: Readonly<Record<string, string>> =
     'debrief_reporting.learner_responses':
       'one row per learner response to a live debrief: run_id, created_at, tenant_id, kind (helpful/flag), helpful (bool), section (which card), reason (flag reason code), urgent, status',
     'debrief_reporting.ideas':
-      'one row per PM agent idea: id, created_at, updated_at, status, idea_kind, prompt_code, setting_key, text, release_id, quick_test_lift, quick_test_passed, gate_passed, trial_status, canary_status',
+      'one row per Debrief PM agent idea: id, created_at, updated_at, status, idea_kind, prompt_code, setting_key, text, release_id, quick_test_lift, quick_test_passed, gate_passed, trial_status, canary_status',
     'debrief_reporting.learner_events':
       'one row per thing a learner did with a live debrief, once per session and kind: created_at, tenant_id, run_id, kind (opened/read_through/listened/practise_next_click/reflection_answered/replied/waited/left_before_ready), platform (web/ios/android or null)',
     'debrief_reporting.probes':
@@ -69,7 +69,7 @@ export class DebriefReportingService {
     const guard = guardSelectQuery(
       sql,
       DEBRIEF_REPORTING_VIEWS,
-      'the PM agent',
+      'the Debrief PM agent',
     );
     if (!guard.ok) return { sql, ok: false, refused: guard.reason };
     try {

@@ -1109,7 +1109,7 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'Weekly, a deeper review monthly, on demand from the Debrief Console, and when a Builder ' +
       'interview handed over with "Hand to Builder" asks a question',
     detail:
-      'The PM agent, one Deep Agent in ally-ai (app/core/pm_agent): reads expert comments, metric failure points ' +
+      'The Debrief PM agent, one Deep Agent in ally-ai (app/core/pm_agent): reads expert comments, metric failure points ' +
       'and redacted reporting views (never transcripts), plans, investigates with read-only subagents, and proposes ' +
       'ideas routed to itself, Builder, Bug Hunter or a person through ally-be gateway tools that refuse the ' +
       'never-list. A reviewer subagent (fresh context, read-only tools, structured verdict) checks each proposed ' +
@@ -1134,9 +1134,9 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     task: LlmTask.DEBRIEF_PM_AGENT,
     runtime: LlmRuntime.ALLY_AI,
     trigger:
-      'A person posts in the Debrief console’s PM agent conversation (POST v1/debriefs/console/pm-agent/conversation)',
+      'A person posts in the Debrief console’s Debrief PM agent conversation (POST v1/debriefs/console/pm-agent/conversation)',
     detail:
-      'The PM agent answering one message (V2_AUTONOMY C1–C3, POST /pm-agent/conversation): the same Deep Agent ' +
+      'The Debrief PM agent answering one message (V2_AUTONOMY C1–C3, POST /pm-agent/conversation): the same Deep Agent ' +
       'harness as the weekly run (shared /memories/ store namespace, read-only skills, investigator and reviewer ' +
       'subagents) on a Postgres checkpoint thread per console thread, over the conversation’s gateway tools (read ' +
       'changes, sessions and metrics; propose; stop, undo, retry, hold a language, pause a kind of change). Approve, ' +

@@ -19,7 +19,7 @@ const make = (can: Record<string, boolean>) => {
 };
 const req = { user: { id: 'u' } } as any;
 
-describe('who sees which changes on the PM agent page', () => {
+describe('who sees which changes on the Debrief PM agent page', () => {
   it('the team and the owner see every change', async () => {
     const ctl = make({ pmAgent: true, approvePinnedRule: false });
     expect((await ctl.list(req)).changes).toHaveLength(2);

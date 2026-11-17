@@ -33,7 +33,7 @@ export const ALWAYS_ASK_LABELS: Record<AlwaysAskKind, string> = {
   crisis_support: 'Crisis lines and support copy',
   pinned_rule: 'Pinned rules (rubric, judge and Evaluator instructions)',
   budget_increase: 'Budget increases',
-  low_confidence: 'Changes the PM agent is not sure about',
+  low_confidence: 'Changes the Debrief PM agent is not sure about',
   new_model: 'New models or providers',
 };
 
@@ -146,7 +146,7 @@ export function alwaysAsk(
     return {
       kind: 'low_confidence',
       locked: false,
-      waitsBecause: `The PM agent is not sure about it${confidence.why ? `: ${confidence.why}` : '.'}`,
+      waitsBecause: `The Debrief PM agent is not sure about it${confidence.why ? `: ${confidence.why}` : '.'}`,
     };
   }
   if (settings.askModels) {
