@@ -8,7 +8,8 @@ with the option's own definition. The option passes only when, on EVERY run:
 - no non-cue example is flagged as a CLEAR risk cue (a ``possible`` one is allowed: it is the
   Writer's call, as in a real debrief).
 
-With ``word_list_raises`` off, the word list never raises a cue to clear, as in a real run.
+With ``word_list_raises`` off, the word list never raises a cue to clear, as in a real
+run.
 Synthetic sessions only.
 """
 
