@@ -15,6 +15,7 @@ import { TrackTranslationService } from 'src/track/service/track-translation.ser
 import { TrackWithStructure } from 'src/track/service/track-shared.service';
 import {
   TrackItemCompletionCriteria,
+  TrackItemCompletionLogic,
   TrackItemType,
   TrackStatus,
   VideoSource,
@@ -231,9 +232,11 @@ export const EDIT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
   {
     name: 'set_completion_rule',
     description:
-      'What a learner must achieve to complete an item: ROLEPLAY {minScore 0-100, ' +
-      'minDurationSeconds}, CASE {minScore}, QUIZ / ANNOTATED_ARTIFACT {passScore 0-100}, VIDEO ' +
-      '{watchPct 1-100}, ARTICLE {minReadSeconds}. GAME has none.',
+      'What a learner must achieve to complete an item: ROLEPLAY {completionLogic, minScore 0-100, ' +
+      'minDurationSeconds} where completionLogic is SCORE, DURATION, SCORE_AND_DURATION (the ' +
+      'default: both gates) or PARTICIPATION (completes on launch, no gate); minDurationSeconds 0 = ' +
+      'no minimum, omitted = the platform default. CASE {minScore}, QUIZ / ANNOTATED_ARTIFACT ' +
+      '{passScore 0-100}, VIDEO {watchPct 1-100}, ARTICLE {minReadSeconds}. GAME has none.',
     input_schema: {
       type: 'object',
       properties: { itemId: id, completionCriteria: { type: 'object' } },
@@ -1493,12 +1496,22 @@ export class CourseCopilotEditToolsService {
     };
     const rule: TrackItemCompletionCriteria = {};
     switch (type) {
-      case TrackItemType.ROLEPLAY:
+      case TrackItemType.ROLEPLAY: {
+        const logic =
+          typeof source.completionLogic === 'string'
+            ? source.completionLogic.trim().toUpperCase()
+            : '';
+        if (
+          (Object.values(TrackItemCompletionLogic) as string[]).includes(logic)
+        ) {
+          rule.completionLogic = logic as TrackItemCompletionLogic;
+        }
         if (pct(source.minScore) !== undefined)
           rule.minScore = pct(source.minScore);
         if (seconds(source.minDurationSeconds) !== undefined)
           rule.minDurationSeconds = seconds(source.minDurationSeconds);
         break;
+      }
       case TrackItemType.CASE:
         if (pct(source.minScore) !== undefined)
           rule.minScore = pct(source.minScore);

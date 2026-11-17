@@ -4,6 +4,7 @@
  */
 
 import type { AgentTurnReceipt } from "./agentChat";
+import type { RoleplayCompletionLogic } from "./tracks";
 
 /* ── Enums ─────────────────────────────────────────────────────────────── */
 
@@ -138,6 +139,8 @@ export type CourseBlueprintItemSource =
   | { kind: "needs-input"; what: "video-url" };
 
 export interface CourseBlueprintCompletionCriteria {
+  /** Roleplay only. */
+  completionLogic?: RoleplayCompletionLogic;
   minScore?: number;
   passScore?: number;
   watchPct?: number;

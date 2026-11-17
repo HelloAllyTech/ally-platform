@@ -992,6 +992,13 @@ export class TrackService {
           // a setting that silently does nothing.
           delete item.completionCriteria.assessmentMode;
         }
+        if (
+          item.type !== TrackItemType.ROLEPLAY &&
+          item.completionCriteria?.completionLogic !== undefined
+        ) {
+          // Same reason: only the roleplay gate reads it.
+          delete item.completionCriteria.completionLogic;
+        }
         if (item.type === TrackItemType.VIDEO) {
           item.completionCriteria = {
             ...item.completionCriteria,

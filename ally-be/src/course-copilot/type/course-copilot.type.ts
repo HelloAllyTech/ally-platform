@@ -1,4 +1,7 @@
-import { TrackItemType } from 'src/track/type/track.type';
+import {
+  TrackItemCompletionLogic,
+  TrackItemType,
+} from 'src/track/type/track.type';
 
 /**
  * The distilled interview — what the trainer has told the copilot so far.
@@ -106,6 +109,8 @@ export type CourseBlueprintItemSource =
   | { kind: 'needs-input'; what: 'video-url' };
 
 export interface CourseBlueprintCompletionCriteria {
+  /** ROLEPLAY only: which of minScore / minDurationSeconds gate it. */
+  completionLogic?: TrackItemCompletionLogic;
   minScore?: number;
   passScore?: number;
   watchPct?: number;

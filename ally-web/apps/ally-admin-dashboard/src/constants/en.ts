@@ -9250,6 +9250,11 @@ export const en = {
       watchPct: (pct: number) => `Watch ${pct}%`,
       minRead: (duration: string) => `Read for ${duration}`,
       minDuration: (duration: string) => `At least ${duration}`,
+      // Roleplay completion logic; SCORE_AND_DURATION needs no phrase of its
+      // own — its two gates already read as two phrases.
+      participation: "Completes on start",
+      scoreOnly: "Score only",
+      durationOnly: "Duration only",
     },
 
     // Brief — read-only, fills in as the interview goes.
