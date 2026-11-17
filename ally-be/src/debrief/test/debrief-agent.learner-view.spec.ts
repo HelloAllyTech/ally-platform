@@ -72,6 +72,7 @@ function build(opts: {
     overrides as any,
     { debriefAgentMode: opts.mode ?? 'shadow' } as any,
     {
+      inCourse: jest.fn(async () => false),
       available: jest.fn(async (_u: number, _t: string, ids: number[]) =>
         ids
           .filter((id) => id === 41)
@@ -193,6 +194,36 @@ describe('DebriefAgentService.learnerView', () => {
       practice: [],
       askAlly: { open: true },
     });
+  });
+
+  it('inside a course, serves no practise card and no roleplay link, even on a debrief written before the rule', async () => {
+    const svc = build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: {
+            opening: 'x',
+            practise_next: {
+              skill: 'Empathy',
+              reason: 'r',
+              scenario_id: 41,
+              try_next: ['a'],
+            },
+            work_on_this: [{ point: 'p', scenario_id: 41 }],
+          },
+          language: 'en',
+          steps: [],
+        },
+      ],
+    });
+    ((svc as any).practice.inCourse as jest.Mock).mockResolvedValue(true);
+    const view = (await svc.learnerView('s', 7)) as any;
+    expect(view.cards.practise_next).toBeUndefined();
+    expect(view.cards.work_on_this).toEqual([
+      { point: 'p', scenario_id: null },
+    ]);
+    expect(view.practice).toEqual([]);
   });
 
   it('keeps Ask Ally closed after its limit, until the month turns for the month limit', async () => {
@@ -498,7 +529,10 @@ describe('DebriefAgentService.onSessionEnded', () => {
       releases as any,
       overrides as any,
       { debriefAgentMode: mode } as any,
-      { available: jest.fn(async () => []) } as any,
+      {
+        inCourse: jest.fn(async () => false),
+        available: jest.fn(async () => []),
+      } as any,
       { ready: jest.fn(async () => undefined) } as any,
     );
     return { svc, runner };
