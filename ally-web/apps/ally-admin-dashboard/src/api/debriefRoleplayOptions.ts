@@ -1,10 +1,5 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
-import {
-  DebriefSkillFrameworkOption,
-  RiskCueOption,
-  RiskCueOptionInput,
-  RiskCueTestResult,
-} from "@types";
+import { RiskCueOption, RiskCueOptionInput, RiskCueTestResult } from "@types";
 
 import { baseAPI } from "./baseApi";
 
@@ -20,12 +15,6 @@ export const debriefRoleplayOptionsAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.DEBRIEF_ROLEPLAY_OPTIONS.AVAILABILITY,
         method: HttpMethod.GET,
         params: scenarioId ? { scenarioId } : undefined,
-      }),
-    }),
-    getDebriefSkillFrameworks: builder.query<DebriefSkillFrameworkOption[], void>({
-      query: () => ({
-        url: ApiEndpoints.DEBRIEF_ROLEPLAY_OPTIONS.FRAMEWORKS,
-        method: HttpMethod.GET,
       }),
     }),
     getRiskCueOptions: builder.query<RiskCueOption[], void>({
@@ -110,7 +99,6 @@ export const debriefRoleplayOptionsAPI = baseAPI.injectEndpoints({
 
 export const {
   useGetDebriefOptionsAvailabilityQuery,
-  useGetDebriefSkillFrameworksQuery,
   useGetRiskCueOptionsQuery,
   useGetRiskCueOptionsForReviewQuery,
   useCreateRiskCueOptionMutation,

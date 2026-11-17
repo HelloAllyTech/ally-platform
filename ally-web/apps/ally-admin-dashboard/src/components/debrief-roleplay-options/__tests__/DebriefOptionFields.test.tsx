@@ -9,7 +9,6 @@ import "@constants";
 import { riskCue } from "./fixtures";
 
 const h = vi.hoisted(() => ({
-  frameworks: [] as unknown[],
   options: [] as unknown[],
   enabled: true,
   availabilityArgs: [] as unknown[],
@@ -26,11 +25,6 @@ vi.mock("@api", async importOriginal => ({
     h.availabilityArgs.push(arg);
     return { data: { enabled: h.enabled } };
   },
-  useGetDebriefSkillFrameworksQuery: () => ({
-    isLoading: false,
-    isError: false,
-    data: h.frameworks,
-  }),
   useGetRiskCueOptionsQuery: () => ({ isLoading: false, isError: false, data: h.options }),
   useCreateRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
   useUpdateRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
@@ -41,60 +35,13 @@ vi.mock("@api", async importOriginal => ({
 /* eslint-disable import/first */
 import { formatSimulationResponseData } from "../../../utils/createSimulation";
 import { DebriefRiskCueField } from "../DebriefRiskCueField";
-import { DebriefSkillFrameworkField } from "../DebriefSkillFrameworkField";
 /* eslint-enable import/first */
 
 let form: ReturnType<typeof useForm> | null = null;
-const Host: React.FC<{
-  initial?: Record<string, unknown>;
-  which: "framework" | "risk" | "both";
-}> = ({ initial, which }) => {
+const Host: React.FC<{ initial?: Record<string, unknown> }> = ({ initial }) => {
   form = useForm({ defaultValues: initial ?? {} });
-  return (
-    <>
-      {which !== "risk" && <DebriefSkillFrameworkField formMethods={form} />}
-      {which !== "framework" && <DebriefRiskCueField formMethods={form} />}
-    </>
-  );
+  return <DebriefRiskCueField formMethods={form} />;
 };
-
-describe("Simulation editor › Debrief skill framework", () => {
-  beforeEach(() => {
-    h.frameworks = [
-      { id: "none", name: "None", isDefault: false },
-      { id: "advanced", name: "Advanced skills", skills: [], isDefault: false },
-      { id: "foundational", name: "Foundational helping skills", skills: [], isDefault: true },
-    ];
-  });
-
-  it("lists the default first and None last, and the unset value shows the default", () => {
-    render(<Host which="framework" />);
-    const options = Array.from(screen.getByRole("combobox").querySelectorAll("option")).map(
-      o => o.textContent,
-    );
-    expect(options).toEqual(["Foundational helping skills (default)", "Advanced skills", "None"]);
-    expect(screen.getByRole("combobox")).toHaveValue("Foundational helping skills (default)");
-  });
-
-  it("saves null for the default, 'none' for None and the id for the others", () => {
-    render(<Host which="framework" initial={{ debriefSkillFramework: "advanced" }} />);
-    const select = screen.getByRole("combobox");
-    expect(select).toHaveValue("Advanced skills");
-    fireEvent.change(select, { target: { value: "None" } });
-    expect(form?.getValues("debriefSkillFramework")).toBe("none");
-    fireEvent.change(select, { target: { value: "Foundational helping skills (default)" } });
-    expect(form?.getValues("debriefSkillFramework")).toBeNull();
-    fireEvent.change(select, { target: { value: "Advanced skills" } });
-    expect(form?.getValues("debriefSkillFramework")).toBe("advanced");
-  });
-
-  it("explains itself in a tooltip", () => {
-    render(<Host which="framework" />);
-    expect(document.querySelector("[data-tooltip]")?.getAttribute("data-tooltip")).toMatch(
-      /beyond this roleplay's own competencies/,
-    );
-  });
-});
 
 describe("Simulation editor › Risk cues in this roleplay", () => {
   beforeEach(() => {
@@ -114,7 +61,7 @@ describe("Simulation editor › Risk cues in this roleplay", () => {
   });
 
   it("lists Standard first; own drafts are disabled with their status in words; others' drafts are hidden", () => {
-    render(<Host which="risk" />);
+    render(<Host />);
     const options = Array.from(screen.getByRole("combobox").querySelectorAll("option"));
     expect(options.map(o => o.textContent)).toEqual([
       "Standard",
@@ -128,7 +75,7 @@ describe("Simulation editor › Risk cues in this roleplay", () => {
   });
 
   it("saves null for Standard and the key for another approved option; a non-approved one is not selectable", () => {
-    render(<Host which="risk" initial={{ debriefRiskCueOption: "peer" }} />);
+    render(<Host initial={{ debriefRiskCueOption: "peer" }} />);
     const select = screen.getByRole("combobox");
     expect(select).toHaveValue("Peer rule");
     expect(screen.getByText("A peer's wording.")).toBeInTheDocument();
@@ -151,7 +98,7 @@ describe("Simulation editor › Risk cues in this roleplay", () => {
         handling: "assessed",
       }),
     ];
-    render(<Host which="risk" initial={{ debriefRiskCueOption: "z" }} />);
+    render(<Host initial={{ debriefRiskCueOption: "z" }} />);
     expect(
       screen.getByText(
         "The reader decides, cue by cue, which risk cues are the skill being practised. Those are assessed in the coaching cards; any other cue is still an alarm.",
@@ -160,7 +107,7 @@ describe("Simulation editor › Risk cues in this roleplay", () => {
   });
 
   it("offers to create one and to open your own drafts", () => {
-    render(<Host which="risk" />);
+    render(<Host />);
     expect(screen.getByRole("button", { name: "Create a risk-cue option" })).toBeInTheDocument();
     expect(screen.getByTestId("risk-cue-mine-mine-draft")).toHaveTextContent("My draft");
     fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
@@ -172,28 +119,24 @@ describe("Where the Debrief choices show", () => {
   beforeEach(() => {
     h.enabled = true;
     h.availabilityArgs = [];
-    h.frameworks = [{ id: "f", name: "Foundational", skills: [], isDefault: true }];
     h.options = [riskCue()];
   });
 
-  it("shows both, with the defaults pre-selected, where the new Debrief is on", () => {
-    render(<Host which="both" />);
-    const [framework, risk] = screen.getAllByRole("combobox");
-    expect(framework).toHaveValue("Foundational (default)");
-    expect(risk).toHaveValue("Standard");
+  it("shows it, with the default pre-selected, where the new Debrief is on", () => {
+    render(<Host />);
+    expect(screen.getByRole("combobox")).toHaveValue("Standard");
     expect(screen.getByRole("button", { name: "Create a risk-cue option" })).toBeInTheDocument();
   });
 
   it("renders nothing at all where it is not on", () => {
     h.enabled = false;
-    const { container } = render(<Host which="both" />);
+    const { container } = render(<Host />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("still shows a saved non-default choice where it is not on", () => {
     h.enabled = false;
-    render(<Host which="both" initial={{ debriefRiskCueOption: "peer" }} />);
-    expect(screen.getByTestId("debrief-framework-field")).toBeInTheDocument();
+    render(<Host initial={{ debriefRiskCueOption: "peer" }} />);
     expect(screen.getByTestId("debrief-risk-cue-field")).toBeInTheDocument();
   });
 
@@ -201,26 +144,24 @@ describe("Where the Debrief choices show", () => {
     render(
       <MemoryRouter initialEntries={["/simulations/abc"]}>
         <Routes>
-          <Route path="/simulations/:id" element={<Host which="framework" />} />
+          <Route path="/simulations/:id" element={<Host />} />
         </Routes>
       </MemoryRouter>,
     );
     expect(h.availabilityArgs).toContainEqual({ scenarioId: "abc" });
     h.availabilityArgs = [];
-    render(<Host which="framework" />);
+    render(<Host />);
     expect(h.availabilityArgs).toContainEqual({ scenarioId: undefined });
   });
 });
 
 describe("Saved choices reach the form", () => {
-  it("hydrates the two metadata fields, unset as null", () => {
+  it("hydrates the metadata field, unset as null", () => {
     const withValues = formatSimulationResponseData({
-      metadata: { debriefSkillFramework: "none", debriefRiskCueOption: "peer" },
+      metadata: { debriefRiskCueOption: "peer" },
     } as never);
-    expect(withValues.debriefSkillFramework).toBe("none");
     expect(withValues.debriefRiskCueOption).toBe("peer");
     const unset = formatSimulationResponseData({ metadata: {} } as never);
-    expect(unset.debriefSkillFramework).toBeNull();
     expect(unset.debriefRiskCueOption).toBeNull();
   });
 });

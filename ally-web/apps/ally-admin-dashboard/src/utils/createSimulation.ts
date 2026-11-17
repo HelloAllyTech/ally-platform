@@ -255,8 +255,7 @@ export const formatSimulationResponseData = (data: GetSimulationByIdResponse) =>
     // tell the whole story.
     feedbackTabDebrief: (data?.metadata as any)?.feedbackTabs?.debrief !== false,
     feedbackTabTranscript: (data?.metadata as any)?.feedbackTabs?.transcript !== false,
-    // The Debrief's two per-roleplay choices. Unset reads as null, which is the default for both.
-    debriefSkillFramework: (data?.metadata as any)?.debriefSkillFramework ?? null,
+    // The Debrief's per-roleplay choice. Unset reads as null, which is the default for both.
     debriefRiskCueOption: (data?.metadata as any)?.debriefRiskCueOption ?? null,
     // Opt-in toggle: missing → disabled (only an explicit true enables it).
     pauseEnabled: (data?.metadata as any)?.pauseEnabled ?? false,

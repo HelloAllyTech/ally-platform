@@ -169,8 +169,6 @@ export interface SimulationInput {
    * these two any more (`enableFeedback`, retired 2026-08-31).
    */
   feedbackTabs?: { debrief: boolean; transcript: boolean };
-  /** Debrief skill framework: null/unset = the default, "none", or a framework id. */
-  debriefSkillFramework?: string | null;
   /** Debrief risk-cue option: null/unset = Standard, or an option's key. */
   debriefRiskCueOption?: string | null;
   fillerEnabled?: boolean;
@@ -395,7 +393,6 @@ export interface StartSimulationResponse {
       summaryChecklistEnabled?: boolean;
       showScoreMeter?: boolean;
       pauseEnabled?: boolean;
-      debriefSkillFramework?: string | null;
       debriefRiskCueOption?: string | null;
       supervisorNotesEnabled?: boolean;
       videoActorEnabled?: boolean;

@@ -837,7 +837,6 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     if (!Array.isArray(restForm.memories)) delete (simulationData as any).memories;
     // Hidden Debrief choices are left out, so ally-be keeps whatever is stored.
     if (!debriefOptionsShown) {
-      delete (simulationData as any).debriefSkillFramework;
       delete (simulationData as any).debriefRiskCueOption;
     }
 

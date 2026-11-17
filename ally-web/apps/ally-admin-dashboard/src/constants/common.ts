@@ -491,10 +491,9 @@ export const ApiEndpoints = {
     QUESTION_SET_PUBLISH: (id: string) => `/v1/lab/question-sets/${id}/publish`,
     QUESTION_SET_ARCHIVE: (id: string) => `/v1/lab/question-sets/${id}/archive`,
   },
-  /** Debrief choices per roleplay: skill framework and risk-cue options. */
+  /** Debrief choices per roleplay: risk-cue options. */
   DEBRIEF_ROLEPLAY_OPTIONS: {
     AVAILABILITY: "/v1/debriefs/roleplay-options/availability",
-    FRAMEWORKS: "/v1/debriefs/roleplay-options/frameworks",
     RISK_CUES: "/v1/debriefs/roleplay-options/risk-cue-options",
     RISK_CUES_REVIEW: "/v1/debriefs/roleplay-options/risk-cue-options/review",
     RISK_CUE: (id: string) => `/v1/debriefs/roleplay-options/risk-cue-options/${id}`,

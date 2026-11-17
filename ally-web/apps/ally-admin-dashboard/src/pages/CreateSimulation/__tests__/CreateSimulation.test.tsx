@@ -1043,23 +1043,20 @@ describe("CreateSimulation", () => {
     const values = {
       title: "Test",
       triggerWarningIds: [],
-      debriefSkillFramework: null,
       debriefRiskCueOption: null,
     };
 
-    it("leaves both keys out when the new Debrief is not on for the roleplay", async () => {
+    it("leaves the key out when the new Debrief is not on for the roleplay", async () => {
       mockDebriefAvailability.enabled = false;
       mockFormMethods.getValues.mockReturnValue(values);
       const scenario = await save();
-      expect(scenario).not.toHaveProperty("debriefSkillFramework");
       expect(scenario).not.toHaveProperty("debriefRiskCueOption");
     });
 
-    it("sends both, default as null, when it is on", async () => {
+    it("sends it, default as null, when it is on", async () => {
       mockDebriefAvailability.enabled = true;
       mockFormMethods.getValues.mockReturnValue(values);
       const scenario = await save();
-      expect(scenario.debriefSkillFramework).toBeNull();
       expect(scenario.debriefRiskCueOption).toBeNull();
       expect(mockDebriefAvailability.args).toContainEqual({ scenarioId: undefined });
     });

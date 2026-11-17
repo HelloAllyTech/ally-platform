@@ -1,13 +1,5 @@
 /** Debrief choices a roleplay author makes in the simulation editor (ally-be `/v1/debriefs/roleplay-options`). */
 
-export interface DebriefSkillFrameworkOption {
-  /** "none" is the option that assesses no framework skills. */
-  id: string;
-  name: string;
-  skills?: string[];
-  isDefault: boolean;
-}
-
 export type RiskCueHandling = "alarm" | "assessed";
 export type RiskCueStatus = "draft" | "awaiting_approval" | "approved" | "retired";
 
