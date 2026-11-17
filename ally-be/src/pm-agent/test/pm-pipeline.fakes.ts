@@ -1,3 +1,4 @@
+import { PM_ROADMAP_READINESS_IDS } from '../gate/pm-critic';
 import { randomUUID } from 'crypto';
 import {
   AgentContentBlock,
@@ -113,6 +114,11 @@ export const recFor = (
     alternativesDropped: ['A larger redesign'],
     repos: ['ally-be'],
     evidenceIds,
+    opportunity: {
+      description: `Counsellors in training lose time today. ${title}: ${why}. Why it matters: every lost minute is practice they never get back.`,
+      productGoal: 'Engagement',
+      effort: 'm',
+    },
     ...over,
   };
 };
@@ -278,6 +284,10 @@ export class FakePipelineStore implements PmPipelineStore {
   async tenantNames() {
     return ['Acme Health'];
   }
+  productGoals = ['Engagement', 'Quality'];
+  async productGoalNames() {
+    return this.productGoals;
+  }
   async hasUxSignals() {
     return this.uxSignals;
   }
@@ -304,6 +314,9 @@ export class FakePipelineStore implements PmPipelineStore {
       versionHash: input.versionHash,
       title: input.candidate.payload.title,
       payload: input.candidate.payload,
+      roadmapFiling: input.candidate.roadmapReadiness
+        ? { readiness: input.candidate.roadmapReadiness }
+        : null,
       rank: input.candidate.rank,
       questionKey: input.candidate.questionKey ?? null,
       revisedFromCardId: input.candidate.revisedFromCardId ?? null,
@@ -389,8 +402,21 @@ export const submitTurn = (candidates: unknown[]) =>
 export const callTool = (name: string, input: Record<string, any> = {}) =>
   turn([toolUse(name, input)]);
 
+/** Every roadmap readiness item met: what a real critic sends for a recommendation it passes. */
+export const READY = Object.fromEntries(
+  PM_ROADMAP_READINESS_IDS.map((id) => [id, true]),
+);
+
+/** A critic submission. Verdicts without `roadmapReadiness` get every item met. */
 export const verdictTurn = (verdicts: unknown[]) =>
-  turn([toolUse(PM_CRITIC_SUBMIT_TOOL, { verdicts })]);
+  turn([
+    toolUse(PM_CRITIC_SUBMIT_TOOL, {
+      verdicts: verdicts.map((verdict: any) => ({
+        roadmapReadiness: READY,
+        ...verdict,
+      })),
+    }),
+  ]);
 
 /** Evidence ids that tool results in the conversation so far carried. */
 export function evidenceIdsIn(request: PmLlmStepRequest): string[] {

@@ -1,8 +1,4 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { BuilderPullRequest } from 'src/builder/entity/builder-pull-request.entity';
-import { BuilderSession } from 'src/builder/entity/builder-session.entity';
 import { PmAgentCard } from '../entity/pm-agent-card.entity';
 import { PmAgentCardEvent } from '../entity/pm-agent-card-event.entity';
 import { PmAgentEvidence } from '../entity/pm-agent-evidence.entity';
@@ -15,29 +11,28 @@ import {
   PmNeedsYou,
 } from '../dto/pm-agent.dto';
 import { PmAgentImpactService } from '../impact/pm-agent-impact.service';
+import { PmRoadmapFiling } from '../pipeline/pm-pipeline.types';
+import { PmAgentRoadmapPort } from './pm-agent-roadmap-port.service';
 
 const iso = (value?: Date | string | null): string | null =>
   value ? new Date(value).toISOString() : null;
 
 const DEFAULT_NEEDS_YOU_REASON: Partial<Record<PmCardStatus, string>> = {
+  [PmCardStatus.NEEDS_ATTENTION]:
+    'Filing to the roadmap stopped and needs a person.',
   [PmCardStatus.FAILED]: 'The build failed.',
-  [PmCardStatus.NEEDS_ATTENTION]: 'The build stopped and needs a person.',
   [PmCardStatus.MERGED_NOT_RELEASED]:
     'Merged, but the release did not reach production.',
 };
 
 /**
- * Shapes cards for the API (the `Card` type in docs/pm-agent.md). Builder state is
- * read directly from its tables (read-only; Builder's own services own every write), in
- * one query per page rather than one per card.
+ * Shapes cards for the API (the `Card` type in docs/pm-agent.md). Where a filed card sits on
+ * the roadmap is read through PmAgentRoadmapPort in one query per page, not one per card.
  */
 @Injectable()
 export class PmAgentPresenterService {
   constructor(
-    @InjectRepository(BuilderPullRequest)
-    private readonly pullRequests: Repository<BuilderPullRequest>,
-    @InjectRepository(BuilderSession)
-    private readonly sessions: Repository<BuilderSession>,
+    private readonly roadmap: PmAgentRoadmapPort,
     @Optional() private readonly impact?: PmAgentImpactService,
   ) {}
 
@@ -47,13 +42,10 @@ export class PmAgentPresenterService {
       this.impact ? this.impact.views(cards) : new Map(),
     ]);
     return cards.map((card) => {
-      const delivery = card.builderSessionId
-        ? deliveries.get(card.builderSessionId)
-        : undefined;
+      const delivery = deliveries.get(card.id);
       const impact = impacts.get(card.id);
       return PmAgentPresenterService.toResponse(
         card,
-        // `delivery.impact` rides on the delivery (a copy: deliveries are shared per session).
         delivery && impact ? { ...delivery, impact } : delivery,
       );
     });
@@ -93,47 +85,28 @@ export class PmAgentPresenterService {
     };
   }
 
+  /** Card id → delivery, for every card that has reached the roadmap. */
   private async deliveries(
     cards: PmAgentCard[],
   ): Promise<Map<string, PmDelivery>> {
-    const sessionIds = [
-      ...new Set(
-        cards
-          .map((card) => card.builderSessionId)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    ];
+    const filed = cards.filter((card) => card.roadmapOpportunityId);
     const out = new Map<string, PmDelivery>();
-    if (!sessionIds.length) return out;
-    const [sessions, prs] = await Promise.all([
-      this.sessions.find({
-        where: { id: In(sessionIds) },
-        select: { id: true, status: true, totalCostUsd: true },
-        withDeleted: true,
-      }),
-      this.pullRequests.find({
-        where: { sessionId: In(sessionIds) },
-        order: { createdAt: 'ASC' },
-      }),
-    ]);
-    for (const session of sessions) {
-      out.set(session.id, {
-        status: session.status ?? null,
+    if (!filed.length) return out;
+    const views = await this.roadmap
+      .getOpportunities(filed.map((card) => card.roadmapOpportunityId!))
+      .catch(() => new Map());
+    for (const card of filed) {
+      const view = views.get(card.roadmapOpportunityId!);
+      out.set(card.id, {
+        status: view?.stage ?? null,
         prs: [],
-        costUsd:
-          session.totalCostUsd != null ? Number(session.totalCostUsd) : null,
-      });
-    }
-    for (const pr of prs) {
-      const delivery = out.get(pr.sessionId);
-      if (!delivery) continue;
-      delivery.prs.push({
-        url: pr.prUrl,
-        state: pr.state ?? null,
-        ciStatus: pr.ciStatus ?? null,
-        merged: Boolean(pr.merged),
-        releaseState: pr.releaseState ?? null,
-        releaseTag: pr.releaseTag ?? null,
+        costUsd: null,
+        roadmap: {
+          opportunityId: card.roadmapOpportunityId!,
+          code: view?.code ?? null,
+          stage: view?.stage ?? null,
+          removed: view ? view.deleted : false,
+        },
       });
     }
     return out;
@@ -146,18 +119,22 @@ export class PmAgentPresenterService {
     ) {
       return undefined;
     }
-    const actions: PmNeedsYou['actions'] =
-      card.status === PmCardStatus.MERGED_NOT_RELEASED
-        ? ['open_pr', 'dismiss']
-        : card.builderSessionId
-          ? ['retry', 'open_pr', 'dismiss']
-          : ['retry', 'dismiss'];
+    const filing = (card.roadmapFiling ?? {}) as PmRoadmapFiling;
+    const duplicateStop =
+      card.status === PmCardStatus.NEEDS_ATTENTION &&
+      Boolean(filing.duplicates?.length) &&
+      !filing.fileAnyway;
     return {
       reason:
         card.needsYouReason ??
         DEFAULT_NEEDS_YOU_REASON[card.status] ??
         'Needs a person.',
-      actions,
+      actions: duplicateStop
+        ? ['file_anyway', 'dismiss']
+        : card.status === PmCardStatus.MERGED_NOT_RELEASED
+          ? ['dismiss']
+          : ['retry', 'dismiss'],
+      ...(duplicateStop ? { duplicates: filing.duplicates } : {}),
     };
   }
 

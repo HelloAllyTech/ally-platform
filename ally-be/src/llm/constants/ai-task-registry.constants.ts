@@ -1982,7 +1982,9 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       detail:
         `PM Agent ${lane} lane: a read-only tool loop over ${reads}, at most 6 passes of ` +
         '4,000 output tokens, ending in one submit_candidates call (one repair retry). ' +
-        'Mandate, strategy page and product map ride in a cached system block.',
+        'Mandate, strategy page, product map, the roadmap filing checklist and a digest of what ' +
+        'the roadmap already holds ride in a cached system block. It proposes; an accepted card ' +
+        'is filed to the roadmap, never built.',
       kind: AiTaskKind.COMPLETION,
       provider: 'openai',
       defaultModel: 'gpt-5-mini',
@@ -1998,8 +2000,10 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     trigger:
       'A PM Agent run has candidate cards that passed the deterministic and dedupe gates',
     detail:
-      'One call per run reviews up to 12 candidates against a written rubric (submit_verdicts, ' +
-      '3,000 output tokens). Fail-closed: if it cannot run, no card reaches the feed. Its ' +
+      'One call per run reviews up to 12 candidates against a written rubric and grades each ' +
+      "recommendation's roadmap entry against the roadmap's readiness checklist (submit_verdicts, " +
+      '3,000 output tokens). Fail-closed: if it cannot run, or any readiness item is not met, the ' +
+      'card does not reach the feed. Its ' +
       'share of the run budget is held back from the lanes. Pick a different model family ' +
       'from the lanes in Skills Store to reduce correlated blind spots.',
     kind: AiTaskKind.COMPLETION,
@@ -2189,9 +2193,11 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger:
-      'The roadmap board classifies, de-duplicates or assesses an opportunity',
+      'The roadmap board classifies, de-duplicates or assesses an opportunity (including one the PM Agent files)',
     detail:
       "Goal classification, the duplicate check's confirmation pass, goal-impact assessment, " +
+      '(the PM Agent runs the duplicate check once per accepted card before filing it, and its ' +
+      "filing is assessed like any other; that spend is the roadmap's, not the PM Agent budget), " +
       "interview-note summaries, Claude-prompt generation, and the Builder drawer's split/merge " +
       'guard. Filing itself moved to the opportunity copilot (its own row). The standalone ' +
       'readiness check, review and enhance calls were removed with the blank filing form.',

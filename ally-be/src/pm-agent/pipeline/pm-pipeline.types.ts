@@ -68,6 +68,30 @@ export interface PmCandidate {
   feedbackId?: string | null;
   /** Set on a question the critic spawned for a recommendation blocked on missing knowledge. */
   unblocks?: boolean;
+  /**
+   * Recommendations: the critic's grading of `payload.opportunity` against the roadmap's
+   * readiness checklist. Set by the pipeline (never by a lane) and stored on the card, so
+   * filing can mint the roadmap's readiness token for the verdict that was actually reached.
+   */
+  roadmapReadiness?: PmRoadmapReadiness | null;
+}
+
+/** The critic's readiness grading of one card's roadmap entry. */
+export interface PmRoadmapReadiness {
+  /** The ROADMAP_READINESS_CRITERIA ids in force when graded; filing refuses a stale set. */
+  criteria: string[];
+  /** Ids the critic did not pass. A persisted card always has none. */
+  failed: string[];
+  gradedAt: string;
+}
+
+/** `pm_agent_cards.roadmapFiling` (migration 1982100000100). */
+export interface PmRoadmapFiling {
+  readiness?: PmRoadmapReadiness;
+  /** The roadmap's duplicate check found these at filing; the card stopped for a person. */
+  duplicates?: { id: string; code: string | null; reason: string }[];
+  /** An admin chose File anyway over `duplicates`. */
+  fileAnyway?: { by: number; at: string };
 }
 
 export interface PmRankedCandidate extends PmCandidate {
@@ -86,6 +110,8 @@ export interface PmDedupeItem {
   questionKey?: string | null;
   /** Rejected cards: `source|label` of the evidence they cited, for the new-evidence rule. */
   evidenceKeys?: string[];
+  /** Roadmap opportunities: their stage, so an archived idea is named as such. */
+  stage?: string;
 }
 
 /** A decided card with an outcome, for exemplars and lane stats. */
@@ -100,6 +126,8 @@ export interface PmOutcomeRow {
   released: boolean;
   buildFailed: boolean;
   reverted: boolean;
+  /** Filed to the roadmap, then archived or removed there: a soft negative. */
+  roadmapArchived?: boolean;
   /** The measured +14 d impact verdict, when the card has one (impact checks). */
   impactVerdict?: 'improved' | 'flat' | 'worse' | null;
   title: string;
@@ -192,6 +220,8 @@ export interface PmPipelineStore {
   ): Promise<void>;
   bumpShown(category: string, lane: string): Promise<void>;
   tenantNames(): Promise<string[]>;
+  /** The roadmap's product goal names (gate layer 1 checks `opportunity.productGoal`). */
+  productGoalNames(): Promise<string[]>;
   hasUxSignals(): Promise<boolean>;
   persistCard(input: PmPersistInput): Promise<PmPersistResult>;
   /** One `gate` trace row per layer (cost 0): what passed, what failed and why. */
@@ -207,6 +237,13 @@ export interface PmSharedContext {
   mandate: string;
   strategy: string;
   productMap: string;
+  /**
+   * What the roadmap already holds, one line per opportunity (newest first), so lanes learn
+   * what is planned and never re-propose it. Empty when the roadmap could not be read.
+   */
+  roadmap: string;
+  /** The roadmap's product goal names, in order — the only values `opportunity.productGoal` may take. */
+  productGoals: string[];
 }
 
 export interface PmContextSource {

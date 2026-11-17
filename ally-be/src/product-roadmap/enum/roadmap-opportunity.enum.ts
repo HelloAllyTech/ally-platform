@@ -69,15 +69,24 @@ export enum RoadmapEmbeddingStatus {
 }
 
 /**
- * Who filed the opportunity, for admin-side filtering only — this has no bearing on
- * permissions or on the create pipeline (both paths run through
+ * Who filed the opportunity, for admin-side filtering and the author shown on the board —
+ * this has no bearing on permissions or on the create pipeline (every path runs through
  * RoadmapOpportunityService.create). Default is STAFF so every pre-existing row and the
  * staff-facing `/opportunities` endpoint need no change.
  */
 export enum RoadmapOpportunitySource {
   STAFF = 'staff',
   CONSUMER = 'consumer',
+  /**
+   * Filed by the PM Agent when an admin accepted one of its cards (src/pm-agent). The board
+   * shows "Product Manager Agent" as the author; `createdBy` is still the accepting admin, for
+   * audit. Same create pipeline and the same readiness gate as a person's filing.
+   */
+  PM_AGENT = 'pm_agent',
 }
+
+/** The author name the board shows for a `pm_agent` opportunity. */
+export const PM_AGENT_AUTHOR_NAME = 'Product Manager Agent';
 
 /**
  * How the board groups its lanes.

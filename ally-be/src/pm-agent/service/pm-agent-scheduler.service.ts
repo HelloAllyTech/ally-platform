@@ -13,23 +13,23 @@ import {
   PM_OUTBOX_LOCK_KEY,
   PM_OUTBOX_LOCK_NAMESPACE,
 } from '../constants/pm-agent.constants';
-import { PmAgentBuildService } from './pm-agent-build.service';
+import { PmAgentFilingService } from './pm-agent-filing.service';
 
 /**
  * Wires the PM Agent's background work.
  *
  *  - **Outbox drain, every 30 s.** An accepted card's row is due ten seconds after Accept
  *    (the undo window); the shared scheduler's shortest tick is five minutes, which would
- *    make "Accept & build" feel broken. Same multi-replica guard as
+ *    leave an accepted card off the roadmap for minutes. Same multi-replica guard as
  *    ScheduledTaskRunnerService: a Postgres session advisory lock on a dedicated
  *    connection, so one replica drains per tick and a dead connection frees the lock.
  *    The rows' own leases (PmAgentOutboxRepository.claim) are the second line.
- *  - **Status reconcile, on the shared 5-minute tick** — Builder's own PR and release
- *    reconciles run on that tick too, so a faster one would only re-read the same rows.
- *  - **Builder requester `pm_agent`.** Builder tells a session's requester when an
- *    interview turn ends. PM Agent sessions do not interview (their PRD is compiled), so
- *    the handler deliberately does nothing: it never answers Builder's questions on a
- *    person's behalf. A question Builder asks shows up as needs_attention via reconcile.
+ *  - **Roadmap reconcile, on the shared 5-minute tick** — a filed card follows its
+ *    opportunity's stage (released / archived). Stage changes are human-paced.
+ *  - **Builder requester `pm_agent`, legacy.** The PM Agent no longer creates Builder
+ *    sessions, but sessions it created before 2026-11-17 still name it as their requester,
+ *    and Builder calls the requester when an interview turn ends. The handler stays, doing
+ *    nothing, so those sessions keep running as they were.
  */
 @Injectable()
 export class PmAgentSchedulerService implements OnModuleInit {
@@ -40,14 +40,14 @@ export class PmAgentSchedulerService implements OnModuleInit {
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly buildService: PmAgentBuildService,
+    private readonly filingService: PmAgentFilingService,
   ) {}
 
   onModuleInit(): void {
     scheduledTaskRegistry.register(
       PM_AGENT_RECONCILE_INTERVAL,
       PM_AGENT_RECONCILE_TASK,
-      () => this.buildService.reconcile().then(() => undefined),
+      () => this.filingService.reconcile().then(() => undefined),
     );
     builderRequesters.register(PM_AGENT_REQUESTER, {
       turnEnded: async () => undefined,
@@ -67,7 +67,7 @@ export class PmAgentSchedulerService implements OnModuleInit {
       );
       if (!rows?.[0]?.locked) return;
       try {
-        await this.buildService.drain();
+        await this.filingService.drain();
       } finally {
         await runner.query('SELECT pg_advisory_unlock($1, $2)', [
           PM_OUTBOX_LOCK_NAMESPACE,

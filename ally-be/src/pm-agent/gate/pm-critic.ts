@@ -10,6 +10,7 @@ import {
   PM_PROMPT_CODES,
   PM_TASK_IDS,
 } from '../constants/pm-agent-pipeline.constants';
+import { ROADMAP_READINESS_CRITERIA } from 'src/product-roadmap/constants/product-roadmap.constants';
 import { PmLlmPort, PmLlmTarget } from '../pipeline/pm-agent-llm.service';
 import { PmCandidate, PmEvidenceRef } from '../pipeline/pm-pipeline.types';
 import { checkCandidate } from '../lane/pm-candidate';
@@ -27,10 +28,19 @@ export const PM_CRITIC_RUBRIC = [
   'honest_risk',
 ] as const;
 
+/** The roadmap's readiness checklist ids, graded per recommendation (fail-closed). */
+export const PM_ROADMAP_READINESS_IDS: string[] =
+  ROADMAP_READINESS_CRITERIA.map((criterion) => criterion.id);
+
 export interface PmCriticVerdict {
   index: number;
   pass: boolean;
   reasons: string[];
+  /**
+   * Recommendations, when readiness is graded: the checklist ids the critic did not mark met
+   * (a missing answer counts as not met). Any entry fails the verdict.
+   */
+  readinessFailed?: string[];
 }
 
 export interface PmCriticResult {
@@ -60,6 +70,15 @@ const verdictTool: AgentToolDefinition = {
               items: { type: 'string', enum: [...PM_CRITIC_RUBRIC] },
             },
             reasons: { type: 'array', items: { type: 'string' } },
+            roadmapReadiness: {
+              type: 'object',
+              description:
+                'Recommendations only: for each id of the roadmap filing checklist, true when the ' +
+                "candidate's opportunity.description meets it. Anything not true fails the candidate.",
+              properties: Object.fromEntries(
+                PM_ROADMAP_READINESS_IDS.map((id) => [id, { type: 'boolean' }]),
+              ),
+            },
             missingKnowledge: {
               type: 'object',
               description:
@@ -115,7 +134,14 @@ export class PmCritic {
     candidates: PmCandidate[];
     runEvidence: ReadonlyMap<string, PmEvidenceRef>;
     ledger: PmRunLedger;
+    /**
+     * Grade recommendations against the roadmap's filing checklist (default true). The lessons
+     * eval replays the critic over cards decided before roadmap filing existed, which have no
+     * `opportunity` to grade, so it turns this off to keep comparing like with like.
+     */
+    gradeReadiness?: boolean;
   }): Promise<PmCriticResult> {
+    const gradeReadiness = input.gradeReadiness !== false;
     if (!input.candidates.length) {
       return { outcome: 'ok', verdicts: [], questions: [] };
     }
@@ -162,7 +188,15 @@ export class PmCritic {
       messages: [
         {
           role: 'user',
-          content: `Review these ${input.candidates.length} candidates and call ${PM_CRITIC_SUBMIT_TOOL}.\n\n${body}`,
+          content:
+            `Review these ${input.candidates.length} candidates and call ${PM_CRITIC_SUBMIT_TOOL}.` +
+            (gradeReadiness
+              ? ` For every recommendation, also grade opportunity.description against the roadmap ` +
+                `filing checklist (${PM_ROADMAP_READINESS_IDS.join(', ')}) in roadmapReadiness: an ` +
+                `accepted card is filed to the roadmap exactly as written, so be as strict as the ` +
+                `roadmap's own gate.`
+              : '') +
+            `\n\n${body}`,
         },
       ],
       tools: [verdictTool],
@@ -197,14 +231,28 @@ export class PmCritic {
         continue;
       }
       seen.add(index);
+      const source = input.candidates[index];
+      const readinessFailed =
+        gradeReadiness && source.kind === PmCardKind.RECOMMENDATION
+          ? PM_ROADMAP_READINESS_IDS.filter(
+              (id) => item?.roadmapReadiness?.[id] !== true,
+            )
+          : undefined;
       const reasons = [
         ...(Array.isArray(item?.failed) ? item.failed.map(String) : []),
+        ...(readinessFailed?.length
+          ? [`roadmap_not_ready: ${readinessFailed.join(', ')}`]
+          : []),
         ...(Array.isArray(item?.reasons) ? item.reasons.map(String) : []),
       ].map((reason) => reason.slice(0, 300));
-      verdicts.push({ index, pass: item?.pass === true, reasons });
-      const source = input.candidates[index];
+      verdicts.push({
+        index,
+        pass: item?.pass === true && !readinessFailed?.length,
+        reasons,
+        ...(readinessFailed ? { readinessFailed } : {}),
+      });
       if (
-        item?.pass !== true &&
+        !verdicts[verdicts.length - 1].pass &&
         item?.missingKnowledge &&
         source.kind === PmCardKind.RECOMMENDATION
       ) {

@@ -93,24 +93,21 @@ export const nextRunLabel = (iso: string | null | undefined, now = Date.now()): 
 };
 
 /** Index (0-5) into the six-step stepper for a status, or -1 when it is not on the path. */
-export const stepIndex = (status: PmCardStatus): number => {
+/**
+ * Where an accepted card is on its way through the roadmap (copy.tracking.steps: Accepted,
+ * On the roadmap, Prioritised, Released). -1 = no stepper: archived on the roadmap, handed off,
+ * or a legacy Builder status.
+ */
+export const stepIndex = (status: PmCardStatus, roadmapStage?: string | null): number => {
   switch (status) {
     case "accepted_pending":
     case "queued":
-      return 0;
-    case "designing":
-      return 1;
-    case "building":
-    case "failed":
     case "needs_attention":
-      return 2;
-    case "pr_open":
-      return 3;
-    case "merged":
-    case "merged_not_released":
-      return 4;
+      return 0;
+    case "filed":
+      return roadmapStage === "prioritised" ? 2 : 1;
     case "released":
-      return 5;
+      return 3;
     default:
       return -1;
   }

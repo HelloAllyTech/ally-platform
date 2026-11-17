@@ -6,7 +6,8 @@ import type { PmCardCategory, PmReasonChip, PmRiskLevel } from "@types";
  */
 export const copy = {
   title: "PM Agent",
-  subtitle: "An AI product manager that proposes a few changes a day for you to decide on.",
+  subtitle:
+    "An AI product manager that proposes a few ideas a day. The ones you accept go on the roadmap.",
   views: { review: "Review", tracking: "Tracking", agent: "Agent" },
   agentBadge: (n: number) => `Agent (${n})`,
   agentBadgeLabel: (n: number) =>
@@ -71,24 +72,23 @@ export const copy = {
   evidenceStale: (when: string) => `Data from ${when}. It may be out of date.`,
   reviewedByCritic: "Plan checked by the quality gate",
 
-  accept: "Accept and build",
-  shipsAuto: "Ships to production automatically",
-  acceptMenu: "More ways to accept",
-  downloadPlan: "Download plan.md",
+  accept: "Accept and add to roadmap",
+  filesToRoadmap: "Goes on the roadmap as posted by Product Manager Agent",
+  notFileable: "Written before roadmap filing, so it can't be added. Reject it or give feedback.",
   reject: "Reject",
   feedback: "Give feedback",
-  confirmTitle: (risk: string) => `This card is ${risk.toLowerCase()}.`,
-  confirmBody: (why: string) =>
-    `${why ? `${why} ` : ""}Build and release it to production automatically?`,
-  confirmYes: "Build and release",
-  confirmNo: "Cancel",
 
-  acceptedToast: (title: string) => `Accepted: ${title}`,
+  roadmapEntry: "Roadmap entry",
+  roadmapEntryTip:
+    "Accepting adds exactly this text to the roadmap. The agent checked it against the roadmap's filing checklist.",
+  roadmapGoal: (goal: string) => `Goal: ${goal}`,
+  roadmapEffort: (effort: string) => `Size: ${effort.toUpperCase()}`,
+  readinessMet: "Meets the roadmap's filing checklist",
+
+  acceptedToast: (title: string) => `Accepted: ${title}. Adding it to the roadmap.`,
   undo: "Undo",
   undone: "Accept undone. The card is back in your queue.",
-  undoTooLate: "Too late to undo. The build has started.",
-  downloadedToast: "Plan downloaded. The card is now handed off.",
-  downloadFailed: "Couldn't download the plan. The card is handed off; try again from Tracking.",
+  undoTooLate: "Too late to undo. It's being added to the roadmap.",
   rejectedToast: (title: string) => `Rejected: ${title}`,
   reasonPrompt: "Tell the agent why (optional)",
   reasonSaved: "Reason saved.",
@@ -134,18 +134,13 @@ export const copy = {
 
   needsYouTitle: "Needs you",
   retry: "Retry",
-  openPr: "Open PR",
+  fileAnyway: "Add to roadmap anyway",
+  filedAnyway: "Adding it to the roadmap anyway.",
+  duplicatesLabel: "Possible duplicates already on the roadmap",
   dismiss: "Dismiss",
-  retried: "Retrying. The card is queued again.",
+  retried: "Trying again to add it to the roadmap.",
   dismissed: "Dismissed.",
   actionFailed: "Couldn't do that. Try again.",
-
-  breakerTitle: "Builds are paused",
-  breakerBody:
-    "Several builds in a row failed, or a release failed its health check. The agent will not start new builds until you resume.",
-  breakerResume: "Resume builds",
-  pausedAutoBuild: "Auto-build is paused. Accepted cards wait in Tracking until you resume.",
-  resumed: "Builds resumed.",
 
   setupTitle: "Set up the PM Agent",
   setupBody:
@@ -167,11 +162,8 @@ export const copy = {
   stateDisabled: "The agent is off.",
   stateDisabledBody: "Nothing runs and nothing is spent while it is off.",
   turnOn: "Turn on",
-  statePaused: "The agent is paused.",
   stateBudget: "The monthly budget is used up.",
   stateBudgetBody: "Raise the budget under Agent to let it run again. It resets next month.",
-  statePausedBody: "Resume it to let the next run go ahead.",
-  resume: "Resume",
   openSettings: "Open settings",
   runFailedTitle: "The last run failed",
   runFailedBody: "No cards were lost. You can try again.",
@@ -190,7 +182,7 @@ export const copy = {
   keys: [
     { keys: ["J", "↓"], label: "Next card" },
     { keys: ["K", "↑"], label: "Previous card" },
-    { keys: ["A"], label: "Accept and build" },
+    { keys: ["A"], label: "Accept and add to roadmap" },
     { keys: ["R"], label: "Reject" },
     { keys: ["F"], label: "Give feedback" },
     { keys: ["1", "–", "4"], label: "Pick a question option" },
@@ -213,16 +205,25 @@ export const copy = {
   },
 
   tracking: {
-    empty: "Nothing accepted yet. Cards you accept show up here with their progress.",
+    empty: "Nothing accepted yet. Cards you accept show up here as they move through the roadmap.",
     groups: {
       needsYou: "Needs you",
-      inProgress: "In progress",
-      shipped: "Shipped",
-      other: "Handed off and other",
+      inProgress: "On the roadmap",
+      shipped: "Released",
+      other: "Archived and other",
     },
     emptyGroup: "Nothing here.",
-    steps: ["Queued", "Designing", "Building", "PR open", "Merged", "Released"],
-    stepsLabel: "Build progress",
+    steps: ["Accepted", "On the roadmap", "Prioritised", "Released"],
+    stepsLabel: "Roadmap progress",
+    stage: {
+      new: "New",
+      prioritised: "Prioritised",
+      released: "Released",
+      archived: "Archived",
+    } as Record<string, string>,
+    opportunityFallback: "Roadmap opportunity",
+    removedFromRoadmap: (code: string | null) =>
+      `${code ?? "The opportunity"} was removed from the roadmap.`,
     stepDone: "done",
     stepCurrent: "current step",
     stepNext: "not reached",
@@ -263,14 +264,11 @@ export const copy = {
     switcher: "Agent sections",
     enabled: "Agent on",
     enabledTip: "The kill switch. Off means no runs and no spend.",
-    pauseAutoBuild: "Pause auto-build",
-    pauseAutoBuildTip:
-      "Stops the agent from starting new builds from accepted cards. Cards you accept wait until you resume. Builds already running finish.",
     slackNotify: "Notify in Slack",
     slackNotifyTip: "Posts a short note to Slack when cards need a decision.",
     budget: "Monthly budget (USD)",
     budgetTip:
-      "Covers the agent's own analysis. Builds are counted separately. When it is used up the agent stops until next month.",
+      "Covers the agent's own analysis. When it is used up the agent stops until next month.",
     budgetMeter: (spent: string, total: string) => `${spent} of ${total} used this month`,
     budgetReserved: (r: string) => `${r} reserved for runs in progress`,
     queueCap: "Queue cap",
