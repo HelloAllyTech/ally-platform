@@ -332,6 +332,59 @@ export class RoadmapReviewService {
     return this.reader.detail(userId, code);
   }
 
+  /**
+   * Start planning (§2.1a, P3b): the plan interview begins in the idea's one
+   * session. The lead on their own idea, or any Owner on any idea; an Owner
+   * starting an idea nobody leads takes the lead, because the plan
+   * interview is the lead's conversation. Idempotent.
+   */
+  async startPlanning(userId: number, code: string): Promise<ItemDetail> {
+    const item = await this.reader.detail(userId, code);
+    const ref = await this.lookup.get(code);
+    const session = await this.planSession(ref.builderSessionId);
+    if (session.plan?.planningStarted === true) return item;
+    if (!item.can.startPlanning) {
+      throw new ForbiddenException(
+        item.shownStage === 'accepted'
+          ? 'Only the lead or an Owner can start planning.'
+          : 'Planning starts once an idea is accepted.',
+      );
+    }
+    const lead = session.leadUserId == null ? null : Number(session.leadUserId);
+    if (lead === null) {
+      await this.store.update(session.id, {
+        leadUserId: userId,
+        updatedBy: userId,
+      });
+      await this.afterLeadAssigned(
+        userId,
+        ref.id,
+        ref.code,
+        session.id,
+        null,
+        userId,
+      );
+    }
+    await this.store.patchPlan(session.id, {
+      planningStarted: true,
+      planningStartedAt: new Date().toISOString(),
+      planningStartedBy: userId,
+    });
+    await this.events.record({
+      sessionId: session.id,
+      kind: PlanEventKind.PLANNING_STARTED,
+      actorUserId: userId,
+    });
+    await this.stage.sync(session.id, userId);
+    this.broadcast.emit({
+      kind: 'ITEM_CHANGED',
+      actorId: userId,
+      code: ref.code,
+      fields: ['stage'],
+    });
+    return this.reader.detail(userId, code);
+  }
+
   /** The lead picker, best first, with why (§4.11). Owner only. */
   async leadSuggestions(
     userId: number,

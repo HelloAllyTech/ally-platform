@@ -108,6 +108,8 @@ import {
   BuilderPullRequestRepository,
   BuilderPrFeedbackRepository,
 } from './repository/builder-build.repository';
+import { BuilderPlanConversationController } from './controller/builder-plan-conversation.controller';
+import { BuilderPlanConversationService } from './service/builder-plan-conversation.service';
 
 /**
  * Builder: the admin agent that interviews an admin into a PRD and then
@@ -192,9 +194,12 @@ import {
     BuilderCorrectionsController,
     BuilderRoomController,
     BuilderPrinciplesController,
+    // Roadmap v2 P3b: answers, comments and Use this answer on a shared plan.
+    BuilderPlanConversationController,
   ],
   providers: [
     BuilderPrinciplesService,
+    BuilderPlanConversationService,
     BuilderSlackService,
     BuilderGateway,
     BuilderSessionService,

@@ -2437,7 +2437,11 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'the prior streamed loop runs. A session opened from a roadmap opportunity also carries ' +
       "the opportunity's hand-off (description, copilot brief, filing interview) as a third " +
       'cached system block on every turn. With roadmap_v2 on, a plan session past its one idea ' +
-      'ceiling (ledger + runner spend) does not start a turn at all (PlanCeilingService).',
+      'ceiling (ledger + runner spend) does not start a turn at all (PlanCeilingService). ' +
+      "Roadmap v2 (P3b): after Start planning the plan interview runs in the idea's one session, and " +
+      'each turn also reads every answer, comment and settled choice posted since the last turn by anyone ' +
+      'with Roadmap access, attributed as [Name · role] (no extra call; a longer user message). ' +
+      'Conflicting answers are withheld until the settler chooses.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',

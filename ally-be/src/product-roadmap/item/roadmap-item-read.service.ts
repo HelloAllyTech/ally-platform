@@ -370,7 +370,7 @@ export class RoadmapItemReadService {
             core.stage.statusParts.step === 'ready',
           awaitingMerge: core.decisions.some((d) => d.kind === 'pr_merge'),
           releaseHeld: false,
-          answersConflict: false,
+          answersConflict: (session?.openConflicts ?? 0) > 0,
         },
       ),
       ...editCapabilitiesFor(role, { isAuthor, isLead }, core.shownStage),
@@ -690,6 +690,7 @@ export class RoadmapItemReadService {
               s.plan->'reviews' AS "planReviews",
               s.plan->'externalBuild' AS "externalBuild",
               s.plan->'planningStarted' AS "planningStarted",
+              s.plan->>'openConflicts' AS "openConflicts",
               w.level AS "watchLevel",
               r."lastSeenAt",
               EXISTS (SELECT 1 FROM "roadmap_allocations" a
@@ -815,6 +816,7 @@ export class RoadmapItemReadService {
               typeof asJson(f.planningStarted) === 'boolean'
                 ? (asJson(f.planningStarted) as boolean)
                 : null,
+            openConflicts: num(f.openConflicts),
             totalCostUsd: num(f.totalCostUsd),
             budgetUsd: f.budgetUsd == null ? null : num(f.budgetUsd),
           }

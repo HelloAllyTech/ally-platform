@@ -103,6 +103,21 @@ export class RoadmapReviewController {
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/start-planning')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Start planning: the plan interview in the same session (the lead, or any Owner)',
+  })
+  async startPlanning(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.settings.assertRoadmapV2();
+    return this.reviews.startPlanning(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
   @Get('items/:code/lead-suggestions')
   @ApiOperation({ summary: 'Owner: the lead picker, best first, with why' })
   async leadSuggestions(

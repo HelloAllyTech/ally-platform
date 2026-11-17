@@ -283,4 +283,31 @@ describe('RoadmapReviewService', () => {
       appsTouched: ['admin'],
     });
   });
+
+  it('Start planning: the lead or an Owner; an Owner with no lead takes it', async () => {
+    const { service, deps } = build({
+      stage: 'accepted',
+      can: { startPlanning: true },
+    });
+    await service.startPlanning(OWNER, 'OPP-0001');
+    expect(deps.store.update).toHaveBeenCalledWith('s-OPP-0001', {
+      leadUserId: OWNER,
+      updatedBy: OWNER,
+    });
+    expect(deps.store.patchPlan).toHaveBeenCalledWith(
+      's-OPP-0001',
+      expect.objectContaining({
+        planningStarted: true,
+        planningStartedBy: OWNER,
+      }),
+    );
+    expect(deps.events.record).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: PlanEventKind.PLANNING_STARTED }),
+    );
+
+    const refused = build({ stage: 'accepted', can: { startPlanning: false } });
+    await expect(
+      refused.service.startPlanning(AUTHOR, 'OPP-0001'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
 });
