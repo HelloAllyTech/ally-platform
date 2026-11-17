@@ -263,7 +263,8 @@ describe("ConversationsTab", () => {
         target: { value: "course 2" },
       });
 
-      expect(screen.getAllByTestId("thread-row")).toHaveLength(1);
+      // waitFor: the toolbar debounces typing, so the filter lands a beat later.
+      await waitFor(() => expect(screen.getAllByTestId("thread-row")).toHaveLength(1));
       expect(screen.getByText("Course 2")).toBeInTheDocument();
       expect(h.fetchPage.mock.calls.length).toBe(calls);
     });
@@ -276,7 +277,7 @@ describe("ConversationsTab", () => {
         target: { value: "no such course" },
       });
 
-      expect(screen.getByText("No conversations match")).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText("No conversations match")).toBeInTheDocument());
       expect(screen.queryByText("No conversations yet")).not.toBeInTheDocument();
     });
 

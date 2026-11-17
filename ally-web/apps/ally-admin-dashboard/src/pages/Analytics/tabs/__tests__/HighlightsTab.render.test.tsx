@@ -163,7 +163,11 @@ describe("HighlightsTab", () => {
       // findAll, not find: a marker phrase may legitimately appear in both a
       // heading and a caption on the same panel, and this asserts the panel
       // rendered — not how many times it said its own name.
-      expect((await screen.findAllByText(marker)).length).toBeGreaterThan(0);
+      // 10s per marker: the heaviest panels take over a second to mount on a busy
+      // machine, longer than findBy's 1s default.
+      expect(
+        (await screen.findAllByText(marker, undefined, { timeout: 10000 })).length,
+      ).toBeGreaterThan(0);
     }
   }, 60000);
 

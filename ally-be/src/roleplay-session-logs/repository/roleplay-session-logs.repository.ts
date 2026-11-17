@@ -174,6 +174,12 @@ export class RoleplaySessionLogsRepository {
       qb.andWhere('lang."value" = :language', { language: filters.language });
     }
 
+    if (filters.scenarioId) {
+      qb.andWhere('ss."scenarioId" = :scenarioId', {
+        scenarioId: filters.scenarioId,
+      });
+    }
+
     if (filters.search) {
       qb.andWhere(
         '(u."name" ILIKE :search OR u."email" ILIKE :search OR scn."title" ILIKE :search)',

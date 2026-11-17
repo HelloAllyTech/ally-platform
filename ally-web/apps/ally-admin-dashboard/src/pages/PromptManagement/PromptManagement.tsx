@@ -12,6 +12,8 @@ import { FilterDropdown, NotionTable, ListToolbar, PromptSidePanel } from "@comp
 import { en, PROMPT_COLUMNS, SORT_BY, SORT_ORDER } from "@constants";
 import { Prompt } from "@types";
 
+import { PrecedenceExplainer } from "../Providers/PrecedenceExplainer";
+
 type PromptManagementFilters = {
   categories: string[];
 };
@@ -323,6 +325,7 @@ export const PromptManagement: React.FC<PromptManagementProps> = ({ header }) =>
             {en.simulation.scenarioPrompts}
           </h1>
         )}
+        <PrecedenceExplainer className="mb-4" />
         <ListToolbar
           searchValue={searchQuery}
           onSearchChange={handleSearchChange}

@@ -1,4 +1,6 @@
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useMemo } from "react";
+
+import { useSearchParams } from "react-router-dom";
 
 import { Tab, TabList, TabPanel, TabPanels, CarbonTabs as Tabs } from "@ally-ui-mono/ui-shared";
 
@@ -211,7 +213,25 @@ export const HighlightsTab = (filters: AnalyticsTabFilters) => {
     () => (restricted ? SUB_TABS.filter(t => t.orgScoped) : SUB_TABS),
     [restricted],
   );
-  const [selected, setSelected] = useState(0);
+  // The open sub-tab lives in `?sub=<id>` so a link opens it; the first is the
+  // default and so the absent value. Unknown ids fall back to the first.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSub = searchParams.get("sub");
+  const selected = Math.max(
+    0,
+    subTabs.findIndex(t => t.id === requestedSub),
+  );
+  const setSelected = (index: number) =>
+    setSearchParams(
+      current => {
+        const next = new URLSearchParams(current);
+        const id = subTabs[index]?.id;
+        if (!id || index === 0) next.delete("sub");
+        else next.set("sub", id);
+        return next;
+      },
+      { replace: true },
+    );
   const active = subTabs[selected] ?? subTabs[0];
 
   return (
