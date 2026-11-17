@@ -45,7 +45,7 @@ export interface BugCaseFile {
   };
   /** Who filed it and what their client captured — human-reported bugs only. */
   reporter: {
-    source: 'staff' | 'consumer';
+    source: 'staff' | 'consumer' | 'pm_agent';
     name: string | null;
     reportedAt: Date;
     context: Record<string, unknown> | null;

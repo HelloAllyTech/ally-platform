@@ -2,8 +2,14 @@
 
 An admin feature: an AI product manager that studies Ally's analytics, code, roadmap and strategy and
 outputs a feed of at most N (default 5) **cards** — each either one _recommendation_ or one _question_ — for an
-admin to accept, reject or redirect. Accepted recommendations are compiled into a Builder session and built,
-merged and released. It replaces Analytics → Suggestions.
+admin to accept, reject or redirect. **It proposes; it never builds.** An accepted recommendation is filed to the
+product roadmap as an opportunity authored by "Product Manager Agent", through the roadmap's own create path and
+readiness gate, and the team prioritises and builds it from there (see "Filing to the roadmap"). It learns from
+the roadmap and never re-proposes what is on it. It replaces Analytics → Suggestions.
+
+(Until 2026-11-17 an accepted card was compiled into a Builder session and built, merged and released
+automatically. That chain was removed by migration `1982100000100`; the sections below that describe it are
+marked legacy.)
 
 Design record: plans/ai-product-manager.md (v3) in the parent ally-code workspace, outside this repo. This file is the **contract** between backend and
 admin UI plus the operating notes. Ships **off** (`pm_agent_settings.enabled = false`); nothing is spent until an
@@ -16,7 +22,7 @@ admin turns it on.
   and have **no write tools**. Unparseable output is discarded, never persisted.
 - Every claim on a recommendation cites evidence items created **in the same run** (`pm_agent_evidence`).
 - Content from learners, tenants, code comments or the web is untrusted data (fenced, never instructions).
-  Compiled PRDs/issues/PRs are for a **public repo**: aggregate and anonymised only (no tenant names, user
+  A card is filed to the roadmap, which is **published**: aggregate and anonymised only (no tenant names, user
   content, raw metrics with small groups, secrets).
 - Budget is **reserve-before-spend**; cap-full runs exit before any paid call and cost nothing.
 - Card state transitions are conditional updates (`UPDATE … WHERE status = :from`); 409 on a lost race.
@@ -25,9 +31,12 @@ admin turns it on.
 
 `PmCardKind`: `recommendation | question`
 `PmCardCategory`: `ui_ux | product | architecture | code_health | infra | cost | strategy_content`
-`PmCardStatus`: `draft | open | accepted_pending | queued | designing | building | pr_open | merged | released |
-failed | needs_attention | merged_not_released | handed_off | rejected | feedback_closed | answered | skipped |
-expired | superseded`
+`PmCardStatus`: `draft | open | accepted_pending | queued | filed | roadmap_archived | released | needs_attention |
+handed_off | rejected | feedback_closed | answered | skipped | expired | superseded`, plus the legacy Builder
+statuses `designing | building | pr_open | merged | merged_not_released | failed` (never written since
+`1982100000100`). After Accept: `accepted_pending` (10 s undo) → `queued` (being filed) → `filed` (on the
+roadmap) → `released` (its opportunity was released) or `roadmap_archived` (archived or removed there);
+`needs_attention` when filing stopped for a person.
 `PmAgentState` (derived, for the UI): `disabled | idle | running | queue_full | budget_exhausted | paused`
 `PmRiskLevel`: `low | medium | high`; `PmCardSize`: `S | M`
 
@@ -36,7 +45,9 @@ expired | superseded`
 Recommendation: `title` (≤12 words, imperative), `whyHeadline` (≤25 words, one cited number), `change[]` (≤3 bullets
 ≤15 words), `problem`, `plan` { `steps[]`, `files[]`, `acceptanceCriteria[]`, `testPlan[]`, `defaultsChosen[]` },
 `size`, `risk`, `riskWhy`, `rollbackNote`, `impactMetric` { `name`, `direction` }, `alternativesDropped[]`,
-`repos[]` (each one of `ally-be | ally-web | ally-ai | ally-ai-learn`), `evidenceIds[]`.
+`repos[]` (each one of `ally-be | ally-web | ally-ai | ally-ai-learn | ally-mobile`), `evidenceIds[]`, and
+(required since 2026-11-17) **`opportunity`** { `description` (80–1000 chars, the roadmap entry itself, goal
+first), `productGoal` (a roadmap product goal name), `effort` (`s | m | l | xl | xxl`) }.
 Question: `title`, `askedBecause`, `usedFor`, `options[2..4]` { `label` ≤8 words, `consequence`, `suggested?` },
 `scope` (`global|feature|tenant`).
 
@@ -47,20 +58,21 @@ Question: `title`, `askedBecause`, `usedFor`, `options[2..4]` { `label` ≤8 wor
 | `GET /state`                               | –                                                                                                                       | `{ agentState, stopReason?, settings, budget:{monthlyBudgetUsd,spentUsd,reservedUsd}, queue:{open,cap,needsYou}, lastRun?, nextRunAt?, autoBuildPaused:boolean }`     |
 | `GET /cards`                               | `status?` (csv), `kind?`, `limit?`                                                                                      | `{ cards: Card[] }` ordered for review (needs-you, questions that unblock, then rank)                                                                                 |
 | `GET /cards/:id`                           | –                                                                                                                       | `Card` incl. `evidence: Evidence[]`, `events: CardEvent[]`                                                                                                            |
-| `POST /cards/:id/accept`                   | `{ path:'builder'\|'download' }`                                                                                        | `Card` (builder: status `accepted_pending`, `undoUntil` = now+10s; download: `handed_off`)                                                                            |
+| `POST /cards/:id/accept`                   | `{ versionHash? }` (`path` is ignored; legacy)                                                                          | `Card` (status `accepted_pending`, `undoUntil` = now+10s; filed to the roadmap when the window closes). 422 for a card with no `opportunity`                          |
 | `POST /cards/:id/undo`                     | –                                                                                                                       | `Card` back to `open` (only while `accepted_pending` and before `undoUntil`; 409 otherwise)                                                                           |
 | `POST /cards/:id/reject`                   | `{ reason?: string, reasonChip?: 'not_priority'\|'already_planned'\|'wrong_idea'\|'too_risky'\|'other' }`               | `Card` (`rejected`)                                                                                                                                                   |
 | `POST /cards/:id/reason`                   | `{ reasonChip?, reason? }`                                                                                              | `Card` (add/replace reason after a reject within 30 s)                                                                                                                |
 | `POST /cards/:id/feedback`                 | `{ text: string, chips?: string[], reviseNow?: boolean }`                                                               | `Card` (`feedback_closed`; creates revision task)                                                                                                                     |
 | `POST /cards/:id/answer`                   | `{ optionIndex?: number, customText?: string }`                                                                         | `Card` (`answered`; writes a memory fact)                                                                                                                             |
 | `POST /cards/:id/skip`                     | –                                                                                                                       | `Card` (`skipped`; same question not re-asked for 14 days)                                                                                                            |
-| `GET /cards/:id/plan.md`                   | –                                                                                                                       | `text/markdown` compiled plan (same text Builder gets)                                                                                                                |
 | `GET /tracking`                            | –                                                                                                                       | `{ needsYou: Card[], inProgress: Card[], shipped: Card[], other: Card[] }` with `delivery:{status,prs:[{url,state,ciStatus,merged,releaseState,releaseTag}],costUsd}` |
-| `POST /cards/:id/retry`                    | –                                                                                                                       | `Card` (needs_attention/failed → queued)                                                                                                                              |
+| `POST /cards/:id/retry`                    | –                                                                                                                       | `Card` (needs_attention → queued; filing runs again from the top)                                                                                                     |
+| `POST /cards/:id/file-anyway`              | –                                                                                                                       | `Card` (only a card stopped as a roadmap duplicate: needs_attention → queued, skipping the duplicate check; 409 otherwise)                                            |
 | `POST /cards/:id/dismiss`                  | –                                                                                                                       | `Card` (leaves needs-you list)                                                                                                                                        |
 | `POST /run`                                | –                                                                                                                       | `{ runId, started:boolean, reason? }` run now (respects kill switch, budget, queue cap)                                                                               |
 | `GET /runs`                                | `limit?`                                                                                                                | `{ runs: Run[] }`                                                                                                                                                     |
 | `GET /settings` · `PATCH /settings`        | `enabled, monthlyBudgetUsd, queueCap(1..10), runHourIst(0..23), mandate, pauseAutoBuild, slackNotify, categoryWeights?` | settings                                                                                                                                                              |
+|                                            | (`pauseAutoBuild`, `autoBuildPaused*` still read and saved for old clients; they do nothing since 2026-11-17)           |                                                                                                                                                                       |
 | `GET /memory`                              | –                                                                                                                       | `{ facts: Fact[], lessons: Lesson[] }`                                                                                                                                |
 | `PATCH /memory/:id` · `DELETE /memory/:id` | `{ value?, active? }`                                                                                                   | fact                                                                                                                                                                  |
 | `GET /history`                             | `limit?`                                                                                                                | cards in `rejected/feedback_closed/answered/skipped/expired`                                                                                                          |
@@ -81,7 +93,47 @@ roadmap, bug findings) → critic LLM (rubric) → ranker (impact × evidence ÷
 Persister`. Revisions (pending feedback) run first. Questions appear when context is thin or a candidate is blocked
 on missing knowledge.
 
-## Accept → Builder (`path: builder`)
+## Filing to the roadmap
+
+Accept → `accepted_pending` (10 s undo; the `file_roadmap` outbox row is not due until `undoUntil`) → the outbox
+worker (`PmAgentFilingService`, 30 s drain, advisory lock `(1982000, 1)`):
+
+1. Claim: `accepted_pending → queued`. Losing the claim means the card was undone; the row is cancelled.
+2. Adopt: an opportunity already filed for the card (`source = 'pm_agent'`, `reporterContext.pmAgentCardId`)
+   is recorded instead of filing again, so a crash between filing and recording never doubles a card.
+3. Checks, each a stop for a person (`needs_attention` with the reason): the payload still meets the contract
+   (a card with no `opportunity` cannot be filed); `roadmapFiling.readiness.criteria` equals today's
+   `ROADMAP_READINESS_CRITERIA` ids (a checklist changed since grading means the verdict is stale); the product
+   goal still exists.
+4. The roadmap's own duplicate detection (`RoadmapAiService.findDuplicates`: vector search, same-goal
+   candidates, an LLM confirmation pass — what the filing drawer runs for a person; its spend is the roadmap's).
+   A match stops the card with `roadmapFiling.duplicates`; `needsYou.actions` is `file_anyway | dismiss`.
+   File anyway records `roadmapFiling.fileAnyway` and refiles without this check.
+5. File: `RoadmapOpportunityService.create(acceptingAdmin, { description, productGoal, effort, type: idea,
+readinessToken }, { source: pm_agent, enforceReadiness: true })`. The readiness token is minted
+   (`RoadmapReadinessTokenService.issue`) for the critic's verdict stored on the card, which is the token
+   service's model: sign the reading that was made, never re-grade on write. The roadmap's gate then checks it
+   exactly as for a person's filing. → `filed`, `roadmapOpportunityId` set. A refusal from the roadmap is a
+   stop; anything else is retried (5 min, up to 5 attempts, then a stop).
+
+The board shows the opportunity's author as **Product Manager Agent** (`PM_AGENT_AUTHOR_NAME`); `createdBy`
+stays the accepting admin for audit.
+
+**Reconcile** (shared 5-min tick): a `filed` card follows its opportunity. `released` → card `released`
+(outcome `released`, lane stat `shipped`, impact checks start at the opportunity's `releasedAt`); `archived`,
+soft-deleted or gone → `roadmap_archived` (outcome `roadmapArchived`). `new`/`prioritised` leave it `filed`.
+`Card.delivery.roadmap` = `{ opportunityId, code, stage, removed }`.
+
+**Readiness at generation.** Every lane reads, in the cached shared block, the roadmap filing checklist
+(`ROADMAP_READINESS_CRITERIA`, rendered from code), the live product goals, and a digest of what the roadmap
+holds (newest 250 ideas, every stage). Gate 1 refuses an `opportunity.productGoal` that is not a roadmap goal.
+Gate 2 compares against the whole roadmap (newest 3,000 opportunities, archived included) on the card text and,
+at a stricter 0.75, on the drafted entry. The critic grades `opportunity.description` against each checklist
+item in `roadmapReadiness`; any item not `true` fails the card (fail-closed), and a persisted card stores the
+grading in `roadmapFiling.readiness`. Learning: `roadmap_archived` nets the accept to zero (+0.5 / −0.5) and
+makes the card a negative exemplar; `released` counts as shipped.
+
+## Accept → Builder (legacy, removed 2026-11-17)
 
 Card → `accepted_pending` (10 s undo window; the outbox row is not due until `undoUntil`) → outbox worker:
 `createSession` (userId = accepting admin, no tenantId, `requestedBy: 'pm_agent'`, `requestRef: cardId`) → file roadmap
@@ -116,6 +168,9 @@ Every model call has a row in `src/llm/constants/ai-task-registry.constants.ts` 
 there is no `pm_agent_ranker` prompt or row.
 
 ## Implementation notes (backend foundations, 2026-11-17)
+
+> Superseded where it describes Accept → Builder, the auto-build pause, the circuit breaker, `plan.md` or the
+> `paused` agent state: see "Filing to the roadmap". `agentState` is never `paused` any more.
 
 Code: `src/pm-agent/` (module `PmAgentModule`). Per-table detail: `DATA_SCHEMA.md` §3.23.
 
@@ -160,9 +215,9 @@ Behaviour worth knowing:
   health hold are unchanged. An unreadable override falls back to the global settings.
 - The `pm_agent` Builder requester's `turnEnded` deliberately does nothing (PM Agent sessions do not interview).
 - Card payloads are validated by `validateCardPayload` (`dto/pm-card-payload.dto.ts`); unknown keys are rejected.
-- Compiled PRD / plan.md: `util/compile-plan.ts` (deterministic) + `util/scrub.util.ts` (tenant names from
-  `tenants`, emails, phones, tokens/keys, internal hosts, URLs with query strings, UUIDs, IPs, long quotes).
-  Evidence snapshots are never included, only the evidence count.
+- Public-text scrubber: `util/scrub.util.ts` (tenant names from `tenants`, emails, phones, tokens/keys,
+  internal hosts, URLs with query strings, UUIDs, IPs, long quotes); gate 1 drops any card it would change. (The
+  compiled PRD / plan.md, `compile-plan`, was removed with Accept → Builder.)
 - Not built yet (later phases): lessons job, critic calibration, impact read-outs, revert, shadow mode.
   (Impact read-outs: since built, see "Implementation notes (impact checks)".)
 
@@ -221,7 +276,7 @@ Persister.
   batch. A near-duplicate of a rejected card passes only if it cites evidence with a source/label the rejected card
   did not. A revision never matches its own original.
 - **Gate 3 (critic)**: one `pm_agent_critic` call over the best 12, rubric `grounded, scoped, no_open_decisions,
-  sensible_defaults, consistent_with_memory_and_strategy, buildable, honest_risk`, answered via `submit_verdicts`.
+sensible_defaults, consistent_with_memory_and_strategy, buildable, honest_risk`, answered via `submit_verdicts`.
   Fail-closed: no verdict, budget or provider failure → nothing passes. A `missingKnowledge` verdict becomes a
   question candidate (layers 1–2 again).
 - **Ranker** (`src/pm-agent/gate/pm-ranker.ts`): impact (category weight × risk × named metric) × evidence strength (sources,
@@ -244,6 +299,7 @@ Persister.
 ## Contract addendum: impact checks and weekly lessons (v1.1)
 
 ### Impact checks (+14 / +30 days)
+
 - A recommendation payload gains an optional `metricRef` (schemaVersion stays 1; additive): `{ source: <catalog key>, params?: object, unit?: 'percent'|'count'|'ms'|'usd'|'ratio', betterWhen: 'up'|'down' }`. `source` must be a key of the **measurable-metric catalog** (`src/pm-agent/impact/metric-catalog.ts`): a closed allow-list of read-only Analytics services / aggregates that can be read as one number for a window. Lanes are told the catalog and may pick one; a card without a valid `metricRef` is shown as "impact not measurable". `impactMetric { name, direction }` stays as the human label.
 - When a card's delivery reaches `released` (reconcile job), the baseline is captured (the metric read over the 14 days **before** release), stored in `pm_agent_outcomes` (new migration adds columns / rows kind `impact`), and two reads are scheduled at release + 14 d and + 30 d (each read covers the 14 days ending then). A daily job performs due reads; reads are metered (no LLM) and never throw into the pipeline.
 - Verdict per read: `improved | flat | worse` using `betterWhen` and a minimum relative change (default 3%) plus a minimum-sample guard (`insufficient_data` if the window has too little volume); `not_measurable` / `unavailable` are terminal statuses.
@@ -252,6 +308,7 @@ Persister.
 - `GET /health` adds `impactMeasuredCount`, `impactImprovedRate`.
 
 ### Weekly lessons
+
 - Lessons are `pm_agent_memory` rows with `kind='lesson'` (no new table). Shape returned in `GET /memory` → `lessons: Lesson[]`: `{ id, text, scope: 'global'|'category'|'lane', category?, status: 'proposed'|'active'|'expired'|'removed', source: 'weekly_job'|'manual', supportCount, supportRatio, evidenceCardIds[], evalResult?: { passed: boolean, agreementBefore: number, agreementAfter: number, sampleSize: number }, requiresConfirm: boolean, createdAt, lastSupportedAt, expiresAt }`.
 - A weekly job (daily scheduler tick on the configured weekday, advisory lock) reads the last 90 days of decisions + outcomes + reasons, asks a reflection prompt (`pm_agent_lessons`) for candidate lessons, validates each against the data in code (minimum 5 supporting decisions and ≥ 75% consistency, else dropped), and runs the **eval gate**: replay the critic over up to 20 past decided cards with the lesson added to its rubric and require agreement with the admin's real decisions not to decrease (reserve-before-spend, counts toward the budget; a budget shortfall leaves the lesson `proposed`, never active). Lessons that pass auto-activate **unless** `requiresConfirm` (any lesson that forbids or de-prioritises a whole category, changes the mandate, or concerns risk/size limits): those stay `proposed` until an admin confirms.
 - Active lessons are injected (fenced as guidance, never instructions) into lane prompts via memory top-k and into the critic rubric context. A lesson expires (`expired`) 60 days after `lastSupportedAt` unless re-supported by the next weekly run.
@@ -334,7 +391,7 @@ columns to `pm_agent_memory`, widens its `scope` (`category`, `lane`) and `sourc
   absent). Fenced as `<tool_data … trust="untrusted-data">`, neutralised. Fewer than 5 eligible decisions →
   `not_enough_decisions`, no call.
 - **Reflection** (`submit_lessons`, only tool, 3,000 output tokens): each lesson is `{ text, expects: accept|reject,
-  predicate: { categories?, lanes?, sizes?, risks?, words? }, citedRefs? }`. Unknown fields (a model-declared
+predicate: { categories?, lanes?, sizes?, risks?, words? }, citedRefs? }`. Unknown fields (a model-declared
   `requiresConfirm`, say), instruction-shaped text, markup, anything the public scrubber would change and empty
   predicates fail; one repair pass for the failures (valid ones kept), then discarded.
 - **Validation in code**: support is recomputed from the rows matching the predicate — supporting = accepted and not

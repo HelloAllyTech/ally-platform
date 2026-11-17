@@ -18,6 +18,7 @@ vi.mock("@api", () => ({
   useGetPmAgentFeedStateQuery: () => ({ data: undefined }),
   useRetryPmAgentCardMutation: () => [vi.fn(), {}],
   useDismissPmAgentCardMutation: () => [vi.fn(), {}],
+  useFileAnywayPmAgentCardMutation: () => [vi.fn(), {}],
   useRunPmAgentNowMutation: () => [vi.fn(), { isLoading: false }],
   useUpdatePmAgentSettingsMutation: () => [vi.fn(), { isLoading: false }],
 }));

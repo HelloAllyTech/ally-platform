@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In, MoreThan, Not } from 'typeorm';
 import { RoadmapOpportunityRepository } from 'src/product-roadmap/repository/roadmap-opportunity.repository';
-import { RoadmapOpportunityStage } from 'src/product-roadmap/enum/roadmap-opportunity.enum';
+import { RoadmapProductGoalRepository } from 'src/product-roadmap/repository/roadmap-taxonomy.repository';
 import { PmAgentCard } from '../entity/pm-agent-card.entity';
 import { PmAgentCardEvent } from '../entity/pm-agent-card-event.entity';
 import { PmAgentMemory } from '../entity/pm-agent-memory.entity';
@@ -71,6 +71,7 @@ export class PmAgentPipelineStore implements PmPipelineStore {
     private readonly signals: PmAgentSignalRepository,
     private readonly opportunities: RoadmapOpportunityRepository,
     private readonly budget: PmAgentBudgetService,
+    private readonly goals: RoadmapProductGoalRepository,
   ) {}
 
   getSettings(): Promise<PmAgentSettings> {
@@ -231,17 +232,12 @@ export class PmAgentPipelineStore implements PmPipelineStore {
         order: { createdAt: 'DESC' },
         take: 500,
       }),
+      // Every stage: an archived opportunity is an idea the team already decided on, and a
+      // released one is built. Soft-deleted rows are excluded (TypeORM's default).
       this.opportunities.find({
-        where: {
-          stage: In([
-            RoadmapOpportunityStage.NEW,
-            RoadmapOpportunityStage.PRIORITISED,
-            RoadmapOpportunityStage.RELEASED,
-          ]),
-        },
-        select: { id: true, code: true, description: true },
+        select: { id: true, code: true, description: true, stage: true },
         order: { createdAt: 'DESC' },
-        take: PM_DEDUPE.CORPUS_LIMIT,
+        take: PM_DEDUPE.ROADMAP_CORPUS_LIMIT,
       }),
       this.dataSource.query(
         `SELECT id, title FROM bug_findings
@@ -295,7 +291,8 @@ export class PmAgentPipelineStore implements PmPipelineStore {
           type: 'opportunity',
           id: row.id,
           label: row.code,
-          text: String(row.description ?? '').slice(0, 400),
+          text: String(row.description ?? '').slice(0, 1000),
+          stage: row.stage,
         }),
       ),
       ...findings.map(
@@ -325,7 +322,7 @@ export class PmAgentPipelineStore implements PmPipelineStore {
     const rows: Record<string, any>[] = await this.dataSource.query(
       `SELECT o."cardId", c.category, c.kind, c.title, c.payload, c.reason,
               c."reasonChip", o.decision, o."decidedAt", o.merged, o.released,
-              o."buildFailed", o.reverted,
+              o."buildFailed", o.reverted, o."roadmapArchived",
               (SELECT i.verdict FROM pm_agent_outcomes i
                 WHERE i."cardId" = o."cardId" AND i.kind = 'impact'
                   AND i.day = 14 AND i.status = 'measured') AS "impactVerdict",
@@ -352,6 +349,7 @@ export class PmAgentPipelineStore implements PmPipelineStore {
       released: Boolean(row.released),
       buildFailed: Boolean(row.buildFailed),
       reverted: Boolean(row.reverted),
+      roadmapArchived: Boolean(row.roadmapArchived),
       impactVerdict: row.impactVerdict ?? null,
       title: row.title,
       payload: row.payload ?? {},
@@ -387,6 +385,10 @@ export class PmAgentPipelineStore implements PmPipelineStore {
 
   tenantNames(): Promise<string[]> {
     return this.cards.listTenantNames();
+  }
+
+  async productGoalNames(): Promise<string[]> {
+    return (await this.goals.findAllOrdered()).map((goal) => goal.name);
   }
 
   async hasUxSignals(): Promise<boolean> {
@@ -437,6 +439,9 @@ export class PmAgentPipelineStore implements PmPipelineStore {
           versionHash: input.versionHash,
           title: String(candidate.payload.title ?? '').slice(0, 200),
           payload: candidate.payload,
+          roadmapFiling: candidate.roadmapReadiness
+            ? { readiness: candidate.roadmapReadiness }
+            : null,
           rank: candidate.rank,
           evidenceFreshness: candidate.evidenceFreshness,
           questionKey: candidate.questionKey ?? null,

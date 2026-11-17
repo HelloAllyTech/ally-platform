@@ -69,9 +69,14 @@ export class LimitQueryDto {
 }
 
 export class AcceptCardDto {
-  @ApiProperty({ enum: PmAcceptPath })
+  /**
+   * Ignored: Accept always files to the roadmap. Still accepted (any legacy value) so an admin
+   * bundle from before 2026-11-17 keeps working through the release window.
+   */
+  @ApiPropertyOptional({ enum: PmAcceptPath, deprecated: true })
+  @IsOptional()
   @IsEnum(PmAcceptPath)
-  path!: PmAcceptPath;
+  path?: PmAcceptPath;
 
   @ApiPropertyOptional({
     description:
@@ -242,7 +247,24 @@ export class UpdateMemoryDto {
 
 export interface PmNeedsYou {
   reason: string;
-  actions: ('retry' | 'open_pr' | 'dismiss')[];
+  /**
+   * `file_anyway` only on a card the roadmap's duplicate check stopped; `open_pr` is legacy
+   * (Builder) and no longer sent.
+   */
+  actions: ('retry' | 'file_anyway' | 'open_pr' | 'dismiss')[];
+  /** What the roadmap's duplicate check matched, when that is why the card stopped. */
+  duplicates?: { id: string; code: string | null; reason: string }[];
+}
+
+/** Where an accepted card sits on the roadmap. */
+export interface PmRoadmapDelivery {
+  opportunityId: string;
+  /** e.g. OPP-0812; null when the opportunity can no longer be read. */
+  code: string | null;
+  /** The roadmap stage: new | prioritised | released | archived; null when unreadable. */
+  stage: string | null;
+  /** Removed from the roadmap (soft-deleted). */
+  removed: boolean;
 }
 
 export interface PmDeliveryPr {
@@ -255,9 +277,13 @@ export interface PmDeliveryPr {
 }
 
 export interface PmDelivery {
+  /** The roadmap stage for a filed card (legacy: the Builder session status). */
   status: string | null;
+  /** Legacy (Builder): always empty for a card filed to the roadmap. */
   prs: PmDeliveryPr[];
   costUsd: number | null;
+  /** Set once the card is on the roadmap. */
+  roadmap?: PmRoadmapDelivery;
   /** Impact checks (+14 / +30 d); absent when the card has no `metricRef`. */
   impact?: PmImpactView;
 }

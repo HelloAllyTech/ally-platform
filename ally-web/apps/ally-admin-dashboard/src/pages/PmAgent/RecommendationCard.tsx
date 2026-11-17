@@ -6,6 +6,7 @@ import type { PmCard, PmRecommendationPayload } from "@types";
 
 import { copy } from "./copy";
 import { absoluteTime, freshnessAge, relativeTime } from "./format";
+import { InfoTip } from "../../components/ally-guide/InfoTip";
 
 const List: React.FC<{ title: string; items?: string[]; ordered?: boolean }> = ({
   title,
@@ -151,6 +152,29 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({ card, fo
 
       {p.impactMetric && (
         <p className="text-sm text-typography-700">{copy.impact(p.impactMetric.name, direction)}</p>
+      )}
+
+      {p.opportunity && (
+        <section
+          aria-label={copy.roadmapEntry}
+          className="flex flex-col gap-1 rounded border border-neutral-500 bg-neutral-50 p-3"
+        >
+          <div className="flex items-center gap-1">
+            <h3 className="text-sm font-semibold text-typography-700">{copy.roadmapEntry}</h3>
+            <InfoTip label={copy.roadmapEntryTip} ariaLabel="About the roadmap entry" />
+          </div>
+          <p className="whitespace-pre-line text-sm text-typography-900">
+            {p.opportunity.description}
+          </p>
+          <p className="text-xs text-typography-600">
+            {copy.roadmapGoal(p.opportunity.productGoal)}
+            {" · "}
+            {copy.roadmapEffort(p.opportunity.effort)}
+            {" · "}
+            <span aria-hidden="true">✓ </span>
+            {copy.readinessMet}
+          </p>
+        </section>
       )}
 
       <p className="text-xs text-typography-600">

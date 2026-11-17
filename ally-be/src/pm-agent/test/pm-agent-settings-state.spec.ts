@@ -104,9 +104,9 @@ describe('PmAgentStateService.deriveState', () => {
     ],
     ['queue full', { openCards: 5 }, PmAgentState.QUEUE_FULL],
     [
-      'paused',
+      'a paused auto-build no longer pauses anything (nothing is built)',
       { settings: { ...base.settings, autoBuildPaused: true } },
-      PmAgentState.PAUSED,
+      PmAgentState.IDLE,
     ],
   ])('%s', (_label, over, expected) => {
     expect(PmAgentStateService.deriveState({ ...base, ...over } as never)).toBe(
@@ -173,7 +173,29 @@ describe('validateCardPayload', () => {
       'change',
     ],
     ['size L', { size: 'L' }, 'size'],
-    ['ally-mobile (no release pipeline)', { repos: ['ally-mobile'] }, 'repos'],
+    ['an unknown repo', { repos: ['ally-infra'] }, 'repos'],
+    ['no roadmap entry', { opportunity: undefined }, 'opportunity'],
+    [
+      'an unsized roadmap entry',
+      {
+        opportunity: {
+          description: 'x'.repeat(120),
+          productGoal: 'Engagement',
+        },
+      },
+      'opportunity.effort',
+    ],
+    [
+      'a roadmap entry too short to meet the checklist',
+      {
+        opportunity: {
+          description: 'Make it better.',
+          productGoal: 'Engagement',
+          effort: 's',
+        },
+      },
+      'opportunity.description',
+    ],
     ['no evidence', { evidenceIds: [] }, 'evidenceIds'],
     ['an unknown field', { secretPlan: 'x' }, 'secretPlan'],
   ])('rejects %s', (_label, over, field) => {
@@ -208,14 +230,18 @@ describe('validateCardPayload', () => {
   });
 });
 
-describe('migration 1982000000000 CHECK constraints', () => {
-  const sql = fs.readFileSync(
-    path.join(
-      __dirname,
-      '../../database/migrations/1982000000000-CreatePmAgent.ts',
-    ),
-    'utf8',
-  );
+describe('migration CHECK constraints (1982000000000, widened by 1982100000100)', () => {
+  const sql = [
+    '1982000000000-CreatePmAgent.ts',
+    '1982100000100-PmAgentFilesToRoadmap.ts',
+  ]
+    .map((file) =>
+      fs.readFileSync(
+        path.join(__dirname, '../../database/migrations', file),
+        'utf8',
+      ),
+    )
+    .join('\n');
 
   it.each([
     ['PmCardStatus', Object.values(PmCardStatus)],

@@ -35,6 +35,7 @@ import {
   RoadmapReferenceImage,
 } from '../entity/roadmap-opportunity.entity';
 import {
+  PM_AGENT_AUTHOR_NAME,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
@@ -785,7 +786,12 @@ export class RoadmapOpportunityService {
       source: row.source,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      creator: users.get(row.createdBy) ?? this.unknownUser(row.createdBy),
+      // A PM Agent filing is authored by the agent; `createdBy` (the admin who accepted the
+      // card) stays on the row for audit but is not who the board says posted it.
+      creator:
+        row.source === RoadmapOpportunitySource.PM_AGENT
+          ? { id: row.createdBy, email: '', name: PM_AGENT_AUTHOR_NAME }
+          : (users.get(row.createdBy) ?? this.unknownUser(row.createdBy)),
     }));
   }
 

@@ -28,6 +28,12 @@ export const recPayload = (
   alternativesDropped: ["Push notification"],
   repos: ["ally-web"],
   evidenceIds: ["e1", "e2"],
+  opportunity: {
+    description:
+      "Learners starting a roleplay cannot see their streak, so the habit loop is invisible. Why it matters: next-day return.",
+    productGoal: "Engagement",
+    effort: "s",
+  },
   ...over,
 });
 

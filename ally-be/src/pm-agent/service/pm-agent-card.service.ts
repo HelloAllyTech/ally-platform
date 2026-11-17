@@ -44,7 +44,7 @@ import {
   PmAgentOutboxRepository,
   PmAgentOutcomeRepository,
 } from '../repository/pm-agent.repositories';
-import { compilePlan, RecommendationPayload } from '../util/compile-plan';
+import { PmRoadmapFiling } from '../pipeline/pm-pipeline.types';
 import { PmAgentEventsService } from './pm-agent-events.service';
 import { PmAgentPresenterService } from './pm-agent-presenter.service';
 import {
@@ -69,8 +69,8 @@ const normaliseKey = (text: string) =>
  * race answers 409 rather than double-acting. Any decision frees a queue slot, because
  * the slot count IS the number of `open` cards — there is no counter to drift.
  *
- * What this service never does: call a model, or call Builder. Accept writes an outbox
- * row; PmAgentBuildService does the Builder work once the undo window closes.
+ * What this service never does: call a model, Builder or the roadmap. Accept writes an
+ * outbox row; PmAgentFilingService files the card to the roadmap once the undo window closes.
  */
 @Injectable()
 export class PmAgentCardService {
@@ -124,17 +124,14 @@ export class PmAgentCardService {
     return Math.max(0, settings.queueCap - open);
   }
 
-  /** The compiled plan.md (the same text Builder's PRD is compiled from). */
-  async planMarkdown(id: string): Promise<string> {
-    const card = await this.load(id);
-    this.assertKind(card, PmCardKind.RECOMMENDATION, 'plan.md');
-    return compilePlan(this.compilable(card), {
-      tenantNames: await this.cards.listTenantNames(),
-    }).markdown;
-  }
-
   // ── decisions ─────────────────────────────────────────────────────────────
 
+  /**
+   * Accept = file to the roadmap. The card waits out the 10-second undo window in
+   * `accepted_pending`; the outbox row is not due until then, and PmAgentFilingService files it
+   * as a Product Manager Agent opportunity. `path` is accepted for old clients and ignored: the
+   * Builder and plan.md paths were removed on 2026-11-17.
+   */
   async accept(
     userId: number,
     id: string,
@@ -142,40 +139,12 @@ export class PmAgentCardService {
   ): Promise<PmCardResponse> {
     const card = await this.load(id);
     this.assertKind(card, PmCardKind.RECOMMENDATION, 'accept');
-    const now = new Date();
-
-    if (dto.path === PmAcceptPath.DOWNLOAD) {
-      const compiled = compilePlan(this.compilable(card), {
-        tenantNames: await this.cards.listTenantNames(),
-      });
-      const moved = await this.cards.transition({
-        cardId: id,
-        from: [PmCardStatus.OPEN],
-        to: PmCardStatus.HANDED_OFF,
-        guard: { versionHash: dto.versionHash },
-        patch: {
-          decidedAt: now,
-          decidedBy: userId,
-          acceptPath: PmAcceptPath.DOWNLOAD,
-          compiledPrdHash: compiled.prdHash,
-        },
-        event: {
-          type: 'accepted',
-          actorUserId: userId,
-          detail: { path: dto.path, versionHash: card.versionHash },
-        },
-        also: (manager, row) =>
-          this.recordDecision(manager, row, PmDecision.HANDED_OFF, userId, now),
-      });
-      return this.after(
-        moved,
-        id,
-        'accept',
-        PmLaneStatDimension.CATEGORY,
-        'accepted',
+    if (!card.payload?.opportunity) {
+      throw new UnprocessableEntityException(
+        'This card was written before cards were filed to the roadmap and has no roadmap entry. Reject it or give feedback for a revised card.',
       );
     }
-
+    const now = new Date();
     const undoUntil = new Date(now.getTime() + PM_UNDO_WINDOW_MS);
     const moved = await this.cards.transition({
       cardId: id,
@@ -185,14 +154,14 @@ export class PmAgentCardService {
       patch: {
         decidedAt: now,
         decidedBy: userId,
-        acceptPath: PmAcceptPath.BUILDER,
+        acceptPath: PmAcceptPath.ROADMAP,
         undoUntil,
       },
       event: {
         type: 'accepted',
         actorUserId: userId,
         detail: {
-          path: dto.path,
+          path: PmAcceptPath.ROADMAP,
           versionHash: card.versionHash,
           undoUntil: undoUntil.toISOString(),
         },
@@ -202,7 +171,7 @@ export class PmAgentCardService {
         await this.outbox.insertWith(manager, {
           cardId: row.id,
           dueAt: undoUntil,
-          step: PmOutboxStep.CREATE_SESSION,
+          step: PmOutboxStep.FILE_ROADMAP,
           createdBy: userId,
         });
         await this.recordDecision(
@@ -250,7 +219,7 @@ export class PmAgentCardService {
           if (!deleted.affected) {
             outboxGone = false;
             throw new ConflictException(
-              'The build has already started and can no longer be undone.',
+              'The card is already being filed to the roadmap and can no longer be undone.',
             );
           }
           await this.outcomes.recordDecisionWith(manager, {
@@ -516,27 +485,60 @@ export class PmAgentCardService {
   }
 
   /** needs_attention / failed → queued: the outbox row reopens where it stopped. */
+  /** Try filing a stopped card again, from the top (every check runs again). */
   async retry(userId: number, id: string): Promise<PmCardResponse> {
     const card = await this.load(id);
-    const existing = await this.outbox.findForCard(id);
-    const step = !card.builderSessionId
-      ? PmOutboxStep.CREATE_SESSION
-      : !existing ||
-          existing.step === PmOutboxStep.DONE ||
-          existing.step === PmOutboxStep.CREATE_SESSION
-        ? PmOutboxStep.START_DESIGN
-        : existing.step;
+    return this.refile(userId, card, 'retried');
+  }
+
+  /**
+   * File a card the roadmap's duplicate check stopped, over that check. Only for a duplicate
+   * stop: every other check (contract, checklist, goal, the roadmap's own gate) still runs.
+   */
+  async fileAnyway(userId: number, id: string): Promise<PmCardResponse> {
+    const card = await this.load(id);
+    const filing = (card.roadmapFiling ?? {}) as PmRoadmapFiling;
+    if (
+      card.status !== PmCardStatus.NEEDS_ATTENTION ||
+      !filing.duplicates?.length
+    ) {
+      throw new ConflictException(
+        'Only a card stopped as a possible roadmap duplicate can be filed anyway.',
+      );
+    }
+    return this.refile(userId, card, 'file_anyway', {
+      roadmapFiling: {
+        ...filing,
+        fileAnyway: { by: userId, at: new Date().toISOString() },
+      },
+    });
+  }
+
+  private async refile(
+    userId: number,
+    card: PmAgentCard,
+    type: 'retried' | 'file_anyway',
+    patch: Partial<PmAgentCard> = {},
+  ): Promise<PmCardResponse> {
     const moved = await this.cards.transition({
-      cardId: id,
+      cardId: card.id,
       from: [PmCardStatus.NEEDS_ATTENTION, PmCardStatus.FAILED],
       to: PmCardStatus.QUEUED,
-      patch: { needsYouReason: null, needsYouDismissedAt: null },
-      event: { type: 'retried', actorUserId: userId, detail: { step } },
+      patch: { ...patch, needsYouReason: null, needsYouDismissedAt: null },
+      event: { type, actorUserId: userId },
     });
     if (moved) {
-      await this.outbox.reopen(id, step, card.decidedBy ?? userId);
+      await this.outbox.reopen(
+        card.id,
+        PmOutboxStep.FILE_ROADMAP,
+        card.decidedBy ?? userId,
+      );
     }
-    return this.after(moved, id, 'retry');
+    return this.after(
+      moved,
+      card.id,
+      type === 'retried' ? 'retry' : 'file anyway',
+    );
   }
 
   /** Take a needs-you item off the list; its status is unchanged. */
@@ -631,18 +633,8 @@ export class PmAgentCardService {
   private assertKind(card: PmAgentCard, kind: PmCardKind, verb: string) {
     if (card.kind !== kind) {
       throw new UnprocessableEntityException(
-        `Only a ${kind} card can ${verb === 'plan.md' ? 'have a plan.md' : `be ${verb === 'answer' ? 'answered' : verb === 'skip' ? 'skipped' : 'accepted'}`}.`,
+        `Only a ${kind} card can be ${verb === 'answer' ? 'answered' : verb === 'skip' ? 'skipped' : 'accepted'}.`,
       );
     }
-  }
-
-  private compilable(card: PmAgentCard) {
-    return {
-      id: card.id,
-      version: card.version,
-      versionHash: card.versionHash,
-      category: card.category,
-      payload: card.payload as RecommendationPayload,
-    };
   }
 }

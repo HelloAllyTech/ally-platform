@@ -81,6 +81,9 @@ export async function replayAgreement(
     candidates: input.sample.map(toCandidate),
     runEvidence: input.evidence,
     ledger: input.ledger,
+    // The replayed cards were decided on their merits; most predate roadmap filing and have
+    // no `opportunity` to grade. Grading readiness would fail them all and swamp the signal.
+    gradeReadiness: false,
   });
   if (review.outcome !== 'ok') return null;
   const pass = new Map(review.verdicts.map((v) => [v.index, v.pass]));

@@ -10,14 +10,50 @@ import { PM_CONTEXT } from '../constants/pm-agent-pipeline.constants';
 import { PmOutcomeRow, PmSharedContext } from '../pipeline/pm-pipeline.types';
 import { fence, neutralise } from '../util/fence.util';
 import { relevance, similarity } from '../util/text-similarity.util';
+import {
+  ROADMAP_FILEABLE_EFFORTS,
+  ROADMAP_READINESS_CRITERIA,
+} from 'src/product-roadmap/constants/product-roadmap.constants';
 
 const cut = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max)}…` : text;
 
 /**
- * The stable prefix every lane and the critic share: the mandate, the Vision & strategy page and
- * the product map, as ONE cached system block (Anthropic `cache_control`; other providers just
- * receive the text). Rendered once per run, so every pass of every lane re-reads it from cache.
+ * What an accepted recommendation becomes, and the roadmap's filing bar. Code, not prompt
+ * text, so it can never drift from ROADMAP_READINESS_CRITERIA (the roadmap's own gate) or from
+ * the live product goals, and so it overrides any older prompt row that still says accepted
+ * cards are built and released.
+ */
+export function roadmapFilingRules(productGoals: readonly string[]): string {
+  const goals = productGoals.length
+    ? productGoals.map((goal) => `"${goal}"`).join(', ')
+    : '(the product_goals tool lists them)';
+  return [
+    '# What happens to an accepted recommendation',
+    "You propose; you never build. An admin who accepts a recommendation files it to Ally's product " +
+      'roadmap as an opportunity posted by "Product Manager Agent", where the team triages, ' +
+      'prioritises and builds it. Nothing is built, merged or released automatically: this ' +
+      'supersedes any line above that says otherwise. `opportunity` is the roadmap entry itself, ' +
+      'filed exactly as you write it; the plan is context for whoever picks it up.',
+    '',
+    'Roadmap filing checklist. `opportunity.description` must meet every item, or the card is dropped:',
+    ...ROADMAP_READINESS_CRITERIA.map(
+      (criterion) =>
+        `- ${criterion.id} — ${criterion.label}: ${criterion.hint}`,
+    ),
+    '- Engineering ideas (code health, infra, cost, architecture) still name the user group that ' +
+      'feels it (admins waiting on a slow report, learners on voice roleplays), never "users" or ' +
+      '"the team" alone. An idea no user group feels is not a roadmap opportunity: drop it.',
+    `- opportunity.effort: the whole opportunity's size, one of ${ROADMAP_FILEABLE_EFFORTS.join(', ')}. Broad is fine; unsized is not.`,
+    `- opportunity.productGoal: exactly one of ${goals}.`,
+  ].join('\n');
+}
+
+/**
+ * The stable prefix every lane and the critic share: the mandate, the Vision & strategy page,
+ * the product map, the roadmap filing rules and what the roadmap already holds, as ONE cached
+ * system block (Anthropic `cache_control`; other providers just receive the text). Rendered
+ * once per run, so every pass of every lane re-reads it from cache.
  */
 export function sharedContextBlock(shared: PmSharedContext): AgentSystemBlock {
   const text = [
@@ -40,6 +76,21 @@ export function sharedContextBlock(shared: PmSharedContext): AgentSystemBlock {
     cut(
       neutralise(shared.productMap.trim() || '(unavailable this run)'),
       PM_CONTEXT.PRODUCT_MAP_MAX_CHARS,
+    ),
+    roadmapFilingRules(shared.productGoals ?? []),
+    '# Already on the roadmap',
+    "The team's roadmap, newest first (code [stage · goal] entry). Learn from it: what the team " +
+      'values, which areas are crowded, which gaps nobody has filed. Never propose what it ' +
+      'already holds, in any wording, as a slice of an existing entry, or as something an ' +
+      'archived entry already decided against. Propose what is missing. Anything that ' +
+      'duplicates the roadmap is dropped before an admin sees it. search_roadmap reaches older ' +
+      'entries.',
+    fence(
+      'tool_data',
+      { source: 'roadmap', kind: 'digest' },
+      (shared.roadmap ?? '').trim() ||
+        '(unavailable this run: search_roadmap before proposing)',
+      PM_CONTEXT.ROADMAP_DIGEST_MAX_CHARS,
     ),
   ].join('\n\n');
   return { text, cache: true };
@@ -103,7 +154,10 @@ const isNegative = (row: PmOutcomeRow) =>
   row.decision === PmDecision.REJECTED ||
   ((row.decision === PmDecision.ACCEPTED ||
     row.decision === PmDecision.HANDED_OFF) &&
-    (row.buildFailed || row.reverted || row.impactVerdict === 'worse'));
+    (row.buildFailed ||
+      row.reverted ||
+      row.roadmapArchived ||
+      row.impactVerdict === 'worse'));
 
 /**
  * The exemplar bank (plan §9b loop 2): the nearest shipped-and-merged cards (positives) and
@@ -159,7 +213,9 @@ export function exemplarBlock(picked: {
                   ? 'build failed'
                   : row.impactVerdict === 'worse'
                     ? 'shipped, and its impact metric got worse'
-                    : 'rejected'
+                    : row.roadmapArchived
+                      ? 'filed to the roadmap, then archived there'
+                      : 'rejected'
             }${
               row.reasonChip ? ` (${row.reasonChip.replace(/_/g, ' ')})` : ''
             }${row.reason ? `: ${row.reason}` : ''}`

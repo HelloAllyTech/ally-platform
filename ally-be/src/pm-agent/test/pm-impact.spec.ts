@@ -12,7 +12,6 @@ import { computeLearnedStats, statKey } from '../learning/pm-lane-selector';
 import { pickExemplars } from '../learning/pm-context';
 import { PmEvidenceRef, PmOutcomeRow } from '../pipeline/pm-pipeline.types';
 import { PmAgentEventsService } from '../service/pm-agent-events.service';
-import { compilePlan } from '../util/compile-plan';
 import {
   metricCatalogBlock,
   metricRefProblems,
@@ -359,20 +358,6 @@ describe('metricRef in the payload contract and gate layer 1', () => {
     );
     expect(check.candidate).toBeUndefined();
     expect(check.errors.join()).toMatch(/params\.task: required/);
-  });
-
-  it('the compiled plan names the metric that will be measured', () => {
-    const card = makeCard({
-      payload: recommendationPayload({
-        metricRef: { source: 'returning_user_rate', betterWhen: 'up' },
-      }),
-    });
-    expect(compilePlan(card as never).markdown).toContain(
-      'Measured after release: Returning users (`returning_user_rate`, percent, better up)',
-    );
-    expect(compilePlan(makeCard() as never).markdown).toContain(
-      'Not automatically measured',
-    );
   });
 });
 

@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -15,7 +14,6 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiProduces,
   ApiResponse,
   ApiSecurity,
   ApiTags,
@@ -106,25 +104,13 @@ export class PmAgentController {
     return this.cardService.getDetail(id);
   }
 
-  @Get('cards/:id/plan.md')
-  @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
-  @Header('Content-Type', 'text/markdown; charset=utf-8')
-  @ApiProduces('text/markdown')
-  @ApiOperation({
-    summary: 'The compiled plan (same text Builder gets), anonymised',
-  })
-  @ApiResponse(INVALID)
-  getPlan(@Param('id', ParseUUIDPipe) id: string): Promise<string> {
-    return this.cardService.planMarkdown(id);
-  }
-
   @Post('cards/:id/accept')
   @HttpCode(200)
   @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
   @ApiOperation({
-    summary: 'Accept a recommendation',
+    summary: 'Accept a recommendation: file it to the roadmap',
     description:
-      '`builder`: status accepted_pending with undoUntil = now + 10 s; the build starts after the window. `download`: handed_off.',
+      'Status accepted_pending with undoUntil = now + 10 s; the card is filed to the roadmap as a Product Manager Agent opportunity after the window. `path` is ignored (legacy).',
   })
   @ApiResponse(CONFLICT)
   @ApiResponse(INVALID)
@@ -219,13 +205,28 @@ export class PmAgentController {
   @Post('cards/:id/retry')
   @HttpCode(200)
   @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
-  @ApiOperation({ summary: 'Retry a failed / needs-attention build' })
+  @ApiOperation({ summary: 'Retry filing a needs-attention card' })
   @ApiResponse(CONFLICT)
   retry(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: AuthedRequest,
   ): Promise<PmCardResponse> {
     return this.cardService.retry(req.user.id, id);
+  }
+
+  @Post('cards/:id/file-anyway')
+  @HttpCode(200)
+  @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
+  @ApiOperation({
+    summary:
+      'File a card the roadmap duplicate check stopped, over that check (every other check still runs)',
+  })
+  @ApiResponse(CONFLICT)
+  fileAnyway(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ): Promise<PmCardResponse> {
+    return this.cardService.fileAnyway(req.user.id, id);
   }
 
   @Post('cards/:id/dismiss')

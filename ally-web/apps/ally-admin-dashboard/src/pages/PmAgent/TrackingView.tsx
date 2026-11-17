@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button, SkeletonText } from "@ally-ui-mono/ui-shared";
 import {
   useDismissPmAgentCardMutation,
-  useGetPmAgentFeedStateQuery,
+  useFileAnywayPmAgentCardMutation,
   useGetPmAgentTrackingQuery,
   useRetryPmAgentCardMutation,
 } from "@api";
@@ -14,18 +14,14 @@ import type { PmCard, PmImpactCheck, PmImpactSummary } from "@types";
 import { copy } from "./copy";
 import { absoluteTime, formatMetricValue, formatUsd, relativeTime, stepIndex } from "./format";
 import { NeedsYouPanel } from "./NeedsYouPanel";
-import { BreakerBanner } from "./statePanels";
-import { usePmAgentControls } from "./usePmAgentControls";
 import { InfoTip } from "../../components/ally-guide/InfoTip";
+import { ROUTES } from "../../constants/common";
 
-/** Six steps. Done, current and not-reached are words (hidden visually) as well as marks. */
+/** Four steps. Done, current and not-reached are words (hidden visually) as well as marks. */
 export const Stepper: React.FC<{ card: PmCard }> = ({ card }) => {
-  const at = stepIndex(card.status);
+  const at = stepIndex(card.status, card.delivery?.roadmap?.stage);
   if (at < 0) return null;
-  const stuck =
-    card.status === "failed" ||
-    card.status === "needs_attention" ||
-    card.status === "merged_not_released";
+  const stuck = card.status === "needs_attention";
   return (
     <ol aria-label={copy.tracking.stepsLabel} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
       {copy.tracking.steps.map((label, i) => {
@@ -146,9 +142,11 @@ const Row: React.FC<{
   shipped?: boolean;
   onRetry: (id: string) => void;
   onDismiss: (id: string) => void;
-}> = ({ card, needsYou, shipped, onRetry, onDismiss }) => {
+  onFileAnyway: (id: string) => void;
+}> = ({ card, needsYou, shipped, onRetry, onDismiss, onFileAnyway }) => {
   const when = card.decidedAt ?? card.createdAt;
   const prs = card.delivery?.prs ?? [];
+  const roadmap = card.delivery?.roadmap;
   return (
     <li className="flex flex-col gap-2 rounded border border-neutral-500 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -159,6 +157,25 @@ const Row: React.FC<{
       </div>
       <Stepper card={card} />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-typography-700">
+        {roadmap && (
+          <span>
+            {roadmap.removed ? (
+              copy.tracking.removedFromRoadmap(roadmap.code)
+            ) : (
+              <>
+                <a
+                  href={`${ROUTES.PRODUCT_ROADMAP}?opportunity=${roadmap.opportunityId}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-primary-700 underline"
+                >
+                  {roadmap.code ?? copy.tracking.opportunityFallback}
+                </a>
+                {roadmap.stage ? ` · ${copy.tracking.stage[roadmap.stage]}` : ""}
+              </>
+            )}
+          </span>
+        )}
         {prs.map((pr, i) => (
           <a
             key={pr.url}
@@ -176,7 +193,14 @@ const Row: React.FC<{
         )}
       </div>
       {shipped && <ImpactLine impact={card.delivery?.impact} />}
-      {needsYou && <NeedsYouPanel card={card} onRetry={onRetry} onDismiss={onDismiss} />}
+      {needsYou && (
+        <NeedsYouPanel
+          card={card}
+          onRetry={onRetry}
+          onDismiss={onDismiss}
+          onFileAnyway={onFileAnyway}
+        />
+      )}
     </li>
   );
 };
@@ -188,7 +212,8 @@ const Group: React.FC<{
   shipped?: boolean;
   onRetry: (id: string) => void;
   onDismiss: (id: string) => void;
-}> = ({ title, cards, needsYou, shipped, onRetry, onDismiss }) => (
+  onFileAnyway: (id: string) => void;
+}> = ({ title, cards, needsYou, shipped, onRetry, onDismiss, onFileAnyway }) => (
   <section aria-label={title} className="flex flex-col gap-2">
     <h3 className="text-sm font-semibold uppercase tracking-wide text-typography-600">
       {title} <span className="font-normal">({cards.length})</span>
@@ -205,6 +230,7 @@ const Group: React.FC<{
             shipped={shipped}
             onRetry={onRetry}
             onDismiss={onDismiss}
+            onFileAnyway={onFileAnyway}
           />
         ))}
       </ul>
@@ -214,10 +240,9 @@ const Group: React.FC<{
 
 export const TrackingView: React.FC = () => {
   const { data, isLoading, isError, refetch } = useGetPmAgentTrackingQuery();
-  const { data: state } = useGetPmAgentFeedStateQuery();
   const [retryCard] = useRetryPmAgentCardMutation();
   const [dismissCard] = useDismissPmAgentCardMutation();
-  const controls = usePmAgentControls();
+  const [fileAnywayCard] = useFileAnywayPmAgentCardMutation();
 
   const act = async (run: () => Promise<unknown>, ok: string) => {
     try {
@@ -243,10 +268,10 @@ export const TrackingView: React.FC = () => {
   const total = t.needsYou.length + t.inProgress.length + t.shipped.length + t.other.length;
   const onRetry = (id: string) => act(() => retryCard(id).unwrap(), copy.retried);
   const onDismiss = (id: string) => act(() => dismissCard(id).unwrap(), copy.dismissed);
+  const onFileAnyway = (id: string) => act(() => fileAnywayCard(id).unwrap(), copy.filedAnyway);
 
   return (
     <div className="flex flex-col gap-5">
-      <BreakerBanner state={state} onResume={controls.resumeBuilds} />
       {total === 0 ? (
         <p className="text-sm text-typography-700">{copy.tracking.empty}</p>
       ) : (
@@ -257,12 +282,14 @@ export const TrackingView: React.FC = () => {
             needsYou
             onRetry={onRetry}
             onDismiss={onDismiss}
+            onFileAnyway={onFileAnyway}
           />
           <Group
             title={copy.tracking.groups.inProgress}
             cards={t.inProgress}
             onRetry={onRetry}
             onDismiss={onDismiss}
+            onFileAnyway={onFileAnyway}
           />
           <Group
             title={copy.tracking.groups.shipped}
@@ -270,12 +297,14 @@ export const TrackingView: React.FC = () => {
             shipped
             onRetry={onRetry}
             onDismiss={onDismiss}
+            onFileAnyway={onFileAnyway}
           />
           <Group
             title={copy.tracking.groups.other}
             cards={t.other}
             onRetry={onRetry}
             onDismiss={onDismiss}
+            onFileAnyway={onFileAnyway}
           />
         </>
       )}

@@ -32,7 +32,7 @@ const h = vi.hoisted(() => {
     skip: ok(),
     retry: ok(),
     dismiss: ok(),
-    plan: ok("# plan"),
+    fileAnyway: ok(),
     ok,
   };
 });
@@ -55,7 +55,7 @@ vi.mock("@api", () => ({
   useSkipPmAgentCardMutation: () => [h.skip, {}],
   useRetryPmAgentCardMutation: () => [h.retry, {}],
   useDismissPmAgentCardMutation: () => [h.dismiss, {}],
-  useLazyGetPmAgentPlanMdQuery: () => [h.plan, {}],
+  useFileAnywayPmAgentCardMutation: () => [h.fileAnyway, {}],
   useRunPmAgentNowMutation: () => [h.ok({ started: true }), { isLoading: false }],
   useUpdatePmAgentSettingsMutation: () => [h.ok({}), { isLoading: false }],
 }));
@@ -84,7 +84,12 @@ describe("ReviewView", () => {
     expect(screen.getByText("Low risk")).toBeInTheDocument();
     expect(screen.getByText("Small")).toBeInTheDocument();
     expect(screen.getByText(/next-day return rate \(should rise\)/)).toBeInTheDocument();
-    expect(screen.getByText("Ships to production automatically")).toBeInTheDocument();
+    expect(
+      screen.getByText("Goes on the roadmap as posted by Product Manager Agent"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Roadmap entry" })).toHaveTextContent(
+      "Goal: Engagement",
+    );
     expect(screen.getByText("2 of 3".replace("2", "1"))).toBeInTheDocument();
   });
 
@@ -121,8 +126,8 @@ describe("ReviewView", () => {
 
   it("accept hides the card at once, shows an undo toast, and undo restores it", async () => {
     renderView();
-    fireEvent.click(screen.getByRole("button", { name: /Accept and build/ }));
-    await waitFor(() => expect(h.accept).toHaveBeenCalledWith({ id: "a", path: "builder" }));
+    fireEvent.click(screen.getByRole("button", { name: /Accept and add to roadmap/ }));
+    await waitFor(() => expect(h.accept).toHaveBeenCalledWith({ id: "a", versionHash: "h" }));
     // Focus moved to the next card.
     expect(screen.getAllByText("Card b").length).toBeGreaterThan(0);
     expect(screen.queryByRole("article", { name: "Card a" })).not.toBeInTheDocument();
@@ -131,7 +136,7 @@ describe("ReviewView", () => {
       string,
       { action: { label: string; onClick: () => void }; duration: number },
     ];
-    expect(message).toBe("Accepted: Card a");
+    expect(message).toBe("Accepted: Card a. Adding it to the roadmap.");
     expect(opts.action.label).toBe("Undo");
     expect(opts.duration).toBeGreaterThan(1000);
     await act(async () => {
@@ -146,19 +151,26 @@ describe("ReviewView", () => {
   it("restores the card with an error toast when the accept fails", async () => {
     h.accept.mockImplementationOnce(() => ({ unwrap: () => Promise.reject({ status: 500 }) }));
     renderView();
-    fireEvent.click(screen.getByRole("button", { name: /Accept and build/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Accept and add to roadmap/ }));
     await waitFor(() => expect(h.toastFn.error).toHaveBeenCalled());
     expect(screen.getByRole("article", { name: "Card a" })).toBeInTheDocument();
   });
 
-  it("asks for one inline confirm on a medium-risk card before building", async () => {
+  it("accepts a medium-risk card in one click: filing to the roadmap releases nothing", async () => {
     setCards([recCard("m", {}, { risk: "medium", riskWhy: "Touches the XP ledger." })]);
     renderView();
-    fireEvent.click(screen.getByRole("button", { name: /Accept and build/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Accept and add to roadmap/ }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(h.accept).toHaveBeenCalledWith({ id: "m", versionHash: "h" }));
+  });
+
+  it("cannot accept a card written before roadmap filing, and says why", () => {
+    setCards([recCard("old", {}, { opportunity: undefined })]);
+    renderView();
+    expect(screen.getByRole("button", { name: /Accept and add to roadmap/ })).toBeDisabled();
+    expect(screen.getByText(/Written before roadmap filing/)).toBeInTheDocument();
+    press("a");
     expect(h.accept).not.toHaveBeenCalled();
-    expect(screen.getByRole("alertdialog")).toHaveTextContent("Touches the XP ledger.");
-    fireEvent.click(screen.getByRole("button", { name: "Build and release" }));
-    await waitFor(() => expect(h.accept).toHaveBeenCalledWith({ id: "m", path: "builder" }));
   });
 
   it("reject is one click and offers reason chips afterwards", async () => {
@@ -211,7 +223,7 @@ describe("ReviewView", () => {
     press("r");
     await waitFor(() => expect(h.reject).toHaveBeenCalledWith({ id: "a" }));
     press("a");
-    await waitFor(() => expect(h.accept).toHaveBeenCalledWith({ id: "b", path: "builder" }));
+    await waitFor(() => expect(h.accept).toHaveBeenCalledWith({ id: "b", versionHash: "h" }));
     press("1");
     await waitFor(() => expect(h.answer).toHaveBeenCalledWith({ id: "q", optionIndex: 0 }));
   });
@@ -276,9 +288,25 @@ describe("ReviewView", () => {
     expect(screen.getByText(/nothing met the bar/)).toBeInTheDocument();
   });
 
-  it("shows the circuit-breaker banner with Resume builds", () => {
-    renderView(stateOf({ autoBuildPaused: true }));
-    expect(screen.getByRole("button", { name: "Resume builds" })).toBeInTheDocument();
+  it("offers Add to roadmap anyway, with the matches, on a duplicate stop", async () => {
+    setCards([
+      recCard("d", {
+        status: "needs_attention",
+        needsYou: {
+          reason: "This looks like OPP-0007 already on the roadmap.",
+          actions: ["file_anyway", "dismiss"],
+          duplicates: [{ id: "opp-7", code: "OPP-0007", reason: "Same streak chip" }],
+        },
+      }),
+    ]);
+    renderView();
+    expect(screen.getByRole("link", { name: "OPP-0007" })).toHaveAttribute(
+      "href",
+      "/product-roadmap?opportunity=opp-7",
+    );
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add to roadmap anyway" }));
+    await waitFor(() => expect(h.fileAnyway).toHaveBeenCalledWith("d"));
   });
 
   it("shows first-run setup when the agent has never been on", () => {
@@ -291,7 +319,7 @@ describe("ReviewView", () => {
     h.cardsError.current = true;
     renderView();
     expect(screen.getByRole("article", { name: "Card a" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Accept and build/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Accept and add to roadmap/ })).toBeDisabled();
     expect(screen.getByText(/last cards that loaded/)).toBeInTheDocument();
   });
 });

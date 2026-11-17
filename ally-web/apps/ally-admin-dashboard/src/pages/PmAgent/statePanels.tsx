@@ -11,7 +11,6 @@ export type StatusKind =
   | "queue_full"
   | "disabled"
   | "budget_exhausted"
-  | "paused"
   | "run_failed"
   | "none";
 
@@ -20,7 +19,6 @@ export const deriveStatusKind = (state: PmAgentStateResponse | undefined): Statu
   if (!state) return "none";
   if (state.agentState === "disabled") return "disabled";
   if (state.agentState === "budget_exhausted") return "budget_exhausted";
-  if (state.agentState === "paused") return "paused";
   if (state.agentState === "running") return "running";
   if (state.lastRun?.status === "failed") return "run_failed";
   if (state.agentState === "queue_full") return "queue_full";
@@ -56,7 +54,6 @@ export interface StatusBannerProps {
   state: PmAgentStateResponse | undefined;
   disabled?: boolean;
   onRunNow: () => void;
-  onResume: () => void;
   onTurnOn: () => void;
   onOpenSettings: () => void;
 }
@@ -65,7 +62,6 @@ export const StatusBanner: React.FC<StatusBannerProps> = ({
   state,
   disabled,
   onRunNow,
-  onResume,
   onTurnOn,
   onOpenSettings,
 }) => {
@@ -114,18 +110,6 @@ export const StatusBanner: React.FC<StatusBannerProps> = ({
           </Button>
         </Box>
       );
-    case "paused":
-      return (
-        <Box tone="warn">
-          <p className="text-sm text-typography-900">
-            <span className="font-semibold">{copy.statePaused}</span> {copy.statePausedBody}
-            {reason}
-          </p>
-          <Button size="sm" disabled={disabled} onClick={onResume}>
-            {copy.resume}
-          </Button>
-        </Box>
-      );
     case "run_failed":
       return (
         <Box tone="error" role="alert">
@@ -143,25 +127,6 @@ export const StatusBanner: React.FC<StatusBannerProps> = ({
     default:
       return null;
   }
-};
-
-/** Circuit-breaker / paused auto-build banner. Shown in Review and Tracking. */
-export const BreakerBanner: React.FC<{
-  state: PmAgentStateResponse | undefined;
-  disabled?: boolean;
-  onResume: () => void;
-}> = ({ state, disabled, onResume }) => {
-  if (!state?.autoBuildPaused) return null;
-  return (
-    <Box tone="warn" role="alert">
-      <p className="text-sm text-typography-900">
-        <span className="font-semibold">{copy.breakerTitle}.</span> {copy.breakerBody}
-      </p>
-      <Button size="sm" disabled={disabled} onClick={onResume}>
-        {copy.breakerResume}
-      </Button>
-    </Box>
-  );
 };
 
 /** What to say when there are no cards left to review. */

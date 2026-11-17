@@ -258,17 +258,6 @@ const SettingsSection: React.FC<{ state: PmAgentStateResponse }> = ({ state }) =
         </div>
         <div className="flex items-center gap-2">
           <CarbonToggle
-            id="pm-pause-auto-build"
-            labelText={a.pauseAutoBuild}
-            labelA="Off"
-            labelB="On"
-            toggled={settings.pauseAutoBuild}
-            onToggle={(v: boolean) => controls.save({ pauseAutoBuild: v })}
-          />
-          <InfoTip label={a.pauseAutoBuildTip} ariaLabel="About pausing auto-build" />
-        </div>
-        <div className="flex items-center gap-2">
-          <CarbonToggle
             id="pm-slack"
             labelText={a.slackNotify}
             labelA="Off"

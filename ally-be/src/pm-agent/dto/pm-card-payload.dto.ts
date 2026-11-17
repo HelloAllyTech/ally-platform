@@ -7,6 +7,7 @@ import {
   IsBoolean,
   IsEnum,
   IsIn,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -26,6 +27,7 @@ import {
   PmRiskLevel,
 } from '../enum/pm-agent.enum';
 import { metricRefProblems, PmMetricRef } from '../impact/metric-catalog';
+import { ROADMAP_FILEABLE_EFFORTS } from 'src/product-roadmap/constants/product-roadmap.constants';
 
 /**
  * The card payload contract (docs/pm-agent.md "Card payload", schemaVersion 1).
@@ -45,6 +47,10 @@ export const PM_CARD_LIMITS = {
   TEXT_MAX: 2000,
   LINE_MAX: 300,
   LIST_MAX: 20,
+  /** The roadmap's own description cap (ROADMAP_LIMITS.DESCRIPTION_MAX). */
+  OPPORTUNITY_MAX: 1000,
+  OPPORTUNITY_MIN: 80,
+  GOAL_MAX: 120,
 } as const;
 
 const wordCount = (value: string) =>
@@ -153,6 +159,29 @@ export class PmImpactMetricDto {
   direction!: 'up' | 'down';
 }
 
+/**
+ * The roadmap entry an accepted recommendation is filed as (docs/pm-agent.md "Filing to the
+ * roadmap"). Written by the lane in the roadmap's own shape, so what the admin accepts is
+ * exactly what lands on the board: `description` is the opportunity text, `productGoal` one
+ * of the roadmap's product goal NAMES (checked against the live list by gate layer 1), and
+ * `effort` the roadmap's shirt size. The critic grades `description` against the roadmap's
+ * readiness checklist (ROADMAP_READINESS_CRITERIA) before the card is ever shown.
+ */
+export class PmOpportunityDraftDto {
+  @IsString()
+  @MinLength(PM_CARD_LIMITS.OPPORTUNITY_MIN)
+  @MaxLength(PM_CARD_LIMITS.OPPORTUNITY_MAX)
+  description!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(PM_CARD_LIMITS.GOAL_MAX)
+  productGoal!: string;
+
+  @IsIn([...ROADMAP_FILEABLE_EFFORTS])
+  effort!: (typeof ROADMAP_FILEABLE_EFFORTS)[number];
+}
+
 export class PmRecommendationPayloadDto {
   @Equals(1)
   schemaVersion!: 1;
@@ -222,6 +251,15 @@ export class PmRecommendationPayloadDto {
   @ArrayMinSize(1)
   @IsEnum(PmRepo, { each: true })
   repos!: PmRepo[];
+
+  /**
+   * Required since 2026-11-17: what Accept files to the roadmap. IsObject because
+   * ValidateNested alone lets a missing value through.
+   */
+  @IsObject()
+  @ValidateNested()
+  @Type(() => PmOpportunityDraftDto)
+  opportunity!: PmOpportunityDraftDto;
 
   @IsArray()
   @ArrayMinSize(1)

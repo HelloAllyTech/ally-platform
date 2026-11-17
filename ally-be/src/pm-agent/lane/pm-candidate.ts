@@ -12,6 +12,7 @@ import {
 import { PM_SUBMIT_TOOL } from '../constants/pm-agent-pipeline.constants';
 import { PmCandidate } from '../pipeline/pm-pipeline.types';
 import { PM_METRIC_KEYS, PM_METRIC_UNITS } from '../impact/metric-catalog';
+import { ROADMAP_FILEABLE_EFFORTS } from 'src/product-roadmap/constants/product-roadmap.constants';
 
 const str = { type: 'string' };
 const strList = { type: 'array', items: str };
@@ -102,6 +103,32 @@ const RECOMMENDATION_SCHEMA = {
       description:
         'Ids of evidence items returned by tools IN THIS RUN. Nothing else may be cited.',
     },
+    opportunity: {
+      type: 'object',
+      description:
+        'The roadmap entry Accept files, exactly as written. It must pass the roadmap filing ' +
+        'checklist in the "Filing to the roadmap" section.',
+      properties: {
+        description: {
+          type: 'string',
+          description:
+            'Plain text, 80–1000 characters, goal first: who is affected, the pain or gain, ' +
+            'what changes for them, then "Why it matters: …". A possible solution may follow ' +
+            'the goal, never replace it.',
+        },
+        productGoal: {
+          type: 'string',
+          description:
+            'Exactly one product goal NAME from the product_goals tool, copied verbatim.',
+        },
+        effort: {
+          type: 'string',
+          enum: [...ROADMAP_FILEABLE_EFFORTS],
+          description: 'Roadmap shirt size of the whole opportunity.',
+        },
+      },
+      required: ['description', 'productGoal', 'effort'],
+    },
   },
   required: [
     'title',
@@ -117,6 +144,7 @@ const RECOMMENDATION_SCHEMA = {
     'alternativesDropped',
     'repos',
     'evidenceIds',
+    'opportunity',
   ],
 };
 

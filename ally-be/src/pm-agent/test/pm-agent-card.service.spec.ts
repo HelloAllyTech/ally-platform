@@ -96,13 +96,11 @@ describe('PmAgentCardService — the card state machine', () => {
 
   afterEach(() => clock.restore());
 
-  describe('accept & build', () => {
+  describe('accept files to the roadmap', () => {
     it('moves to accepted_pending with a 10 s undo window and a not-yet-due outbox row', async () => {
       const card = cards.add(makeCard());
 
-      const result = await service.accept(ADMIN, card.id, {
-        path: PmAcceptPath.BUILDER,
-      });
+      const result = await service.accept(ADMIN, card.id, {});
 
       expect(result.status).toBe(PmCardStatus.ACCEPTED_PENDING);
       expect(new Date(result.undoUntil!).getTime()).toBe(clock.now + 10_000);
@@ -124,8 +122,8 @@ describe('PmAgentCardService — the card state machine', () => {
       const card = cards.add(makeCard());
 
       const results = await Promise.allSettled([
-        service.accept(ADMIN, card.id, { path: PmAcceptPath.BUILDER }),
-        service.accept(OTHER_ADMIN, card.id, { path: PmAcceptPath.BUILDER }),
+        service.accept(ADMIN, card.id, {}),
+        service.accept(OTHER_ADMIN, card.id, {}),
       ]);
 
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
@@ -141,38 +139,49 @@ describe('PmAgentCardService — the card state machine', () => {
 
       await expect(
         service.accept(ADMIN, card.id, {
-          path: PmAcceptPath.BUILDER,
           versionHash: 'not-the-hash',
         }),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(cards.get(card.id).status).toBe(PmCardStatus.OPEN);
     });
 
-    it('hands off for download without touching the outbox', async () => {
+    it('records the roadmap path and a file_roadmap outbox row, whatever path an old client sends', async () => {
       const card = cards.add(makeCard());
 
-      const result = await service.accept(ADMIN, card.id, {
-        path: PmAcceptPath.DOWNLOAD,
-      });
+      await service.accept(ADMIN, card.id, { path: PmAcceptPath.DOWNLOAD });
 
-      expect(result.status).toBe(PmCardStatus.HANDED_OFF);
+      expect(cards.get(card.id).acceptPath).toBe(PmAcceptPath.ROADMAP);
+      expect(outbox.forCard(card.id)).toMatchObject({
+        step: PmOutboxStep.FILE_ROADMAP,
+        status: PmOutboxStatus.PENDING,
+      });
+    });
+
+    it('refuses a card written before roadmap filing (no roadmap entry, 422)', async () => {
+      const payload = { ...makeCard().payload };
+      delete payload.opportunity;
+      const card = cards.add(makeCard({ payload }));
+
+      await expect(service.accept(ADMIN, card.id, {})).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      expect(cards.get(card.id).status).toBe(PmCardStatus.OPEN);
       expect(outbox.rows.size).toBe(0);
-      expect(cards.get(card.id).compiledPrdHash).toMatch(/^[a-f0-9]{64}$/);
     });
 
     it('refuses to accept a question (422)', async () => {
       const card = cards.add(makeCard({ kind: PmCardKind.QUESTION }));
 
-      await expect(
-        service.accept(ADMIN, card.id, { path: PmAcceptPath.BUILDER }),
-      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      await expect(service.accept(ADMIN, card.id, {})).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
     });
   });
 
   describe('undo', () => {
     it('restores the card to open and deletes the outbox row inside the window', async () => {
       const card = cards.add(makeCard());
-      await service.accept(ADMIN, card.id, { path: PmAcceptPath.BUILDER });
+      await service.accept(ADMIN, card.id, {});
       clock.advance(9_000);
 
       const result = await service.undo(ADMIN, card.id);
@@ -188,7 +197,7 @@ describe('PmAgentCardService — the card state machine', () => {
 
     it('answers 409 once the window has closed', async () => {
       const card = cards.add(makeCard());
-      await service.accept(ADMIN, card.id, { path: PmAcceptPath.BUILDER });
+      await service.accept(ADMIN, card.id, {});
       clock.advance(10_001);
 
       await expect(service.undo(ADMIN, card.id)).rejects.toBeInstanceOf(
@@ -200,7 +209,7 @@ describe('PmAgentCardService — the card state machine', () => {
 
     it('answers 409 (and rolls back) when the worker already claimed the row', async () => {
       const card = cards.add(makeCard());
-      await service.accept(ADMIN, card.id, { path: PmAcceptPath.BUILDER });
+      await service.accept(ADMIN, card.id, {});
       outbox.forCard(card.id)!.status = PmOutboxStatus.RUNNING;
 
       await expect(service.undo(ADMIN, card.id)).rejects.toBeInstanceOf(
@@ -212,12 +221,10 @@ describe('PmAgentCardService — the card state machine', () => {
 
     it('a card can be accepted again after an undo (the unique outbox row is gone)', async () => {
       const card = cards.add(makeCard());
-      await service.accept(ADMIN, card.id, { path: PmAcceptPath.BUILDER });
+      await service.accept(ADMIN, card.id, {});
       await service.undo(ADMIN, card.id);
 
-      const again = await service.accept(ADMIN, card.id, {
-        path: PmAcceptPath.BUILDER,
-      });
+      const again = await service.accept(ADMIN, card.id, {});
 
       expect(again.status).toBe(PmCardStatus.ACCEPTED_PENDING);
       expect(outbox.rows.size).toBe(1);
@@ -265,7 +272,7 @@ describe('PmAgentCardService — the card state machine', () => {
 
     it('cannot reject a card that was already accepted (409)', async () => {
       const card = cards.add(makeCard());
-      await service.accept(ADMIN, card.id, { path: PmAcceptPath.BUILDER });
+      await service.accept(ADMIN, card.id, {});
 
       await expect(
         service.reject(OTHER_ADMIN, card.id, {}),
@@ -348,7 +355,7 @@ describe('PmAgentCardService — the card state machine', () => {
       const open = [1, 2, 3, 4, 5].map(() => cards.add(makeCard()));
       expect(await service.freeSlots()).toBe(0);
 
-      await service.accept(ADMIN, open[0].id, { path: PmAcceptPath.BUILDER });
+      await service.accept(ADMIN, open[0].id, {});
       await service.reject(ADMIN, open[1].id, {});
       await service.feedback(ADMIN, open[2].id, { text: 'x' });
 
@@ -361,11 +368,11 @@ describe('PmAgentCardService — the card state machine', () => {
   });
 
   describe('needs-you actions', () => {
-    it('retry moves a failed card back to queued and reopens its outbox row at the build', async () => {
+    it('retry moves a stopped card back to queued and reopens its outbox row at filing', async () => {
       const card = cards.add(
         makeCard({
-          status: PmCardStatus.FAILED,
-          builderSessionId: 'sess-1',
+          status: PmCardStatus.NEEDS_ATTENTION,
+          needsYouReason: 'The roadmap refused the filing.',
           decidedBy: ADMIN,
         }),
       );
@@ -373,40 +380,21 @@ describe('PmAgentCardService — the card state machine', () => {
         cardId: card.id,
         dueAt: clock.date(),
         createdBy: ADMIN,
-        step: PmOutboxStep.DONE,
-        status: PmOutboxStatus.DONE,
+        step: PmOutboxStep.FILE_ROADMAP,
+        status: PmOutboxStatus.FAILED,
       });
 
       const result = await service.retry(ADMIN, card.id);
 
       expect(result.status).toBe(PmCardStatus.QUEUED);
+      expect(cards.get(card.id).needsYouReason).toBeNull();
       expect(outbox.forCard(card.id)).toMatchObject({
         status: PmOutboxStatus.PENDING,
-        step: PmOutboxStep.START_DESIGN,
+        step: PmOutboxStep.FILE_ROADMAP,
       });
     });
 
-    it('retry resumes a chain that stopped mid-way at the step it stopped', async () => {
-      const card = cards.add(
-        makeCard({
-          status: PmCardStatus.NEEDS_ATTENTION,
-          builderSessionId: 'sess-1',
-        }),
-      );
-      await outbox.insertWith(null, {
-        cardId: card.id,
-        dueAt: clock.date(),
-        createdBy: ADMIN,
-        step: PmOutboxStep.PATCH_PRD,
-        status: PmOutboxStatus.FAILED,
-      });
-
-      await service.retry(ADMIN, card.id);
-
-      expect(outbox.forCard(card.id)!.step).toBe(PmOutboxStep.PATCH_PRD);
-    });
-
-    it('retry is refused for a card that is not failed (409)', async () => {
+    it('retry is refused for a card that is not stopped (409)', async () => {
       const card = cards.add(makeCard());
 
       await expect(service.retry(ADMIN, card.id)).rejects.toBeInstanceOf(
@@ -414,38 +402,57 @@ describe('PmAgentCardService — the card state machine', () => {
       );
     });
 
-    it('dismiss takes the item off the needs-you list without changing status', async () => {
+    it('a duplicate stop offers File anyway, which records who overrode it and refiles', async () => {
+      const duplicates = [
+        { id: 'opp-1', code: 'OPP-0101', reason: 'Same streak chip' },
+      ];
       const card = cards.add(
         makeCard({
-          status: PmCardStatus.MERGED_NOT_RELEASED,
-          builderSessionId: 'sess-1',
+          status: PmCardStatus.NEEDS_ATTENTION,
+          needsYouReason: 'This looks like OPP-0101 already on the roadmap.',
+          roadmapFiling: { duplicates },
+          decidedBy: ADMIN,
         }),
       );
 
       const before = PmAgentPresenterService.toResponse(cards.get(card.id));
-      expect(before.needsYou?.actions).toEqual(['open_pr', 'dismiss']);
+      expect(before.needsYou).toMatchObject({
+        actions: ['file_anyway', 'dismiss'],
+        duplicates,
+      });
+
+      const result = await service.fileAnyway(OTHER_ADMIN, card.id);
+
+      expect(result.status).toBe(PmCardStatus.QUEUED);
+      expect(cards.get(card.id).roadmapFiling).toMatchObject({
+        duplicates,
+        fileAnyway: { by: OTHER_ADMIN },
+      });
+      expect(outbox.forCard(card.id)!.step).toBe(PmOutboxStep.FILE_ROADMAP);
+    });
+
+    it('File anyway is refused for a stop that was not a duplicate (409)', async () => {
+      const card = cards.add(
+        makeCard({ status: PmCardStatus.NEEDS_ATTENTION }),
+      );
+
+      await expect(service.fileAnyway(ADMIN, card.id)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('dismiss takes the item off the needs-you list without changing status', async () => {
+      const card = cards.add(
+        makeCard({ status: PmCardStatus.NEEDS_ATTENTION }),
+      );
+
+      const before = PmAgentPresenterService.toResponse(cards.get(card.id));
+      expect(before.needsYou?.actions).toEqual(['retry', 'dismiss']);
 
       const result = await service.dismiss(ADMIN, card.id);
 
-      expect(result.status).toBe(PmCardStatus.MERGED_NOT_RELEASED);
+      expect(result.status).toBe(PmCardStatus.NEEDS_ATTENTION);
       expect(result.needsYou).toBeUndefined();
     });
-  });
-
-  it('plan.md is compiled and anonymised', async () => {
-    const card = cards.add(
-      makeCard({
-        payload: {
-          ...makeCard().payload,
-          problem: 'Acme Health learners (ops@acme.example) stop after day 1.',
-        },
-      }),
-    );
-
-    const markdown = await service.planMarkdown(card.id);
-
-    expect(markdown).toContain('# Show the streak count');
-    expect(markdown).not.toContain('Acme Health');
-    expect(markdown).not.toContain('ops@acme.example');
   });
 });

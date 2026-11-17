@@ -65,7 +65,12 @@ export function computeLearnedStats(
       case PmDecision.ACCEPTED:
       case PmDecision.HANDED_OFF:
         if (row.buildFailed || row.reverted) negative = w;
-        else positive = w * (row.merged || row.released ? 1.5 : 1);
+        // Filed, then archived on the roadmap: the team looked and passed. Softer than a
+        // reject (accepting it was still a yes), so the accept and the archive net out.
+        else if (row.roadmapArchived) {
+          positive = 0.5 * w;
+          negative = 0.5 * w;
+        } else positive = w * (row.merged || row.released ? 1.5 : 1);
         // Measured impact at +14 d (impact checks): improved +1, worse −1; flat and
         // insufficient data are 0. Outcome beats opinion: a shipped card that made its
         // metric worse nets negative.

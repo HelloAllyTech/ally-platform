@@ -75,6 +75,10 @@ export class PmAgentOutcome extends BaseWithoutTenantEntity {
   @Column({ type: 'boolean', default: false })
   healthCheckFailed!: boolean;
 
+  /** Filed to the roadmap, then archived or removed there (migration 1982100000100). */
+  @Column({ type: 'boolean', default: false })
+  roadmapArchived!: boolean;
+
   @Column({ type: 'varchar', length: 120, nullable: true })
   impactMetricName?: string | null;
 
