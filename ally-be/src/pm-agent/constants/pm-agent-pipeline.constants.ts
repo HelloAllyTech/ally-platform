@@ -34,8 +34,15 @@ export const PM_PIPELINE = {
   /** Wall clock per lane and per run. */
   LANE_TIMEOUT_MS: 4 * 60_000,
   RUN_TIMEOUT_MS: 20 * 60_000,
-  /** A `running` row older than this is a crashed run; the scheduler fails it. */
-  STALE_RUN_MS: 45 * 60_000,
+  /**
+   * A `running` row older than this is a crashed run (usually a deploy killed the task
+   * mid-run); the scheduler's 10-minute tick fails it, and until then the UI shows the
+   * agent as running and Run now stays disabled. A live run cannot outlast
+   * RUN_TIMEOUT_MS by much: lanes are clamped to the run deadline, then the critic gets
+   * one call plus one fallback (2 × CALL_TIMEOUT_MS) — about 23.5 min in all. Keep this
+   * just above that, not far above it.
+   */
+  STALE_RUN_MS: 30 * 60_000,
   /** Tool results the model reads, after fencing. */
   TOOL_RESULT_MAX_CHARS: 12_000,
   /** Evidence snapshot kept per item (internal; never in a compiled PRD). */

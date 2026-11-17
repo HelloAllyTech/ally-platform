@@ -9,6 +9,7 @@ import {
   PmRunStatus,
   PmRunTrigger,
 } from '../enum/pm-agent.enum';
+import { PM_PIPELINE } from '../constants/pm-agent-pipeline.constants';
 import { PmAgentCard } from '../entity/pm-agent-card.entity';
 import { PmAgentMemory } from '../entity/pm-agent-memory.entity';
 import { PmRunPipeline } from '../pipeline/pm-run-pipeline';
@@ -506,5 +507,16 @@ describe('daily schedule', () => {
     expect(
       PmAgentRunSchedulerService.isDue(9, at('2026-11-17T10:00:00Z'), true),
     ).toBe(false);
+  });
+});
+
+describe('stale-run window', () => {
+  it('fails a dead run soon after the longest a live run can take, never before', () => {
+    // Lanes stop at the run deadline; the critic then gets one call and one fallback.
+    const longestLiveRunMs =
+      PM_PIPELINE.RUN_TIMEOUT_MS + 2 * PM_PIPELINE.CALL_TIMEOUT_MS;
+    expect(PM_PIPELINE.STALE_RUN_MS).toBeGreaterThan(longestLiveRunMs);
+    // A deploy mid-run leaves the page showing "Running" until this passes.
+    expect(PM_PIPELINE.STALE_RUN_MS).toBeLessThanOrEqual(30 * 60_000);
   });
 });
