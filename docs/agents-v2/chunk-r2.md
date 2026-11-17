@@ -11,7 +11,7 @@ Since 3r, eight chunks have added to the agent runtime: streaming, the gateway, 
 
 ## Part 1 — Review (then the stop)
 
-Write `docs/agents-v2/R2-REVIEW.md`: every finding with its file and line, why it matters, the proposed change, its risk, and an estimate. Group them as below. Check LangGraph against **its current documentation and release notes** (look them up; don't rely on memory), and note the version in use against the latest stable.
+Write `docs/agents-v2/R2-REVIEW.md`: every finding with its file and line, why it matters, the proposed change, its risk, and an estimate. Group them as below. Check LangGraph against **its current documentation and release notes** (look them up; don't rely on memory), and note the version in use against the latest stable. <!-- docs-path-lint: planned -->
 
 ### A. Are we using LangGraph well?
 
