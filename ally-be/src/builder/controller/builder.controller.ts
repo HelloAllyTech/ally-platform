@@ -42,6 +42,7 @@ import {
 } from '../util/builder-autonomy.util';
 import { BuilderSettingsService } from '../service/builder-settings.service';
 import { AUTO_RELEASE_HELD_PATHS_DEFAULT } from 'src/product-planning/constants/product-planning.constants';
+import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.service';
 import { BuilderNotificationService } from '../service/builder-notification.service';
 import { BuilderExemplarService } from '../service/builder-exemplar.service';
 import { BuilderMetricsService } from '../service/builder-metrics.service';
@@ -113,6 +114,7 @@ export class BuilderController {
     private readonly catalogService: BuilderCatalogService,
     private readonly evidenceLog: BuilderEvidenceLogService,
     private readonly decisionService: BuilderDecisionService,
+    private readonly roadmapRoles: RoadmapRoleService,
   ) {}
 
   @Post('sessions')
@@ -756,10 +758,22 @@ export class BuilderController {
     permissions: [PERMISSIONS.EDIT_BUILDER],
   })
   @ApiOperation({ summary: 'Update Builder settings' })
-  updateSettings(
+  async updateSettings(
     @Body() dto: UpdateBuilderSettingsDto,
     @CurrentUser() user: TokenUser,
   ) {
+    // The roadmap_v2 flag moves every Roadmap and Builder user at once (D8),
+    // so it is the Owner's switch (plans/roadmap-builder-merge §3.1:
+    // configure is Owner-only), not every Builder's. The other settings keep
+    // their Builder gate.
+    if (
+      dto.roadmapV2Enabled !== undefined &&
+      (await this.roadmapRoles.roleOf(user.id)) !== 'owner'
+    ) {
+      throw new ForbiddenException(
+        'Only a Roadmap Owner (Product Roadmap — Manage) can switch Roadmap v2 on or off.',
+      );
+    }
     return this.settingsService.update(
       {
         ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
