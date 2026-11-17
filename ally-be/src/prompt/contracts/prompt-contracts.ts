@@ -528,10 +528,6 @@ export const COURSE_COPILOT_ARTICLE_WRITER = definePrompt(
 /** src/prompts/course_copilot/blueprint_planner.txt */
 export const COURSE_COPILOT_BLUEPRINT_PLANNER = definePrompt(
   'course_copilot_blueprint_planner',
-  /**
-   * Turns the trainer's interview brief into a course blueprint for approval: sections as simple-to-complex task classes, each item's type, purpose, outcomes, minutes, source (library pick, new, or needs a video link), generation spec and completion rule. Capstone last, worked example before the first roleplay, journal after every practice block, games only as breaks. JSON mode; normalised and limit-checked in code.
-   * Updated to include completionLogic and minDurationSeconds for ROLEPLAY items.
-   */
   {
     brief_json: 'required',
     duration_minutes: 'optional',
