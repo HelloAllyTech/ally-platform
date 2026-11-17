@@ -20,6 +20,7 @@ class FakeBoardDb {
   bugs: any[] = [];
   /** The old Bug Hunter's `public.bug_findings`, top-level rows only. */
   findings: any[] = [];
+  events: any[] = [];
   settings = { mode: 'off', daily_run_limit: 10, updated_by: null };
   schemaPresent = true;
   failInsert = false;
@@ -65,6 +66,23 @@ class FakeBoardDb {
         queued_by: params[2],
       });
       return [[{ id: b.id }], 1];
+    }
+    if (
+      s.startsWith(
+        'SELECT id, source, repo, title, description, status, severity',
+      )
+    ) {
+      return this.findings
+        .filter((f) => f.id === params[0] && !f.parent_finding_id)
+        .map((f) => ({
+          ...f,
+          dispatched_at: null,
+          decided_at: null,
+          released_at: null,
+        }));
+    }
+    if (s.startsWith('SELECT stage, summary')) {
+      return this.events.filter((e) => e.finding_id === params[0]);
     }
     if (s.startsWith('INSERT INTO bughunter.bugs')) {
       if (this.failInsert) throw new Error('connection reset');
@@ -284,6 +302,36 @@ describe('BugHunterBoardService', () => {
     // Plan steps stay out; a reported bug v2 also has counts once.
     expect(BOARD_ROWS_SQL).toContain('f.parent_finding_id IS NULL');
     expect(BOARD_ROWS_SQL).toContain("'reported:' || f.reported_bug_id::text");
+  });
+
+  it('opens a v1 bug in v2, read-only, with its history', async () => {
+    fake.findings = [
+      finding('a', 'merged', { pr_url: 'https://example.test/pr/2' }),
+      finding('step', 'fixing', { parent_finding_id: 'a' }),
+    ];
+    fake.events = [
+      {
+        finding_id: 'a',
+        stage: 'pr_opened',
+        summary: 'Opened a PR',
+        created_at: new Date('2026-10-02T00:00:00Z'),
+      },
+    ];
+    const out = await service.v1Detail('a');
+    expect(out).toMatchObject({
+      origin: 'v1',
+      v1FindingId: 'a',
+      status: 'merged',
+      tab: 'done',
+      prUrl: 'https://example.test/pr/2',
+      events: [{ stage: 'pr_opened', summary: 'Opened a PR' }],
+    });
+    await expect(service.v1Detail('step')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(service.v1Detail('nope')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('switches the mode with an audit entry of before and after', async () => {

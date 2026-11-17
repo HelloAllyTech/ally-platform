@@ -121,3 +121,30 @@ export interface BugHunterV2Board {
   counts: Record<BugHunterV2Tab, number>;
   items: BugHunterV2Bug[];
 }
+
+/** One of the old Bug Hunter's findings, read-only, as Bug Hunter v2 shows it. */
+export interface BugHunterV2V1BugDetail {
+  origin: "v1";
+  v1FindingId: string;
+  /** `v1:<finding source>` */
+  source: string;
+  app: string | null;
+  title: string;
+  description: string;
+  status: string;
+  tab: BugHunterV2Tab;
+  severity: string | null;
+  file: string | null;
+  evidence: string | null;
+  prUrl: string | null;
+  escalationQuestion: string | null;
+  escalationAnswer: string | null;
+  decisionReason: string | null;
+  decisionNote: string | null;
+  releaseTag: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  decidedAt: string | null;
+  releasedAt: string | null;
+  events: { stage: string; summary: string; at: string }[];
+}

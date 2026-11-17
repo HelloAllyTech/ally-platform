@@ -2720,6 +2720,22 @@ export const en = {
       superseded: "Replaced",
       by: "by admin",
     },
+    v1Bug: {
+      readOnly:
+        "Found or handled by the old Bug Hunter. Read-only here: Bug Hunter v2 does not run or change it.",
+      description: "What was reported",
+      evidence: "Evidence",
+      outcome: "Outcome",
+      question: "Question asked",
+      answer: "Answer",
+      decision: "Decision",
+      pr: "Pull request",
+      release: "Release",
+      history: "History",
+      noHistory: "No history recorded for this bug.",
+      none: "—",
+      loadError: "Could not load this bug.",
+    },
     board: {
       title: "Bug Hunter v2",
       intro:
@@ -2792,7 +2808,7 @@ export const en = {
       noApp: "—",
       v1Badge: "v1",
       v1Help:
-        "Found or handled by the old Bug Hunter. Shown here so the board has the whole history; it opens in the old Bug Hunter, which still owns it.",
+        "Found or handled by the old Bug Hunter. Shown here so the board has the whole history; Bug Hunter v2 does not run it.",
     },
   },
   bugHunter: {

@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   bugsQuery: vi.fn(),
   setMode: vi.fn(),
   start: vi.fn(),
+  v1Query: vi.fn(),
 }));
 
 vi.mock("@api", async importOriginal => ({
@@ -22,12 +23,14 @@ vi.mock("@api", async importOriginal => ({
   useSetBugHunterV2ModeMutation: () => [api.setMode, { isLoading: false }],
   useStartBugHunterV2BugMutation: () => [api.start, { isLoading: false }],
   useGetBugHunterV2ReportQuery: (id: unknown) => api.reportQuery(id),
+  useGetBugHunterV2V1BugQuery: (id: unknown) => api.v1Query(id),
   useRecordBugHunterV2VerdictMutation: () => [api.record, { isLoading: false }],
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { BugHunterV2ReportDetail } from "../BugHunterV2ReportDetail";
 import { BugHunterV2Board } from "../BugHunterV2Board";
+import { BugHunterV2V1Bug } from "../BugHunterV2V1Bug";
 import { VerdictForm } from "../VerdictForm";
 
 const strings = en.bugHunterV2;
@@ -201,12 +204,21 @@ describe("Bug Hunter v2 board", () => {
         ],
       },
     });
-    renderBoard();
+    render(
+      <MemoryRouter initialEntries={["/bug-hunter-v2"]}>
+        <Routes>
+          <Route path="/bug-hunter-v2" element={<BugHunterV2Board />} />
+          <Route path="/bug-hunter-v2/v1/:findingId" element={<div>v1 bug page</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
     expect(screen.getByText(board.v1Badge)).toBeInTheDocument();
     expect(screen.getByText("Old lint bug")).toBeInTheDocument();
     // Only the v2 row offers Start fix.
     expect(screen.getAllByRole("button", { name: board.startFix })).toHaveLength(1);
-    expect(screen.getByTestId("bug-row-v1-f-1")).toHaveClass("cursor-pointer");
+    fireEvent.click(screen.getByTestId("bug-row-v1-f-1"));
+    // Opens inside v2, not the old Bug Hunter.
+    expect(screen.getByText("v1 bug page")).toBeInTheDocument();
   });
 
   it("explains a missing Bug Hunter database instead of a generic error", () => {
@@ -287,5 +299,52 @@ describe("verdict form", () => {
     });
     expect(screen.getByText(strings.verdict.amendTitle)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: strings.verdict.amend })).toBeInTheDocument();
+  });
+});
+
+describe("Bug Hunter v2: an old Bug Hunter finding", () => {
+  it("shows it read-only inside v2, with its outcome and history", () => {
+    api.v1Query.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        origin: "v1",
+        v1FindingId: "f-1",
+        source: "v1:reported_bug",
+        app: "ally-web",
+        title: "Old reported bug",
+        description: "Save does nothing",
+        status: "merged",
+        tab: "done",
+        severity: "high",
+        file: null,
+        evidence: null,
+        prUrl: "https://example.test/pr/3",
+        escalationQuestion: null,
+        escalationAnswer: null,
+        decisionReason: null,
+        decisionNote: null,
+        releaseTag: null,
+        createdAt: "2026-10-01T00:00:00Z",
+        startedAt: null,
+        decidedAt: null,
+        releasedAt: null,
+        events: [{ stage: "pr_opened", summary: "Opened the fix PR", at: "2026-10-02T00:00:00Z" }],
+      },
+    });
+    render(
+      <MemoryRouter initialEntries={["/bug-hunter-v2/v1/f-1"]}>
+        <Routes>
+          <Route path="/bug-hunter-v2/v1/:findingId" element={<BugHunterV2V1Bug />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(api.v1Query).toHaveBeenCalledWith("f-1");
+    expect(screen.getByText("Old reported bug")).toBeInTheDocument();
+    expect(screen.getByText(en.bugHunterV2.v1Bug.readOnly)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "https://example.test/pr/3" })).toBeInTheDocument();
+    expect(screen.getByText("Opened the fix PR")).toBeInTheDocument();
+    // Nothing to act on: v2 never runs a v1 bug.
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

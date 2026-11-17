@@ -326,6 +326,7 @@ describe('BugHunterApprovalsController access', () => {
     'settings',
     'setMode',
     'bugs',
+    'v1Bug',
     'start',
   ] as const;
   const proto = BugHunterApprovalsController.prototype as any;

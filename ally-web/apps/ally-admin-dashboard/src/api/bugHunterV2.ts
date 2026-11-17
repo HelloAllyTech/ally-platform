@@ -5,6 +5,7 @@ import {
   BugHunterV2ReportDetail,
   BugHunterV2Settings,
   BugHunterV2Tab,
+  BugHunterV2V1BugDetail,
   BugHunterV2VerdictInput,
 } from "@types";
 
@@ -44,6 +45,13 @@ export const bugHunterV2API = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
     }),
+    getBugHunterV2V1Bug: builder.query<BugHunterV2V1BugDetail, string>({
+      query: findingId => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.V1_BUG(findingId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
     getBugHunterV2Report: builder.query<BugHunterV2ReportDetail, number>({
       query: id => ({ url: ApiEndpoints.BUG_HUNTER_V2.REPORT(id), method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
@@ -65,5 +73,6 @@ export const {
   useGetBugHunterV2BugsQuery,
   useStartBugHunterV2BugMutation,
   useGetBugHunterV2ReportQuery,
+  useGetBugHunterV2V1BugQuery,
   useRecordBugHunterV2VerdictMutation,
 } = bugHunterV2API;

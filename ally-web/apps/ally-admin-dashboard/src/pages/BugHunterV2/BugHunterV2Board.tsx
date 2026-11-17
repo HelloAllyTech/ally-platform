@@ -289,10 +289,10 @@ const BugTable: FC<{ bugs: BugHunterV2Bug[]; modeOff: boolean }> = ({ bugs, mode
       </thead>
       <tbody>
         {bugs.map(b => {
-          // A v2 row opens its report; a v1 row opens in the old Bug Hunter, which owns it.
+          // A v2 row opens its report; a v1 row opens read-only here, never the old page.
           const target =
             b.origin === "v1"
-              ? `${ROUTES.BUG_HUNTER}?bug=${encodeURIComponent(b.v1FindingId ?? "")}`
+              ? ROUTES.BUG_HUNTER_V2_V1_BUG(b.v1FindingId ?? "")
               : b.reportId !== null
                 ? ROUTES.BUG_HUNTER_V2_REPORT(b.reportId)
                 : null;

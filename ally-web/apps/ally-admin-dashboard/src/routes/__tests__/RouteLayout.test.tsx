@@ -73,6 +73,7 @@ vi.mock("@pages", () => ({
   AgentLogsPage: () => <div>AgentLogsPage</div>,
   BugHunterV2Board: () => <div>BugHunterV2ReportsPage</div>,
   BugHunterV2ReportDetail: () => <div>BugHunterV2ReportDetailPage</div>,
+  BugHunterV2V1Bug: () => <div>BugHunterV2V1BugPage</div>,
   PmAgentPage: () => <div>PmAgentPage</div>,
   DebriefSettingsPage: () => <div>DebriefSettingsPage</div>,
   Competencies: () => <div>CompetenciesPage</div>,
@@ -226,10 +227,11 @@ describe("RouteLayout", () => {
     expect(screen.getByText("CourseCopilotSessionPage")).toBeInTheDocument();
   });
 
-  it("gates both Bug Hunter v2 routes on the bug_hunter_v2_verdicts toggle", () => {
+  it("gates every Bug Hunter v2 route on the bug_hunter_v2_verdicts toggle", () => {
     for (const [path, page] of [
       [ROUTES.BUG_HUNTER_V2, "BugHunterV2ReportsPage"],
       [ROUTES.BUG_HUNTER_V2_REPORT(7), "BugHunterV2ReportDetailPage"],
+      [ROUTES.BUG_HUNTER_V2_V1_BUG("f-1"), "BugHunterV2V1BugPage"],
     ] as const) {
       privateLayoutCalls.props.length = 0;
       window.history.pushState({}, "", path);

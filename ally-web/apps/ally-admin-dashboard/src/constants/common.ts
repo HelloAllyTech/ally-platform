@@ -723,6 +723,8 @@ export const ApiEndpoints = {
     MODE: "/v1/bug-hunter-approvals/settings/mode",
     BUGS: "/v1/bug-hunter-approvals/bugs",
     START: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/start`,
+    V1_BUG: (findingId: string) =>
+      `/v1/bug-hunter-approvals/bugs/v1/${encodeURIComponent(findingId)}`,
   },
   BUG_HUNTER: {
     SETTINGS: "/v1/bug-hunter/settings",
@@ -1248,6 +1250,7 @@ export const ROUTES = {
   BUG_HUNTER: "/bug-hunter",
   BUG_HUNTER_V2: "/bug-hunter-v2",
   BUG_HUNTER_V2_REPORT: (id: string | number) => `/bug-hunter-v2/${id}`,
+  BUG_HUNTER_V2_V1_BUG: (findingId: string) => `/bug-hunter-v2/v1/${findingId}`,
   BUILDER: "/builder",
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",

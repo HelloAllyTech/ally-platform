@@ -56,8 +56,9 @@ is no sync job.
 - v1's plan steps (`parent_finding_id`) are left out, as v1's own reports do.
 - A bug reported after v2 was set up exists on both sides; the v1 copy is dropped so
   it counts once.
-- A v1 row shows v1's status and source labels and a "v1" tag, opens in the old Bug
-  Hunter (`/bug-hunter?bug=<id>`), and has no Start fix: v2's worker never touches it.
+- A v1 row shows v1's status and source labels and a "v1" tag, opens read-only inside v2
+  (`/bug-hunter-v2/v1/<id>`: description, evidence, outcome, PR, release, history from
+  `bug_hunt_events`), and has no Start fix: v2's worker never touches it.
 
 ## Code map
 

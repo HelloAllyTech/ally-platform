@@ -241,6 +241,63 @@ export class BugHunterBoardService {
     };
   }
 
+  /**
+   * One of the old Bug Hunter's findings, read-only, with its history: so a v1 row
+   * on the v2 board opens here rather than sending the reader to the old page.
+   * Plan steps are not board rows, so they are not served either.
+   */
+  async v1Detail(findingId: string) {
+    const ds = await this.db.get();
+    const [f] = await ds.query(
+      `SELECT id, source, repo, title, description, status, severity, file, evidence,
+              pr_url, escalation_question, escalation_answer, decision_reason,
+              decision_note, release_tag, "createdAt" AT TIME ZONE 'UTC' AS created_at,
+              dispatched_at AT TIME ZONE 'UTC' AS dispatched_at,
+              decided_at AT TIME ZONE 'UTC' AS decided_at,
+              released_at AT TIME ZONE 'UTC' AS released_at
+         FROM public.bug_findings
+        WHERE id = $1 AND parent_finding_id IS NULL`,
+      [findingId],
+    );
+    if (!f) throw new NotFoundException('No such bug.');
+    const events = await ds.query(
+      `SELECT stage, summary, "createdAt" AT TIME ZONE 'UTC' AS created_at
+         FROM public.bug_hunt_events
+        WHERE finding_id = $1
+        ORDER BY "createdAt" ASC
+        LIMIT 200`,
+      [findingId],
+    );
+    return {
+      origin: 'v1' as const,
+      v1FindingId: f.id,
+      source: `v1:${f.source}`,
+      app: f.repo ?? null,
+      title: f.title,
+      description: f.description ?? '',
+      status: f.status,
+      tab: V1_STATUS_TAB[f.status] ?? 'backlog',
+      severity: f.severity ?? null,
+      file: f.file ?? null,
+      evidence: f.evidence ?? null,
+      prUrl: f.pr_url ?? null,
+      escalationQuestion: f.escalation_question ?? null,
+      escalationAnswer: f.escalation_answer ?? null,
+      decisionReason: f.decision_reason ?? null,
+      decisionNote: f.decision_note ?? null,
+      releaseTag: f.release_tag ?? null,
+      createdAt: new Date(f.created_at).toISOString(),
+      startedAt: iso(f.dispatched_at),
+      decidedAt: iso(f.decided_at),
+      releasedAt: iso(f.released_at),
+      events: (events as any[]).map((e) => ({
+        stage: e.stage,
+        summary: e.summary,
+        at: new Date(e.created_at).toISOString(),
+      })),
+    };
+  }
+
   /** Start fix (backlog) or Retry (failed): queue it for the worker. */
   async start(id: number, dto: StartBugDto, userId: number) {
     const ds = await this.db.get();
