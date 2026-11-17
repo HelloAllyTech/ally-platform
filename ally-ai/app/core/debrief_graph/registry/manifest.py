@@ -122,6 +122,9 @@ class AgentManifest:
     #: and the case memory the Analyst must read. Agents that `require` one
     #: are satisfied by the floor.
     floor: bool = False
+    #: Release/run-level gate beyond "the release lists it": e.g. the guidance
+    #: agent is offered only when its settings give it a cap and a tool.
+    offered_when: Optional[Callable[[Ctx], bool]] = None
 
     @property
     def node(self) -> str:

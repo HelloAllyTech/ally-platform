@@ -133,6 +133,7 @@ const STEP_NAMES: Record<string, string> = {
   [DEBRIEF_PROMPT_CODES.languageSpecialist]: 'Language specialist',
   [DEBRIEF_PROMPT_CODES.progress]: 'Progress',
   [DEBRIEF_PROMPT_CODES.progressReader]: 'Progress',
+  [DEBRIEF_PROMPT_CODES.guidanceAgent]: 'Guidance agent',
   debrief_quality_judge_system: 'Judge',
 };
 

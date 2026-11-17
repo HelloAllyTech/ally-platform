@@ -19,6 +19,7 @@ import {
   DebriefModelCatalog,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
   DEBRIEF_SESSION_BUDGET_DEFAULT,
+  GUIDANCE_TOOLS_DEFAULT,
   isOrchestrated,
   orchestratorModels,
   validateDebriefBundle,
@@ -56,7 +57,7 @@ import {
   DebriefRiskCueOptionService,
   STANDARD_RISK_CUE,
 } from './debrief-risk-cue-option.service';
-import { FOUNDATIONAL_FRAMEWORK } from '../constants/debrief-framework.constants';
+import { emptyFramework } from '../constants/debrief-framework.constants';
 import {
   DEBRIEF_ORCHESTRATOR_TOOLS,
   DEBRIEF_GATEWAY_TOOLS,
@@ -113,6 +114,7 @@ const GRAPH_PROMPT_CODES: readonly string[] = [
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
   DEBRIEF_PROMPT_CODES.progress,
+  DEBRIEF_PROMPT_CODES.guidanceAgent,
   DEBRIEF_PROMPT_CODES.writer,
   DEBRIEF_PROMPT_CODES.reviser,
   DEBRIEF_PROMPT_CODES.rubric,
@@ -210,7 +212,7 @@ export class DebriefRunnerService {
     private readonly progressResults?: Repository<DebriefProgressResult>,
     /** V2_AUTONOMY A9: a language pinned to another release. Absent in unit tests. */
     @Optional() private readonly holds?: DebriefChangeHoldsService,
-    /** The roleplay's skill framework (Context Library). Absent in unit tests: the foundational one. */
+    /** The organisation's skill frameworks (Context Library). Absent in unit tests: none. */
     @Optional() private readonly frameworks?: DebriefFrameworkService,
     /** The roleplay's risk-cue option. Absent in unit tests: Standard. */
     @Optional() private readonly riskCueOptions?: DebriefRiskCueOptionService,
@@ -352,6 +354,9 @@ export class DebriefRunnerService {
             isOrchestrated(bundle)
               ? [...DEBRIEF_GATEWAY_TOOLS, ...DEBRIEF_ORCHESTRATOR_TOOLS]
               : DEBRIEF_GATEWAY_TOOLS,
+            // Which step may call which guidance tool, enforced by the gateway.
+            (bundle.settings.guidanceTools as Record<string, string[]>) ??
+              GUIDANCE_TOOLS_DEFAULT,
           ),
           gateway_url: `${this.config.publicApiBaseUrl.replace(/\/+$/, '')}/api/v1/internal/debrief`,
         },
@@ -585,11 +590,11 @@ export class DebriefRunnerService {
 
     // The context the graph's steps read. The optional reads never block a
     // debrief: unreadable means none.
-    // What the roleplay chose (spec DEBRIEF_ACROSS_ROLEPLAYS §4–5); unset or unreadable reads as
-    // today's behaviour, so neither can stop a debrief.
+    // The skill frameworks the learner's organisation can read (spec DEBRIEF_ACROSS_ROLEPLAYS §4);
+    // none or unreadable means only the roleplay's own competencies, so it can never stop a debrief.
     const framework = this.frameworks
-      ? await this.frameworks.resolve(session.skillFramework)
-      : FOUNDATIONAL_FRAMEWORK;
+      ? await this.frameworks.forTenant(session.tenantId)
+      : emptyFramework();
     const riskCue = this.riskCueOptions
       ? await this.riskCueOptions.resolve(session.riskCueOption)
       : STANDARD_RISK_CUE;
@@ -658,6 +663,7 @@ export class DebriefRunnerService {
       // Not `framework`: the graph's answer writes its own key of that name into the workspace.
       frameworkUsed: {
         id: framework.id,
+        ids: framework.ids,
         name: framework.name,
         areas: framework.areas.map((a) => a.name),
       },

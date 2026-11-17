@@ -13,7 +13,6 @@ function build(
   };
   const ctl = new DebriefRoleplayOptionsController(
     dataSource as any,
-    {} as any,
     riskCues as any,
     tests as any,
   );

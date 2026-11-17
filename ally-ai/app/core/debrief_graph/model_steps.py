@@ -303,6 +303,7 @@ WRITER = ModelStep(
     on_success=_written,
     on_failure=_writer_failed,
     destinations=("checks", "finish"),
+    tools_for="writer",
 )
 
 
@@ -369,4 +370,5 @@ REVISER = ModelStep(
     on_success=_revised,
     on_failure=lambda s, c: ({}, "decide"),
     destinations=("checks", "decide"),
+    tools_for="reviser",
 )

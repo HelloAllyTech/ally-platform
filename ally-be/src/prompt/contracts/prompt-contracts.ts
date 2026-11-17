@@ -1609,6 +1609,26 @@ export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/debrief/guidance_agent_system.txt */
+export const DEBRIEF_GUIDANCE_AGENT_SYSTEM = definePrompt(
+  'debrief_guidance_agent_system',
+  {
+    guidance_index: 'optional',
+    moments: 'required',
+    skills: 'optional',
+    baseline_passages: 'optional',
+    learner_level: 'optional',
+    max_calls: 'optional',
+  },
+  {
+    name: 'Debrief Guidance Agent',
+    description:
+      "The debrief agent's guidance agent: given the Analyst's moments, the skills in play and the baseline passages already found, it browses an index of Debrief Guidance (code, kind, level, title, hint) and may search or fetch more entries by code, within a call budget, so the Writer gets the guidance that fits this learner's level and moments. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/debrief/writer_system.txt */
 export const DEBRIEF_WRITER_SYSTEM = definePrompt(
   'debrief_writer_system',

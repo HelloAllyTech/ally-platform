@@ -937,6 +937,22 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'debrief release bundle (recipes.standard.steps[progress_reader].model)',
   },
   {
+    id: 'debrief-guidance-agent',
+    // No LlmTask label: adding one is outside the Debrief system (src/learn). ally-ai records its usage under the step name.
+    task: null,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Debrief runs whose release sets guidanceAgentMaxCalls above 0, before the Writer',
+    detail:
+      'The guidance agent (prompt debrief_guidance_agent_system): a bounded tool loop that browses the Debrief Guidance index (guidance_index), searches it (guidance_search) and fetches entries by code (guidance_fetch), at most guidanceAgentMaxCalls tool calls, then hands the passages to the Writer. The tools it is offered come from the release setting guidanceTools.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (settings.guidanceAgentMaxCalls, settings.guidanceTools); model DEBRIEF_MODELS.guidanceAgent',
+    promptOverride: 'debrief_guidance_agent_system',
+  },
+  {
     id: 'debrief-writer',
     task: LlmTask.DEBRIEF_WRITER,
     runtime: LlmRuntime.ALLY_AI,

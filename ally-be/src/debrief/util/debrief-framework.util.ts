@@ -2,7 +2,6 @@ import {
   DebriefArea,
   DebriefSkill,
   DebriefSkillFramework,
-  FOUNDATIONAL_FRAMEWORK,
   SKILL_FRAMEWORK_KIND,
 } from '../constants/debrief-framework.constants';
 
@@ -11,19 +10,15 @@ import {
  * entry, writing one back, and naming a skill the Analyst described loosely. Pure.
  */
 
-/** A skill line in the entry: `key | Skill name | word, word, word` (words optional). */
+/** A skill line in the entry: `key | Skill name` (any further column on an old entry is ignored). */
 export function parseSkillLine(line: string): DebriefSkill | null {
-  const [key, name, words] = String(line ?? '')
+  const [key, name] = String(line ?? '')
     .split('|')
     .map((p) => p.trim());
   if (!key || !name) return null;
   return {
     key: key.toLowerCase().replace(/[^a-z0-9_-]+/g, '-'),
     name,
-    words: (words ?? '')
-      .split(',')
-      .map((w) => w.trim().toLowerCase())
-      .filter(Boolean),
   };
 }
 
@@ -55,6 +50,7 @@ export function frameworkFromChunk(chunk: {
     });
   return {
     id: chunk.code,
+    ids: [chunk.code],
     name: chunk.statement.trim(),
     foundational: attrs.foundational === true,
     skills,
@@ -64,16 +60,30 @@ export function frameworkFromChunk(chunk: {
   };
 }
 
-/** The entry's attributes for a framework (what seeding and the editor store). */
-export function frameworkAttributes(
-  f: DebriefSkillFramework,
-): Record<string, unknown> {
+/**
+ * One framework for a run from every entry the organisation can read: skills by key, areas by
+ * name, names joined, foundational when any entry says so. No entries is the empty framework.
+ */
+export function mergeFrameworks(
+  fs: ReadonlyArray<DebriefSkillFramework>,
+): DebriefSkillFramework {
+  const skills = new Map<string, DebriefSkill>();
+  const areas = new Map<string, DebriefArea>();
+  for (const f of fs) {
+    for (const s of f.skills) if (!skills.has(s.key)) skills.set(s.key, s);
+    for (const a of f.areas) if (!areas.has(a.name)) areas.set(a.name, a);
+  }
+  const ids = fs.flatMap((f) => f.ids);
   return {
-    skills: f.skills.map((s) =>
-      [s.key, s.name, s.words.join(', ')].join(' | '),
-    ),
-    areas: f.areas.map((a) => `${a.name} | ${a.description}`),
-    foundational: f.foundational,
+    id: ids.length === 1 ? ids[0] : null,
+    ids,
+    name: fs
+      .map((f) => f.name)
+      .filter(Boolean)
+      .join(' + '),
+    foundational: fs.some((f) => f.foundational),
+    skills: [...skills.values()],
+    areas: [...areas.values()],
   };
 }
 
@@ -85,8 +95,6 @@ const norm = (text: unknown) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-const escapeRe = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /** A named competency's progress key: the same competency in two roleplays is one line. */
 export function competencyKey(name: string): string {
   return `competency:${norm(name)
@@ -95,13 +103,13 @@ export function competencyKey(name: string): string {
 }
 
 /**
- * The progress key for a skill name the Analyst wrote: the framework's own skill (by key or exact
- * name), then a named competency of the roleplay (exact name), then a framework skill one of whose
- * words starts a word in the name (narrow skills first), else `other` (sent, never trended).
+ * The progress key for a skill name the Analyst wrote: the framework's own skill (exact key or
+ * exact name), then a named competency of the roleplay (exact name), else `other` (sent, never
+ * trended). No keyword matching: the Analyst is told the exact keys.
  */
 export function skillKeyOf(
   name: unknown,
-  framework: DebriefSkillFramework = FOUNDATIONAL_FRAMEWORK,
+  framework: DebriefSkillFramework,
   competencies: ReadonlyArray<string> = [],
 ): string {
   const n = norm(name);
@@ -112,17 +120,12 @@ export function skillKeyOf(
   for (const c of competencies) {
     if (n === norm(c)) return competencyKey(c);
   }
-  for (const s of framework.skills) {
-    for (const w of s.words) {
-      if (new RegExp(`\\b${escapeRe(norm(w))}`).test(n)) return s.key;
-    }
-  }
   return 'other';
 }
 
 /** Key → name for every trendable skill: the framework's, then the named competencies'. */
 export function skillNamesOf(
-  framework: DebriefSkillFramework = FOUNDATIONAL_FRAMEWORK,
+  framework: DebriefSkillFramework,
   competencies: ReadonlyArray<string> = [],
 ): Record<string, string> {
   const out: Record<string, string> = {};

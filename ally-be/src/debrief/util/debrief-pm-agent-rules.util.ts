@@ -1,6 +1,8 @@
 import {
   DEBRIEF_PROMPT_CODES,
   PM_AGENT_EDITABLE_PROMPTS,
+  GUIDANCE_TOOL_NAMES,
+  GUIDANCE_TOOL_STEPS,
   PM_AGENT_SETTINGS,
 } from '../constants/debrief-release.constants';
 import { OWNER_SETTINGS_SPEC } from '../constants/debrief-owner-settings.constants';
@@ -119,6 +121,50 @@ const NEVER_SETTINGS: Record<string, NeverListArea> = {
   passScore: 'judge',
 };
 
+/** The one object-valued setting the PM agent may propose: which guidance tools each step has. */
+export const GUIDANCE_TOOLS_KEY = 'guidanceTools';
+
+/** A proposed `guidanceTools` value (an object or its JSON text) as an object, or null. */
+export function parseGuidanceTools(
+  value: unknown,
+): Record<string, string[]> | null {
+  let v = value;
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      return null;
+    }
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const out: Record<string, string[]> = {};
+  for (const [step, tools] of Object.entries(v as Record<string, unknown>)) {
+    if (
+      !(GUIDANCE_TOOL_STEPS as readonly string[]).includes(step) ||
+      !Array.isArray(tools) ||
+      tools.some((t) => !(GUIDANCE_TOOL_NAMES as readonly string[]).includes(t))
+    ) {
+      return null;
+    }
+    out[step] = [...new Set(tools as string[])];
+  }
+  return out;
+}
+
+/**
+ * A stored or proposed setting value as the bundle holds it: a number, or for `guidanceTools` the
+ * per-step object. Ideas store it as text (numbers as `String(n)`, the object as JSON).
+ */
+export function settingValueOf(key: string, raw: unknown): unknown {
+  return key === GUIDANCE_TOOLS_KEY ? parseGuidanceTools(raw) : Number(raw);
+}
+
+/** A setting value as an idea stores it. */
+export function settingValueText(key: string, value: unknown): string {
+  const g = key === GUIDANCE_TOOLS_KEY ? parseGuidanceTools(value) : null;
+  return g ? JSON.stringify(g) : String(Number(value));
+}
+
 export function settingRefusal(
   key: string | null | undefined,
   value: unknown,
@@ -138,12 +184,20 @@ export function settingRefusal(
         'deadlines are a promise to learners; ask the owner (route D) instead',
     };
   }
+  if (key === GUIDANCE_TOOLS_KEY) {
+    return parseGuidanceTools(value)
+      ? null
+      : {
+          reason: `guidanceTools must be an object whose keys are steps (${GUIDANCE_TOOL_STEPS.join(', ')}) and whose values are lists of ${GUIDANCE_TOOL_NAMES.join(', ')}`,
+        };
+  }
   const range = PM_AGENT_SETTINGS[key];
   if (!range) {
     return {
-      reason: `${key} is not a setting the PM agent may change; it may change: ${Object.keys(
-        PM_AGENT_SETTINGS,
-      ).join(', ')}`,
+      reason: `${key} is not a setting the PM agent may change; it may change: ${[
+        ...Object.keys(PM_AGENT_SETTINGS),
+        GUIDANCE_TOOLS_KEY,
+      ].join(', ')}`,
     };
   }
   const v = Number(value);

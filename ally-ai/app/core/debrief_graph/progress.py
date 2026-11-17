@@ -13,7 +13,6 @@ from __future__ import annotations
 from typing import Any, Dict, List, Mapping, Optional
 
 from app.core.debrief_graph.progress_vetoes import (
-    FOUNDATIONAL_SKILLS,
     OTHER,
     countable,
     skill_key,
@@ -48,7 +47,7 @@ def agent_input(
 ) -> Dict[str, Any]:
     """This session's observations per foundational skill (the newest evidence),
     beside each skill's countable history, so the agent reads one table."""
-    names = FOUNDATIONAL_SKILLS if names is None else names
+    names = {} if names is None else names
     this = this_session_observations(evidence, profile.get("analyst_version"), names)
     order = list(names)
     keys = sorted(
@@ -79,7 +78,7 @@ def writer_reading(
     """The vetoed report as the Writer's `ProgressReading`
     (`items: [{skill, trend, evidence, follows_up_point}]`), or None when it
     has nothing for the Writer."""
-    names = FOUNDATIONAL_SKILLS if names is None else names
+    names = {} if names is None else names
     by_point = {
         str(p.get("point")): skill_key(p.get("skill"), names)
         for p in past_points(profile)

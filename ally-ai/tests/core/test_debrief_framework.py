@@ -5,24 +5,23 @@ from app.core.debrief import framework as fw
 from app.core.debrief.render import NONE
 
 
-def test_absent_framework_is_the_foundational_default():
-    f = fw.framework_of({})
-    assert f["foundational"] is True and f["id"] is None
-    assert [s["key"] for s in f["skills"]] == list(fw.DEFAULT_FOUNDATIONAL_SKILLS)
-    assert len(f["skills"]) == 14
-    assert [a["name"] for a in f["areas"]] == [
-        "Listening Engagement",
-        "Emotional Attunement",
-        "Supportive Engagement",
-    ]
-    assert fw.framework_of({"framework": None}) == f
+def test_absent_framework_is_empty():
+    empty = {"id": None, "name": "", "foundational": False, "skills": [], "areas": []}
+    assert fw.framework_of({}) == empty
+    assert fw.framework_of({"framework": None}) == empty
+    assert fw.framework_of({"framework": "junk"}) == empty
+    assert fw.framework_of(None) == empty
+    assert fw.default_framework() == empty
+    assert fw.is_none_framework(fw.framework_of({}))
+    assert fw.skill_names(fw.framework_of({})) == {}
+    assert fw.skill_framework_text(fw.framework_of({})) == NONE
 
 
-def test_default_names_match_progress_constant():
-    from app.core.debrief_graph.progress_vetoes import FOUNDATIONAL_SKILLS
+def test_empty_names_trend_nothing_as_framework_skill():
+    from app.core.debrief_graph.progress_vetoes import skill_key
 
-    assert FOUNDATIONAL_SKILLS == fw.DEFAULT_FOUNDATIONAL_SKILLS
-    assert fw.skill_names(fw.framework_of({})) == FOUNDATIONAL_SKILLS
+    assert skill_key("empathy") == "other"
+    assert skill_key("competency:x", {"competency:x": "Calm"}) == "competency:x"
 
 
 def test_a_custom_framework_is_normalised():
@@ -33,7 +32,7 @@ def test_a_custom_framework_is_normalised():
                 "name": " Triage ",
                 "foundational": False,
                 "skills": [
-                    {"key": "a", "name": "Ask", "words": ["why", "", 3]},
+                    {"key": "a", "name": "Ask", "words": ["why"]},
                     {"key": "a", "name": "dup"},
                     {"key": "", "name": "nokey"},
                     "junk",
@@ -43,7 +42,7 @@ def test_a_custom_framework_is_normalised():
         }
     )
     assert f["name"] == "Triage" and f["foundational"] is False
-    assert f["skills"] == [{"key": "a", "name": "Ask", "words": ["why"]}]
+    assert f["skills"] == [{"key": "a", "name": "Ask"}]
     assert f["areas"] == [{"name": "Listening", "description": ""}]
     assert fw.area_names(f) == ["Listening"]
 
@@ -62,10 +61,11 @@ def test_skill_names_adds_extra_competencies_framework_wins():
 
 
 def test_skill_framework_text_lists_names_exactly():
-    text = fw.skill_framework_text(fw.framework_of({}))
-    for name in fw.DEFAULT_FOUNDATIONAL_SKILLS.values():
-        assert f"- {name}" in text
-    assert "named exactly as written" in text
+    text = fw.skill_framework_text(
+        fw.framework_of({"framework": {"skills": [{"key": "k", "name": "Kind"}]}})
+    )
+    assert "- k — Kind" in text
+    assert "exact key" in text
 
 
 def test_risk_cue_defaults_and_values():

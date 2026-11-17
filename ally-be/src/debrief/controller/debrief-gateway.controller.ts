@@ -71,8 +71,21 @@ export class DebriefGatewayController {
     const { run, claims } = await this.tokens.authorise(authorization, name);
     const b = body ?? {};
     switch (name as DebriefGatewayTool) {
-      case 'guidance_search':
-        return this.gateway.guidanceSearch(run, b);
+      case 'guidance_search': {
+        const step = this.gateway.guidanceStep(claims, 'guidance_search', b);
+        return this.gateway.guidanceSearch(run, b, step);
+      }
+      case 'guidance_index':
+        return this.gateway.guidanceIndexTool(
+          run,
+          this.gateway.guidanceStep(claims, 'guidance_index', b),
+        );
+      case 'guidance_fetch':
+        return this.gateway.guidanceFetchTool(
+          run,
+          b,
+          this.gateway.guidanceStep(claims, 'guidance_fetch', b),
+        );
       case 'run_checks':
         return this.gateway.runChecks(run, b as any);
       case 'render_cards':

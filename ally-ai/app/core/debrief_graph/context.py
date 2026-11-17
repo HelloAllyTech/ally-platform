@@ -76,7 +76,7 @@ class DebriefRunContext:
 
     @property
     def framework(self) -> Dict[str, Any]:
-        """The session's skill framework (default foundational when absent)."""
+        """The session's skill framework (empty when absent)."""
         return framework.framework_of(self.session)
 
     @property

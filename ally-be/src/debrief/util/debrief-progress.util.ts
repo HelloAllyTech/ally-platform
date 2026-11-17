@@ -1,6 +1,6 @@
 import {
   DebriefSkillFramework,
-  FOUNDATIONAL_FRAMEWORK,
+  emptyFramework,
 } from '../constants/debrief-framework.constants';
 import { skillKeyOf, skillNamesOf } from './debrief-framework.util';
 
@@ -162,13 +162,12 @@ export interface ProgressFhsRow {
 
 /**
  * The Analyst names skills in free text. Map a name to a skill key of the roleplay's framework
- * (default: the foundational helping skills, `helping-skills-rubric.constants.ts`), or to a named
- * competency of the roleplay, where it is obvious; else `other` (sent, never trended). The words
- * that identify a skill live with the framework (a Context Library entry), narrow skills first.
+ * (exact key or exact name), or to a named competency of the roleplay (exact name); else `other`
+ * (sent, never trended). No keyword matching.
  */
 export function progressSkillKey(
   name: unknown,
-  framework: DebriefSkillFramework = FOUNDATIONAL_FRAMEWORK,
+  framework: DebriefSkillFramework,
   competencies: ReadonlyArray<string> = [],
 ): string {
   return skillKeyOf(name, framework, competencies);
@@ -308,13 +307,13 @@ export function assembleProgressProfile(input: {
   /** Newest first. */
   voice: ProgressVoiceRow[];
   fhs: ProgressFhsRow[] | null;
-  /** The roleplay's skill framework; absent means the foundational helping skills. */
+  /** The run's skill framework (the organisation's library entries); absent means none. */
   framework?: DebriefSkillFramework;
   /** The roleplay's named competencies, trended alongside the framework's skills. */
   competencies?: ReadonlyArray<string>;
 }): ProgressProfile {
   const { settings } = input;
-  const framework = input.framework ?? FOUNDATIONAL_FRAMEWORK;
+  const framework = input.framework ?? emptyFramework();
   const competencies = input.competencies ?? [];
   const rows = input.rows.slice(0, progressWindow(settings));
   const sessionNumber = Math.max(0, input.eligiblePast) + 1;

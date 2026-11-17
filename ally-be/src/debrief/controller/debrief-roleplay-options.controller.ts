@@ -33,7 +33,6 @@ import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorat
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
 import { DebriefAct } from '../util/debrief-console-roles.util';
-import { DebriefFrameworkService } from '../service/debrief-framework.service';
 import {
   DebriefRiskCueOptionService,
   RiskCueOptionInput,
@@ -122,7 +121,6 @@ function view(o: DebriefRiskCueOption, userId?: number) {
 export class DebriefRoleplayOptionsController {
   constructor(
     private readonly dataSource: DataSource,
-    private readonly frameworks: DebriefFrameworkService,
     private readonly riskCues: DebriefRiskCueOptionService,
     private readonly riskCueTests: DebriefRiskCueTestService,
   ) {}
@@ -160,16 +158,6 @@ export class DebriefRoleplayOptionsController {
       [scenarioId ?? null, DEBRIEF_AGENT_KEY],
     );
     return { enabled: row?.enabled === true };
-  }
-
-  @Get('frameworks')
-  @RequireFeatureToggle(FeatureToggleKey.CREATE_ROLEPLAYS)
-  @ApiOperation({
-    summary:
-      'The skill frameworks a roleplay may choose (Context Library entries, the default first, then None)',
-  })
-  listFrameworks() {
-    return this.frameworks.list();
   }
 
   @Get('risk-cue-options')

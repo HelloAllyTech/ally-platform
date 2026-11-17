@@ -61,7 +61,6 @@ export const SCENARIO_METADATA_FIELDS: (keyof UpdateScenarioDto)[] = [
   'textChatEnabled',
   'liveTabEnabled',
   'pauseEnabled',
-  'debriefSkillFramework',
   'debriefRiskCueOption',
   'currentState',
   'remindersEnabled',
@@ -274,7 +273,6 @@ export const mapCreateScenarioRequestToEntity = (
       liveTabEnabled: scenario.liveTabEnabled,
       pauseEnabled: scenario.pauseEnabled,
       // What the roleplay's Debrief assesses and how it handles a risk cue (unset: today's).
-      debriefSkillFramework: scenario.debriefSkillFramework,
       debriefRiskCueOption: scenario.debriefRiskCueOption,
       currentState: scenario.currentState,
       remindersEnabled: scenario.remindersEnabled,

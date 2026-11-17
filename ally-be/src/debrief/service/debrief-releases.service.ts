@@ -120,12 +120,18 @@ export type ReleaseSettingChange = Partial<
 const RUNNABLE_PROVIDERS = ['gemini', 'openai'];
 
 /** Registry agents that are also recipe steps: listed once, as the step. */
-const STEP_AGENTS = new Set(['analyst', 'progress_reader', 'guidance_lookup']);
+const STEP_AGENTS = new Set([
+  'analyst',
+  'progress_reader',
+  'guidance_lookup',
+  'guidance_agent',
+]);
 const STEP_ORDER: string[] = [
   DebriefStep.SAFETY_READER,
   DebriefStep.ANALYST,
   DebriefStep.PROGRESS_READER,
   DebriefStep.GUIDANCE_LOOKUP,
+  DebriefStep.GUIDANCE_AGENT,
   DebriefStep.WRITER,
   DebriefStep.CHECKS,
   DebriefStep.EVALUATOR,
@@ -1297,7 +1303,7 @@ export class DebriefReleasesService implements OnModuleInit {
     budgetOnly: boolean;
     diff: ReturnType<typeof bundleDiff>;
   }> {
-    const { release: live, bundle } = await this.runner.resolveRelease();
+    const { bundle } = await this.runner.resolveRelease();
     const next = await this.applyChanges(
       bundle,
       input.steps,
@@ -1305,6 +1311,28 @@ export class DebriefReleasesService implements OnModuleInit {
       input.reply,
       input.prompts,
     );
+    return this.proposeBundle(next, input.title, input.why, userId);
+  }
+
+  /**
+   * The shared tail of every person's proposed change: `next` is the live
+   * release's bundle with the changes applied and already validated. Makes the
+   * DRAFT release and the idea that carries it (never an edit to a live
+   * release). Settings › Agents uses it with a bundle it built and checked.
+   */
+  async proposeBundle(
+    next: DebriefBundle,
+    titleIn: string,
+    why: string | null | undefined,
+    userId: number,
+  ): Promise<{
+    ideaId: string;
+    releaseId: string;
+    version: number;
+    budgetOnly: boolean;
+    diff: ReturnType<typeof bundleDiff>;
+  }> {
+    const { release: live, bundle } = await this.runner.resolveRelease();
     const diff = bundleDiff(bundle, next);
     if (
       !diff.prompts.length &&
@@ -1316,7 +1344,7 @@ export class DebriefReleasesService implements OnModuleInit {
     ) {
       throw new BadRequestException('Nothing changed from the live release');
     }
-    const title = (input.title ?? '').trim();
+    const title = (titleIn ?? '').trim();
     if (!title) throw new BadRequestException('Give the change a title');
     const draft = await this.releases.createDraft(
       DEBRIEF_AGENT_KEY,
@@ -1344,7 +1372,7 @@ export class DebriefReleasesService implements OnModuleInit {
         title.slice(0, 300),
         JSON.stringify(change),
         JSON.stringify({
-          why: input.why?.trim() || null,
+          why: why?.trim() || null,
           proposedBy: userId,
           diff: { ...diff, budgetOnly: diff.budgetOnly },
         }),

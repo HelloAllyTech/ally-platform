@@ -260,6 +260,7 @@ class InProcessSteps:
             safety=body.get("safety") or {},
             risk_cue=body.get("risk_cue"),
             speaker_labels=body.get("speaker_labels"),
+            passages=body.get("passages") or None,
         )
         if out is None:
             return None

@@ -32,6 +32,7 @@ export const PICKABLE_STEPS = [
   DebriefStep.SAFETY_READER,
   DebriefStep.ANALYST,
   DebriefStep.PROGRESS_READER,
+  DebriefStep.GUIDANCE_AGENT,
   DebriefStep.WRITER,
   DebriefStep.EVALUATOR,
   DebriefStep.REVISER,

@@ -30,6 +30,7 @@ import {
   introducesSessionText,
   ROUTE_KIND,
   settingRefusal,
+  settingValueText,
   stripQuotes,
 } from '../util/debrief-pm-agent-rules.util';
 import {
@@ -528,7 +529,7 @@ export class DebriefPmAgentToolsService {
       change = {
         ideaKind: 'setting',
         settingKey: b.setting_key,
-        settingValue: String(Number(b.setting_value)),
+        settingValue: settingValueText(b.setting_key, b.setting_value),
       };
       lessonKind = 'policy';
     } else if (kind === 'registry_agent') {

@@ -273,6 +273,10 @@ def reviser_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "safety": state.get("safety") or {},
         "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
         **contract_extras(ctx, "risk_cue", "speaker_labels"),
+        # Guidance the tool phase fetched for the Reviser (only when it did).
+        **(
+            {"passages": state["tool_passages"]} if state.get("tool_passages") else {}
+        ),
         # What the evidence top-up found (D3), for an orchestrated run only.
         **(
             {

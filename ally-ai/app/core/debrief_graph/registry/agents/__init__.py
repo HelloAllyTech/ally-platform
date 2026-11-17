@@ -8,6 +8,7 @@ from app.core.debrief_graph.registry.agents import (  # noqa: F401
     case_memory,
     cohort_comparison,
     course_patterns,
+    guidance_agent,
     guidance_lookup,
     history_deep,
     language_specialist,

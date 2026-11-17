@@ -16,11 +16,6 @@ from __future__ import annotations
 import copy
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
-from app.core.debrief.framework import DEFAULT_FOUNDATIONAL_SKILLS
-
-#: The 14 foundational helping skills: key -> name (the default framework).
-FOUNDATIONAL_SKILLS: Dict[str, str] = DEFAULT_FOUNDATIONAL_SKILLS
-
 OTHER = "other"
 THIS_RUN = "this"
 MIN_SESSIONS = 3
@@ -36,8 +31,8 @@ def skill_key(
 ) -> str:
     """A skill key or the Analyst's name for it -> its key; anything else ->
     other. ``names`` is the run's key -> name mapping (the framework's skills
-    and the profile's named competencies); default the 14 foundational."""
-    names = FOUNDATIONAL_SKILLS if names is None else names
+    and the profile's named competencies); default none."""
+    names = {} if names is None else names
     norm = _norm(name or "")
     by_key = {_norm(k): k for k in names}
     if norm in by_key:

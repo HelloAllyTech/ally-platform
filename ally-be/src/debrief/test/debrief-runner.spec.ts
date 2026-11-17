@@ -101,7 +101,6 @@ function build(
     catalog?: string[];
     debriefTabOff?: boolean;
     /** The roleplay's two Debrief choices, and what the services answer for them. */
-    skillFramework?: string | null;
     riskCueOption?: string | null;
     framework?: unknown;
     riskCue?: unknown;
@@ -167,7 +166,6 @@ function build(
             inCase: opts.inCase ?? false,
             languageRecorded: opts.languageRecorded ?? true,
             debriefTabOff: opts.debriefTabOff ?? false,
-            skillFramework: opts.skillFramework ?? null,
             riskCueOption: opts.riskCueOption ?? null,
           },
     ),
@@ -259,7 +257,7 @@ function build(
     progressResults as any,
     undefined,
     opts.framework
-      ? ({ resolve: jest.fn(async () => opts.framework) } as any)
+      ? ({ forTenant: jest.fn(async () => opts.framework) } as any)
       : undefined,
     opts.riskCue
       ? ({ resolve: jest.fn(async () => opts.riskCue) } as any)
@@ -299,9 +297,10 @@ describe('DebriefRunnerService', () => {
   describe('what the roleplay chose (skill framework and risk-cue option)', () => {
     const custom = {
       id: 'DG-0300',
+      ids: ['DG-0300'],
       name: 'Palliative skills',
       foundational: false,
-      skills: [{ key: 'presence', name: 'Presence', words: ['present'] }],
+      skills: [{ key: 'presence', name: 'Presence' }],
       areas: [],
     };
     const option = {
@@ -314,14 +313,15 @@ describe('DebriefRunnerService', () => {
       wording: 'A cue here is the practice itself.',
     };
 
-    it('sends today’s behaviour when nothing is chosen: foundational skills, Standard, legacy labels', async () => {
+    it('sends no framework when the library has none: no skills, Standard, legacy labels', async () => {
       const { svc, request } = build();
       await svc.run('s1', { mode: DebriefRunMode.LIVE });
       const s = request().session;
-      expect(s.framework).toMatchObject({ foundational: true });
-      expect(s.framework.skills.map((k: { key: string }) => k.key)).toContain(
-        'verbal',
-      );
+      expect(s.framework).toMatchObject({
+        foundational: false,
+        skills: [],
+        areas: [],
+      });
       expect(s.risk_cue).toEqual({
         key: 'standard',
         name: 'Standard',
@@ -335,9 +335,8 @@ describe('DebriefRunnerService', () => {
       );
     });
 
-    it('sends the chosen framework and option, and an option’s own wording replaces the pinned definition', async () => {
+    it('sends the organisation’s framework and the chosen option, and an option’s own wording replaces the pinned definition', async () => {
       const { svc, request, context, saved } = build({
-        skillFramework: 'DG-0300',
         riskCueOption: 'part_of_practice',
         framework: custom,
         riskCue: option,
@@ -364,7 +363,11 @@ describe('DebriefRunnerService', () => {
       );
       // The run records what it used, so a later edit never changes a past debrief.
       const ws = saved[saved.length - 1]?.workspace ?? {};
-      expect(ws.frameworkUsed).toMatchObject({ id: 'DG-0300', areas: [] });
+      expect(ws.frameworkUsed).toMatchObject({
+        id: 'DG-0300',
+        ids: ['DG-0300'],
+        areas: [],
+      });
       expect(ws.riskCueOption).toMatchObject({
         key: 'part_of_practice',
         version: 4,
@@ -408,6 +411,7 @@ describe('DebriefRunnerService', () => {
         'run-1',
         's1',
         DEBRIEF_GATEWAY_TOOLS,
+        expect.any(Object),
       );
       expect(req.bundle.settings.passScore).toBe(7);
       expect(req.bundle.settings.deadlineMs).toBe(
@@ -831,9 +835,9 @@ describe('DebriefRunnerService', () => {
           useFhs: true,
           showWorseToLearners: false,
         },
-        // The roleplay's framework (default: foundational) and its named competencies.
+        // The organisation's framework (none here) and the roleplay's named competencies.
         expect.objectContaining({
-          framework: expect.objectContaining({ foundational: true }),
+          framework: expect.objectContaining({ skills: [] }),
           competencies: expect.any(Array),
         }),
       );
@@ -949,6 +953,7 @@ describe('DebriefRunnerService with the orchestrator (spec A11)', () => {
       'run-1',
       's1',
       DEBRIEF_GATEWAY_TOOLS,
+      expect.any(Object),
     );
     expect(context.availability).not.toHaveBeenCalled();
     expect(request().context).not.toHaveProperty('availability');
@@ -965,10 +970,12 @@ describe('DebriefRunnerService with the orchestrator (spec A11)', () => {
     await svc.run('s1', { mode: DebriefRunMode.SHADOW });
     const req = request();
     expect(req.bundle.orchestrator.enabled).toBe(true);
-    expect(tokens.sign).toHaveBeenCalledWith('run-1', 's1', [
-      ...DEBRIEF_GATEWAY_TOOLS,
-      ...DEBRIEF_ORCHESTRATOR_TOOLS,
-    ]);
+    expect(tokens.sign).toHaveBeenCalledWith(
+      'run-1',
+      's1',
+      [...DEBRIEF_GATEWAY_TOOLS, ...DEBRIEF_ORCHESTRATOR_TOOLS],
+      expect.any(Object),
+    );
     expect(req.context.availability).toEqual({
       org_protocols: 2,
       past_debriefs: 4,

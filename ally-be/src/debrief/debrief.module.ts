@@ -8,6 +8,7 @@ import { ContextLibraryModule } from '../context-library/context-library.module'
 import { ClChunk } from '../context-library/entity/cl-chunk.entity';
 import { DebriefRiskCueOption } from './entity/debrief-risk-cue-option.entity';
 import { DebriefFrameworkService } from './service/debrief-framework.service';
+import { DebriefGuidanceIndexService } from './service/debrief-guidance-index.service';
 import { DebriefRiskCueOptionService } from './service/debrief-risk-cue-option.service';
 import { DebriefRiskCueTestService } from './service/debrief-risk-cue-test.service';
 import { DebriefRoleplayOptionsController } from './controller/debrief-roleplay-options.controller';
@@ -80,6 +81,8 @@ import { DebriefRunLogsService } from './service/debrief-run-logs.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
 
+import { DebriefAgentsConfigController } from './controller/debrief-agents-config.controller';
+import { DebriefAgentsConfigService } from './service/debrief-agents-config.service';
 import { DebriefAdvisorsController } from './controller/debrief-advisors.controller';
 import { DebriefAdvisorsService } from './service/debrief-advisors.service';
 
@@ -159,11 +162,14 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     DebriefSchedulesController,
     // User Management › Clinical advisors (gated like Ally admins).
     DebriefAdvisorsController,
+    DebriefAgentsConfigController,
   ],
   providers: [
     DebriefAdvisorsService,
+    DebriefAgentsConfigService,
     // Spec DEBRIEF_ACROSS_ROLEPLAYS: the skill framework and risk-cue option a roleplay chose.
     DebriefFrameworkService,
+    DebriefGuidanceIndexService,
     DebriefRiskCueOptionService,
     DebriefRiskCueTestService,
     // Debrief v2: the cumulative score, Changes and the watch, Slack posts.

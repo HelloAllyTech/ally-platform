@@ -155,7 +155,7 @@ class ProgressEvidenceRef(BaseModel):
 
 class ProgressSkill(BaseModel):
     skill: str = Field(
-        description="A foundational skill key from SKILL KEYS (never 'other')."
+        description="A skill key from SKILL KEYS (never 'other')."
     )
     trend: ProgressTrend
     why: str = Field(
@@ -189,7 +189,7 @@ class ProgressFollowup(BaseModel):
 
 
 class ProgressFocus(BaseModel):
-    skill: str = Field(description="A foundational skill key from SKILL KEYS.")
+    skill: str = Field(description="A skill key from SKILL KEYS.")
     why: str = Field(description="For the Ally team: why this is the focus now.")
     learner_line: str = Field(
         description=(

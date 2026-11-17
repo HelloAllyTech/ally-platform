@@ -17,6 +17,7 @@ class Step:
     ANALYST = "analyst"
     PROGRESS_READER = "progress_reader"
     GUIDANCE_LOOKUP = "guidance_lookup"
+    GUIDANCE_AGENT = "guidance_agent"
     WRITER = "writer"
     CHECKS = "checks"
     EVALUATOR = "evaluator"
@@ -45,6 +46,8 @@ PROMPT_CODES = {
     "progress_reader": "debrief_progress_reader_system",
     # The progress agent, under the bundle's `progress_reader` step key.
     "progress": "debrief_progress_system",
+    # The guidance agent: a bounded tool loop over the guidance gateway tools.
+    "guidance_agent": "debrief_guidance_agent_system",
     "writer": "debrief_writer_system",
     "reviser": "debrief_reviser_system",
     "rubric": "debrief_quality_rubric",
@@ -75,6 +78,8 @@ STEP_TIMEOUT_S: Dict[str, float] = {
     "progress-reader": 50.0,
     "progress-agent": 50.0,
     "analyst": 90.0,
+    # The guidance agent's whole tool loop (model passes and gateway calls).
+    "guidance-agent": 40.0,
     "writer": 75.0,
     "evaluator": 90.0,
     "reviser": 120.0,

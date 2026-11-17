@@ -49,6 +49,12 @@ class DebriefState(TypedDict, total=False):
     progress_result: Optional[Dict[str, Any]]
     history: Optional[str]
     passages: List[Dict[str, str]]  # {title, text}, what the Writer reads
+    #: The guidance agent has run (as the planner's choice or the fixed node):
+    #: the fixed hop never runs it a second time.
+    guidance_agent_ran: bool
+    #: The planner selected the `guidance_agent` registry agent (a marker the
+    #: registry agent writes alone in its wave; the fixed node does the work).
+    guidance_agent_selected: bool
 
     # The check → evaluate ⇄ revise loop.
     round: int  # revision rounds started

@@ -9,6 +9,7 @@ import pytest
 
 from app.core.debrief.safety_reader import TranscriptTurn
 from app.core.debrief.schemas import BehaviourEvidence, EvidenceMap
+from tests.core.debrief_graph.fakes import FOUNDATIONAL_FRAMEWORK as FOUNDATIONAL
 from tests.core.test_debrief_steps import TRANSCRIPT, dispatch_returns  # noqa: F401
 
 FOUNDATIONAL_NAMES = [
@@ -20,7 +21,7 @@ CUSTOM = {
     "id": "fw-1",
     "name": "Triage",
     "foundational": False,
-    "skills": [{"key": "ask", "name": "Ask directly", "words": []}],
+    "skills": [{"key": "ask", "name": "Ask directly"}],
     "areas": [{"name": "Safety", "description": "keeping the person safe"}],
 }
 NONE_FW = {"id": None, "name": "None", "foundational": False, "skills": []}
@@ -53,9 +54,9 @@ async def analyse_prompt(dispatch_returns, **kw):  # noqa: F811
 async def test_default_analyst_prompt_lists_the_foundational_skills(
     dispatch_returns,  # noqa: F811
 ):
-    p = await analyse_prompt(dispatch_returns)
+    p = await analyse_prompt(dispatch_returns, framework=FOUNDATIONAL)
     for name in FOUNDATIONAL_NAMES:
-        assert f"- {name}\n" in p
+        assert f" — {name}\n" in p
     assert p.count("- ") >= 14
     assert (
         "SKILL COVERAGE: set coverage_category on every behaviour to the one "
@@ -80,7 +81,7 @@ async def test_none_framework_marks_none_and_drops_the_coverage_rule(
 @pytest.mark.asyncio
 async def test_custom_framework_names_and_areas(dispatch_returns):  # noqa: F811
     p = await analyse_prompt(dispatch_returns, framework=CUSTOM)
-    assert "Triage. Skills, to be named exactly as written:\n- Ask directly" in p
+    assert "- ask — Ask directly" in p
     assert "Verbal communication" not in p
     assert "to the one area it belongs to (Safety), or null" in p
     assert "Safety (keeping the person safe)" in p
@@ -102,7 +103,7 @@ async def test_coverage_category_outside_the_areas_becomes_null(monkeypatch):
     assert [b.coverage_category for b in out.behaviours] == ["Safety", None]
     out, _ = await analyse(TRANSCRIPT, "en", "m", framework=NONE_FW)
     assert [b.coverage_category for b in out.behaviours] == [None, None]
-    out, _ = await analyse(TRANSCRIPT, "en", "m")
+    out, _ = await analyse(TRANSCRIPT, "en", "m", framework=FOUNDATIONAL)
     assert [b.coverage_category for b in out.behaviours] == [
         None,
         "Listening Engagement",
@@ -347,7 +348,9 @@ async def test_progress_keys_and_fhs_gating(dispatch_returns):  # noqa: F811
     from app.core.debrief.steps import read_progress_report
 
     calls = dispatch_returns(None)
-    await read_progress_report({}, _profile(), {}, "en", "m")
+    await read_progress_report(
+        {}, _profile(), {}, "en", "m", framework=FOUNDATIONAL
+    )
     p = calls["prompt"]
     assert "verbal = Verbal communication" in p
     assert "FOUNDATIONAL SKILLS LEVELS: not used" not in p
@@ -362,7 +365,9 @@ async def test_progress_keys_and_fhs_gating(dispatch_returns):  # noqa: F811
     assert "FOUNDATIONAL SKILLS LEVELS: not used; set fhs to absent." in p
 
     # Foundational but the profile switches levels off.
-    await read_progress_report({}, _profile(useFhs=False), {}, "en", "m")
+    await read_progress_report(
+        {}, _profile(useFhs=False), {}, "en", "m", framework=FOUNDATIONAL
+    )
     assert "not used; set fhs to absent" in calls["prompt"]
     # None framework: only the competencies.
     await read_progress_report({}, prof, {}, "en", "m", framework=NONE_FW)
@@ -377,7 +382,7 @@ def test_vetoes_with_competency_keys_and_fhs_gating():
     assert skill_key("Staying calm", names) == "competency:calm"
     assert skill_key("competency:calm", names) == "competency:calm"
     assert skill_key("Verbal communication", names) == OTHER
-    assert skill_key("Verbal communication") == "verbal"
+    assert skill_key("Verbal communication") == OTHER  # no default names
 
     prof = _profile()
     prof["skills"] = {
@@ -471,7 +476,8 @@ async def test_graph_absent_contract_reports_alarm_and_sends_no_new_body_keys(
     closed,
 ):
     steps, gateway = fakes.FakeSteps(), fakes.FakeGateway()
-    result = await fakes.run(steps, gateway)
+    session = {k: v for k, v in fakes.SESSION.items() if k != "framework"}
+    result = await fakes.run(steps, gateway, session=session)
     assert result["workspace"]["risk_cue"] == {
         "key": None,
         "handling": "alarm",
@@ -479,7 +485,8 @@ async def test_graph_absent_contract_reports_alarm_and_sends_no_new_body_keys(
     }
     assert result["workspace"]["speaker_labels"] == "legacy"
     assert result["has_alarm_risk_cue"] is result["has_risk_cue"]
-    assert result["workspace"]["framework"]["foundational"] is True
+    assert result["workspace"]["framework"]["foundational"] is False
+    assert not result["workspace"]["framework"].get("skills")
     assert gateway.tools("run_checks")[0]["risk_handling"] == "alarm"
     for call in steps.calls:
         for k in ("framework", "risk_cue", "speaker_labels"):

@@ -6,6 +6,7 @@ import pytest
 
 from app.core.debrief.safety_reader import TranscriptTurn
 from app.core.debrief.schemas import DebriefCards, EvidenceMap
+from tests.core.debrief_graph.fakes import FOUNDATIONAL_FRAMEWORK as FOUNDATIONAL
 
 TRANSCRIPT = [
     TranscriptTurn(turn_index=1, role="counselor", text="What brings you in?"),
@@ -67,7 +68,9 @@ async def test_analyst_falls_back_to_foundational_skills_with_nothing(
     from app.core.debrief.steps import DEFAULT_ANALYST_SYSTEM, analyse
 
     calls = dispatch_returns(EvidenceMap())
-    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    await analyse(
+        TRANSCRIPT, "en", "gemini-2.5-pro", framework=FOUNDATIONAL
+    )
     assert "(ROLEPLAY EXPECTATIONS):\nnone" in calls["prompt"]
     assert "<roleplay_expectations>" not in calls["prompt"]
     assert "Empathy, warmth and genuineness" in calls["prompt"]

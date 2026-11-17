@@ -491,6 +491,11 @@ export const ApiEndpoints = {
     QUESTION_SET_PUBLISH: (id: string) => `/v1/lab/question-sets/${id}/publish`,
     QUESTION_SET_ARCHIVE: (id: string) => `/v1/lab/question-sets/${id}/archive`,
   },
+  /** Debrief Settings › Agents: recipes, models and tools of the live release. */
+  DEBRIEF_AGENTS: {
+    CONFIG: "/v1/debriefs/agents-config",
+    CHANGES: "/v1/debriefs/agents-config/changes",
+  },
   /** Debrief choices per roleplay: risk-cue options. */
   DEBRIEF_ROLEPLAY_OPTIONS: {
     AVAILABILITY: "/v1/debriefs/roleplay-options/availability",

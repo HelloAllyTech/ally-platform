@@ -34,6 +34,7 @@ import { PM_HOLD_DAYS } from '../util/debrief-outcome.util';
 import {
   changeEvidenceRefusal,
   introducedInjectionPattern,
+  settingValueOf,
 } from '../util/debrief-pm-agent-rules.util';
 import {
   metricValues,
@@ -276,7 +277,7 @@ export class DebriefPmAgentService
     promptTexts: Record<string, string>,
   ): {
     promptOverrides?: Record<string, string>;
-    settingOverrides?: Record<string, number>;
+    settingOverrides?: Record<string, unknown>;
     maxRevisionRounds?: number;
   } {
     if (change.ideaKind === 'prompt_edit') {
@@ -293,9 +294,9 @@ export class DebriefPmAgentService
       };
     }
     if (change.ideaKind === 'setting') {
-      const v = Number(change.settingValue);
+      const v = settingValueOf(change.settingKey, change.settingValue);
       if (change.settingKey === 'maxRevisionRounds')
-        return { maxRevisionRounds: v };
+        return { maxRevisionRounds: v as number };
       return { settingOverrides: { [change.settingKey]: v } };
     }
     throw new BadRequestException(
@@ -721,7 +722,7 @@ export class DebriefPmAgentService
   }
 
   /** The models the live release already runs (a model in it is not new, A1). */
-  private async liveModels(): Promise<Set<string>> {
+  async liveModels(): Promise<Set<string>> {
     try {
       const { bundle } = await this.gaBundle();
       const out = new Set<string>();
@@ -982,11 +983,11 @@ export class DebriefPmAgentService
       next.prompts[code] = version.version;
     } else {
       const key = idea.change.settingKey as string;
-      const v = Number(idea.change.settingValue);
+      const v = settingValueOf(key, idea.change.settingValue);
       if (key === 'maxRevisionRounds') {
-        next.recipes[DebriefRecipeKey.STANDARD].maxRevisionRounds = v;
+        next.recipes[DebriefRecipeKey.STANDARD].maxRevisionRounds = v as number;
       } else {
-        (next.settings as unknown as Record<string, number>)[key] = v;
+        (next.settings as unknown as Record<string, unknown>)[key] = v;
       }
     }
     const problems = validateDebriefBundle(

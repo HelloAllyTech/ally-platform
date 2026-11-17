@@ -355,6 +355,7 @@ export function learnerProgress(
   if (!p?.step) return null;
   switch (p.step) {
     case DebriefStep.GUIDANCE_LOOKUP:
+    case DebriefStep.GUIDANCE_AGENT:
       return p.topic
         ? { key: 'guidance', topic: p.topic }
         : { key: 'guidance' };

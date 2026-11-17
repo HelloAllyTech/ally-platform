@@ -1,5 +1,5 @@
 import { DebriefClinicalListsService } from './debrief-clinical-lists.service';
-import { Injectable, Optional } from '@nestjs/common';
+import { ForbiddenException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ContextRetrievalService } from '../../context-library/service/context-retrieval.service';
@@ -17,6 +17,12 @@ import {
 } from '../util/debrief-cards.util';
 import { SKILL_FRAMEWORK_KIND } from '../constants/debrief-framework.constants';
 import { guidancePassage, guidanceSearch } from '../util/debrief-guidance.util';
+import {
+  GUIDANCE_TOOLS_DEFAULT,
+  GuidanceToolName,
+  guidanceToolsFor,
+} from '../constants/debrief-release.constants';
+import { DebriefGuidanceIndexService } from './debrief-guidance-index.service';
 import { DebriefAggregatesService } from './debrief-aggregates.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefRunClaims } from './debrief-run-token.service';
@@ -49,7 +55,82 @@ export class DebriefGatewayService {
     private readonly aggregates: DebriefAggregatesService,
     /** Settings › Clinical lists; the checks use the defaults without it. */
     @Optional() private readonly clinicalLists?: DebriefClinicalListsService,
+    /** The guidance agent's index and fetch tools (CONTRACT.md §2). */
+    @Optional() private readonly guidanceIndex?: DebriefGuidanceIndexService,
   ) {}
+
+  private async runTenant(run: DebriefRun): Promise<string | null> {
+    return (
+      run.tenantId ??
+      (await this.context.loadSession(run.scenarioSessionId))?.tenantId ??
+      null
+    );
+  }
+
+  /**
+   * Which step is calling a guidance tool, and whether the release lets it (`settings.guidanceTools`,
+   * carried in the run token). A call without `step` is the guidance agent's for index and fetch,
+   * and the debrief graph's own lookup for search (always allowed, as before). Ask Ally's reply
+   * token is not a step. Refused with 403, which ally-ai hands the model as a tool error.
+   */
+  guidanceStep(
+    claims: DebriefRunClaims | undefined,
+    tool: GuidanceToolName,
+    body: { step?: unknown } | undefined,
+  ): string {
+    const raw = typeof body?.step === 'string' ? body.step.trim() : '';
+    if (claims?.scope === 'reply') return raw || 'ask_ally';
+    if (!raw && tool === 'guidance_search') return 'guidance_lookup';
+    const step = raw || 'guidance_agent';
+    if (!/^[a-z_]{1,32}$/.test(step)) {
+      throw new ForbiddenException('Unknown step');
+    }
+    if (
+      !guidanceToolsFor(
+        claims?.guidanceTools ?? GUIDANCE_TOOLS_DEFAULT,
+        step,
+      ).includes(tool)
+    ) {
+      throw new ForbiddenException(`${tool} is not enabled for step ${step}`);
+    }
+    return step;
+  }
+
+  /** `guidance_index`: what the learner's organisation may read, for an agent to browse. */
+  async guidanceIndexTool(run: DebriefRun, step = 'guidance_agent') {
+    if (!this.guidanceIndex) {
+      return { version: 'unavailable', entries: [], unavailable: true };
+    }
+    try {
+      const out = await this.guidanceIndex.index(await this.runTenant(run));
+      this.guidanceIndex.logCall(step, 'guidance_index', out.entries.length);
+      return out;
+    } catch {
+      return { version: 'unavailable', entries: [], unavailable: true };
+    }
+  }
+
+  /** `guidance_fetch`: up to five entries by code, visible to the run's organisation only. */
+  async guidanceFetchTool(
+    run: DebriefRun,
+    body: { codes?: unknown },
+    step = 'guidance_agent',
+  ) {
+    const codes = Array.isArray(body?.codes) ? body.codes.map(String) : [];
+    if (!this.guidanceIndex) {
+      return { passages: [], not_found: codes, unavailable: true };
+    }
+    try {
+      return await this.guidanceIndex.fetch(
+        await this.runTenant(run),
+        codes,
+        run.scenarioSessionId,
+        step,
+      );
+    } catch {
+      return { passages: [], not_found: codes, unavailable: true };
+    }
+  }
 
   /** The session the run is for, as the orchestrator's data tools scope to it. */
   private async session(run: DebriefRun) {
@@ -109,7 +190,14 @@ export class DebriefGatewayService {
   async guidanceSearch(
     run: DebriefRun,
     body: { topics?: GuidanceTopic[]; per_moment?: number },
+    /** The calling step, for the debug log only; the search is the same for every step. */
+    step = 'guidance_lookup',
   ) {
+    this.guidanceIndex?.logCall(
+      step,
+      'guidance_search',
+      (body.topics ?? []).length,
+    );
     const perMoment = Math.max(0, Math.min(Number(body.per_moment ?? 2), 5));
     const topics = (body.topics ?? []).slice(0, MAX_TOPICS);
     const tenantId =

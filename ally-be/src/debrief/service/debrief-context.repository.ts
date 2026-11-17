@@ -69,8 +69,6 @@ export interface DebriefSessionContext {
    * run, nothing to tell the learner.
    */
   debriefTabOff?: boolean;
-  /** `scenarios.metadata.debriefSkillFramework`: a Context Library code, `none`, or unset (default). */
-  skillFramework?: string | null;
   /** `scenarios.metadata.debriefRiskCueOption`: an option's key, or unset (Standard). */
   riskCueOption?: string | null;
 }
@@ -115,7 +113,6 @@ export class DebriefContextRepository {
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
               s."caseSessionItemId" IS NOT NULL AS in_case,
               COALESCE(sc.metadata->'feedbackTabs'->>'debrief', '') = 'false' AS debrief_tab_off,
-              NULLIF(sc.metadata->>'debriefSkillFramework', '') AS skill_framework,
               NULLIF(sc.metadata->>'debriefRiskCueOption', '') AS risk_cue_option,
               COALESCE((ti."completionCriteria"->>'assessmentMode')::boolean, false) AS assessment,
               -- PRD §6.1: a blank line (an empty transcription) is not a
@@ -159,7 +156,6 @@ export class DebriefContextRepository {
       inCase: r.in_case === true,
       languageRecorded: r.language_recorded === true,
       debriefTabOff: r.debrief_tab_off === true,
-      skillFramework: r.skill_framework ?? null,
       riskCueOption: r.risk_cue_option ?? null,
     };
   }
