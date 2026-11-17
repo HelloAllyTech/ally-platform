@@ -89,6 +89,8 @@ import {
   PlanEventKind,
   PlanNotificationKind,
   PlanStage,
+  RoadmapNotificationKind,
+  RoadmapWatchLevel,
 } from '../../product-planning/enum/product-planning.enum';
 import {
   CourseCopilotEventType,
@@ -113,6 +115,7 @@ import {
   ROADMAP_CATEGORIES,
   ROADMAP_STAGES,
 } from '../../public-roadmap/constants/public-roadmap.constants';
+import { RoadmapReviewState } from '../../product-roadmap/enum/roadmap-opportunity.enum';
 import {
   FhsAssessmentStatus,
   FhsBenchmarkStatus,
@@ -314,7 +317,13 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_plan_spend_entries_stage', Object.values(PlanStage)],
     ['CHK_builder_sessions_plan_stage', Object.values(PlanStage)],
     ['CHK_roadmap_opportunities_plan_stage', Object.values(PlanStage)],
+    [
+      'CHK_roadmap_opportunities_review_state',
+      Object.values(RoadmapReviewState),
+    ],
     ['CHK_plan_notifications_kind', Object.values(PlanNotificationKind)],
+    ['CHK_roadmap_notifications_kind', Object.values(RoadmapNotificationKind)],
+    ['CHK_roadmap_watches_level', Object.values(RoadmapWatchLevel)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],
     ['CHK_builder_build_runs_status', Object.values(BuilderRunStatus)],
     ['CHK_builder_build_runs_mode', Object.values(BuilderRunMode)],

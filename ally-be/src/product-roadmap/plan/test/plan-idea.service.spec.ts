@@ -158,6 +158,19 @@ describe('PlanIdeaService', () => {
     );
   });
 
+  it('refuses a turn past the plan ceiling before writing anything (Roadmap v2)', async () => {
+    const { service, deps } = build();
+    const assertWithinCeiling = jest
+      .fn()
+      .mockRejectedValue(new Error('This idea has spent $100.00'));
+    (service as any).ceiling = { assertWithinCeiling };
+
+    await expect(service.turn('p1', 7, 'more')).rejects.toThrow(/has spent/);
+    expect(assertWithinCeiling).toHaveBeenCalledWith('p1', 'copilot_turn');
+    expect(deps.messages.appendMessage).not.toHaveBeenCalled();
+    expect(deps.copilot.takeTurn).not.toHaveBeenCalled();
+  });
+
   it('refuses to file until every criterion is met, naming what is missing', async () => {
     const { service } = build({
       plan: {

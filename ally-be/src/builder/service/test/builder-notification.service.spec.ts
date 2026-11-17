@@ -194,3 +194,57 @@ describe('BuilderNotificationService marking read', () => {
     expect(criteria).toEqual({ id: 'n-1', adminId: 7 });
   });
 });
+
+/**
+ * Roadmap v2 dual-write (plans/roadmap-builder-merge §5.6): every Builder
+ * notice also goes to the one inbox, after its own row, and nothing about the
+ * old row or the announcement changes.
+ */
+describe('BuilderNotificationService dual-write to the Roadmap inbox', () => {
+  const session = { id: 'sess-1', createdBy: 7, title: 'Archive' } as any;
+
+  const build = () => {
+    const repository = {
+      create: (row: any) => row,
+      save: jest.fn().mockResolvedValue({ id: 'n1' }),
+    };
+    const slack = { sendMessage: jest.fn().mockResolvedValue(undefined) };
+    const config = { adminBaseUrl: 'https://admin.example.com', builder: {} };
+    const inbox = { fromBuilderNotification: jest.fn().mockResolvedValue([]) };
+    const service = new BuilderNotificationService(
+      repository as never,
+      slack as never,
+      config as never,
+      undefined,
+      inbox as never,
+    );
+    return { service, repository, inbox };
+  };
+
+  it('writes the old row for the creator and the same notice to the inbox', async () => {
+    const { service, repository, inbox } = build();
+
+    await service.buildCompleted(session);
+
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adminId: 7,
+        sessionId: 'sess-1',
+        kind: BuilderNotificationKind.BUILD_COMPLETED,
+      }),
+    );
+    expect(inbox.fromBuilderNotification).toHaveBeenCalledWith(
+      session,
+      BuilderNotificationKind.BUILD_COMPLETED,
+      '“Archive” is done.',
+    );
+  });
+
+  it('still dual-writes when the old row fails, and never throws', async () => {
+    const { service, repository, inbox } = build();
+    repository.save.mockRejectedValueOnce(new Error('db down'));
+
+    await expect(service.buildCompleted(session)).resolves.toBeUndefined();
+    expect(inbox.fromBuilderNotification).toHaveBeenCalled();
+  });
+});

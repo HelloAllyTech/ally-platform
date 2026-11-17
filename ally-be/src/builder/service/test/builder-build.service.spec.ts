@@ -90,6 +90,7 @@ describe('BuilderBuildService', () => {
     buildFailed: jest.Mock;
     budgetReached: jest.Mock;
     automationPaused: jest.Mock;
+    planCeilingReached?: jest.Mock;
   };
   let eventService: { record: jest.Mock };
   let redisService: { acquireLock: jest.Mock; releaseLock: jest.Mock };
@@ -777,6 +778,35 @@ describe('BuilderBuildService', () => {
         service.startBuild(readySession() as any, 1),
       ).rejects.toThrow(/switched off/i);
       expect(github.createIssue).not.toHaveBeenCalled();
+    });
+
+    it('refuses a plan past its ceiling before touching the session (Roadmap v2)', async () => {
+      const assertWithinCeiling = jest
+        .fn()
+        .mockRejectedValue(new Error('This idea has spent $100.00'));
+      (service as any).planCeiling = { assertWithinCeiling };
+
+      await expect(
+        service.startBuild(readySession() as any, 1),
+      ).rejects.toThrow(/has spent/);
+      expect(assertWithinCeiling).toHaveBeenCalledWith(
+        'session-1',
+        'build_dispatch',
+      );
+      expect(sessionRepository.update).not.toHaveBeenCalled();
+      expect(github.createIssue).not.toHaveBeenCalled();
+    });
+
+    it('checks the ceiling again at dispatch, for every run (the chain backstop)', async () => {
+      const assertWithinCeiling = jest.fn().mockResolvedValue(undefined);
+      (service as any).planCeiling = { assertWithinCeiling };
+
+      await service.startBuild(readySession() as any, 1);
+
+      expect(assertWithinCeiling.mock.calls).toEqual([
+        ['session-1', 'build_dispatch'],
+        ['session-1', 'build_dispatch'],
+      ]);
     });
 
     it('refuses when GitHub is not configured', async () => {
@@ -1620,6 +1650,56 @@ describe('BuilderBuildService', () => {
       );
 
       expect(notificationService.budgetReached).toHaveBeenCalled();
+    });
+
+    it('tells the lead once, at the phase boundary where a plan crosses its ceiling', async () => {
+      notificationService.planCeilingReached = jest.fn();
+      runRepository.findOne.mockResolvedValue({
+        id: 'run-1',
+        sessionId: 'session-1',
+        cost: null,
+        costUsd: null,
+      });
+      sessionRepository.findOne.mockResolvedValue(
+        readySession({ totalCostUsd: '90', budgetUsd: null }),
+      );
+      const checkAt = jest.fn().mockResolvedValue({
+        exceeded: true,
+        spentUsd: 105,
+        ceilingUsd: 100,
+      });
+      (service as any).planCeiling = { checkAt };
+
+      await service.recordRunCost(
+        { id: 'run-1', sessionId: 'session-1' } as any,
+        { totalCostUsd: 15 },
+      );
+
+      expect(checkAt).toHaveBeenCalledWith('session-1', 'phase_boundary');
+      expect(notificationService.planCeilingReached!).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'session-1' }),
+        105,
+        100,
+      );
+
+      // Already past it before this phase: not said again.
+      notificationService.planCeilingReached!.mockClear();
+      checkAt.mockResolvedValue({
+        exceeded: true,
+        spentUsd: 130,
+        ceilingUsd: 100,
+      });
+      runRepository.findOne.mockResolvedValue({
+        id: 'run-1',
+        sessionId: 'session-1',
+        cost: { phases: { build: { usd: 15 } } },
+        costUsd: '15',
+      });
+      await service.recordRunCost(
+        { id: 'run-1', sessionId: 'session-1' } as any,
+        { phase: 'verify', totalCostUsd: 10 },
+      );
+      expect(notificationService.planCeilingReached!).not.toHaveBeenCalled();
     });
 
     it('bills every phase of the tiered loop, not just the coding pass', async () => {

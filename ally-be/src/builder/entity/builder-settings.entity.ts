@@ -1,5 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
+import type { RoadmapReleaseWindow } from 'src/product-planning/constants/product-planning.constants';
 
 /**
  * Singleton row of platform-level Builder controls (the bug_hunter_settings
@@ -221,6 +222,40 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
   /** Closing a plan whose idea has more votes than this needs a second Lead. */
   @Column({ type: 'int', default: 10 })
   planCloseConfirmVotes!: number;
+
+  // ── Roadmap v2 (plans/roadmap-builder-merge) ─────────────────────────────
+
+  /**
+   * The `roadmap_v2` flag: one Roadmap tab for ideas and builds. Off by
+   * default, and while it is off every `/v1/roadmap/*` route answers 404 and
+   * nothing built for it changes what production does. One switch at cutover
+   * (D8), no pilot.
+   */
+  @Column({ type: 'boolean', default: false })
+  roadmapV2Enabled!: boolean;
+
+  /** The most a lead may raise their idea's ceiling to; an Owner may set any amount. */
+  @Column({ type: 'numeric', precision: 10, scale: 4, default: 200 })
+  maxLeadCeilingUsd!: string;
+
+  /** Working days an idea waits for review before triage shows its age in amber. */
+  @Column({ type: 'int', default: 5 })
+  awaitingReviewAmberDays!: number;
+
+  /**
+   * When auto-release may start (RoadmapReleaseWindow). Null means any time.
+   * Read by the auto-release policy (P5), nothing before it.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  releaseWindow?: RoadmapReleaseWindow | null;
+
+  /**
+   * Globs whose change holds an auto-release for a Release click. Null means
+   * AUTO_RELEASE_HELD_PATHS_DEFAULT, so the defaults live in code with a spec
+   * pinning them. Read by the auto-release policy (P5), nothing before it.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  autoReleaseHeldPaths?: string[] | null;
 
   @Column({ type: 'int', nullable: true })
   updatedBy?: number | null;

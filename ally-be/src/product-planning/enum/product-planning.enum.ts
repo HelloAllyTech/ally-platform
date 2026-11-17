@@ -70,3 +70,35 @@ export enum PlanNotificationKind {
   CEILING_WARNING = 'ceiling_warning',
   CHECK_FINDING = 'check_finding',
 }
+
+/**
+ * What a Roadmap v2 notification is about (roadmap_notifications.kind): the
+ * §4.8 events, plus `budget` (a ceiling reached) and `activity` (anything
+ * else an older writer reports, delivered to its original recipient only).
+ */
+export enum RoadmapNotificationKind {
+  SUBMITTED = 'submitted',
+  ACCEPTED = 'accepted',
+  DECLINED = 'declined',
+  LEAD_ASSIGNED = 'lead_assigned',
+  ASSIGNED_TO_YOU = 'assigned_to_you',
+  HANDED_BACK = 'handed_back',
+  AGENT_QUESTION = 'agent_question',
+  MENTION = 'mention',
+  ANSWERS_CONFLICT = 'answers_conflict',
+  DECISION_NEEDED = 'decision_needed',
+  SHIPPED = 'shipped',
+  OUTCOME_REVIEWED = 'outcome_reviewed',
+  RELEASE_HELD = 'release_held',
+  RELEASE_FAILED = 'release_failed',
+  BREAKER_OPEN = 'breaker_open',
+  BUDGET = 'budget',
+  ACTIVITY = 'activity',
+}
+
+/** How closely someone follows one idea (§4.8). */
+export enum RoadmapWatchLevel {
+  ALL = 'all',
+  MILESTONES = 'milestones',
+  NONE = 'none',
+}
