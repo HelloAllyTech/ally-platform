@@ -17,6 +17,7 @@ import { motionTransition, useReducedMotionPreference } from "../../../motion";
 import { RollingNumber } from "../components/FlowMotion";
 import { sectionsFor } from "../components/QueueList";
 import { RoadmapBreakpoint, hasReadingPane } from "../hooks/useRoadmapBreakpoint";
+import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
 import { isTypingTarget } from "../utils/keyboard";
 
 /** Waiting more than this many working days turns the age amber (§4.6). */
@@ -203,6 +204,19 @@ export const TriageView: React.FC<TriageViewProps> = ({
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [touch, declineFor, leadFor, selected, open, targets, acceptRows]);
+
+  // P8: a row awaiting review taking focus (J/K or opened) starts "triage one" for it; Accept or
+  // Decline ends it (useReviewActions). Moving away and back starts a fresh attempt.
+  const jobs = useRoadmapJobTimer();
+  const focusedCode = open ?? selected;
+  const focusedAwaiting = !!focusedCode && sectionOf(focusedCode) === "awaitingReview";
+  useEffect(() => {
+    if (focusedCode && focusedAwaiting) {
+      jobs.start("triage_one", { itemId: focusedCode, restart: true });
+    }
+    // Per focus change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedCode, focusedAwaiting]);
 
   // ── states ──────────────────────────────────────────────────────────────────────────────────
   if (isLoading) {

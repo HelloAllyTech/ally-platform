@@ -41,6 +41,11 @@ import { PlanView, PlanViewService } from './plan-view.service';
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const NUDGE_AFTER_DAYS = 7;
 export const RELEASE_AFTER_DAYS = 14;
+/**
+ * How the idle hand-back's note starts. P8's Measures counts idle-lead
+ * releases by it (`plan_events.detail.note`), so keep the two together.
+ */
+export const IDLE_RELEASE_NOTE_PREFIX = 'No activity for';
 
 /** A row of the Needs a lead queue. */
 export interface PlanQueueItem {
@@ -191,6 +196,10 @@ export class PlanLeadService {
   ): Promise<{ nudged: number; released: number }> {
     const settings = await this.settings.get();
     if (!settings.enabled) return { nudged: 0, released: 0 };
+    // Roadmap v2 (D11, plan §4.10): the Owner assigns the lead, so nothing is unassigned
+    // automatically. An idle lead shows as "Reassign?" in the Owner's To triage instead, and
+    // the old Lead toggle no longer decides who may lead (a Builder may not hold it).
+    const ownerAssigns = (await this.settings.getRoadmapV2()).enabled;
     const led = await this.store.repository
       .createQueryBuilder('s')
       .addSelect('s.plan')
@@ -206,7 +215,10 @@ export class PlanLeadService {
         plan.status === BuilderSessionStatus.BUILDING ||
         plan.status === BuilderSessionStatus.WAITING_FOR_INPUT;
       if (live || plan.plan?.closed) continue;
-      if (!(await this.access.canLead(plan.leadUserId as number))) {
+      if (
+        !ownerAssigns &&
+        !(await this.access.canLead(plan.leadUserId as number))
+      ) {
         await this.release(
           plan,
           null,
@@ -217,12 +229,12 @@ export class PlanLeadService {
         continue;
       }
       const quietDays = (now.getTime() - plan.updatedAt.getTime()) / DAY_MS;
-      if (quietDays >= RELEASE_AFTER_DAYS) {
+      if (quietDays >= RELEASE_AFTER_DAYS && !ownerAssigns) {
         await this.release(
           plan,
           null,
           PlanEventKind.AUTO_RELEASED,
-          `No activity for ${RELEASE_AFTER_DAYS} days.`,
+          `${IDLE_RELEASE_NOTE_PREFIX} ${RELEASE_AFTER_DAYS} days.`,
         );
         released++;
       } else if (quietDays >= NUDGE_AFTER_DAYS && !plan.plan?.nudgedAt) {

@@ -13,6 +13,7 @@ import {
 } from "../../../api/roadmapV2Flow";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
 import { errorCode, errorStatus } from "../drafts/draftUtils";
+import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
 
 import type { RoadmapBatchReviewItem } from "../../../types/roadmapV2Flow";
 
@@ -77,6 +78,9 @@ export const useReviewActions = () => {
   const [undo] = useUndoRoadmapReviewMutation();
   const [setLead] = useSetRoadmapLeadMutation();
   const copy = en.roadmapV2.review;
+  // P8: Accept (with or without a lead) or Decline (with a reason) ends "triage one" (§4.16) when
+  // the row's focus started it. Bulk reviews are not timed per idea.
+  const { complete: completeJob } = useRoadmapJobTimer();
 
   const offerUndo = useCallback(
     (message: string, token: string, onUndone?: () => void) => {
@@ -123,6 +127,7 @@ export const useReviewActions = () => {
           ...(lead ? { leadUserId: lead.id } : {}),
         }).unwrap();
         haptic(10);
+        completeJob("triage_one", { itemId: code });
         offerUndo(
           lead ? copy.acceptedWithLead(code, lead.name) : copy.accepted(code),
           result.undoToken,
@@ -134,7 +139,7 @@ export const useReviewActions = () => {
         return false;
       }
     },
-    [review, offerUndo, copy],
+    [review, offerUndo, copy, completeJob],
   );
 
   const decline = useCallback(
@@ -142,6 +147,7 @@ export const useReviewActions = () => {
       try {
         const result = await review({ code, decision: "decline", reason }).unwrap();
         haptic([15, 60, 15]);
+        completeJob("triage_one", { itemId: code });
         offerUndo(copy.declined(code), result.undoToken, onUndone);
         return true;
       } catch {
@@ -149,7 +155,7 @@ export const useReviewActions = () => {
         return false;
       }
     },
-    [review, offerUndo, copy],
+    [review, offerUndo, copy, completeJob],
   );
 
   const reopen = useCallback(

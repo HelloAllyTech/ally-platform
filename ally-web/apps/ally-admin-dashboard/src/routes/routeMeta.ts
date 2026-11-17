@@ -193,6 +193,7 @@ const buildTable = (): RouteMetaEntry[] => {
       { path: ROUTES.ROADMAP_AGENT_SECTION(":section"), title: p.roadmapAgent },
       { path: ROUTES.ROADMAP_SETTINGS, title: p.roadmapSettings },
       { path: ROUTES.ROADMAP_BUGS, title: p.roadmapBugs },
+      { path: ROUTES.ROADMAP_MEASURES, title: en.roadmapV2Measures.title },
     ].map(entry => ({
       ...entry,
       section: "product" as const,

@@ -44,6 +44,7 @@ import {
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useQueueSavedViews } from "./hooks/useQueueSavedViews";
 import { hasReadingPane, useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
+import { isRoadmapEntry, useRoadmapJobTimer } from "./hooks/useRoadmapJobTimer";
 import { useRoadmapRealtime } from "./hooks/useRoadmapRealtime";
 import { useKeyboardInset } from "./hooks/useVisualViewport";
 import { useRoadmapRole } from "./RoadmapGate";
@@ -157,8 +158,21 @@ export const RoadmapQueuePage: React.FC = () => {
     );
   };
 
+  // P8 job timing (§4.16): opening the Roadmap starts "find my idea"; opening an idea from a For
+  // you row that is an agent question (the notification) starts answering it.
+  const jobs = useRoadmapJobTimer();
+  useEffect(() => {
+    if (isRoadmapEntry()) jobs.start("find_my_idea");
+    // On arrival only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openIdea = useCallback(
     (code: string) => {
+      const row = state.view === "for-you" ? rows.find(r => r.code === code) : undefined;
+      if (row?.whyHere?.kind === "agentQuestion") {
+        jobs.start("answer_from_notification", { itemId: code, restart: true });
+      }
       setSelected(code);
       if (withPane) {
         setState({ ...state, open: code });
@@ -167,7 +181,7 @@ export const RoadmapQueuePage: React.FC = () => {
         navigate(ROUTES.ROADMAP_IDEA(code));
       }
     },
-    [withPane, setState, state, navigate],
+    [withPane, setState, state, navigate, rows, jobs],
   );
 
   const closePane = useCallback(() => {
