@@ -42,7 +42,7 @@ async function logIn(page: Page) {
   await expect(digits.first()).toBeVisible();
   const count = await digits.count();
   for (let i = 0; i < count; i++) await digits.nth(i).fill(String((i % 9) + 1));
-  await page.getByRole("button", { name: "Verify" }).click();
+  // The last digit verifies on its own (master's 04f3c2f8b), so there's no Verify to press.
   // Logged in once the app has moved on from the login screen.
   await page.waitForURL(url => !url.pathname.startsWith("/login"));
 }
