@@ -14,7 +14,7 @@ import {
   builderTransition,
   prefersReducedMotion,
   staggerDelayMs,
-} from "../../pages/Builder/builderMotion";
+} from "../../motion/builderMotion";
 import { sharedMarkdownComponents } from "../markdown/markdownComponents";
 
 /**

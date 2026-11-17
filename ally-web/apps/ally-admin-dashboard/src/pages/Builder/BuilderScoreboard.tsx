@@ -18,7 +18,7 @@ import { useGetBuilderScoreboardQuery } from "@api";
 import { LineChart } from "@components/charts";
 import { en, ROUTES } from "@constants";
 
-import { BUILDER_OUTCOME_TAG_TYPE } from "./builderMotion";
+import { BUILDER_OUTCOME_TAG_TYPE } from "../../motion/builderMotion";
 import { PartnerScoreboard } from "./room/PartnerScoreboard";
 import {
   buildsStartedSeries,

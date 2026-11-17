@@ -20,7 +20,7 @@ import {
 } from "@types";
 import { asAgentText, asAgentTextList, formatRelativeTime } from "@utils";
 
-import { BuilderTagType } from "../../pages/Builder/builderMotion";
+import { BuilderTagType } from "../../motion/builderMotion";
 import { sharedMarkdownComponents } from "../markdown/markdownComponents";
 
 /** Same reasoning as PrdDocPanel's: every list here is agent-written. */

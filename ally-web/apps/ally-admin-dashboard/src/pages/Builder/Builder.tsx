@@ -26,7 +26,7 @@ import {
   builderTransition,
   prefersReducedMotion,
   staggerDelayMs,
-} from "./builderMotion";
+} from "../../motion/builderMotion";
 import { sessionTitleFrom, startErrorMessage } from "./builderStart";
 
 /** Sessions the agent cannot move forward without a person. */

@@ -7,7 +7,7 @@ import {
   BUILDER_DURATION,
   BUILDER_EASING,
   prefersReducedMotion,
-} from "../../pages/Builder/builderMotion";
+} from "../../motion/builderMotion";
 
 interface ReadinessRingProps {
   readiness: BuilderPrdReadiness;

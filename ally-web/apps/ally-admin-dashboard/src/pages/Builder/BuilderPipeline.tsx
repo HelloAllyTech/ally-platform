@@ -17,7 +17,7 @@ import {
 import { useGetBuilderPipelineHealthQuery } from "@api";
 import { en, ROUTES } from "@constants";
 
-import { BUILDER_RUN_STATUS_TAG_TYPE } from "./builderMotion";
+import { BUILDER_RUN_STATUS_TAG_TYPE } from "../../motion/builderMotion";
 import {
   formatCount,
   formatDurationMs,

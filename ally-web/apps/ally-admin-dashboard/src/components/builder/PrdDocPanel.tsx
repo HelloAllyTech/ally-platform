@@ -25,7 +25,7 @@ import {
   BUILDER_DURATION,
   BUILDER_EASING,
   prefersReducedMotion,
-} from "../../pages/Builder/builderMotion";
+} from "../../motion/builderMotion";
 
 /**
  * Every list in this panel is written by the agent, so none of it can be

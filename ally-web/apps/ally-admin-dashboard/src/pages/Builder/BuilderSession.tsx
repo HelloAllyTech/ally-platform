@@ -49,7 +49,7 @@ import {
 } from "@types";
 import { asAgentText } from "@utils";
 
-import { BUILDER_STATUS_TAG_TYPE } from "./builderMotion";
+import { BUILDER_STATUS_TAG_TYPE } from "../../motion/builderMotion";
 import { PrinciplesInPlay } from "./PrinciplesInPlay";
 
 /** The PRD is the build's source of truth while a run is reading it. */
