@@ -145,8 +145,14 @@ export function normaliseReleaseWindow(raw: unknown): ReleaseWindow | null {
   }
   if (!value || typeof value !== 'object') return null;
   const input = value as Record<string, unknown>;
-  const start = String(input.start ?? '');
-  const end = String(input.end ?? '');
+  // P0's settings DTO stores whole hours as { startHour, endHour, timezone };
+  // read that shape too, so a window saved from Settings is never ignored.
+  const hourToHhMm = (h: unknown): string =>
+    typeof h === 'number' && Number.isInteger(h) && h >= 0 && h <= 23
+      ? `${String(h).padStart(2, '0')}:00`
+      : '';
+  const start = String(input.start ?? hourToHhMm(input.startHour));
+  const end = String(input.end ?? hourToHhMm(input.endHour));
   if (!HH_MM.test(start) || !HH_MM.test(end)) return null;
   const days = Array.isArray(input.days)
     ? input.days
@@ -156,7 +162,9 @@ export function normaliseReleaseWindow(raw: unknown): ReleaseWindow | null {
   let timeZone =
     typeof input.timeZone === 'string' && input.timeZone
       ? input.timeZone
-      : DEFAULT_WINDOW_TIME_ZONE;
+      : typeof input.timezone === 'string' && input.timezone
+        ? input.timezone
+        : DEFAULT_WINDOW_TIME_ZONE;
   try {
     new Intl.DateTimeFormat('en-US', { timeZone });
   } catch {

@@ -126,6 +126,22 @@ describe('held paths', () => {
 });
 
 describe('release window', () => {
+  it("reads the Settings shape: whole hours and 'timezone'", () => {
+    expect(
+      normaliseReleaseWindow({
+        startHour: 22,
+        endHour: 6,
+        timezone: 'Asia/Kolkata',
+      }),
+    ).toEqual({
+      days: null,
+      start: '22:00',
+      end: '06:00',
+      timeZone: 'Asia/Kolkata',
+    });
+    expect(normaliseReleaseWindow({ startHour: 24, endHour: 6 })).toBeNull();
+  });
+
   it('is any time when unset or unreadable', () => {
     expect(normaliseReleaseWindow(null)).toBeNull();
     expect(normaliseReleaseWindow({ start: '25:00', end: '02:00' })).toBeNull();
