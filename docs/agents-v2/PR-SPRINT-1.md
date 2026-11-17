@@ -52,7 +52,7 @@ Clinic, pharmacy and coaching assistants turn down medical, dose and under-18 qu
 - **How it works no longer shows Ally's own instructions.** Ally's layers are plain summaries; the owner's own parts keep "Show exact text". The text stays on the server. The page now lists what the assistant can do with each list ("Leads: look up, add and change entries.").
 - **Lists fixes:** a choice typed but not added is kept on Next or Save. Make it yours keeps your choices after Back.
 - **Bot page code screen** says who gets a code without revealing whether this email does.
-- **One line in `ally_ai_agent_lists`** (version 4): offer to take details when a price or detail isn't known. It helps only sometimes; the real fix is chunk 6b items 29 and 30.
+- **The lead offer** (a price or detail it doesn't have → offer to take their details) was tried as a line in `ally_ai_agent_lists` and reverted: it helped only sometimes, and live prompt text goes through the Skills Store, not Git. `lists.txt` matches master. The real fix is chunk 6b items 29 and 30.
 - **ally-be ESLint** parses `scripts/**/*.ts` without type information, so the pre-commit hook passes on scripts.
 
 **Merging master** (`5fb03fe82`): master's AdminShell (#275) now wraps every route. Under it, A1's deep-link login, `/chatbots` redirects, sign-up redirects and the "Assistants" name are kept; details are in the merge commit.
@@ -72,4 +72,3 @@ Clinic, pharmacy and coaching assistants turn down medical, dose and under-18 qu
    - five probes per pack.
 
    The publish hold on medical, pharmacy and minors stays in `LAUNCH-CHECKLIST.md` until they pass.
-4. **Skills Store:** publish `ally_ai_agent_lists` version 4's text in production (`prompts push`, then publish).
