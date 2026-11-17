@@ -1995,6 +1995,43 @@ export class GithubActionsService {
   }
 
   /**
+   * Runs of a workflow that are queued or in progress. A release dispatched
+   * while another is running takes the NEXT patch number (the running one has
+   * already made its tag), which burns a version on an identical build. Null
+   * when GitHub cannot be read, which a caller must treat as "maybe".
+   */
+  async countActiveRuns(
+    repo: string,
+    workflow: string,
+  ): Promise<number | null> {
+    this.requireConfigured();
+    try {
+      let active = 0;
+      for (const status of ['in_progress', 'queued']) {
+        const { data } = await axios.get(
+          this.url(repo, `actions/workflows/${workflow}/runs`),
+          {
+            headers: this.headers,
+            params: { status, per_page: 1 },
+            timeout: 15_000,
+          },
+        );
+        active += Number(data?.total_count ?? 0);
+      }
+      this.noteAuthOutcome();
+      return active;
+    } catch (error) {
+      this.noteAuthOutcome(error);
+      this.logger.warn(
+        `Could not list active runs of ${workflow} in ${repo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
    * The commit a branch points at now. The release policy reads master once
    * per pass and compares every service against that one commit, so master
    * moving mid-pass cannot give two services two different heads. Null when

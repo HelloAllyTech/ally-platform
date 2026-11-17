@@ -105,6 +105,17 @@ import { ItemLinkedPr } from './entity/item-linked-pr.entity';
 import { ItemRelease } from './entity/item-release.entity';
 import { BuilderPullRequest } from 'src/builder/entity/builder-pull-request.entity';
 import { GithubModule } from 'src/github/github.module';
+import { ReleaseModule } from 'src/release/release.module';
+import { ReleasePolicyLog } from './entity/release-policy-log.entity';
+import { ReleasePlanService } from './service/release-plan.service';
+import { ReleasePolicyService } from './service/release-policy.service';
+import { ReleasePolicySettingsService } from './service/release-policy-settings.service';
+import { ReleasePolicyAccessService } from './service/release-policy-access.service';
+import {
+  LoggingReleasePolicyOwnerNotifier,
+  ReleasePolicyOwnerNotifier,
+} from './service/release-policy-notifier';
+import { ReleasePolicySchedulerRegistrationService } from './service/release-policy-scheduler-registration.service';
 import { AwsModule } from 'src/aws/aws.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 
@@ -170,10 +181,14 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
       ItemLinkedPr,
       ItemRelease,
       BuilderPullRequest,
+      // The auto-release policy's shadow log (Roadmap v2, P5).
+      ReleasePolicyLog,
     ]),
     // GithubActionsService — release tracking's compare / runs / tags reads, on the shared
     // client and token. Builder imports it too but does not re-export it.
     GithubModule,
+    // ProductionReleaseService — a Release click on the Roadmap (P5). Imports only GithubModule.
+    ReleaseModule,
     // AiService — the Weaviate client for duplicate detection.
     AiModule,
     // PromptSharedService — resolves src/prompts/roadmap/*.txt (with any dashboard override)
@@ -276,6 +291,17 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     // Release tracking: Released from what is actually in production (Roadmap v2, P1).
     ItemReleaseService,
     ItemReleaseSchedulerRegistrationService,
+    // The auto-release policy, shadow mode only (Roadmap v2, P5). The settings,
+    // access and notifier providers are the seams P0 rewires.
+    ReleasePlanService,
+    ReleasePolicyService,
+    ReleasePolicySettingsService,
+    ReleasePolicyAccessService,
+    {
+      provide: ReleasePolicyOwnerNotifier,
+      useClass: LoggingReleasePolicyOwnerNotifier,
+    },
+    ReleasePolicySchedulerRegistrationService,
     // Classifies a reported bug's repo at intake (RoadmapOpportunityService.create).
     // Provided directly rather than importing BugHunterModule: it constructs
     // itself from AppConfigService (global), PromptSharedService and

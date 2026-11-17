@@ -126,6 +126,27 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
   autoReleaseEnabled!: boolean;
 
   /**
+   * Whether the roadmap's auto-release policy (Roadmap v2, P5) may act.
+   * False: it runs in shadow, logging "would release …" to
+   * `release_policy_log` and dispatching nothing. Nothing reads it to
+   * dispatch yet — going live is a later change after at least five shadow
+   * cycles, and needs `autoReleaseEnabled` as well.
+   */
+  @Column({ type: 'boolean', default: false })
+  autoReleasePolicyLive!: boolean;
+
+  /**
+   * The policy's circuit breaker: set platform-wide after two consecutive
+   * failed or unhealthy auto-releases, cleared only by an Owner
+   * (`POST /v1/roadmap/release/resume`). Release clicks work while it is set.
+   */
+  @Column({ type: 'timestamp', nullable: true })
+  autoReleasePausedAt?: Date | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  autoReleasePausedReason?: string | null;
+
+  /**
    * Fix runs per pull request. A fix that cannot fix it will not fix it on the
    * fourth attempt either, and the failure mode without a ceiling is a loop
    * that pushes commits until someone notices the bill.

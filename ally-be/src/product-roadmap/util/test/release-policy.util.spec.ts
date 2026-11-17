@@ -3,7 +3,7 @@ import { GraphCommit } from 'src/github/service/github-actions.service';
 import {
   DEFAULT_AUTO_RELEASE_HELD_PATHS,
   RELEASE_DEBOUNCE_MS,
-  ReleasePolicyService,
+  PolicyServiceKey,
 } from '../../constants/release-policy.constants';
 import {
   ReleasePolicyComparison,
@@ -358,7 +358,7 @@ describe('decideReleases', () => {
   const longAgo = at('2026-11-17T11:00:00Z');
 
   function plan(
-    service: ReleasePolicyService,
+    service: PolicyServiceKey,
     overrides: Partial<ServiceReleasePlan> = {},
   ): ServiceReleasePlan {
     return {
@@ -387,7 +387,7 @@ describe('decideReleases', () => {
       ...overrides,
     };
   }
-  const empty = (service: ReleasePolicyService) =>
+  const empty = (service: PolicyServiceKey) =>
     plan(service, {
       commits: [],
       lastChangeAt: null,

@@ -5,6 +5,16 @@ import {
   ItemReleaseState,
 } from '../../product-roadmap/enum/item-release.enum';
 import {
+  ReleasePolicyBreakerEvent,
+  ReleasePolicyComparison,
+  ReleasePolicyDecision,
+  ReleasePolicyLogKind,
+  ReleasePolicyMode,
+  ReleasePolicyOrigin,
+  ReleasePolicyOutcome,
+} from '../../product-roadmap/enum/release-policy.enum';
+import { RELEASE_POLICY_SERVICES } from '../../product-roadmap/constants/release-policy.constants';
+import {
   NO_RELEASE_SERVICE,
   RELEASE_SERVICE_KEYS,
 } from '../../release/constants/release-services.constants';
@@ -530,6 +540,21 @@ describe('CHECK constraints cover their enums', () => {
     [
       'CHK_item_releases_service',
       [...RELEASE_SERVICE_KEYS, NO_RELEASE_SERVICE],
+    ],
+    // The auto-release policy's shadow log (Roadmap v2, P5).
+    ['CHK_release_policy_log_kind', Object.values(ReleasePolicyLogKind)],
+    ['CHK_release_policy_log_mode', Object.values(ReleasePolicyMode)],
+    ['CHK_release_policy_log_service', [...RELEASE_POLICY_SERVICES]],
+    ['CHK_release_policy_log_decision', Object.values(ReleasePolicyDecision)],
+    [
+      'CHK_release_policy_log_breaker_event',
+      Object.values(ReleasePolicyBreakerEvent),
+    ],
+    ['CHK_release_policy_log_outcome', Object.values(ReleasePolicyOutcome)],
+    ['CHK_release_policy_log_origin', Object.values(ReleasePolicyOrigin)],
+    [
+      'CHK_release_policy_log_comparison',
+      Object.values(ReleasePolicyComparison),
     ],
   ])('%s accepts every enum value', (constraint, values) => {
     const allowed = allowedValues(constraint as string);

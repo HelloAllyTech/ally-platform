@@ -14,7 +14,7 @@ import {
   DEFAULT_AUTO_RELEASE_HELD_PATHS,
   RELEASE_DEBOUNCE_MS,
   RELEASE_POLICY_BACKENDS,
-  ReleasePolicyService,
+  PolicyServiceKey,
 } from '../constants/release-policy.constants';
 import {
   ReleasePolicyComparison,
@@ -25,7 +25,7 @@ import {
  * The deterministic half of the auto-release policy (Roadmap v2, P5; plan
  * §5.5): which commits a release would ship, whether any of them holds it,
  * and what the policy decides. No I/O, so every rule is testable on its own;
- * `ReleasePlanService` and `ReleasePolicyService` do the reading and writing.
+ * `ReleasePlanService` and `PolicyServiceKey` do the reading and writing.
  */
 
 // ── Held paths ───────────────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ export interface RangeClassification {
  * is listed with the service's commits when any of its branch commits is.
  */
 export function classifyRange(params: {
-  service: ReleasePolicyService;
+  service: PolicyServiceKey;
   /** For the frontend: classify for one dashboard (its own app or shared code). */
   app?: FrontendApp;
   commits: readonly GraphCommit[];
@@ -485,7 +485,7 @@ export function mergeRangeClassifications(
 
 /** Everything the policy knows about one service's next release. */
 export interface ServiceReleasePlan extends RangeClassification {
-  service: ReleasePolicyService;
+  service: PolicyServiceKey;
   /** The newest successful production release (a tag, or its run's head commit). */
   baseRef: string | null;
   baseTag: string | null;
@@ -514,14 +514,14 @@ export interface PolicyVerdict {
  * so a dashboard never ships ahead of the API it reads.
  */
 export function decideReleases(input: {
-  plans: ReadonlyMap<ReleasePolicyService, ServiceReleasePlan>;
+  plans: ReadonlyMap<PolicyServiceKey, ServiceReleasePlan>;
   now: Date;
   pausedAt: Date | null;
   window: ReleaseWindow | null;
   /** Backends released recently whose health check has not passed yet. */
-  unverifiedBackends: readonly ReleasePolicyService[];
-}): Map<ReleasePolicyService, PolicyVerdict> {
-  const verdicts = new Map<ReleasePolicyService, PolicyVerdict>();
+  unverifiedBackends: readonly PolicyServiceKey[];
+}): Map<PolicyServiceKey, PolicyVerdict> {
+  const verdicts = new Map<PolicyServiceKey, PolicyVerdict>();
   const verdict = (
     decision: ReleasePolicyDecision,
     reason: string | null = null,
@@ -639,8 +639,8 @@ export function unverifiedBackends(
     finishedAt: Date;
   }[],
   now: Date,
-): ReleasePolicyService[] {
-  const out = new Set<ReleasePolicyService>();
+): PolicyServiceKey[] {
+  const out = new Set<PolicyServiceKey>();
   for (const release of releases) {
     if (
       !(RELEASE_POLICY_BACKENDS as readonly string[]).includes(release.service)
@@ -649,8 +649,7 @@ export function unverifiedBackends(
     if (!release.succeeded) continue;
     if (now.getTime() - release.finishedAt.getTime() > BACKEND_HEALTH_WAIT_MS)
       continue;
-    if (release.healthy !== true)
-      out.add(release.service as ReleasePolicyService);
+    if (release.healthy !== true) out.add(release.service as PolicyServiceKey);
   }
   return [...out];
 }

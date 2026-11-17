@@ -42,11 +42,11 @@ export const RELEASE_POLICY_SERVICES = [
   ...RELEASE_POLICY_BACKENDS,
   'frontend',
 ] as const;
-export type ReleasePolicyService = (typeof RELEASE_POLICY_SERVICES)[number];
+export type PolicyServiceKey = (typeof RELEASE_POLICY_SERVICES)[number];
 
-export function isReleasePolicyService(
+export function isPolicyServiceKey(
   value: string | null | undefined,
-): value is ReleasePolicyService {
+): value is PolicyServiceKey {
   return (RELEASE_POLICY_SERVICES as readonly string[]).includes(value ?? '');
 }
 
