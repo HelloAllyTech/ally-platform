@@ -181,7 +181,7 @@ Persister.
   (`disabled` only for manual runs, `queue_full`, `budget`); `already_running` records nothing. The run row's
   `reservedUsd` is its cap (counted in `GET /state` while it runs); `spentUsd` is updated after every lane.
 - **Stop reasons** on a finished run: `queue_full` (slots filled), `budget`, `timeout` (20 min run clock),
-  `no_candidates`, `error` (run `failed`), `abandoned` (a `running` row older than 45 min, failed by the scheduler);
+  `no_candidates`, `error` (run `failed`), `abandoned` (a `running` row older than 30 min — a live run ends within ~23.5 — failed by the scheduler's next tick);
   `null` when it ran normally with slots left.
 - **Scheduler** (`PmAgentRunSchedulerService`): a 10-minute tick under advisory lock `(1982000, 2)` runs once per IST
   date when the IST hour ≥ `runHourIst` and no `scheduled` run (or skip) exists for the date. Run now is
