@@ -18,7 +18,9 @@ const DAYS = [1, 2, 3, 4, 5, 6, 0];
 export const HandoverSettingsGroup: React.FC<{
   field: HomeField<Settings>;
   disabled: boolean;
-}> = ({ field, disabled }) => {
+  /** The assistant's time zone (chunk 6b): opening hours start in it; they keep their own after. */
+  zone?: string;
+}> = ({ field, disabled, zone = "Asia/Kolkata" }) => {
   const id = useId();
   const value = field.value;
   const set = (patch: Partial<Settings>, now = false) => field.set({ ...value, ...patch }, { now });
@@ -53,7 +55,7 @@ export const HandoverSettingsGroup: React.FC<{
                 {
                   hours: event.target.checked
                     ? {
-                        timeZone: "Asia/Kolkata",
+                        timeZone: zone,
                         days: [1, 2, 3, 4, 5],
                         from: "09:00",
                         to: "18:00",

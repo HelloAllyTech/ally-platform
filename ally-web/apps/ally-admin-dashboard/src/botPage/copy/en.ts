@@ -79,6 +79,46 @@ export const en = {
       writing: "Writing the reply…",
     },
   },
+  /**
+   * What the assistant is doing, step by step, and what it did (copy §30, chunk 6b). `{list}` is a
+   * list's name as the owner wrote it; `{when}` a day and time ("Thu 19 Nov, 11:00"); `{business}`
+   * the page's title.
+   */
+  steps: {
+    doing: {
+      reading: "Reading your message…",
+      search: "Searching {business}'s information…",
+      findTimes: "Checking free times…",
+      find: "Looking in {list}…",
+      findAny: "Looking it up…",
+      create: "Booking {when}…",
+      createAny: "Saving your details…",
+      update: "Updating your booking…",
+      cancel: "Cancelling your booking…",
+      hand_over: "Passing this to the team…",
+      writing: "Writing a reply…",
+      slow: "Still working on it…",
+    },
+    done: {
+      search: "Searched {business}'s information",
+      findTimes: "Checked free times",
+      find: "Looked in {list}",
+      findAny: "Looked it up",
+      create: "Booked {when}",
+      createAny: "Saved your details",
+      update: "Updated your booking",
+      cancel: "Cancelled your booking",
+      hand_over: "Passed this to the team",
+    },
+    /** The collapsed line's button, for screen readers. */
+    show: "Show what I did",
+    hide: "Hide what I did",
+    card: {
+      create: "Booked",
+      update: "Changed",
+      cancel: "Cancelled",
+    },
+  },
   /** The website widget (copy §22, chunk 13). */
   embed: {
     close: "Close",

@@ -5,7 +5,7 @@ import { Orb } from "../../components/v2/core/Orb";
 import { initials } from "../theme";
 
 import type { BotPageCopy } from "../copy";
-import type { AnswerFeedback, BotPageBranding, PublicCitation } from "../types";
+import type { AnswerFeedback, BotPageBranding, PublicCitation, PublicConfirmation } from "../types";
 
 /**
  * Whether a screen's heading takes focus when it appears. Off in the dashboard's live preview, so
@@ -296,5 +296,92 @@ export function Footer({ branding, copy }: { branding: BotPageBranding; copy: Bo
       )}
       <span>{copy.poweredBy}</span>
     </footer>
+  );
+}
+
+/** The step the assistant is on (chunk 6b): one calm line with a small moving mark. */
+export function StepLine({ text }: { text: string }) {
+  return (
+    <span className="bp-step" data-testid="live-step" aria-hidden="true">
+      <span className="bp-step__mark" aria-hidden="true" />
+      <span>{text}</span>
+    </span>
+  );
+}
+
+const CheckIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.4"
+    aria-hidden="true"
+  >
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </svg>
+);
+
+/**
+ * What the assistant did for a reply (chunk 6b): one quiet line ("Checked free times · Booked Thu
+ * 19 Nov, 11:00") that opens to the list of steps.
+ */
+export function StepsDone({ lines, copy }: { lines: string[]; copy: BotPageCopy }) {
+  const [open, setOpen] = useState(false);
+  if (!lines.length) return null;
+  return (
+    <div className="bp-done" data-testid="steps-done">
+      <button
+        type="button"
+        className="bp-done__toggle"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="ally-sr-only">{open ? copy.steps.hide : copy.steps.show}: </span>
+        <span aria-hidden={open || undefined}>{lines.join(" · ")}</span>
+      </button>
+      {open && (
+        <ul className="bp-done__list">
+          {lines.map(text => (
+            <li key={text}>
+              <CheckIcon />
+              {text}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** A booking or change made in a reply (chunk 6b), from the stored record. */
+export function ConfirmationCard({
+  confirmation,
+  copy,
+  when,
+}: {
+  confirmation: PublicConfirmation;
+  copy: BotPageCopy;
+  when: string;
+}) {
+  return (
+    <section className="bp-card" data-testid="confirmation-card" aria-label={confirmation.list}>
+      <p className="bp-card__what" data-action={confirmation.action}>
+        <CheckIcon />
+        {copy.steps.card[confirmation.action]} · {confirmation.list}
+      </p>
+      <p className="bp-card__when">{when}</p>
+      {confirmation.details.length > 0 && (
+        <dl className="bp-card__details">
+          {confirmation.details.map(d => (
+            <div key={d.label}>
+              <dt>{d.label}</dt>
+              <dd>{d.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </section>
   );
 }

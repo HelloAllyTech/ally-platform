@@ -84,6 +84,41 @@ export const hi: BotPageCopy = {
     },
   },
   /** The website widget (copy §22, chunk 13). */
+  // needs review: drafted in chunk 6b, not yet checked by a Hindi speaker (all of `steps`).
+  steps: {
+    doing: {
+      reading: "आपका संदेश पढ़ रहे हैं…",
+      search: "{business} की जानकारी में खोज रहे हैं…",
+      findTimes: "खाली समय देख रहे हैं…",
+      find: "{list} में देख रहे हैं…",
+      findAny: "देख रहे हैं…",
+      create: "{when} बुक कर रहे हैं…",
+      createAny: "आपकी जानकारी सेव कर रहे हैं…",
+      update: "आपकी बुकिंग बदल रहे हैं…",
+      cancel: "आपकी बुकिंग रद्द कर रहे हैं…",
+      hand_over: "इसे टीम को भेज रहे हैं…",
+      writing: "जवाब लिख रहे हैं…",
+      slow: "अभी भी काम चल रहा है…",
+    },
+    done: {
+      search: "{business} की जानकारी में खोजा",
+      findTimes: "खाली समय देखे",
+      find: "{list} में देखा",
+      findAny: "देखा",
+      create: "{when} बुक किया",
+      createAny: "आपकी जानकारी सेव की",
+      update: "आपकी बुकिंग बदली",
+      cancel: "आपकी बुकिंग रद्द की",
+      hand_over: "इसे टीम को भेजा",
+    },
+    show: "मैंने क्या किया, देखें",
+    hide: "छिपाएँ",
+    card: {
+      create: "बुक हो गया",
+      update: "बदल दिया",
+      cancel: "रद्द कर दिया",
+    },
+  },
   embed: {
     close: "बंद करें",
   },

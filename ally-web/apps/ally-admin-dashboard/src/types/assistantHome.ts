@@ -30,6 +30,8 @@ export interface HomeFieldValues {
   whatsappAccess: ChatbotAccessMode;
   /** Remember people between chats (chunk 8a), and what it never remembers. */
   memory: MemorySettings;
+  /** Where the business is (chunk 6b): an IANA time zone, Asia/Kolkata until the owner picks one. */
+  timeZone: string;
 }
 
 /**
