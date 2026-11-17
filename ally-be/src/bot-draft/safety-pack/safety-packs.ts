@@ -362,3 +362,31 @@ export function packRulesBlock(
     '</safety_rules>',
   ].join('\n');
 }
+
+/**
+ * The crisis reply on an assistant with a safety pack (chunk 6b, item 25), when the bot has no
+ * crisis wording of its own. The platform's default is written for counsellors ("contact a
+ * supervisor"), so a business's assistant gets its own:
+ * - medical and pharmacy cover both kinds of emergency, since the classifier can't reliably tell a
+ *   physical one (chest pain, an overdose) from a mental-health one;
+ * - every other pack the platform's wording without "a supervisor".
+ * The bot's helpline numbers follow when it has some. Null for a bot with no pack: the platform's
+ * text (and its keyword template) as before.
+ */
+export const MEDICAL_CRISIS_TEXT =
+  "If this is an emergency, call 112 or an ambulance (108) now. If you're thinking of harming yourself, call Tele-MANAS 14416.";
+export const PACK_CRISIS_TEXT =
+  "It sounds like this may be urgent. This assistant can't help in a crisis. Please contact emergency services or a crisis line now.";
+
+export function packCrisisText(
+  id: SafetyPackId | string | null | undefined,
+  helplineNumbers: string | null | undefined,
+): string | null {
+  if (!packFor(id)) return null;
+  const base =
+    id === SafetyPackId.MEDICAL || id === SafetyPackId.PHARMACY
+      ? MEDICAL_CRISIS_TEXT
+      : PACK_CRISIS_TEXT;
+  const helplines = (helplineNumbers ?? '').trim();
+  return helplines ? `${base} You can also call: ${helplines}.` : base;
+}

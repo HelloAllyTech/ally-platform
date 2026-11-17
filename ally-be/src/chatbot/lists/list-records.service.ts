@@ -658,7 +658,14 @@ export class ListRecordsService {
     }
   }
 
-  /** Every relation value points at a live record of the named list, or a contact, of this bot. */
+  /**
+   * Every relation value points at a live record of the named list, or a contact, of this bot.
+   *
+   * Each target is locked `FOR SHARE` until the write commits (chunk 6b, the `in_use` race): a
+   * delete of that slot takes `FOR UPDATE` (`lockRow`), so it waits for this booking and is then
+   * refused as in use; and a booking that comes second waits for the delete, then finds the slot
+   * gone. Before, both could commit and leave a booking pointing at a deleted slot.
+   */
   private async checkRelations(
     m: EntityManager,
     chatbotId: string,
@@ -673,14 +680,15 @@ export class ListRecordsService {
       const found: unknown[] =
         to === 'contact'
           ? await m.query(
-              `SELECT 1 FROM chatbot_contacts WHERE id = $1 AND chatbot_id = $2`,
+              `SELECT 1 FROM chatbot_contacts WHERE id = $1 AND chatbot_id = $2 FOR SHARE`,
               [value, chatbotId],
             )
           : await m.query(
               `SELECT 1 FROM collection_records r
                  JOIN collections c ON c.id = r.collection_id
                 WHERE r.id = $1 AND r.chatbot_id = $2 AND r.deleted_at IS NULL
-                  AND c.chatbot_id = $2 AND c.key = $3 AND c.deleted_at IS NULL`,
+                  AND c.chatbot_id = $2 AND c.key = $3 AND c.deleted_at IS NULL
+                  FOR SHARE OF r`,
               [value, chatbotId, to],
             );
       if (!found.length) {

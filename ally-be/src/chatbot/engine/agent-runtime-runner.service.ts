@@ -21,6 +21,7 @@ import {
   todayFor,
 } from '../agent-tools/list-tools';
 import { handoverOf } from '../handover/handover';
+import { assistantZone } from '../agent-tools/list-tools';
 import {
   isPreviewConversation,
   ListToolsService,
@@ -266,7 +267,10 @@ export class AgentRuntimeRunner {
             turn.chatbot,
             turn.contactId,
             run.conversationId,
-            handoverOf(turn.settings).hours?.timeZone,
+            assistantZone({
+              timeZone: turn.chatbot.settings?.timeZone,
+              handover: handoverOf(turn.settings),
+            }),
           )
         : Promise.resolve({ fields: {}, refs: {} }),
     ]);
@@ -308,7 +312,10 @@ export class AgentRuntimeRunner {
               definitions: lists.definitions,
               today: todayFor(
                 new Date(),
-                handoverOf(turn.settings).hours?.timeZone,
+                assistantZone({
+                  timeZone: turn.chatbot.settings?.timeZone,
+                  handover: handoverOf(turn.settings),
+                }),
               ),
             }
           : {}),

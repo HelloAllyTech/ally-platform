@@ -1,4 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
+import { packCrisisText } from '../../bot-draft/safety-pack/safety-packs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type {
@@ -71,6 +72,18 @@ export const AGENT_PROMPT_CODES = [
   'ally_ai_agent_memory',
 ];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
+
+/**
+ * The crisis reply that fits the assistant (chunk 6b, item 25): the bot's own crisis wording if it
+ * has some, else its safety pack's (`packCrisisText`), else null for the platform's text. The same
+ * on the keyword and the classifier paths.
+ */
+export function crisisTextFor(
+  turn: Pick<ChatTurn, 'chatbot' | 'settings'>,
+): string | null {
+  if (turn.chatbot.settings?.crisisEscalationText?.trim()) return null;
+  return packCrisisText(turn.chatbot.safetyPack, turn.settings.helplineNumbers);
+}
 
 /** Purposes with a section of their own in the Skills Store (chunk 20a-2). */
 const PURPOSE_SECTIONS = new Set(['answer', 'enquiries', 'training', 'guide']);
@@ -260,10 +273,12 @@ export class ChatbotEngineService {
     const { chatbot, settings, sender } = turn;
     return {
       handledBy: WaHandledBy.CRISIS,
-      body: this.settingsService.renderPlaceholders(
-        template.responseText || settings.crisisEscalationText,
-        settings,
-      ),
+      body:
+        crisisTextFor(turn) ??
+        this.settingsService.renderPlaceholders(
+          template.responseText || settings.crisisEscalationText,
+          settings,
+        ),
       templateId: template.id,
       alert: this.alert(
         200,
@@ -519,10 +534,12 @@ export class ChatbotEngineService {
       : 'The fixed safety reply was sent and the answer was discarded.';
     return {
       handledBy: WaHandledBy.CRISIS,
-      body: this.settingsService.renderPlaceholders(
-        settings.crisisEscalationText,
-        settings,
-      ),
+      body:
+        crisisTextFor(turn) ??
+        this.settingsService.renderPlaceholders(
+          settings.crisisEscalationText,
+          settings,
+        ),
       retrievalMeta: { ...ran },
       alert: this.alert(
         200,

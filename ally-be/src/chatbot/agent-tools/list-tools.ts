@@ -705,8 +705,38 @@ export function recordPassage(
   };
 }
 
-/** Where a business is, until bots have a time zone setting: the pilots are in India. */
+/** Where a business is when its assistant hasn't said (chunk 6b): the pilots are in India. */
 export const DEFAULT_TIME_ZONE = 'Asia/Kolkata';
+
+/** Whether `zone` is an IANA time zone this runtime knows. */
+export function isTimeZone(zone: unknown): zone is string {
+  if (typeof zone !== 'string' || !zone.trim()) return false;
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where the assistant's business is (chunk 6b, item 9): its own Time zone setting, else the
+ * hand-over hours' zone (what pilots set before 6b), else Asia/Kolkata. Lists, `{today}`, Repeat
+ * weekly, the time check and memory's dates all use it. Hand-over hours keep their own zone.
+ */
+export function assistantZone(
+  settings:
+    | {
+        timeZone?: unknown;
+        handover?: { hours?: { timeZone?: unknown } | null } | null;
+      }
+    | null
+    | undefined,
+): string {
+  if (isTimeZone(settings?.timeZone)) return settings!.timeZone as string;
+  const hours = settings?.handover?.hours?.timeZone;
+  return isTimeZone(hours) ? hours : DEFAULT_TIME_ZONE;
+}
 
 /**
  * Today where the business is, for the lists section (chunk 6): "Saturday 14 Nov 2026, 11:58

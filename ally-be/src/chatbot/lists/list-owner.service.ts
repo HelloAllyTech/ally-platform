@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import {
   abilityFor,
+  assistantZone,
   DEFAULT_TIME_ZONE,
   listToolName,
 } from '../agent-tools/list-tools';
@@ -185,12 +186,15 @@ export class ListOwnerService {
     private readonly settings: ChatbotSettingsService,
   ) {}
 
-  /** Where the business is: the hand-over hours' zone, as the agent's `{today}` uses it. */
+  /** Where the business is, as the agent's `{today}` uses it (chunk 6b: `assistantZone`). */
   async timeZone(
     chatbot: Pick<Chatbot, 'settings'> & Partial<Pick<Chatbot, 'safetyPack'>>,
   ): Promise<string> {
     const effective = await this.settings.getForChatbot(chatbot);
-    return zoneOrDefault(handoverOf(effective).hours?.timeZone);
+    return assistantZone({
+      timeZone: chatbot.settings?.timeZone,
+      handover: handoverOf(effective),
+    });
   }
 
   abilitiesOf(
