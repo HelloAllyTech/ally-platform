@@ -6,6 +6,7 @@ import { DebriefScoreView } from "@types";
 
 import { ChartCard } from "../../Analytics/chartKit";
 import { languageLabel } from "../consoleLabels";
+import { SCORE_DAYS } from "./ImprovementSection";
 
 /** Fewer debriefs than this in a slice and its score is too few to read (as elsewhere on the page). */
 export const SCORE_MIN_N = 20;
@@ -92,7 +93,7 @@ const ScoreChart: React.FC<{ view: DebriefScoreView }> = ({ view }) => {
  */
 export const ScoreSection: React.FC = () => {
   const t = en.debriefs.v2.score;
-  const q = useGetDebriefScoreQuery({ days: 56 });
+  const q = useGetDebriefScoreQuery({ days: SCORE_DAYS });
   const view = q.data;
   if (q.isError && !view) {
     return (
