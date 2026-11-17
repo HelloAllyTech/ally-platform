@@ -2,8 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { BadgeUserService } from './badge-user.service';
 import { BadgeService } from './badge.service';
-import { BadgeCategory } from '../constants/badge.constants';
+import {
+  BADGE_EARNED_NOTIFICATION_TYPE,
+  BadgeCategory,
+} from '../constants/badge.constants';
+import type { TenantBadgeResponse } from '../type/badge-response.type';
 import { filterInvalidBadges } from '../util/badge.util';
+
+import { ExecutionManager } from 'src/common/execution/execution-manager';
+import { InAppNotificationService } from 'src/notification/service/in-app-notification.service';
 
 import { ReviewCommentRemovedEventParams } from 'src/review/type/review-event.type';
 
@@ -14,7 +21,36 @@ export class BadgeAwardService {
   constructor(
     private readonly badgeService: BadgeService,
     private readonly badgeUserService: BadgeUserService,
+    private readonly inAppNotificationService: InAppNotificationService,
   ) {}
+
+  /**
+   * One in-app notification per badge earned. Best-effort: a failed
+   * notification never undoes the award.
+   */
+  private async notifyBadgesEarned(
+    userId: number,
+    badges: readonly TenantBadgeResponse[],
+  ): Promise<void> {
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) return;
+    for (const badge of badges) {
+      try {
+        await this.inAppNotificationService.create({
+          userId,
+          tenantId,
+          type: BADGE_EARNED_NOTIFICATION_TYPE,
+          title: 'You earned a badge',
+          body: `You earned the "${badge.name}" badge`,
+          data: { screen: 'Badges', badgeId: badge.id },
+        });
+      } catch (error) {
+        this.logger.error(
+          `Badge notification failed for userId=${userId} badgeId=${badge.id}: ${(error as Error).message}`,
+        );
+      }
+    }
+  }
 
   async awardCommentReactionBadgeByReceiverGiverId(
     receiverId: number,
@@ -65,6 +101,11 @@ export class BadgeAwardService {
       if (badgeToAward.length > 0) {
         try {
           await this.badgeUserService.saveBadgeUsers(badgeToAward);
+          const awardedIds = new Set(badgeToAward.map((b) => b.badgeId));
+          await this.notifyBadgesEarned(
+            receiverId,
+            receiverUnawardedBadges.filter((badge) => awardedIds.has(badge.id)),
+          );
           this.logger.log(
             `Awarded ${badgeToAward.length} badge(s) to receiver userId=${receiverId} badgeIds=[${badgeToAward.map((b) => b.badgeId).join(', ')}] (receivedCount=${receivedCommentsReactionsCount})`,
           );
@@ -101,6 +142,11 @@ export class BadgeAwardService {
       if (badgeToAward.length > 0) {
         try {
           await this.badgeUserService.saveBadgeUsers(badgeToAward);
+          const awardedIds = new Set(badgeToAward.map((b) => b.badgeId));
+          await this.notifyBadgesEarned(
+            giverId,
+            giverUnawardedBadges.filter((badge) => awardedIds.has(badge.id)),
+          );
           this.logger.log(
             `Awarded ${badgeToAward.length} badge(s) to giver userId=${giverId} badgeIds=[${badgeToAward.map((b) => b.badgeId).join(', ')}] (givenCount=${givenCommentsReactionsCount})`,
           );

@@ -24,6 +24,7 @@ import { AuditModule } from 'src/audit/audit.module';
 import { UserModule } from 'src/user/user.module';
 import { LanguageModule } from 'src/language/language.module';
 import { LearnModule } from 'src/learn/learn.module';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { LearnModule } from 'src/learn/learn.module';
     forwardRef(() => UserModule),
     LanguageModule,
     forwardRef(() => LearnModule),
+    NotificationModule,
   ],
   controllers: [BadgeController],
   providers: [

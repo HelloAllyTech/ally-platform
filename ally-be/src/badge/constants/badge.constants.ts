@@ -41,3 +41,6 @@ export const BADGE_MANDATORY_FIELDS: (keyof CreateBadgeDto)[] = [
   'achievementParams',
   'groupIds',
 ];
+
+/** `in_app_notifications.type` written when a learner earns a badge. */
+export const BADGE_EARNED_NOTIFICATION_TYPE = 'BADGE_EARNED';
