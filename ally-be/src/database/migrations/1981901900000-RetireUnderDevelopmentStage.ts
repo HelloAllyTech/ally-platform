@@ -24,8 +24,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Ship release 1 first and wait for it to be live — an old container still writing
  * `under_development` would hit the new CHECK. Hand-written SQL, no exported helpers.
  */
-export class RetireUnderDevelopmentStage1981901700000 implements MigrationInterface {
-  name = 'RetireUnderDevelopmentStage1981901700000';
+export class RetireUnderDevelopmentStage1981901900000 implements MigrationInterface {
+  name = 'RetireUnderDevelopmentStage1981901900000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
