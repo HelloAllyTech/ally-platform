@@ -96,7 +96,7 @@ describe("RoadmapFilterBar", () => {
 
     expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Consumer" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "In development" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Prioritised" })).not.toBeInTheDocument();
   });
 
   it("opens the popover with every loaded facet as a section", () => {
@@ -123,9 +123,7 @@ describe("RoadmapFilterBar", () => {
 
     captured.dropdown.onApplyFilters({ source: [RoadmapOpportunitySource.CONSUMER] });
 
-    expect(handlers.onSourceFilterChange).toHaveBeenCalledWith([
-      RoadmapOpportunitySource.CONSUMER,
-    ]);
+    expect(handlers.onSourceFilterChange).toHaveBeenCalledWith([RoadmapOpportunitySource.CONSUMER]);
   });
 
   it("does not clear a facet the popover left out of its result", () => {
@@ -152,7 +150,7 @@ describe("RoadmapFilterBar", () => {
 
     expect(screen.getByRole("button", { name: "Filter (2)" })).toBeInTheDocument();
     expect(screen.getByText("Stage:")).toBeInTheDocument();
-    expect(screen.getByText("In development")).toBeInTheDocument();
+    expect(screen.getByText("Prioritised")).toBeInTheDocument();
     expect(screen.getByText("Ajey Gore, Sandeep Malhotra")).toBeInTheDocument();
   });
 
