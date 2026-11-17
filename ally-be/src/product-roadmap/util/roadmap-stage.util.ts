@@ -56,20 +56,3 @@ export function unreshapeableMessage(
     `already point at. Votes and comments are untouched.`
   );
 }
-
-/**
- * `under_development` is being retired (2026-11): the roadmap ladder is Idea (`new`) →
- * Prioritised → Released, with Archived as a hidden terminal state. Release 1 of the removal is
- * TOLERANT: the value still exists in storage and CHECK constraints so old rows load, but nothing
- * writes it any more. Release 2 migrates the remaining rows and drops it from the constraints.
- *
- * Every path that accepts a stage from a client routes it through here, so a stale admin tab that
- * still offers "In development" cannot put the value back.
- */
-export function normaliseStage<
-  T extends RoadmapOpportunityStage | null | undefined,
->(stage: T): T | RoadmapOpportunityStage.PRIORITISED {
-  return stage === RoadmapOpportunityStage.UNDER_DEVELOPMENT
-    ? RoadmapOpportunityStage.PRIORITISED
-    : stage;
-}

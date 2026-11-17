@@ -542,7 +542,7 @@ export class RoadmapCopilotService {
   private async boardSnapshot(userId: number): Promise<string> {
     try {
       const { items } = await this.opportunityService.list(userId, {
-        stage: ['new', 'prioritised', 'under_development'],
+        stage: ['new', 'prioritised'],
         limit: ROADMAP_COPILOT.BOARD_SNAPSHOT_ROWS,
       } as any);
       if (!items.length) return '(the board is empty)';
