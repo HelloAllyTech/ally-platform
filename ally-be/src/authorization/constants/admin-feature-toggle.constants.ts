@@ -437,9 +437,10 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
   },
   {
     key: FeatureToggleKey.WHATSAPP_BOT,
-    label: 'WhatsApp Bot',
+    // Called Assistants everywhere people see it (6b); the key stays whatsapp_bot.
+    label: 'Assistants',
     description:
-      'Manage the WhatsApp Q&A bot: templates, conversations, unanswered queue and analytics.',
+      'Create assistants and see Assistants in the menu. Anyone can open an assistant whose team they are on without this.',
     legacyGrants: SDA_ONLY,
     // The platform number and global settings span every organization, but each organization
     // can connect its own number. An org-restricted admin reaches only the @OrgScopedRoute
