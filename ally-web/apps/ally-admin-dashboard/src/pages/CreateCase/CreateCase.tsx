@@ -35,11 +35,12 @@ import { GetScenarioType } from "@types";
 import {
   extractValidData,
   getErrorMessage,
-  isEmpty,
   isNonEmptyArray,
   isNonEmptyObject,
   isNonEmptyString,
 } from "@utils";
+
+import { areCaseFieldsFilled } from "./caseValidity";
 
 // Get all mandatory field IDs from the configuration
 const getMandatoryFieldIds = () => {
@@ -115,19 +116,7 @@ export const CreateCase: FC = () => {
 
   // Custom validation to check if all mandatory fields are filled
   const areAllMandatoryFieldsFilled = useMemo(() => {
-    const mandatoryFieldIds = getMandatoryFieldIds();
-    const allMandatoryFormFieldsFilled = mandatoryFieldIds.every(fieldId => {
-      const value = formValues[fieldId];
-      // Check if value exists and is not empty
-      if (isEmpty(value)) return false;
-
-      if (Array.isArray(value)) return !isNonEmptyArray(value);
-
-      if (value instanceof FileList && value.length === 0) return false;
-
-      return true;
-    });
-    return allMandatoryFormFieldsFilled && formValues?.scenarios?.length > 1; // at least one simulation is required
+    return areCaseFieldsFilled(getMandatoryFieldIds(), formValues);
   }, [formValues]);
 
   const toggleSimulationModal = () => {

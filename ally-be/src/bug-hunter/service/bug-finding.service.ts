@@ -23,6 +23,7 @@ import { BugHunterMissClassifierService } from './bug-hunter-miss-classifier.ser
 import { releaseLinkedRoadmapOpportunity } from '../util/release-linked-roadmap-opportunity.util';
 import { checkForAndRecordReversals } from '../util/check-for-reversals.util';
 import { effectiveStage } from '../util/bug-finding-stage.util';
+import { normaliseStage } from 'src/product-roadmap/util/roadmap-stage.util';
 import { truncateTitle } from '../util/truncate-title.util';
 import {
   fixDidNotHold,
@@ -310,7 +311,7 @@ export class BugFindingService {
     const before = effectiveStage(finding);
 
     await this.findingRepository.update(id, {
-      stageOverride: stage,
+      stageOverride: normaliseStage(stage),
       // Cleared together with the override: "pinned by nobody at no time" is the
       // only honest reading of a derived stage, and leaving the old stamps behind
       // would make the drawer claim a pin that is no longer in force.

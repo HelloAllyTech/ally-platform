@@ -128,6 +128,8 @@ export const ComponentLibrary: React.FC = () => {
     try {
       await deleteComponentTemplates({ ids }).unwrap();
       setTemplates(prev => prev.filter(item => !ids.includes(item.id)));
+      // Keep the server total in step, or `hasMore` stays true and 'Load more' does nothing.
+      setTotal(prev => Math.max(0, prev - ids.length));
       toast.success(
         `${en.common.successfullyDeleted} ${ids.length} ${
           ids.length > 1 ? en.componentLibrary.templates : en.componentLibrary.template
@@ -144,6 +146,7 @@ export const ComponentLibrary: React.FC = () => {
     try {
       await deleteComponentTemplates({ ids: [templateId] }).unwrap();
       setTemplates(prev => prev.filter(item => item.id !== templateId));
+      setTotal(prev => Math.max(0, prev - 1));
       toast.success(en.componentLibrary.templateDeletedSuccessfully);
     } catch {
       toast.error(en.componentLibrary.failedToDeleteTemplate);

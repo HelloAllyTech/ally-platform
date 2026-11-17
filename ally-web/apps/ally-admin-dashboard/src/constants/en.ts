@@ -170,6 +170,8 @@ export const en = {
     OrganizationNotFound: "Organization not found",
     minimumScoreError: "Minimum score must be a positive integer",
     failedToCreateEvent: "Failed to create event",
+    failedToCreateLanguage: "Failed to create language",
+    failedToUpdateLanguage: "Failed to update language",
     failedToProceed: "Fill atleast title field to proceed to Event Configuration!",
     failedToSaveEvents: "Failed to save events. Please try again.",
     failedToBulkAddEvents: (count: number) =>
