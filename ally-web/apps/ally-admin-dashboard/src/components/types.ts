@@ -283,6 +283,8 @@ export interface ListToolbarProps {
   tertiaryAction?: ActionProps;
   className?: string;
   addFilterButtonRef?: React.RefObject<HTMLButtonElement>;
+  /** Quiet period before onSearchChange fires while typing (default 300ms; 0 = every keystroke). */
+  searchDebounceMs?: number;
 }
 
 export interface RequestFilterOption {

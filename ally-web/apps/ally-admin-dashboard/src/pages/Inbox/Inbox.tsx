@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 
 import {
   useGetChatbotsQuery,
+  useGetInboxCountsQuery,
   useGetInboxQuery,
   type InboxChannelFilter,
   type InboxView,
@@ -30,6 +31,9 @@ import "./inbox.css";
 import "../AssistantHome/ui/scale.css";
 
 const VIEWS: InboxView[] = ["needs_person", "live", "all"];
+// Land on the chats that are waiting for a person, not on a wall of every chat. "All" is one
+// click away and is kept in the URL (?view=all) so a shared link still opens where it was sent.
+const DEFAULT_VIEW: InboxView = "needs_person";
 
 const ago = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
@@ -45,12 +49,13 @@ const ago = (iso: string) =>
  */
 export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) => {
   const [params, setParams] = useSearchParams();
-  const view = (params.get("view") as InboxView) || "all";
+  const view = (params.get("view") as InboxView) || DEFAULT_VIEW;
   const channel = (params.get("channel") as InboxChannelFilter) || undefined;
   const chatbotId = locked ?? (params.get("assistant") || undefined);
   const selected = params.get("conversation");
   const { data: items = [], isLoading } = useGetInboxQuery({ view, channel, chatbotId });
   const { data: bots } = useGetChatbotsQuery();
+  const { data: counts } = useGetInboxCountsQuery();
   const { user } = useUser();
   const [sound, setSoundState] = useState(soundOn());
   const [askNotify, setAskNotify] = useState(canAskForNotifications());
@@ -147,9 +152,12 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
                 type="button"
                 className="ally-inbox__tab"
                 aria-pressed={view === v}
-                onClick={() => set("view", v === "all" ? null : v)}
+                onClick={() => set("view", v === DEFAULT_VIEW ? null : v)}
               >
                 {INBOX.filters[v]}
+                {v === "needs_person" && counts && counts.needsPerson > 0 ? (
+                  <span className="ally-inbox__tab-count"> ({counts.needsPerson})</span>
+                ) : null}
               </button>
             ))}
           </div>

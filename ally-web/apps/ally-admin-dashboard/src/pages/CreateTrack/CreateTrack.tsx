@@ -41,6 +41,7 @@ import {
   isTranslationsSelection,
 } from "./components/types";
 import {
+  cloneSectionWithNewIds,
   createEmptySection,
   createItemFormValueFromTemplate,
   createItemOfType,
@@ -169,16 +170,55 @@ export const CreateTrack: FC = () => {
     setSelection({ sectionIndex, itemIndex: items.length - 1 });
   };
 
+  // Deleting is reversible here: the removed content is held for the toast's Undo instead of
+  // asking "are you sure?" first (a confirm on every delete is the friction; losing work is the harm).
   const handleDeleteSection = (sectionIndex: number) => {
+    const removed = cloneSectionWithNewIds(getValues(`sections.${sectionIndex}`));
+    const original = getValues(`sections.${sectionIndex}`);
     sectionArray.remove(sectionIndex);
     setSelection("settings");
+    toast("Section deleted", {
+      action: {
+        label: "Undo",
+        onClick: () => sectionArray.insert(sectionIndex, { ...removed, title: original.title }),
+      },
+    });
+  };
+
+  const handleDuplicateSection = (sectionIndex: number) => {
+    const copy = cloneSectionWithNewIds(getValues(`sections.${sectionIndex}`));
+    sectionArray.insert(sectionIndex + 1, copy);
   };
 
   const handleDeleteItem = (sectionIndex: number, itemIndex: number) => {
     const section = getValues(`sections.${sectionIndex}`);
+    const removed = section.items?.[itemIndex];
     const items = (section.items ?? []).filter((_, index) => index !== itemIndex);
     formMethods.setValue(`sections.${sectionIndex}.items`, items, { shouldDirty: true });
     setSelection("settings");
+    if (removed) {
+      toast("Component deleted", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const current = [...(getValues(`sections.${sectionIndex}.items`) ?? [])];
+            current.splice(itemIndex, 0, removed);
+            formMethods.setValue(`sections.${sectionIndex}.items`, current, { shouldDirty: true });
+          },
+        },
+      });
+    }
+  };
+
+  const handleDuplicateItem = (sectionIndex: number, itemIndex: number) => {
+    const section = getValues(`sections.${sectionIndex}`);
+    const source = section.items?.[itemIndex];
+    if (!source) return;
+    const copy = cloneSectionWithNewIds({ ...section, items: [source] }).items[0];
+    const items = [...(section.items ?? [])];
+    items.splice(itemIndex + 1, 0, { ...copy, title: `${source.title || "Component"} (copy)` });
+    formMethods.setValue(`sections.${sectionIndex}.items`, items, { shouldDirty: true });
+    setSelection({ sectionIndex, itemIndex: itemIndex + 1 });
   };
 
   const handleReorderSections = (from: number, to: number) => {
@@ -373,14 +413,27 @@ export const CreateTrack: FC = () => {
       );
     }
     return (
-      <ItemEditorCanvas
-        key={item.localId}
-        sectionIndex={sectionIndex}
-        itemIndex={itemIndex}
-        type={item.type}
-        onDelete={() => handleDeleteItem(sectionIndex, itemIndex)}
-        isPublished={trackDetail?.status === SimulationStatus.ACTIVE}
-      />
+      <>
+        {!isViewOnly && (
+          <div className="flex justify-end px-4 pt-2">
+            <button
+              type="button"
+              onClick={() => handleDuplicateItem(sectionIndex, itemIndex)}
+              className="text-xs text-typography-600 underline hover:text-typography-900"
+            >
+              Duplicate component
+            </button>
+          </div>
+        )}
+        <ItemEditorCanvas
+          key={item.localId}
+          sectionIndex={sectionIndex}
+          itemIndex={itemIndex}
+          type={item.type}
+          onDelete={() => handleDeleteItem(sectionIndex, itemIndex)}
+          isPublished={trackDetail?.status === SimulationStatus.ACTIVE}
+        />
+      </>
     );
   };
 
@@ -487,6 +540,7 @@ export const CreateTrack: FC = () => {
               onAddItem={handleAddItem}
               onAddItemFromTemplate={handleAddItemFromTemplate}
               onDeleteSection={handleDeleteSection}
+              onDuplicateSection={handleDuplicateSection}
               onReorderSections={isViewOnly ? () => undefined : handleReorderSections}
               onReorderItems={isViewOnly ? () => undefined : handleReorderItems}
             />

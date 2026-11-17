@@ -26,6 +26,9 @@ const getQueryMock = vi.fn();
 vi.mock("@api", () => ({
   useGetRoleplaySessionLogQuery: (...args: unknown[]) => getQueryMock(...args),
   useGetI18nTranslationsQuery: () => ({ data: undefined }),
+  useGetRoleplaySessionLogsQuery: () => ({
+    data: { data: [{ id: "s0" }, { id: "sess-1" }, { id: "s2" }], total: 3 },
+  }),
 }));
 
 import { RoleplaySessionLogDetail } from "../RoleplaySessionLogDetail";
@@ -81,6 +84,17 @@ describe("RoleplaySessionLogDetail — summary card", () => {
     render(<RoleplaySessionLogDetail />);
     expect(screen.getByText("Session ID")).toBeInTheDocument();
     expect(screen.getByText(baseDetail.id)).toBeInTheDocument();
+  });
+});
+
+describe("RoleplaySessionLogDetail — navigation", () => {
+  it("offers Newer and Older sessions and a jump link per section", () => {
+    getQueryMock.mockReturnValue({ data: baseDetail, isLoading: false, isError: false });
+    render(<RoleplaySessionLogDetail />);
+    expect(screen.getByRole("button", { name: /Newer/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Older/ })).toBeEnabled();
+    const nav = screen.getByTestId("section-nav");
+    expect(nav.querySelectorAll("button").length).toBeGreaterThan(1);
   });
 });
 
@@ -157,7 +171,7 @@ describe("RoleplaySessionLogDetail — language glossary card", () => {
 
     render(<RoleplaySessionLogDetail />);
 
-    expect(screen.getByText("Language glossary")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Language glossary" })).toBeInTheDocument();
     expect(screen.getByText("Delivered")).toBeInTheDocument();
     expect(screen.getByText("1,147")).toBeInTheDocument(); // Tier 0 char count
     expect(screen.getByText("emotions: 3")).toBeInTheDocument();
@@ -186,7 +200,7 @@ describe("RoleplaySessionLogDetail — language glossary card", () => {
 
     render(<RoleplaySessionLogDetail />);
 
-    expect(screen.getByText("Language glossary")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Language glossary" })).toBeInTheDocument();
     expect(screen.getByText(/Not delivered this session/)).toBeInTheDocument();
   });
 });
@@ -340,7 +354,7 @@ describe("RoleplaySessionLogDetail — weak performing metrics card", () => {
       ]),
     );
     render(<RoleplaySessionLogDetail />);
-    expect(screen.getByText("Actor quality metrics")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Actor quality metrics" })).toBeInTheDocument();
     expect(screen.getByText("Actor clienthood")).toBeInTheDocument();
     expect(screen.getByText("Conversational progression")).toBeInTheDocument();
   });

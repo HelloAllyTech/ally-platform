@@ -92,6 +92,24 @@ export type QuestionPath =
 /* Factories                                                                  */
 /* -------------------------------------------------------------------------- */
 
+/** Deep copy of a section with every `localId` regenerated, so the copy is fully independent. */
+export const cloneSectionWithNewIds = (section: TrackSectionFormValue): TrackSectionFormValue => {
+  const fresh = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(fresh);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+          k,
+          k === "localId" ? newId() : fresh(v),
+        ]),
+      );
+    }
+    return value;
+  };
+  const copy = fresh(section) as TrackSectionFormValue;
+  return { ...copy, title: `${section.title || "Section"} (copy)` };
+};
+
 export const createEmptySection = (index: number): TrackSectionFormValue => ({
   localId: newId(),
   title: `Section ${index + 1}`,

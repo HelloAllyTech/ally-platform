@@ -636,6 +636,7 @@ export const {
   useEscalateDebriefMutation,
   useGetDebriefMeQuery,
   useGetDebriefSessionsQuery,
+  useLazyGetDebriefSessionsQuery,
   useGetDebriefSessionQuery,
   useGetDebriefRunLogsQuery,
   useGetDebriefAttentionQuery,

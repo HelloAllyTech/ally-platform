@@ -187,6 +187,37 @@ export const en = {
     failedToSave: "Failed to save branding",
     saving: "Saving...",
   },
+  // Shared admin building blocks (ConfirmDialog, autosave indicator, bulk bar, publish blockers).
+  adminUx: {
+    confirm: {
+      cancel: "Cancel",
+      irreversibleLabel: "This cannot be undone",
+      reversibleHint: "You can undo this afterwards.",
+      acknowledge: "I understand this cannot be undone",
+    },
+    autosave: {
+      saving: "Saving…",
+      saved: "Saved",
+      savedAt: (time: string) => `Saved ${time}`,
+      failed: "Couldn't save. Retrying on your next change.",
+      restoreTitle: "Restore your unsaved draft?",
+      restoreBody: "We found changes from an earlier session that were never saved.",
+      restore: "Restore draft",
+      discard: "Discard draft",
+    },
+    bulk: {
+      selected: (n: number) => `${n} selected`,
+      clear: "Clear selection",
+      selectAll: "Select all rows",
+      selectRow: "Select row",
+    },
+    blockers: {
+      readyTitle: "Ready to publish",
+      blockedTitle: (n: number) =>
+        n === 1 ? "1 thing is blocking publish" : `${n} things are blocking publish`,
+      fix: "Fix",
+    },
+  },
   common: {
     apply: "Apply",
     search: "Search",
@@ -399,11 +430,31 @@ export const en = {
     pleaseWait: "Please wait while we verify your link",
     magicLinkExpired: "Invalid or Expired Link",
     redirectingToLogin: "Redirecting to login page...",
+    backToLogin: "Back to login",
+    magicLinkMissingToken:
+      "This sign-in link is incomplete. Open the link from your email again, or request a new one.",
     redirectingToDashboard: "Redirecting to dashboard...",
   },
   // Per-admin content toggles (Create Roleplays / Cases / Courses). A type whose
   // toggle is off is view-only; the copy names the toggle to ask for, matching
   // ally-be's refusal (ContentAccessService).
+  organizationAccess: {
+    bulk: {
+      enableAll: "Enable all",
+      enableAllHint: (noun: string) =>
+        `Turn on every published ${noun} this organisation does not have yet`,
+      enableAllTitle: "Enable everything published?",
+      copyFrom: "Copy access from…",
+      copy: "Copy",
+      copyTitle: (from: string) => `Copy access from ${from}?`,
+      consequence: (n: number, noun: string) =>
+        `This turns on ${n} ${noun} for this organisation. Nothing is switched off, and you can turn any of them off again one by one.`,
+      confirm: (n: number) => `Enable ${n}`,
+      nothingToChange: (noun: string) => `Nothing to change: no ${noun} to add.`,
+      done: (n: number, noun: string) => `Enabled ${n} ${noun}`,
+      failed: "Couldn't update access. Nothing may have changed, so check the list.",
+    },
+  },
   contentAccess: {
     view: "View",
     viewOnlyEmptyTitle: (plural: string) => `No ${plural} to show`,
@@ -1005,6 +1056,25 @@ export const en = {
     loadingToggles: "Loading feature access...",
   },
   userManagement: {
+    bulkSuspend: "Suspend",
+    bulkActivate: "Activate",
+    bulkSuspendTitle: (n: number) => `Suspend ${n} ${n === 1 ? "user" : "users"}?`,
+    bulkSuspendConsequence:
+      "They are signed out and cannot sign in until activated again. Their data is kept, and you can activate them at any time.",
+    bulkActivateTitle: (n: number) => `Activate ${n} ${n === 1 ? "user" : "users"}?`,
+    bulkActivateConsequence: "They can sign in again straight away.",
+    bulkStatusDone: (n: number, status: string) =>
+      `${n} ${n === 1 ? "user" : "users"} set to ${status.toLowerCase()}`,
+    bulkStatusFailed: (names: string[]) =>
+      `Couldn't update ${names.length} ${names.length === 1 ? "user" : "users"}: ${names.slice(0, 5).join(", ")}${names.length > 5 ? ` and ${names.length - 5} more` : ""}`,
+    roleHelpHeading: "What each role can do",
+    roleHelp: {
+      COUNSELOR: "Counsellor: works the helpline and practises in the app. No admin access.",
+      ADMIN: "Admin: manages one organisation's users, content access and results.",
+      LEARNER: "Learner: practises roleplays and courses in the app. No admin access.",
+      MULTI_TENANT_ADMIN:
+        "Multi-tenant admin: an admin across several organisations. Choose which ones after the account exists.",
+    } as Record<string, string>,
     organizationCreated: "Organization created successfully",
     organizationUpdated: "Organization updated successfully",
     failedUpdateOrganization: "Failed to update organization",
@@ -1036,6 +1106,10 @@ export const en = {
     bulkAddUsersSuccess: (count: number) =>
       `${count} ${count === 1 ? "user" : "users"} added successfully`,
     bulkAddUsersFailed: "Failed to add users",
+    creditFloorRaised: (min: number) =>
+      `Learners always get at least ${min} credits, so the limit was set to ${min}.`,
+    bulkAddUsersInvalidRows: (rows: string[]) =>
+      `${rows.length} ${rows.length === 1 ? "row isn't a valid email" : "rows aren't valid emails"}, so nothing was added: ${rows.slice(0, 5).join(", ")}${rows.length > 5 ? ` and ${rows.length - 5} more` : ""}`,
     bulkAddUsersEmptyError: "Enter at least one email address",
     bulkAddUsersHint:
       "Users are created without a name — they'll be asked to complete their profile on first login.",
@@ -1253,6 +1327,8 @@ export const en = {
     mapFailed:
       "Couldn't sort memories into states, so your knowledge sources were copied over as they are. Check them below.",
     remap: "Re-map from knowledge sources",
+    remapTitle: "Re-map memories?",
+    remapAction: "Re-map",
     remapConfirm:
       "Re-map memories from your knowledge sources? This replaces every memory below, including any edits you made to them.",
     remapFailed: "Couldn't re-map memories. Your memories were left as they were.",
@@ -1698,6 +1774,8 @@ export const en = {
         assign: "Use for this chatbot",
         assigned: "Channel moved.",
         unassign: "Remove from chatbot",
+        unassignTitle: "Remove this channel?",
+        unassignAction: "Remove channel",
         unassignConfirm:
           "Remove this channel from its chatbot? It stops answering until you add it to a chatbot.",
         unassigned: "Channel removed from its chatbot.",
@@ -1895,6 +1973,8 @@ export const en = {
       subscribed: "Subscribed. Send a test message to your number.",
       subscribeFailed: "Could not subscribe the app.",
       checking: "Checking…",
+      disconnectTitle: "Disconnect this number?",
+      disconnectAction: "Disconnect",
       disconnectConfirm:
         "Disconnect this number? Its stored token and secret are deleted and messages to it stop being answered.",
       disconnected: "Number disconnected.",
@@ -10164,6 +10244,11 @@ export const en = {
     },
     // v9 §3.3 / PRD §4: the success metrics.
     metrics: {
+      rangeCapNote: {
+        "12m":
+          "Success metrics cover the last 12 months. The operator numbers and judge agreement below cover the last 90 days, the most this view holds.",
+        all: "Success metrics show up to the last 12 months. The operator numbers and judge agreement below cover the last 90 days, the most this view holds.",
+      } as Record<string, string>,
       heading: "Metrics",
       help: "How the debrief is doing for learners in switched-on organisations, week by week. Each number is shown with how many debriefs it counts; below 20 it is marked as too few to read.",
       steering: {
@@ -10843,6 +10928,8 @@ export const en = {
     },
     // One session's page (redesign 2026-11-12): the roleplay beside the debrief, and the review.
     session: {
+      nextUp: "Done. Opening the next one.",
+      queueClear: "That was the last one in this queue.",
       turn: (n: number) => `Turn ${n}`,
       turns: (n: number) => `${n} ${n === 1 ? "turn" : "turns"}`,
       roleplay: "Roleplay",

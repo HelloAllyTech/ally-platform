@@ -159,6 +159,13 @@ vi.mock("@assets", () => ({
 }));
 
 vi.mock("@components", () => ({
+  PublishBlockers: ({ blockers }: any) => (
+    <ul data-testid="publish-blockers">
+      {blockers.map((b: any) => (
+        <li key={b.id}>{b.message}</li>
+      ))}
+    </ul>
+  ),
   AppTooltip: ({ children }: any) => children,
   Button: ({ children, onClick, disabled, className }: any) => (
     <button onClick={onClick} disabled={disabled} className={className}>
@@ -959,6 +966,8 @@ describe("CreateSimulation", () => {
 
       const publishButton = screen.getByText("Publish");
       expect(publishButton).toBeDisabled();
+      // ...and the page says what is blocking it.
+      expect(screen.getByTestId("publish-blockers").children.length).toBeGreaterThan(0);
     });
 
     it("should enable publish button when all mandatory fields are filled", () => {

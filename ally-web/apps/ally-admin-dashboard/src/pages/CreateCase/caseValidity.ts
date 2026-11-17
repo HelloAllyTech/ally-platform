@@ -21,3 +21,21 @@ export const areCaseFieldsFilled = (
 ): boolean =>
   mandatoryFieldIds.every(fieldId => isMandatoryValueFilled(formValues?.[fieldId])) &&
   isNonEmptyArray(formValues?.scenarios);
+
+/** Why a case can't be published yet, one entry per missing thing, in words an author can act on. */
+export const unfilledCaseFields = (
+  mandatoryFieldIds: string[],
+  formValues: Record<string, unknown> | undefined,
+  labels: Record<string, string> = {},
+): { id: string; message: string }[] => {
+  const blockers = mandatoryFieldIds
+    .filter(fieldId => !isMandatoryValueFilled(formValues?.[fieldId]))
+    .map(fieldId => ({
+      id: fieldId,
+      message: `Fill in "${labels[fieldId] ?? fieldId.replace(/([A-Z])/g, " $1").replace(/^./, c => c.toUpperCase())}"`,
+    }));
+  if (!isNonEmptyArray(formValues?.scenarios)) {
+    blockers.push({ id: "scenarios", message: "Add at least one roleplay to the case" });
+  }
+  return blockers;
+};

@@ -1736,6 +1736,7 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
 
 export const {
   useGetSimulationsQuery,
+  useLazyGetSimulationsQuery,
   useMapScenarioMemoriesMutation,
   useLazyGetAdminSimulationByIdQuery,
   useCreateSimulationMutation,

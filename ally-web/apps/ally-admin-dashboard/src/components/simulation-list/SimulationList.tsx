@@ -267,6 +267,26 @@ export const SimulationList: React.FC<SimulationListProps> = ({
     },
   ];
 
+  /**
+   * What clicking the row's title or thumbnail does. Edit is the default for a draft the viewer
+   * can author. A published or archived simulation opens read-only (View) instead, because Edit
+   * there asks to move it back to draft and a stray click should never start that. Preview stays
+   * as its own button and as the fallback when neither applies.
+   */
+  const openRow = (simulation: Simulation) => {
+    if (
+      !readOnly &&
+      simulation.status === SimulationStatus.DRAFT &&
+      isCreatorOrSuperAdmin(simulation)
+    ) {
+      onEdit?.(simulation);
+    } else if (onView) {
+      onView(simulation);
+    } else if (showPreview(simulation)) {
+      onPreview?.(simulation);
+    }
+  };
+
   const thumbnailConfig = {
     width: "w-[100px]",
     height: "h-[50px]",
@@ -276,7 +296,7 @@ export const SimulationList: React.FC<SimulationListProps> = ({
 
   const titleConfig = {
     width: "w-[44%] md:w-[40%] lg:w-[33%]",
-    onClick: simulation => showPreview(simulation) && onPreview?.(simulation),
+    onClick: openRow,
   };
 
   return (
