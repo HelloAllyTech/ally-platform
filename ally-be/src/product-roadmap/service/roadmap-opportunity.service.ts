@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/user/entity/user.entity';
@@ -39,6 +39,7 @@ import {
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
+  RoadmapReviewState,
 } from '../enum/roadmap-opportunity.enum';
 import {
   RoadmapOpportunityRepository,
@@ -454,6 +455,77 @@ export class RoadmapOpportunityService {
         `This opportunity is not ready to file yet (${failed.join(', ')}). ` +
           `Keep the interview going until every item is met.`,
       );
+    }
+  }
+
+  /**
+   * The Roadmap cutover's one filing door (Roadmap v2 P6, plans/roadmap-builder-merge §6): an
+   * idea for an in-flight direct Builder session that never had one, so every live build sits
+   * on the Roadmap from switch-on day.
+   *
+   * A labelled path of its own rather than a flag on `create()`:
+   * - it runs inside the cutover's transaction (`manager`), so the idea, its link to the
+   *   session and the flag commit or fail together;
+   * - the readiness gate does not apply, because the work is already under way and the idea
+   *   records it rather than proposing it — the row says so with
+   *   `source = 'migrated_builder_session'`;
+   * - it is already accepted (`reviewState`), Prioritised (as "Open in Builder Agent" makes a
+   *   linked idea) and linked by `builderSessionId`, the same column every other link uses.
+   *   `UQ_roadmap_opps_builder_session` is the backstop against a second idea for one session.
+   *
+   * The vector index and goal-impact assessment run after the commit, best-effort, through
+   * `afterMigratedFiling` — as `create()` runs them after its own save.
+   */
+  async fileMigratedBuilderSession(
+    manager: EntityManager,
+    input: {
+      sessionId: string;
+      description: string;
+      productGoal: string;
+      /** The session's creator: the idea's author, and its lead. */
+      creatorUserId: number;
+      /** The Owner running the cutover: the reviewer of record. */
+      actorUserId: number;
+    },
+  ): Promise<{ id: string; code: string }> {
+    const repository = manager.getRepository(RoadmapOpportunity);
+    const saved = await repository.save(
+      repository.create({
+        description: input.description,
+        type: RoadmapOpportunityType.IDEA,
+        stage: RoadmapOpportunityStage.PRIORITISED,
+        productGoal: input.productGoal,
+        effort: null,
+        ownerUserId: null,
+        referenceImages: [],
+        builderSessionId: input.sessionId,
+        reviewState: RoadmapReviewState.ACCEPTED,
+        reviewedBy: input.actorUserId,
+        reviewedAt: new Date(),
+        createdBy: input.creatorUserId,
+        updatedBy: input.actorUserId,
+        source: RoadmapOpportunitySource.MIGRATED_BUILDER_SESSION,
+        tenantId: null,
+        reporterContext: null,
+      }),
+    );
+    // `code` comes from the column default; read it back inside the same transaction.
+    const [row] = await manager.query(
+      `SELECT code FROM "roadmap_opportunities" WHERE id = $1`,
+      [saved.id],
+    );
+    return { id: saved.id, code: String(row?.code ?? saved.code ?? '') };
+  }
+
+  /**
+   * What `create()` does after its save, for ideas the cutover filed: index each one for the
+   * duplicate check and score it against the strategy. Both are best-effort and swallow their
+   * own failures, so a model outage never undoes a committed cutover.
+   */
+  async afterMigratedFiling(ids: string[], actorUserId: number): Promise<void> {
+    for (const id of ids) {
+      await this.vectorService.indexQuietly(id);
+      await this.goalImpactService.assessQuietly(id, actorUserId);
     }
   }
 

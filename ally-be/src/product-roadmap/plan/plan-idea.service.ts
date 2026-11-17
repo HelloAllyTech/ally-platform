@@ -479,11 +479,18 @@ export class PlanIdeaService {
    * Once, when planning is switched on: every parked `roadmap_idea_drafts`
    * row becomes a parked private plan, and the old row is retired. Idempotent
    * by `migratedFromDraftId`.
+   *
+   * Skips a row the Roadmap cutover already copied (`migratedAt`): that row is
+   * kept on purpose so turning Roadmap off shows it unchanged, and retiring or
+   * copying it again here would undo that or move it twice.
    */
   async migrateIdeaDrafts(): Promise<number> {
     const settings = await this.settings.get();
     if (!settings.enabled) return 0;
-    const drafts = await this.drafts.find({ where: {}, take: 1000 });
+    const drafts = await this.drafts.find({
+      where: { migratedAt: IsNull() },
+      take: 1000,
+    });
     let moved = 0;
     for (const draft of drafts) {
       const existing: { id: string }[] = await this.dataSource.query(

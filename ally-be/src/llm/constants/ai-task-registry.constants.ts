@@ -2222,7 +2222,9 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       "Goal-impact assessment re-runs when an idea's text changes, whether from the drawer or " +
       "from Roadmap v2's inline edit (PATCH /v1/roadmap/items/:code), which reuses the same update path. " +
       "Roadmap v2 reuses the duplicate check twice more: a draft page's Similar ideas (GET /v1/roadmap/drafts/:code/similar, " +
-      "debounced by the client after typing stops) and the Owner's triage pane (GET /v1/roadmap/items/:code/similar).",
+      "debounced by the client after typing stops) and the Owner's triage pane (GET /v1/roadmap/items/:code/similar). " +
+      "The Roadmap cutover (POST /v1/roadmap/cutover, an Owner's one-off switch-on) assesses each idea it files for a " +
+      'live direct Builder session once, after its commit, as any filing is (and embeds it for the duplicate check).',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',

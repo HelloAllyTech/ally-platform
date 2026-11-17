@@ -127,7 +127,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 13923,
+      "words": 13955,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -596,7 +596,7 @@
         "api"
       ],
       "last_reconciled": "2026-11-10",
-      "words": 6702,
+      "words": 6829,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-be.md",
       "skip_reason": ""
     },
