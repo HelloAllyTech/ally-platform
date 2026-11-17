@@ -450,6 +450,39 @@ export const ApiEndpoints = {
     ADMIN_REINDEX: "/v1/product-roadmap/admin/reindex",
   },
   /**
+   * Roadmap v2's idea flow (P3 contract): New idea and drafts, dictation, the Owner's review and
+   * lead, and the answers and comments on a shared plan session. 404 while `roadmap_v2` is off.
+   */
+  ROADMAP_V2_FLOW: {
+    DRAFTS: "/v1/roadmap/drafts",
+    DRAFT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}`,
+    DRAFT_RESTORE: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/restore`,
+    DRAFT_TURN: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/turn`,
+    DRAFT_REOPEN_CHECK: (code: string, checkId: string) =>
+      `/v1/roadmap/drafts/${encodeURIComponent(code)}/checks/${encodeURIComponent(checkId)}/reopen`,
+    DRAFT_SELF_CHECK: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/self-check`,
+    DRAFT_SIMILAR: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/similar`,
+    DRAFT_ADD_TO: (code: string, target: string) =>
+      `/v1/roadmap/drafts/${encodeURIComponent(code)}/add-to/${encodeURIComponent(target)}`,
+    DRAFT_SUBMIT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/submit`,
+    DICTATION: "/v1/roadmap/dictation",
+    REVIEW: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/review`,
+    REVIEW_BATCH: "/v1/roadmap/items/review:batch",
+    REVIEW_UNDO: "/v1/roadmap/items/review:undo",
+    LEAD: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/lead`,
+    LEAD_SUGGESTIONS: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/lead-suggestions`,
+    ITEM_SIMILAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/similar`,
+    START_PLANNING: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/start-planning`,
+    SESSION_ANSWERS: (sessionId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/answers`,
+    SESSION_COMMENTS: (sessionId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/comments`,
+    SESSION_USE_ANSWER: (sessionId: string, postId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/answers/${encodeURIComponent(postId)}/use`,
+  },
+  /**
    * Roadmap v2 (plans/roadmap-builder-merge §5.2, P2 contract). Every route answers 404 while the
    * `roadmap_v2` flag is off, which is how the frontend learns the flag: `ME_ROLE` succeeding.
    */
@@ -1276,6 +1309,10 @@ export const ROUTES = {
   PRODUCT_ROADMAP: "/product-roadmap",
   /** Roadmap v2's Queue (dark behind `roadmap_v2`; the old pages stay as they are). */
   ROADMAP: "/roadmap",
+  /** My drafts: Roadmap's own tab (§4.4). */
+  ROADMAP_DRAFTS: "/roadmap/drafts",
+  /** New idea: an empty draft page; the draft and its code exist once there are words (§4.2). */
+  ROADMAP_NEW_IDEA: "/roadmap/new",
   /** One idea's page, by code (OPP-388). The read model also accepts the uuid. */
   ROADMAP_IDEA: (code: string) => `/roadmap/i/${code}`,
   BUG_HUNTER: "/bug-hunter",
