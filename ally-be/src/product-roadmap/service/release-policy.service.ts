@@ -60,6 +60,8 @@ import {
 } from './release-policy-settings.service';
 
 const LOCK_NAME = 'roadmap-release-policy';
+/** An observed release whose comparison still cannot be read after this is recorded as `different_head`. */
+const COMPARISON_GIVE_UP_MS = 24 * 60 * 60_000;
 
 /**
  * The mode the policy runs in. **P5 is shadow only**: whatever the settings
@@ -304,7 +306,7 @@ export class ReleasePolicyService {
         await this.recordObservedRelease(service, head, run);
       }
     }
-    await this.compareObservedReleases();
+    await this.compareObservedReleases(now);
   }
 
   private async recordObservedRelease(
@@ -388,7 +390,7 @@ export class ReleasePolicyService {
    * decision was `release` — whether the release carried exactly the service
    * commits the policy saw.
    */
-  private async compareObservedReleases(): Promise<void> {
+  private async compareObservedReleases(now: Date): Promise<void> {
     const pending = await this.logRepository.find({
       where: {
         kind: ReleasePolicyLogKind.OBSERVED_RELEASE,
@@ -422,7 +424,12 @@ export class ReleasePolicyService {
                   : undefined,
               )
             : null;
-        if (extra === null) continue; // try again next pass
+        // Unreadable now: try again next pass, but not forever — a range
+        // that never reads (diverged history, a vanished commit) is not a match.
+        const stale =
+          now.getTime() - (row.finishedAt ?? row.createdAt).getTime() >
+          COMPARISON_GIVE_UP_MS;
+        if (extra === null && !stale) continue;
         comparison =
           extra === 0
             ? ReleasePolicyComparison.MATCH
