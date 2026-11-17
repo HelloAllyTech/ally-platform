@@ -3,11 +3,7 @@ import React from "react";
 import { en } from "@constants";
 import { BuilderPrdReadiness } from "@types";
 
-import {
-  BUILDER_DURATION,
-  BUILDER_EASING,
-  prefersReducedMotion,
-} from "../../motion/builderMotion";
+import { BUILDER_DURATION, BUILDER_EASING, prefersReducedMotion } from "../../motion/builderMotion";
 
 interface ReadinessRingProps {
   readiness: BuilderPrdReadiness;

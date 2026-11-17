@@ -49,8 +49,8 @@ import {
 } from "@types";
 import { asAgentText } from "@utils";
 
-import { BUILDER_STATUS_TAG_TYPE } from "../../motion/builderMotion";
 import { PrinciplesInPlay } from "./PrinciplesInPlay";
+import { BUILDER_STATUS_TAG_TYPE } from "../../motion/builderMotion";
 
 /** The PRD is the build's source of truth while a run is reading it. */
 const PRD_FROZEN: BuilderSessionStatus[] = ["BUILDING", "WAITING_FOR_INPUT"];

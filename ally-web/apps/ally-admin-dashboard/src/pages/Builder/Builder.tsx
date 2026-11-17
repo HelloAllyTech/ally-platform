@@ -21,13 +21,13 @@ import { FilterChipProps } from "@components/types";
 import { en, ROUTES } from "@constants";
 import { BuilderSession, BuilderSessionStatus } from "@types";
 
+import { sessionTitleFrom, startErrorMessage } from "./builderStart";
 import {
   BUILDER_STATUS_TAG_TYPE,
   builderTransition,
   prefersReducedMotion,
   staggerDelayMs,
 } from "../../motion/builderMotion";
-import { sessionTitleFrom, startErrorMessage } from "./builderStart";
 
 /** Sessions the agent cannot move forward without a person. */
 const NEEDS_YOU: BuilderSessionStatus[] = ["WAITING_FOR_INPUT", "PRD_READY", "FAILED"];
