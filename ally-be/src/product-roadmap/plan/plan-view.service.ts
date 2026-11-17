@@ -163,7 +163,12 @@ export class PlanViewService {
       spend: {
         totalUsd: Number(spend.totalUsd.toFixed(4)),
         approximate: spend.approximate,
-        ceilingUsd: isPrivate ? settings.ideaCeilingUsd : settings.ceilingUsd,
+        // A raised ceiling (Roadmap v2, POST /v1/roadmap/items/:code/ceiling)
+        // is only ever written while roadmap_v2 is on; until then this is
+        // always the settings ceiling, as before.
+        ceilingUsd: isPrivate
+          ? settings.ideaCeilingUsd
+          : (plan.plan?.ceilingUsd ?? settings.ceilingUsd),
         byStage: spend.byStage,
         byActor: spend.byActor,
       },

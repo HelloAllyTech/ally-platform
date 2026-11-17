@@ -45,6 +45,10 @@ import { BuilderReadinessService } from './builder-readiness.service';
 import { BuilderPrinciplesService } from './builder-principles.service';
 import { BuilderLessonsService } from './builder-lessons.service';
 import { PlanSpendService } from 'src/product-planning/service/plan-spend.service';
+import {
+  PlanCeilingReachedException,
+  PlanCeilingService,
+} from 'src/product-planning/service/plan-ceiling.service';
 
 import {
   BuilderInterviewToolsService,
@@ -409,6 +413,13 @@ export class BuilderInterviewOrchestratorService {
     /** Prices a plan session's interview into its plan spend ledger. Optional, like the rest. */
     @Optional()
     private readonly planSpend?: PlanSpendService,
+    /**
+     * Roadmap v2's one ceiling per idea, checked before a plan session's turn.
+     * A no-op while the flag is off and for every non-plan session. Optional,
+     * like the rest.
+     */
+    @Optional()
+    private readonly planCeiling?: PlanCeilingService,
   ) {}
 
   /**
@@ -520,6 +531,25 @@ export class BuilderInterviewOrchestratorService {
     userId: number,
   ): AsyncGenerator<BuilderSseFrame> {
     const session = await this.sessionService.getSession(sessionId);
+
+    // A plan past its ceiling does not start a turn (Roadmap v2, §5.6).
+    // Refused before anything is written, like a misconfigured model below,
+    // so the interview is exactly where it was once the lead raises it.
+    try {
+      await this.planCeiling?.assertWithinCeiling(
+        sessionId,
+        'interviewer_turn',
+      );
+    } catch (error) {
+      if (!(error instanceof PlanCeilingReachedException)) throw error;
+      yield {
+        event: 'error',
+        data: error.getResponse() as Record<string, unknown>,
+      };
+      yield { event: 'done', data: {} };
+      return;
+    }
+
     const doc = await this.prdService.getOrCreateDoc(
       sessionId,
       userId,

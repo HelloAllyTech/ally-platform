@@ -1,3 +1,4 @@
+import { PlanCeilingReachedException } from 'src/product-planning/service/plan-ceiling.service';
 import { BuilderInterviewOrchestratorService } from '../builder-interview-orchestrator.service';
 import { BuilderMessageRole } from '../../enum/builder.enum';
 import { createEmptyPrdDocument } from '../../type/builder-prd.type';
@@ -158,6 +159,52 @@ describe('BuilderInterviewOrchestratorService — turn autosave', () => {
     // `create` is the non-streaming call the cheap-model summariser uses;
     // `stream` is the turn itself. Both are needed once a history is long
     // enough to be summarised.
+  });
+
+  it('refuses a plan past its ceiling before writing anything (Roadmap v2)', async () => {
+    const reached = new PlanCeilingReachedException('interviewer_turn', {
+      sessionId: 'session-1',
+      spentUsd: 100,
+      ledgerUsd: 60,
+      runnerUsd: 40,
+      ceilingUsd: 100,
+      raised: false,
+      exceeded: true,
+      approximate: false,
+    });
+    const assertWithinCeiling = jest.fn().mockRejectedValue(reached);
+    (service as any).planCeiling = { assertWithinCeiling };
+
+    const frames = await drain();
+
+    expect(assertWithinCeiling).toHaveBeenCalledWith(
+      'session-1',
+      'interviewer_turn',
+    );
+    expect(frames).toEqual([
+      {
+        event: 'error',
+        data: expect.objectContaining({
+          code: 'plan_ceiling_reached',
+          spentUsd: 100,
+          ceilingUsd: 100,
+        }),
+      },
+      { event: 'done', data: {} },
+    ]);
+    expect(messageRepository.appendMessage).not.toHaveBeenCalled();
+    expect(provider.stream).not.toHaveBeenCalled();
+  });
+
+  it('runs the turn when the ceiling check passes (and with the flag off it always does)', async () => {
+    (service as any).planCeiling = {
+      assertWithinCeiling: jest.fn().mockResolvedValue(undefined),
+    };
+    streams = [fakeStream([{ type: 'text', text: 'Fine.' }], 'end_turn')];
+
+    await drain();
+
+    expect(messageRepository.appendMessage).toHaveBeenCalledTimes(2);
   });
 
   it('allocates the assistant row before the model runs, not after', async () => {

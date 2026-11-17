@@ -3,9 +3,11 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   forwardRef,
 } from '@nestjs/common';
+import { PlanCeilingService } from 'src/product-planning/service/plan-ceiling.service';
 import { In, IsNull, Like, MoreThanOrEqual, Not } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
@@ -177,6 +179,13 @@ export class BuilderBuildService {
     private readonly llmUsage: LlmUsageService,
     private readonly prdService: BuilderPrdService,
     private readonly readiness: BuilderReadinessService,
+    /**
+     * Roadmap v2's one ceiling per idea (plans/roadmap-builder-merge §5.6):
+     * a plan session's design and build runs count against it. A no-op while
+     * the flag is off and for every non-plan session, which keep `budgetUsd`.
+     */
+    @Optional()
+    private readonly planCeiling?: PlanCeilingService,
   ) {}
 
   /**
@@ -205,6 +214,8 @@ export class BuilderBuildService {
         'GITHUB_TOKEN is not configured on this environment, so builds cannot be dispatched.',
       );
     }
+    // Before the session is touched: a refused start leaves it as it was.
+    await this.planCeiling?.assertWithinCeiling(session.id, 'build_dispatch');
     // CANCELLED is startable, and leaving it out made stop a one-way door.
     //
     // A session only reaches CANCELLED by way of BUILDING, so its PRD is ready
@@ -460,6 +471,7 @@ export class BuilderBuildService {
 
     await this.assertWithinConcurrency(settings.maxConcurrentBuilds);
     this.assertWithinBudget(session, settings.maxRunnerMinutes);
+    await this.planCeiling?.assertWithinCeiling(session.id, 'design_run');
 
     const models = this.resolveModels(session, settings);
     await this.assertModelsAreReal(models);
@@ -1388,6 +1400,13 @@ export class BuilderBuildService {
     // Only the session is needed here — everything else in `params` is passed
     // straight through to `dispatchRunLocked`, which does the destructuring.
     const { session } = params;
+
+    // The backstop for every dispatch, including the next milestone of a
+    // chain (advanceEpic), which has no start call of its own to check in.
+    await this.planCeiling?.assertWithinCeiling(
+      session.id,
+      params.mode === BuilderRunMode.DESIGN ? 'design_run' : 'build_dispatch',
+    );
 
     // Per-session dispatch mutex. The atomic sequence counter stops two
     // dispatches colliding on a run number, but nothing stopped them both
@@ -2590,6 +2609,19 @@ export class BuilderBuildService {
       // otherwise repeat it on every invocation past the ceiling, and the
       // dispatch guard already refuses from here on.
       await this.notificationService.budgetReached(session, total);
+    }
+
+    // A plan's phase boundary (Roadmap v2, §5.6). The runner does not read
+    // this response, so a phase already running finishes; what this does is
+    // tell the lead once, as the plan crosses its ceiling, and every later
+    // dispatch, turn and specialist is refused by the same check.
+    const plan = await this.planCeiling?.checkAt(session.id, 'phase_boundary');
+    if (plan?.exceeded && plan.spentUsd - delta < plan.ceilingUsd) {
+      await this.notificationService.planCeilingReached(
+        session,
+        plan.spentUsd,
+        plan.ceilingUsd,
+      );
     }
   }
 

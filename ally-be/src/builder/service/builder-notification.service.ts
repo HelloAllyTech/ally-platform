@@ -469,6 +469,23 @@ export class BuilderNotificationService {
     );
   }
 
+  /**
+   * A plan session crossed its one idea ceiling (Roadmap v2, §5.6). Only
+   * reachable while the flag is on: PlanCeilingService answers nothing
+   * otherwise.
+   */
+  planCeilingReached(
+    session: BuilderSession,
+    spent: number,
+    ceiling: number,
+  ): Promise<void> {
+    return this.notify(
+      session,
+      BuilderNotificationKind.BUDGET_REACHED,
+      `“${session.title}” has spent $${spent.toFixed(2)} of its $${ceiling.toFixed(2)} ceiling and won't start more work until its lead raises it.`,
+    );
+  }
+
   listForAdmin(adminId: number, unreadOnly = false) {
     return this.repository.listForAdmin(adminId, unreadOnly);
   }
