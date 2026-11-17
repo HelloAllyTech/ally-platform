@@ -15,6 +15,7 @@ import { TrackTranslationService } from 'src/track/service/track-translation.ser
 import { TrackWithStructure } from 'src/track/service/track-shared.service';
 import {
   TrackItemCompletionCriteria,
+  TrackItemCompletionLogic,
   TrackItemType,
   TrackStatus,
   VideoSource,
@@ -1498,6 +1499,16 @@ export class CourseCopilotEditToolsService {
           rule.minScore = pct(source.minScore);
         if (seconds(source.minDurationSeconds) !== undefined)
           rule.minDurationSeconds = seconds(source.minDurationSeconds);
+        if (typeof source.completionLogic === 'string') {
+          const logic = source.completionLogic.toUpperCase();
+          if (
+            (Object.values(TrackItemCompletionLogic) as string[]).includes(
+              logic,
+            )
+          ) {
+            rule.completionLogic = logic as TrackItemCompletionLogic;
+          }
+        }
         break;
       case TrackItemType.CASE:
         if (pct(source.minScore) !== undefined)

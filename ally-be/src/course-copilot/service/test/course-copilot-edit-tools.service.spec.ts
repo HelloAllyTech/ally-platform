@@ -946,10 +946,11 @@ describe('CourseCopilotEditToolsService', () => {
     });
 
     it('merges into the existing rule rather than replacing it', async () => {
-      await rule('I-rp', { minScore: 70 });
+      await rule('I-rp', { minScore: 70, completionLogic: 'PARTICIPATION' });
       expect(itemRow('I-rp').completionCriteria).toEqual({
         minScore: 70,
         minDurationSeconds: 30,
+        completionLogic: 'PARTICIPATION',
       });
     });
 

@@ -669,6 +669,9 @@ export class CourseCopilotStructureService {
           ...(criteria.minDurationSeconds !== undefined
             ? { minDurationSeconds: criteria.minDurationSeconds }
             : {}),
+          ...(criteria.completionLogic
+            ? { completionLogic: criteria.completionLogic }
+            : {}),
         };
         // Undefined rather than {}: an empty rule is still a value, and a
         // regenerated roleplay would replace the item's real rule with it.
