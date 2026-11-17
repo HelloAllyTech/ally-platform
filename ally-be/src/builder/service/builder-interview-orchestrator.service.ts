@@ -36,7 +36,12 @@ import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderMessageRepository } from '../repository/builder-message.repository';
 import { BuilderSessionRepository } from '../repository/builder-session.repository';
 import { BuilderExemplarService } from './builder-exemplar.service';
-import { BuilderMessageRole } from '../enum/builder.enum';
+import { BuilderMessageRole, BuilderSessionKind } from '../enum/builder.enum';
+import {
+  isPlanPost,
+  PlanBatchMeta,
+  renderPlanBatch,
+} from '../util/plan-conversation.util';
 import { BuilderSessionService } from './builder-session.service';
 import { BuilderPrdService } from './builder-prd.service';
 import { BuilderKnowledgeService } from './builder-knowledge.service';
@@ -613,9 +618,19 @@ export class BuilderInterviewOrchestratorService {
     // A plan's private Idea stage was a different conversation (the roadmap
     // copilot, its own protocol). It stays in the visible transcript but is not
     // replayed to the PRD interview, which starts from the hand-off instead.
-    const history = (
-      await this.messageRepository.listBySession(sessionId)
-    ).filter((m) => m.metadata?.planStage !== 'idea');
+    const fullHistory = await this.messageRepository.listBySession(sessionId);
+    const history = fullHistory.filter(
+      // Roadmap v2 posts (answers, comments, choices by anyone on the idea)
+      // reach the model only through the batch on the lead's row, below.
+      (m) => m.metadata?.planStage !== 'idea' && !isPlanPost(m),
+    );
+    // Roadmap v2 (D13, §4.5a): everything people posted since the last turn,
+    // attributed, folded into this turn. Plan sessions only; nothing posts
+    // these while roadmap_v2 is off, so every other turn is unchanged.
+    const planBatch =
+      session.kind === BuilderSessionKind.PLAN
+        ? renderPlanBatch(fullHistory, await this.planSettler(session))
+        : null;
     const validatedTurns = await this.validatedTurnsEnabled();
     // The interview protocol rides on validated turns: its brief and its
     // question gate are checked the way a validated reply is.
@@ -637,11 +652,12 @@ export class BuilderInterviewOrchestratorService {
       ? renderBriefResponse(briefAnswered, briefResponse)
       : this.renderUserContent(dto);
     const userMetadata =
-      dto.questionId || dto.answer || briefResponse
+      dto.questionId || dto.answer || briefResponse || planBatch
         ? {
             ...(dto.questionId ? { questionId: dto.questionId } : {}),
             ...(dto.answer ? { answer: dto.answer } : {}),
             ...(briefResponse ? { briefResponse } : {}),
+            ...(planBatch ? { planBatch } : {}),
           }
         : null;
     const userMessage = await this.messageRepository.appendMessage(sessionId, {
@@ -822,18 +838,23 @@ export class BuilderInterviewOrchestratorService {
       ...(await this.replayHistory(session, history)),
       {
         role: 'user',
-        content: this.buildLiveUserTurn(doc.draft, turnReadiness, userContent, [
-          ...(turn.discovery
-            ? [
-                renderDiscoveryBlock(turn.discovery),
-                'This is the opening turn of the interview: read what matters, then end it ' +
-                  'with `submit_situation_brief`. No question until the admin has answered it.',
-              ]
-            : []),
-          ...(briefAnswered
-            ? [renderBriefForModel(briefAnswered, briefResponse)]
-            : []),
-        ]),
+        content: this.buildLiveUserTurn(
+          doc.draft,
+          turnReadiness,
+          planBatch ? `${planBatch.text}\n\n${userContent}` : userContent,
+          [
+            ...(turn.discovery
+              ? [
+                  renderDiscoveryBlock(turn.discovery),
+                  'This is the opening turn of the interview: read what matters, then end it ' +
+                    'with `submit_situation_brief`. No question until the admin has answered it.',
+                ]
+              : []),
+            ...(briefAnswered
+              ? [renderBriefForModel(briefAnswered, briefResponse)]
+              : []),
+          ],
+        ),
       },
     ];
     const tools = this.toolsService.getToolDefinitions({
@@ -2129,6 +2150,28 @@ export class BuilderInterviewOrchestratorService {
    * therefore cacheable, and the model always sees the document as it is now
    * rather than as it was when the session started.
    */
+  /**
+   * Who settles conflicting answers on a plan (D13): the lead, or the author
+   * before a lead exists. Named in the batch so the agent says who it waits
+   * for. Null when the name cannot be read; the batch still holds them back.
+   */
+  private async planSettler(
+    session: BuilderSession,
+  ): Promise<{ name: string } | null> {
+    const id = session.leadUserId ?? session.createdBy;
+    if (!id) return null;
+    try {
+      const rows: { name: string | null }[] =
+        await this.sessionRepository.manager.query(
+          `SELECT name FROM "users" WHERE id = $1`,
+          [id],
+        );
+      return rows?.[0]?.name ? { name: rows[0].name } : null;
+    } catch {
+      return null;
+    }
+  }
+
   private buildLiveUserTurn(
     draft: unknown,
     readiness: BuilderPrdReadiness,
@@ -2578,12 +2621,20 @@ export class BuilderInterviewOrchestratorService {
             next?.role === BuilderMessageRole.ASSISTANT
               ? (next.metadata?.discovery as BuilderDiscovery | undefined)
               : undefined;
+          // Roadmap v2: the people's posts this turn was handed, replayed where
+          // the model first read them.
+          const batch = (
+            message.metadata?.planBatch as PlanBatchMeta | undefined
+          )?.text;
+          const content = batch
+            ? `${batch}\n\n${message.content}`
+            : message.content;
           messages.push({
             role: 'user',
             content:
               discovery && Array.isArray(discovery.items)
-                ? `${renderDiscoveryBlock(discovery)}\n\n${message.content}`
-                : message.content,
+                ? `${renderDiscoveryBlock(discovery)}\n\n${content}`
+                : content,
           });
         }
         continue;

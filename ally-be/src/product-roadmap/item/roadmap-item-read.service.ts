@@ -261,6 +261,22 @@ export class RoadmapItemReadService {
     return { ...paged, rows: await this.toRows(loaded, paged.rows) };
   }
 
+  /**
+   * Queue rows for these ideas, in the order given (P3: similar ideas, the
+   * review batch's answer). Ids that are not on the board are left out.
+   */
+  async rowsFor(userId: number, ids: string[]): Promise<ItemRow[]> {
+    if (!ids.length) return [];
+    const role = await this.roles.roleOf(userId);
+    if (role === 'none') throw this.noAccess();
+    const loaded = await this.loadAll(userId, role);
+    const byId = new Map(loaded.cores.map((c) => [c.id, c]));
+    const cores = ids
+      .map((id) => byId.get(id))
+      .filter((c): c is ItemCore => !!c);
+    return this.toRows(loaded, cores);
+  }
+
   /** Quick open: by code, title or author; the caller's recent ideas when empty. */
   async search(userId: number, q: string): Promise<ItemSearchResponse> {
     const role = await this.roles.roleOf(userId);
@@ -354,7 +370,7 @@ export class RoadmapItemReadService {
             core.stage.statusParts.step === 'ready',
           awaitingMerge: core.decisions.some((d) => d.kind === 'pr_merge'),
           releaseHeld: false,
-          answersConflict: false,
+          answersConflict: (session?.openConflicts ?? 0) > 0,
         },
       ),
       ...editCapabilitiesFor(role, { isAuthor, isLead }, core.shownStage),
@@ -674,6 +690,7 @@ export class RoadmapItemReadService {
               s.plan->'reviews' AS "planReviews",
               s.plan->'externalBuild' AS "externalBuild",
               s.plan->'planningStarted' AS "planningStarted",
+              s.plan->>'openConflicts' AS "openConflicts",
               w.level AS "watchLevel",
               r."lastSeenAt",
               EXISTS (SELECT 1 FROM "roadmap_allocations" a
@@ -799,6 +816,7 @@ export class RoadmapItemReadService {
               typeof asJson(f.planningStarted) === 'boolean'
                 ? (asJson(f.planningStarted) as boolean)
                 : null,
+            openConflicts: num(f.openConflicts),
             totalCostUsd: num(f.totalCostUsd),
             budgetUsd: f.budgetUsd == null ? null : num(f.budgetUsd),
           }

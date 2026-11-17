@@ -247,6 +247,12 @@ export class RoadmapOpportunityService {
        * property of the IDEA-filing path, not of this table.
        */
       enforceReadiness?: boolean;
+      /**
+       * Roadmap v2's Submit only: the code its draft was given when New idea created it
+       * (session-first, §4.2), so the idea keeps one code for life. Allocated from the same
+       * sequence as the column default. Everyone else leaves it out and the default fires.
+       */
+      code?: string;
     },
   ): Promise<OpportunityResponseDto> {
     // Assigning at filing time is a MANAGE action on a route gated at the VOTE tier, so it is
@@ -305,6 +311,7 @@ export class RoadmapOpportunityService {
         referenceImages,
         brief,
         interviewTranscript,
+        ...(extra?.code ? { code: extra.code } : {}),
         createdBy: userId,
         updatedBy: userId,
         source: extra?.source ?? RoadmapOpportunitySource.STAFF,

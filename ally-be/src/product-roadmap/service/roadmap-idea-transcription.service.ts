@@ -34,6 +34,11 @@ export class RoadmapIdeaTranscriptionService {
     this.model = configService.openai.transcriptionModel;
   }
 
+  /** The transcription model this deployment runs (for usage and spend rows). */
+  get modelId(): string {
+    return this.model;
+  }
+
   /** The words in one clip; '' when nothing intelligible was said. */
   async transcribe(audio: Express.Multer.File | undefined): Promise<string> {
     if (!audio?.buffer?.length) {
