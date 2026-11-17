@@ -31,6 +31,7 @@ import {
   PmCardDetailResponse,
   PmCardResponse,
   PmHealthResponse,
+  PmLessonResponse,
   PmMemoryResponse,
   PmRunNowResponse,
   PmRunResponse,
@@ -291,7 +292,7 @@ export class PmAgentController {
   @ApiOperation({ summary: 'Memory facts and lessons' })
   memory(): Promise<{
     facts: PmMemoryResponse[];
-    lessons: PmMemoryResponse[];
+    lessons: PmLessonResponse[];
   }> {
     return this.memoryService.list();
   }
@@ -303,17 +304,20 @@ export class PmAgentController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateMemoryDto,
     @Req() req: AuthedRequest,
-  ): Promise<PmMemoryResponse> {
+  ): Promise<PmMemoryResponse | PmLessonResponse> {
     return this.memoryService.update(req.user.id, id, body);
   }
 
   @Delete('memory/:id')
   @RequireFeatureToggle(FeatureToggleKey.PM_AGENT)
-  @ApiOperation({ summary: 'Delete a memory item' })
+  @ApiOperation({
+    summary: 'Delete a memory item (a lesson is marked removed, not deleted)',
+  })
   deleteMemory(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<PmMemoryResponse> {
-    return this.memoryService.remove(id);
+    @Req() req: AuthedRequest,
+  ): Promise<PmMemoryResponse | PmLessonResponse> {
+    return this.memoryService.remove(id, req.user?.id ?? null);
   }
 
   @Get('history')

@@ -100,6 +100,8 @@ export interface PmOutcomeRow {
   released: boolean;
   buildFailed: boolean;
   reverted: boolean;
+  /** The measured +14 d impact verdict, when the card has one (impact checks). */
+  impactVerdict?: 'improved' | 'flat' | 'worse' | null;
   title: string;
   payload: Record<string, any>;
   reason: string | null;

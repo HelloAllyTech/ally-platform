@@ -132,6 +132,23 @@ export class PmAgentSettingsService {
       }
       Object.assign(patch, PmAgentSettingsService.resumePatch());
     }
+    if (dto.lessonsEnabled !== undefined) {
+      if (typeof dto.lessonsEnabled !== 'boolean') {
+        fail('lessonsEnabled must be a boolean');
+      }
+      patch.lessonsEnabled = dto.lessonsEnabled;
+    }
+    if (dto.lessonsWeekday !== undefined) {
+      const value = dto.lessonsWeekday;
+      if (
+        !Number.isInteger(value) ||
+        value < PM_SETTINGS_LIMITS.LESSONS_WEEKDAY_MIN ||
+        value > PM_SETTINGS_LIMITS.LESSONS_WEEKDAY_MAX
+      ) {
+        fail('lessonsWeekday must be a whole number from 0 (Sunday) to 6');
+      }
+      patch.lessonsWeekday = value;
+    }
     return patch;
   }
 
@@ -161,6 +178,8 @@ export class PmAgentSettingsService {
         ? new Date(row.autoBuildPausedAt).toISOString()
         : null,
       updatedAt: new Date(row.updatedAt ?? Date.now()).toISOString(),
+      lessonsEnabled: row.lessonsEnabled ?? true,
+      lessonsWeekday: row.lessonsWeekday ?? 1,
     };
   }
 }

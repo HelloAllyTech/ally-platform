@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { PmAgentRun } from '../entity/pm-agent-run.entity';
 import { PmAgentSettings } from '../entity/pm-agent-settings.entity';
 import {
@@ -31,6 +31,8 @@ import {
   PmAgentRunTrigger,
 } from './pm-agent-run-trigger';
 import { PmAgentSettingsService } from './pm-agent-settings.service';
+import { PmAgentImpactService } from '../impact/pm-agent-impact.service';
+import { PmAgentLessonsService } from '../lessons/pm-lessons.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -64,6 +66,8 @@ export class PmAgentStateService {
     private readonly presenter: PmAgentPresenterService,
     @Inject(PM_AGENT_RUN_TRIGGER)
     private readonly runTrigger: PmAgentRunTrigger,
+    @Optional() private readonly impact?: PmAgentImpactService,
+    @Optional() private readonly lessons?: PmAgentLessonsService,
   ) {}
 
   /**
@@ -201,9 +205,12 @@ export class PmAgentStateService {
   async health(now: Date = new Date()): Promise<PmHealthResponse> {
     const since30 = new Date(now.getTime() - 30 * DAY_MS);
     const since7 = new Date(now.getTime() - 7 * DAY_MS);
-    const [decided, spendByLane] = await Promise.all([
+    const [decided, spendByLane, impact] = await Promise.all([
       this.cards.listDecidedSince(since30),
       this.runSteps.spendByLaneSince(since30),
+      this.impact
+        ? this.impact.healthFigures()
+        : { impactMeasuredCount: 0, impactImprovedRate: null },
     ]);
     const isAccepted = (status: PmCardStatus, path?: string | null) =>
       Boolean(path) &&
@@ -257,6 +264,10 @@ export class PmAgentStateService {
         : null,
       spendByLane,
       repeatedRejectionRate: ratio(repeats, rejected.length),
+      ...impact,
+      ...(this.lessons
+        ? await this.lessons.healthFields()
+        : { activeLessons: 0, proposedLessons: 0, lessonAgreementDelta: null }),
     };
   }
 

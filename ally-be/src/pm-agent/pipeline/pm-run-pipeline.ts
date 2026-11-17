@@ -30,6 +30,13 @@ import {
   sharedContextBlock,
   topMemory,
 } from '../learning/pm-context';
+import { metricCatalogBlock } from '../impact/metric-catalog';
+import {
+  isActiveLesson,
+  lessonCategoriesFor,
+  lessonsBlock,
+  topLessons,
+} from '../lessons/pm-lessons-context';
 import {
   computeLearnedStats,
   effectiveCategoryWeights,
@@ -211,6 +218,8 @@ export class PmRunPipeline {
       const facts = memory.filter(
         (m) => m.kind === PmMemoryKind.FACT && m.active,
       );
+      // Active weekly lessons (lessons/): guidance, fenced; never above the hard gates.
+      const lessons = memory.filter((m) => isActiveLesson(m, now));
       const runEvidence = new Map<string, PmEvidenceRef>();
       const runner = new PmLaneRunner(this.deps.llm, this.deps.toolbox);
       const candidates: PmCandidate[] = [];
@@ -311,7 +320,16 @@ export class PmRunPipeline {
             {
               text: [
                 memoryBlock(topMemory(facts, definition.topic, now)),
+                lessonsBlock(
+                  topLessons(lessons, now, {
+                    lane,
+                    categories: lessonCategoriesFor(lane),
+                  }),
+                ),
                 exemplarBlock(picked),
+                // Code-injected (not a template variable), so it never drifts from the
+                // catalog and needs no prompt-variable release order.
+                metricCatalogBlock(),
               ].join('\n\n'),
             },
           ],
@@ -390,9 +408,14 @@ export class PmRunPipeline {
         ledger,
         shared,
         facts: facts.length,
-        memoryText: memoryBlock(
-          topMemory(facts, 'scope risk decision strategy rejected', now),
-        ),
+        memoryText: [
+          memoryBlock(
+            topMemory(facts, 'scope risk decision strategy rejected', now),
+          ),
+          lessonsBlock(topLessons(lessons, now)),
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
         log,
         stats,
         onBudget: () => {

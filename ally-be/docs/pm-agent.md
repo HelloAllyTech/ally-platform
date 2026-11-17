@@ -164,6 +164,7 @@ Behaviour worth knowing:
   `tenants`, emails, phones, tokens/keys, internal hosts, URLs with query strings, UUIDs, IPs, long quotes).
   Evidence snapshots are never included, only the evidence count.
 - Not built yet (later phases): lessons job, critic calibration, impact read-outs, revert, shadow mode.
+  (Impact read-outs: since built, see "Implementation notes (impact checks)".)
 
 ## Implementation notes (generation pipeline, 2026-11-17)
 
@@ -239,3 +240,129 @@ Persister.
   uniformly; the rest by a Thompson-style draw (only after 8 decisions) × mandate weight × a coverage boost.
   Memory: top 8 active facts per lane by keyword relevance (answers/manual boosted). Exemplars: 2 nearest
   shipped-and-merged and 2 nearest rejected/reverted cards by text similarity, fenced as data.
+
+## Contract addendum: impact checks and weekly lessons (v1.1)
+
+### Impact checks (+14 / +30 days)
+- A recommendation payload gains an optional `metricRef` (schemaVersion stays 1; additive): `{ source: <catalog key>, params?: object, unit?: 'percent'|'count'|'ms'|'usd'|'ratio', betterWhen: 'up'|'down' }`. `source` must be a key of the **measurable-metric catalog** (`src/pm-agent/impact/metric-catalog.ts`): a closed allow-list of read-only Analytics services / aggregates that can be read as one number for a window. Lanes are told the catalog and may pick one; a card without a valid `metricRef` is shown as "impact not measurable". `impactMetric { name, direction }` stays as the human label.
+- When a card's delivery reaches `released` (reconcile job), the baseline is captured (the metric read over the 14 days **before** release), stored in `pm_agent_outcomes` (new migration adds columns / rows kind `impact`), and two reads are scheduled at release + 14 d and + 30 d (each read covers the 14 days ending then). A daily job performs due reads; reads are metered (no LLM) and never throw into the pipeline.
+- Verdict per read: `improved | flat | worse` using `betterWhen` and a minimum relative change (default 3%) plus a minimum-sample guard (`insufficient_data` if the window has too little volume); `not_measurable` / `unavailable` are terminal statuses.
+- `Card.delivery.impact` (in `GET /tracking`, `GET /cards/:id`): `{ metricName, direction, unit?, baseline?: number, checks: [{ day: 14|30, status: 'pending'|'measured'|'insufficient_data'|'unavailable', value?: number, readAt?: string, dueAt: string, verdict?: 'improved'|'flat'|'worse' }], summary?: string }` where `summary` is plain text like `Next-day return: 38% to 44% (improved)`; absent when no `metricRef`.
+- Learning: a measured `improved` read at +14 d adds +1 to the card's category/lane score (and marks the exemplar positive-effective); `worse` adds −1 and marks it a negative exemplar; `flat`/`insufficient_data` are 0.
+- `GET /health` adds `impactMeasuredCount`, `impactImprovedRate`.
+
+### Weekly lessons
+- Lessons are `pm_agent_memory` rows with `kind='lesson'` (no new table). Shape returned in `GET /memory` → `lessons: Lesson[]`: `{ id, text, scope: 'global'|'category'|'lane', category?, status: 'proposed'|'active'|'expired'|'removed', source: 'weekly_job'|'manual', supportCount, supportRatio, evidenceCardIds[], evalResult?: { passed: boolean, agreementBefore: number, agreementAfter: number, sampleSize: number }, requiresConfirm: boolean, createdAt, lastSupportedAt, expiresAt }`.
+- A weekly job (daily scheduler tick on the configured weekday, advisory lock) reads the last 90 days of decisions + outcomes + reasons, asks a reflection prompt (`pm_agent_lessons`) for candidate lessons, validates each against the data in code (minimum 5 supporting decisions and ≥ 75% consistency, else dropped), and runs the **eval gate**: replay the critic over up to 20 past decided cards with the lesson added to its rubric and require agreement with the admin's real decisions not to decrease (reserve-before-spend, counts toward the budget; a budget shortfall leaves the lesson `proposed`, never active). Lessons that pass auto-activate **unless** `requiresConfirm` (any lesson that forbids or de-prioritises a whole category, changes the mandate, or concerns risk/size limits): those stay `proposed` until an admin confirms.
+- Active lessons are injected (fenced as guidance, never instructions) into lane prompts via memory top-k and into the critic rubric context. A lesson expires (`expired`) 60 days after `lastSupportedAt` unless re-supported by the next weekly run.
+- Endpoints (same base): `POST /lessons/:id/confirm` (proposed → active, 409 otherwise), `PATCH /memory/:id` `{ value?, active? }` (existing; editing a lesson's text re-marks `source:'manual'`, keeps it active), `DELETE /memory/:id` (existing → `removed`), `POST /lessons/run` (run the weekly job now; returns `{ started, reason? }`; respects kill switch/budget). Settings gains `lessonsEnabled` (default true) and `lessonsWeekday` (0–6, default 1 = Monday).
+- `GET /health` adds `activeLessons`, `proposedLessons`, `lessonAgreementDelta`.
+
+## Implementation notes (impact checks, 2026-11-17)
+
+Code: `src/pm-agent/impact/` — `metric-catalog.ts` (the catalog, `metricRef` validation, `readMetric`),
+`impact-verdict.ts` (windows, verdict, formatting, tunables `PM_IMPACT`), `pm-agent-impact.service.ts`,
+`pm-agent-impact.scheduler.ts`, `pm-impact.store.ts`, `pm-metric-sources.service.ts`. Migration
+`1982000000500-PmAgentImpactOutcomes`; table detail in `DATA_SCHEMA.md` §3.23. No model call anywhere, so no
+AI task registry row.
+
+- **Catalog** (closed; platform-wide, never a tenantId; each a windowed summary figure of an existing
+  AnalyticsModule service): `roleplay_completion_rate` (%, completion rate), `returning_user_rate` (%, overview
+  retention), `active_users`, `simulations_completed` (counts, overview), `roleplay_median_quality` (median judge
+  composite, score distribution), `learner_avg_rating` (1–5), `coaching_share_rate` (%, coaching loop),
+  `scribe_sessions` (count), `voice_latency_p95_ms` (ms, better down), `llm_cost_usd` (`params.task` optional) and
+  `llm_cost_per_call_usd` (`params.task` required, an `LlmTask` value), both from `llm_usage` priced with the shared
+  table. Left out: activation rate and the six all-time sections (the window does not move them). Each entry has a
+  `minSample` (10–200) on the volume behind the number.
+- **`metricRef`**: validated by `validateCardPayload` (so gate layer 1 and the lane repair pass reject an unknown
+  source, unknown/missing params, a unit other than the entry's, or a bad `betterWhen`). The lanes see the catalog
+  as a code-appended context block (not a template variable), and the lane `.txt` defaults gained one rule line.
+  `plan.md` / the PRD state the measured metric ("Measured after release: …") or "Not automatically measured".
+- **Rows**: at the reconcile transition to `released`, `onReleased` inserts (insert-if-missing on UNIQUE
+  (`cardId`,`kind`,`day`), so a second call is a no-op) day 0 / 14 / 30 `impact` rows and reads the baseline at
+  once. Release time = the latest `builder_pull_requests.releasedAt` (now if unrecorded). Windows are whole UTC
+  days, both ends inclusive: baseline = the 14 days before the release day; +d = the 14 days ending on release
+  day + d, due at the start of the next day (so the release day itself is in no window). A card whose
+  `metricRef` no longer validates gets `not_measurable` rows; a card without one gets none.
+- **Daily job** (`PmAgentImpactScheduler`, 04:00 IST, advisory lock `(1982000, 5)`, one pass of ≤ 200 due rows,
+  runs even when the agent is off — it spends nothing): baseline before checks; a check waits while its baseline
+  is `pending` and becomes `unavailable` when the baseline is terminal. A failed or timed-out read (60 s) stays
+  `pending` with `attempts`/`lastError` and is retried the next day; the third failure is terminal `unavailable`.
+  Verdict: `insufficient_data` when either side has no value or is under the entry's `minSample` (the value is
+  still stored); else |relative change| < 3% → `flat`, otherwise `improved`/`worse` by `betterWhen` (exactly 3%
+  counts; a zero baseline judges by sign). Each read emits `card.updated` and mirrors the value onto the
+  decision row's `baselineValue`/`value14d`/`value30d`.
+- **API**: `delivery.impact` is added by the presenter wherever a card is presented with a delivery (so also
+  `GET /cards`), exactly the contract shape; `not_measurable` rows are presented as `unavailable`; `baseline` is
+  present once the baseline read has a value; `summary` comes from the latest read check with a value
+  (`… (not enough data)` for `insufficient_data`) and is absent before that. A measurable card not yet released
+  has `checks: []`. `GET /health` adds `impactMeasuredCount` (measured +14 d checks) and `impactImprovedRate`
+  (improved ÷ measured, null at 0).
+- **Learning**: `PmOutcomeRow.impactVerdict` = the measured +14 d verdict. Lane/category scores: improved adds
+  +1 (positive), worse adds −1 (negative) on top of the shipped credit. Exemplars: positive requires merged AND
+  not worse; worse makes it a negative exemplar. **Anything reading decisions from `pm_agent_outcomes` must filter
+  `kind = 'decision'`** (the pipeline store does).
+
+## Implementation notes (lessons, 2026-11-17)
+
+Code: `src/pm-agent/lessons/` (job `pm-lessons-job.ts`, framework-free behind `PmLessonsStore` and `PmLlmPort`;
+deterministic checks `pm-lesson-data.ts`; eval gate `pm-lesson-eval.ts`; prompt injection `pm-lessons-context.ts`;
+admin patches and the `Lesson` shape `pm-lesson-admin.ts`; Nest wiring `pm-lessons.service.ts`,
+`pm-lessons.controller.ts`, `pm-lessons.store.ts`). Migration `1982000000600-AddPmAgentLessons` adds lesson-only
+columns to `pm_agent_memory`, widens its `scope` (`category`, `lane`) and `source` (`weekly_job`) CHECKs, and adds
+`lessonsEnabled`, `lessonsWeekday`, `lessonsLastRunDate`, `lessonsLastRun` to the settings. Prompt
+`pm_agent_lessons` (`src/prompts/pm_agent/lessons.txt`), registry row `pm-agent-lessons`.
+
+- **Schedule**: `PmAgentLessonsScheduler` ticks on the run scheduler's 10-minute cadence (its own cron, not the run
+  tick) and runs once per IST date when the IST weekday is `lessonsWeekday` and the IST hour ≥ `runHourIst`, while
+  `enabled && lessonsEnabled`. The date is claimed (`lessonsLastRunDate`, conditional update) before the job runs, so a
+  budget-skipped or failed week is not retried every tick. One job at a time: advisory lock `(1982000, 6)` on a
+  dedicated connection, for scheduled and manual runs alike. `POST /lessons/run` answers `{ started: true }` (the job
+  continues in the background, then `state.updated`) or `{ started: false, reason }` with `reason` one of
+  `disabled`, `lessons_disabled`, `already_running`, `budget_exhausted`. The last job's counts land in
+  `pm_agent_settings.lessonsLastRun` (not exposed in the API yet).
+- **Budget**: the job cap is the run-cap formula (min(month left, monthly ÷ 20)); under $0.02 → `budget_exhausted`
+  with no call. A ledger holds 60% of the cap back for the eval gate; every call reserves its worst case first
+  (`PmAgentLlmService`), writes `llm_usage` (task `pm_agent`, metadata `lane: 'lessons'`), and writes **no**
+  `pm_agent_run_steps` row (`noTrace`): the job has no `pm_agent_runs` row and must not take the card run's
+  one-running slot. Consequence: lessons spend is in the month's budget and `GET /state` spend, but not in
+  `GET /health` `spendByLane`, and a card run started while the job runs does not see the job's open reservation.
+- **Data pack**: last 90 days of `pm_agent_outcomes` joined to cards, recommendations accepted / handed off /
+  rejected / feedback only (questions excluded). Each card is `c1…cN` with category, lane, size, risk, ≤ 6 scrubbed
+  title words, decision, reason **chip** (never the free-text reason), feedback chips, outcome flags and an impact
+  verdict when the impact checks recorded one (any `*verdict*` field in the outcome row; +14 d preferred; tolerated
+  absent). Fenced as `<tool_data … trust="untrusted-data">`, neutralised. Fewer than 5 eligible decisions →
+  `not_enough_decisions`, no call.
+- **Reflection** (`submit_lessons`, only tool, 3,000 output tokens): each lesson is `{ text, expects: accept|reject,
+  predicate: { categories?, lanes?, sizes?, risks?, words? }, citedRefs? }`. Unknown fields (a model-declared
+  `requiresConfirm`, say), instruction-shaped text, markup, anything the public scrubber would change and empty
+  predicates fail; one repair pass for the failures (valid ones kept), then discarded.
+- **Validation in code**: support is recomputed from the rows matching the predicate — supporting = accepted and not
+  build-failed / reverted / impact `worse` (for `accept`), or rejected / feedback / accepted-but-went-wrong (for
+  `reject`). Kept only with ≥ 5 supporting and ≥ 75% of the matching rows. Scope is derived (one category →
+  `category`, one lane → `lane`, else `global`). Dedupe (text similarity ≥ 0.6 or the same predicate signature): a
+  fact → dropped; a `removed` lesson → dropped (an admin's removal sticks); an `active`/`proposed` lesson →
+  **re-supported** in place (`lastSupportedAt`, support, evidence, `expiresAt` = +60 d; no re-eval); an `expired` one is
+  re-evaluated and revived in place. `requiresConfirm` is a keyword + category check: sizes/risks in the predicate,
+  risk/size or mandate/strategy/priority words in the text, a `reject` lesson that narrows only by category/lane, or
+  forbidding words with a whole-category scope or a category name in the text.
+- **Eval gate**: the real critic (its prompt, model and fail-closed parsing) is replayed over up to 20 past decided
+  recommendations (≤ 10 accepted + ≤ 10 declined, topped up from the larger side) with their stored evidence: one
+  baseline call with the current active lessons, then one call per candidate with it added. Agreement = critic pass
+  ⇔ the admin accepted (a missing verdict is a fail). Passed = `after ≥ before` with `sampleSize ≥ 8`. Fewer than 8
+  replayable cards, a critic failure, or no budget → no `evalResult` → `proposed`. Pass + not `requiresConfirm` →
+  `active`; pass + `requiresConfirm` → `proposed`; fail → nothing stored.
+- **Expiry**: at the end of every job (also a skipped one), `weekly_job` lessons that are `active`/`proposed` and
+  not re-supported for 60 days → `expired`. Lessons an admin edited (`source: manual`) never expire.
+- **Use**: `isActiveLesson` (status `active`, `active`, unexpired). Lanes get global lessons plus those scoped to the
+  lane or one of its categories (scoped first, then support × consistency), the critic gets all active ones; at most 8
+  per prompt, fenced as `<memory kind="lesson">` under a header that says the rules, rubric and hard limits win. The
+  deterministic gates never read lessons.
+- **Admin actions** (no card exists, so the audit is the row's `lessonEvents` jsonb, not `pm_agent_card_events`):
+  `POST /lessons/:id/confirm` is a conditional `proposed → active` (409 otherwise, 404 unknown; `expiresAt` = +60 d).
+  `PATCH /memory/:id` on a lesson: `value` → `source: manual`, `active`, no expiry (409 on a `removed` lesson unless
+  `active: true` is sent too); `active: false` → `removed`; `active: true` → `active`. `DELETE /memory/:id` on a lesson
+  → `removed` (soft). Every change emits `state.updated`. PATCH/DELETE on a lesson answer the `Lesson` shape.
+- **Settings**: `lessonsEnabled`, `lessonsWeekday` (whole number 0–6) in `GET`/`PATCH /settings` (and `GET /state`).
+- **Health**: `activeLessons`, `proposedLessons`, `lessonAgreementDelta` (mean `agreementAfter − agreementBefore` over
+  active lessons with an eval, 3 dp; null when none).

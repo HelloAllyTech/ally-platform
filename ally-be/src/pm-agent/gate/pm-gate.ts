@@ -43,7 +43,8 @@ export function candidateText(candidate: Pick<PmCandidate, 'payload'>): string {
 /**
  * Gate layer 1 — deterministic, cheapest first (plan §6). Pure: same input, same verdict.
  *
- *  - the payload contract (lengths, enums, unknown keys);
+ *  - the payload contract (lengths, enums, unknown keys; an optional `metricRef` must name a
+ *    measurable-metric catalog entry with that entry's params — impact/metric-catalog.ts);
  *  - every cited evidence id exists AND was fetched in this run;
  *  - repos have a release pipeline, and the change is not `libs/`-only or mobile;
  *  - nothing a public-repo scrubber would redact (tenant names, contact details, secrets,

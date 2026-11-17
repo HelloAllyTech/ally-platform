@@ -310,10 +310,15 @@ wrong call is corrected from the admin console's audience toggle.
 
 `pm_agent/` holds the PM Agent's system prompts ([pm-agent.md](pm-agent.md)): one per analysis lane
 (`lane_analytics.txt`, `lane_ux_signals.txt`, `lane_code_health.txt`, `lane_infra_cost.txt`,
-`lane_strategy_content.txt`, `lane_revisions.txt`) and `critic.txt`. They are agent-shaped (a read-only
+`lane_strategy_content.txt`, `lane_revisions.txt`), `critic.txt`, and `lessons.txt` (the weekly lessons
+job's reflection: it reads an anonymised, fenced pack of past decisions and answers through `submit_lessons`;
+code recomputes each lesson's support from the data, so nothing it claims about support, scope or risk is used). They are agent-shaped (a read-only
 tool loop) but their answer is a single closing tool call (`submit_candidates`, `submit_verdicts`)
 that code validates field by field against the card contract; anything that fails is repaired once,
-then discarded. None has runtime variables: the run's data arrives as fenced tool results. Each lane
+then discarded. None has runtime variables: the run's data arrives as fenced tool results. The
+measurable-metric catalog a lane may cite in a card's optional `metricRef` (impact checks) is likewise
+appended to each lane's context by code from `src/pm-agent/impact/metric-catalog.ts`, never through a
+template variable, so the lane text and the catalog cannot drift and no prompt-release order applies. Each lane
 prompt repeats the card rules on purpose — the limits are enforced in code either way, and a lane
 edited alone in the Skills Store must still read whole.
 

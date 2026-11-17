@@ -3,7 +3,7 @@ import React from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { Button, ContentSwitcher, Switch } from "@ally-ui-mono/ui-shared";
-import { useGetPmAgentFeedStateQuery } from "@api";
+import { useGetPmAgentFeedStateQuery, useGetPmAgentMemoryQuery } from "@api";
 
 import { AgentView } from "./AgentView";
 import { copy } from "./copy";
@@ -38,7 +38,9 @@ export const PmAgentFeed: React.FC = () => {
     pollingInterval: STATE_POLL_MS,
     skipPollingIfUnfocused: true,
   });
+  const { data: memory } = useGetPmAgentMemoryQuery();
   usePmAgentSocket();
+  const proposedLessons = (memory?.lessons ?? []).filter(l => l?.status === "proposed").length;
   const controls = usePmAgentControls();
 
   const open = state?.queue.open ?? 0;
@@ -75,7 +77,20 @@ export const PmAgentFeed: React.FC = () => {
           onChange={(e: { name?: string | number }) => setView(String(e.name) as View)}
         >
           {VIEWS.map(v => (
-            <Switch key={v} name={v} text={copy.views[v]} />
+            <Switch
+              key={v}
+              name={v}
+              text={
+                v === "agent" && proposedLessons > 0
+                  ? copy.agentBadge(proposedLessons)
+                  : copy.views[v]
+              }
+              aria-label={
+                v === "agent" && proposedLessons > 0
+                  ? copy.agentBadgeLabel(proposedLessons)
+                  : undefined
+              }
+            />
           ))}
         </ContentSwitcher>
       </div>

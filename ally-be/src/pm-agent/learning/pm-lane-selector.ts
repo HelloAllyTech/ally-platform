@@ -29,7 +29,8 @@ export const statKey = (dimension: 'category' | 'lane', key: string) =>
 
 /**
  * Selection learning from outcomes (plan §9b loop 3). Outcome beats opinion: an accepted card
- * whose build failed or was reverted counts as a negative; a shipped one counts extra. Each
+ * whose build failed or was reverted counts as a negative; a shipped one counts extra; a
+ * measured +14 d impact adds +1 (improved) or −1 (worse). Each
  * decision is weighted by age (half-life), so old taste fades. Questions are not judged here.
  */
 export function computeLearnedStats(
@@ -65,6 +66,11 @@ export function computeLearnedStats(
       case PmDecision.HANDED_OFF:
         if (row.buildFailed || row.reverted) negative = w;
         else positive = w * (row.merged || row.released ? 1.5 : 1);
+        // Measured impact at +14 d (impact checks): improved +1, worse −1; flat and
+        // insufficient data are 0. Outcome beats opinion: a shipped card that made its
+        // metric worse nets negative.
+        if (row.impactVerdict === 'improved') positive += w;
+        else if (row.impactVerdict === 'worse') negative += w;
         break;
       case PmDecision.REJECTED:
         negative = w;

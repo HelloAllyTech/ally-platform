@@ -11,6 +11,7 @@ import {
 } from '../enum/pm-agent.enum';
 import { PM_SUBMIT_TOOL } from '../constants/pm-agent-pipeline.constants';
 import { PmCandidate } from '../pipeline/pm-pipeline.types';
+import { PM_METRIC_KEYS, PM_METRIC_UNITS } from '../impact/metric-catalog';
 
 const str = { type: 'string' };
 const strList = { type: 'array', items: str };
@@ -72,6 +73,23 @@ const RECOMMENDATION_SCHEMA = {
         direction: { type: 'string', enum: ['up', 'down'] },
       },
       required: ['name', 'direction'],
+    },
+    metricRef: {
+      type: 'object',
+      description:
+        'Optional. The measurable-metric catalog entry the platform reads 14 and 30 days after ' +
+        'release to judge this card. Only when it genuinely measures this change; otherwise omit.',
+      properties: {
+        source: { type: 'string', enum: [...PM_METRIC_KEYS] },
+        params: {
+          type: 'object',
+          description:
+            "Only the entry's own params (e.g. { task } for llm_* entries).",
+        },
+        unit: { type: 'string', enum: [...PM_METRIC_UNITS] },
+        betterWhen: { type: 'string', enum: ['up', 'down'] },
+      },
+      required: ['source', 'betterWhen'],
     },
     alternativesDropped: strList,
     repos: {

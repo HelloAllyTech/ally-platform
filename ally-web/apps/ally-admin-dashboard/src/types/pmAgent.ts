@@ -103,10 +103,33 @@ export interface PmPullRequest {
   releaseTag?: string | null;
 }
 
+export type PmImpactVerdict = "improved" | "flat" | "worse";
+export type PmImpactCheckStatus = "pending" | "measured" | "insufficient_data" | "unavailable";
+
+export interface PmImpactCheck {
+  day: 14 | 30;
+  status: PmImpactCheckStatus;
+  value?: number;
+  readAt?: string;
+  dueAt: string;
+  verdict?: PmImpactVerdict;
+}
+
+/** Impact checks at +14 / +30 days after release. Absent when the card has no `metricRef`. */
+export interface PmImpactSummary {
+  metricName: string;
+  direction: string;
+  unit?: "percent" | "count" | "ms" | "usd" | "ratio";
+  baseline?: number;
+  checks: PmImpactCheck[];
+  summary?: string;
+}
+
 export interface PmDelivery {
   status: string;
   prs: PmPullRequest[];
   costUsd?: number | null;
+  impact?: PmImpactSummary | null;
 }
 
 /** An item that needs a person: a failed build, a merged-but-not-released change. */
@@ -166,6 +189,9 @@ export interface PmSettings {
   mandate: string;
   pauseAutoBuild: boolean;
   slackNotify: boolean;
+  /** Added in v1.1; absent on an older backend. */
+  lessonsEnabled?: boolean;
+  lessonsWeekday?: number;
   categoryWeights?: Record<string, number> | null;
 }
 
@@ -210,6 +236,11 @@ export interface PmRunNowResponse {
   reason?: string;
 }
 
+export interface PmLessonsRunResponse {
+  started: boolean;
+  reason?: string;
+}
+
 export interface PmMemoryFact {
   id: string;
   value: string;
@@ -220,19 +251,35 @@ export interface PmMemoryFact {
   [key: string]: unknown;
 }
 
+export type PmLessonStatus = "proposed" | "active" | "expired" | "removed";
+
+export interface PmLessonEval {
+  passed: boolean;
+  agreementBefore: number;
+  agreementAfter: number;
+  sampleSize: number;
+}
+
 export interface PmLesson {
-  id?: string;
-  text?: string;
-  lesson?: string;
-  summary?: string;
+  id: string;
+  text: string;
+  scope: "global" | "category" | "lane";
   category?: string;
+  status: PmLessonStatus;
+  source: "weekly_job" | "manual";
+  supportCount: number;
+  supportRatio: number;
+  evidenceCardIds?: string[];
+  evalResult?: PmLessonEval | null;
+  requiresConfirm: boolean;
   createdAt?: string;
-  [key: string]: unknown;
+  lastSupportedAt?: string;
+  expiresAt?: string | null;
 }
 
 export interface PmMemoryResponse {
   facts: PmMemoryFact[];
-  lessons: PmLesson[];
+  lessons?: PmLesson[];
 }
 
 export interface PmHealth {
@@ -242,6 +289,11 @@ export interface PmHealth {
   costPerAcceptedCardUsd?: number | null;
   spendByLane?: Record<string, number> | null;
   repeatedRejectionRate?: number | null;
+  impactMeasuredCount?: number | null;
+  impactImprovedRate?: number | null;
+  activeLessons?: number | null;
+  proposedLessons?: number | null;
+  lessonAgreementDelta?: number | null;
 }
 
 export interface PmDecisionInput {
