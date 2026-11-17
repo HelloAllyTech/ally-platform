@@ -1,7 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 
 import { baseAPI } from "./baseApi";
-import { roadmapV2API } from "./roadmapV2";
 
 import type { RoadmapItemDetail, RoadmapItemRow } from "../types/roadmapV2";
 import type {
@@ -195,16 +194,9 @@ export const roadmapV2FlowAPI = baseAPI.injectEndpoints({
         method: HttpMethod.POST,
         body: goalId ? { goalId } : {},
       }),
+      // The draft page hands the answer to the idea page itself, after the Submit motion plays
+      // (the dashed outline turns solid first), so the swap never cuts it short.
       invalidatesTags: [draftsTag, listTag],
-      async onQueryStarted({ code }, { dispatch, queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          // The idea page now loads /items/:code; give it the answer so it never flashes a 404.
-          await dispatch(roadmapV2API.util.upsertQueryData("getRoadmapItem", code, data.item));
-        } catch {
-          // The caller shows the failure.
-        }
-      },
     }),
 
     roadmapDictate: builder.mutation<RoadmapDictationResult, FormData>({
