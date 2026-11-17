@@ -27,12 +27,16 @@ export interface RoadmapPersonRef {
   name: string;
   role: RoadmapRole;
   relation?: RoadmapRelation;
+  /** P4: ideas this person filed that are Released (the chip's hover). */
+  ideasShipped?: number;
 }
 
 export type RoadmapCapability =
   | "vote"
   | "comment"
   | "answer"
+  /** P0 returns it; the contract's list omits it. Absent: follow `answer` (Viewers have neither). */
+  | "watch"
   | "submit"
   | "review"
   | "pickLead"
@@ -58,7 +62,7 @@ export type RoadmapCapability =
 export type RoadmapCan = Partial<Record<RoadmapCapability, boolean>>;
 
 /** ci state of one open pull request inside the status line. */
-export type RoadmapCiState = "pending" | "passing" | "failing" | string;
+export type RoadmapCiState = "pending" | "passing" | "failing" | "unknown";
 
 /**
  * The status line under the tracker, as `deriveItemStage` returns it (ally-be
@@ -76,6 +80,8 @@ export type RoadmapStatusParts =
       prdPercent: number | null;
       openQuestions: number;
       designAwaitingApproval: boolean;
+      /** P4: the brief went to Claude Code and no PR exists yet ("Brief sent … waiting for a PR"). */
+      externalBuild?: { byUserId: number; at: string } | null;
     }
   | {
       stage: "building";
@@ -104,13 +110,21 @@ export type RoadmapStatusParts =
       at: string | null;
     };
 
-export type RoadmapDecisionKind = "approveDesign" | "merge" | "release" | "budget" | "settleAnswer";
+export type RoadmapDecisionKind =
+  | "approveDesign"
+  | "merge"
+  | "release"
+  | "budget"
+  | "settleAnswer"
+  | "startBuild"
+  /** A stopped build, or a PR handed to a person. */
+  | "unblock";
 
 /** Why a row is in a view. The frontend renders the copy. */
 export type RoadmapWhyHere =
-  | { kind: "agentQuestion"; phase: "idea" | "plan"; questionPreview: string }
-  | { kind: "mention"; by: RoadmapPersonRef }
-  | { kind: "decision"; decision: RoadmapDecisionKind }
+  | { kind: "agentQuestion"; phase: "idea" | "plan"; questionPreview: string; since?: string }
+  | { kind: "mention"; by: RoadmapPersonRef; since?: string }
+  | { kind: "decision"; decision: RoadmapDecisionKind; since?: string }
   | { kind: "awaitingReview"; since: string }
   | { kind: "needsLead"; since: string }
   | { kind: "reassign"; idleDays: number }
@@ -153,7 +167,7 @@ export interface RoadmapItemPr {
   repo: string;
   number: number;
   url: string;
-  state: string;
+  state: "open" | "merged" | "closed" | string;
   ci?: "pending" | "passing" | "failing";
 }
 
@@ -162,6 +176,8 @@ export interface RoadmapItemRelease {
   state: "pending" | "live" | "failed";
   tag?: string;
   releasedAt?: string;
+  repo?: string;
+  prNumber?: number;
 }
 
 export interface RoadmapItemSummary {
@@ -176,14 +192,15 @@ export interface RoadmapItemDetail extends RoadmapItemRow {
   summary: RoadmapItemSummary;
   /** The plan / builder session; its transcript comes from the existing builder endpoints. */
   sessionId?: string;
-  prd?: { readinessPct: number; versionId?: string };
+  prd?: { readinessPct: number; versionNumber: number };
   design?: { state: RoadmapDesignState };
   runs: RoadmapItemRun[];
   prs: RoadmapItemPr[];
   /** P1's `item_releases`. Empty (or absent) where P1 isn't deployed. */
   releases: RoadmapItemRelease[];
   outcome?: { review?: unknown };
-  spend: { spentUsd: number; ceilingUsd: number };
+  /** Absent for Viewers (D2) and for an idea with no session. */
+  spend?: { spentUsd: number; ceilingUsd: number };
   people: RoadmapPersonRef[];
   can: RoadmapCan;
   watchLevel: RoadmapWatchLevel;
@@ -244,9 +261,10 @@ export interface RoadmapSearchResponse {
 export interface RoadmapItemPatch {
   title?: string;
   goalId?: string;
-  summary?: RoadmapItemSummary;
+  /** Only the problem is editable; who and outcome come from the copilot's brief. */
+  summary?: { problem?: string };
   leadUserId?: number;
-  plannedMonth?: string;
+  plannedMonth?: string | null;
 }
 
 export interface RoadmapStarResponse {
@@ -261,10 +279,16 @@ export interface RoadmapItemChangedEvent {
   actorId?: number;
 }
 
+export interface RoadmapWatchResponse {
+  itemId: string;
+  level: RoadmapWatchLevel;
+}
+
 export interface RoadmapPresenceEvent {
   code: string;
   userId: number;
   name: string;
   kind: "viewing" | "typing";
   questionId?: string;
+  at?: string;
 }

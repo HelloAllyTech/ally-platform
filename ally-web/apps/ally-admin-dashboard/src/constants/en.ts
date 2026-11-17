@@ -88,6 +88,7 @@ export const en = {
       organization: "Organization",
       languageGlossary: "Glossary",
       builderSession: "Session",
+      roadmapIdea: "Idea",
       builderSessions: "All sessions",
       builderSettings: "Settings",
       builderPipeline: "Pipeline",
@@ -8595,6 +8596,7 @@ export const en = {
       building: (repos: string) => `Building ${repos}`,
       buildingHere: "Building",
       pr: (number: number, ci: string) => `PR #${number} CI ${ci}`,
+      prOnly: (number: number) => `PR #${number}`,
       ciWords: { pending: "running", passing: "passing", failing: "failing" } as Record<
         string,
         string
@@ -8624,6 +8626,8 @@ export const en = {
         release: "Held for your Release",
         budget: "Paused at its ceiling",
         settleAnswer: "Answers waiting for you to choose",
+        startBuild: "Ready for you to build",
+        unblock: "A build is waiting on you",
       } as Record<string, string>,
       waitingDays: (days: number) =>
         days <= 0
@@ -8703,6 +8707,14 @@ export const en = {
       search: "Search ideas",
       searchPlaceholder: "Search by title, code or author",
       typeToAdd: "Type a name and press Enter",
+      services: {
+        be: "Backend",
+        ai: "AI service",
+        learn: "Voice agent",
+        frontend: "Admin and helpline",
+        mobile: "Mobile app",
+      } as Record<string, string>,
+      monthOption: (label: string) => label,
     },
     sort: {
       label: "Sort",
@@ -8787,6 +8799,16 @@ export const en = {
         shipped: "Shipped",
       },
       agentStepSummary: (count: number) => (count === 1 ? "1 agent step" : `${count} agent steps`),
+      agentNames: { idea: "Idea agent", plan: "Plan agent", build: "Builder" } as Record<
+        string,
+        string
+      >,
+      expandStep: "Show this step in full",
+      collapseStep: "Show less",
+      questionAsked: "Asked",
+      answered: (answer: string) => `Answered: ${answer}`,
+      unknownPerson: "Someone",
+      openDetails: "Details",
       viewing: (names: string) => `${names} viewing`,
       typing: (name: string) => `${name} is answering…`,
       panel: "Idea details",
@@ -8854,6 +8876,10 @@ export const en = {
       editTitle: "Edit the title",
       editSaved: "Saved",
       editFailed: "Couldn't save that change.",
+      approveDesign: "Approve design",
+      openFull: "Open the full page",
+      back: "Back to the queue",
+      vote: "Vote",
       comment: "Comment",
     },
     quickOpen: {

@@ -73,6 +73,21 @@ describe("statusLine", () => {
     expect(planning("prd")).toBe("PRD 70% · 2 questions");
     expect(planning("design", true)).toBe("Design waiting for approval");
     expect(planning("ready")).toBe("Ready to build");
+    expect(
+      statusLine({
+        ...row({ shownStage: "planning" }),
+        people: [priya],
+        statusParts: {
+          stage: "planning",
+          step: "ready",
+          leadUserId: 2,
+          prdPercent: 100,
+          openQuestions: 0,
+          designAwaitingApproval: false,
+          externalBuild: { byUserId: 2, at: "2026-11-10" },
+        },
+      }),
+    ).toBe("Brief sent to Claude Code by Priya · waiting for a PR");
   });
 
   it("says a brief was sent until a PR exists, and names a held release", () => {

@@ -123,6 +123,11 @@ export const statusLine = (
       return join(lead ? s.leads(lead) : null, s.planningNotStarted);
     }
     case "planning": {
+      // P4 moves "Brief sent to Claude Code … waiting for a PR" here, before any PR exists.
+      if (parts.externalBuild) {
+        const by = nameFor(parts.externalBuild.byUserId, people);
+        return by ? s.briefSentBy(by) : s.briefSent;
+      }
       if (parts.step === "ready") return s.readyToBuild;
       if (parts.step === "design" || parts.designAwaitingApproval) {
         return parts.designAwaitingApproval ? s.designWaiting : s.designDrafting;
@@ -144,7 +149,8 @@ export const statusLine = (
       const pr = prs[0];
       return join(
         repos.length ? s.building(repos.join(" + ")) : s.buildingHere,
-        pr ? s.pr(pr.number, s.ciWords[pr.ci] ?? String(pr.ci)) : null,
+        // An unknown CI state says nothing worth reading; the PR number alone still helps.
+        pr ? (s.ciWords[pr.ci] ? s.pr(pr.number, s.ciWords[pr.ci]) : s.prOnly(pr.number)) : null,
       );
     }
     case "shipped": {

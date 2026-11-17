@@ -9,6 +9,7 @@ import {
   RoadmapSearchResponse,
   RoadmapStarResponse,
   RoadmapWatchLevel,
+  RoadmapWatchResponse,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
@@ -47,8 +48,33 @@ export const roadmapV2API = baseAPI.injectEndpoints({
       providesTags: [TAG_TYPES.ROADMAP_V2_ROLE],
     }),
 
+    /**
+     * One cache entry per view + filters + sort; the cursor is NOT part of the key. "Show more"
+     * fetches the next page with a cursor and appends it to the same entry, so the optimistic
+     * row patches below reach every loaded page, and changing filters starts a fresh entry.
+     */
     getRoadmapItems: builder.query<RoadmapItemsResponse, RoadmapItemsQuery>({
       query: params => ({ url: ApiEndpoints.ROADMAP_V2.ITEMS, method: HttpMethod.GET, params }),
+      serializeQueryArgs: ({ endpointName, queryArgs }) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { cursor: _cursor, ...rest } = queryArgs;
+        const keyed = Object.fromEntries(
+          Object.entries(rest).sort(([a], [b]) => a.localeCompare(b)),
+        );
+        return `${endpointName}(${JSON.stringify(keyed)})`;
+      },
+      merge: (current, incoming, { arg }) => {
+        if (arg.cursor && "rows" in current && "rows" in incoming) {
+          const seen = new Set(current.rows.map(row => row.code));
+          const fresh = Array.isArray(incoming.rows) ? incoming.rows : [];
+          current.rows.push(...fresh.filter(row => !seen.has(row.code)));
+          current.nextCursor = incoming.nextCursor;
+          current.total = incoming.total;
+          return undefined;
+        }
+        return incoming;
+      },
+      forceRefetch: ({ currentArg, previousArg }) => currentArg?.cursor !== previousArg?.cursor,
       providesTags: result => [
         listTag,
         ...rowsOfItemsResponse(result).map(row => itemTag(row.code)),
@@ -94,7 +120,7 @@ export const roadmapV2API = baseAPI.injectEndpoints({
     }),
 
     setRoadmapWatch: builder.mutation<
-      { level: RoadmapWatchLevel },
+      RoadmapWatchResponse,
       { code: string; level: RoadmapWatchLevel }
     >({
       query: ({ code, level }) => ({
