@@ -42,6 +42,7 @@ import { Tracker } from "./Tracker";
 import { motionTransition, paneVariants, useReducedMotionPreference } from "../../../motion";
 import { DraftView } from "../drafts/DraftView";
 import { RoadmapBreakpoint, sidePanelMode } from "../hooks/useRoadmapBreakpoint";
+import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
 import { PresenceEntry } from "../hooks/useRoadmapRealtime";
 import { useKeyboardInset } from "../hooks/useVisualViewport";
 import { CommentBox } from "../session/CommentBox";
@@ -167,6 +168,17 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
     markedRef.current = item.code;
     if (item.unread) void markRead(item.code);
   }, [item, markRead]);
+
+  // P8: opening an idea you wrote ends "find where my idea is" (§4.16), if the Roadmap open
+  // started it. Pane or page, the first one counts.
+  const jobs = useRoadmapJobTimer();
+  const authorId = item?.author?.id;
+  useEffect(() => {
+    if (!item || authorId === undefined || authorId !== user?.id) return;
+    jobs.complete("find_my_idea", { itemId: item.code });
+    // Once per idea shown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.code, authorId, user?.id]);
 
   const [showAgentWork, setShowAgentWork] = useState<boolean>(() =>
     readPref(ROADMAP_PREF_KEYS.showAgentWork, false),

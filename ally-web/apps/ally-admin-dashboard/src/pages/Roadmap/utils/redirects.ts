@@ -44,6 +44,8 @@ export const isAgentSection = (value: unknown): value is AgentSection =>
 
 export const canSeeAgent = (role: RoadmapRole): boolean => role === "builder" || role === "owner";
 export const canSeeSettings = (role: RoadmapRole): boolean => role === "owner";
+/** Measures (P8): the funnel, stage times, review wait and spend. Owner only, like the route. */
+export const canSeeMeasures = (role: RoadmapRole): boolean => role === "owner";
 
 /**
  * `/product-roadmap?…`. `opportunity` and `plan` carry the opportunity's uuid, which the idea page

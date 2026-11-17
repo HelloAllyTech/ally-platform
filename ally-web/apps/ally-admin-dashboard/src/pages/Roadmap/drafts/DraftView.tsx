@@ -41,6 +41,7 @@ import { typeInText } from "../hooks/useDictation";
 import { useDraftAutosave } from "../hooks/useDraftAutosave";
 import { useOutbox } from "../hooks/useOutbox";
 import { RoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
+import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
 import { useKeyboardInset } from "../hooks/useVisualViewport";
 import { shortDate } from "../utils/copy";
 import { isOfflineError } from "../utils/deviceStore";
@@ -142,12 +143,23 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
   const textRef = useRef<HTMLTextAreaElement>(null);
   const caretFromNew = (location.state as { caret?: number } | null)?.caret;
 
+  // P8 job timing (§4.16): New idea opening starts "capture an idea", the first save (the draft
+  // exists) ends it; a draft's page opening starts "draft to submitted", Submit ends it.
+  const jobs = useRoadmapJobTimer();
+  useEffect(() => {
+    if (!code) jobs.start("capture_idea", { restart: true });
+    else if (!readOnly) jobs.start("draft_to_submitted", { itemId: code });
+    // On arrival, per draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, readOnly]);
+
   const autosave = useDraftAutosave({
     code,
     server: draft,
     initialText,
     readOnly,
     onCreated: created => {
+      jobs.complete("capture_idea", { itemId: created.code });
       // The draft has its code: the page moves to it, keeping the caret where it was.
       navigate(ROUTES.ROADMAP_IDEA(created.code), {
         replace: true,
@@ -310,6 +322,7 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
     const goalId = autosave.goalId ?? draft.suggestedGoal?.id ?? undefined;
     try {
       const result = await submit({ code, ...(goalId ? { goalId } : {}) }).unwrap();
+      jobs.complete("draft_to_submitted", { itemId: code });
       setConfirmOpen(false);
       haptic(10);
       if (result.firstSubmit) markFirstSubmit(code);

@@ -133,6 +133,8 @@ import { RoadmapDraftService } from './draft/roadmap-draft.service';
 import { RoadmapDictationService } from './draft/roadmap-dictation.service';
 import { RoadmapReviewController } from './review/roadmap-review.controller';
 import { RoadmapReviewService } from './review/roadmap-review.service';
+import { RoadmapMetricsController } from './metrics/roadmap-metrics.controller';
+import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
 
 /**
  * Product Roadmap — the internal vote-based prioritisation board, rebuilt from the standalone
@@ -241,6 +243,8 @@ import { RoadmapReviewService } from './review/roadmap-review.service';
     // P3: New idea, drafts, dictation, review and the lead.
     RoadmapDraftController,
     RoadmapReviewController,
+    // P8: the Owner's Measures.
+    RoadmapMetricsController,
     RoadmapItemBuildController,
     RoadmapPeopleController,
     RoadmapOpportunityController,
@@ -261,6 +265,7 @@ import { RoadmapReviewService } from './review/roadmap-review.service';
     RoadmapDraftService,
     RoadmapDictationService,
     RoadmapReviewService,
+    RoadmapMetricsService,
     RoadmapItemBuildService,
     RoadmapRoleAdminService,
     // Roadmap v2 P6: the Owner's switch-on action.

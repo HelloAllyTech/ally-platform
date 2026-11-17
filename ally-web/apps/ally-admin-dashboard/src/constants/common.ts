@@ -512,6 +512,10 @@ export const ApiEndpoints = {
     ITEM_STAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/star`,
     SEARCH: "/v1/roadmap/search",
   },
+  /** Roadmap v2 P8: the Owner's Measures. 404 while the flag is off, 403 for anyone but an Owner. */
+  ROADMAP_V2_MEASURES: {
+    METRICS: "/v1/roadmap/metrics",
+  },
   AI_LAB: {
     SKILLS: "/v1/lab/skills",
     SKILL_BY_ID: (id: string) => `/v1/lab/skills/${id}`,
@@ -1368,6 +1372,8 @@ export const ROUTES = {
   ROADMAP_SETTINGS: "/roadmap/settings",
   /** Roadmap v2's Bugs tab: Bug Hunter's table, read-only. */
   ROADMAP_BUGS: "/roadmap/bugs",
+  /** Roadmap v2's Measures (Owner, P8): funnel, stage times, review wait, releases, spend. */
+  ROADMAP_MEASURES: "/roadmap/measures",
   /** User Interviews, out of the Roadmap into its own sidebar entry (D14). */
   USER_INTERVIEWS: "/user-interviews",
   COURSE_COPILOT: "/course-copilot",

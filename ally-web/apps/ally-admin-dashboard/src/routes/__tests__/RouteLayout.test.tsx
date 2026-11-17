@@ -99,6 +99,7 @@ vi.mock("@pages", () => ({
   RoadmapLegacyRedirect: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   RoadmapAgentPage: () => <div>RoadmapAgentPage</div>,
   RoadmapSettingsPage: () => <div>RoadmapSettingsPage</div>,
+  RoadmapMeasuresPage: () => <div>RoadmapMeasuresPage</div>,
   RoadmapBugsPage: () => <div>RoadmapBugsPage</div>,
   UserInterviewsPage: () => <div>UserInterviewsPage</div>,
   EvaluateLogin: () => <div>EvaluateLoginPage</div>,

@@ -10,17 +10,23 @@ import { ROUTES, en } from "@constants";
 import type { RoadmapRole } from "@types";
 
 import { requestShortcuts, useRoadmapFrame } from "../RoadmapFrame";
-import { canSeeAgent, canSeeSettings } from "../utils/redirects";
+import { canSeeAgent, canSeeMeasures, canSeeSettings } from "../utils/redirects";
 
-/** The tabs past Queue · My drafts · Bugs, for the roles that have them (§4.1, §4.15). */
-export const roleTabsFor = (role: RoadmapRole): { key: "agent" | "settings"; to: string }[] => [
+type RoleTabKey = "agent" | "settings" | "measures";
+
+/** The tabs past Queue · My drafts · Bugs, for the roles that have them (§4.1, §4.15; P8). */
+export const roleTabsFor = (role: RoadmapRole): { key: RoleTabKey; to: string }[] => [
   ...(canSeeAgent(role) ? [{ key: "agent" as const, to: ROUTES.ROADMAP_AGENT }] : []),
   ...(canSeeSettings(role) ? [{ key: "settings" as const, to: ROUTES.ROADMAP_SETTINGS }] : []),
+  ...(canSeeMeasures(role) ? [{ key: "measures" as const, to: ROUTES.ROADMAP_MEASURES }] : []),
 ];
 
-/** Agent (Builders, Owners) and Settings (Owners), as links in the Roadmap's tab row. */
+/** A tab's label. Measures' copy lives in its own block (P8). */
+const tabLabel = (key: RoleTabKey): string =>
+  key === "measures" ? en.roadmapV2Measures.tab : en.roadmapV2Tools.tabs[key];
+
+/** Agent (Builders, Owners), Settings and Measures (Owners), as links in the Roadmap's tab row. */
 export const RoadmapRoleTabs: React.FC<{ role: RoadmapRole }> = ({ role }) => {
-  const copy = en.roadmapV2Tools.tabs;
   return (
     <>
       {roleTabsFor(role).map(tab => (
@@ -31,7 +37,7 @@ export const RoadmapRoleTabs: React.FC<{ role: RoadmapRole }> = ({ role }) => {
             isActive ? "font-semibold text-typography-900" : "text-typography-600 hover:underline"
           }
         >
-          {copy[tab.key]}
+          {tabLabel(tab.key)}
         </NavLink>
       ))}
     </>
@@ -123,7 +129,7 @@ export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => v
               onClick={onNavigate}
               className="flex min-h-12 items-center rounded border border-border-light px-4 text-base text-typography-900"
             >
-              {copy.tabs[tab.key]}
+              {tabLabel(tab.key)}
             </NavLink>
           ))}
         </nav>

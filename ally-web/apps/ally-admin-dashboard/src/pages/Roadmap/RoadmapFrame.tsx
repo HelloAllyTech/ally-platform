@@ -9,6 +9,7 @@ import { en } from "@constants";
 
 import { motionTransition, useReducedMotionPreference } from "../../motion";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
+import { useRoadmapPresence } from "./hooks/useRoadmapJobTimer";
 import {
   ROADMAP_STORE_KEYS,
   readStore,
@@ -94,6 +95,8 @@ export const requestShortcuts = (): void => {
  * line introducing the shortcuts (§4.15) [FP-1228, FP-1227].
  */
 export const RoadmapFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // P8: tells the job timer someone is inside the Roadmap ("Roadmap open" for find_my_idea).
+  useRoadmapPresence();
   const location = useLocation();
   const navigate = useNavigate();
   const breakpoint = useRoadmapBreakpoint();

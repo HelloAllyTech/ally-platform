@@ -16,6 +16,7 @@ import { en } from "@constants";
 import type { RoadmapBuildBrief, RoadmapItemDetail } from "@types";
 
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
+import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
 import {
   briefFitsDeepLink,
   claudeCodeLink,
@@ -184,6 +185,16 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({ item, phone = false, fullW
 
   const actions = buildMenuActions(item.can, { phone, hasFolder: !!folder });
 
+  // P8 (§4.16): Ready to build in front of someone who can send the brief starts "brief to Claude
+  // Code"; Open in Claude Code opening the app ends it. Once a brief went, it isn't timed again.
+  const jobs = useRoadmapJobTimer();
+  const canSendBrief = actions.includes("openInClaudeCode") && !external;
+  useEffect(() => {
+    if (canSendBrief) jobs.start("brief_to_claude_code", { itemId: item.code });
+    // On arrival, per idea.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSendBrief, item.code]);
+
   // Close on outside click and Esc; focus returns to the button.
   useEffect(() => {
     if (!open) return undefined;
@@ -238,6 +249,7 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({ item, phone = false, fullW
       toast.message(copy.longBrief(brief.filename));
     }
     cancelOpen.current?.();
+    jobs.complete("brief_to_claude_code", { itemId: item.code });
     cancelOpen.current = openDeepLink(claudeCodeLink(promptFor(brief), target), () =>
       toast(copy.didNotOpen, {
         action: { label: copy.copyInstead, onClick: () => void copyText(brief) },

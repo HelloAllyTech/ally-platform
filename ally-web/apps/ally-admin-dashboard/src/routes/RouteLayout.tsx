@@ -51,6 +51,7 @@ import {
   RoadmapLegacyRedirect,
   RoadmapQueuePage,
   RoadmapSettingsPage,
+  RoadmapMeasuresPage,
   UserInterviewsPage,
   Settings,
   Logs,
@@ -683,6 +684,23 @@ export const RouteLayout: React.FC = () => {
                 <RoadmapGate fallback={<NotFound />}>
                   <RoadmapFrame>
                     <RoadmapSettingsPage />
+                  </RoadmapFrame>
+                </RoadmapGate>
+              </PrivateLayout>
+            }
+          />
+          {/* Measures (P8): Owners only; the page sends anyone else to the Queue. */}
+          <Route
+            path={ROUTES.ROADMAP_MEASURES}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+                fullBleed
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapFrame>
+                    <RoadmapMeasuresPage />
                   </RoadmapFrame>
                 </RoadmapGate>
               </PrivateLayout>
