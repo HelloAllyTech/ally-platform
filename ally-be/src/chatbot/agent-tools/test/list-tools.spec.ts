@@ -586,3 +586,50 @@ describe('chunk 6b: what the definitions carry', () => {
     expect(create(required).input_schema.properties.interest).toBeDefined();
   });
 });
+
+describe('chunk 6b: nothing in the stretch asked for', () => {
+  const { nearestForWindow } = require('../list-tools.service');
+  const t = (iso: string) => Date.parse(iso);
+  const at = (r: string) => t(r);
+  const slots = [
+    '2026-11-19T14:00:00+05:30',
+    '2026-11-19T15:00:00+05:30',
+    '2026-11-19T16:00:00+05:30',
+    '2026-11-20T10:00:00+05:30',
+    '2026-11-20T18:00:00+05:30',
+    '2026-11-20T19:00:00+05:30',
+    '2026-11-20T20:00:00+05:30',
+  ];
+
+  it('"Thursday evening": the latest that day, then the next evening with times', () => {
+    expect(
+      nearestForWindow(
+        slots,
+        at,
+        t('2026-11-19T17:00:00+05:30'),
+        t('2026-11-19T23:59:00+05:30'),
+      ),
+    ).toEqual([
+      '2026-11-19T16:00:00+05:30',
+      '2026-11-20T18:00:00+05:30',
+      '2026-11-20T19:00:00+05:30',
+    ]);
+  });
+
+  it('with no evening later in the week, only the latest that day', () => {
+    expect(
+      nearestForWindow(
+        slots.slice(0, 4),
+        at,
+        t('2026-11-19T17:00:00+05:30'),
+        t('2026-11-19T23:59:00+05:30'),
+      ),
+    ).toEqual(['2026-11-19T16:00:00+05:30']);
+  });
+
+  it('a single time asked is left to nearness', () => {
+    expect(
+      nearestForWindow(slots, at, t('2026-11-19T11:00:00+05:30'), NaN),
+    ).toEqual([]);
+  });
+});
