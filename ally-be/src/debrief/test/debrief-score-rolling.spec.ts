@@ -1,6 +1,10 @@
 import { DEBRIEF_QUALITY_DIMENSIONS } from '../../analytics/constants/debrief-quality.constants';
 import { defaultOwnerSettings } from '../constants/debrief-owner-settings.constants';
-import { dimsOf } from '../service/debrief-score.service';
+import {
+  dimsOf,
+  toScoredRun,
+  uncoveredClearCue,
+} from '../service/debrief-score.service';
 import {
   mondays,
   qualityBreakdown,
@@ -117,5 +121,70 @@ describe('the quality score in detail', () => {
       ]),
     ).toEqual({ tone: 8 });
     expect(dimsOf(null)).toBeNull();
+  });
+});
+
+describe('the risk gate: a clear cue the learner was shown without', () => {
+  const run = (over: Record<string, unknown>) =>
+    toScoredRun({
+      status: 'below_bar',
+      has_cards: true,
+      judged: true,
+      quality: 9,
+      hard_fails: [],
+      shown: true,
+      risk_cues: [],
+      important_moment: null,
+      ...over,
+    });
+
+  it('counts a clear cue the important moment does not cover', () => {
+    expect(
+      uncoveredClearCue([{ turn_index: 4, strength: 'clear' }], {
+        turn_index: 9,
+      }),
+    ).toBe(true);
+    // A cue with no strength is clear, as in ally-ai.
+    expect(uncoveredClearCue([{ turn_index: 4 }], null)).toBe(true);
+  });
+
+  it('never counts a possible cue, nor a clear one the moment or its others cover', () => {
+    // Prod 2026-11-13, f8f12995: three clear cues, all in the important moment; two possible ones flagged.
+    const cues = [
+      { turn_index: 4, strength: 'clear' },
+      { turn_index: 6, strength: 'possible' },
+      { turn_index: 15, strength: 'clear' },
+      { turn_index: 19, strength: 'possible' },
+      { turn_index: 22, strength: 'clear' },
+    ];
+    const moment = {
+      turn_index: 22,
+      others: [{ turn_index: 4 }, { turn_index: 15 }],
+    };
+    expect(uncoveredClearCue(cues, moment)).toBe(false);
+    expect(
+      uncoveredClearCue([{ turn_index: 12, strength: 'possible' }], null),
+    ).toBe(false);
+  });
+
+  it("no longer reads the Evaluator's old review reason", () => {
+    // Prod 2026-11-13, ef76926b: one possible cue, held as missed_risk_cue on release 7.
+    expect(
+      run({ risk_cues: [{ turn_index: 12, strength: 'possible' }] })
+        .missedClearRiskCue,
+    ).toBe(false);
+  });
+
+  it("also counts the judge's own missed clear risk cue, and only on a debrief the learner was shown", () => {
+    expect(
+      run({ hard_fails: [{ code: 'missed_risk_cue' }] }).missedClearRiskCue,
+    ).toBe(true);
+    expect(
+      run({
+        shown: false,
+        status: 'failed',
+        risk_cues: [{ turn_index: 1, strength: 'clear' }],
+      }).missedClearRiskCue,
+    ).toBe(false);
   });
 });
