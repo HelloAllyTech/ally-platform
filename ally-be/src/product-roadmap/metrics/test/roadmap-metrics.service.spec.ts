@@ -154,6 +154,52 @@ describe('RoadmapMetricsService', () => {
     ]);
   });
 
+  it('leaves ideas the cutover filed out of the review times', async () => {
+    const query = jest.fn(async (sql: string) => {
+      const rows = respond(sql);
+      if (
+        sql.includes('FROM "roadmap_opportunities" o') &&
+        sql.includes('drafted')
+      ) {
+        return [
+          ...rows,
+          {
+            id: 'o3',
+            createdAt: '2026-11-10T00:00:00Z',
+            reviewState: 'accepted',
+            reviewedAt: '2026-11-15T00:00:00Z',
+            stage: 'prioritised',
+            releasedAt: null,
+            builderSessionId: null,
+            source: 'migrated_builder_session',
+            sessionCreatedAt: null,
+            drafted: null,
+            planClosed: false,
+            planningStartedAt: null,
+            externalBuildAt: null,
+          },
+        ];
+      }
+      return rows;
+    });
+    const service = new RoadmapMetricsService({ query } as any);
+    const result = await service.compute({ from, to, amberDays: 5, now });
+    const stage = result.stages.find((s) => s.key === 'submitted_accepted');
+    expect(stage).toMatchObject({ n: 1, medianMs: 86_400_000 });
+    expect(result.reviewWait.n).toBe(1);
+    expect(result.funnel.filedWithoutDraft).toBe(2);
+  });
+
+  it('reads timestamp-without-time-zone columns as UTC', async () => {
+    const { service, query } = make();
+    await service.compute({ from, to, amberDays: 5, now });
+    const sql = query.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(sql).toContain(`(o."createdAt" AT TIME ZONE 'UTC') AS "createdAt"`);
+    expect(sql).toContain(
+      `(s."createdAt" AT TIME ZONE 'UTC') AS "sessionCreatedAt"`,
+    );
+  });
+
   it('never selects a decline reason, a transcript or a draft text', async () => {
     const { service, query } = make();
     await service.compute({ from, to, amberDays: 5, now });

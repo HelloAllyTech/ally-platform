@@ -41,6 +41,14 @@ const MEASURED_VERDICTS = ['hit', 'partial', 'miss'];
  * is never an Owner. Reads no transcript, no decline reason, no draft text: a
  * private draft is counted, and its spend is listed by code with no title.
  */
+/**
+ * Read a `timestamp without time zone` column as the UTC instant it stores. node-postgres
+ * otherwise parses those as the server's local time, which skews every duration measured against
+ * a `timestamptz` column (`reviewedAt`, `plan_events.at`) by the host's offset: 5.5 hours on an
+ * IST laptop, nothing on a UTC container.
+ */
+const UTC = (expr: string): string => `(${expr} AT TIME ZONE 'UTC')`;
+
 @Injectable()
 export class RoadmapMetricsService {
   constructor(private readonly dataSource: DataSource) {}
@@ -79,9 +87,9 @@ export class RoadmapMetricsService {
    */
   private async timelines(range: { from: Date; to: Date }) {
     const opportunities: Row[] = await this.dataSource.query(
-      `SELECT o.id, o."createdAt", o."reviewState", o."reviewedAt", o.stage,
-              o."releasedAt", o."builderSessionId",
-              s."createdAt" AS "sessionCreatedAt",
+      `SELECT o.id, ${UTC('o."createdAt"')} AS "createdAt", o."reviewState", o."reviewedAt",
+              o.stage, ${UTC('o."releasedAt"')} AS "releasedAt", o."builderSessionId", o.source,
+              ${UTC('s."createdAt"')} AS "sessionCreatedAt",
               (s.kind = 'plan' AND s.plan ? 'draftVersion') AS drafted,
               COALESCE(jsonb_typeof(s.plan->'closed') = 'object', false)
                 AS "planClosed",
@@ -100,7 +108,7 @@ export class RoadmapMetricsService {
     );
     // Discarded drafts are hard-deleted and cannot be counted (P8-NOTES).
     const drafts: Row[] = await this.dataSource.query(
-      `SELECT s.id, s."createdAt"
+      `SELECT s.id, ${UTC('s."createdAt"')} AS "createdAt"
          FROM "builder_sessions" s
         WHERE s.kind = 'plan' AND s.plan ? 'draftVersion'
           AND s."createdAt" >= $1 AND s."createdAt" < $2`,
@@ -134,7 +142,7 @@ export class RoadmapMetricsService {
         : Promise.resolve([]),
       sessionIds.length
         ? this.dataSource.query(
-            `SELECT "sessionId", min("createdAt") AS "firstRunAt"
+            `SELECT "sessionId", ${UTC('min("createdAt")')} AS "firstRunAt"
                FROM "builder_build_runs"
               WHERE "sessionId" = ANY($1::uuid[])
               GROUP BY "sessionId"`,
@@ -143,7 +151,7 @@ export class RoadmapMetricsService {
         : Promise.resolve([]),
       opportunityIds.length
         ? this.dataSource.query(
-            `SELECT "opportunityId", min("createdAt") AS "firstPrAt"
+            `SELECT "opportunityId", ${UTC('min("createdAt")')} AS "firstPrAt"
                FROM "item_linked_prs"
               WHERE "opportunityId" = ANY($1::uuid[])
               GROUP BY "opportunityId"`,
@@ -170,6 +178,7 @@ export class RoadmapMetricsService {
 
     const ideas: IdeaTimeline[] = opportunities.map((o) => {
       const sessionId = o.builderSessionId ? String(o.builderSessionId) : '';
+      const migrated = o.source === 'migrated_builder_session';
       const e = eventsBy.get(sessionId) ?? {};
       const externalBuildAt = earliest(
         date(e.externalBuildAt),
@@ -178,8 +187,10 @@ export class RoadmapMetricsService {
       return {
         capturedAt: o.drafted === true ? date(o.sessionCreatedAt) : null,
         submittedAt: date(o.createdAt),
-        reviewState: reviewStateOf(o.reviewState),
-        reviewedAt: date(o.reviewedAt),
+        // The cutover accepts what it files for a live Builder session (P6): nobody waited for a
+        // review, so those rows read as unreviewed legacy ones, out of the review-wait times.
+        reviewState: migrated ? null : reviewStateOf(o.reviewState),
+        reviewedAt: migrated ? null : date(o.reviewedAt),
         planningAt: earliest(
           date(e.planningAt),
           date(o.planningStartedAt),
@@ -222,7 +233,7 @@ export class RoadmapMetricsService {
   }): Promise<PolicyLogRow[]> {
     const rows: Row[] = await this.dataSource.query(
       `SELECT kind, mode, decision, outcome, healthy, service,
-              COALESCE("finishedAt", "createdAt") AS at
+              ${UTC('COALESCE("finishedAt", "createdAt")')} AS at
          FROM "release_policy_log"
         WHERE ((kind = 'decision' AND decision = 'held')
                OR (kind = 'observed_release'
