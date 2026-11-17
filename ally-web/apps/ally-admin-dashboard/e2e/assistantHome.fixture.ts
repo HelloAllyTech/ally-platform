@@ -389,21 +389,12 @@ export async function mockAssistantHome(
       const parts = [
         { layer: "business", text: "# Who you are\nYou are Asha.\n", owner: true },
         { layer: "tone", text: "Your tone: warm.\n", owner: true },
-        {
-          layer: "safety",
-          text: "# Safety rules\n- Never diagnose.\n- Never Talk about prices for other clinics\n\n",
-          owner: false,
-        },
-        {
-          layer: "base",
-          text: "Answer only from the passages, cite each one, and say plainly when you don't know.",
-          owner: false,
-        },
+        // Ally's layers arrive with no text (17 Nov 2026).
+        { layer: "safety", text: "", owner: false },
+        { layer: "base", text: "", owner: false },
       ];
       return json(route, {
-        full: parts.map(p => p.text).join(""),
         parts,
-        placeholders: { question: "(the visitor's message)", passages: "" },
         search: { top_k: 8, max_passages: 5, min_similarity: 0.35, searches: 2, documents: 5 },
         purpose: "answer",
         safetyPack: "mental_health",
