@@ -393,7 +393,11 @@ export class PlanIdeaService {
     now = new Date(),
   ): Promise<{ archived: number; purged: number }> {
     const settings = await this.settings.get();
-    if (!settings.enabled) return { archived: 0, purged: 0 };
+    // Roadmap v2's drafts (P3) are the same private plan sessions and expire
+    // the same way (§4.4), so the sweep also runs while roadmap_v2 is on.
+    if (!settings.enabled && !(await this.settings.getRoadmapV2()).enabled) {
+      return { archived: 0, purged: 0 };
+    }
     const drafts = await this.store.repository
       .createQueryBuilder('s')
       .addSelect('s.plan')

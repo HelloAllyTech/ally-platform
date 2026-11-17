@@ -79,6 +79,23 @@ export class RoadmapRoleService {
   }
 
   /**
+   * Everyone who may lead an idea (D11: a Builder, or an Owner): the Builder
+   * and Manage toggles' holders, confirmed one by one like `owners()`.
+   */
+  async leadCandidates(): Promise<number[]> {
+    const ids = [
+      ...new Set([
+        ...(await this.toggles.listEnabledHolderIds(FeatureToggleKey.BUILDER)),
+        ...(await this.toggles.listEnabledHolderIds(
+          FeatureToggleKey.PRODUCT_ROADMAP_MANAGE,
+        )),
+      ]),
+    ];
+    const roles = await Promise.all(ids.map((id) => this.roleOf(id)));
+    return ids.filter((_, i) => roles[i] === 'builder' || roles[i] === 'owner');
+  }
+
+  /**
    * The people who will become Builder and Owner at cutover (§3.3), for the
    * Owner to confirm before the switch: Builder gains merge rights on real
    * code. Builder and Manage are granted per person, so their rows are the

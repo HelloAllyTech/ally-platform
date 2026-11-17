@@ -122,6 +122,11 @@ import {
 import { ReleasePolicySchedulerRegistrationService } from './service/release-policy-scheduler-registration.service';
 import { AwsModule } from 'src/aws/aws.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
+import { RoadmapDraftController } from './draft/roadmap-draft.controller';
+import { RoadmapDraftService } from './draft/roadmap-draft.service';
+import { RoadmapDictationService } from './draft/roadmap-dictation.service';
+import { RoadmapReviewController } from './review/roadmap-review.controller';
+import { RoadmapReviewService } from './review/roadmap-review.service';
 
 /**
  * Product Roadmap — the internal vote-based prioritisation board, rebuilt from the standalone
@@ -224,6 +229,9 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
   controllers: [
     // Roadmap v2 (plans/roadmap-builder-merge): 404 while roadmap_v2 is off.
     RoadmapItemController,
+    // P3: New idea, drafts, dictation, review and the lead.
+    RoadmapDraftController,
+    RoadmapReviewController,
     RoadmapOpportunityController,
     RoadmapCollaborationController,
     RoadmapAdminController,
@@ -238,6 +246,10 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     // Roadmap v2's read model and its inline edits (P2).
     RoadmapItemReadService,
     RoadmapItemEditService,
+    // Roadmap v2 P3: drafts, dictation, review and the lead.
+    RoadmapDraftService,
+    RoadmapDictationService,
+    RoadmapReviewService,
     // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
     PlanSessionStore,
     PlanStageService,

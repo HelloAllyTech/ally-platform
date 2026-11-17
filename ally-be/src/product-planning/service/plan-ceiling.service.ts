@@ -26,7 +26,9 @@ export type PlanSpendPoint =
   | 'design_run'
   | 'build_dispatch'
   | 'pr_automation'
-  | 'phase_boundary';
+  | 'phase_boundary'
+  /** Dictation on a shared idea's answer or comment box (D9). */
+  | 'dictation';
 
 export interface PlanCeilingState {
   sessionId: string;

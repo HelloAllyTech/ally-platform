@@ -67,6 +67,25 @@ export interface PlanRecord {
    */
   ceilingUsd?: number | null;
 
+  /**
+   * Roadmap v2 (P3): the draft's code, allocated from the opportunity code
+   * sequence when New idea creates the session, and kept by the opportunity
+   * Submit creates. Unique among plan sessions (migration 1983300000000).
+   */
+  code?: string;
+  /** Roadmap v2 draft page: the idea as the author has written it (autosaved). */
+  draftText?: string;
+  /** Roadmap v2 draft page: the product goal the author picked (roadmap_product_goals.id). */
+  draftGoalId?: string | null;
+  /** Bumps on every autosave, for the page's stale-write check. */
+  draftVersion?: number;
+  /** Set by Submit (P3): false until Start planning is pressed (P3b). */
+  planningStarted?: boolean;
+  planningStartedAt?: string | null;
+  planningStartedBy?: number | null;
+  /** Questions whose answers conflict and wait for the settler (P3b), for the read model. */
+  openConflicts?: number;
+
   /** Last stage written, with when — mirrors the planStage column. */
   lastStage?: PlanStage;
 }
@@ -85,6 +104,18 @@ export interface PlanIdeaState {
   /** Minted by the copilot over that exact draft and brief. */
   readinessToken?: string | null;
   lastTurnAt?: string;
+
+  // ── Roadmap v2 draft page (P3) ──
+  /** Verbatim words that met each check, keyed by check id (Check my idea, §4.13). */
+  evidence?: Record<string, string>;
+  /** The copilot's goal suggestion from the same turn (§4.11), a product goal name. */
+  suggestedGoal?: string | null;
+  /** Checks the author reopened with "Not quite"; cleared by the next turn. */
+  reopened?: string[];
+  /** "Fill it in yourself": the author's own five answers, keyed by check id. */
+  selfCheck?: Record<string, string> | null;
+  /** Failed copilot turns in a row; two offer Fill it in yourself. */
+  turnFailures?: number;
 }
 
 export type PlanImpactTagId =

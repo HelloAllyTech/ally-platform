@@ -1772,6 +1772,24 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configPath: 'openai.transcriptionModel',
   },
   {
+    id: 'roadmap-dictation',
+    task: LlmTask.ROADMAP_DICTATION,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Someone presses the mic on a Roadmap v2 draft, answer box or comment box and stops talking',
+    detail:
+      'One call per clip, capped at 2 minutes (and 10MB) before it is sent; mixed Hindi–English ' +
+      'is expected, so the language is auto-detected. The words come back as editable text and ' +
+      'are never sent on their own. Same OpenAI transcription path as the scribe voice note. A ' +
+      "draft's clips count against its $1 idea-stage cap (refused at the cap); a shared idea's " +
+      'against its plan ceiling. Audio is never stored.',
+    kind: AiTaskKind.TRANSCRIPTION,
+    provider: 'openai',
+    defaultModel: 'whisper-1',
+    configuredBy: 'OPENAI_TRANSCRIPTION_MODEL',
+    configPath: 'openai.transcriptionModel',
+  },
+  {
     id: 'roadmap-idea-transcribe',
     task: LlmTask.TRANSCRIPTION,
     runtime: LlmRuntime.ALLY_BE,
@@ -2202,7 +2220,9 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'guard. Filing itself moved to the opportunity copilot (its own row). The standalone ' +
       'readiness check, review and enhance calls were removed with the blank filing form. ' +
       "Goal-impact assessment re-runs when an idea's text changes, whether from the drawer or " +
-      "from Roadmap v2's inline edit (PATCH /v1/roadmap/items/:code), which reuses the same update path.",
+      "from Roadmap v2's inline edit (PATCH /v1/roadmap/items/:code), which reuses the same update path. " +
+      "Roadmap v2 reuses the duplicate check twice more: a draft page's Similar ideas (GET /v1/roadmap/drafts/:code/similar, " +
+      "debounced by the client after typing stops) and the Owner's triage pane (GET /v1/roadmap/items/:code/similar).",
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
@@ -2233,11 +2253,15 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     task: LlmTask.ROADMAP_OPPORTUNITY_COPILOT,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'Someone files a roadmap opportunity — every turn of the "New opportunity" conversation',
+      'Someone files a roadmap opportunity — every turn of the "New opportunity" conversation, ' +
+      "and (Roadmap v2) Check my idea and every reply on a private draft's page",
     detail:
       'A tool loop per turn: up to 8 research passes (the board, user-interview notes, the ' +
       'Analytics Agent, UX signals, Bug Hunter findings, repo docs, GitHub code and wiki, ' +
-      'First Principles from the Context Library), then a structured turn — question, readiness verdicts, draft and brief. One ' +
+      'First Principles from the Context Library), then a structured turn — question, readiness verdicts, draft and brief. ' +
+      'On the Roadmap v2 draft page the same submit_turn also returns, per met check, the verbatim words that met it, ' +
+      'and a product-goal suggestion — structured output of this call, never a second call. Each draft turn is priced ' +
+      'into the plan spend ledger at the idea stage ($1 wrap-up cap). One ' +
       'llm_usage row per pass. Two cached system blocks: a product map (repos, admin ' +
       'surfaces, the head of each Builder knowledge pack, the wiki and repo-docs index — ' +
       '~10k tokens, re-rendered at most every 30 min) and the Vision & strategy page, goals ' +

@@ -306,6 +306,9 @@ export enum LlmTask {
   // loop (research, then a structured turn). Tagged with metadata.iteration so
   // a turn's passes can be summed.
   ROADMAP_OPPORTUNITY_COPILOT = 'roadmap_opportunity_copilot',
+  // Roadmap v2 dictation (D9): one short clip from the mic on the draft page or
+  // an answer/comment box, transcribed to editable text.
+  ROADMAP_DICTATION = 'roadmap_dictation',
   // Track 2.0 quiz: grading one open-ended learner answer against its rubric.
   TRACK_QUIZ_GRADING = 'track_quiz_grading',
   TRANSLATE_SCENARIO = 'translate_scenario',

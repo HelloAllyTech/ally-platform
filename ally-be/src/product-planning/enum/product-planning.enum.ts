@@ -53,6 +53,16 @@ export enum PlanEventKind {
    * lead or planned month. `detail` is { field, from?, to? }.
    */
   ITEM_EDITED = 'item_edited',
+  /** The Owner accepted, declined or reopened a submitted idea (D10). detail: { decision, undo? }. */
+  REVIEWED = 'reviewed',
+  /** The Owner picked or changed the lead (D11). detail: { from, to }. */
+  LEAD_ASSIGNED = 'lead_assigned',
+  /** The lead handed the idea back to the Owner (D11). detail: { note? }. */
+  LEAD_HANDED_BACK = 'lead_handed_back',
+  /** Start planning: the plan interview begins in the same session (§2.1a). */
+  PLANNING_STARTED = 'planning_started',
+  /** "Use this answer": the settler chose between conflicting answers (D13). */
+  ANSWER_SETTLED = 'answer_settled',
 }
 
 /** What a plan notification says (plan_notifications.kind). */

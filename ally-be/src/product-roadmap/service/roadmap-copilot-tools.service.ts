@@ -106,7 +106,12 @@ export class RoadmapCopilotToolsService {
    * Research tools first, `submit_turn` last — a stable order, because the tool list sits in
    * front of the cached system prefix and any reordering invalidates it.
    */
-  getToolDefinitions(): AgentToolDefinition[] {
+  getToolDefinitions(options?: { checks?: boolean }): AgentToolDefinition[] {
+    const tools = this.baseToolDefinitions();
+    return options?.checks ? withCheckEvidence(tools) : tools;
+  }
+
+  private baseToolDefinitions(): AgentToolDefinition[] {
     return [
       {
         name: 'search_roadmap',
@@ -838,3 +843,56 @@ const bound = (serialised: string): string =>
   serialised.length <= ROADMAP_COPILOT.TOOL_RESULT_MAX_CHARS
     ? serialised
     : `${serialised.slice(0, ROADMAP_COPILOT.TOOL_RESULT_MAX_CHARS)}… [truncated — narrow the lookup]`;
+
+/**
+ * Roadmap v2's Check my idea (§4.13, §5.7b): the SAME `submit_turn`, asking
+ * for two more things in the same structured answer — the verbatim words
+ * that met each check, and a goal suggestion — so the draft page shows its
+ * evidence without a second model call. Only the v2 draft page passes
+ * `checks`; every other caller gets the schema exactly as before.
+ */
+function withCheckEvidence(
+  tools: AgentToolDefinition[],
+): AgentToolDefinition[] {
+  return tools.map((tool) => {
+    if (tool.name !== COPILOT_SUBMIT_TOOL) return tool;
+    const schema = tool.input_schema as {
+      properties: Record<string, any>;
+      required?: string[];
+    };
+    const gates = schema.properties.gates;
+    return {
+      ...tool,
+      input_schema: {
+        ...schema,
+        properties: {
+          ...schema.properties,
+          gates: {
+            ...gates,
+            items: {
+              ...gates.items,
+              properties: {
+                ...gates.items.properties,
+                evidence: {
+                  type: 'string',
+                  description:
+                    'For a met criterion: the exact words that meet it, copied verbatim (no ' +
+                    'paraphrase, no ellipsis) from the idea as written or from one of the ' +
+                    "admin's answers — a phrase or one sentence. Empty string when not met.",
+                },
+              },
+            },
+          },
+          suggestedGoal: {
+            type: 'string',
+            nullable: true,
+            description:
+              'The product goal this idea most likely serves — exactly one of the product goal ' +
+              'names, chosen from what is written so far even before the criteria are met — or ' +
+              'null when none fits.',
+          },
+        },
+      },
+    };
+  });
+}

@@ -292,11 +292,12 @@ describe('PlanIdeaService', () => {
     );
   });
 
-  it('does nothing while planning is switched off', async () => {
+  it('does nothing while planning and roadmap_v2 are both switched off', async () => {
     const { service, deps } = build({
       deps: {
         settings: {
           get: jest.fn(async () => ({ enabled: false })),
+          getRoadmapV2: jest.fn(async () => ({ enabled: false })),
           assertEnabled: jest.fn(),
         },
       },
@@ -304,6 +305,20 @@ describe('PlanIdeaService', () => {
     expect(await service.sweepExpiry()).toEqual({ archived: 0, purged: 0 });
     expect(await service.migrateIdeaDrafts()).toBe(0);
     expect(deps.store.repository.createQueryBuilder).not.toHaveBeenCalled();
+  });
+
+  it('sweeps drafts while roadmap_v2 is on even with planning off', async () => {
+    const { service, deps } = build({
+      deps: {
+        settings: {
+          get: jest.fn(async () => ({ enabled: false })),
+          getRoadmapV2: jest.fn(async () => ({ enabled: true })),
+          assertEnabled: jest.fn(),
+        },
+      },
+    });
+    await service.sweepExpiry();
+    expect(deps.store.repository.createQueryBuilder).toHaveBeenCalled();
   });
 
   it('rejects an empty idea', async () => {
