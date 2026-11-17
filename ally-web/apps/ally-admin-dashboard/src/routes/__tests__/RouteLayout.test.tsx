@@ -138,13 +138,14 @@ describe("RouteLayout", () => {
     }
   });
 
-  it("opens an assistant at /assistants/:id in the assistants' own space (A1)", () => {
+  it("opens an assistant at /assistants/:id edge to edge, inside the admin sidebar", () => {
     privateLayoutCalls.props.length = 0;
     window.history.pushState({}, "", "/assistants/bot-1?section=lists");
     render(<RouteLayout />);
     expect(screen.getByText("AssistantHomePage")).toBeInTheDocument();
-    const last = privateLayoutCalls.props.at(-1) as { shell?: string };
-    expect(last.shell).toBe("assistants");
+    const last = privateLayoutCalls.props.at(-1) as { shell?: string; fullBleed?: boolean };
+    expect(last.fullBleed).toBe(true);
+    expect(last.shell).toBeUndefined();
   });
 
   it("has no sign-up: /signup and /sign-up go to the login screen (A1)", () => {

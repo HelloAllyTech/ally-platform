@@ -129,8 +129,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
   const { track } = useAnalytics();
 
   const isHoverExpandEnabled = features?.includes(FeatureToggleKey.SIDEBAR_HOVER_EXPAND);
-  // Assistants are reached from here since Chatbots left the navigation (A1).
-  const hasChatbots = Boolean(features?.includes(FeatureToggleKey.WHATSAPP_BOT));
 
   const [isHovered, setIsHovered] = useState(false);
   const [isPinned, setIsPinned] = useState(() => {
@@ -447,6 +445,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return location.pathname.includes(ROUTES.PRODUCT_ROADMAP);
       case ROUTES.SETTINGS:
         return location.pathname.includes(ROUTES.SETTINGS);
+      // The list, each assistant and onboarding (`/assistants/new`).
+      case ROUTES.WHATSAPP_BOT:
+        return (
+          location.pathname === ROUTES.WHATSAPP_BOT ||
+          location.pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`)
+        );
       default:
         return false;
     }
@@ -597,19 +601,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
                 <ManageAccounts />
                 <span>{en.auth.profileSettings}</span>
               </button>
-              {hasChatbots && (
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    handleNavigation(ROUTES.WHATSAPP_BOT);
-                  }}
-                  data-testid="sidebar-your-assistants"
-                  className="flex flex-row items-center w-full px-4 py-2 gap-2 text-left text-sm text-typography-900 hover:bg-background-secondary"
-                >
-                  <Chat size={20} />
-                  <span>{en.assistantsShell.yourAssistants}</span>
-                </button>
-              )}
               <button
                 onClick={handleLogout}
                 className="flex flex-row items-center w-full px-4 py-2 gap-2 text-left text-sm text-typography-900 hover:bg-background-secondary transition-colors"

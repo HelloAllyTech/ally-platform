@@ -64,11 +64,11 @@ Two decisions changed the plan during planning (Shehbaz):
 ## 4. Assistants out of Ally admin; custom logins
 
 **The assistants area is `/assistants`** (`ROUTES.WHATSAPP_BOT`, `CHATBOT_DETAIL`, `CHATBOT_NEW*`).
-- It uses `PrivateLayout shell="assistants"`: a slim `AssistantsHeader` with "Your assistants" and an account menu (profile, Ally admin when they have anything there, sign out), and no Ally admin navigation. The assistant switcher stays in each assistant's own header, beside its name.
+- It sits in the normal admin layout, with the Sidebar. (A1 first gave it a slim `AssistantsHeader` and no navigation; that was dropped after A1.) The assistant switcher stays in each assistant's own header, beside its name.
 - `/chatbots`, `/chatbots/*`, `/whatsapp-bot` and `/inbox` redirect, keeping the sub-path, query and hash.
 - Internal links moved: MemoryPanel, StepFrame and the email link in ally-be. Others use the route constants.
 
-**Chatbots left the nav.** People who also have Ally admin reach their assistants from the Sidebar's account menu ("Your assistants").
+**Assistants is a Sidebar item** for anyone with Chatbots. A login whose only feature is Chatbots (`isChatbotsOnly` in `utils/navigation.ts`) sees just that one item.
 
 **Custom logins** (Ally admin → Users → Ally admins):
 - **Create a custom login:** name, email, organisation, and "What can they use?", every toggle in the registry with Chatbots first and ticked. Saving runs the existing routes in order:
@@ -111,7 +111,6 @@ The screens follow the toggles, so the UI shows only Chatbots. A custom login wi
   - `database/scripts/backfill-chatbot-owners.ts`;
   - `chatbot/service/test/settings-moved-to-owners.spec.ts`.
 - **ally-web** (`apps/ally-admin-dashboard/src`):
-  - `components/assistants-shell/AssistantsHeader.tsx`;
   - `routes/{PrivateLayout,PublicRoute,DefaultRedirect,RouteLayout}.tsx`;
   - `utils/loginRedirect.ts`;
   - `pages/AssistantHome/{NoAccess.tsx,userLists/HandOverAbility.tsx}`;
@@ -127,7 +126,7 @@ The screens follow the toggles, so the UI shows only Chatbots. A custom login wi
 - **Playwright at 1440:** `E2E_BASE_URL=http://localhost:8091 npx playwright test -c apps/ally-admin-dashboard/playwright.config.ts assistantsAccess --project=desktop`, with `npx vite --port 8091` running. 5 passed:
   - logged out → login → back to the deep link;
   - `/signup` → login;
-  - a Chatbots-only login lands on `/assistants` with no sidebar, and Users refuses it;
+  - a Chatbots-only login lands on `/assistants` with Assistants as its one Sidebar item, and Users refuses it;
   - an old `/chatbots/:id?section=` link redirects;
   - no access.
 - **Gotcha:** that Vite server also opens its HMR socket on `[::1]:8081`, which hides the Docker admin on `localhost:8081` ("Upgrade Required"). Stop it after the run.

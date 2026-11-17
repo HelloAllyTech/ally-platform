@@ -12,7 +12,6 @@ import {
   useGetCharacterLibraryEnabledQuery,
 } from "@api";
 import { Sidebar, AccessDenied, ErrorBoundary } from "@components";
-import { AssistantsHeader } from "@components/assistants-shell";
 import { NotificationBell } from "@components/notification-bell/NotificationBell";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
@@ -65,11 +64,6 @@ interface PrivateLayoutProps {
    * onboarding, chunk 20d).
    */
   fullBleed?: boolean;
-  /**
-   * Which frame the page sits in. `assistants` (A1) is the assistants area's own slim space: a
-   * header with Your assistants and the account menu, and no Ally admin navigation.
-   */
-  shell?: "admin" | "assistants";
 }
 
 export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
@@ -81,7 +75,6 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   requiredOrgToggle,
   allowedEmails,
   fullBleed = false,
-  shell = "admin",
 }) => {
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
@@ -282,20 +275,6 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
       )}
     </ErrorBoundary>
   );
-
-  // The assistants area (A1): its own slim header, no Ally admin navigation.
-  if (shell === "assistants") {
-    return (
-      <div className="flex h-dvh flex-col bg-white" data-testid="assistants-shell">
-        <AssistantsHeader />
-        <main
-          className={`relative min-h-0 flex-1 overflow-y-auto ${fullBleed ? "" : "p-4 lg:p-6"}`}
-        >
-          {content}
-        </main>
-      </div>
-    );
-  }
 
   // The preview routes render bare, with no shell to preserve — but a crash
   // there used to blank the page just the same, so they get the barrier too.

@@ -1561,16 +1561,12 @@ export const en = {
     loadingTracks: "Loading tracks...",
     noTracks: "No tracks available — a superadmin can upload them in Settings.",
   },
-  // A1: the assistants area's own slim space, out of Ally admin's navigation.
   assistantsShell: {
-    yourAssistants: "Your assistants",
-    allyAdmin: "Ally admin",
-    signOut: "Sign out",
     noAccess: "You don't have access to this assistant. Ask its owner to add you.",
     toYourAssistants: "Go to your assistants",
   },
   whatsappBot: {
-    navLabel: "AI Chatbots",
+    navLabel: "Assistants",
     title: "AI Chatbots",
     // Chunk 20d-2: the list page in the owner's words (deck §25): assistants, not chatbots.
     subtitle:

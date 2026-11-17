@@ -24,10 +24,6 @@ vi.mock("@components", async importOriginal => {
   };
 });
 
-vi.mock("@components/assistants-shell", () => ({
-  AssistantsHeader: () => <div data-testid="assistants-header">Your assistants</div>,
-}));
-
 vi.mock("@components/notification-bell/NotificationBell", () => ({
   NotificationBell: () => null,
 }));
@@ -164,7 +160,7 @@ describe("PrivateLayout", () => {
             <Route
               path="/assistants/:botId"
               element={
-                <PrivateLayout shell="assistants">
+                <PrivateLayout>
                   <div>Assistant</div>
                 </PrivateLayout>
               }
@@ -178,7 +174,7 @@ describe("PrivateLayout", () => {
     );
   });
 
-  it("draws the assistants area in its own slim space, with no Ally admin navigation (A1)", () => {
+  it("draws the assistants area inside the admin sidebar, like every other page", () => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
     render(
       <Provider store={mockStore}>
@@ -187,7 +183,7 @@ describe("PrivateLayout", () => {
             <Route
               path="/assistants"
               element={
-                <PrivateLayout shell="assistants">
+                <PrivateLayout>
                   <div>Your list</div>
                 </PrivateLayout>
               }
@@ -196,10 +192,8 @@ describe("PrivateLayout", () => {
         </MemoryRouter>
       </Provider>,
     );
-    expect(screen.getByTestId("assistants-shell")).toBeInTheDocument();
-    expect(screen.getByTestId("assistants-header")).toBeInTheDocument();
     expect(screen.getByText("Your list")).toBeInTheDocument();
-    expect(screen.queryByText("Sidebar")).not.toBeInTheDocument();
+    expect(screen.getByText("Sidebar")).toBeInTheDocument();
   });
 
   it("renders children when authenticated and has permissions", () => {

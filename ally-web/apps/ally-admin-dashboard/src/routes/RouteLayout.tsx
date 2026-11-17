@@ -113,7 +113,7 @@ export const ChatbotsLegacyRedirect: React.FC = () => {
  * an old `?view=classic` link opens the home, and its `tab=` still lands on the right section.
  */
 const ChatbotDetailRoute: React.FC = () => (
-  <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed shell="assistants">
+  <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
     <AssistantHome />
   </PrivateLayout>
 );
@@ -751,11 +751,7 @@ export const RouteLayout: React.FC = () => {
           path={ROUTES.WHATSAPP_BOT}
           element={
             // Full bleed, as the assistant home: the page draws its own background to the edges.
-            <PrivateLayout
-              requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
-              fullBleed
-              shell="assistants"
-            >
+            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
               <WhatsAppBot />
             </PrivateLayout>
           }
@@ -768,7 +764,6 @@ export const RouteLayout: React.FC = () => {
               requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
               requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
               fullBleed
-              shell="assistants"
             >
               <OnboardingStart />
             </PrivateLayout>
@@ -781,7 +776,6 @@ export const RouteLayout: React.FC = () => {
               requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
               requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
               fullBleed
-              shell="assistants"
             >
               <OnboardingSession />
             </PrivateLayout>

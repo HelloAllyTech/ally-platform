@@ -204,8 +204,7 @@ describe("deriveNavigationItems", () => {
     expect(ids).toContain(SIDEBAR_ITEMS.USER_BADGES);
     expect(ids).toContain(SIDEBAR_ITEMS.ANALYTICS);
     expect(ids).toContain(SIDEBAR_ITEMS.SCENARIO_LANGUAGES);
-    // Chatbots left Ally admin's navigation in A1 (assistants have their own space).
-    expect(ids).not.toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
+    expect(ids).toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
     expect(ids).toContain(SIDEBAR_ITEMS.BUG_HUNTER);
   });
 
@@ -319,14 +318,27 @@ describe("deriveNavigationItems", () => {
     expect(ids).not.toContain(SIDEBAR_ITEMS.DEBRIEFS);
   });
 
-  it("never shows Chatbots in Ally admin's navigation, even to a holder of the toggle (A1)", () => {
+  it("shows a Chatbots-only login (a custom login) just the Assistants item", () => {
+    // It holds the platform-admin role's permissions, which would otherwise surface every
+    // permission-gated tab.
     const result = deriveNavigationItems({
-      permissions: [],
+      permissions: Object.values(Permissions),
       features: [FeatureToggleKey.WHATSAPP_BOT],
       savedOrder: undefined,
     });
-    expect(result.find(i => i.id === SIDEBAR_ITEMS.WHATSAPP_BOT)).toBeUndefined();
-    expect(result.find(i => i.path === ROUTES.WHATSAPP_BOT)).toBeUndefined();
+    expect(result.map(i => [i.id, i.path, i.label])).toEqual([
+      [SIDEBAR_ITEMS.WHATSAPP_BOT, ROUTES.WHATSAPP_BOT, "Assistants"],
+    ]);
+  });
+
+  it("adds Assistants to everything else for a holder of Chatbots and other features", () => {
+    const ids = deriveNavigationItems({
+      permissions: Object.values(Permissions),
+      features: [FeatureToggleKey.WHATSAPP_BOT, FeatureToggleKey.ANALYTICS],
+      savedOrder: undefined,
+    }).map(i => i.id);
+    expect(ids).toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
+    expect(ids).toContain(SIDEBAR_ITEMS.ANALYTICS);
   });
 
   // Both halves are required, like Simulation Studio: Course Copilot is deliberately not in

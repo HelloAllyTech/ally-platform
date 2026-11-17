@@ -179,9 +179,20 @@ const buildNavigationItems = (): NavigationItem[] => [
     label: en.contextLibrary.navLabel,
     path: ROUTES.CONTEXT_LIBRARY,
   },
-  // AI Chatbots left Ally admin's navigation in A1: assistants are their own space at
-  // `/assistants`, reached from the account menu ("Your assistants") or straight after login.
+  {
+    id: SIDEBAR_ITEMS.WHATSAPP_BOT,
+    label: en.whatsappBot.navLabel,
+    path: ROUTES.WHATSAPP_BOT,
+  },
 ];
+
+/**
+ * A login whose only feature is Chatbots, as a custom login with just Chatbots ticked is. It holds
+ * the platform-admin role's permissions, so the permission-gated tabs would otherwise show; its
+ * sidebar is the one Assistants item, and it lands there after login.
+ */
+export const isChatbotsOnly = (features: string[] | undefined): boolean =>
+  Boolean(features?.length) && features!.every(key => key === FeatureToggleKey.WHATSAPP_BOT);
 
 /**
  * Returns `items` reordered to follow `savedOrder` (a list of item ids).
@@ -241,6 +252,9 @@ export const deriveNavigationItems = ({
   orgToggles?: Partial<Record<OrgToggle, boolean>>;
 }): NavigationItem[] => {
   const navigationItems = buildNavigationItems();
+  if (isChatbotsOnly(features)) {
+    return navigationItems.filter(item => item.id === SIDEBAR_ITEMS.WHATSAPP_BOT);
+  }
   const featureGatedItems = buildSidebarItemFeatureKeyMap(SIDEBAR_ITEMS);
   const orgGatedItems = buildSidebarItemOrgToggleMap(SIDEBAR_ITEMS);
   const hasPermissions = Boolean(permissions && permissions.length > 0);

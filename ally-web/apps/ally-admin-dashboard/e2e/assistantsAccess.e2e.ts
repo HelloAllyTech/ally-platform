@@ -5,7 +5,7 @@ import { BOT_ID, mockAssistantHome } from "./assistantHome.fixture";
 /**
  * A1 smoke, at 1440 only: logged out → a deep link → the login screen (no sign-up) → back on the
  * deep link; and a custom login whose only feature is Chatbots lands on its assistants, in the
- * slim space with no Ally admin navigation. The API is mocked; no backend is needed.
+ * sidebar with Assistants as its only page. The API is mocked; no backend is needed.
  */
 test.skip(({ viewport }) => (viewport?.width ?? 0) < 1000, "A1's smoke runs at 1440 only");
 
@@ -61,8 +61,7 @@ test("logged out: a deep link goes to login (no sign-up), then back to the deep 
 
   await logIn(page);
   await expect(page).toHaveURL(new RegExp(`/assistants/${BOT_ID}\\?section=lists&tool=memory$`));
-  await expect(page.getByTestId("assistants-header")).toBeVisible();
-  await expect(page.getByTestId("admin-sidebar")).toHaveCount(0);
+  await expect(page.getByTestId("admin-sidebar")).toBeVisible();
 });
 
 test("sign-up links go to the login screen", async ({ page }) => {
@@ -78,8 +77,10 @@ test("a Chatbots-only custom login lands on its assistants and sees nothing else
   await page.goto("/login");
   await logIn(page);
   await expect(page).toHaveURL(/\/assistants$/);
-  await expect(page.getByTestId("assistants-header")).toBeVisible();
-  await expect(page.getByTestId("admin-sidebar")).toHaveCount(0);
+  // The sidebar, with Assistants as its one page.
+  const nav = page.getByTestId("admin-sidebar").locator("nav li");
+  await expect(nav).toHaveCount(1);
+  await expect(nav).toContainText("Assistants");
 
   // Ally admin's pages refuse it: Users needs a toggle it doesn't have.
   await page.goto("/user-management");
