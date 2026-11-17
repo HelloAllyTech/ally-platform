@@ -10,9 +10,9 @@
  */
 import { useSyncExternalStore } from "react";
 
-import type { Transition } from "framer-motion";
+import { BUILDER_DURATION, BUILDER_EASING } from "./builderMotion";
 
-import { BUILDER_DURATION, BUILDER_EASING, prefersReducedMotion } from "./builderMotion";
+import type { Transition } from "framer-motion";
 
 export const MOTION_DURATION_MS = {
   instant: 70,
@@ -124,16 +124,30 @@ export const setReduceMotionSwitch = (on: boolean): void => {
   listeners.forEach(listener => listener());
 };
 
+/**
+ * The OS setting. Defensive where Builder's `prefersReducedMotion` isn't: a stubbed or missing
+ * `matchMedia` (jsdom, old embedded browsers) reads as "no preference" instead of throwing.
+ */
+const osPrefersReducedMotion = (): boolean => {
+  try {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+  } catch {
+    return false;
+  }
+};
+
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
   const onStorage = (event: StorageEvent) => {
     if (event.key === REDUCE_MOTION_STORAGE_KEY) listener();
   };
   window.addEventListener("storage", onStorage);
-  let media: MediaQueryList | null = null;
-  if (typeof window.matchMedia === "function") {
-    media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    media.addEventListener?.("change", listener);
+  let media: MediaQueryList | null | undefined = null;
+  try {
+    media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    media?.addEventListener?.("change", listener);
+  } catch {
+    media = null;
   }
   return () => {
     listeners.delete(listener);
@@ -144,7 +158,8 @@ const subscribe = (listener: () => void) => {
 
 /** True when either the OS asks for less motion or the in-app switch is on. Read fresh each time. */
 export const isMotionReduced = (): boolean =>
-  prefersReducedMotion() || (memoryFallback ?? getReduceMotionSwitch());
+  typeof window !== "undefined" &&
+  (osPrefersReducedMotion() || (memoryFallback ?? getReduceMotionSwitch()));
 
 /** Hook form of {@link isMotionReduced}; re-renders when either source changes. */
 export const useReducedMotionPreference = (): boolean =>
