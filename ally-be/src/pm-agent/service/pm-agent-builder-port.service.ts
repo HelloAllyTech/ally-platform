@@ -10,10 +10,7 @@ import { PM_AGENT_REQUESTER } from 'src/builder/util/builder-requesters.registry
 import type { BuilderTechnicalDesignStatus } from 'src/builder/type/builder-prd.type';
 import { RoadmapOpportunityRepository } from 'src/product-roadmap/repository/roadmap-opportunity.repository';
 import { RoadmapProductGoalRepository } from 'src/product-roadmap/repository/roadmap-taxonomy.repository';
-import {
-  RoadmapOpportunityStage,
-  RoadmapOpportunityType,
-} from 'src/product-roadmap/enum/roadmap-opportunity.enum';
+import { RoadmapOpportunityType } from 'src/product-roadmap/enum/roadmap-opportunity.enum';
 import { PrdPatchOp } from '../util/compile-plan';
 
 export interface PmBuilderSessionView {
@@ -226,7 +223,6 @@ export class PmAgentBuilderPort {
       { id: created.id, builderSessionId: IsNull() },
       {
         builderSessionId: sessionId,
-        stage: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
         updatedBy: userId,
       },
     );

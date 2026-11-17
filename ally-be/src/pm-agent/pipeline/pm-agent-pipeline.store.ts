@@ -236,7 +236,6 @@ export class PmAgentPipelineStore implements PmPipelineStore {
           stage: In([
             RoadmapOpportunityStage.NEW,
             RoadmapOpportunityStage.PRIORITISED,
-            RoadmapOpportunityStage.UNDER_DEVELOPMENT,
             RoadmapOpportunityStage.RELEASED,
           ]),
         },
