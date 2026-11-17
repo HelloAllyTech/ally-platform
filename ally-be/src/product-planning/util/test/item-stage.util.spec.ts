@@ -163,6 +163,7 @@ describe('deriveItemStage', () => {
           prdPercent: 70,
           openQuestions: 2,
           designAwaitingApproval: false,
+          externalBuild: null,
         },
       });
     });
@@ -196,6 +197,7 @@ describe('deriveItemStage', () => {
         prdPercent: null,
         openQuestions: 0,
         designAwaitingApproval: false,
+        externalBuild: null,
       });
     });
   });
@@ -235,39 +237,81 @@ describe('deriveItemStage', () => {
       });
     });
 
-    it('is building in Claude Code once the brief is sent, waiting for a PR', () => {
-      const parts = derive({
-        plan: plan({ leadUserId: 7, designApproved: true }),
-        build: {
-          externalBuild: { byUserId: 7, at: '2026-11-10T00:00:00.000Z' },
-          repos: [],
-          openPrs: [],
-          mergedPrs: 0,
-          releasing: false,
-          heldReason: null,
+    const sent = { byUserId: 7, at: '2026-11-10T00:00:00.000Z' };
+    const external = (over: { openPrs?: number[]; mergedPrs?: number }) => ({
+      externalBuild: sent,
+      repos: [],
+      openPrs: (over.openPrs ?? []).map((number) => ({
+        number,
+        ci: 'pending' as const,
+      })),
+      mergedPrs: over.mergedPrs ?? 0,
+      releasing: false,
+      heldReason: null,
+    });
+
+    it('stays Ready to build, "Brief sent to Claude Code", until a PR exists', () => {
+      expect(
+        derive({
+          plan: plan({ leadUserId: 7, designApproved: true, prdReady: true }),
+          build: external({}),
+        }),
+      ).toEqual({
+        shownStage: 'planning',
+        statusParts: {
+          stage: 'planning',
+          step: 'ready',
+          leadUserId: 7,
+          prdPercent: null,
+          openQuestions: 0,
+          designAwaitingApproval: false,
+          externalBuild: sent,
         },
-      }).statusParts;
-      expect(parts).toMatchObject({
-        stage: 'building',
-        where: 'claude_code',
-        waitingForPr: true,
       });
     });
 
-    it('stops waiting once a PR carrying the code appears', () => {
+    it('is Building in Claude Code once a PR carrying the code appears', () => {
       expect(
         derive({
           plan: plan({ leadUserId: 7, designApproved: true }),
-          build: {
-            externalBuild: { byUserId: 7, at: '2026-11-10T00:00:00.000Z' },
-            repos: ['ally-be'],
-            openPrs: [{ number: 9, ci: 'pending' }],
-            mergedPrs: 0,
-            releasing: false,
-            heldReason: null,
-          },
+          build: { ...external({ openPrs: [9] }), repos: ['ally-be'] },
         }).statusParts,
-      ).toMatchObject({ where: 'claude_code', waitingForPr: false });
+      ).toEqual({
+        stage: 'building',
+        where: 'claude_code',
+        leadUserId: 7,
+        externalBuild: sent,
+        repos: ['ally-be'],
+        openPrs: [{ number: 9, ci: 'pending' }],
+        mergedPrs: 0,
+        waitingForPr: false,
+        releasing: false,
+        heldReason: null,
+      });
+      expect(
+        derive({
+          plan: plan({ leadUserId: 7, designApproved: true }),
+          build: external({ mergedPrs: 1 }),
+        }).statusParts,
+      ).toMatchObject({ stage: 'building', where: 'claude_code' });
+    });
+
+    it('a PR without a sent brief does not make an idea Building', () => {
+      expect(
+        derive({
+          plan: plan({ leadUserId: 7, designApproved: true }),
+          build: { ...external({ openPrs: [9] }), externalBuild: null },
+        }).shownStage,
+      ).toBe('planning');
+    });
+
+    it('a run here wins over Claude Code', () => {
+      expect(
+        derive({
+          plan: plan({ leadUserId: 7, buildStarted: true }),
+          build: external({}),
+        }).statusParts,
+      ).toMatchObject({ stage: 'building', where: 'here' });
     });
 
     it('shows merged-and-releasing and a held release', () => {

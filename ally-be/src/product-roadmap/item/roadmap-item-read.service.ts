@@ -1161,7 +1161,11 @@ export class RoadmapItemReadService {
       entries.push([c.opp.starredById, 'owner']);
     }
     const parts = c.stage.statusParts;
-    if (parts.stage === 'building' && parts.externalBuild) {
+    // "Brief sent to Claude Code by …" (planning) and "Building in Claude Code" both name the sender.
+    if (
+      (parts.stage === 'building' || parts.stage === 'planning') &&
+      parts.externalBuild
+    ) {
       entries.push([parts.externalBuild.byUserId, 'builder']);
     }
     if (parts.stage === 'closed' && parts.byUserId) {
