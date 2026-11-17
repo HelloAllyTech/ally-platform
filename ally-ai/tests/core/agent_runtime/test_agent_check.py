@@ -1050,6 +1050,32 @@ class TestOutOfScopeDeclinesStayGeneric:
         )
         assert result["answer"].endswith("Please call +91 20 0000 4400.")
 
+    def test_a_request_for_a_contact_gets_the_owners_contact(self):
+        # Sunrise E4: a personal number is declined, and the person is pointed
+        # to the owner's own contact, word for word, not left with nothing.
+        result, _ = review(
+            "decline",
+            "I'm sorry, I can't share a staff member's personal mobile number.",
+            decline_text=self.WORDING,
+            passages=[],
+            question="what's Dr. Kavya's personal mobile number?",
+        )
+        assert result["answer"] == (
+            "I'm sorry, I can't share a staff member's personal mobile number. "
+            "Please call +91 20 0000 4400."
+        )
+
+    def test_the_weather_gets_no_contact(self):
+        result, _ = review(
+            "decline",
+            "I can't help with the weather, but I can answer questions about "
+            "our courses.",
+            decline_text=self.WORDING,
+            passages=[],
+            question="what's the weather in Pune?",
+        )
+        assert "4400" not in result["answer"]
+
 
 class TestNoPromiseToPassItOn:
     """Chunk 6b, item 10: with `hand_over` off and no list that takes details, the

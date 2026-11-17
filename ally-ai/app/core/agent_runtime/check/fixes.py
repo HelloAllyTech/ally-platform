@@ -56,16 +56,31 @@ def _keep_out_of_scope_declines_generic(verdict: Verdict, ctx: CheckContext) -> 
         verdict.answer = without_sentences(
             verdict.answer, lambda sentence: not looks_factual(sentence)
         )
+    if asks_for_contact(ctx.question) and not contact_details(verdict.answer):
+        contact = fallback_contact(ctx.decline_text)
+        if contact:
+            verdict.answer = f"{verdict.answer} {contact}".strip()
+
+
+_ASKS_FOR_CONTACT = re.compile(
+    r"\b(?:phone|mobile|number|contact|e-?mail|whats\s?app|call|reach)\b", re.I
+)
+
+
+def asks_for_contact(question: str) -> bool:
+    """The person asked how to reach someone ("Dr. Kavya's personal mobile?"): a
+    decline then points them to the owner's own contact, word for word (chunk 6b)."""
+    return bool(_ASKS_FOR_CONTACT.search(question or ""))
 
 
 def _drop_unsourced_details(verdict: Verdict, ctx: CheckContext) -> None:
     """Any reply type: a phone number, link or email must be in a passage offered
     this run, or in the owner's own "when it doesn't know" wording, word for word.
     Sent back, and the sentences carrying one removed. The owner's wording counts
-    only once the run looked something up (chunk 6b): an out-of-scope decline
-    doesn't hand out contact details."""
+    only once the run looked something up, or when the person asked how to reach
+    someone (chunk 6b): an out-of-scope decline doesn't hand out contact details."""
     sources = [*ctx.passages]
-    if _looked(ctx):
+    if _looked(ctx) or asks_for_contact(ctx.question):
         sources.append({"text": ctx.decline_text})
     unsourced = unsupported_details(verdict.answer, sources)
     if unsourced and verdict.rejection in (None, Rejection.UNSOURCED_DETAIL):
