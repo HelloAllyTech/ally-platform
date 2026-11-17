@@ -62,6 +62,7 @@ export const ApiEndpoints = {
     AI_TASKS: "/v1/llm/tasks",
     LLM_MODEL_CATALOG_BY_ID: (id: string) => `/v1/llm/catalog/${id}`,
     PREVIEW_LLM_MODEL: (id: string) => `/v1/llm-preview/model/${id}`,
+    PREVIEW_PROMPT: "/v1/llm-preview/prompt",
     UPDATE_LLM_CONFIG: (id: string) => `/v1/learn/llm-configs/${id}`,
     SCENARIO_LANGUAGES: "/v1/learn/scenario-languages",
     GET_LANGUAGES: "/v1/language",

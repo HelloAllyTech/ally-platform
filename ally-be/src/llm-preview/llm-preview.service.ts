@@ -32,6 +32,24 @@ const PREVIEW_MAX_TOKENS = 32;
 /** AI-task-registry row id; the key for this call's config and reporting. */
 const AI_TASK_ID = 'llm-preview';
 
+/**
+ * Output cap for "test this prompt": longer than the one-word preview because
+ * the point is to read a realistic reply, still bounded so a runaway reply costs
+ * little. On gpt-5-family models the cap also counts reasoning tokens.
+ */
+export const PROMPT_TEST_MAX_TOKENS = 1024;
+/** More generous than the one-word preview: a real prompt takes real time. */
+export const PROMPT_TEST_TIMEOUT_MS = 60_000;
+
+export interface PromptTestInput {
+  modelId: string;
+  /** The prompt text being edited, sent as the system instruction. */
+  promptText: string;
+  /** Stand-in for the user turn (or the variable block the prompt expects). */
+  sampleInput?: string;
+  temperature?: number;
+}
+
 export interface LlmPreviewResponse extends LlmPreviewResult {
   configName: string;
   provider: string;
@@ -85,6 +103,33 @@ export class LlmPreviewService {
     };
   }
 
+  /**
+   * Run an EDITED, unsaved prompt against a sample on a catalog model.
+   *
+   * Nothing is stored: the admin sees what the prompt would do before saving it.
+   * Same contract as the other previews — misconfiguration raises, a vendor
+   * rejection comes back as data, and the model is never substituted.
+   */
+  async previewPrompt(input: PromptTestInput): Promise<LlmPreviewResponse> {
+    const row = (await this.llmModelService.getCatalog()).find(
+      (model) => model.id === input.modelId,
+    );
+    if (!row) {
+      throw new NotFoundException('Model not found');
+    }
+    return {
+      ...(await this.run(row.provider, row.model, input.temperature, {
+        system: input.promptText,
+        prompt: input.sampleInput?.trim() || 'Begin.',
+        maxTokens: PROMPT_TEST_MAX_TOKENS,
+        timeoutMs: PROMPT_TEST_TIMEOUT_MS,
+      })),
+      configName: row.label,
+      provider: row.provider,
+      model: row.model,
+    };
+  }
+
   async previewConfig(configId: string): Promise<LlmPreviewResponse> {
     const config = await this.llmConfigService.getConfigById(configId);
     if (!config) {
@@ -115,6 +160,12 @@ export class LlmPreviewService {
     provider: string,
     model: string,
     temperature?: number,
+    overrides?: {
+      system?: string;
+      prompt: string;
+      maxTokens: number;
+      timeoutMs: number;
+    },
   ): Promise<LlmPreviewResult> {
     const normalised = assertPreviewable(provider, model);
 
@@ -140,10 +191,11 @@ export class LlmPreviewService {
         // otherwise serve the task.
         provider: normalised,
         model,
-        prompt: PREVIEW_PROMPT,
-        maxTokens: PREVIEW_MAX_TOKENS,
+        system: overrides?.system,
+        prompt: overrides?.prompt ?? PREVIEW_PROMPT,
+        maxTokens: overrides?.maxTokens ?? PREVIEW_MAX_TOKENS,
         temperature,
-        timeoutMs: PREVIEW_TIMEOUT_MS,
+        timeoutMs: overrides?.timeoutMs ?? PREVIEW_TIMEOUT_MS,
       });
 
       return {

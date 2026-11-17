@@ -32,6 +32,8 @@ interface ProviderConfigRegistryProps {
   onDelete: (id: string) => Promise<void>;
   /** Optional live check; omitted by registries that have nothing to test. */
   onTest?: (id: string) => Promise<ProviderConfigTestResult>;
+  /** Hide the page heading when the registry is a tab inside another page. */
+  hideTitle?: boolean;
 }
 
 /**
@@ -53,6 +55,7 @@ export const ProviderConfigRegistry: React.FC<ProviderConfigRegistryProps> = ({
   onSave,
   onDelete,
   onTest,
+  hideTitle = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
@@ -114,9 +117,11 @@ export const ProviderConfigRegistry: React.FC<ProviderConfigRegistryProps> = ({
 
   return (
     <div className="py-[2px] font-primary overflow-hidden relative">
-      <div className="flex items-center gap-3 pb-4 md:pb-6">
-        <h1 className="text-2xl text-typography-900 font-secondary">{title}</h1>
-      </div>
+      {!hideTitle && (
+        <div className="flex items-center gap-3 pb-4 md:pb-6">
+          <h1 className="text-2xl text-typography-900 font-secondary">{title}</h1>
+        </div>
+      )}
 
       <ListToolbar
         searchValue={searchQuery}

@@ -27,6 +27,11 @@ vi.mock("../PrivateLayout", () => ({
     return <>{props.children}</>;
   },
 }));
+// The shell (sidebar, palette) has its own suite; here it is just the layout route's outlet.
+vi.mock("../AdminShell", async () => {
+  const { Outlet } = await import("react-router-dom");
+  return { AdminShell: () => <Outlet /> };
+});
 vi.mock("../PublicRoute", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -100,6 +105,12 @@ vi.mock("@pages", () => ({
   CourseCopilotSessions: () => <div>CourseCopilotSessionsPage</div>,
   CourseCopilotNew: () => <div>CourseCopilotNewPage</div>,
   CourseCopilotSession: () => <div>CourseCopilotSessionPage</div>,
+}));
+
+// Onboarding pulls in the QR-code library; the router only needs the two entry components.
+vi.mock("../../pages/Onboarding", () => ({
+  OnboardingStart: () => <div>OnboardingStartPage</div>,
+  OnboardingSession: () => <div>OnboardingSessionPage</div>,
 }));
 
 // The assistant home (chunk 20d) stands in for its real page, which needs the store.
@@ -338,9 +349,13 @@ describe("RouteLayout", () => {
     expect(screen.getByText("DefaultRedirectPage")).toBeInTheDocument();
   });
 
-  it("redirects unknown route to Simulation Studio", () => {
+  it("shows a 404 with a link home for an unknown route, instead of redirecting", () => {
     window.history.pushState({}, "", "/unknown-path");
     render(<RouteLayout />);
-    expect(screen.getByText("RolePlaysPage")).toBeInTheDocument();
+    expect(screen.queryByText("RolePlaysPage")).not.toBeInTheDocument();
+    expect(screen.getByTestId("admin-not-found")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to your home page" })).toHaveAttribute("href", "/");
+    expect(window.location.pathname).toBe("/unknown-path");
+    expect(document.title).toBe("Page not found · Ally Admin");
   });
 });

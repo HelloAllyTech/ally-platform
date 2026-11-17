@@ -34,6 +34,7 @@ import {
   TranslationJob,
   TranslationLanguageProgress,
   TranslationProgressToast,
+  PublishBlockers,
 } from "@components";
 import { ButtonVariant } from "@components/types";
 import {
@@ -113,6 +114,19 @@ const getMandatoryFieldIds = () => {
   });
   return mandatoryFields;
 };
+
+const MANDATORY_FIELD_LABELS = new Map<string, string>(
+  SIMULATION_CREATOR_FIELD_GROUPS.flatMap(group =>
+    group.fields
+      .filter(
+        field => field.isMandatory && typeof (field as { label?: unknown }).label === "string",
+      )
+      .map(field => [field.id, (field as { label: string }).label] as [string, string]),
+  ),
+);
+
+const humanizeFieldId = (id: string) =>
+  id.replace(/([A-Z])/g, " $1").replace(/^./, ch => ch.toUpperCase());
 
 const isOverviewMandatoryValueFilled = (fieldId: string, value: unknown): boolean => {
   if (value instanceof FileList) {
@@ -469,9 +483,9 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   const formValues = watch();
 
   // Custom validation to check if all mandatory fields are filled
-  const areAllMandatoryFieldsFilled = useMemo(() => {
+  const missingMandatoryFieldIds = useMemo(() => {
     const mandatoryFieldIds = getMandatoryFieldIds();
-    return mandatoryFieldIds.every(fieldId => {
+    const isFilled = (fieldId: string): boolean => {
       const value = formValues[fieldId];
       if (isEmpty(value)) return false;
       if (Array.isArray(value) && value.length === 0) return false;
@@ -499,8 +513,20 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           return false;
       }
       return true;
-    });
+    };
+    return mandatoryFieldIds.filter(fieldId => !isFilled(fieldId));
   }, [formValues]);
+  const areAllMandatoryFieldsFilled = missingMandatoryFieldIds.length === 0;
+
+  // "What is blocking publish": the same check as the disabled Publish button, in words.
+  const publishBlockers = useMemo(
+    () =>
+      missingMandatoryFieldIds.map(id => ({
+        id,
+        message: `Fill in "${MANDATORY_FIELD_LABELS.get(id) ?? humanizeFieldId(id)}"`,
+      })),
+    [missingMandatoryFieldIds],
+  );
 
   const overviewMissingMandatoryLabels = useMemo(
     () => getMissingOverviewMandatoryLabels(formValues as Record<string, unknown>),
@@ -1575,6 +1601,10 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           )}
         </div>
       </div>
+
+      {!viewMode && publishBlockers.length > 0 && (
+        <PublishBlockers blockers={publishBlockers} className="mx-4 mt-3" />
+      )}
 
       {/* Memory mapping in progress. Page-level, not only next to the prompt
           picker, so it is seen from any tab, and it says how long and what is

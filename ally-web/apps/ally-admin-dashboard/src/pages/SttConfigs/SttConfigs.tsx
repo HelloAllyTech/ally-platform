@@ -16,7 +16,7 @@ import { PROVIDER_CONFIG_COLUMNS, STT_PROVIDER_OPTIONS, STT_PROVIDER_SCHEMA } fr
  * Editing a row changes behaviour everywhere it's referenced, which is the
  * point: a model bump is one edit rather than one per language.
  */
-export const SttConfigs: React.FC = () => {
+export const SttConfigs: React.FC<{ hideTitle?: boolean }> = ({ hideTitle }) => {
   const { data: sttConfigs = [], isFetching } = useGetSttConfigsQuery();
   const [createSttConfig] = useCreateSttConfigMutation();
   const [updateSttConfig] = useUpdateSttConfigMutation();
@@ -40,6 +40,7 @@ export const SttConfigs: React.FC = () => {
   return (
     <ProviderConfigRegistry
       title="Speech Recognition"
+      hideTitle={hideTitle}
       subject="STT config"
       configs={sttConfigs}
       isFetching={isFetching}

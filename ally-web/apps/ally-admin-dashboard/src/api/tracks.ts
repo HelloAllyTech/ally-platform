@@ -265,6 +265,7 @@ export const {
   useGetTracksQuery,
   useGetTrackByIdQuery,
   useLazyGetTrackByIdQuery,
+  useLazyGetTracksQuery,
   useCreateTrackMutation,
   useUpdateTrackByIdMutation,
   useUpdateTrackStructureMutation,

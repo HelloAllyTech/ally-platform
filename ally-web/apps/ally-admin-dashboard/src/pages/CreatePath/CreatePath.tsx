@@ -20,6 +20,7 @@ import {
   Button,
   SimulationSelectionModal,
   CreateSimulationSubSection,
+  AutosaveIndicator,
 } from "@components";
 import { ButtonVariant } from "@components/types";
 import {
@@ -30,7 +31,7 @@ import {
   PathStepperList,
   getCreatePathSubSectionById,
 } from "@constants";
-import { useDebounce } from "@hooks";
+import { useAutosaveDraft, useDebounce } from "@hooks";
 import { GetScenarioType } from "@types";
 import {
   extractValidData,
@@ -115,7 +116,8 @@ export const CreatePath: FC = () => {
       // Check if value exists and is not empty
       if (isEmpty(value)) return false;
 
-      if (Array.isArray(value)) return !isNonEmptyArray(value);
+      // A non-empty array satisfies a mandatory array field (this was inverted).
+      if (Array.isArray(value)) return isNonEmptyArray(value);
 
       if (value instanceof FileList && value.length === 0) return false;
 
@@ -123,6 +125,31 @@ export const CreatePath: FC = () => {
     });
     return allMandatoryFormFieldsFilled && formValues?.scenarios?.length > 1; // at least one simulation is required
   }, [formValues]);
+
+  // Autosave: only an existing DRAFT with a title and at least one edit. A published or archived
+  // item is never autosaved (saving as draft would unpublish or unarchive it), and a brand-new
+  // item is left to the explicit Save so autosave never creates records.
+  const { status: autosaveStatus, savedAt: autosavedAt } = useAutosaveDraft({
+    storageKey: `path-draft:${pathId ?? "new"}`,
+    value: formValues,
+    enabled:
+      !!pathId &&
+      individualPath?.status === SimulationStatus.DRAFT &&
+      !!formValues?.title &&
+      isNonEmptyObject(dirtyFields),
+    delayMs: 3000,
+    persistLocal: false,
+    save: async values => {
+      const result: any = await updateSimulationPathByIdQuery({
+        id: pathId as string,
+        data: {
+          ...extractValidData(PATH_CREATOR_FIELD_GROUPS, values),
+          status: SimulationStatus.DRAFT,
+        },
+      });
+      if (result?.error) throw new Error("autosave failed");
+    },
+  });
 
   const toggleSimulationModal = () => {
     setShowSimulationModal(prev => !prev);
@@ -319,6 +346,10 @@ export const CreatePath: FC = () => {
         showPreview={false}
         type="Track"
       />
+
+      <div className="flex justify-end px-4 min-h-[18px]">
+        <AutosaveIndicator status={autosaveStatus} savedAt={autosavedAt} />
+      </div>
 
       <div className="flex flex-col md:flex-row md:h-[calc(100vh-100px)]">
         <VerticalStepper

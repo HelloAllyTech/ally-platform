@@ -21,7 +21,10 @@ const post: BlogPost = {
   updatedAt: "2026-10-01T00:00:00Z",
 };
 
-const renderPanel = (selectedBlog: BlogPost | null, onSave = vi.fn().mockResolvedValue(undefined)) => {
+const renderPanel = (
+  selectedBlog: BlogPost | null,
+  onSave = vi.fn().mockResolvedValue(undefined),
+) => {
   render(
     <Provider store={store}>
       <MemoryRouter>
@@ -59,7 +62,30 @@ describe("BlogSidePanel cover colour", () => {
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({ coverColor: "#565045", tags: ["Engineering"] }),
       false,
+      false,
     );
     expect(onSave.mock.calls[0][0]).not.toHaveProperty("category");
+  });
+});
+
+describe("BlogSidePanel save buttons", () => {
+  const published: BlogPost = { ...post, status: "PUBLISHED" };
+
+  it("does not call the unpublish action 'Save as draft' on a published post", () => {
+    renderPanel(published);
+    expect(screen.queryByRole("button", { name: "Save as draft" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Unpublish and save as draft" })).toBeInTheDocument();
+  });
+
+  it("'Save and keep editing' keeps a published post published and leaves the panel open", () => {
+    const onSave = renderPanel(published);
+    fireEvent.click(screen.getByRole("button", { name: "Save and keep editing" }));
+    expect(onSave).toHaveBeenCalledWith(expect.anything(), true, true);
+  });
+
+  it("'Save and keep editing' on a draft stays a draft", () => {
+    const onSave = renderPanel(post);
+    fireEvent.click(screen.getByRole("button", { name: "Save and keep editing" }));
+    expect(onSave).toHaveBeenCalledWith(expect.anything(), false, true);
   });
 });

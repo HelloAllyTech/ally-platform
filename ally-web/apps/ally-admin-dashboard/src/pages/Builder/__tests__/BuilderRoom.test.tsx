@@ -196,6 +196,24 @@ describe("BuilderRoom", () => {
     expect(screen.getByText("Writing code")).toBeInTheDocument();
   });
 
+  it("shows the six Builder sub-pages as visible links, not only in the ⋯ menu", () => {
+    renderRoom();
+
+    const nav = screen.getByTestId("builder-subpages");
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .map(link => link.getAttribute("href")),
+    ).toEqual([
+      "/builder/sessions",
+      "/builder/pipeline",
+      "/builder/scoreboard",
+      "/builder/knowledge",
+      "/builder/eval",
+      "/builder/settings",
+    ]);
+  });
+
   it("links the header to First Principles in the Context Library", () => {
     renderRoom();
     expect(

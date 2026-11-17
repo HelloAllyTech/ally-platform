@@ -137,12 +137,31 @@ export const GuardrailsManagement: React.FC = () => {
         if (columnId === "active") updatePayload.active = value;
       }
 
+      // Saves are instant, so the only way back from a slip is an Undo that puts
+      // the previous values back. One toast id per guardrail so a run of edits
+      // replaces the toast instead of stacking them.
+      const previous = Object.fromEntries(
+        (Object.keys(updatePayload) as Array<keyof UpdateConversationalGuardrailInput>).map(key => [
+          key,
+          (item as any)[key],
+        ]),
+      ) as UpdateConversationalGuardrailInput;
+
       try {
         const response: any = await updateGuardrail({ id: item.id, guardrail: updatePayload });
         if (response.error) {
           toast.error("Failed to update guardrail");
+        } else {
+          toast.success(`Saved "${item.name}"`, {
+            id: `guardrail-saved-${item.id}`,
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void updateGuardrail({ id: item.id, guardrail: previous });
+              },
+            },
+          });
         }
-        // else toast.success("Guardrail updated"); // Optional toast to avoid spam on typing
       } catch {
         toast.error("Failed to update guardrail");
       }
@@ -160,7 +179,7 @@ export const GuardrailsManagement: React.FC = () => {
     // active=false). Skip them and warn rather than failing the whole batch.
     const deletableIds = ids.filter(id => !guardrails.find(g => g.id === id)?.mandatory);
     if (deletableIds.length < ids.length) {
-      toast.error("System guardrails cannot be deleted and were skipped.");
+      toast.error("System guardrails cannot be deactivated and were skipped.");
     }
     if (deletableIds.length === 0) {
       setShowDeleteConfirmationPopup(false);
@@ -175,16 +194,23 @@ export const GuardrailsManagement: React.FC = () => {
       const hasError = results.some((r: any) => r.error);
 
       if (hasError) {
-        toast.error("Failed to delete some guardrails");
+        toast.error("Failed to deactivate some guardrails");
       } else {
-        toast.success(`Successfully deleted ${deletableIds.length} guardrail(s)`);
+        toast.success(`Deactivated ${deletableIds.length} guardrail(s)`, {
+          action: {
+            label: "Undo",
+            onClick: () => {
+              deletableIds.forEach(id => void updateGuardrail({ id, guardrail: { active: true } }));
+            },
+          },
+        });
         setShowDeleteConfirmationPopup(false);
         setSelectedGuardrails([]);
         setIsSidePanelOpen(false);
         setSelectedGuardrail(null);
       }
     } catch {
-      toast.error("Failed to delete guardrails");
+      toast.error("Failed to deactivate guardrails");
     }
   };
 
@@ -217,7 +243,7 @@ export const GuardrailsManagement: React.FC = () => {
   const listToolbarAction = useMemo(() => {
     return selectedGuardrails.length > 0
       ? {
-          label: en.common.delete, // "Delete"
+          label: "Deactivate",
           variant: ButtonVariant.SECONDARY,
           icon: (
             <div className="w-3 h-3">
@@ -287,10 +313,10 @@ export const GuardrailsManagement: React.FC = () => {
           <ActionConfirmationPopup
             isOpen={showDeleteConfirmationPopup}
             onClose={() => setShowDeleteConfirmationPopup(false)}
-            title={`Delete ${selectedGuardrails.length > 1 ? "guardrails" : "guardrail"}`}
-            description={`Are you sure you want to delete ${selectedGuardrails.length} item(s)?`}
+            title={`Deactivate ${selectedGuardrails.length > 1 ? "guardrails" : "guardrail"}`}
+            description={`Deactivate ${selectedGuardrails.length} item(s)? They stop applying to conversations but are kept, and you can turn them back on from the Active column.`}
             primaryButton={{
-              label: en.common.delete,
+              label: "Deactivate",
               onClick: () =>
                 handleDeleteGuardrails(selectedGuardrails.map(g => g.id.value || g.id)),
               variant: ButtonVariant.DESTRUCTIVE,

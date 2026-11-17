@@ -83,38 +83,30 @@ describe("AllyConsole", () => {
     expect(screen.getByText(/control room for Ally/)).toBeInTheDocument();
   });
 
-  it("offers the twelve tabs, in order", () => {
+  it("groups the twelve tabs into Monitor, Release and Configure", () => {
     renderAt();
 
     expect(
-      [
-        "overview",
-        "conversations",
-        "releases",
-        "playground",
-        "evals",
-        "alerts",
-        "baseline",
-        "configuration",
-        "library",
-        "advice",
-        "settings",
-        "crisis-copy",
-      ].map(id => screen.getByTestId(`tab-${id}`).textContent),
-    ).toEqual([
-      "Overview",
-      "Conversations",
-      "Releases",
-      "Playground",
-      "Evals",
-      "Alerts",
-      "Baseline",
-      "Configuration",
-      "Library",
-      "Advice",
-      "Settings",
-      "Crisis copy",
-    ]);
+      ["monitor", "release", "configure"].map(id => screen.getByTestId(`group-${id}`).textContent),
+    ).toEqual(["Monitor", "Release", "Configure"]);
+    // Monitor is open: its four tabs, in order, and none of the others.
+    expect(
+      ["overview", "conversations", "alerts", "baseline"].map(
+        id => screen.getByTestId(`tab-${id}`).textContent,
+      ),
+    ).toEqual(["Overview", "Conversations", "Alerts", "Baseline"]);
+    expect(screen.queryByTestId("tab-releases")).not.toBeInTheDocument();
+  });
+
+  it("opens the group that holds a linked tab", () => {
+    renderAt("/ally?tab=crisis-copy");
+
+    expect(screen.getByTestId("group-configure")).toHaveAttribute("aria-pressed", "true");
+    expect(
+      ["configuration", "settings", "crisis-copy", "library", "advice"].map(
+        id => screen.getByTestId(`tab-${id}`).textContent,
+      ),
+    ).toEqual(["Configuration", "Settings", "Crisis copy", "Library", "Advice"]);
   });
 
   it("hides the Playground tab from an admin who cannot edit, since the server would refuse every run", () => {
@@ -166,7 +158,7 @@ describe("AllyConsole", () => {
   });
 
   it("puts the chosen tab in the address, so a link opens exactly there", () => {
-    renderAt();
+    renderAt("/ally?tab=evals");
 
     fireEvent.click(screen.getByTestId("tab-releases"));
 

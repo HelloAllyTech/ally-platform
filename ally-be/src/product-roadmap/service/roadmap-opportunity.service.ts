@@ -76,6 +76,7 @@ import {
   normaliseFilingInterview,
   normaliseOpportunityBrief,
 } from '../util/roadmap-brief.util';
+import { normaliseStage } from '../util/roadmap-stage.util';
 import { RoadmapGoalImpactService } from './roadmap-goal-impact.service';
 import { RoadmapStrategyGoalService } from './roadmap-strategy-goal.service';
 import { RoadmapVectorService } from './roadmap-vector.service';
@@ -585,8 +586,10 @@ export class RoadmapOpportunityService {
     }
 
     if (dto.stage !== undefined) {
-      patch.stage = dto.stage;
-      patch.releasedAt = this.resolveReleasedAt(existing, dto.stage);
+      // Retired stage: a stale client resubmitting `under_development` lands on Prioritised.
+      const nextStage = normaliseStage(dto.stage);
+      patch.stage = nextStage;
+      patch.releasedAt = this.resolveReleasedAt(existing, nextStage);
     }
 
     if (

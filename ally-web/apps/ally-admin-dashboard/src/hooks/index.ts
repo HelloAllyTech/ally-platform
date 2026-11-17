@@ -1,6 +1,8 @@
 import { imageJobStore, isImageSettled } from "./imageStudioJobStore";
+import { useAdminActionTracking, useAdminPageView } from "./useAdminAnalytics";
 import { useAllyGuideAccess } from "./useAllyGuideAccess";
 import { AllySocketStatus, useAllySocket } from "./useAllySocket";
+import { useAutosaveDraft } from "./useAutosaveDraft";
 import { useBuilderSocket } from "./useBuilderSocket";
 import { useBuilderStream } from "./useBuilderStream";
 import { useCanUseCourseCopilot } from "./useCanUseCourseCopilot";
@@ -23,6 +25,7 @@ import { useSimulations } from "./useSimulations";
 import { useTracks } from "./useTracks";
 import { useTrackTranslationsSocket } from "./useTrackTranslationsSocket";
 import { useTranscriptDisclaimer } from "./useTranscriptDisclaimer";
+import { useUrlState, useUrlStates } from "./useUrlState";
 import { useUser } from "./useUser";
 import { useVoicePreview } from "./useVoicePreview";
 
@@ -33,6 +36,11 @@ export {
   useUser,
   useLiveKitRoom,
   useClickOutside,
+  useAdminActionTracking,
+  useAdminPageView,
+  useAutosaveDraft,
+  useUrlState,
+  useUrlStates,
   useDebounce,
   useIsPlaceholderUsed,
   useSimulations,

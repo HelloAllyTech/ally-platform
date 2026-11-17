@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   stillHappening: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
+  queue: vi.fn(),
 }));
 
 vi.mock(
@@ -37,6 +38,7 @@ vi.mock("@api", async importOriginal => {
     ...(await importOriginal<Record<string, unknown>>()),
     useGetDebriefSessionQuery: () => h.session(),
     useGetDebriefModelsQuery: () => ok(MODELS),
+    useLazyGetDebriefSessionsQuery: () => [h.queue],
     useActOnDebriefRunMutation: () => [h.act, { isLoading: false }],
     useResolveDebriefFlagMutation: () => [h.resolve, { isLoading: false }],
     useCorrectDebriefRunMutation: () => [h.correct, { isLoading: false }],
@@ -281,9 +283,9 @@ const view = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const renderPage = () =>
+const renderPage = (search = "language=en") =>
   render(
-    <MemoryRouter initialEntries={["/debriefs/sessions/run-1?language=en"]}>
+    <MemoryRouter initialEntries={[`/debriefs/sessions/run-1?${search}`]}>
       <Routes>
         <Route path="/debriefs/sessions/:runId" element={<DebriefSessionPage />} />
       </Routes>
@@ -488,6 +490,35 @@ describe("Session page", () => {
         expect(screen.getByTestId("review-button")).toHaveTextContent("Reviewed · kept"),
       );
       expect(screen.getByTestId("review-button")).toHaveAttribute("data-reviewed", "true");
+    });
+
+    it("after the last decision, opens the next item in the queue it came from", async () => {
+      h.resolve.mockImplementation(() => {
+        h.session.mockReturnValue(ok(view({ pendingActions: [] })));
+        return { unwrap: async () => ({}) };
+      });
+      h.queue.mockReturnValue({
+        unwrap: async () => ({ items: [{ runId: "run-1" }, { runId: "run-2" }] }),
+      });
+      renderPage("language=en&cat=needs");
+      fireEvent.click(screen.getByTestId("review-button"));
+      fireEvent.click(
+        within(screen.getByTestId("review-panel")).getByRole("button", { name: "Keep it" }),
+      );
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByLabelText(/Why it stays/), {
+        target: { value: "It fits." },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Keep it" }));
+      await waitFor(() => expect(h.queue).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(h.toastSuccess).toHaveBeenCalledWith("Done. Opening the next one."),
+      );
+    });
+
+    it("does not move on when the viewer did not come from a queue", async () => {
+      renderPage();
+      expect(h.queue).not.toHaveBeenCalled();
     });
 
     it("shows no bar and no decisions to a viewer whose role can't act", () => {

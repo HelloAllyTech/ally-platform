@@ -40,6 +40,17 @@ vi.mock("../../DebriefAccess/DebriefAccess", () => ({
 
 // Mock components
 vi.mock("@components", () => ({
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true), dialog: null }),
+  BulkActionBar: ({ count, actions }: any) =>
+    count > 0 ? (
+      <div data-testid="bulk-bar">
+        {actions.map((a: any) => (
+          <button key={a.label} onClick={a.onClick}>
+            {a.label}
+          </button>
+        ))}
+      </div>
+    ) : null,
   cellTypes: {
     editableText: "editableText",
     dropdown: "dropdown",
@@ -861,7 +872,7 @@ describe("UserManagement", () => {
       expect(roleSection).toHaveTextContent("LEARNER");
     });
 
-    it("shows no extra content for an ordinary account's change-role modal", () => {
+    it("shows the role descriptions but no platform note for an ordinary account's change-role modal", () => {
       vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue({
         ...mockUserManagementHook,
         selectedOption: "Change role",
@@ -870,7 +881,8 @@ describe("UserManagement", () => {
 
       renderUserManagement();
 
-      expect(screen.queryByTestId("modal-extra-content")).not.toBeInTheDocument();
+      expect(screen.getByText("What each role can do")).toBeInTheDocument();
+      expect(screen.queryByText(/platform/i)).not.toBeInTheDocument();
     });
 
     // The picker can't show the tier, so without this note the modal reads as

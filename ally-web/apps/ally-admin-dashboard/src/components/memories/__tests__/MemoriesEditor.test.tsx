@@ -1,6 +1,6 @@
 import React from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useForm, UseFormReturn } from "react-hook-form";
 import { describe, expect, it, vi } from "vitest";
 
@@ -97,8 +97,7 @@ describe("MemoriesEditor", () => {
     expect(form.getValues("memories")[0].title).toBe("");
   });
 
-  it("re-maps from knowledge sources only after the author confirms", () => {
-    const confirm = vi.spyOn(window, "confirm");
+  it("re-maps from knowledge sources only after the author confirms", async () => {
     render(
       <Harness
         defaults={{
@@ -109,14 +108,14 @@ describe("MemoriesEditor", () => {
       />,
     );
 
-    confirm.mockReturnValueOnce(false);
     fireEvent.click(screen.getByTestId("memories-remap"));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
     expect(runMapping).not.toHaveBeenCalled();
 
-    confirm.mockReturnValueOnce(true);
     fireEvent.click(screen.getByTestId("memories-remap"));
-    expect(runMapping).toHaveBeenCalledWith({ replace: true });
-    confirm.mockRestore();
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Re-map" }));
+    await waitFor(() => expect(runMapping).toHaveBeenCalledWith({ replace: true }));
   });
 
   it("shows the empty state when there are no memories", () => {

@@ -111,3 +111,7 @@ export * from "./internal-monologue";
 export * from "./voice-option";
 export * from "./rich-text-editor";
 export * from "./ally-guide";
+export * from "./confirm-dialog";
+export * from "./autosave-indicator";
+export * from "./bulk-action-bar";
+export * from "./publish-blockers";

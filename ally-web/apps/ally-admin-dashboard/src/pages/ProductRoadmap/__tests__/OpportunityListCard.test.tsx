@@ -82,7 +82,7 @@ describe("OpportunityListCard queue rank tooltip", () => {
   });
 });
 
-describe("OpportunityListCard poster", () => {
+describe("OpportunityListCard row facts", () => {
   const renderCard = (overrides: Partial<RoadmapOpportunity>, isQueue = true) =>
     render(
       <OpportunityListCard
@@ -95,27 +95,39 @@ describe("OpportunityListCard poster", () => {
       />,
     );
 
-  it("names the person who posted it on a queue card", () => {
-    const { getByText } = renderCard({
+  it("shows votes with backers, an effort chip and the goal on a queue card", () => {
+    const { getByText } = renderCard({ voterCount: 3, effort: RoadmapOpportunityEffort.L });
+    expect(getByText(/40 votes · 3 backers/)).toBeTruthy();
+    expect(getByText("L")).toBeTruthy();
+    expect(getByText("Scribe")).toBeTruthy();
+  });
+
+  it("uses the singular for one backer", () => {
+    const { getByText } = renderCard({ voterCount: 1 });
+    expect(getByText(/1 backer$/)).toBeTruthy();
+  });
+
+  it("shows a dashed Size? chip when unsized", () => {
+    const { getByText } = renderCard({ effort: null });
+    expect(getByText("Size?").className).toMatch(/border-dashed/);
+  });
+
+  it("no longer shows owner, month or poster on a queue card", () => {
+    const { queryByText } = renderCard({
+      owner: "Priya",
+      plannedMonth: "2026-12",
       creator: { id: 7, email: "asha@example.com", name: "Asha Rao" },
     });
-    expect(getByText("Posted by Asha Rao")).toBeTruthy();
+    expect(queryByText("Priya")).toBeNull();
+    expect(queryByText(/Dec 2026/)).toBeNull();
+    expect(queryByText(/Posted by/)).toBeNull();
   });
 
-  it("shows a name built from the email, never the email, when the account has no name", () => {
-    const { getByText, queryByText } = renderCard({
-      creator: { id: 7, email: "asha.rao@example.com", name: "" },
-    });
-    expect(getByText("Posted by Asha Rao")).toBeTruthy();
-    expect(queryByText(/@/)).toBeNull();
-  });
-
-  it("keeps the poster in the Filed line outside the queue, not as a second mention", () => {
+  it("keeps the filer in the Filed line outside the queue", () => {
     const { queryByText } = renderCard(
       { creator: { id: 7, email: "asha@example.com", name: "Asha Rao" } },
       false,
     );
-    expect(queryByText(/Posted by/)).toBeNull();
     expect(queryByText(/Asha Rao/)).toBeTruthy();
   });
 });

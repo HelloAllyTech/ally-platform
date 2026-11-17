@@ -11,6 +11,7 @@ import {
 } from "@constants";
 
 import { AiTaskFilters, filterAiTasks, optionsFrom, toTableRows } from "./aiTaskRows";
+import { PrecedenceExplainer } from "../Providers/PrecedenceExplainer";
 
 /**
  * AI Tasks — every action on the platform that calls a model, and which model
@@ -122,6 +123,7 @@ export const AiTasks: React.FC = () => {
         prompt or per simulation — “Configured by” names the default.
       </p>
 
+      <PrecedenceExplainer className="mb-4" />
       <ListToolbar
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}

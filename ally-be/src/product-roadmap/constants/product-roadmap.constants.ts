@@ -429,6 +429,13 @@ export const ROADMAP_FILEABLE_EFFORTS = ['s', 'm', 'l', 'xl', 'xxl'] as const;
 export const ROADMAP_EFFORT_UNSIZED = 'unsized';
 
 /**
+ * Sentinel the owner FILTER accepts alongside owner names, meaning "nobody owns this" — no linked
+ * user and no legacy owner text. Same idea as ROADMAP_EFFORT_UNSIZED: a filter-only value, never
+ * stored. It exists for the triage Inbox, which needs to find work that has no owner yet.
+ */
+export const ROADMAP_OWNER_UNASSIGNED = 'unassigned';
+
+/**
  * How long a signed readiness verdict stays spendable.
  *
  * Generous rather than tight: the interview stays open while someone reads the draft and the

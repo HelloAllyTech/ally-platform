@@ -10,7 +10,7 @@ import {
   useGetWaNumbersQuery,
   useSubscribeWaNumberMutation,
 } from "@api";
-import { Button } from "@components";
+import { Button, useConfirm } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { WaBusinessNumber, WaBusinessNumberStatus } from "@types";
@@ -73,6 +73,7 @@ const ChannelRow: React.FC<{
   const [finishing, setFinishing] = useState(false);
   const [check, { isLoading: isChecking }] = useCheckWaNumberMutation();
   const [disconnect, { isLoading: isDisconnecting }] = useDisconnectWaNumberMutation();
+  const { confirm, dialog } = useConfirm();
   const awaiting = number.status === WaBusinessNumberStatus.AWAITING_WEBHOOK;
 
   const handleCheck = async () => {
@@ -86,7 +87,13 @@ const ChannelRow: React.FC<{
   };
 
   const handleDisconnect = async () => {
-    if (!window.confirm(c.disconnectConfirm)) return;
+    const ok = await confirm({
+      title: c.disconnectTitle,
+      consequence: c.disconnectConfirm,
+      irreversible: true,
+      confirmLabel: c.disconnectAction,
+    });
+    if (!ok) return;
     try {
       await disconnect({ id: number.id }).unwrap();
       toast.success(c.disconnected);
@@ -97,6 +104,7 @@ const ChannelRow: React.FC<{
 
   return (
     <li className="flex flex-col gap-3 py-4">
+      {dialog}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex-1 min-w-[12rem] flex flex-col gap-0.5">
           <div className="flex items-center gap-2">

@@ -426,6 +426,23 @@ describe("Login", () => {
   });
 
   describe("Generate OTP", () => {
+    it("submits the email when Enter is pressed", async () => {
+      mockGenerateOTP.mockResolvedValue({ data: { success: true } });
+      renderLogin();
+      const emailInput = screen.getByTestId("text-field-input");
+      fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+      fireEvent.keyDown(emailInput, { key: "Enter" });
+      await waitFor(() =>
+        expect(mockGenerateOTP).toHaveBeenCalledWith({ email: "test@example.com" }),
+      );
+    });
+
+    it("does not submit on Enter while the email is empty", () => {
+      renderLogin();
+      fireEvent.keyDown(screen.getByTestId("text-field-input"), { key: "Enter" });
+      expect(mockGenerateOTP).not.toHaveBeenCalled();
+    });
+
     it("should call generateOTP when next button is clicked", async () => {
       mockGenerateOTP.mockResolvedValue({ data: { success: true } });
 

@@ -24,6 +24,7 @@ const unwrapped = (fn: (args: unknown) => unknown) => (args: unknown) => ({
 
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
+  useGetInboxCountsQuery: () => ({ data: { unread: 3, needsPerson: 2, safety: 0 } }),
   useGetInboxQuery: () => ({ data: h.items.current, isLoading: false }),
   useGetChatbotsQuery: () => ({
     data: { chatbots: [{ id: "b1", name: "Sunrise Mind", myRole: "editor" }] },
@@ -153,6 +154,23 @@ describe("Inbox", () => {
     expect(screen.getByText("Your name")).toBeTruthy();
     fireEvent.click(screen.getByText(INBOX.takeOver));
     await waitFor(() => expect(h.takeOver).toHaveBeenCalledWith({ chatbotId: "b1", id: "c1" }));
+  });
+
+  it("shows how many chats need a person on the first tab", () => {
+    open();
+    expect(screen.getByText("(2)")).toBeTruthy();
+  });
+
+  it("Enter sends the reply", async () => {
+    h.thread.current = thread({ state: "held", heldBy: { id: 7, name: "Asha Rao" } });
+    h.reply.mockReturnValue({ messageId: "m4" });
+    open("/inbox?conversation=c1&bot=b1");
+    const box = screen.getByPlaceholderText(INBOX.replyPlaceholder);
+    fireEvent.change(box, { target: { value: "On it." } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() =>
+      expect(h.reply).toHaveBeenCalledWith({ chatbotId: "b1", id: "c1", text: "On it." }),
+    );
   });
 
   it("while you have it: the banner, the reply box, Hand back", async () => {
