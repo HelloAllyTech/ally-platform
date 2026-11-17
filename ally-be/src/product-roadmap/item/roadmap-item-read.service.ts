@@ -1108,6 +1108,7 @@ export class RoadmapItemReadService {
         whyHere = { ...whyHere, by: person(whyHere.by.id) };
       }
       return {
+        id: c.id,
         code: c.code,
         title: c.title,
         shownStage: c.shownStage,

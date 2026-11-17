@@ -51,6 +51,8 @@ export type WhyHere =
   | { kind: 'shipped'; at: string };
 
 export interface ItemRow {
+  /** The opportunity uuid: what the existing vote endpoint takes. */
+  id: string;
   code: string;
   title: string;
   shownStage: ShownStage;
