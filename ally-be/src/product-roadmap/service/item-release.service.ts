@@ -38,7 +38,6 @@ import {
 import { RoadmapOpportunityStage } from '../enum/roadmap-opportunity.enum';
 import { RoadmapOpportunityRepository } from '../repository/roadmap-opportunity.repository';
 import {
-  ReleaseRunLike,
   ResolvedTag,
   containedIn,
   extractOpportunityCodes,
@@ -73,16 +72,17 @@ const LOCK_NAME = 'roadmap-item-release-reconcile';
  * the run history that says when a merge first went out or that a release
  * after it failed.
  */
-interface ReleaseHead {
+export interface ReleaseHead {
   /** A tag name, or the run's head commit when the tag could not be named. */
   ref: string;
   tag: string | null;
-  runs: ReleaseRunLike[];
+  /** The release workflow's completed runs, every conclusion, newest first. */
+  runs: CompletedWorkflowRun[];
   /** For frontends: which app the head is for (`shippedApp` filter). */
   app?: string;
 }
 
-type HeadKey =
+export type HeadKey =
   | 'be'
   | 'ai'
   | 'learn'
@@ -823,6 +823,18 @@ export class ItemReleaseService {
       },
     );
     return false;
+  }
+
+  /**
+   * The newest successful production release of each service, for the
+   * auto-release policy (Roadmap v2, P5): the base of each service's release
+   * diff, and the run history it reads human releases from. The same read
+   * release tracking makes, so the two can never disagree about what is live.
+   */
+  releaseHeads(
+    services: Iterable<ReleaseServiceKey>,
+  ): Promise<Map<HeadKey, ReleaseHead | null>> {
+    return this.loadHeads(new Set(services));
   }
 
   /**

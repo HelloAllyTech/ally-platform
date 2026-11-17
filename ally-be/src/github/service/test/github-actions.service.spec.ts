@@ -769,3 +769,86 @@ describe('GithubActionsService release-tracking reads (Roadmap v2 P1)', () => {
     ).toEqual({ commitSha: 'c', at: new Date('2026-11-10T05:00:00Z') });
   });
 });
+
+describe('GithubActionsService release-policy reads (Roadmap v2 P5)', () => {
+  let service: GithubActionsService;
+  const configService = {
+    githubToken: 'gh-token',
+    githubOrg: 'HelloAllyTech',
+    githubMonorepo: 'ally-platform',
+  } as unknown as AppConfigService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new GithubActionsService(configService);
+  });
+
+  it('getBranchSha reads the branch ref once', async () => {
+    mockedAxios.get.mockResolvedValue({ data: { object: { sha: 'abc' } } });
+
+    expect(await service.getBranchSha('ally-platform', 'master')).toBe('abc');
+    expect(mockedAxios.get.mock.calls[0][0]).toBe(
+      'https://api.github.com/repos/HelloAllyTech/ally-platform/git/ref/heads/master',
+    );
+  });
+
+  it('compareCommitGraph keeps parents and the committer date, and says when GitHub cut the list short', async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        status: 'ahead',
+        total_commits: 300,
+        commits: [
+          {
+            sha: 'm1',
+            parents: [{ sha: 'p1' }, { sha: 'p2' }],
+            author: { login: 'priya' },
+            commit: {
+              message: 'Merge pull request #5 from x/y',
+              committer: { date: '2026-11-17T07:00:00Z' },
+            },
+          },
+        ],
+      },
+    });
+
+    const graph = await service.compareCommitGraph(
+      'ally-platform',
+      'be-v1.2.3',
+      'abc',
+    );
+    expect(graph).toEqual({
+      status: 'ahead',
+      truncated: true,
+      commits: [
+        {
+          sha: 'm1',
+          parents: ['p1', 'p2'],
+          message: 'Merge pull request #5 from x/y',
+          authorLogin: 'priya',
+          committedAt: new Date('2026-11-17T07:00:00Z'),
+        },
+      ],
+    });
+  });
+
+  it('getCommitFiles lists a rename’s old path too, and is null when GitHub cannot answer', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        files: [
+          {
+            filename: 'a/new.ts',
+            previous_filename: 'ally-be/src/auth/old.ts',
+          },
+          { filename: 'b.ts' },
+        ],
+      },
+    });
+    expect(await service.getCommitFiles('ally-platform', 'abc')).toEqual({
+      files: ['a/new.ts', 'ally-be/src/auth/old.ts', 'b.ts'],
+      truncated: false,
+    });
+
+    mockedAxios.get.mockRejectedValueOnce(new Error('500'));
+    expect(await service.getCommitFiles('ally-platform', 'abc')).toBeNull();
+  });
+});
