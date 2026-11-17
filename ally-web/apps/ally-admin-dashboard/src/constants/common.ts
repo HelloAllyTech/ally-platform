@@ -700,17 +700,9 @@ export const ApiEndpoints = {
     ASK: "/v1/analytics/agent/ask",
     CATALOG: "/v1/analytics/agent/catalog",
   },
-  // Analytics Suggestions — its own namespace for the same reason as the agent's:
-  // the elevated super-duper-admin tier, because accepting a suggestion writes
-  // onto the product roadmap rather than only reading a chart.
-  ANALYTICS_SUGGESTIONS: {
-    LIST: "/v1/analytics/suggestions",
-    GENERATE: "/v1/analytics/suggestions/generate",
-    ACCEPT: (id: string) => `/v1/analytics/suggestions/${id}/accept`,
-    REJECT: (id: string) => `/v1/analytics/suggestions/${id}/reject`,
-  },
-  // UX Signals — the PostHog scan that files into Bug Hunter and the Suggestions
-  // queue. Its own namespace because it is a producer for both, owned by neither.
+  // UX Signals — the PostHog scan that files bugs into Bug Hunter and improvement
+  // signals for the PM Agent. Its own namespace because it is a producer for both,
+  // owned by neither.
   UX_SIGNALS: {
     SCAN: "/v1/ux-signals/scan",
     SCANS: "/v1/ux-signals/scans",
@@ -1459,8 +1451,6 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_IDEA_DRAFTS: "productRoadmapIdeaDrafts",
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
-  // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.
-  ANALYTICS_SUGGESTIONS: "analyticsSuggestions",
   // PM Agent (also registered in baseApi.ts's `tagTypes`).
   PM_AGENT_STATE: "pmAgentState",
   PM_AGENT_CARDS: "pmAgentCards",

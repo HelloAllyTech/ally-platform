@@ -111,7 +111,9 @@ weekly lessons job with eval gate, critic calibration reports, +14/+30 d metric 
 ## Registry and prompts
 
 Every model call has a row in `src/llm/constants/ai-task-registry.constants.ts` (CLAUDE.md rule). Prompt codes:
-`pm_agent_lane_<lane>`, `pm_agent_critic`, `pm_agent_ranker`, under `src/prompts/pm_agent/`.
+`pm_agent_lane_<lane>` (six) and `pm_agent_critic`, under `src/prompts/pm_agent/`; registry ids
+`pm-agent-lane-<lane>` and `pm-agent-critic`, all with usage label `pm_agent`. The ranker is deterministic code, so
+there is no `pm_agent_ranker` prompt or row.
 
 ## Implementation notes (backend foundations, 2026-11-17)
 
@@ -126,9 +128,9 @@ Additive to the contract (nothing above was renamed or removed):
   after the circuit breaker (`true` is refused: only the breaker pauses). Turning `pauseAutoBuild` off does
   NOT clear the breaker.
 - `needsYou.actions` values are `retry | open_pr | dismiss` (Revert is a follow-up).
-- `POST /run` answers `{ runId: null, started: false, reason }` with `reason` one of `disabled`,
-  `already_running`, `budget_exhausted`, `queue_full`, or `pipeline_unavailable` until the generation pipeline
-  provides `PM_AGENT_RUN_TRIGGER` (default provider is a no-op).
+- `POST /run` answers `{ runId, started: true }` (the run continues in the background) or
+  `{ runId: null, started: false, reason }` with `reason` one of `disabled`, `already_running`, `budget_exhausted`,
+  `queue_full`.
 - POST action routes answer **200** (not Nest's default 201).
 - `GET /cards` with no `status` returns `open` plus needs-you cards not dismissed. `GET /memory` returns all
   facts/lessons (active and inactive), newest first.
@@ -161,5 +163,79 @@ Behaviour worth knowing:
 - Compiled PRD / plan.md: `util/compile-plan.ts` (deterministic) + `util/scrub.util.ts` (tenant names from
   `tenants`, emails, phones, tokens/keys, internal hosts, URLs with query strings, UUIDs, IPs, long quotes).
   Evidence snapshots are never included, only the evidence count.
-- Not built here (pipeline / later phases): lanes, critic, ranker, daily scheduler, budget reservation,
-  exemplars, lessons job, impact read-outs, revert.
+- Not built yet (later phases): lessons job, critic calibration, impact read-outs, revert, shadow mode.
+
+## Implementation notes (generation pipeline, 2026-11-17)
+
+Code: `src/pm-agent/pipeline/` (orchestrator, model port, store), `lane/` (definitions, tool belt, runner),
+`gate/` (deterministic + dedupe, critic, ranker), `learning/` (lane selection, memory/exemplar retrieval). No new
+tables. `PmRunPipeline` is framework-free (ports: `PmLlmPort`, `PmToolbox`, `PmPipelineStore`); `PmAgentRunService`
+wires it to Nest and provides `PM_AGENT_RUN_TRIGGER`.
+
+Run order: RunGuard → revisions → lane selection (+ degradation) → lanes → gate 1 → gate 2 → critic → ranker →
+Persister.
+
+- **RunGuard** (`PmRunPipeline.start`): `enabled` → no `running` row → free slots (`queueCap` − `open` cards; nothing
+  else counts) → run cap = min(monthly − (spent + open reservations), monthly ÷ 20). A cap under $0.02 is
+  `budget_exhausted` and nothing is called. Skips are recorded as `skipped` runs with `stopReason`
+  (`disabled` only for manual runs, `queue_full`, `budget`); `already_running` records nothing. The run row's
+  `reservedUsd` is its cap (counted in `GET /state` while it runs); `spentUsd` is updated after every lane.
+- **Stop reasons** on a finished run: `queue_full` (slots filled), `budget`, `timeout` (20 min run clock),
+  `no_candidates`, `error` (run `failed`), `abandoned` (a `running` row older than 45 min, failed by the scheduler);
+  `null` when it ran normally with slots left.
+- **Scheduler** (`PmAgentRunSchedulerService`): a 10-minute tick under advisory lock `(1982000, 2)` runs once per IST
+  date when the IST hour ≥ `runHourIst` and no `scheduled` run (or skip) exists for the date. Run now is
+  `trigger=manual`; Revise now is `trigger=revision`, the revisions lane only, for that feedback row.
+- **Budget** (`src/pm-agent/util/run-ledger.ts`): every model pass reserves its worst case (prompt chars ÷ 3 + tool overhead at the
+  input rate, `maxTokens` at the output rate; unknown models at $5/$25 per 1M) before calling, then settles to the
+  actual. Caps: run; the critic's 20% held back from lanes; per lane (max(1/n, 50%) of the lane budget); per call
+  4,000 (lane) / 3,000 (critic) output tokens; 6 passes per lane; 90 s per call; 4 min per lane. Degradation is decided
+  before spending (`src/pm-agent/pipeline/pm-degrade.ts`): drop lowest-weight lanes → FAST-tier model → half the candidates → stop.
+- **Models** (`src/pm-agent/pipeline/pm-agent-llm.service.ts`): the prompt row's model in Skills Store, else the REASONING tier; a
+  provider with no key here uses the tier model; a failing call (401/403/404/408/429/5xx, socket) retries once on the
+  tier model over OpenAI. Each call writes one `llm_usage` row (task `pm_agent`, metadata `runId`, `lane`,
+  `promptCode`) and one `pm_agent_run_steps` row (prompt version pinned, tool calls, cost, reservation, outcome).
+  Shared context (mandate, Vision & strategy page, product map) is one `cache: true` system block.
+- **Lanes**: `analytics`, `ux_signals` (skipped when `pm_agent_signals` has nothing from the last 45 days),
+  `code_health`, `infra_cost`, `strategy_content`, `revisions`. Each = its prompt + an allow-list of read-only tools
+  (`src/pm-agent/lane/pm-lane-definitions.ts`). Tools: `analytics_section` (the 15 AnalyticsModule aggregates, compacted),
+  `ux_signals_list` (`pm_agent_signals` only — UX Signals internals are not imported), `llm_usage_summary`,
+  `ai_task_registry`, `product_goals`, and the roadmap copilot's read tools (roadmap, interviews, Bug Hunter findings,
+  docs, GitHub code, wiki) resolved lazily from `RoadmapCopilotToolsService`. Left out: `analytics_ask` (a second
+  billed agent), Context Library principles (attributed to the copilot), the AWS logs proxy (`LogsService` is not
+  exported for this). Every tool call records `pm_agent_evidence` rows as it fetches; results are fenced as
+  `<tool_data … trust="untrusted-data">` with tag-like sequences neutralised. A tool outside the allow-list is
+  refused without running.
+- **Lane output**: one `submit_candidates` call (it is the only tool on the final pass; current Claude models reject
+  a forced `tool_choice`). Each candidate is validated by `validateCardPayload` plus "every evidence id was returned
+  in this run"; invalid ones are sent back once (valid ones kept), then discarded. Cut-off (`max_tokens`) passes are
+  ignored. Revisions: one successor per pending feedback row, category forced to the original's, `revisedFromCardId`
+  set; feedback goes `pending → in_progress → done` (with `successorCardId`), back to `pending` only when the lane
+  could not run (budget, provider, clock), `cancelled` after 14 days.
+- **Gate 1** (`src/pm-agent/gate/pm-gate.ts`): payload contract, evidence from this run, repos with a release pipeline, not
+  `libs/`-only, no `ally-mobile`; any string the public-repo scrubber would change fails the candidate (dropped, not
+  edited); instruction-shaped text fails. Skipped question keys are suppressed for 14 days.
+- **Gate 2**: token-Jaccard / containment / trigram similarity ≥ 0.6 against cards (open, accepted, in progress,
+  shipped, answered), roadmap opportunities (new → released, latest 400), open Bug Hunter findings, and within the
+  batch. A near-duplicate of a rejected card passes only if it cites evidence with a source/label the rejected card
+  did not. A revision never matches its own original.
+- **Gate 3 (critic)**: one `pm_agent_critic` call over the best 12, rubric `grounded, scoped, no_open_decisions,
+  sensible_defaults, consistent_with_memory_and_strategy, buildable, honest_risk`, answered via `submit_verdicts`.
+  Fail-closed: no verdict, budget or provider failure → nothing passes. A `missingKnowledge` verdict becomes a
+  question candidate (layers 1–2 again).
+- **Ranker** (`src/pm-agent/gate/pm-ranker.ts`): impact (category weight × risk × named metric) × evidence strength (sources,
+  items, age) ÷ effort (S 1, M 1.6); greedy with diversity (each card already chosen in a category halves the next;
+  no category above 60% of slots) and a question cap (⌊slots ÷ 3⌋, min 1, once memory holds ≥ 10 active facts).
+- **Persister** (`PmAgentPipelineStore.persistCard`, the only card writer): one transaction under advisory xact lock
+  `(1982000, 3)`: skip if the version hash exists in this run or among open cards; stop at the cap; insert the card
+  (`open`, `openedAt`, `versionHash`, `questionKey`, `rank`, `evidenceFreshness`, version = original + 1 for a
+  revision) and a `created` event whose `detail.lane` is what lane learning reads; mark cited UX signals `used`.
+  Then `card.updated`/`state.updated`.
+- **Learning**: each run recomputes per-category and per-lane scores from `pm_agent_outcomes` (180-day lookback,
+  30-day half-life; accepted = +1, shipped +1.5, failed/reverted/rejected = −1, feedback = +0.25/−0.75; questions
+  excluded) into `pm_agent_lane_stats.decayedScore`, and bumps `shown` per category and lane when a card is created
+  (the card service already bumps accepted/rejected/feedback per category). Lane selection: lanes whose categories
+  are all weighted 0 never run; a lane absent from the last 10 runs is forced in; ≥ 15% of slots (≥ 1) explore
+  uniformly; the rest by a Thompson-style draw (only after 8 decisions) × mandate weight × a coverage boost.
+  Memory: top 8 active facts per lane by keyword relevance (answers/manual boosted). Exemplars: 2 nearest
+  shipped-and-merged and 2 nearest rejected/reverted cards by text similarity, fenced as data.

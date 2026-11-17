@@ -99,7 +99,6 @@ describe('FeatureToggleService — toggles for organization-restricted admins', 
 
   it.each([
     FeatureToggleKey.ANALYTICS_AGENT,
-    FeatureToggleKey.ANALYTICS_SUGGESTIONS,
     FeatureToggleKey.ROLEPLAY_SESSION_LOGS,
     FeatureToggleKey.LOGS,
     FeatureToggleKey.ADMIN_USER_MANAGEMENT,

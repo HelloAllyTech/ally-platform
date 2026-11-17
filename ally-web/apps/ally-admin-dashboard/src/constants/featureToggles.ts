@@ -36,7 +36,6 @@ export const FeatureToggleKey = {
   USERS: "users",
   ANALYTICS: "analytics",
   ANALYTICS_AGENT: "analytics_agent",
-  ANALYTICS_SUGGESTIONS: "analytics_suggestions",
   UX_SIGNALS: "ux_signals",
   USER_BADGES: "user_badges",
   CHARACTER_LIBRARY: "character_library",
@@ -186,7 +185,6 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
 
   [FeatureToggleKey.ANALYTICS]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   [FeatureToggleKey.ANALYTICS_AGENT]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
-  [FeatureToggleKey.ANALYTICS_SUGGESTIONS]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   // The Debriefs console sits on Analytics access; sign-off rides with it.
   [FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   [FeatureToggleKey.DEBRIEF_SCHEDULES]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,

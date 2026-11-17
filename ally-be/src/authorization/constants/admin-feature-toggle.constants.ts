@@ -85,7 +85,6 @@ export enum FeatureToggleKey {
   // Analytics (route itself is SUPER_ADMIN-tier; two sub-tabs are SDA-only)
   ANALYTICS = 'analytics',
   ANALYTICS_AGENT = 'analytics_agent',
-  ANALYTICS_SUGGESTIONS = 'analytics_suggestions',
   UX_SIGNALS = 'ux_signals',
 
   // Platform config (formerly SUPER_DUPER_ADMIN-only)
@@ -364,20 +363,11 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     platformOnly: true,
   },
   {
-    key: FeatureToggleKey.ANALYTICS_SUGGESTIONS,
-    label: 'Analytics — Suggestions',
-    description:
-      'The Analytics Suggestions sub-tab, on top of general Analytics access.',
-    legacyGrants: SDA_ONLY,
-    // Built from platform-wide analytics.
-    platformOnly: true,
-  },
-  {
     key: FeatureToggleKey.UX_SIGNALS,
     label: 'UX Signals',
     description:
-      'The PostHog UX scan that files findings to Bug Hunter and suggestions ' +
-      'to the Analytics Suggestions queue, plus its "Scan now" control.',
+      'The PostHog UX scan that files findings to Bug Hunter and improvement ' +
+      'signals for the PM Agent, plus its "Scan now" control.',
     legacyGrants: SDA_ONLY,
     // Scans every user's PostHog sessions across the platform.
     platformOnly: true,

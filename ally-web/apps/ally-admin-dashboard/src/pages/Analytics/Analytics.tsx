@@ -48,7 +48,6 @@ import { RatingsCommentsTab } from "./tabs/RatingsCommentsTab";
 import { RetrievalQualityTab } from "./tabs/RetrievalQualityTab";
 import { ScribeTab } from "./tabs/ScribeTab";
 import { ConversationDrift } from "../ConversationDrift/ConversationDrift";
-import { SuggestionsTab } from "./tabs/suggestions/SuggestionsTab";
 import { WeakPerformingMetricsTab } from "./tabs/WeakPerformingMetricsTab";
 import { TokenConsumption } from "./TokenConsumption";
 import { DebriefAnalytics } from "../Debriefs/metrics/DebriefAnalytics";
@@ -81,7 +80,7 @@ interface TabDef {
   render: (f: AnalyticsTabFilters) => ReactNode;
   /**
    * Optional extra gate, on top of the route's analytics feature toggle. Only
-   * two tabs need it today (Analytics Agent and Suggestions), and a tab
+   * one tab needs it today (Analytics Agent), and a tab
    * without it stays visible to everyone who can reach the page — which is
    * how every other tab here already behaved.
    *
@@ -295,23 +294,6 @@ const TABS: TabDef[] = [
     uses: { language: false, range: false },
     render: () => <AnalyticsAgentTab />,
     visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_AGENT),
-  },
-  {
-    // "What should we build next?", answered from the platform's own numbers and
-    // reviewed card by card. Visible to everyone who can reach this page, like
-    // every other tab — this used to sit on the elevated tier because accepting
-    // a suggestion WRITES onto the product roadmap, a different privilege from
-    // reading a chart, but the product decision was made to give every admin
-    // tier parity across all analytics surfaces instead.
-    //
-    // No page-level pickers: the period belongs to a Generate run that already
-    // happened and is stamped on every card, so a picker at the top of the page
-    // would imply it re-scopes a queue it cannot touch.
-    id: "suggestions",
-    label: en.analyticsSuggestions.tabLabel,
-    uses: { language: false, range: false },
-    render: () => <SuggestionsTab />,
-    visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_SUGGESTIONS),
   },
 ];
 

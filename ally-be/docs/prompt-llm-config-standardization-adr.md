@@ -24,6 +24,7 @@ independent ad-hoc integrations**, one per consuming runtime.
 ### Current state (inventory)
 
 **Storage + delivery (ally-be)**
+
 - `prompts.model` (varchar) + `prompts.temperature` (numeric) columns
   (`1818000000000-AddModelAndTemperatureToPrompts` — the original text cited
   `1796000000000`, which is not the migration in the repo).
@@ -40,6 +41,7 @@ independent ad-hoc integrations**, one per consuming runtime.
 | ally-be | autofill: `openai-autofil-service` / `anthropic-autofill.service` | OpenAI, Anthropic | explicit per-service | (autofill/copilot only; not prompt-driven) |
 
 **Model lists (UI / picker) — ~4 independent sources, already drifting:**
+
 - `ally-web` `PROMPT_LLM_MODEL_OPTIONS` (OpenAI + Gemini, hand-curated)
 - `ally-be` `PREFERRED_AUTOFILL_MODELS` + `PREFERRED_ANTHROPIC_AUTOFILL_MODELS`
 - `ally-ai-learn` `DEFAULT_LLM_CONFIG`
@@ -49,6 +51,7 @@ independent ad-hoc integrations**, one per consuming runtime.
 prompt-level → simulation-level (temperature, main agent only).
 
 **ally-be's own prompt-driven LLM calls (besides delivery):**
+
 - **Coaching chat** (`scenario-session-chat.service`, prompt `openai_scenario_session_chat`)
   **now consumes** the prompt's model/temperature (OpenAI-only guard; precedence
   code → prompt → simulation), via shared `common/util/llm-model.util.ts` +
@@ -59,16 +62,17 @@ prompt-level → simulation-level (temperature, main agent only).
   override — a candidate for the registry's `runtimes`/capability data to make explicit.
 
 ### Problems this creates
+
 1. **Drifting model lists** — four hand-maintained lists; we already shipped stale ones.
-   *(Resolved in Phase 1 — see Update.)*
+   _(Resolved in Phase 1 — see Update.)_
 2. **Provider inferred from model name** — fragile: a fine-tuned/custom model id, or a
    new provider whose names don't match known prefixes, resolves wrong or not at all.
    The prompt stores only `model`, never `provider`.
-   *(Superseded: `prompts.provider` now exists and inference is a fallback — see Update.)*
+   _(Superseded: `prompts.provider` now exists and inference is a fallback — see Update.)_
 3. **No capability awareness** — the UI offers a temperature slider for every model,
    but some models (o-series, some gpt-5 variants) reject a non-default temperature.
-   *(Resolved — `supportsTemperature` is served by the registry and the ai-learn factory
-   drops an invalid temperature rather than 400-ing.)*
+   _(Resolved — `supportsTemperature` is served by the registry and the ai-learn factory
+   drops an invalid temperature rather than 400-ing.)_
 4. **No shared contract** — each runtime re-implements parsing + a factory + a provider
    set; adding a provider/model is a multi-place change in services that diverge.
 
@@ -78,7 +82,7 @@ prompt-level → simulation-level (temperature, main agent only).
 full unification now.**
 
 - The feature is correct and tested for the current OpenAI+Gemini scope.
-- Most of the payoff is realized only when adding the *next* provider or on ongoing
+- Most of the payoff is realized only when adding the _next_ provider or on ongoing
   model churn; building it all now is premature abstraction across three runtimes that
   legitimately differ.
 - We capture the target design here so the next change is cheap and consistent.
@@ -86,28 +90,35 @@ full unification now.**
 **Do now:** nothing in code (this ADR).
 **Do opportunistically (present value):** the shared **model registry** (kills list drift).
 **Do at the next-provider trigger:** explicit `provider` on the prompt + capability flags
-+ aligning the per-runtime factories to the shared contract.
-**Do not:** collapse the three runtime factories into one shared client library — they
-have different latency/streaming/provider needs.
+
+- aligning the per-runtime factories to the shared contract.
+  **Do not:** collapse the three runtime factories into one shared client library — they
+  have different latency/streaming/provider needs.
 
 ## Target architecture
 
 ### 1. Shared LLM-config contract
+
 A prompt's override is a structured object, not a bare model string:
+
 ```jsonc
 { "provider": "openai" | "gemini" | "anthropic", "model": "gpt-5", "temperature": 0.4 }
 ```
+
 - **Explicit `provider`** — removes name-prefix inference everywhere.
 - Documented once; every consumer parses it identically.
 - `temperature` optional; precedence unchanged
   (code → language → prompt → simulation).
 
 ### 2. Model registry (single source of truth)
+
 One ally-be endpoint, e.g. `GET /api/v1/llm/models`, returning:
+
 ```jsonc
 [{ "provider": "openai", "model": "gpt-5", "label": "GPT-5",
    "supportsTemperature": true, "runtimes": ["ai-learn","ally-ai"] }, ...]
 ```
+
 - All UIs consume it (replaces the ~4 hardcoded lists).
 - `runtimes` tells the UI which models a given prompt's runtime can actually run, so we
   never offer a model the consumer can't instantiate (the OpenAI-only / no-Anthropic
@@ -115,7 +126,9 @@ One ally-be endpoint, e.g. `GET /api/v1/llm/models`, returning:
 - `supportsTemperature` lets the UI disable the slider where invalid.
 
 ### 3. Per-runtime provider factories, aligned
+
 Keep each runtime's factory (they differ), but align them to:
+
 - a common provider enum,
 - reading `provider` from the contract (no inference),
 - a shared, documented fallback rule (unrunnable override → log + default, never crash —
@@ -146,6 +159,7 @@ anticipate: **model deprecation**, rather than a new provider.
 ### What shipped
 
 **Phase 1 — model registry (done).**
+
 - `src/llm/constants/llm-model-registry.constants.ts` — `LLM_MODEL_REGISTRY`, with
   `provider`, `model`, `label`, `supportsTemperature`, `runtimes[]`.
 - Served by `GET /api/v1/llm/models` (`src/llm/controller/llm.controller.ts`), optionally
@@ -155,11 +169,12 @@ anticipate: **model deprecation**, rather than a new provider.
   survive **only as degraded-mode fallbacks** — `llmModels?.length ? … : FALLBACK`.
 
 **Phase 2 — explicit provider (largely done).**
+
 - `prompts.provider` exists ('openai' | 'gemini' | 'anthropic'); null means "infer from
   the model", so it is backward compatible.
 - Delivered to ally-ai through `getPromptOverrides()` as `{provider, model, temperature}`.
 - ai-learn's `create_llm_client` takes a `provider_override`; `infer_provider_from_model`
-  is now the *fallback*, not the primary path.
+  is now the _fallback_, not the primary path.
 
 **Not anticipated by the original ADR:** per-language LLM config moved out of the
 `languages.llmProviderConfig` jsonb column into an `llm_configs` registry table
@@ -174,14 +189,14 @@ Resolution is now: language `llmConfigId` → legacy jsonb → platform default.
 
 `LLM_MODEL_REGISTRY` bundles three different kinds of fact:
 
-| Field | What it actually is | Home |
-|---|---|---|
-| `provider` + `model` + `label` | Pure data. Adding `gpt-5.1-mini` under OpenAI needs **no code change** — the client is constructed from a provider and a model string | **DB** |
-| `supportsTemperature` | Not a code capability: a prefix guess over the model name (`o1`/`o3`/`o4`/`gpt-5`) in `modelSupportsTemperature`. A fact about the model that we infer, badly | **DB**, seeded from the heuristic |
-| `runtimes[]` | A genuine property of deployed code — ai-learn's `ally-ai-learn/app/llms/factory.py` has OpenAI/Gemini/Ollama/vLLM branches and no Anthropic; `PromptSidePanel.tsx` hardcodes `PROVIDER_ORDER` to OpenAI + Gemini | **Code** |
+| Field                          | What it actually is                                                                                                                                                                                               | Home                              |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `provider` + `model` + `label` | Pure data. Adding `gpt-5.1-mini` under OpenAI needs **no code change** — the client is constructed from a provider and a model string                                                                             | **DB**                            |
+| `supportsTemperature`          | Not a code capability: a prefix guess over the model name (`o1`/`o3`/`o4`/`gpt-5`) in `modelSupportsTemperature`. A fact about the model that we infer, badly                                                     | **DB**, seeded from the heuristic |
+| `runtimes[]`                   | A genuine property of deployed code — ai-learn's `ally-ai-learn/app/llms/factory.py` has OpenAI/Gemini/Ollama/vLLM branches and no Anthropic; `PromptSidePanel.tsx` hardcodes `PROVIDER_ORDER` to OpenAI + Gemini | **Code**                          |
 
 **Refinement:** `runtimes` should not be stored per model at all — it is a property of the
-*provider*. Every OpenAI model runs wherever the OpenAI client is wired. Keep a small
+_provider_. Every OpenAI model runs wherever the OpenAI client is wired. Keep a small
 in-code provider×runtime matrix (3 runtimes × ~5 providers, changing perhaps twice a year)
 and derive a model's runtimes from its provider. Then:
 
@@ -201,18 +216,19 @@ if "model" not in config_dict and not is_local_provider:
 ```
 
 A config naming a provider the runtime cannot serve keeps that provider and acquires the
-*platform default model* — a silently wrong client, not a visible failure. Hence the
+_platform default model_ — a silently wrong client, not a visible failure. Hence the
 provider matrix stays in code: an admin may add any model under a provider the runtime
 already speaks, but cannot invent a provider nothing can build.
 
 **Costs accepted:**
+
 - The catalog becomes **environment-specific**. Today it is versioned with the code and
   identical everywhere; in the DB, dev and prod can diverge. The seed migration covers day
   one; the liveness probe must report per environment so drift is visible.
 - The endpoint needs a **fallback to the in-code list** when the table is empty or the
   query fails, or a single bad migration empties every model picker in the product.
 
-**Shape:** a new `llm_models` catalog table, *not* an extension of `llm_configs`. They have
+**Shape:** a new `llm_models` catalog table, _not_ an extension of `llm_configs`. They have
 different cardinality and meaning — `llm_configs` is "a named config a language points at"
 (several may share one model at different temperatures), `llm_models` is "this model exists
 and is selectable". The liveness probe checks models, deduped; overloading one table would
@@ -228,14 +244,14 @@ The two registries do not share a provider vocabulary:
 - `LLM_CONFIG_SCHEMA` (for `llm_configs`) accepts `openai | google | gemini | ollama | vllm`
 - `LLM_MODEL_REGISTRY` uses `openai | gemini | anthropic`
 
-`google` vs `gemini` currently works only because `infer_provider_from_model` maps *both*
+`google` vs `gemini` currently works only because `infer_provider_from_model` maps _both_
 prefixes to `GEMINI`. That is an accident, and it must be reconciled before validation is
 built on top of it. `ollama`/`vllm` are absent from the catalog entirely (they are local
 runtimes with no model list), so any validation needs an explicit exemption for them.
 
 ### Phase 4 (proposed) — model liveness
 
-The original phases cover *drift between our own lists*. They do not cover **a provider
+The original phases cover _drift between our own lists_. They do not cover **a provider
 retiring a model we depend on**, where today the first signal is a production failure.
 
 **4a — LLM preview endpoint.** Mirror `src/voice-preview/`: `POST /api/v1/llm/preview`
@@ -266,20 +282,20 @@ also not proof of unusability — providers keep serving de-listed models, and a
 - an `available: false` flag hides a model from **new** selections and badges rows using
   it; it never stops existing usage;
 - the alert names the exact languages and prompts affected, so the fix is obvious;
-- require *consecutive* failures before flagging, and never flag on a transport error —
+- require _consecutive_ failures before flagging, and never flag on a transport error —
   only on an authoritative "model not found".
 
 ### Suggested sequence
 
-| Order | Work | Risk |
-|---|---|---|
-| 1 | 4a preview endpoint + test button | Low — additive, no schema change |
-| 2 | `llm_models` catalog table, seeded from `LLM_MODEL_REGISTRY`; endpoint reads DB with the in-code list as fallback; provider×runtime matrix stays in code | Low–Medium |
-| 3 | 4b liveness probe, alert-only, monthly | Low |
-| 4 | Reconcile `google`/`gemini`; validate `llm_configs` against the catalog | Medium — touches resolution |
+| Order | Work                                                                                                                                                     | Risk                             |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 1     | 4a preview endpoint + test button                                                                                                                        | Low — additive, no schema change |
+| 2     | `llm_models` catalog table, seeded from `LLM_MODEL_REGISTRY`; endpoint reads DB with the in-code list as fallback; provider×runtime matrix stays in code | Low–Medium                       |
+| 3     | 4b liveness probe, alert-only, monthly                                                                                                                   | Low                              |
+| 4     | Reconcile `google`/`gemini`; validate `llm_configs` against the catalog                                                                                  | Medium — touches resolution      |
 
 Step 2 replaces the earlier "seed `llm_configs` from the catalog" item: with a real catalog
-table there is nothing to duplicate into `llm_configs`, which goes on holding *choices*.
+table there is nothing to duplicate into `llm_configs`, which goes on holding _choices_.
 Any picker offering catalog models to a language must still filter by the derived
 `runtimes`, or it will offer Anthropic models that ai-learn cannot run.
 
@@ -288,6 +304,7 @@ the same hazard shape as the voice-provider casing migration that had to be reve
 stored value the client's dropdown cannot match, where saving silently rewrites the field.
 
 ## Consequences
+
 - **Pro:** next provider/model is a near one-place change; no drifting lists; no silent
   provider misresolution; UI can't offer unrunnable/temperature-incompatible models.
 - **Con:** the registry is net-new surface to maintain; `provider` is a schema addition
@@ -296,15 +313,16 @@ stored value the client's dropdown cannot match, where saving silently rewrites 
   the inference fragility compounds.
 
 ## Not doing (and why)
+
 - Full shared LLM client library across runtimes — over-engineering; runtimes differ
   (LiveKit streaming voice vs batch analytics vs autofill).
-- Provider field / capability gating *speculatively now* — no payoff until a new provider;
+- Provider field / capability gating _speculatively now_ — no payoff until a new provider;
   do it as part of that work.
 
 ## Update — 2026-09-05: ally-be's agentic call sites gain a provider layer
 
-The 2026-06-30 inventory recorded ally-be's own LLM consumption as *"autofill:
-`openai-autofill-service` / `anthropic-autofill.service`, explicit per-service"*. That
+The 2026-06-30 inventory recorded ally-be's own LLM consumption as _"autofill:
+`openai-autofill-service` / `anthropic-autofill.service`, explicit per-service"_. That
 undercounted it. Everything **agentic** in ally-be — the Character Library interview,
 Builder, the copilot, Bug Hunter, UX Signals, track grading, and a dozen more — bypassed
 all three factories and constructed `new Anthropic(...)` directly, because none of the
@@ -323,12 +341,12 @@ and simply isn't the thing being read.
 `src/llm-agent/` — a fourth, deliberately narrow abstraction covering exactly the gap:
 one streamed, tool-capable turn.
 
-| Piece | What it is |
-|---|---|
-| `type/agent-llm.type.ts` | Neutral blocks (`text` / `tool_use` / `tool_result`), stop reasons, usage |
-| `provider/{anthropic,openai,gemini}-agent.provider.ts` | Per-provider adapters |
-| `service/agent-llm.factory.ts` | `AgentLlmProviderFactory`, plus `providerForModel` |
-| `util/gemini-schema.util.ts` | JSON Schema → Gemini's OpenAPI subset |
+| Piece                                                  | What it is                                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `type/agent-llm.type.ts`                               | Neutral blocks (`text` / `tool_use` / `tool_result`), stop reasons, usage |
+| `provider/{anthropic,openai,gemini}-agent.provider.ts` | Per-provider adapters                                                     |
+| `service/agent-llm.factory.ts`                         | `AgentLlmProviderFactory`, plus `providerForModel`                        |
+| `util/gemini-schema.util.ts`                           | JSON Schema → Gemini's OpenAPI subset                                     |
 
 **The block vocabulary is Anthropic's**, not a third invented spelling — not out of
 deference, but because `character_interview_messages.tool_calls` / `.tool_results` (and
@@ -359,7 +377,7 @@ transcript table, so they are left for whoever next touches them.
 
 - **Gemini returns `MALFORMED_FUNCTION_CALL` intermittently** against a tool schema the
   size of the interview's — measured at roughly one call in three on `gemini-2.5-flash`.
-  The candidate comes back *empty*, so a loop that doesn't recognise it reports the turn as
+  The candidate comes back _empty_, so a loop that doesn't recognise it reports the turn as
   the model having nothing to say. It is surfaced as its own stop reason
   (`invalid_tool_call`), is transient, and is worth a bounded retry of the identical
   request.
@@ -377,6 +395,7 @@ back and the model continues) — the pass that breaks, because it is where the 
 providers' tool-result shapes differ. Unit fakes cannot produce a rejected tool schema.
 
 ## Appendix — touch points for future phases
+
 - ally-be: `prompt.entity.ts`, `src/prompt/dto/create-prompt.dto.ts`, `src/prompt/dto/update-prompt.dto.ts`, `prompt-response.type.ts`,
   `prompt-shared.service.ts` (`getPromptsByOptions`), `ai.service.ts` (`getPromptOverrides`),
   `scenario-shared.service.ts` (`getPromptsForScenarioSession`), `ai.request.dto.ts`
@@ -417,7 +436,6 @@ providers' tool-result shapes differ. Unit fakes cannot produce a rejected tool 
   `copilot/`, `bug-hunter/service/bug-hunter-repo-classifier.service.ts`,
   `ux-signals/service/ux-signals-ai.service.ts`,
   `product-roadmap/service/roadmap-ai.service.ts`,
-  `analytics-suggestions/service/analytics-suggestions-ai.service.ts`,
   `track/service/track-quiz-llm-grader.service.ts`, `track/service/track-memory.service.ts`,
   `lab/service/lab-run.service.ts`, `chat/service/voice-note.service.ts`,
   `learn/service/autofill.service.ts`,

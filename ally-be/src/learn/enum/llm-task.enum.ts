@@ -173,12 +173,8 @@ export enum LlmTask {
   // the narrator carries result rows, so their token profiles differ.
   ANALYTICS_AGENT_PLAN = 'analytics_agent_plan',
   ANALYTICS_AGENT_ANSWER = 'analytics_agent_answer',
-  // Analytics Suggestions (admin Analytics -> Suggestions tab): one call per
-  // Generate run. Its own label because the profile is unlike anything else
-  // here — a whole analytics window in, at most ten suggestions out.
-  ANALYTICS_SUGGESTIONS = 'analytics_suggestions',
   // UX Signals scan (src/ux-signals): one triage call per scan, turning
-  // threshold-crossing PostHog signals into bug findings and suggestions. Its
+  // threshold-crossing PostHog signals into bug findings and PM Agent signals. Its
   // own label because the input is telemetry aggregates rather than an
   // analytics window, so its token profile tracks detector count, not date range.
   UX_SIGNALS = 'ux_signals',

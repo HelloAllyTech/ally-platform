@@ -4,6 +4,12 @@ import { BuilderSession } from 'src/builder/entity/builder-session.entity';
 import { BuilderSettings } from 'src/builder/entity/builder-settings.entity';
 import { BuilderPullRequest } from 'src/builder/entity/builder-pull-request.entity';
 import { NotificationModule } from 'src/notification/notification.module';
+import { AnalyticsModule } from 'src/analytics/analytics.module';
+import { LlmUsageModule } from 'src/analytics/llm-usage.module';
+import { AppConfigModule } from 'src/config/config.module';
+import { LlmModule } from 'src/llm/llm.module';
+import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
+import { PromptModule } from 'src/prompt/prompt.module';
 import { ProductRoadmapModule } from 'src/product-roadmap/product-roadmap.module';
 import { PmAgentController } from './controller/pm-agent.controller';
 import { PmAgentGateway } from './gateway/pm-agent.gateway';
@@ -39,10 +45,15 @@ import { PmAgentCardService } from './service/pm-agent-card.service';
 import { PmAgentEventsService } from './service/pm-agent-events.service';
 import { PmAgentMemoryService } from './service/pm-agent-memory.service';
 import { PmAgentPresenterService } from './service/pm-agent-presenter.service';
+import { PM_AGENT_RUN_TRIGGER } from './service/pm-agent-run-trigger';
 import {
-  NoopPmAgentRunTrigger,
-  PM_AGENT_RUN_TRIGGER,
-} from './service/pm-agent-run-trigger';
+  PmAgentRunSchedulerService,
+  PmAgentRunService,
+} from './service/pm-agent-run.service';
+import { PmAgentLlmService } from './pipeline/pm-agent-llm.service';
+import { PmAgentPipelineStore } from './pipeline/pm-agent-pipeline.store';
+import { PmAgentContextService } from './pipeline/pm-agent-context.service';
+import { PmLaneToolsService } from './lane/pm-lane-tools.service';
 import { PmAgentSchedulerService } from './service/pm-agent-scheduler.service';
 import { PmAgentSettingsService } from './service/pm-agent-settings.service';
 import { PmAgentStateService } from './service/pm-agent-state.service';
@@ -50,9 +61,9 @@ import { PmAgentStateService } from './service/pm-agent-state.service';
 /**
  * PM Agent (docs/pm-agent.md): the admin AI product manager. This module is the
  * deterministic half — state, queue, budget read-out, the card state machine, the accept
- * outbox and Builder wiring, the realtime feed. The generation pipeline (lanes, critic,
- * ranker, daily scheduler) plugs in by providing PM_AGENT_RUN_TRIGGER and writing cards
- * through the repositories exported here.
+ * outbox and Builder wiring, the realtime feed — and the generation pipeline (lanes, gate,
+ * critic, ranker, Persister, daily scheduler: pipeline/, lane/, gate/, learning/), which
+ * provides PM_AGENT_RUN_TRIGGER through PmAgentRunService.
  *
  * Builder is reached lazily through ModuleRef (PmAgentBuilderPort), never imported: Builder's
  * module graph reaches UX Signals and much else, and Builder must not depend on us either —
@@ -82,6 +93,14 @@ import { PmAgentStateService } from './service/pm-agent-state.service';
     ProductRoadmapModule,
     // SlackService, for the circuit breaker's one notification.
     NotificationModule,
+    // The pipeline: the 15 exported analytics read services (lane tools), prompts, model
+    // resolution + provider adapters, and llm_usage metering.
+    AppConfigModule,
+    AnalyticsModule,
+    PromptModule,
+    LlmModule,
+    LlmAgentModule,
+    LlmUsageModule,
   ],
   controllers: [PmAgentController],
   providers: [
@@ -107,7 +126,13 @@ import { PmAgentStateService } from './service/pm-agent-state.service';
     PmAgentBuildService,
     PmAgentSchedulerService,
     PmAgentGateway,
-    { provide: PM_AGENT_RUN_TRIGGER, useClass: NoopPmAgentRunTrigger },
+    PmAgentLlmService,
+    PmAgentPipelineStore,
+    PmAgentContextService,
+    PmLaneToolsService,
+    PmAgentRunService,
+    PmAgentRunSchedulerService,
+    { provide: PM_AGENT_RUN_TRIGGER, useExisting: PmAgentRunService },
   ],
   exports: [
     PmAgentSettingsRepository,

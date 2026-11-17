@@ -33,8 +33,8 @@ import { UxSignalsService } from '../service/ux-signals.service';
  *
  * Two endpoints and no decision endpoints, deliberately. A scan's *output* is
  * reviewed where the rest of that queue's work already is — bugs in Bug Hunter,
- * suggestions in the Analytics Suggestions tab — so there is no third review UI
- * to learn and no second approve/reject flow to keep consistent with the first.
+ * improvements as evidence the PM Agent reads — so there is no extra review UI
+ * to learn and no second approve/reject flow to keep consistent.
  * This controller only starts scans and reports on them.
  *
  * Gated on the UX_SIGNALS feature toggle, at the same role tier as the rest of
@@ -56,8 +56,8 @@ export class UxSignalsController {
     description:
       'Runs every detector over the last seven days of telemetry, sends what crossed ' +
       'a threshold to the model for clustering and classification, and files the ' +
-      'result into the two existing review queues: bug-shaped items become Bug Hunter ' +
-      'findings at NEW, improvement-shaped ones become pending Analytics Suggestions.\n\n' +
+      'result: bug-shaped items become Bug Hunter findings at NEW, improvement-shaped ' +
+      'ones are stored as UX signals the PM Agent reads as evidence.\n\n' +
       'NOTHING IS ACTIONED AUTOMATICALLY. No fix session is dispatched and no roadmap ' +
       'opportunity is filed — both remain human decisions behind their existing gates.\n\n' +
       'ASYNCHRONOUS: this returns 202 as soon as the scan row is claimed, and the work ' +

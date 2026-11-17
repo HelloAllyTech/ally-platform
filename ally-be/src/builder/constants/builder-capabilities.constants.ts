@@ -218,11 +218,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     reuseWhen:
       'A request wants a new chart, metric or dashboard for admins. Add a chart to the registry ' +
       'and an endpoint; do not build a separate dashboard page.',
-    modules: [
-      'ally-be:src/analytics',
-      'ally-be:src/analytics-agent',
-      'ally-be:src/analytics-suggestions',
-    ],
+    modules: ['ally-be:src/analytics', 'ally-be:src/analytics-agent'],
     adminRoute: '/analytics',
     keywords: ['chart', 'dashboard', 'metric', 'report', 'analytics', 'kpi'],
   },

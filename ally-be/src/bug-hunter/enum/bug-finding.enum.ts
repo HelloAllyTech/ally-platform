@@ -1,6 +1,6 @@
 /**
  * Where a finding came from. `character varying` with a CHECK constraint, per
- * repo convention (see AnalyticsSuggestionStatus) — not a Postgres enum.
+ * repo convention — not a Postgres enum.
  *
  * The first four are Bug Hunter's own finders (see `.claude/workflows/bug-hunt.mjs`).
  * `REPORTED_BUG` additionally exists from the moment a human files a roadmap

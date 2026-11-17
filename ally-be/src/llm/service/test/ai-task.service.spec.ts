@@ -35,7 +35,6 @@ const configStub = {
   },
   anthropic: {
     autofillModel: 'claude-sonnet-4-6',
-    suggestionsModel: 'claude-sonnet-4-6',
   },
   characterInterview: { model: 'gpt-5-mini' },
   courseCopilot: { model: 'gpt-5-mini' },

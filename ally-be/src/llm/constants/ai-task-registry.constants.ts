@@ -1926,28 +1926,13 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configPath: 'imageStudio.judgeModel',
   },
   {
-    id: 'analytics-suggestions',
-    task: LlmTask.ANALYTICS_SUGGESTIONS,
-    runtime: LlmRuntime.ALLY_BE,
-    tier: LlmModelTier.REASONING,
-    trigger: 'An admin clicks Generate on the Suggestions tab',
-    detail:
-      'A whole analytics window in, at most ten roadmap suggestions out — the one place a ' +
-      'larger model may be worth the latency, so it has its own env var.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'openai',
-    defaultModel: 'gpt-5-mini',
-    configuredBy: 'LLM_REASONING_MODEL',
-    promptOverride: 'analytics_suggestions_generate',
-  },
-  {
     id: 'ux-signals',
     task: LlmTask.UX_SIGNALS,
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger: 'Scheduled: the UX Signals scan triages PostHog',
     detail:
-      'Threshold-crossing detectors become bug findings and roadmap suggestions. Its token ' +
+      'Threshold-crossing detectors become bug findings and PM Agent signals. Its token ' +
       'profile tracks detector count, not date range.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
@@ -1955,22 +1940,73 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configuredBy: 'LLM_REASONING_MODEL',
     promptOverride: 'ux_signals_triage',
   },
+  // PM Agent (src/pm-agent, docs/pm-agent.md): one row per prompt, all labelled `pm_agent`
+  // so the agent's monthly budget sums them. Each pass of a lane is one call and one
+  // llm_usage row; every call first reserves its maximum cost in the run's ledger, so a
+  // cap-full or queue-full day makes no call at all. Model: the prompt row in Skills Store,
+  // else the tier; a provider with no key or a failing call falls back to the tier model on
+  // OpenAI. When the budget runs short a lane drops to LLM_FAST_MODEL.
+  ...(
+    [
+      [
+        'analytics',
+        'the platform analytics aggregates (15 dashboard sections)',
+      ],
+      [
+        'ux-signals',
+        'UX Signals findings (pm_agent_signals); skipped when there are none',
+      ],
+      [
+        'code-health',
+        'the docs, code and product map through Builder’s GitHub read tools',
+      ],
+      ['infra-cost', 'llm_usage spend aggregates and this registry'],
+      [
+        'strategy-content',
+        'the mandate, Vision & strategy page, product goals, roadmap and interview notes',
+      ],
+      [
+        'revisions',
+        "an admin's feedback on a closed card (runs first; Revise now runs it alone)",
+      ],
+    ] as const
+  ).map(
+    ([lane, reads]): AiTaskEntry => ({
+      id: `pm-agent-lane-${lane}`,
+      task: LlmTask.PM_AGENT,
+      runtime: LlmRuntime.ALLY_BE,
+      tier: LlmModelTier.REASONING,
+      trigger:
+        'Scheduled daily at the PM Agent’s run hour (or Run now) while it is enabled, has budget ' +
+        'and has free queue slots',
+      detail:
+        `PM Agent ${lane} lane: a read-only tool loop over ${reads}, at most 6 passes of ` +
+        '4,000 output tokens, ending in one submit_candidates call (one repair retry). ' +
+        'Mandate, strategy page and product map ride in a cached system block.',
+      kind: AiTaskKind.COMPLETION,
+      provider: 'openai',
+      defaultModel: 'gpt-5-mini',
+      configuredBy: 'LLM_REASONING_MODEL',
+      promptOverride: `pm_agent_lane_${lane.replace(/-/g, '_')}`,
+    }),
+  ),
   {
-    id: 'pm-agent',
+    id: 'pm-agent-critic',
     task: LlmTask.PM_AGENT,
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger:
-      'Scheduled daily (or Run now) while the PM Agent is enabled and its queue has free slots',
+      'A PM Agent run has candidate cards that passed the deterministic and dedupe gates',
     detail:
-      "The admin PM Agent's bounded analysis lanes, critic and ranker, producing at most " +
-      'queueCap recommendation/question cards. Spend is capped by the monthly budget in ' +
-      'pm_agent_settings (reserve-before-spend, IST month); a full queue costs nothing. ' +
-      'Per-lane rows are added with the pipeline.',
+      'One call per run reviews up to 12 candidates against a written rubric (submit_verdicts, ' +
+      '3,000 output tokens). Fail-closed: if it cannot run, no card reaches the feed. Its ' +
+      'share of the run budget is held back from the lanes. Pick a different model family ' +
+      'from the lanes in Skills Store to reduce correlated blind spots.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
     configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'pm_agent_critic',
   },
   {
     id: 'foundational-skills-judge',

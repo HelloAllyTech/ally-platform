@@ -65,4 +65,37 @@ export class PmAgentBudgetService {
     }
     return { spentUsd: Number(spentUsd.toFixed(4)), approximate };
   }
+
+  /**
+   * What the month has already committed: priced `llm_usage` spend plus the open
+   * reservations of running runs (their reserved cap minus what they have recorded as
+   * spent). The run guard subtracts this from the monthly budget before reserving a new
+   * run's cap — reserve-before-spend at month level (plan §10).
+   */
+  async committedThisMonthUsd(now: Date = new Date()): Promise<number> {
+    const [{ spentUsd }, rows] = await Promise.all([
+      this.spentThisMonthUsd(now),
+      this.dataSource.query(
+        `SELECT COALESCE(SUM(GREATEST("reservedUsd" - "spentUsd", 0)), 0) AS reserved
+           FROM "pm_agent_runs" WHERE status = 'running'`,
+      ) as Promise<{ reserved: string | null }[]>,
+    ]);
+    return Number((spentUsd + Number(rows?.[0]?.reserved ?? 0)).toFixed(4));
+  }
+
+  /**
+   * The cap one run may reserve: what is left of the month, and never more than
+   * monthly ÷ `divisor` (≈ 20 runs a month). Zero when the month is used up.
+   */
+  static runCapUsd(
+    monthlyBudgetUsd: number,
+    committedUsd: number,
+    divisor: number,
+  ): number {
+    const cap = Math.min(
+      monthlyBudgetUsd - committedUsd,
+      monthlyBudgetUsd / divisor,
+    );
+    return Number(Math.max(0, cap).toFixed(4));
+  }
 }

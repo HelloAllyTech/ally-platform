@@ -345,11 +345,9 @@ erDiagram
     bug_findings ||--o{ bug_findings : "parentFindingId"
     bug_findings ||--o{ bug_hunt_events : "findingId"
     bug_findings ||--o{ bug_hunter_notifications : ""
-    analytics_suggestions ||--o{ bug_hunt_events : "suggestionId"
 
     roadmap_opportunities ||--o{ roadmap_opportunity_comments : "opportunityId"
     roadmap_opportunities ||--o{ roadmap_allocations : ""
-    roadmap_opportunities ||--o{ analytics_suggestions : ""
     users ||--o{ roadmap_opportunities : "ownerUserId"
     users ||--o{ roadmap_allocations : ""
     users ||--o{ roadmap_user_tab_order : ""
