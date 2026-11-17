@@ -141,3 +141,24 @@ export const slugify = (text: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60) || "plan";
+
+/** A metric value in its unit: percent/ratio as "38%", ms as "120 ms", usd as "$4.20". */
+export const formatMetricValue = (
+  value: number | null | undefined,
+  unit?: "percent" | "count" | "ms" | "usd" | "ratio",
+): string => {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  const round = (n: number) => (Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10);
+  switch (unit) {
+    case "percent":
+      return `${round(value)}%`;
+    case "ratio":
+      return `${round(value * 100)}%`;
+    case "ms":
+      return `${round(value)} ms`;
+    case "usd":
+      return formatUsd(value);
+    default:
+      return String(round(value));
+  }
+};

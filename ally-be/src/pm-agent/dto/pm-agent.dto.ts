@@ -21,6 +21,7 @@ import {
   PmCardStatus,
   PmRejectReasonChip,
 } from '../enum/pm-agent.enum';
+import type { PmImpactView } from '../impact/pm-agent-impact.service';
 
 // ── requests ────────────────────────────────────────────────────────────────
 
@@ -203,6 +204,24 @@ export class UpdatePmAgentSettingsDto {
   @IsOptional()
   @IsBoolean()
   autoBuildPaused?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Weekly lessons job on/off (default on).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  lessonsEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    minimum: PM_SETTINGS_LIMITS.LESSONS_WEEKDAY_MIN,
+    maximum: PM_SETTINGS_LIMITS.LESSONS_WEEKDAY_MAX,
+    description: 'IST weekday of the lessons job, 0 = Sunday … 6 = Saturday.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(PM_SETTINGS_LIMITS.LESSONS_WEEKDAY_MIN)
+  @Max(PM_SETTINGS_LIMITS.LESSONS_WEEKDAY_MAX)
+  lessonsWeekday?: number;
 }
 
 export class UpdateMemoryDto {
@@ -239,6 +258,8 @@ export interface PmDelivery {
   status: string | null;
   prs: PmDeliveryPr[];
   costUsd: number | null;
+  /** Impact checks (+14 / +30 d); absent when the card has no `metricRef`. */
+  impact?: PmImpactView;
 }
 
 export interface PmCardResponse {
@@ -303,6 +324,8 @@ export interface PmSettingsResponse {
   autoBuildPausedReason: string | null;
   autoBuildPausedAt: string | null;
   updatedAt: string;
+  lessonsEnabled: boolean;
+  lessonsWeekday: number;
 }
 
 export interface PmRunResponse {
@@ -346,13 +369,49 @@ export interface PmMemoryResponse {
   updatedAt: string;
 }
 
-export interface PmHealthResponse {
+/** A weekly-job lesson (docs/pm-agent.md, "Weekly lessons"). `lane` is additive. */
+export interface PmLessonResponse {
+  id: string;
+  text: string;
+  scope: 'global' | 'category' | 'lane';
+  category?: string;
+  lane?: string;
+  status: 'proposed' | 'active' | 'expired' | 'removed';
+  source: 'weekly_job' | 'manual';
+  supportCount: number;
+  supportRatio: number;
+  evidenceCardIds: string[];
+  evalResult?: {
+    passed: boolean;
+    agreementBefore: number;
+    agreementAfter: number;
+    sampleSize: number;
+  };
+  requiresConfirm: boolean;
+  createdAt: string;
+  lastSupportedAt: string | null;
+  expiresAt: string | null;
+}
+
+/** GET /health additions for lessons (lessons/pm-lessons.service.ts). */
+export interface PmLessonHealth {
+  activeLessons: number;
+  proposedLessons: number;
+  /** Mean (agreementAfter − agreementBefore) over active lessons with an eval; null if none. */
+  lessonAgreementDelta: number | null;
+}
+
+export interface PmHealthResponse extends Partial<PmLessonHealth> {
   acceptRate7d: number | null;
   acceptRate30d: number | null;
   shippedRate: number | null;
   costPerAcceptedCardUsd: number | null;
   spendByLane: { lane: string; costUsd: number }[];
   repeatedRejectionRate: number | null;
+  /** +14 d impact checks with a verdict (impact checks, v1.1). */
+  impactMeasuredCount?: number;
+  /** Share of those that improved; null when none is measured yet. */
+  impactImprovedRate?: number | null;
 }
 
 export interface PmTrackingResponse {

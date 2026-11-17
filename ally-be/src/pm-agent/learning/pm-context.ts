@@ -90,18 +90,20 @@ export function memoryBlock(facts: PmAgentMemory[]): string {
   ].join('\n');
 }
 
+/** Effective-positive: shipped (merged) and its measured impact, if any, was not worse. */
 const isPositive = (row: PmOutcomeRow) =>
   (row.decision === PmDecision.ACCEPTED ||
     row.decision === PmDecision.HANDED_OFF) &&
   (row.merged || row.released) &&
   !row.buildFailed &&
-  !row.reverted;
+  !row.reverted &&
+  row.impactVerdict !== 'worse';
 
 const isNegative = (row: PmOutcomeRow) =>
   row.decision === PmDecision.REJECTED ||
   ((row.decision === PmDecision.ACCEPTED ||
     row.decision === PmDecision.HANDED_OFF) &&
-    (row.buildFailed || row.reverted));
+    (row.buildFailed || row.reverted || row.impactVerdict === 'worse'));
 
 /**
  * The exemplar bank (plan §9b loop 2): the nearest shipped-and-merged cards (positives) and
@@ -150,10 +152,22 @@ export function exemplarBlock(picked: {
         `Title: ${row.title}`,
         `Why: ${row.payload?.whyHeadline ?? ''}`,
         polarity === 'rejected'
-          ? `Outcome: ${row.reverted ? 'reverted' : row.buildFailed ? 'build failed' : 'rejected'}${
+          ? `Outcome: ${
+              row.reverted
+                ? 'reverted'
+                : row.buildFailed
+                  ? 'build failed'
+                  : row.impactVerdict === 'worse'
+                    ? 'shipped, and its impact metric got worse'
+                    : 'rejected'
+            }${
               row.reasonChip ? ` (${row.reasonChip.replace(/_/g, ' ')})` : ''
             }${row.reason ? `: ${row.reason}` : ''}`
-          : `Outcome: accepted and ${row.released ? 'released' : 'merged'}`,
+          : `Outcome: accepted and ${row.released ? 'released' : 'merged'}${
+              row.impactVerdict === 'improved'
+                ? '; its impact metric improved'
+                : ''
+            }`,
       ].join('\n'),
       600,
     );

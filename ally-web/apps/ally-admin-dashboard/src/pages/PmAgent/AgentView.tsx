@@ -7,17 +7,21 @@ import {
   CarbonToggle,
   ContentSwitcher,
   NumberInput,
+  Select,
+  SelectItem,
   SkeletonText,
   Switch,
   TextArea,
   TextInput,
 } from "@ally-ui-mono/ui-shared";
 import {
+  useConfirmPmAgentLessonMutation,
   useDeletePmAgentMemoryMutation,
   useGetPmAgentHealthQuery,
   useGetPmAgentHistoryQuery,
   useGetPmAgentMemoryQuery,
   useGetPmAgentFeedStateQuery,
+  useRunPmAgentLessonsMutation,
   useUpdatePmAgentMemoryMutation,
 } from "@api";
 import type { PmAgentStateResponse, PmLesson, PmSettingsPatch } from "@types";
@@ -49,6 +53,8 @@ export const validateSettings = (input: {
   cap: string;
   hour: string;
   mandate: string;
+  /** Omitted when the backend has no weekly lessons yet. */
+  weekday?: string;
 }): { patch?: PmSettingsPatch; errors: Record<string, string> } => {
   const errors: Record<string, string> = {};
   const budget = Number(input.budget);
@@ -59,6 +65,12 @@ export const validateSettings = (input: {
   if (!Number.isInteger(cap) || cap < 1 || cap > 10) errors.cap = a.invalidCap;
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) errors.hour = a.invalidHour;
   if (!input.mandate.trim()) errors.mandate = a.mandateRequired;
+  const weekday = Number(input.weekday);
+  if (
+    input.weekday !== undefined &&
+    (input.weekday.trim() === "" || !Number.isInteger(weekday) || weekday < 0 || weekday > 6)
+  )
+    errors.weekday = a.invalidWeekday;
   if (Object.keys(errors).length) return { errors };
   return {
     errors,
@@ -67,6 +79,7 @@ export const validateSettings = (input: {
       queueCap: cap,
       runHourIst: hour,
       mandate: input.mandate.trim(),
+      ...(input.weekday !== undefined ? { lessonsWeekday: weekday } : {}),
     },
   };
 };
@@ -78,6 +91,8 @@ const SettingsSection: React.FC<{ state: PmAgentStateResponse }> = ({ state }) =
   const [cap, setCap] = useState(String(settings.queueCap));
   const [hour, setHour] = useState(String(settings.runHourIst));
   const [mandate, setMandate] = useState(settings.mandate);
+  const hasLessons = settings.lessonsEnabled !== undefined || settings.lessonsWeekday !== undefined;
+  const [weekday, setWeekday] = useState(String(settings.lessonsWeekday ?? 1));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Pick up server changes (another tab, a socket push) unless the user is mid-edit.
@@ -86,7 +101,14 @@ const SettingsSection: React.FC<{ state: PmAgentStateResponse }> = ({ state }) =
     setCap(String(settings.queueCap));
     setHour(String(settings.runHourIst));
     setMandate(settings.mandate);
-  }, [settings.monthlyBudgetUsd, settings.queueCap, settings.runHourIst, settings.mandate]);
+    setWeekday(String(settings.lessonsWeekday ?? 1));
+  }, [
+    settings.monthlyBudgetUsd,
+    settings.queueCap,
+    settings.runHourIst,
+    settings.mandate,
+    settings.lessonsWeekday,
+  ]);
 
   const pct =
     budget.monthlyBudgetUsd > 0
@@ -94,7 +116,13 @@ const SettingsSection: React.FC<{ state: PmAgentStateResponse }> = ({ state }) =
       : 0;
 
   const submit = async () => {
-    const result = validateSettings({ budget: budgetText, cap, hour, mandate });
+    const result = validateSettings({
+      budget: budgetText,
+      cap,
+      hour,
+      mandate,
+      weekday: hasLessons ? weekday : undefined,
+    });
     setErrors(result.errors);
     if (!result.patch) return;
     await controls.save(result.patch, a.saved);
@@ -177,6 +205,26 @@ const SettingsSection: React.FC<{ state: PmAgentStateResponse }> = ({ state }) =
         </div>
       </div>
 
+      {hasLessons && (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-end gap-2">
+            <Select
+              id="pm-lessons-weekday"
+              labelText={a.lessonsWeekday}
+              value={weekday}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setWeekday(e.target.value)}
+              invalid={Boolean(errors.weekday)}
+              invalidText={errors.weekday ?? ""}
+            >
+              {a.weekdays.map((name, i) => (
+                <SelectItem key={name} value={String(i)} text={name} />
+              ))}
+            </Select>
+            <InfoTip label={a.lessonsWeekdayTip} ariaLabel="About the lesson day" />
+          </div>
+        </div>
+      )}
+
       <div>
         <TextArea
           id="pm-mandate"
@@ -230,6 +278,19 @@ const SettingsSection: React.FC<{ state: PmAgentStateResponse }> = ({ state }) =
           />
           <InfoTip label={a.slackNotifyTip} ariaLabel="About Slack notifications" />
         </div>
+        {hasLessons && (
+          <div className="flex items-center gap-2">
+            <CarbonToggle
+              id="pm-lessons-enabled"
+              labelText={a.lessonsEnabled}
+              labelA="Off"
+              labelB="On"
+              toggled={settings.lessonsEnabled ?? true}
+              onToggle={(v: boolean) => controls.save({ lessonsEnabled: v })}
+            />
+            <InfoTip label={a.lessonsEnabledTip} ariaLabel="About weekly lessons" />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -324,13 +385,208 @@ const FactRow: React.FC<{ id: string; value: string; active?: boolean }> = ({
   );
 };
 
-const lessonText = (l: PmLesson): string => l.text ?? l.lesson ?? l.summary ?? "";
+const LESSON_GROUPS = ["proposed", "active", "expired"] as const;
+
+const LessonRow: React.FC<{ lesson: PmLesson }> = ({ lesson }) => {
+  const [confirm, { isLoading: confirming }] = useConfirmPmAgentLessonMutation();
+  const [update] = useUpdatePmAgentMemoryMutation();
+  const [remove] = useDeletePmAgentMemoryMutation();
+  const [editing, setEditing] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [text, setText] = useState(lesson.text);
+  const [error, setError] = useState<string | null>(null);
+  const proposed = lesson.status === "proposed";
+  const ev = lesson.evalResult;
+
+  const keep = async () => {
+    try {
+      await confirm(lesson.id).unwrap();
+      toast.success(a.lessonConfirmed);
+    } catch {
+      toast.error(a.lessonConfirmFailed);
+    }
+  };
+  const save = async () => {
+    if (!text.trim()) {
+      setError(a.lessonEmptyText);
+      return;
+    }
+    try {
+      await update({ id: lesson.id, value: text.trim() }).unwrap();
+      toast.success(a.lessonSaved);
+      setEditing(false);
+      setError(null);
+    } catch {
+      toast.error(a.lessonFailed);
+    }
+  };
+  const del = async () => {
+    try {
+      await remove(lesson.id).unwrap();
+      toast.success(a.lessonRemoved);
+    } catch {
+      toast.error(a.lessonFailed);
+    }
+  };
+
+  return (
+    <li className="flex flex-col gap-2 rounded border border-neutral-500 p-3">
+      {editing ? (
+        <>
+          <TextArea
+            id={`lesson-${lesson.id}`}
+            labelText="Lesson"
+            hideLabel
+            rows={3}
+            value={text}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+              setText(e.target.value);
+              setError(null);
+            }}
+            invalid={Boolean(error)}
+            invalidText={error ?? ""}
+          />
+          <div className="flex gap-2">
+            <Button size="sm" onClick={save}>
+              {a.lessonSave}
+            </Button>
+            <Button
+              size="sm"
+              kind="ghost"
+              onClick={() => {
+                setEditing(false);
+                setText(lesson.text);
+                setError(null);
+              }}
+            >
+              {a.lessonCancel}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-typography-900">{lesson.text}</p>
+      )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-typography-700">
+        <span className="rounded border border-neutral-500 px-1.5 py-0.5">
+          {a.lessonScopeLabel(lesson.scope, lesson.category)}
+        </span>
+        <span>{a.lessonSupport(lesson.supportCount ?? 0, formatPercent(lesson.supportRatio))}</span>
+        {lesson.source === "manual" && <span>{a.lessonManual}</span>}
+      </div>
+      <p className="text-xs text-typography-700">
+        {ev ? (
+          <>
+            <span aria-hidden="true">{ev.passed ? "✓ " : "⚠ "}</span>
+            {(ev.passed ? a.lessonEvalPassed : a.lessonEvalFailed)(
+              ev.sampleSize,
+              formatPercent(ev.agreementBefore),
+              formatPercent(ev.agreementAfter),
+            )}
+          </>
+        ) : (
+          a.lessonEvalNone
+        )}
+      </p>
+      {!editing &&
+        (removing ? (
+          <div
+            className="flex flex-wrap items-center gap-2"
+            role="group"
+            aria-label={a.lessonRemovePrompt}
+          >
+            <span className="text-sm text-typography-800">{a.lessonRemovePrompt}</span>
+            <Button size="sm" kind="danger" onClick={del}>
+              {a.lessonRemoveConfirm}
+            </Button>
+            <Button size="sm" kind="ghost" onClick={() => setRemoving(false)}>
+              {a.lessonCancel}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-1">
+            {proposed && (
+              <>
+                <Button
+                  size="sm"
+                  kind={lesson.requiresConfirm ? "primary" : "tertiary"}
+                  disabled={confirming}
+                  onClick={keep}
+                >
+                  {a.lessonKeep}
+                </Button>
+                <InfoTip
+                  label={lesson.requiresConfirm ? a.lessonKeepTip : a.lessonKeepTipPlain}
+                  ariaLabel="About keeping this lesson"
+                />
+              </>
+            )}
+            <Button size="sm" kind="tertiary" onClick={() => setEditing(true)}>
+              {a.lessonEdit}
+            </Button>
+            <Button size="sm" kind="ghost" onClick={() => setRemoving(true)}>
+              {a.lessonRemove}
+            </Button>
+          </div>
+        ))}
+    </li>
+  );
+};
+
+const LessonsSection: React.FC<{ lessons: PmLesson[] }> = ({ lessons }) => {
+  const [runLessons, { isLoading: running }] = useRunPmAgentLessonsMutation();
+  const run = async () => {
+    try {
+      const res = await runLessons().unwrap();
+      if (res.started) toast.success(a.lessonsRunStarted);
+      else toast.message(a.lessonsRunNotStarted(res.reason));
+    } catch {
+      toast.error(a.lessonsRunFailed);
+    }
+  };
+  const visible = lessons.filter(l => l && l.text && l.status !== "removed");
+  return (
+    <section aria-label={a.lessonsTitle} className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-base font-semibold text-typography-900">{a.lessonsTitle}</h3>
+        <span className="flex items-center gap-1">
+          <Button kind="tertiary" size="sm" disabled={running} onClick={run}>
+            {running ? a.lessonsRunning : a.lessonsRun}
+          </Button>
+          <InfoTip label={a.lessonsRunTip} ariaLabel="About running the lesson review" />
+        </span>
+      </div>
+      {visible.length === 0 ? (
+        <p className="text-sm text-typography-600">{a.lessonsEmpty}</p>
+      ) : (
+        <>
+          <p className="text-sm text-typography-700">{a.lessonsIntro}</p>
+          {LESSON_GROUPS.map(g => {
+            const items = visible.filter(l => l.status === g);
+            if (items.length === 0) return null;
+            return (
+              <section key={g} aria-label={a.lessonGroups[g]} className="flex flex-col gap-2">
+                <h4 className="text-sm font-semibold text-typography-800">
+                  {a.lessonGroups[g]} <span className="font-normal">({items.length})</span>
+                </h4>
+                <ul className="flex flex-col gap-2">
+                  {items.map(l => (
+                    <LessonRow key={l.id} lesson={l} />
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+        </>
+      )}
+    </section>
+  );
+};
 
 const MemorySection: React.FC = () => {
   const { data, isLoading } = useGetPmAgentMemoryQuery();
   if (isLoading) return <SkeletonText paragraph lineCount={3} />;
   const facts = data?.facts ?? [];
-  const lessons = (data?.lessons ?? []).filter(l => lessonText(l));
+  const lessons = data?.lessons ?? [];
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <section aria-label={a.sections.memory} className="flex flex-col gap-2">
@@ -345,18 +601,7 @@ const MemorySection: React.FC = () => {
           </ul>
         )}
       </section>
-      <section aria-label={a.lessonsTitle} className="flex flex-col gap-2">
-        <h3 className="text-base font-semibold text-typography-900">{a.lessonsTitle}</h3>
-        {lessons.length === 0 ? (
-          <p className="text-sm text-typography-600">{a.lessonsEmpty}</p>
-        ) : (
-          <ul className="list-disc pl-5 text-sm text-typography-800">
-            {lessons.map((l, i) => (
-              <li key={l.id ?? i}>{lessonText(l)}</li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <LessonsSection lessons={lessons} />
     </div>
   );
 };
@@ -393,6 +638,9 @@ const HistorySection: React.FC = () => {
   );
 };
 
+const countOrDash = (n: number | null | undefined): string =>
+  n === null || n === undefined || Number.isNaN(n) ? "-" : String(n);
+
 const HealthSection: React.FC = () => {
   const { data, isLoading, isError } = useGetPmAgentHealthQuery();
   if (isLoading) return <SkeletonText paragraph lineCount={3} />;
@@ -403,6 +651,23 @@ const HealthSection: React.FC = () => {
     { key: "shippedRate", value: formatPercent(data.shippedRate) },
     { key: "costPerAcceptedCardUsd", value: formatUsd(data.costPerAcceptedCardUsd) },
     { key: "repeatedRejectionRate", value: formatPercent(data.repeatedRejectionRate) },
+    { key: "impactMeasuredCount", value: countOrDash(data.impactMeasuredCount) },
+    { key: "impactImprovedRate", value: formatPercent(data.impactImprovedRate) },
+    { key: "activeLessons", value: countOrDash(data.activeLessons) },
+    { key: "proposedLessons", value: countOrDash(data.proposedLessons) },
+    {
+      key: "lessonAgreementDelta",
+      value:
+        data.lessonAgreementDelta == null || Number.isNaN(data.lessonAgreementDelta)
+          ? "-"
+          : `${data.lessonAgreementDelta > 0 ? "+" : ""}${
+              Math.round(
+                (Math.abs(data.lessonAgreementDelta) <= 1
+                  ? data.lessonAgreementDelta * 100
+                  : data.lessonAgreementDelta) * 10,
+              ) / 10
+            } pts`,
+    },
   ];
   const lanes = Object.entries(data.spendByLane ?? {});
   return (

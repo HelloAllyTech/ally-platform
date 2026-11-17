@@ -9,13 +9,14 @@ import {
   useGetPmAgentTrackingQuery,
   useRetryPmAgentCardMutation,
 } from "@api";
-import type { PmCard } from "@types";
+import type { PmCard, PmImpactCheck, PmImpactSummary } from "@types";
 
 import { copy } from "./copy";
-import { absoluteTime, formatUsd, relativeTime, stepIndex } from "./format";
+import { absoluteTime, formatMetricValue, formatUsd, relativeTime, stepIndex } from "./format";
 import { NeedsYouPanel } from "./NeedsYouPanel";
 import { BreakerBanner } from "./statePanels";
 import { usePmAgentControls } from "./usePmAgentControls";
+import { InfoTip } from "../../components/ally-guide/InfoTip";
 
 /** Six steps. Done, current and not-reached are words (hidden visually) as well as marks. */
 export const Stepper: React.FC<{ card: PmCard }> = ({ card }) => {
@@ -62,12 +63,90 @@ export const Stepper: React.FC<{ card: PmCard }> = ({ card }) => {
   );
 };
 
+const imp = copy.tracking.impact;
+
+const CheckStep: React.FC<{ check: PmImpactCheck; unit?: PmImpactSummary["unit"] }> = ({
+  check,
+  unit,
+}) => {
+  let text: string;
+  let when = check.dueAt;
+  if (check.status === "measured") {
+    when = check.readAt ?? check.dueAt;
+    const v =
+      check.value !== undefined ? formatMetricValue(check.value, unit) : imp.measuredNoValue;
+    const verdict = check.verdict ? ` (${imp.verdict[check.verdict] ?? check.verdict})` : "";
+    text = `${v}${verdict.toLowerCase()}`;
+  } else if (check.status === "pending") text = imp.pending(relativeTime(check.dueAt));
+  else if (check.status === "insufficient_data") text = imp.insufficient;
+  else text = imp.unavailable;
+  return (
+    <li className="text-xs text-typography-700" title={absoluteTime(when)}>
+      <span className="font-medium">{imp.day(check.day)}</span>
+      <span aria-hidden="true">: </span>
+      <span className="sr-only">: </span>
+      {text}
+    </li>
+  );
+};
+
+/** Impact of a shipped change: summary and verdict, baseline, and the +14 d / +30 d checks. */
+export const ImpactLine: React.FC<{ impact?: PmImpactSummary | null }> = ({ impact }) => {
+  if (!impact || !impact.metricName) {
+    return (
+      <div className="flex items-center gap-1 text-xs text-typography-600">
+        {imp.notMeasurable}
+        <InfoTip label={imp.notMeasurableTip} ariaLabel="About impact not measurable" />
+      </div>
+    );
+  }
+  const checks = [...(impact.checks ?? [])].sort((x, y) => x.day - y.day);
+  const latest = [...checks].reverse().find(c => c.status === "measured" && c.verdict);
+  const verdict = latest?.verdict;
+  const hasBaseline = impact.baseline !== undefined && impact.baseline !== null;
+  return (
+    <div className="flex flex-col gap-1" aria-label={imp.label}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-typography-800">
+        <span>{impact.summary || impact.metricName}</span>
+        {verdict && (
+          <span
+            className={`rounded border px-1.5 py-0.5 text-xs font-medium ${
+              verdict === "improved"
+                ? "border-green-700 text-green-800"
+                : verdict === "worse"
+                  ? "border-red-700 text-red-800"
+                  : "border-neutral-500 text-typography-700"
+            }`}
+          >
+            <span aria-hidden="true">{imp.verdictIcon[verdict]} </span>
+            {imp.verdict[verdict]}
+          </span>
+        )}
+        {hasBaseline && (
+          <span className="flex items-center gap-1 text-xs text-typography-600">
+            {imp.baseline(formatMetricValue(impact.baseline, impact.unit))}
+            <InfoTip label={imp.baselineTip} ariaLabel="About the baseline" />
+          </span>
+        )}
+      </div>
+      {checks.length > 0 && (
+        <ul aria-label={imp.checksLabel} className="flex flex-wrap gap-x-4 gap-y-0.5">
+          {checks.map(c => (
+            <CheckStep key={c.day} check={c} unit={impact.unit} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 const Row: React.FC<{
   card: PmCard;
   needsYou?: boolean;
+  shipped?: boolean;
   onRetry: (id: string) => void;
   onDismiss: (id: string) => void;
-}> = ({ card, needsYou, onRetry, onDismiss }) => {
+}> = ({ card, needsYou, shipped, onRetry, onDismiss }) => {
   const when = card.decidedAt ?? card.createdAt;
   const prs = card.delivery?.prs ?? [];
   return (
@@ -96,6 +175,7 @@ const Row: React.FC<{
           <span>{copy.tracking.cost(formatUsd(card.delivery.costUsd))}</span>
         )}
       </div>
+      {shipped && <ImpactLine impact={card.delivery?.impact} />}
       {needsYou && <NeedsYouPanel card={card} onRetry={onRetry} onDismiss={onDismiss} />}
     </li>
   );
@@ -105,9 +185,10 @@ const Group: React.FC<{
   title: string;
   cards: PmCard[];
   needsYou?: boolean;
+  shipped?: boolean;
   onRetry: (id: string) => void;
   onDismiss: (id: string) => void;
-}> = ({ title, cards, needsYou, onRetry, onDismiss }) => (
+}> = ({ title, cards, needsYou, shipped, onRetry, onDismiss }) => (
   <section aria-label={title} className="flex flex-col gap-2">
     <h3 className="text-sm font-semibold uppercase tracking-wide text-typography-600">
       {title} <span className="font-normal">({cards.length})</span>
@@ -117,7 +198,14 @@ const Group: React.FC<{
     ) : (
       <ul className="flex flex-col gap-2">
         {cards.map(c => (
-          <Row key={c.id} card={c} needsYou={needsYou} onRetry={onRetry} onDismiss={onDismiss} />
+          <Row
+            key={c.id}
+            card={c}
+            needsYou={needsYou}
+            shipped={shipped}
+            onRetry={onRetry}
+            onDismiss={onDismiss}
+          />
         ))}
       </ul>
     )}
@@ -179,6 +267,7 @@ export const TrackingView: React.FC = () => {
           <Group
             title={copy.tracking.groups.shipped}
             cards={t.shipped}
+            shipped
             onRetry={onRetry}
             onDismiss={onDismiss}
           />

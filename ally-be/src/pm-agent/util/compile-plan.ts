@@ -1,4 +1,5 @@
 import { canonicalJson, sha256 } from './card-hash.util';
+import { metricDefinition } from '../impact/metric-catalog';
 import { scrubDeep, ScrubOptions } from './scrub.util';
 
 /**
@@ -44,6 +45,12 @@ export interface RecommendationPayload {
   riskWhy: string;
   rollbackNote: string;
   impactMetric: { name: string; direction: 'up' | 'down' };
+  /** Optional (impact checks): the catalog metric read after release. */
+  metricRef?: {
+    source: string;
+    params?: Record<string, string>;
+    betterWhen?: string;
+  };
   alternativesDropped: string[];
   repos: string[];
   evidenceIds: string[];
@@ -135,6 +142,13 @@ export function compilePlan(
   const metric = p.impactMetric.name
     ? `${p.impactMetric.name} (${p.impactMetric.direction === 'up' ? 'should go up' : 'should go down'})`
     : 'not named';
+  // Catalog wording only (never model text), so nothing here needs scrubbing.
+  const measured = metricDefinition(card.payload?.metricRef?.source);
+  const measuredLine = measured
+    ? `Measured after release: ${measured.label} (\`${measured.key}\`, ${measured.unit}, better ${
+        card.payload.metricRef?.betterWhen === 'down' ? 'down' : 'up'
+      }), platform-wide over the 14 days before release and again at +14 and +30 days.`
+    : 'Not automatically measured (no catalog metric attached).';
   const provenance =
     `Compiled from PM Agent card ${card.id} v${card.version} ` +
     `(hash ${card.versionHash.slice(0, 12)}). ` +
@@ -178,6 +192,7 @@ export function compilePlan(
     '',
     '## Impact to watch',
     metric,
+    measuredLine,
     '',
     '## Alternatives dropped',
     list(p.alternativesDropped),

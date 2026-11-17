@@ -8,6 +8,9 @@ export const copy = {
   title: "PM Agent",
   subtitle: "An AI product manager that proposes a few changes a day for you to decide on.",
   views: { review: "Review", tracking: "Tracking", agent: "Agent" },
+  agentBadge: (n: number) => `Agent (${n})`,
+  agentBadgeLabel: (n: number) =>
+    `Agent, ${n} lesson${n === 1 ? "" : "s"} waiting for you to confirm`,
   viewSwitcher: "PM Agent views",
   today: (toReview: number, needsYou: number) =>
     `Today · ${toReview} to review${needsYou > 0 ? ` · ${needsYou} needs you` : ""}`,
@@ -228,10 +231,35 @@ export const copy = {
     prState: "Open PR",
     loadError: "Couldn't load tracking.",
     noRevert: "",
+    impact: {
+      label: "Impact",
+      notMeasurable: "Impact not measurable",
+      notMeasurableTip:
+        "The agent couldn't tie this change to a metric it can read, so it won't check the result.",
+      baseline: (v: string) => `Baseline ${v}`,
+      baselineTip: "The metric over the 14 days before release.",
+      verdict: { improved: "Improved", flat: "Flat", worse: "Worse" } as Record<string, string>,
+      verdictIcon: { improved: "▲", flat: "■", worse: "▼" } as Record<string, string>,
+      checksLabel: "Impact checks",
+      pending: (rel: string) => `Due ${rel}`,
+      insufficient: "Not enough data to tell",
+      unavailable: "Couldn't read this metric",
+      measured: (v: string) => v,
+      measuredNoValue: "Measured",
+      day: (d: number) => `+${d} d`,
+      waiting: "Checking 14 and 30 days after release",
+    },
   },
 
   agent: {
     sections: { settings: "Settings", memory: "Memory", history: "History", health: "Health" },
+    lessonsEnabled: "Weekly lessons",
+    lessonsEnabledTip:
+      "Once a week the agent looks back over your decisions and writes down patterns it can use. Off means it stops learning new lessons; active ones stay in use.",
+    lessonsWeekday: "Lesson day",
+    lessonsWeekdayTip: "The weekday the agent reviews your decisions, in India time.",
+    weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    invalidWeekday: "Pick a day of the week.",
     switcher: "Agent sections",
     enabled: "Agent on",
     enabledTip: "The kill switch. Off means no runs and no spend.",
@@ -273,7 +301,51 @@ export const copy = {
     memoryFailed: "Couldn't update memory.",
     memoryInactive: "Not in use",
     lessonsTitle: "What I've learned",
-    lessonsEmpty: "No lessons yet. They appear once the agent has seen enough of your decisions.",
+    lessonsEmpty: "Lessons appear after a few weeks of decisions",
+    lessonsIntro:
+      "Patterns the agent found in your decisions. Active lessons shape what it proposes.",
+    lessonGroups: {
+      proposed: "Proposed (needs you)",
+      active: "Active",
+      expired: "Expired",
+    },
+    lessonScopeLabel: (scope: string, category?: string) => {
+      if (scope === "global") return "All cards";
+      const name = (category ?? "").replace(/_/g, " ");
+      const kind = scope === "lane" ? "Area" : "Category";
+      return name ? `${kind}: ${name}` : kind;
+    },
+    lessonSupport: (n: number, pct: string) => `Based on ${n} decisions (${pct} consistent)`,
+    lessonEvalPassed: (n: number, before: string, after: string) =>
+      `Checked against ${n} past decisions: agreement ${before} to ${after}`,
+    lessonEvalFailed: (n: number, before: string, after: string) =>
+      `Checked against ${n} past decisions: agreement ${before} to ${after}, so it was not activated`,
+    lessonEvalNone: "Not checked yet",
+    lessonManual: "Edited by you",
+    lessonKeep: "Keep",
+    lessonKeepTip:
+      "Makes this lesson active so the agent follows it. It needs your confirmation because it changes what whole groups of cards the agent proposes, or touches risk or size limits.",
+    lessonKeepTipPlain: "Makes this lesson active so the agent follows it.",
+    lessonConfirmed: "Lesson kept.",
+    lessonConfirmFailed: "Couldn't keep this lesson. It may have changed; reload and try again.",
+    lessonEdit: "Edit",
+    lessonSave: "Save",
+    lessonCancel: "Cancel",
+    lessonRemove: "Remove",
+    lessonRemoveConfirm: "Remove lesson",
+    lessonRemovePrompt: "Remove this lesson? The agent will stop using it.",
+    lessonEmptyText: "Write the lesson before saving.",
+    lessonSaved: "Lesson saved.",
+    lessonRemoved: "Lesson removed.",
+    lessonFailed: "Couldn't update the lesson.",
+    lessonsRun: "Run now",
+    lessonsRunning: "Running",
+    lessonsRunTip:
+      "Reviews your last 90 days of decisions now instead of waiting for the weekly run. It uses part of the monthly budget.",
+    lessonsRunStarted: "The agent started reviewing your decisions.",
+    lessonsRunNotStarted: (reason?: string) =>
+      reason ? `The review didn't start: ${reason}` : "The review didn't start.",
+    lessonsRunFailed: "Couldn't start the review.",
     historyEmpty: "No decided cards yet.",
     historyIntro: "Cards you rejected, answered, skipped or sent feedback on.",
     historyOutcome: {
@@ -292,6 +364,11 @@ export const copy = {
       shippedRate: "Shipped rate",
       costPerAcceptedCardUsd: "Cost per accepted card",
       repeatedRejectionRate: "Repeated rejection rate",
+      impactMeasuredCount: "Changes with measured impact",
+      impactImprovedRate: "Changes that improved their metric",
+      activeLessons: "Active lessons",
+      proposedLessons: "Lessons waiting for you",
+      lessonAgreementDelta: "Lessons effect on agreement",
     },
     metricTips: {
       acceptRate7d: "Share of decided cards you accepted in the last 7 days.",
@@ -300,6 +377,13 @@ export const copy = {
       costPerAcceptedCardUsd: "Agent spend divided by cards you accepted.",
       repeatedRejectionRate:
         "Share of rejections on ideas close to ones you rejected before. Lower is better.",
+      impactMeasuredCount:
+        "Shipped changes whose metric the agent has read at least once after release.",
+      impactImprovedRate: "Share of measured changes whose metric moved the right way.",
+      activeLessons: "Lessons the agent is following now.",
+      proposedLessons: "Lessons that need your confirmation before the agent follows them.",
+      lessonAgreementDelta:
+        "Average change in how often the agent's review agrees with your real decisions, from adding lessons. Above zero is better.",
     },
     spendByLane: "Spend by area",
     loadError: "Couldn't load settings.",

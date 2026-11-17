@@ -88,3 +88,21 @@ export const stateOf = (over: Partial<PmAgentStateResponse> = {}): PmAgentStateR
   autoBuildPaused: false,
   ...over,
 });
+
+export const lessonOf = (
+  id: string,
+  over: Partial<import("@types").PmLesson> = {},
+): import("@types").PmLesson => ({
+  id,
+  text: `Lesson ${id}`,
+  scope: "category",
+  category: "ui_ux",
+  status: "active",
+  source: "weekly_job",
+  supportCount: 8,
+  supportRatio: 0.82,
+  evidenceCardIds: [],
+  evalResult: { passed: true, agreementBefore: 0.7, agreementAfter: 0.75, sampleSize: 20 },
+  requiresConfirm: false,
+  ...over,
+});

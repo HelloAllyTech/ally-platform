@@ -1,20 +1,36 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PmAgentMemory } from '../entity/pm-agent-memory.entity';
 import { PmMemoryKind } from '../enum/pm-agent.enum';
-import { PmMemoryResponse, UpdateMemoryDto } from '../dto/pm-agent.dto';
+import {
+  PmLessonResponse,
+  PmMemoryResponse,
+  UpdateMemoryDto,
+} from '../dto/pm-agent.dto';
 import { PmAgentMemoryRepository } from '../repository/pm-agent.repositories';
+import {
+  lessonEditPatch,
+  lessonRemovePatch,
+  toLessonResponse,
+} from '../lessons/pm-lesson-admin';
+import { PmAgentEventsService } from './pm-agent-events.service';
 
 /**
  * The agent's memory, as the admin sees and edits it (Agent › Memory). Facts are data the
  * lanes retrieve, never instructions; an admin may correct, deactivate or delete any.
+ * Lessons (kind `lesson`, from the weekly job) share the routes but not the semantics:
+ * editing one makes it `manual` and active, deleting one marks it `removed` (soft, so the
+ * job does not propose it again) — see lessons/pm-lesson-admin.ts.
  */
 @Injectable()
 export class PmAgentMemoryService {
-  constructor(private readonly repository: PmAgentMemoryRepository) {}
+  constructor(
+    private readonly repository: PmAgentMemoryRepository,
+    private readonly events: PmAgentEventsService,
+  ) {}
 
   async list(): Promise<{
     facts: PmMemoryResponse[];
-    lessons: PmMemoryResponse[];
+    lessons: PmLessonResponse[];
   }> {
     const [facts, lessons] = await Promise.all([
       this.repository.listAll(PmMemoryKind.FACT),
@@ -22,7 +38,7 @@ export class PmAgentMemoryService {
     ]);
     return {
       facts: facts.map(PmAgentMemoryService.toResponse),
-      lessons: lessons.map(PmAgentMemoryService.toResponse),
+      lessons: lessons.map(toLessonResponse),
     };
   }
 
@@ -30,18 +46,36 @@ export class PmAgentMemoryService {
     userId: number,
     id: string,
     dto: UpdateMemoryDto,
-  ): Promise<PmMemoryResponse> {
+  ): Promise<PmMemoryResponse | PmLessonResponse> {
     const row = await this.load(id);
+    if (row.kind === PmMemoryKind.LESSON) {
+      const lessonPatch = lessonEditPatch(row, dto, userId, new Date());
+      await this.repository.update({ id }, lessonPatch as never);
+      this.events.stateUpdated();
+      return toLessonResponse({ ...row, ...lessonPatch });
+    }
     const patch: Partial<PmAgentMemory> = { updatedBy: userId };
     if (dto.value !== undefined) patch.value = dto.value.trim();
     if (dto.active !== undefined) patch.active = dto.active;
     await this.repository.update({ id }, patch);
+    this.events.stateUpdated();
     return PmAgentMemoryService.toResponse({ ...row, ...patch });
   }
 
-  async remove(id: string): Promise<PmMemoryResponse> {
+  /** Facts are deleted; a lesson becomes `removed` (soft). */
+  async remove(
+    id: string,
+    userId: number | null = null,
+  ): Promise<PmMemoryResponse | PmLessonResponse> {
     const row = await this.load(id);
+    if (row.kind === PmMemoryKind.LESSON) {
+      const lessonPatch = lessonRemovePatch(row, userId, new Date());
+      await this.repository.update({ id }, lessonPatch as never);
+      this.events.stateUpdated();
+      return toLessonResponse({ ...row, ...lessonPatch });
+    }
     await this.repository.delete({ id });
+    this.events.stateUpdated();
     return PmAgentMemoryService.toResponse(row);
   }
 

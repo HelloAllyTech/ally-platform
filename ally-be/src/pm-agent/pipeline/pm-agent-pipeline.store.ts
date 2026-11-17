@@ -326,12 +326,16 @@ export class PmAgentPipelineStore implements PmPipelineStore {
       `SELECT o."cardId", c.category, c.kind, c.title, c.payload, c.reason,
               c."reasonChip", o.decision, o."decidedAt", o.merged, o.released,
               o."buildFailed", o.reverted,
+              (SELECT i.verdict FROM pm_agent_outcomes i
+                WHERE i."cardId" = o."cardId" AND i.kind = 'impact'
+                  AND i.day = 14 AND i.status = 'measured') AS "impactVerdict",
               (SELECT e.detail->>'lane' FROM pm_agent_card_events e
                 WHERE e."cardId" = c.id AND e.type = 'created'
                 ORDER BY e."createdAt" ASC LIMIT 1) AS lane
          FROM pm_agent_outcomes o
          JOIN pm_agent_cards c ON c.id = o."cardId"
-        WHERE o."decidedAt" >= now() - ($1::int * interval '1 day')
+        WHERE o.kind = 'decision'
+          AND o."decidedAt" >= now() - ($1::int * interval '1 day')
           AND o.undone = false
         ORDER BY o."decidedAt" DESC
         LIMIT 1000`,
@@ -348,6 +352,7 @@ export class PmAgentPipelineStore implements PmPipelineStore {
       released: Boolean(row.released),
       buildFailed: Boolean(row.buildFailed),
       reverted: Boolean(row.reverted),
+      impactVerdict: row.impactVerdict ?? null,
       title: row.title,
       payload: row.payload ?? {},
       reason: row.reason ?? null,

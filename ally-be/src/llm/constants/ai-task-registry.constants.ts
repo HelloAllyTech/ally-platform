@@ -2009,6 +2009,26 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     promptOverride: 'pm_agent_critic',
   },
   {
+    id: 'pm-agent-lessons',
+    task: LlmTask.PM_AGENT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Weekly on the PM Agent’s lessons weekday at its run hour (IST), or Run lessons now, while ' +
+      'the agent and lessons are enabled and the month has budget',
+    detail:
+      'One reflection call over an anonymised pack of the last 90 days of card decisions and ' +
+      'outcomes (submit_lessons, 3,000 output tokens, one repair). Each surviving candidate is ' +
+      'then evaluated by replaying the pm-agent-critic row (same prompt and model) over up to 20 ' +
+      'past decided cards: one baseline call plus one per candidate, all counted in llm_usage ' +
+      'and the monthly budget; the eval share (60% of the job cap) is held back from the reflection.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'pm_agent_lessons',
+  },
+  {
     id: 'foundational-skills-judge',
     task: LlmTask.FOUNDATIONAL_SKILLS_ASSESSMENT,
     runtime: LlmRuntime.ALLY_BE,

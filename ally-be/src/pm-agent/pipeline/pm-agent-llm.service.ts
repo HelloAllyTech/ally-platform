@@ -47,6 +47,11 @@ export interface PmLlmStepRequest {
   maxTokens: number;
   timeoutMs: number;
   ledger: PmRunLedger;
+  /**
+   * Skip the `pm_agent_run_steps` row: set by callers with no `pm_agent_runs` row (the weekly
+   * lessons job), whose `runId` is a label. The `llm_usage` row is still written.
+   */
+  noTrace?: boolean;
 }
 
 export type PmLlmStepResult =
@@ -295,6 +300,7 @@ export class PmAgentLlmService implements PmLlmPort {
     started: number | null,
     detail: Record<string, unknown>,
   ): Promise<void> {
+    if (request.noTrace) return;
     try {
       await this.runSteps.insert({
         runId: request.runId,

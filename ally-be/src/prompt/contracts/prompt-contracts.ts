@@ -1255,6 +1255,22 @@ export const PM_AGENT_CRITIC = definePrompt(
   },
 );
 
+/** src/prompts/pm_agent/lessons.txt */
+export const PM_AGENT_LESSONS = definePrompt(
+  'pm_agent_lessons',
+  {},
+  {
+    name: 'PM Agent: Weekly lessons',
+    description:
+      "System prompt for the PM Agent's weekly reflection: reads an anonymised pack of the last 90 " +
+      'days of card decisions and outcomes (fenced as data) and proposes candidate lessons through ' +
+      'submit_lessons, each with a structured predicate. Code recomputes support from the data, ' +
+      'classifies which need an admin confirm, and replays the critic before any lesson is used.',
+    category: 'PM Agent',
+    runtimes: ['ally-be'],
+  },
+);
+
 /** Every contract, by prompt code. */
 /** src/prompts/agent_template_translation.txt */
 export const AGENT_TEMPLATE_TRANSLATION = definePrompt(

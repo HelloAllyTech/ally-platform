@@ -316,7 +316,9 @@ export class PmAgentOutcomeRepository extends Repository<PmAgentOutcome> {
           'undone',
           'impactMetricName',
         ],
-        ['cardId'],
+        // The decision row is (cardId, 'decision', 0): the insert leaves kind/day to their
+        // defaults, and the conflict target is the UNIQUE triple (migration 1982000000500).
+        ['cardId', 'kind', 'day'],
       )
       .execute();
   }
@@ -338,7 +340,7 @@ export class PmAgentOutcomeRepository extends Repository<PmAgentOutcome> {
       >
     > & { buildCostUsd?: string | null; reasonChip?: string | null },
   ): Promise<void> {
-    await this.update({ cardId }, flags);
+    await this.update({ cardId, kind: 'decision' }, flags);
   }
 }
 
