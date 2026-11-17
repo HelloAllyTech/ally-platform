@@ -87,17 +87,26 @@ export const summarizeCompletion = (criteria: unknown): string[] => {
   const strings = en.courseCopilotPane.completion;
   const phrases: string[] = [];
 
+  const logic = rule.completionLogic;
+  if (logic === "PARTICIPATION") return [strings.participation];
+
   const minScore = asNumber(rule.minScore);
-  if (minScore !== null) phrases.push(strings.minScore(minScore));
+  const needsScore = !logic || logic === "SCORE" || logic === "SCORE_AND_DURATION";
+  if (minScore !== null && needsScore) phrases.push(strings.minScore(minScore));
+
   const passScore = asNumber(rule.passScore);
   if (passScore !== null) phrases.push(strings.passScore(passScore));
+
   const watchPct = asNumber(rule.watchPct);
   if (watchPct !== null) phrases.push(strings.watchPct(watchPct));
+
   const minReadSeconds = asNumber(rule.minReadSeconds);
   if (minReadSeconds !== null && minReadSeconds > 0)
     phrases.push(strings.minRead(formatSeconds(minReadSeconds)));
+
   const minDurationSeconds = asNumber(rule.minDurationSeconds);
-  if (minDurationSeconds !== null && minDurationSeconds > 0)
+  const needsDuration = logic === "DURATION" || logic === "SCORE_AND_DURATION";
+  if (minDurationSeconds !== null && minDurationSeconds > 0 && needsDuration)
     phrases.push(strings.minDuration(formatSeconds(minDurationSeconds)));
 
   return phrases;

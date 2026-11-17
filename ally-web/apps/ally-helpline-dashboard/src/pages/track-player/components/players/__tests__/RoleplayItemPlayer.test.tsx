@@ -334,7 +334,7 @@ describe("RoleplayItemPlayer — assessment mode", () => {
     expect(screen.queryByTestId("refresh-icon")).not.toBeInTheDocument();
     expect(screen.queryByTestId("language-dropdown")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("roleplay-assessment-submitted"));
+    fireEvent.click(screen.getByTestId("roleplay-attempt-failed"));
     expect(screen.getByTestId("session-log-panel")).toBeInTheDocument();
   });
 
@@ -344,5 +344,76 @@ describe("RoleplayItemPlayer — assessment mode", () => {
     expect(screen.queryByTestId("roleplay-assessment-submitted")).not.toBeInTheDocument();
     expect(screen.queryByTestId("refresh-icon")).not.toBeInTheDocument();
     expect(screen.getByTestId("roleplay-assessment-locked")).toBeInTheDocument();
+  });
+});
+
+describe("RoleplayItemPlayer — failure reasons", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockScenario();
+    mockCatalogLanguages([ENGLISH]);
+  });
+
+  it("shows the specific message for insufficient score", () => {
+    const item = {
+      ...buildItem(null),
+      failureReasons: ["INSUFFICIENT_SCORE"],
+    };
+    const failedPayload: StartRoleplayItemPayload = {
+      ...payload,
+      lastScenarioSessionId: "session-1",
+    };
+    render(
+      <RoleplayItemPlayer
+        payload={failedPayload}
+        item={item}
+        trackId="track-1"
+        alreadyCompleted={false}
+      />,
+    );
+
+    expect(screen.getByText(/Insufficient score/)).toBeInTheDocument();
+  });
+
+  it("shows the specific message for insufficient duration", () => {
+    const item = {
+      ...buildItem(null),
+      failureReasons: ["INSUFFICIENT_DURATION"],
+    };
+    const failedPayload: StartRoleplayItemPayload = {
+      ...payload,
+      lastScenarioSessionId: "session-1",
+    };
+    render(
+      <RoleplayItemPlayer
+        payload={failedPayload}
+        item={item}
+        trackId="track-1"
+        alreadyCompleted={false}
+      />,
+    );
+
+    expect(screen.getByText(/Insufficient duration/)).toBeInTheDocument();
+  });
+
+  it("shows the combined message for both", () => {
+    const item = {
+      ...buildItem(null),
+      failureReasons: ["INSUFFICIENT_SCORE", "INSUFFICIENT_DURATION"],
+    };
+    const failedPayload: StartRoleplayItemPayload = {
+      ...payload,
+      lastScenarioSessionId: "session-1",
+    };
+    render(
+      <RoleplayItemPlayer
+        payload={failedPayload}
+        item={item}
+        trackId="track-1"
+        alreadyCompleted={false}
+      />,
+    );
+
+    expect(screen.getByText(/Insufficient score and duration/)).toBeInTheDocument();
   });
 });

@@ -468,6 +468,13 @@ export type TrackItemContent =
   | BranchingScenarioContent
   | BucketSortContent;
 
+export enum TrackItemCompletionLogic {
+  SCORE = "SCORE",
+  DURATION = "DURATION",
+  SCORE_AND_DURATION = "SCORE_AND_DURATION",
+  PARTICIPATION = "PARTICIPATION",
+}
+
 export interface CompletionCriteria {
   /** Roleplay, 0 or above (score depends on configured behaviours and can exceed 100). */
   minScore?: number;
@@ -480,6 +487,7 @@ export interface CompletionCriteria {
   watchPct?: number;
   /** Article. */
   minReadSeconds?: number;
+  completionLogic?: TrackItemCompletionLogic;
 }
 
 /** Source text an author pastes, kept in form state so re-segmentation is live. */

@@ -1,6 +1,6 @@
 import { TFunction } from "i18next";
 
-import { TrackDetailItem, TrackItemType } from "@types";
+import { TrackDetailItem, TrackItemCompletionLogic, TrackItemType } from "@types";
 
 /**
  * Builds the small meta line under a track item title on the journey map,
@@ -36,15 +36,36 @@ export const getTrackItemMeta = (item: TrackDetailItem, t: TFunction): string =>
     case TrackItemType.ARTICLE:
       return t("tracks2.meta.article");
     case TrackItemType.ROLEPLAY: {
-      // A minScore of 0 is the unconfigured default and gates nothing (see
-      // meetsMinimumScore in ally-be), so only a real threshold is shown —
-      // advertising "min score 0" would read as a hurdle that isn't there.
-      if ((criteria?.minScore ?? 0) > 0) {
-        return `${t("tracks2.meta.roleplay")} · ${t("tracks2.meta.minScore", {
-          score: criteria.minScore,
-        })}`;
+      const parts: string[] = [t("tracks2.meta.roleplay")];
+      const logic = criteria?.completionLogic || TrackItemCompletionLogic.SCORE_AND_DURATION;
+
+      if (logic === TrackItemCompletionLogic.PARTICIPATION) {
+        parts.push(t("tracks2.meta.participation"));
+      } else {
+        const needsScore =
+          logic === TrackItemCompletionLogic.SCORE ||
+          logic === TrackItemCompletionLogic.SCORE_AND_DURATION;
+        const needsDuration =
+          logic === TrackItemCompletionLogic.DURATION ||
+          logic === TrackItemCompletionLogic.SCORE_AND_DURATION;
+
+        if (needsScore && (criteria?.minScore ?? 0) > 0) {
+          parts.push(t("tracks2.meta.minScore", { score: criteria.minScore }));
+        }
+
+        if (needsDuration && (criteria?.minDurationSeconds ?? 0) > 0) {
+          const minutes = Math.floor(criteria.minDurationSeconds! / 60);
+          const seconds = criteria.minDurationSeconds! % 60;
+          const duration =
+            minutes > 0 && seconds > 0
+              ? `${minutes}m ${seconds}s`
+              : minutes > 0
+                ? `${minutes}m`
+                : `${seconds}s`;
+          parts.push(t("tracks2.meta.minDuration", { duration }));
+        }
       }
-      return t("tracks2.meta.roleplay");
+      return parts.join(" · ");
     }
     case TrackItemType.CASE:
       return t("tracks2.meta.case");

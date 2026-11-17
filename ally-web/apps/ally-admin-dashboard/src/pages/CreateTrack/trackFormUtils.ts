@@ -864,6 +864,9 @@ const compactCriteria = (criteria?: CompletionCriteria): CompletionCriteria | un
   if (criteria.minDurationSeconds != null) {
     compact.minDurationSeconds = criteria.minDurationSeconds;
   }
+  if (criteria.completionLogic) {
+    compact.completionLogic = criteria.completionLogic;
+  }
   if (criteria.watchPct != null) compact.watchPct = criteria.watchPct;
   if (criteria.minReadSeconds != null) compact.minReadSeconds = criteria.minReadSeconds;
   // Only when on: an absent flag is "off", and sending `false` would read as a

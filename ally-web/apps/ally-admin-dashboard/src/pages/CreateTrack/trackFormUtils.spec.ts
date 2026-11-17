@@ -14,6 +14,7 @@ import {
   TrackDetail,
   TrackFormValues,
   TrackGameKey,
+  TrackItemCompletionLogic,
   TrackItemType,
   TrueFalseQuestion,
 } from "@types";
@@ -720,6 +721,62 @@ describe("ungraded questions (isGraded: false) and showCorrectAnswer", () => {
     const rebuiltQuestion = (rebuilt.sections[0].items[1].quiz as QuizContent).questions[0];
     expect(rebuiltQuestion.isGraded).toBe(false);
     expect(rebuiltQuestion.showCorrectAnswer).toBe(false);
+  });
+});
+
+describe("completion logic and custom duration", () => {
+  it("serializes roleplay completion criteria including the new logic field", () => {
+    const form = buildValidForm();
+    form.sections[0].items[0].completionCriteria = {
+      completionLogic: TrackItemCompletionLogic.DURATION,
+      minDurationSeconds: 120,
+    };
+
+    const structure = serializeTrackForm(form);
+    expect(structure.sections[0].items[0].completionCriteria).toEqual({
+      completionLogic: TrackItemCompletionLogic.DURATION,
+      minDurationSeconds: 120,
+    });
+  });
+
+  it("round-trips the completion logic field", () => {
+    const form = buildValidForm();
+    form.sections[0].items[0].completionCriteria = {
+      completionLogic: TrackItemCompletionLogic.PARTICIPATION,
+    };
+    const structure = serializeTrackForm(form);
+
+    const detail: TrackDetail = {
+      id: "track-1",
+      title: form.title,
+      description: form.description,
+      coverImageUrl: form.coverImageUrl,
+      status: SimulationStatus.DRAFT,
+      isGlobal: form.isGlobal,
+      totalItems: 1,
+      sections: [
+        {
+          id: "s1",
+          title: "S",
+          description: "",
+          order: 1,
+          items: [
+            {
+              id: "i1",
+              type: TrackItemType.ROLEPLAY,
+              order: 1,
+              title: "R",
+              completionCriteria: structure.sections[0].items[0].completionCriteria ?? null,
+            },
+          ],
+        },
+      ],
+    };
+
+    const roundTripped = deserializeTrack(detail);
+    expect(roundTripped.sections[0].items[0].completionCriteria.completionLogic).toBe(
+      TrackItemCompletionLogic.PARTICIPATION,
+    );
   });
 });
 

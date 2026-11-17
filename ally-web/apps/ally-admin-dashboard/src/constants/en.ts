@@ -9240,6 +9240,7 @@ export const en = {
       watchPct: (pct: number) => `Watch ${pct}%`,
       minRead: (duration: string) => `Read for ${duration}`,
       minDuration: (duration: string) => `At least ${duration}`,
+      participation: "Participation only",
     },
 
     // Brief — read-only, fills in as the interview goes.

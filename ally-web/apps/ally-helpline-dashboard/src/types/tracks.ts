@@ -61,6 +61,13 @@ export interface GetLearnTracksResponse {
   count: number;
 }
 
+export enum TrackItemCompletionLogic {
+  SCORE = "SCORE",
+  DURATION = "DURATION",
+  SCORE_AND_DURATION = "SCORE_AND_DURATION",
+  PARTICIPATION = "PARTICIPATION",
+}
+
 export interface TrackCompletionCriteria {
   minScore?: number;
   minDurationSeconds?: number;
@@ -69,6 +76,7 @@ export interface TrackCompletionCriteria {
   passScore?: number;
   watchPct?: number;
   minReadSeconds?: number;
+  completionLogic?: TrackItemCompletionLogic;
 }
 
 /** Type-specific display metadata for the overview meta line. */
@@ -113,6 +121,11 @@ export interface TrackDetailItem {
   assessmentSubmittedAt?: string | null;
   /** The author enabled a discussion thread beneath this item. */
   hasDiscussion?: boolean;
+  /**
+   * Reasons the item is not yet completed (e.g. INSUFFICIENT_SCORE, INSUFFICIENT_DURATION).
+   * Only present when the learner has made at least one attempt.
+   */
+  failureReasons?: string[];
   /**
    * Non-null when this component reads in English despite the course being
    * read in another language — the card tells the learner why up front.
@@ -899,6 +912,7 @@ export interface TrackItemCompletionResult {
   unlockedItemIds: string[];
   sectionCompleted: boolean;
   trackCompleted: boolean;
+  failureReasons?: string[];
 }
 
 export interface VideoProgressResult extends TrackItemCompletionResult {

@@ -2025,6 +2025,8 @@
       "prompts_other": "{{count}} prompts",
       "roleplay": "Roleplay",
       "minScore": "score {{score}}+",
+      "minDuration": "duration {{duration}}+",
+      "participation": "participation only",
       "case": "Case study",
       "annotationTranscript": "Transcript",
       "annotationDocument": "Note",
@@ -2129,7 +2131,11 @@
       "assessmentIntro": "This roleplay is an assessment. Complete the scenario in a live roleplay.",
       "assessmentNotice": "You get one attempt. When you end the roleplay, your attempt is submitted and can't be retaken.",
       "assessmentSubmitted": "Submitted {{date}}",
+      "latestAttempt": "Latest attempt",
       "assessmentNotPassed": "This attempt didn't meet the passing requirements.",
+      "insufficientScore": "Insufficient score.",
+      "insufficientDuration": "Insufficient duration.",
+      "insufficientScoreAndDuration": "Insufficient score and duration.",
       "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer."
     },
     "quiz": {

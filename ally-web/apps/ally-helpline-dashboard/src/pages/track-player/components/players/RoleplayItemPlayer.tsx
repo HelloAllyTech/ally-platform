@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -120,9 +120,26 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
     setSelectedLanguage(availableLanguages?.find(lang => lang.label === label) || null);
   };
 
-  // Same rule as the standalone scenario page: a choice only where the org and
-  // this roleplay both offer text chat, otherwise the voice start it always was.
   const textChatAvailable = !isCase && scenario?.textChatAvailable === true;
+
+  const hasFailedAttempt = !alreadyCompleted && !!lastScenarioSessionId;
+
+  const failureMessage = useMemo(() => {
+    const reasons = item.failureReasons ?? [];
+    const hasInsufficientScore = reasons.includes("INSUFFICIENT_SCORE");
+    const hasInsufficientDuration = reasons.includes("INSUFFICIENT_DURATION");
+
+    if (hasInsufficientScore && hasInsufficientDuration) {
+      return t("tracks2.roleplay.insufficientScoreAndDuration");
+    }
+    if (hasInsufficientScore) {
+      return t("tracks2.roleplay.insufficientScore");
+    }
+    if (hasInsufficientDuration) {
+      return t("tracks2.roleplay.insufficientDuration");
+    }
+    return t("tracks2.roleplay.assessmentNotPassed");
+  }, [item.failureReasons, t]);
 
   const coverImage = isCase ? caseDetails?.coverImageUrl : scenario?.coverImageUrl;
   // The full brief, rendered under the card. The card itself clamps its blurb
@@ -219,32 +236,29 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
               }`}
             />
           </button>
-        ) : assessmentLocked && assessmentSubmittedAt && !alreadyCompleted ? (
+        ) : (assessmentLocked || hasFailedAttempt) && lastScenarioSessionId && !alreadyCompleted ? (
           <button
             type="button"
-            onClick={() => lastScenarioSessionId && setLogExpanded(prev => !prev)}
+            onClick={() => setLogExpanded(prev => !prev)}
             aria-expanded={logExpanded}
-            disabled={!lastScenarioSessionId}
             className="mt-4 flex w-full max-w-sm items-center justify-between gap-3 rounded-2xl border border-border-light bg-neutral-50 px-4 py-2.5 text-left transition-colors enabled:hover:bg-neutral-100"
-            data-testid="roleplay-assessment-submitted"
+            data-testid="roleplay-attempt-failed"
           >
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium text-typography-900">
-                {t("tracks2.roleplay.assessmentSubmitted", {
-                  date: getFormattedDateTime(assessmentSubmittedAt, "MMM d, yyyy"),
-                })}
+                {assessmentSubmittedAt
+                  ? t("tracks2.roleplay.assessmentSubmitted", {
+                      date: getFormattedDateTime(assessmentSubmittedAt, "MMM d, yyyy"),
+                    })
+                  : t("tracks2.roleplay.latestAttempt")}
               </span>
-              <span className="block text-xs text-typography-600">
-                {t("tracks2.roleplay.assessmentNotPassed")}
-              </span>
+              <span className="block text-xs text-typography-600">{failureMessage}</span>
             </span>
-            {lastScenarioSessionId && (
-              <ArrowDownFilled
-                className={`h-3 w-3 shrink-0 text-typography-600 transition-transform ${
-                  logExpanded ? "rotate-180" : ""
-                }`}
-              />
-            )}
+            <ArrowDownFilled
+              className={`h-3 w-3 shrink-0 text-typography-600 transition-transform ${
+                logExpanded ? "rotate-180" : ""
+              }`}
+            />
           </button>
         ) : (
           alreadyCompleted && (

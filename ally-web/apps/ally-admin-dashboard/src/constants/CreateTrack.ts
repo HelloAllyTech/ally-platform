@@ -17,6 +17,7 @@ import {
   QuizSettings,
   TrackFormValues,
   TrackGameKey,
+  TrackItemCompletionLogic,
   TrackItemType,
 } from "@types";
 
@@ -205,7 +206,7 @@ export const DEFAULT_QUIZ_SETTINGS: QuizSettings = {
 };
 
 export const DEFAULT_COMPLETION_CRITERIA: Record<TrackItemType, CompletionCriteria> = {
-  [TrackItemType.ROLEPLAY]: {},
+  [TrackItemType.ROLEPLAY]: { completionLogic: TrackItemCompletionLogic.SCORE_AND_DURATION },
   [TrackItemType.CASE]: {},
   [TrackItemType.QUIZ]: {},
   [TrackItemType.ARTICLE]: {},
