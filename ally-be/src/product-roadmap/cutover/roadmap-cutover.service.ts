@@ -346,6 +346,14 @@ export class RoadmapCutoverService {
           }),
         );
         sessionId = saved.id;
+        // Keep when the idea was captured, not when it moved: a session dated cutover day would
+        // read as a burst of captures that day in the Roadmap measures (P8).
+        await manager.query(
+          `UPDATE "builder_sessions" s SET "createdAt" = d."createdAt"
+             FROM "roadmap_idea_drafts" d
+            WHERE s.id = $1 AND d.id = $2`,
+          [sessionId, draft.id],
+        );
         await this.events.record(
           {
             sessionId,
