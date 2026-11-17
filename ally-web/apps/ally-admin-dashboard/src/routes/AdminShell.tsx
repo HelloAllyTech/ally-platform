@@ -5,14 +5,16 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { InlineLoading } from "@ally-ui-mono/ui-shared";
 // Direct paths, not the @components barrel: suites mock these two on their own.
+import { AssistantOnlyHeader } from "@components/assistant-only/AssistantOnlyHeader";
 import { CommandPaletteProvider } from "@components/command-palette/CommandPaletteProvider";
 import { ErrorBoundary } from "@components/error-boundary";
 import { NotificationBell } from "@components/notification-bell/NotificationBell";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import { Sidebar } from "@components/sidebar";
-import { LOCAL_STORAGE_KEYS, en } from "@constants";
+import { LOCAL_STORAGE_KEYS, ROUTES, en } from "@constants";
 import { useAdminPageView } from "@hooks/useAdminAnalytics";
+import { useAssistantOnly } from "@hooks/useAssistantOnly";
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
 import { loginPathWithNext } from "@utils/loginRedirect";
 
@@ -20,6 +22,10 @@ import { PageBreadcrumbs } from "./PageBreadcrumbs";
 import { resolveRouteMeta } from "./routeMeta";
 import { ShellContext } from "./ShellContext";
 import { useDocumentTitle } from "./useDocumentTitle";
+
+/** Creating an assistant needs the Chatbots switch; someone who only has theirs can't. */
+const isOnboarding = (pathname: string): boolean =>
+  pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/new`);
 
 /** What a lazy page shows while its chunk loads, inside the shell (the sidebar never blinks). */
 export const PageFallback: React.FC = () => (
@@ -45,6 +51,7 @@ export const AdminShell: React.FC = () => {
   const meta = resolveRouteMeta(pathname, search);
   // Usage tracking: one `admin_page_viewed` per route change (route pattern only, never ids).
   useAdminPageView(pathname);
+  const { assistantOnly } = useAssistantOnly();
   // A URL the table does not know is either a redirect (no title to set) or the 404, which sets its own.
   useDocumentTitle(meta.known ? meta.title : undefined, meta.known);
 
@@ -66,6 +73,31 @@ export const AdminShell: React.FC = () => {
   if (!isAuthenticated) {
     // Back here after logging in (A1): `/login?next=<this page>`, as `PrivateLayout` does.
     return <Navigate to={loginPathWithNext(pathname, search, hash)} replace />;
+  }
+
+  // Someone whose only way in is an assistant's team (chunk 6b): their assistant and nothing else.
+  if (assistantOnly) {
+    if (!pathname.startsWith(ROUTES.WHATSAPP_BOT) || isOnboarding(pathname)) {
+      return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
+    }
+    return (
+      <ShellContext.Provider value>
+        <div className="flex h-dvh flex-col bg-white" data-testid="assistant-only-shell">
+          <AssistantOnlyHeader />
+          <main
+            id="admin-main-content"
+            tabIndex={-1}
+            className="relative min-h-0 flex-1 overflow-y-auto outline-none"
+          >
+            <ErrorBoundary resetKey={pathname}>
+              <Suspense fallback={<PageFallback />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
+          </main>
+        </div>
+      </ShellContext.Provider>
+    );
   }
 
   return (

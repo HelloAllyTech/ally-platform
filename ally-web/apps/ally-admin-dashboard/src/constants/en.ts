@@ -1747,6 +1747,8 @@ export const en = {
   },
   assistantsShell: {
     noAccess: "You don't have access to this assistant. Ask its owner to add you.",
+    /** Someone who only has their assistant (chunk 6b): the one thing in its frame. */
+    logOut: "Log out",
     toYourAssistants: "Go to your assistants",
   },
   whatsappBot: {

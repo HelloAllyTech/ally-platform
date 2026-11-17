@@ -30,6 +30,13 @@ vi.mock("@components/scenario-reports-socket-provider/ScenarioReportsSocketProvi
 }));
 vi.mock("@pages/ContextLibrary/upload/UploadDock", () => ({ UploadDockHost: () => null }));
 vi.mock("@ally-ui-mono/ui-shared", () => ({ InlineLoading: () => <div>loading…</div> }));
+const access = vi.hoisted(() => ({ assistantOnly: false }));
+vi.mock("@hooks/useAssistantOnly", () => ({
+  useAssistantOnly: () => ({ ready: true, assistantOnly: access.assistantOnly }),
+}));
+vi.mock("@components/assistant-only/AssistantOnlyHeader", () => ({
+  AssistantOnlyHeader: () => <header data-testid="assistant-only-header">Log out</header>,
+}));
 const pageViewSpy = vi.fn();
 vi.mock("@hooks/useAdminAnalytics", () => ({ useAdminPageView: (p: string) => pageViewSpy(p) }));
 
@@ -69,6 +76,7 @@ const renderShell = (path: string) =>
 
 describe("AdminShell", () => {
   beforeEach(() => {
+    access.assistantOnly = false;
     mounts.sidebar = 0;
     pageViewSpy.mockClear();
     localStorage.setItem("adminIsAuthenticated", "true");
@@ -142,5 +150,30 @@ describe("AdminShell", () => {
       "href",
       "#admin-main-content",
     );
+  });
+
+  describe("someone whose only way in is an assistant's team (chunk 6b)", () => {
+    beforeEach(() => {
+      access.assistantOnly = true;
+    });
+
+    it("sees their assistants with no Sidebar, only the slim header", () => {
+      renderShell("/assistants");
+      expect(screen.getByText("assistants")).toBeInTheDocument();
+      expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
+      expect(screen.getByTestId("assistant-only-header")).toBeInTheDocument();
+    });
+
+    it("is sent back to their assistants from any other page", () => {
+      renderShell("/manage-prompts");
+      expect(screen.getByText("assistants")).toBeInTheDocument();
+      expect(screen.queryByText("prompts")).not.toBeInTheDocument();
+    });
+  });
+
+  it("anyone with other pages keeps the Sidebar", () => {
+    renderShell("/assistants");
+    expect(screen.getByTestId("stub-sidebar")).toBeInTheDocument();
+    expect(screen.queryByTestId("assistant-only-header")).not.toBeInTheDocument();
   });
 });
