@@ -209,3 +209,50 @@ export function capabilitiesFor(
         : false,
   };
 }
+
+/** The inline edits on the idea page (§4.11), one flag per field. */
+export interface RoadmapEditCapabilities {
+  editTitle: boolean;
+  editGoal: boolean;
+  editSummary: boolean;
+  editLead: boolean;
+  editMonth: boolean;
+}
+
+/**
+ * Who may edit which field in place (§4.11). Pure.
+ *
+ * - Title, goal and summary: the author while the idea waits for review, the
+ *   lead once it is accepted, and an Owner at any point.
+ * - Lead and planned month: an Owner (D11). The month stops being editable
+ *   once the idea ships, because a shipped idea sits in the month it shipped.
+ * - Declined and Closed ideas are read-only (§4.7), and a draft is edited on
+ *   its own page, not here.
+ */
+export function editCapabilitiesFor(
+  role: RoadmapRole,
+  rel: Pick<RoadmapRelationship, 'isAuthor' | 'isLead'>,
+  stage: ShownStage,
+): RoadmapEditCapabilities {
+  const owner = role === 'owner';
+  const open =
+    roleAtLeast(role, 'idea') &&
+    stage !== 'draft' &&
+    stage !== 'declined' &&
+    stage !== 'closed';
+  const text =
+    open &&
+    (owner ||
+      (stage === 'submitted'
+        ? rel.isAuthor
+        : rel.isLead && roleAtLeast(role, 'builder')));
+  return {
+    editTitle: text,
+    editGoal: text,
+    editSummary: text,
+    editLead:
+      owner &&
+      (stage === 'accepted' || stage === 'planning' || stage === 'building'),
+    editMonth: open && owner && stage !== 'shipped',
+  };
+}

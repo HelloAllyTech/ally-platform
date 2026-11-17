@@ -1,12 +1,17 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -29,10 +34,20 @@ import {
 } from 'src/product-planning/util/roadmap-role.util';
 import {
   MarkRoadmapNotificationsReadDto,
+  PatchRoadmapItemDto,
   SetRoadmapCeilingDto,
   SetRoadmapWatchDto,
 } from './roadmap-item.dto';
 import { RoadmapItemLookupService } from './roadmap-item-lookup.service';
+import { RoadmapItemReadService } from './roadmap-item-read.service';
+import { RoadmapItemEditService } from './roadmap-item-edit.service';
+import { parseItemQuery } from './roadmap-item-query.util';
+import type {
+  ItemDetail,
+  ItemListResponse,
+  ItemSearchResponse,
+  PersonRef,
+} from './roadmap-item.types';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP] };
 
@@ -55,7 +70,102 @@ export class RoadmapItemController {
     private readonly ceiling: PlanCeilingService,
     private readonly inbox: RoadmapInboxService,
     private readonly items: RoadmapItemLookupService,
+    private readonly reader: RoadmapItemReadService,
+    private readonly editor: RoadmapItemEditService,
   ) {}
+
+  // ── P2: the read model (§5.2) ──────────────────────────────────────────────
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Get('items')
+  @ApiOperation({
+    summary:
+      'The queue: view=for-you|leading|to-triage|all, filters, sort and cursor (role-checked per view)',
+  })
+  async list(
+    @CurrentUser() user: TokenUser,
+    @Query() query: Record<string, unknown>,
+  ): Promise<ItemListResponse> {
+    await this.settings.assertRoadmapV2();
+    return this.reader.list(user.id, parseItemQuery(query ?? {}));
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Get('search')
+  @ApiOperation({
+    summary:
+      'Quick open: ideas by code, title or author; your recent ideas when q is empty',
+  })
+  async search(
+    @CurrentUser() user: TokenUser,
+    @Query('q') q?: string,
+  ): Promise<ItemSearchResponse> {
+    await this.settings.assertRoadmapV2();
+    return this.reader.search(user.id, typeof q === 'string' ? q : '');
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Get('items/:code')
+  @ApiOperation({ summary: 'Everything the idea page needs, in one request' })
+  async detail(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ): Promise<ItemDetail> {
+    await this.settings.assertRoadmapV2();
+    return this.reader.detail(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Patch('items/:code')
+  @ApiOperation({
+    summary:
+      'Inline edits: title, goal, summary (author before review, lead after, Owner), lead and month (Owner)',
+  })
+  async patch(
+    @Param('code') code: string,
+    @Body() dto: PatchRoadmapItemDto,
+    @CurrentUser() user: TokenUser,
+  ): Promise<ItemDetail> {
+    await this.settings.assertRoadmapV2();
+    return this.editor.patch(user.id, code, dto);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/read')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'The caller opened this idea (clears its unread dot)',
+  })
+  async markItemRead(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ): Promise<void> {
+    await this.settings.assertRoadmapV2();
+    await this.editor.markRead(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/star')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Owner: star an idea (D16)' })
+  async star(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ): Promise<{ starred: boolean; starredBy: PersonRef | null }> {
+    await this.settings.assertRoadmapV2();
+    return this.editor.setStar(user.id, code, true);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Delete('items/:code/star')
+  @ApiOperation({ summary: "Owner: take an idea's star away" })
+  async unstar(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ): Promise<{ starred: boolean; starredBy: PersonRef | null }> {
+    await this.settings.assertRoadmapV2();
+    return this.editor.setStar(user.id, code, false);
+  }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
   @Get('me/role')

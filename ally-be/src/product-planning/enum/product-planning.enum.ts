@@ -48,6 +48,11 @@ export enum PlanEventKind {
   OUTCOME_REVIEWED = 'outcome_reviewed',
   CLOSED = 'closed',
   REOPENED = 'reopened',
+  /**
+   * An inline edit on the Roadmap v2 idea page (§4.11): title, goal, summary,
+   * lead or planned month. `detail` is { field, from?, to? }.
+   */
+  ITEM_EDITED = 'item_edited',
 }
 
 /** What a plan notification says (plan_notifications.kind). */

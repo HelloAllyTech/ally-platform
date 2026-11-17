@@ -2200,7 +2200,9 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       "filing is assessed like any other; that spend is the roadmap's, not the PM Agent budget), " +
       "interview-note summaries, Claude-prompt generation, and the Builder drawer's split/merge " +
       'guard. Filing itself moved to the opportunity copilot (its own row). The standalone ' +
-      'readiness check, review and enhance calls were removed with the blank filing form.',
+      'readiness check, review and enhance calls were removed with the blank filing form. ' +
+      "Goal-impact assessment re-runs when an idea's text changes, whether from the drawer or " +
+      "from Roadmap v2's inline edit (PATCH /v1/roadmap/items/:code), which reuses the same update path.",
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',

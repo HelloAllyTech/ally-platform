@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { normaliseOpportunityCode } from '../util/item-release.util';
 
 /** The few facts the v2 routes need about one idea. */
 export interface RoadmapItemRef {
@@ -20,13 +21,15 @@ export class RoadmapItemLookupService {
   async get(idOrCode: string): Promise<RoadmapItemRef> {
     const key = (idOrCode ?? '').trim();
     if (!key || key.length > 64) throw new NotFoundException('Idea not found');
+    // `opp-388` and `388` find OPP-0388, as a link written by hand would.
+    const code = normaliseOpportunityCode(key) ?? key;
     const rows: RoadmapItemRef[] = await this.dataSource.query(
       `SELECT id, code, "createdBy", "builderSessionId"
          FROM "roadmap_opportunities"
-        WHERE (id::text = $1 OR upper(code) = upper($1))
+        WHERE (id::text = $1 OR upper(code) = upper($2))
           AND "deletedAt" IS NULL
         LIMIT 1`,
-      [key],
+      [key, code],
     );
     const row = rows?.[0];
     if (!row) throw new NotFoundException('Idea not found');

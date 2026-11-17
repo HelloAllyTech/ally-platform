@@ -24,6 +24,11 @@ import { PlanSession, PlanSessionStore } from './plan-session.store';
 import { PlanReadinessService } from './plan-readiness.service';
 import { checkFactsHash } from './plan-check.service';
 
+/** What getSessionDetail returns, for callers that pass it in. */
+export type PlanSessionDetail = Awaited<
+  ReturnType<BuilderSessionService['getSessionDetail']>
+>;
+
 const BUILD_STATUSES: string[] = [
   BuilderSessionStatus.BUILDING,
   BuilderSessionStatus.WAITING_FOR_INPUT,
@@ -52,7 +57,14 @@ export class PlanStageService {
     private readonly opportunities: Repository<RoadmapOpportunity>,
   ) {}
 
-  async facts(plan: PlanSession): Promise<PlanStageFacts> {
+  /**
+   * `preloaded` is the session detail when the caller already read it (the
+   * Roadmap v2 idea page), so one page load reads the PRD once.
+   */
+  async facts(
+    plan: PlanSession,
+    preloaded?: PlanSessionDetail | null,
+  ): Promise<PlanStageFacts> {
     const record = plan.plan ?? {};
     const opportunity = record.opportunityId
       ? await this.opportunities.findOne({
@@ -65,10 +77,9 @@ export class PlanStageService {
     let prdReady = false;
     let designApproved = false;
     if (!isPrivate && plan.leadUserId) {
-      const detail = await this.builderSessions.getSessionDetail(
-        plan.id,
-        plan.createdBy,
-      );
+      const detail =
+        preloaded ??
+        (await this.builderSessions.getSessionDetail(plan.id, plan.createdBy));
       prdReady = (
         await this.readiness.assess(
           plan,

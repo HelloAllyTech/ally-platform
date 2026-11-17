@@ -35,19 +35,31 @@ function build(opts: { enabled?: boolean; role?: string } = {}) {
     setWatch: jest.fn(async (_u, itemId, level) => ({ itemId, level })),
   };
   const items = { get: jest.fn(async () => ({ ...ITEM })) };
+  const reader = {
+    list: jest.fn(async () => ({ rows: [], total: 0 })),
+    search: jest.fn(async () => ({ items: [], recent: [] })),
+    detail: jest.fn(async () => ({ code: ITEM.code })),
+  };
+  const editor = {
+    patch: jest.fn(async () => ({ code: ITEM.code })),
+    markRead: jest.fn(async () => undefined),
+    setStar: jest.fn(async () => ({ starred: true, starredBy: null })),
+  };
   const controller = new RoadmapItemController(
     settings as never,
     roles as never,
     ceiling as never,
     inbox as never,
     items as never,
+    reader as never,
+    editor as never,
   );
-  return { controller, roles, ceiling, inbox, items };
+  return { controller, roles, ceiling, inbox, items, reader, editor };
 }
 
 describe('RoadmapItemController', () => {
   it('answers 404 on every route while roadmap_v2 is off, before doing anything', async () => {
-    const { controller, roles, ceiling, inbox, items } = build({
+    const { controller, roles, ceiling, inbox, items, reader, editor } = build({
       enabled: false,
     });
     const calls = [
@@ -57,6 +69,13 @@ describe('RoadmapItemController', () => {
       () => controller.notifications(user),
       () => controller.markRead(user, { all: true }),
       () => controller.watch('OPP-388', { level: RoadmapWatchLevel.ALL }, user),
+      () => controller.list(user, { view: 'all' }),
+      () => controller.search(user, 'streak'),
+      () => controller.detail('OPP-388', user),
+      () => controller.patch('OPP-388', { title: 'x' }, user),
+      () => controller.markItemRead('OPP-388', user),
+      () => controller.star('OPP-388', user),
+      () => controller.unstar('OPP-388', user),
     ];
     for (const call of calls) {
       await expect(call()).rejects.toBeInstanceOf(NotFoundException);
@@ -66,6 +85,37 @@ describe('RoadmapItemController', () => {
     expect(ceiling.setCeiling).not.toHaveBeenCalled();
     expect(inbox.listGrouped).not.toHaveBeenCalled();
     expect(inbox.markRead).not.toHaveBeenCalled();
+    for (const fn of [
+      ...Object.values(reader),
+      ...Object.values(editor),
+    ] as jest.Mock[]) {
+      expect(fn).not.toHaveBeenCalled();
+    }
+  });
+
+  it('parses the queue query before handing it to the read model', async () => {
+    const { controller, reader } = build();
+    await controller.list(user, {
+      view: 'leading',
+      stage: 'planning,building,nonsense',
+      starred: '1',
+      sort: 'votes',
+    });
+    expect(reader.list).toHaveBeenCalledWith(5, {
+      view: 'leading',
+      filters: { stage: ['planning', 'building'], starred: true },
+      sort: 'votes',
+      offset: 0,
+      limit: 50,
+    });
+  });
+
+  it('routes star and unstar to the same write', async () => {
+    const { controller, editor } = build();
+    await controller.star('OPP-388', user);
+    await controller.unstar('OPP-388', user);
+    expect(editor.setStar).toHaveBeenNthCalledWith(1, 5, 'OPP-388', true);
+    expect(editor.setStar).toHaveBeenNthCalledWith(2, 5, 'OPP-388', false);
   });
 
   it('returns the role with its global switches', async () => {
