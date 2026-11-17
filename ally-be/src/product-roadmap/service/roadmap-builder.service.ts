@@ -318,7 +318,6 @@ export class RoadmapBuilderService {
         stage: In([
           RoadmapOpportunityStage.NEW,
           RoadmapOpportunityStage.PRIORITISED,
-          RoadmapOpportunityStage.UNDER_DEVELOPMENT,
         ]),
       },
       take: 100,

@@ -300,3 +300,17 @@ describe('judging a run is exclusive', () => {
     expect(row.workspace.judge.overall).toBe(5);
   });
 });
+
+describe('the judge drain reaches older unscored runs', () => {
+  it('asks only for runs with no score, so scored newer runs cannot starve older ones', async () => {
+    const find = jest.fn(async () => []);
+    const svc = Object.create(DebriefRunJudgeService.prototype) as any;
+    Object.assign(svc, { runs: { find } });
+    await svc.drain(5);
+    const where = (find.mock.calls[0] as any)[0].where;
+    expect(where.workspace).toBeDefined();
+    expect(where.workspace.getSql('w')).toBe(
+      `NOT (coalesce(w, '{}'::jsonb) ? 'judge')`,
+    );
+  });
+});

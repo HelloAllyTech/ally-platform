@@ -76,7 +76,6 @@ import {
   normaliseFilingInterview,
   normaliseOpportunityBrief,
 } from '../util/roadmap-brief.util';
-import { normaliseStage } from '../util/roadmap-stage.util';
 import { RoadmapGoalImpactService } from './roadmap-goal-impact.service';
 import { RoadmapStrategyGoalService } from './roadmap-strategy-goal.service';
 import { RoadmapVectorService } from './roadmap-vector.service';
@@ -586,8 +585,8 @@ export class RoadmapOpportunityService {
     }
 
     if (dto.stage !== undefined) {
-      // Retired stage: a stale client resubmitting `under_development` lands on Prioritised.
-      const nextStage = normaliseStage(dto.stage);
+      // A retired stage value never reaches here: the DTO's @IsEnum rejects it with a 400.
+      const nextStage = dto.stage;
       patch.stage = nextStage;
       patch.releasedAt = this.resolveReleasedAt(existing, nextStage);
     }
@@ -864,7 +863,7 @@ export class RoadmapOpportunityService {
    * The shared assets bucket, the same one blog headers and badge icons live in.
    *
    * Resolved per call rather than in the constructor: reading configuration at construction time
-   * is module-load-time work, and this module is imported by AnalyticsSuggestions — a missing
+   * is module-load-time work, and this module is imported by other feature modules — a missing
    * env var would take down suites that never touch an image. Failing here fails only the
    * request that actually needed a bucket.
    */

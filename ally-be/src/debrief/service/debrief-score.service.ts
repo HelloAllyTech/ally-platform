@@ -127,8 +127,9 @@ export class DebriefScoreService {
               (r.workspace->'judge'->>'overall')::float AS quality,
               r.workspace->'judge'->'dimensions' AS dims,
               COALESCE(r.workspace->'judge'->'hardFails', '[]'::jsonb) AS hard_fails,
-              (r.status IN ('published','below_bar')
-                AND r.workspace->'decision'->>'reviewReason' = 'missed_risk_cue') AS missed_clear,
+              (r.status IN ('published','below_bar')) AS shown,
+              r.workspace->'safety'->'risk_cues' AS risk_cues,
+              r.cards->'important_moment' AS important_moment,
               COALESCE(r."actualCostUsd", r."estimatedCostUsd")::float
                 + COALESCE((r.workspace->>'askAllySpentUsd')::float, 0) AS session_cost,
               h.up, h.down,
@@ -290,9 +291,46 @@ export function toScoredRun(r: Record<string, any>): ScoredRun {
     helpful: r.up ? true : r.down ? false : null,
     flagged: !!r.flagged,
     dims: dimsOf(r.dims),
-    missedClearRiskCue: !!r.missed_clear,
+    missedClearRiskCue:
+      !!r.shown &&
+      (uncoveredClearCue(r.risk_cues, r.important_moment) ||
+        hardFails.some(
+          (h: { code?: string }) => h?.code === 'missed_risk_cue',
+        )),
     sessionCostUsd: Number.isFinite(cost as number) ? cost : null,
   };
+}
+
+/**
+ * Whether the learner was shown a debrief that left out a clear risk cue: a
+ * cue the safety reading rated clear (a cue with no strength counts as clear,
+ * as in ally-ai's cue_strength) whose turn the important moment does not
+ * cover, neither as its own turn nor among its `others`. Possible cues never
+ * count. (Before 2026-11-17 the gate read the Evaluator's `reviewReason`,
+ * which on older releases flagged possible cues too: three false alarms.)
+ */
+export function uncoveredClearCue(cues: unknown, moment: unknown): boolean {
+  if (!Array.isArray(cues)) return false;
+  const m = (moment ?? null) as {
+    turn_index?: unknown;
+    others?: Array<{ turn_index?: unknown }>;
+  } | null;
+  const covered = new Set<number>();
+  if (m && Number.isInteger(Number(m.turn_index)) && m.turn_index != null) {
+    covered.add(Number(m.turn_index));
+  }
+  for (const o of Array.isArray(m?.others) ? m.others : []) {
+    if (o?.turn_index != null && Number.isInteger(Number(o.turn_index))) {
+      covered.add(Number(o.turn_index));
+    }
+  }
+  return (cues as Array<{ strength?: unknown; turn_index?: unknown }>).some(
+    (c) =>
+      c?.strength !== 'possible' &&
+      c?.turn_index != null &&
+      Number.isInteger(Number(c.turn_index)) &&
+      !covered.has(Number(c.turn_index)),
+  );
 }
 
 /** The judge's `[{dimension, score}]` as a map; null when not judged. */

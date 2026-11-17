@@ -14,8 +14,15 @@ export interface BuilderRequester {
   turnEnded(sessionId: string, requestRef: string | null): Promise<void>;
 }
 
-/** The only requester today: "Hand to Builder" on a Debrief PM agent idea. */
+/** "Hand to Builder" on a Debrief PM agent idea. */
 export const DEBRIEF_PM_AGENT_REQUESTER = 'debrief_pm_agent';
+
+/**
+ * The admin PM Agent (`src/pm-agent`, docs/pm-agent.md): an accepted recommendation card is
+ * compiled into a PRD and built. Sessions requested under this name are created with the
+ * per-session autonomy override `auto` (BuilderSession.autonomyOverride).
+ */
+export const PM_AGENT_REQUESTER = 'pm_agent';
 
 class BuilderRequesterRegistry {
   private readonly requesters = new Map<string, BuilderRequester>();

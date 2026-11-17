@@ -173,15 +173,16 @@ export enum LlmTask {
   // the narrator carries result rows, so their token profiles differ.
   ANALYTICS_AGENT_PLAN = 'analytics_agent_plan',
   ANALYTICS_AGENT_ANSWER = 'analytics_agent_answer',
-  // Analytics Suggestions (admin Analytics -> Suggestions tab): one call per
-  // Generate run. Its own label because the profile is unlike anything else
-  // here — a whole analytics window in, at most ten suggestions out.
-  ANALYTICS_SUGGESTIONS = 'analytics_suggestions',
   // UX Signals scan (src/ux-signals): one triage call per scan, turning
-  // threshold-crossing PostHog signals into bug findings and suggestions. Its
+  // threshold-crossing PostHog signals into bug findings and PM Agent signals. Its
   // own label because the input is telemetry aggregates rather than an
   // analytics window, so its token profile tracks detector count, not date range.
   UX_SIGNALS = 'ux_signals',
+  // PM Agent (src/pm-agent, docs/pm-agent.md): the admin AI product manager's own
+  // analysis — lanes, critic, ranker. Its own label because the agent's monthly budget is
+  // read from llm_usage rows carrying it (PmAgentBudgetService, IST month). The pipeline
+  // may add finer `pm_agent_*` labels per lane; the budget sums those too.
+  PM_AGENT = 'pm_agent',
   // Foundational helping skills (src/foundational-skills): one call per
   // 5,000-character cut of a learner's roleplay speech, scoring it against the
   // fixed foundational helping skills rubric. Scheduled, never on a request path. Its own

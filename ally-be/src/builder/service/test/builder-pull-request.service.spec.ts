@@ -123,6 +123,8 @@ describe('BuilderPullRequestService', () => {
     buildService = {
       dispatchReviewRun: jest.fn().mockResolvedValue({ id: 'run-3' }),
       listActiveIssueRuns: jest.fn().mockResolvedValue([]),
+      listRecoverableIssueRuns: jest.fn().mockResolvedValue([]),
+      reviveIssueRun: jest.fn().mockResolvedValue(true),
       recentReviewOutcomes: jest.fn().mockResolvedValue([]),
       settleRun: jest.fn(),
       recordIssueFixRequest: jest.fn(),
@@ -264,6 +266,85 @@ describe('BuilderPullRequestService', () => {
       await service.reconcileOpenPullRequests();
       expect(github.createIssueComment).not.toHaveBeenCalled();
       expect(buildService.settleRun).not.toHaveBeenCalled();
+    });
+
+    it("puts the failing job's output in the fix request, and points at the repo's rules", async () => {
+      buildService.listActiveIssueRuns.mockResolvedValue([issueRun()]);
+      github.getCheckRollup.mockResolvedValue({
+        state: 'failure',
+        failed: ['check'],
+        total: 1,
+      });
+      github.failedCheckExcerpts.mockResolvedValue({
+        check:
+          'Prompt check failed (1):\n  - ally-be/src/prompts/x.txt: Live prompt text belongs in the Skills Store',
+      });
+
+      await service.reconcileOpenPullRequests();
+
+      expect(github.failedCheckExcerpts).toHaveBeenCalledWith(
+        'o/ally-be',
+        'sha-1',
+      );
+      const body = github.createIssueComment.mock.calls[0][2] as string;
+      expect(body).toContain('Output of "check"');
+      expect(body).toContain('belongs in the Skills Store');
+      expect(body).toContain('AGENTS.md');
+    });
+
+    describe('a failed build whose pull request went green later', () => {
+      beforeEach(() => {
+        buildService.listRecoverableIssueRuns.mockResolvedValue([
+          issueRun({ status: 'FAILED' }),
+        ]);
+      });
+
+      it('is revived and recorded as passed', async () => {
+        github.getCheckRollup.mockResolvedValue({
+          state: 'success',
+          failed: [],
+          total: 3,
+        });
+
+        await service.reconcileOpenPullRequests();
+
+        expect(buildService.reviveIssueRun).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'run-9' }),
+        );
+        expect(buildService.recordIssueMilestone).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'run-9' }),
+          'ci-pass:sha-1',
+          expect.stringMatching(/after the build had given up/),
+          undefined,
+          expect.anything(),
+        );
+      });
+
+      it('stays failed while CI is not green', async () => {
+        github.getCheckRollup.mockResolvedValue({
+          state: 'failure',
+          failed: ['check'],
+          total: 3,
+        });
+
+        await service.reconcileOpenPullRequests();
+
+        expect(buildService.reviveIssueRun).not.toHaveBeenCalled();
+        expect(github.createIssueComment).not.toHaveBeenCalled();
+      });
+
+      it('records nothing when the session has moved on', async () => {
+        github.getCheckRollup.mockResolvedValue({
+          state: 'success',
+          failed: [],
+          total: 3,
+        });
+        buildService.reviveIssueRun.mockResolvedValue(false);
+
+        await service.reconcileOpenPullRequests();
+
+        expect(buildService.recordIssueMilestone).not.toHaveBeenCalled();
+      });
     });
 
     it('fails the build when fix requests run out', async () => {
@@ -2088,6 +2169,84 @@ describe('BuilderPullRequestService', () => {
       expect(notificationService.prReadyToMerge).toHaveBeenCalled();
     });
 
+    /**
+     * The PM Agent's sessions carry the per-session override `auto`: they merge with
+     * auto-merge off globally, every other session does not, and the global kill switch
+     * still wins. The other safeguards are the same tests above, unchanged.
+     */
+    describe('a session with the auto override', () => {
+      beforeEach(() => {
+        settingsService.get.mockResolvedValue(
+          on({
+            autoMergeEnabled: false,
+            autoReviewEnabled: false,
+            autoApproveEnabled: false,
+            autoFixEnabled: false,
+          }),
+        );
+      });
+
+      it('merges although auto-merge is off globally', async () => {
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockResolvedValue('auto');
+
+        await tick();
+
+        expect(sessionRepository.findAutonomyOverride).toHaveBeenCalledWith(
+          'session-1',
+        );
+        expect(github.mergePullRequest).toHaveBeenCalled();
+      });
+
+      it('leaves every other session on the global switches', async () => {
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockResolvedValue(null);
+
+        await tick();
+
+        expect(github.mergePullRequest).not.toHaveBeenCalled();
+      });
+
+      it('still honours the global kill switch', async () => {
+        settingsService.get.mockResolvedValue(on({ enabled: false }));
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockResolvedValue('auto');
+
+        await tick();
+
+        expect(github.mergePullRequest).not.toHaveBeenCalled();
+      });
+
+      it('still needs a review that passed on this exact head', async () => {
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockResolvedValue('auto');
+        const attempted = openPr({
+          headSha: 'abc1234def',
+          reviewedSha: 'abc1234def',
+          reviewPassedSha: null,
+        });
+        repository.findOne.mockResolvedValue(attempted);
+
+        await tick({}, attempted);
+
+        expect(github.mergePullRequest).not.toHaveBeenCalled();
+      });
+
+      it('falls back to the global settings when the override cannot be read', async () => {
+        sessionRepository.findAutonomyOverride = jest
+          .fn()
+          .mockRejectedValue(new Error('db down'));
+
+        await tick();
+
+        expect(github.mergePullRequest).not.toHaveBeenCalled();
+      });
+    });
+
     /** What a reader acts on differs, so the sentence differs. */
     it('says whether a release is on the way', async () => {
       settingsService.get.mockResolvedValue(on({ autoReleaseEnabled: true }));
@@ -2338,6 +2497,37 @@ describe('BuilderPullRequestService', () => {
         autoReleaseEnabled: false,
         maxFixRunsPerPr: 3,
       });
+
+      await merge();
+
+      expect(releaseService.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('releases a PM Agent session (override auto) with auto-release off globally', async () => {
+      settingsService.get.mockResolvedValue({
+        enabled: true,
+        autoReleaseEnabled: false,
+        maxFixRunsPerPr: 3,
+      });
+      sessionRepository.findAutonomyOverride = jest
+        .fn()
+        .mockResolvedValue('auto');
+
+      await merge();
+
+      expect(releaseService.dispatch).toHaveBeenCalled();
+    });
+
+    it('does not release an override session while the release health hold is on', async () => {
+      settingsService.get.mockResolvedValue({
+        enabled: true,
+        autoReleaseEnabled: false,
+        maxFixRunsPerPr: 3,
+      });
+      sessionRepository.findAutonomyOverride = jest
+        .fn()
+        .mockResolvedValue('auto');
+      repository.count.mockResolvedValue(1); // a release is unhealthy
 
       await merge();
 

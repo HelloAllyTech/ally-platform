@@ -18,8 +18,7 @@ const WHATS_NEW_PROMPT_CODE = 'mobile_release_whats_new';
 
 /**
  * Anthropic call shape for the one generation call per request. Small and
- * fast relative to AnalyticsSuggestionsAiService's SUGGESTION_LLM: the input
- * here is a short list of commit subjects (not a whole analytics window) and
+ * fast: the input here is a short list of commit subjects and
  * the output is a few marketing-copy bullet points, not a JSON array.
  */
 const WHATS_NEW_LLM = {
@@ -31,7 +30,7 @@ const WHATS_NEW_LLM = {
  * Turns raw ally-mobile commit subjects since the last release into a
  * polished, user-facing "What's New in This Version" draft for the App
  * Store submission — same Anthropic-SDK + PromptSharedService pattern as
- * AnalyticsSuggestionsAiService, just a single free-text call instead of a
+ * the other single-call LLM services, just a single free-text call instead of a
  * JSON-shaped one (there is nothing here to parse: the whole response text
  * IS the suggestion).
  */

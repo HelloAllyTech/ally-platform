@@ -94,6 +94,7 @@ vi.mock("@pages", () => ({
   EvaluateRecordDetail: () => <div>EvaluateRecordDetailPage</div>,
   BugHunter: () => <div>BugHunterPage</div>,
   Builder: () => <div>BuilderPage</div>,
+  PmAgentFeed: () => <div>PmAgentFeedPage</div>,
   BuilderRoom: () => <div>BuilderRoomPage</div>,
   BuilderSession: () => <div>BuilderSessionPage</div>,
   BuilderSettings: () => <div>BuilderSettingsPage</div>,
@@ -185,6 +186,14 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.SIMULATION_STUDIO);
     render(<RouteLayout />);
     expect(screen.getByText("RolePlaysPage")).toBeInTheDocument();
+  });
+
+  it("renders PM Agent at /pm-agent, gated on the pm_agent toggle", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", ROUTES.PM_AGENT);
+    render(<RouteLayout />);
+    expect(screen.getByText("PmAgentFeedPage")).toBeInTheDocument();
+    expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(FeatureToggleKey.PM_AGENT);
   });
 
   it("renders the Builder tab (Now · Rules · History) at /builder", () => {

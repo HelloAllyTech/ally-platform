@@ -30,7 +30,7 @@ export enum UxSignalDetector {
 /**
  * What a detector's signal most likely is, before triage sees it in context.
  * Bug-shaped signals head for Bug Hunter; improvement-shaped ones for the
- * suggestions queue.
+ * PM Agent's signal store.
  */
 export enum UxSignalKind {
   BUG = 'bug',

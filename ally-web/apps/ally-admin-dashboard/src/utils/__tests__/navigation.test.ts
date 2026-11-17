@@ -325,6 +325,18 @@ describe("deriveNavigationItems", () => {
     expect(ids).not.toContain(SIDEBAR_ITEMS.DEBRIEFS);
   });
 
+  it("shows PM Agent only to a holder of the pm_agent toggle", () => {
+    const withToggle = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.PM_AGENT],
+      savedOrder: undefined,
+    });
+    const item = withToggle.find(i => i.id === SIDEBAR_ITEMS.PM_AGENT);
+    expect(item?.path).toBe(ROUTES.PM_AGENT);
+    const without = deriveNavigationItems({ permissions: [], features: [], savedOrder: undefined });
+    expect(without.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.PM_AGENT);
+  });
+
   it("shows a Chatbots-only login (a custom login) just the Assistants item", () => {
     // It holds the platform-admin role's permissions, which would otherwise surface every
     // permission-gated tab.

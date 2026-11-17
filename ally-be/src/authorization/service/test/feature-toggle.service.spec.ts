@@ -99,12 +99,12 @@ describe('FeatureToggleService — toggles for organization-restricted admins', 
 
   it.each([
     FeatureToggleKey.ANALYTICS_AGENT,
-    FeatureToggleKey.ANALYTICS_SUGGESTIONS,
     FeatureToggleKey.ROLEPLAY_SESSION_LOGS,
     FeatureToggleKey.LOGS,
     FeatureToggleKey.ADMIN_USER_MANAGEMENT,
     FeatureToggleKey.MULTI_TENANT_ALLOWLIST_MANAGEMENT,
     FeatureToggleKey.UX_SIGNALS,
+    FeatureToggleKey.PM_AGENT,
   ])('withholds %s from a restricted admin', async (key) => {
     tenantScopeService.isRestricted.mockResolvedValue(true);
 

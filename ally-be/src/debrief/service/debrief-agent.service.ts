@@ -276,6 +276,27 @@ export function withPractiseNextFallback<
   } as T;
 }
 
+/**
+ * The cards without anything that sends the learner to a roleplay: no
+ * practise card and no roleplay link on a Work-on-this card.
+ */
+export function withoutPractice<
+  T extends Record<string, any> | null | undefined,
+>(cards: T): T {
+  if (!cards) return cards;
+  const { practise_next: _drop, ...rest } = cards as Record<string, any>;
+  void _drop;
+  return {
+    ...rest,
+    work_on_this: Array.isArray(rest.work_on_this)
+      ? rest.work_on_this.map((c: Record<string, any>) => ({
+          ...c,
+          scenario_id: null,
+        }))
+      : rest.work_on_this,
+  } as unknown as T;
+}
+
 /** The roleplays a debrief's cards link to, once each. */
 function practiceIds(cards?: Record<string, any> | null): number[] {
   const ids = [
@@ -1239,10 +1260,16 @@ export class DebriefAgentService implements OnModuleInit {
       case DebriefRunStatus.BELOW_BAR: {
         // A custom competency's code never reaches the learner, even on a
         // debrief published before the guard (review 2026-11-16).
-        const read = await readableCards(
+        const readable = await readableCards(
           this.dataSource,
           cardsForReader(run.cards, run.recipeKey),
         );
+        // Inside a course the course decides what comes next: no "Practise
+        // this next" or "Practise this again", even on a debrief written
+        // before that rule (Gopi, 2026-11-17).
+        const read = (await this.practice.inCourse(sessionId))
+          ? withoutPractice(readable)
+          : readable;
         const thisRoleplay =
           s.scenario_id != null ? Number(s.scenario_id) : null;
         const available = await this.practice.available(

@@ -104,21 +104,18 @@ export const MetricsTab: React.FC<{ range?: AnalyticsRange }> = ({ range = "90d"
 /** A trend of counts that never left zero says nothing: no sparkline. */
 const someCount = (xs: number[]) => (xs.some(x => x > 0) ? xs : undefined);
 
-const TILE_GRID = "grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6";
+const TILE_GRID = "grid grid-cols-2 gap-4 md:grid-cols-4";
 
 const MetricsSkeleton: React.FC = () => {
   const t = en.debriefs.metrics.tiles;
   return (
     <div className="flex flex-col gap-6" data-testid="debrief-metrics-loading">
       <div className={TILE_GRID}>
-        {[t.pass, t.hardFail, t.judge, t.debriefs, t.outages, t.unjudged].map(l => (
+        {[t.hardFail, t.debriefs, t.outages, t.unjudged].map(l => (
           <KpiTile key={l} label={l} value="" loading />
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <ChartCard title={en.debriefs.metrics.sections.passByWeek} loading />
-        <ChartCard title={en.debriefs.metrics.sections.hardFailByWeek} loading />
-      </div>
+      <ChartCard title={en.debriefs.metrics.sections.hardFailByWeek} loading />
     </div>
   );
 };
@@ -193,25 +190,8 @@ const MetricsBody: React.FC<{
 const HeadlineTiles: React.FC<{ view: DebriefMetricsView }> = ({ view }) => {
   const t = en.debriefs.metrics.tiles;
   const h = useMemo(() => headlineNumbers(view), [view]);
-  const ci = rangeOf(h.pass);
   return (
     <div className={TILE_GRID} data-testid="metrics-tiles">
-      <KpiTile
-        label={t.pass}
-        value={h.pass.value == null ? en.debriefs.metrics.none : pctNum(h.pass.value)}
-        n={h.pass.of}
-        nUnit={t.debriefsUnit}
-        minN={MIN_RATE_SAMPLE}
-        delta={h.delta.pass}
-        deltaSuffix=" pts"
-        comparisonLabel={t.vsWeek}
-        spark={h.spark.pass}
-        description={
-          ci.low != null && ci.high != null
-            ? t.passHelp(pctNum(ci.low), pctNum(ci.high), h.pass.n, h.pass.of)
-            : undefined
-        }
-      />
       <KpiTile
         label={t.hardFail}
         value={h.hardFail.value == null ? en.debriefs.metrics.none : pctNum(h.hardFail.value)}
@@ -224,18 +204,6 @@ const HeadlineTiles: React.FC<{ view: DebriefMetricsView }> = ({ view }) => {
         comparisonLabel={t.vsWeek}
         spark={h.spark.hardFail}
         description={h.hardFail.of ? t.hardFailHelp(h.hardFail.n, h.hardFail.of) : undefined}
-      />
-      <KpiTile
-        label={t.judge}
-        value={fixed(h.judgeMean, 2)}
-        n={h.judged}
-        nUnit={t.judgedUnit}
-        minN={MIN_RATE_SAMPLE}
-        delta={h.delta.judge}
-        deltaDecimals={2}
-        comparisonLabel={t.vsWeek}
-        spark={h.spark.judge}
-        description={t.judgeHelp(h.judged)}
       />
       <KpiTile
         label={t.debriefs}
@@ -330,14 +298,6 @@ const QualitySection: React.FC<{
   const sec = en.debriefs.metrics.sections;
   const c = s.cols;
   const weeks = useMemo(() => quality?.byWeek ?? [], [quality]);
-  const passBand = useMemo(
-    () =>
-      rateBand(
-        c.passRate,
-        weeks.map(w => ({ week: w.week, rate: w.passRate })),
-      ),
-    [weeks, c.passRate],
-  );
   const hardBand = useMemo(
     () =>
       rateBand(
@@ -347,7 +307,6 @@ const QualitySection: React.FC<{
     [weeks, c.hardFailRate],
   );
   if (!quality) return null;
-  const thinWeeks = weeks.filter(w => w.passRate.of > 0 && w.passRate.of < MIN_RATE_SAMPLE);
   const hardMax =
     niceCeiling(weeks.map(w => rangeOf(w.hardFailRate).high ?? w.hardFailRate.value ?? 0)) * 100;
   const total = (pick: (g: DebriefPassGroup) => DebriefRate) => sumRates(weeks.map(pick));
@@ -371,23 +330,7 @@ const QualitySection: React.FC<{
           <p className="sr-only" data-testid="metrics-quality-headline">
             {rateWithRange(total(g => g.passRate))}
           </p>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <ChartCard
-              title={sec.passByWeek}
-              caption={sec.passByWeekCaption}
-              source={
-                thinWeeks.length ? sec.thinWeeks(thinWeeks.map(w => w.week).join(", ")) : undefined
-              }
-              empty={!passBand.some(p => p.value != null)}
-              emptyText={s.empty}
-            >
-              <div data-testid="metrics-pass-by-week">
-                <AreaChart
-                  data={passBand}
-                  options={bandChartOpts(c.passRate, PALETTE.blue, [0, 100])}
-                />
-              </div>
-            </ChartCard>
+          <div className="grid grid-cols-1 gap-4">
             <ChartCard
               title={sec.hardFailByWeek}
               caption={sec.hardFailByWeekCaption}
@@ -489,23 +432,11 @@ const GuardrailsCard: React.FC<{ view: DebriefMetricsView }> = ({ view }) => {
   const series = view.series;
   const g = series[series.length - 1]?.guardrails;
   const windowHardFail = sumRates(series.map(w => w.guardrails.hardFailRate));
-  const windowThumbsDown = sumRates(series.map(w => w.guardrails.thumbsDownRate));
   const fabricated = series.reduce((a, w) => a + w.guardrails.fabricatedQuotes, 0);
   const legacyHf = view.baselines.legacyHardFailRate.value;
-  const preThumbs = view.baselines.legacyThumbsDownRate.value;
   const p90s = g?.visibleSecondsP90 ?? 0;
   const cost90 = g?.costP90 ?? 0;
   const rows: BulletRow[] = [
-    {
-      key: "judge-p50",
-      label: s.guardrails.judgeP50,
-      targetLabel: "≥ 8",
-      value: g?.judgeP50 ?? null,
-      targets: [8],
-      max: 10,
-      words: <Words main={`${fixed(g?.judgeP50)} / 10`} sub={s.columns.latest} />,
-      state: targetState(g?.judgeP50 ?? null, { atLeast: 8 }, g?.judged),
-    },
     rateBullet("hard-fail", s.guardrails.hardFailRate, windowHardFail, {
       target: legacyHf == null ? {} : { atMost: legacyHf },
       targetLabel: s.guardrails.legacy(pct(view.baselines.legacyHardFailRate)),
@@ -526,11 +457,6 @@ const GuardrailsCard: React.FC<{ view: DebriefMetricsView }> = ({ view }) => {
       ),
       state: fabricated > 0 ? "missed" : series.some(w => w.debriefs) ? "met" : "no_data",
     },
-    rateBullet("thumbs-down", s.guardrails.thumbsDown, windowThumbsDown, {
-      target: preThumbs == null ? {} : { atMost: preThumbs },
-      targetLabel: s.guardrails.preLaunch(pct(view.baselines.legacyThumbsDownRate)),
-      latest: g?.thumbsDownRate,
-    }),
     {
       key: "visible",
       label: s.guardrails.visible,
