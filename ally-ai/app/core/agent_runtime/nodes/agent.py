@@ -81,7 +81,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
         # shortened id) gets one more try (chunk 6b). One that succeeded may run
         # again within the step cap (chunk 6): find can look at Thursday, then
         # Friday. `hand_over` ends the run when it succeeds.
-        failed = failed_tools(state)
+        failed = failed_tools(state) | answered_finds(state)
         offered_gateway = (
             [tool for tool in gateway_tools(bot) if tool.name not in failed]
             if steps_left(state)
@@ -184,6 +184,18 @@ def failed_tools(state: AgentState) -> set:
         tool
         for tool, errors in failures.items()
         if not (len(errors) == 1 and errors[0] in RETRYABLE_ERRORS)
+    }
+
+
+def answered_finds(state: AgentState) -> set:
+    """Finds that already returned the nearest entries this run (chunk 6b, item 3):
+    nothing was at the time asked, and the nearest (the latest that day, the next
+    day's same stretch) are the answer. Looking again only cost a model step and ran
+    "Thursday evening" past the run's cap."""
+    return {
+        call.get("tool")
+        for call in state.get("tool_calls") or []
+        if call.get("list_kind") == "find" and call.get("ok") and call.get("nearest")
     }
 
 

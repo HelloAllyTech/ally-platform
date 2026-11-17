@@ -37,6 +37,7 @@ from app.core.agent_runtime.nodes import (
     route_after_tools,
 )
 from app.core.agent_runtime.state import RUN_SCOPED_KEYS, AgentState, BotConfig
+from app.core.agent_runtime.tools.confirmed import is_plain_yes
 from app.core.agent_runtime.trace import summarise_run
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
@@ -141,7 +142,10 @@ async def run_agent(
         "run_name": "agent_run",
         "metadata": {"run_id": run_id, "chatbot_id": chatbot_id},
     }
-    if bot.get("gateway_definitions"):
+    # Only for a plain yes ("perfect, book it"): that's the message that repeated
+    # the look-up. A new question looks things up afresh, so the assistant never
+    # books from what it showed before without being asked to (chunk 6b).
+    if bot.get("gateway_definitions") and is_plain_yes(question):
         inputs["carried_records"] = await _previous_records(graph, config) or None
     # recursion_limit is LangGraph's default of 25 supersteps. A run takes at most
     # about 20: MAX_TOOL_CALLS (bounded at 8) agent→tools rounds (and at most

@@ -1359,3 +1359,48 @@ class TestCarriedRecords:
             )
         assert state["result"]["answer"] == "You're welcome!"
         assert len(llm.calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_a_new_question_never_carries_the_previous_entries(graph):
+    """Chunk 6b: only a plain yes carries the slot over; "can I book Thursday at
+    11:00?" looks it up afresh and asks before booking."""
+    gateway = FakeGateway(
+        found((THU_11, "Thu 19 Nov 2026, 11:00")),
+        found((THU_11, "Thu 19 Nov 2026, 11:00")),
+    )
+    llm = FakeLLM(
+        find(starts_at_from="2026-11-19T11:00:00+05:30"),
+        reply("answer", "Thursday 19 Nov at 11:00 is free.", citations=[1]),
+        find(starts_at_from="2026-11-19T11:00:00+05:30"),
+        reply("clarify", "Shall I book Thursday 19 Nov at 11:00?", citations=[1]),
+    )
+    args = dict(
+        conversation_id="conv-q", chatbot_id="bot-1", bot=booking_bot(), gateway=gateway
+    )
+    with patch(f"{CONVERSATION}.generate_structured", llm):
+        await run_agent(
+            graph, run_id="run-q1", question="what's free thursday?", history=[], **args
+        )
+        state = await run_agent(
+            graph,
+            run_id="run-q2",
+            question="can I book Thursday at 11:00?",
+            history=[],
+            **args,
+        )
+    assert not state.get("carried_records")
+    assert len(state["passages"]) == 1
+
+
+def test_a_find_that_returned_the_nearest_is_not_offered_again():
+    """Chunk 6b, item 3: "Thursday evening" looked again after the nearest came
+    back, and ran past the cap."""
+    from app.core.agent_runtime.nodes.agent import answered_finds
+
+    calls = [
+        {"tool": "find_slots", "list_kind": "find", "ok": True, "nearest": True},
+        {"tool": "find_appointments", "list_kind": "find", "ok": True},
+    ]
+    assert answered_finds({"tool_calls": calls}) == {"find_slots"}
+    assert answered_finds({"tool_calls": calls[1:]}) == set()
