@@ -89,7 +89,7 @@ Two decisions changed the plan during planning (Shehbaz):
 
   These check only the toggle. Most of the settings, and the provider registration, are Ally-wide.
 - **11 routes an organisation preference opens:** `v1/scenario-characters/*`, if its organisation has the Character Library switched on.
-- **585 routes with no feature toggle**, gated only by role permissions, which the platform-admin role holds almost all of. It's an upper bound: some also check roles. The biggest areas:
+- **586 routes with no feature toggle** (585 at A1; one more from the master merge on 17 Nov, among its new Debrief and Roadmap routes), gated only by role permissions, which the platform-admin role holds almost all of. It's an upper bound: some also check roles. The biggest areas:
   - `v1/learn` (88), `v1/bug-hunter` (44), `v1/chats` (33), `learn/scenarios` (33), `v1/guide` (26);
   - `v1/users` (16), `v1/settings` (13), `v1/debriefs` (11), `v1/super-duper-admins` (8), `v1/analytics` (7).
 
