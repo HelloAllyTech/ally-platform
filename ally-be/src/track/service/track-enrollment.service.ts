@@ -30,6 +30,7 @@ import {
   ArticleExperience,
   ArticleQuestion,
   JournalContent,
+  LastRoleplayAttempt,
   parseArticleQuestionMarkers,
   TrackAccessDenialReason,
   TrackItemType,
@@ -37,6 +38,7 @@ import {
   VideoContent,
   VideoSource,
 } from '../type/track.type';
+import { roleplayFailureReasons } from '../util/roleplay-gate.util';
 import { QuizAnswer, QuizContent } from '../type/quiz.type';
 import { AnnotationContent } from '../type/annotation.type';
 import { TrackSharedService, TrackWithStructure } from './track-shared.service';
@@ -629,6 +631,7 @@ export class TrackEnrollmentService {
           trackItemProgressId: progress.id,
           scenarioId: item.scenarioId,
           completionCriteria: item.completionCriteria ?? null,
+          ...this.roleplayLearnerFields(item, progress),
           lastScenarioSessionId,
           assessmentSubmittedAt,
           /** The roleplay runs in the scenario's own translated language, which
@@ -1245,7 +1248,46 @@ export class TrackEnrollmentService {
         (item.completionCriteria?.assessmentMode &&
           progress?.meta?.assessmentSubmittedAt) ||
         null,
+      ...(item.type === TrackItemType.ROLEPLAY
+        ? this.roleplayLearnerFields(item, progress)
+        : {}),
     };
+  }
+
+  /**
+   * What a learner needs to see about a roleplay's completion rule:
+   * `roleplayGate` is the rule with the platform default already applied (so
+   * clients never need to know that default), and `lastRoleplayAttempt` says
+   * which bar their latest attempt missed. The attempt is dropped once the
+   * item is complete — there is nothing left to explain.
+   *
+   * A trainer can change a roleplay's rule on a live course, so the stored
+   * attempt is re-checked against the rule as it is now: only the gates it
+   * still misses are reported, against today's bars, and an attempt that
+   * misses none is not reported at all (the requirement line already says
+   * what a fresh attempt needs).
+   */
+  private roleplayLearnerFields(item: TrackItem, progress?: TrackItemProgress) {
+    const gate = this.trackProgressService.getRoleplayGate(
+      item.completionCriteria,
+    );
+    const stored = progress?.meta?.lastRoleplayAttempt;
+    let lastRoleplayAttempt: LastRoleplayAttempt | null = null;
+    if (progress?.status !== SessionItemStatus.COMPLETED && stored) {
+      const failureReasons = roleplayFailureReasons(gate, {
+        score: stored.score,
+        durationSeconds: stored.durationSeconds,
+      });
+      if (failureReasons.length > 0) {
+        lastRoleplayAttempt = {
+          ...stored,
+          failureReasons,
+          requiredScore: gate.minScore,
+          requiredDurationSeconds: gate.minDurationSeconds,
+        };
+      }
+    }
+    return { roleplayGate: gate, lastRoleplayAttempt };
   }
 
   /** Safe, answer-free summary of inline content for list/detail views. */

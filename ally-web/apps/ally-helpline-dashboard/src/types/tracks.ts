@@ -61,7 +61,36 @@ export interface GetLearnTracksResponse {
   count: number;
 }
 
+/** Which gates complete a roleplay item; absent = SCORE_AND_DURATION. */
+export type RoleplayCompletionLogic = "SCORE" | "DURATION" | "SCORE_AND_DURATION" | "PARTICIPATION";
+
+/**
+ * A roleplay item's completion rule as the server resolved it, platform
+ * default included. Display from this, never from raw completionCriteria —
+ * an item with no minDurationSeconds can still have a default minimum.
+ */
+export interface RoleplayGate {
+  completionLogic: RoleplayCompletionLogic;
+  /** Null when no score gate applies. */
+  minScore: number | null;
+  /** Null when no duration gate applies. */
+  minDurationSeconds: number | null;
+}
+
+export type RoleplayAttemptFailureReason = "INSUFFICIENT_SCORE" | "INSUFFICIENT_DURATION";
+
+/** The learner's latest roleplay attempt that missed a gate; null once the item is complete. */
+export interface LastRoleplayAttempt {
+  failureReasons: RoleplayAttemptFailureReason[];
+  score: number | null;
+  durationSeconds: number;
+  requiredScore: number | null;
+  requiredDurationSeconds: number | null;
+  endedAt: string;
+}
+
 export interface TrackCompletionCriteria {
+  completionLogic?: RoleplayCompletionLogic;
   minScore?: number;
   minDurationSeconds?: number;
   /** Roleplay: one attempt only, locked once submitted. */
@@ -111,6 +140,10 @@ export interface TrackDetailItem {
   maxWatchedPct: number | null;
   /** Assessment roleplay: when the one attempt was submitted; null while still open. */
   assessmentSubmittedAt?: string | null;
+  /** Roleplay: the resolved completion rule (absent from older servers). */
+  roleplayGate?: RoleplayGate;
+  /** Roleplay: why the latest attempt didn't complete the item. */
+  lastRoleplayAttempt?: LastRoleplayAttempt | null;
   /** The author enabled a discussion thread beneath this item. */
   hasDiscussion?: boolean;
   /**
@@ -626,6 +659,10 @@ export interface StartRoleplayItemPayload extends StartTrackItemBase {
   lastScenarioSessionId: string | null;
   /** Assessment roleplay: when the one attempt was submitted; null while still open. */
   assessmentSubmittedAt?: string | null;
+  /** The resolved completion rule (absent from older servers). */
+  roleplayGate?: RoleplayGate;
+  /** Why the latest attempt didn't complete the item; null once complete. */
+  lastRoleplayAttempt?: LastRoleplayAttempt | null;
 }
 
 export interface StartCaseItemPayload extends StartTrackItemBase {

@@ -14,6 +14,7 @@ import {
   TrackQuizGradedEvent,
   TrackRoleplayAttemptEndedEvent,
 } from 'src/track/service/track-progress.service';
+import { RoleplayAttemptFailureReason } from 'src/track/type/track.type';
 import { CourseSpine } from '../conductor/course-spine';
 import { GuideConductorService } from '../conductor/guide-conductor.service';
 import {
@@ -514,6 +515,17 @@ export class GuideProgressListener {
       describe: (title) => {
         switch (event.outcome) {
           case 'too_short':
+            if (
+              event.failureReasons?.includes(
+                RoleplayAttemptFailureReason.INSUFFICIENT_SCORE,
+              )
+            ) {
+              return (
+                `The learner's practice "${title}" was both shorter than the course asks and below its score bar, so it does not count yet. ` +
+                'Acknowledge it without judgement and offer to try again when they are ready, ' +
+                'staying with the conversation for longer.'
+              );
+            }
             return (
               `The learner left the practice "${title}" early, so it does not count yet. ` +
               'Acknowledge it without judgement and offer to try again when they are ready, ' +

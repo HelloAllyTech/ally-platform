@@ -13,6 +13,7 @@ import '../../../simulations/presentation/widgets/scenario_language_dropdown.dar
 import '../../../simulations/presentation/widgets/simulation_card.dart';
 import '../../data/course_models.dart';
 import '../../data/start_item_payload.dart';
+import 'roleplay_requirement.dart';
 import '../../../../core/localization/cached_date_format.dart';
 
 /// System font — RN's `<Text>`s here set no `fontFamily`.
@@ -139,6 +140,17 @@ class _RoleplayCasePlayerState extends ConsumerState<RoleplayCasePlayer> {
         textAlign: TextAlign.center,
         style: _systemStyle,
       ),
+      if (!_isCase && roleplayRequirementText(payload.roleplayGate ?? widget.item.roleplayGate, ref.t) != null)
+        Text(
+          roleplayRequirementText(payload.roleplayGate ?? widget.item.roleplayGate, ref.t)!,
+          key: const Key('roleplay-requirement'),
+          textAlign: TextAlign.center,
+          style: _systemStyle,
+        ),
+      if (!_isCase &&
+          !widget.alreadyCompleted &&
+          (payload.lastRoleplayAttempt ?? widget.item.lastRoleplayAttempt) != null)
+        RoleplayAttemptNotice(attempt: (payload.lastRoleplayAttempt ?? widget.item.lastRoleplayAttempt)!),
       if (_isAssessment && !_assessmentLocked)
         Container(
           key: const Key('roleplay-assessment-notice'),

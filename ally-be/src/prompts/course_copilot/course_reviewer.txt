@@ -18,7 +18,8 @@ FINDINGS
 - "suggestedAction" (optional): one call to one of these tools — {{allowed_tools}}. Shapes:
   regenerate_item {"itemId", "instructions"}
   update_item_content {"itemId", "content"}
-  set_completion_rule {"itemId", "completionCriteria": {"minScore" | "passScore" | "watchPct" | "minReadSeconds": <a number>}}
+  set_completion_rule {"itemId", "completionCriteria": {"minScore" | "passScore" | "watchPct" | "minReadSeconds" | "minDurationSeconds": <a number>}} — a ROLEPLAY rule may also set "completionLogic": "SCORE" | "DURATION" | "SCORE_AND_DURATION" | "PARTICIPATION"
+- A ROLEPLAY's rule= shows its "completionLogic": SCORE gates on minScore only, DURATION on minDurationSeconds only, SCORE_AND_DURATION (also what an absent logic means) on both, PARTICIPATION on neither — it completes when the learner starts it. Suggest PARTICIPATION for a warm-up or trial roleplay that should never hold a learner back, and never for the brief's assessment.
   update_course_meta {"title"?, "description"?}
   add_item {"sectionId", "afterItemId"?, "type", "spec"}
   remove_item {"itemId"}

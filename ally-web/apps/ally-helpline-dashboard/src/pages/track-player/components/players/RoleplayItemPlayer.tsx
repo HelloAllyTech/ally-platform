@@ -11,6 +11,7 @@ import {
   InteractionModePicker,
   useInteractionModePreference,
 } from "@components/interaction-mode-picker/InteractionModePicker";
+import { getRoleplayFailureLines, getRoleplayRequirement } from "@components/track-visuals";
 import { useStartSimulation } from "@hooks";
 import {
   ACTIVE_TRACK_CONTEXT_KEY,
@@ -79,6 +80,13 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
   const assessmentSubmittedAt =
     payload.type === "ROLEPLAY" ? (payload.assessmentSubmittedAt ?? null) : null;
   const assessmentLocked = isAssessment && !!assessmentSubmittedAt;
+  const requirement =
+    payload.type === "ROLEPLAY" ? getRoleplayRequirement(payload.roleplayGate, t) : null;
+  // Why the last attempt didn't count. The server drops it once the item is
+  // complete; the alreadyCompleted check covers a just-finished replay.
+  const lastAttempt =
+    payload.type === "ROLEPLAY" && !alreadyCompleted ? (payload.lastRoleplayAttempt ?? null) : null;
+  const failureLines = lastAttempt ? getRoleplayFailureLines(lastAttempt, t) : [];
 
   const { data: scenario } = useGetScenarioQuery({ scenarioId, isPrivate: true }, { skip: isCase });
   const { data: caseDetails } = useGetScenarioCaseDetailsQuery(
@@ -174,6 +182,33 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
         <p className="mt-5 max-w-md text-sm text-typography-700">
           {isAssessment ? t("tracks2.roleplay.assessmentIntro") : t("tracks2.roleplay.intro")}
         </p>
+
+        {requirement && !alreadyCompleted && !assessmentLocked && (
+          <p
+            className="mt-2 max-w-md text-sm font-medium text-typography-900"
+            data-testid="roleplay-requirement"
+          >
+            {requirement}
+          </p>
+        )}
+
+        {failureLines.length > 0 && (
+          <div
+            className="mt-4 w-full max-w-sm rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-left text-sm text-typography-800"
+            role="status"
+            data-testid="roleplay-last-attempt"
+          >
+            <p className="font-medium text-typography-900">
+              {t("tracks2.roleplay.lastAttempt.title")}
+            </p>
+            <ul className="mt-1 list-disc pl-5">
+              {failureLines.map(line => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            {!assessmentLocked && <p className="mt-1">{t("tracks2.roleplay.lastAttempt.retry")}</p>}
+          </div>
+        )}
 
         {isAssessment && !assessmentLocked && (
           <div

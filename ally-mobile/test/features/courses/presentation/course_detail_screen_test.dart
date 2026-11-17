@@ -11,6 +11,7 @@ import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/course_detail_screen.dart';
+import 'package:ally_mobile_flutter/features/courses/presentation/roleplay/roleplay_requirement.dart';
 import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/learning_path_widgets.dart';
 
 import '../../../support/fake_network_image.dart';
@@ -496,6 +497,41 @@ void main() {
     expect(find.byKey(const Key('course-language-option-en')), findsNothing);
   });
 
+  testWidgets('shows the last-attempt notice on a not-completed roleplay row, not once completed', (tester) async {
+    final attempt = LastRoleplayAttempt.tryParse({
+      'failureReasons': ['INSUFFICIENT_DURATION', 'INSUFFICIENT_SCORE'],
+      'score': 40,
+      'durationSeconds': 30,
+      'requiredScore': 70,
+      'requiredDurationSeconds': 180,
+    });
+    TrackDetailItem rp(String id, TrackItemStatus status, LastRoleplayAttempt? a) => TrackDetailItem(
+          id: id,
+          type: TrackItemType.roleplay,
+          order: 0,
+          title: 'RP $id',
+          description: null,
+          status: status,
+          score: null,
+          maxWatchedPct: null,
+          lastRoleplayAttempt: a,
+        );
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(items: [
+        rp('open', TrackItemStatus.unlocked, attempt),
+        rp('done', TrackItemStatus.completed, attempt),
+      ]),
+    );
+
+    await pump(tester);
+
+    expect(find.byKey(const Key('roleplay-last-attempt-notice')), findsOneWidget);
+    expect(find.textContaining('courses.roleplay.lastAttemptTitle'), findsOneWidget);
+    expect(find.textContaining('courses.roleplay.lastAttemptDuration'), findsOneWidget);
+    expect(find.textContaining('courses.roleplay.lastAttemptScore'), findsOneWidget);
+    expect(find.textContaining('courses.roleplay.lastAttemptFooter'), findsOneWidget);
+  });
+
   group('trackItemMeta (RN getTrackItemMeta)', () {
     String t(String key, [Map<String, Object?>? params]) =>
         params == null ? key : '$key${params.values.toList()}';
@@ -527,6 +563,55 @@ void main() {
         trackItemMeta(withMeta(TrackItemType.video, {'contentMeta': {'durationSeconds': 20}}), t),
         'courses.meta.videoDuration_one[1, 1]',
       );
+    });
+
+    group('roleplayGate requirement', () {
+      TrackDetailItem gated(String logic, {num? minScore, num? minDuration}) =>
+          withMeta(TrackItemType.roleplay, {
+            'roleplayGate': {'completionLogic': logic, 'minScore': minScore, 'minDurationSeconds': minDuration},
+          });
+
+      test('SCORE', () {
+        expect(trackItemMeta(gated('SCORE', minScore: 70), t),
+            'courses.meta.roleplay · courses.meta.requireScore[70]');
+      });
+      test('DURATION', () {
+        expect(trackItemMeta(gated('DURATION', minDuration: 180), t),
+            'courses.meta.roleplay · courses.meta.requireDuration[courses.meta.durationMin[3]]');
+      });
+      test('SCORE_AND_DURATION, and a null half is dropped', () {
+        expect(trackItemMeta(gated('SCORE_AND_DURATION', minScore: 70, minDuration: 90), t),
+            'courses.meta.roleplay · courses.meta.requireScoreAndDuration[70, courses.meta.durationMinSec[1, 30]]');
+        expect(trackItemMeta(gated('SCORE_AND_DURATION', minDuration: 45), t),
+            'courses.meta.roleplay · courses.meta.requireDuration[courses.meta.durationSec[45]]');
+      });
+      test('PARTICIPATION', () {
+        expect(trackItemMeta(gated('PARTICIPATION'), t),
+            'courses.meta.roleplay · courses.meta.requireParticipation');
+      });
+      test('both gates null shows nothing extra', () {
+        expect(trackItemMeta(gated('SCORE_AND_DURATION'), t), 'courses.meta.roleplay');
+      });
+    });
+
+    test('failure lines for duration, score and both', () {
+      LastRoleplayAttempt attempt(List<String> reasons, {num? score}) => LastRoleplayAttempt.tryParse({
+            'failureReasons': reasons,
+            'score': score,
+            'durationSeconds': 90,
+            'requiredScore': 70,
+            'requiredDurationSeconds': 180,
+          })!;
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_DURATION']), t), [
+        'courses.roleplay.lastAttemptDuration[courses.meta.durationMinSec[1, 30], courses.meta.durationMin[3]]',
+      ]);
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE'], score: 55), t), [
+        'courses.roleplay.lastAttemptScore[55, 70]',
+      ]);
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE']), t), [
+        'courses.roleplay.lastAttemptScoreUnknown[70]',
+      ]);
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE', 'INSUFFICIENT_DURATION'], score: 55), t).length, 2);
     });
   });
 
@@ -567,6 +652,8 @@ extension on TrackDetailItem {
     startedAt: startedAt,
     contentMeta: contentMeta,
     completionCriteria: completionCriteria,
+    roleplayGate: roleplayGate,
+    lastRoleplayAttempt: lastRoleplayAttempt,
     languageFallbackReason: languageFallbackReason,
   );
 }

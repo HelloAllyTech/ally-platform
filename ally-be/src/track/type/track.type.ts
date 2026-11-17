@@ -219,6 +219,45 @@ export interface JournalContent {
 }
 
 /**
+ * Which gates a ROLEPLAY track item applies when an attempt ends.
+ *  - SCORE: minScore only; any length of call counts.
+ *  - DURATION: minDurationSeconds only (falling back to the platform default
+ *    when unset); any score counts.
+ *  - SCORE_AND_DURATION: both. The behaviour of every item created before
+ *    this field existed.
+ *  - PARTICIPATION: no gate; the item completes when the learner launches it.
+ */
+export enum TrackItemCompletionLogic {
+  SCORE = 'SCORE',
+  DURATION = 'DURATION',
+  SCORE_AND_DURATION = 'SCORE_AND_DURATION',
+  PARTICIPATION = 'PARTICIPATION',
+}
+
+/** Why a roleplay attempt did not complete its track item. */
+export enum RoleplayAttemptFailureReason {
+  INSUFFICIENT_SCORE = 'INSUFFICIENT_SCORE',
+  INSUFFICIENT_DURATION = 'INSUFFICIENT_DURATION',
+}
+
+/**
+ * The most recent roleplay attempt on a track item, kept on the progress row
+ * so the learner can be told why it did not count. Cleared once the item
+ * completes.
+ */
+export interface LastRoleplayAttempt {
+  /** At least one entry: only attempts that missed a gate are kept. */
+  failureReasons: RoleplayAttemptFailureReason[];
+  score: number | null;
+  durationSeconds: number;
+  /** The bar that applied to this attempt; null where that gate was off. */
+  requiredScore: number | null;
+  requiredDurationSeconds: number | null;
+  /** ISO timestamp. */
+  endedAt: string;
+}
+
+/**
  * Per-item completion rule. Only the keys relevant to the item's type are
  * read; the rest are ignored:
  *  - ROLEPLAY/CASE → minScore (+ minDurationSeconds for ROLEPLAY, falling back
@@ -235,8 +274,15 @@ export interface JournalContent {
  * `assessmentMode` (ROLEPLAY only) is not a completion rule but rides along
  * here because it is per-item and read in the same places: the learner gets
  * one attempt, and the start gate refuses a second session once it is used.
+ *
+ * `completionLogic` (ROLEPLAY only) picks which of minScore and
+ * minDurationSeconds gate the item — see TrackItemCompletionLogic. Absent
+ * reads as SCORE_AND_DURATION, which is how every roleplay item behaved
+ * before the field existed. Resolve it with `resolveRoleplayGate`
+ * (roleplay-gate.util.ts), never by reading the keys directly.
  */
 export interface TrackItemCompletionCriteria {
+  completionLogic?: TrackItemCompletionLogic;
   minScore?: number;
   minDurationSeconds?: number;
   assessmentMode?: boolean;
@@ -292,6 +338,8 @@ export interface TrackItemProgressMeta {
    * which is also what makes this the record the completion rule counts.
    */
   answeredArticleQuestions?: Record<string, AnsweredArticleQuestion>;
+  /** ROLEPLAY: the latest attempt that did not complete the item, and why. */
+  lastRoleplayAttempt?: LastRoleplayAttempt;
   /**
    * ROLEPLAY in assessment mode: when the learner's one attempt ended. Set
    * whether or not it passed; drives the learner's "submitted" state.

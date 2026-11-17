@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/start_item_payload.dart';
 
 void main() {
@@ -451,6 +452,84 @@ void main() {
       expect(payload.bucketSortAnswered, isEmpty);
       expect(payload.bucketSortRounds, 0);
       expect(payload.bucketSortBestFirstTryPct, isNull);
+    });
+  });
+
+  group('ROLEPLAY gate and last attempt', () {
+    StartItemPayload parse(Map<String, dynamic> extra) =>
+        StartItemPayload.fromJson({'trackItemProgressId': 'p', 'type': 'ROLEPLAY', 'scenarioId': 1, ...extra});
+
+    test('parses roleplayGate and lastRoleplayAttempt', () {
+      final payload = parse({
+        'roleplayGate': {'completionLogic': 'SCORE_AND_DURATION', 'minScore': 70, 'minDurationSeconds': 180},
+        'lastRoleplayAttempt': {
+          'failureReasons': ['INSUFFICIENT_SCORE', 'INSUFFICIENT_DURATION'],
+          'score': 55,
+          'durationSeconds': 90,
+          'requiredScore': 70,
+          'requiredDurationSeconds': 180,
+          'endedAt': '2026-11-17T10:00:00Z',
+        },
+      });
+      expect(payload.roleplayGate!.completionLogic, RoleplayCompletionLogic.scoreAndDuration);
+      expect(payload.roleplayGate!.minScore, 70);
+      expect(payload.roleplayGate!.minDurationSeconds, 180);
+      final attempt = payload.lastRoleplayAttempt!;
+      expect(attempt.failureReasons, [
+        RoleplayFailureReason.insufficientScore,
+        RoleplayFailureReason.insufficientDuration,
+      ]);
+      expect(attempt.score, 55);
+      expect(attempt.durationSeconds, 90);
+      expect(attempt.requiredDurationSeconds, 180);
+    });
+
+    test('absent or null fields stay null and never throw', () {
+      final payload = parse({'roleplayGate': null, 'lastRoleplayAttempt': null});
+      expect(payload.roleplayGate, isNull);
+      expect(payload.lastRoleplayAttempt, isNull);
+      expect(parse({}).roleplayGate, isNull);
+    });
+
+    test('null thresholds and null score are kept as null', () {
+      final payload = parse({
+        'roleplayGate': {'completionLogic': 'DURATION', 'minScore': null, 'minDurationSeconds': 60},
+        'lastRoleplayAttempt': {
+          'failureReasons': ['INSUFFICIENT_SCORE'],
+          'score': null,
+          'durationSeconds': 10,
+          'requiredScore': 70,
+        },
+      });
+      expect(payload.roleplayGate!.completionLogic, RoleplayCompletionLogic.duration);
+      expect(payload.roleplayGate!.minScore, isNull);
+      expect(payload.lastRoleplayAttempt!.score, isNull);
+      expect(payload.lastRoleplayAttempt!.requiredDurationSeconds, isNull);
+    });
+
+    test('unknown logic reads as score-and-duration; unknown reasons are ignored', () {
+      final payload = parse({
+        'roleplayGate': {'completionLogic': 'WAT'},
+        'lastRoleplayAttempt': {
+          'failureReasons': ['SOMETHING_NEW', 'INSUFFICIENT_DURATION'],
+          'durationSeconds': 5,
+        },
+      });
+      expect(payload.roleplayGate!.completionLogic, RoleplayCompletionLogic.scoreAndDuration);
+      expect(payload.lastRoleplayAttempt!.failureReasons, [RoleplayFailureReason.insufficientDuration]);
+      expect(parse({'lastRoleplayAttempt': {'failureReasons': ['SOMETHING_NEW']}}).lastRoleplayAttempt, isNull);
+      expect(parse({'roleplayGate': 'junk', 'lastRoleplayAttempt': 5}).roleplayGate, isNull);
+    });
+
+    test('completionCriteria.completionLogic parses on the track item', () {
+      final item = TrackDetailItem.fromJson({
+        'id': 'x',
+        'type': 'ROLEPLAY',
+        'title': 'x',
+        'completionCriteria': {'completionLogic': 'PARTICIPATION'},
+      });
+      expect(item.completionCriteria!.completionLogic, RoleplayCompletionLogic.participation);
+      expect(item.roleplayGate, isNull);
     });
   });
 

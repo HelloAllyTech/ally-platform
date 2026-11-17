@@ -2025,6 +2025,8 @@
       "prompts_other": "{{count}} prompts",
       "roleplay": "Roleplay",
       "minScore": "score {{score}}+",
+      "minDuration": "{{duration}}+",
+      "participation": "completes on start",
       "case": "Case study",
       "annotationTranscript": "Transcript",
       "annotationDocument": "Note",
@@ -2130,7 +2132,25 @@
       "assessmentNotice": "You get one attempt. When you end the roleplay, your attempt is submitted and can't be retaken.",
       "assessmentSubmitted": "Submitted {{date}}",
       "assessmentNotPassed": "This attempt didn't meet the passing requirements.",
-      "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer."
+      "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer.",
+      "duration": {
+        "minutesSeconds": "{{minutes}} min {{seconds}} sec",
+        "minutes": "{{minutes}} min",
+        "seconds": "{{seconds}} sec"
+      },
+      "requirement": {
+        "score": "To complete it, score at least {{score}}.",
+        "duration": "To complete it, keep the roleplay going for at least {{duration}}.",
+        "scoreAndDuration": "To complete it, score at least {{score}} and keep the roleplay going for at least {{duration}}.",
+        "participation": "This completes as soon as you start the roleplay."
+      },
+      "lastAttempt": {
+        "title": "Your last attempt didn't complete this roleplay",
+        "duration": "It lasted {{actual}}; this roleplay needs at least {{required}}.",
+        "score": "You scored {{score}}; this roleplay needs at least {{required}}.",
+        "scoreMissing": "It didn't reach the minimum score of {{required}}.",
+        "retry": "Try again when you're ready."
+      }
     },
     "quiz": {
       "intro": {

@@ -346,3 +346,98 @@ describe("RoleplayItemPlayer — assessment mode", () => {
     expect(screen.getByTestId("roleplay-assessment-locked")).toBeInTheDocument();
   });
 });
+
+describe("RoleplayItemPlayer — completion requirement and last attempt", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockScenario();
+    mockCatalogLanguages(undefined);
+  });
+
+  const renderWith = (extra: Partial<StartRoleplayItemPayload>, alreadyCompleted = false) =>
+    render(
+      <RoleplayItemPlayer
+        payload={{ ...payload, ...extra }}
+        item={buildItem(null)}
+        trackId="track-1"
+        alreadyCompleted={alreadyCompleted}
+      />,
+    );
+
+  const attempt = (failureReasons: Array<"INSUFFICIENT_SCORE" | "INSUFFICIENT_DURATION">) => ({
+    failureReasons,
+    score: 40,
+    durationSeconds: 75,
+    requiredScore: 60,
+    requiredDurationSeconds: 90,
+    endedAt: "2026-11-17T10:00:00.000Z",
+  });
+
+  it.each([
+    [
+      { completionLogic: "SCORE" as const, minScore: 60, minDurationSeconds: null },
+      "To complete it, score at least 60.",
+    ],
+    [
+      { completionLogic: "DURATION" as const, minScore: null, minDurationSeconds: 90 },
+      "To complete it, keep the roleplay going for at least 1 min 30 sec.",
+    ],
+    [
+      { completionLogic: "SCORE_AND_DURATION" as const, minScore: 60, minDurationSeconds: 180 },
+      "To complete it, score at least 60 and keep the roleplay going for at least 3 min.",
+    ],
+    [
+      { completionLogic: "PARTICIPATION" as const, minScore: null, minDurationSeconds: null },
+      "This completes as soon as you start the roleplay.",
+    ],
+  ])("states the %o requirement before launch", (roleplayGate, text) => {
+    renderWith({ roleplayGate });
+    expect(screen.getByTestId("roleplay-requirement")).toHaveTextContent(text);
+  });
+
+  it("states nothing when the item has no gate and no server rule", () => {
+    renderWith({});
+    expect(screen.queryByTestId("roleplay-requirement")).not.toBeInTheDocument();
+  });
+
+  it("tells the learner they missed the time requirement", () => {
+    renderWith({ lastRoleplayAttempt: attempt(["INSUFFICIENT_DURATION"]) });
+    const notice = screen.getByTestId("roleplay-last-attempt");
+    expect(notice).toHaveTextContent("Your last attempt didn't complete this roleplay");
+    expect(notice).toHaveTextContent(
+      "It lasted 1 min 15 sec; this roleplay needs at least 1 min 30 sec.",
+    );
+    expect(notice).not.toHaveTextContent("You scored");
+    expect(notice).toHaveTextContent("Try again when you're ready.");
+  });
+
+  it("tells the learner they missed the score", () => {
+    renderWith({ lastRoleplayAttempt: attempt(["INSUFFICIENT_SCORE"]) });
+    const notice = screen.getByTestId("roleplay-last-attempt");
+    expect(notice).toHaveTextContent("You scored 40; this roleplay needs at least 60.");
+    expect(notice).not.toHaveTextContent("It lasted");
+  });
+
+  it("names both gates when both were missed", () => {
+    renderWith({
+      lastRoleplayAttempt: attempt(["INSUFFICIENT_DURATION", "INSUFFICIENT_SCORE"]),
+    });
+    const notice = screen.getByTestId("roleplay-last-attempt");
+    expect(notice).toHaveTextContent("It lasted 1 min 15 sec");
+    expect(notice).toHaveTextContent("You scored 40");
+  });
+
+  it("explains a missing score without inventing one", () => {
+    renderWith({
+      lastRoleplayAttempt: { ...attempt(["INSUFFICIENT_SCORE"]), score: null },
+    });
+    expect(screen.getByTestId("roleplay-last-attempt")).toHaveTextContent(
+      "It didn't reach the minimum score of 60.",
+    );
+  });
+
+  it("shows no failure once the item is complete", () => {
+    renderWith({ lastRoleplayAttempt: attempt(["INSUFFICIENT_SCORE"]) }, true);
+    expect(screen.queryByTestId("roleplay-last-attempt")).not.toBeInTheDocument();
+  });
+});

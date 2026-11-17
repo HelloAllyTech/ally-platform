@@ -1934,6 +1934,13 @@
       "prompts_other": "{{count}} प्रॉम्प्ट",
       "roleplay": "रोल-प्ले",
       "minScore": "न्यूनतम स्कोर {{score}}%",
+      "requireScore": "कम से कम {{score}} स्कोर करें",
+      "requireDuration": "कम से कम {{duration}}",
+      "requireScoreAndDuration": "कम से कम {{score}} स्कोर करें · कम से कम {{duration}}",
+      "requireParticipation": "शुरू करते ही पूरा हो जाता है",
+      "durationMin": "{{min}} मिनट",
+      "durationSec": "{{sec}} सेकंड",
+      "durationMinSec": "{{min}} मिनट {{sec}} सेकंड",
       "case": "केस",
       "game": "गेम · बस मनोरंजन के लिए",
       "branchingScenario": "परिदृश्य प्रश्नोत्तरी",
@@ -2044,7 +2051,12 @@
       "assessmentNotice": "आपको एक ही मौका मिलेगा। रोल-प्ले खत्म करते ही आपका प्रयास जमा हो जाएगा और दोबारा नहीं किया जा सकेगा।",
       "assessmentSubmitted": "{{date}} को जमा किया गया",
       "assessmentNotPassed": "यह प्रयास पास होने की शर्तें पूरी नहीं कर पाया।",
-      "assessmentLocked": "आपका मूल्यांकन जमा हो चुका है। दोबारा प्रयास के लिए अपने ट्रेनर से कहें।"
+      "assessmentLocked": "आपका मूल्यांकन जमा हो चुका है। दोबारा प्रयास के लिए अपने ट्रेनर से कहें।",
+      "lastAttemptTitle": "आपका पिछला प्रयास इस रोलप्ले को पूरा नहीं कर पाया",
+      "lastAttemptDuration": "यह {{actual}} चला; इस रोलप्ले के लिए कम से कम {{required}} चाहिए।",
+      "lastAttemptScore": "आपका स्कोर {{score}} रहा; इस रोलप्ले के लिए कम से कम {{required}} चाहिए।",
+      "lastAttemptScoreUnknown": "यह न्यूनतम स्कोर {{required}} तक नहीं पहुँचा।",
+      "lastAttemptFooter": "जब आप तैयार हों, फिर से कोशिश करें।"
     },
     "quiz": {
       "intro": {

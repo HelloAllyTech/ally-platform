@@ -2025,6 +2025,8 @@
       "prompts_other": "{{count}} प्रॉम्प्ट",
       "roleplay": "रोल प्ले",
       "minScore": "स्कोर {{score}}+",
+      "minDuration": "{{duration}}+",
+      "participation": "शुरू करते ही पूरा",
       "case": "केस स्टडी",
       "annotationTranscript": "प्रतिलिपि",
       "annotationDocument": "नोट",
@@ -2130,7 +2132,25 @@
       "assessmentNotice": "आपको एक ही मौका मिलेगा। रोल प्ले खत्म करते ही आपका प्रयास जमा हो जाएगा और दोबारा नहीं किया जा सकेगा।",
       "assessmentSubmitted": "जमा किया गया {{date}}",
       "assessmentNotPassed": "यह प्रयास पास होने की शर्तें पूरी नहीं कर पाया।",
-      "assessmentLocked": "आपका मूल्यांकन जमा हो चुका है। दोबारा प्रयास के लिए अपने ट्रेनर से कहें।"
+      "assessmentLocked": "आपका मूल्यांकन जमा हो चुका है। दोबारा प्रयास के लिए अपने ट्रेनर से कहें।",
+      "duration": {
+        "minutesSeconds": "{{minutes}} मिनट {{seconds}} सेकंड",
+        "minutes": "{{minutes}} मिनट",
+        "seconds": "{{seconds}} सेकंड"
+      },
+      "requirement": {
+        "score": "इसे पूरा करने के लिए कम से कम {{score}} स्कोर करें।",
+        "duration": "इसे पूरा करने के लिए रोल प्ले को कम से कम {{duration}} तक जारी रखें।",
+        "scoreAndDuration": "इसे पूरा करने के लिए कम से कम {{score}} स्कोर करें और रोल प्ले को कम से कम {{duration}} तक जारी रखें।",
+        "participation": "रोल प्ले शुरू करते ही यह पूरा हो जाता है।"
+      },
+      "lastAttempt": {
+        "title": "आपके पिछले प्रयास से यह रोल प्ले पूरा नहीं हुआ",
+        "duration": "यह {{actual}} चला; इस रोल प्ले के लिए कम से कम {{required}} चाहिए।",
+        "score": "आपका स्कोर {{score}} रहा; इस रोल प्ले के लिए कम से कम {{required}} चाहिए।",
+        "scoreMissing": "यह न्यूनतम स्कोर {{required}} तक नहीं पहुँचा।",
+        "retry": "जब आप तैयार हों, फिर से कोशिश करें।"
+      }
     },
     "quiz": {
       "intro": {

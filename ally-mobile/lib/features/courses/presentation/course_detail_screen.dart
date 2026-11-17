@@ -14,6 +14,7 @@ import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import 'course_language_sheet.dart';
 import 'course_progress_screen.dart';
+import 'roleplay/roleplay_requirement.dart';
 
 /// Port of ally-mobile (React Native)'s `CourseOverviewScreen` (header,
 /// language row, LearningPathListHeader, CourseSectionBlock/CourseItemRow).
@@ -394,6 +395,12 @@ String trackItemMeta(TrackDetailItem item, String Function(String, [Map<String, 
     case TrackItemType.article:
       return t('courses.meta.article');
     case TrackItemType.roleplay:
+      if (item.roleplayGate != null) {
+        final requirement = roleplayRequirementText(item.roleplayGate, t);
+        return requirement == null
+            ? t('courses.meta.roleplay')
+            : '${t('courses.meta.roleplay')} · $requirement';
+      }
       // A minScore of 0 is the unconfigured default and gates nothing.
       final minScore = criteria?.minScore ?? 0;
       if (minScore > 0) {
@@ -542,6 +549,12 @@ class _CourseItemRow extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(trackItemMeta(item, ref.t), style: _robotoSmall),
+                    if (item.type == TrackItemType.roleplay &&
+                        !isCompleted &&
+                        item.lastRoleplayAttempt != null) ...[
+                      const SizedBox(height: 8),
+                      RoleplayAttemptNotice(attempt: item.lastRoleplayAttempt!),
+                    ],
                     if (item.languageFallbackReason != null) ...[
                       const SizedBox(height: 2),
                       Text(

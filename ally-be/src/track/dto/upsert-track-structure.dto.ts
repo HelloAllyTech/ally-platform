@@ -16,16 +16,28 @@ import {
   ValidateNested,
   IsBoolean,
 } from 'class-validator';
-import { TrackItemType } from '../type/track.type';
+import { TrackItemCompletionLogic, TrackItemType } from '../type/track.type';
 
 export class UpsertTrackItemCompletionCriteriaDto {
+  @ApiPropertyOptional({
+    enum: TrackItemCompletionLogic,
+    description:
+      'Which gates complete a ROLEPLAY item: SCORE, DURATION, SCORE_AND_DURATION (the default when absent) or PARTICIPATION (completes on launch)',
+  })
+  @IsOptional()
+  @IsEnum(TrackItemCompletionLogic)
+  completionLogic?: TrackItemCompletionLogic;
+
   @ApiPropertyOptional({ description: 'Minimum score (ROLEPLAY/CASE)' })
   @IsOptional()
   @IsNumber()
   @Min(0)
   minScore?: number;
 
-  @ApiPropertyOptional({ description: 'Minimum call duration s (ROLEPLAY)' })
+  @ApiPropertyOptional({
+    description:
+      'Minimum call duration in seconds (ROLEPLAY). 0 = no minimum; absent = the platform default',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
