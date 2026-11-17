@@ -65,6 +65,11 @@ export class BuilderSettingsService {
         | 'planIdeaCeilingUsd'
         | 'planCloseConfirmVotes'
         | 'builderDirectInterviewEnabled'
+        | 'roadmapV2Enabled'
+        | 'maxLeadCeilingUsd'
+        | 'awaitingReviewAmberDays'
+        | 'releaseWindow'
+        | 'autoReleaseHeldPaths'
       >
     >,
     userId: number,
@@ -89,6 +94,12 @@ export class BuilderSettingsService {
     // The one action in this module that cannot be undone from inside it.
     // "Who turned it on, and when" is the first question after any pull
     // request that reached master without a person choosing to take it.
+    // The switch that moves every Roadmap and Builder user onto the new tab at once (D8).
+    if (changes.roadmapV2Enabled !== undefined) {
+      this.logger.info(
+        `Roadmap v2 ${changes.roadmapV2Enabled ? 'ENABLED' : 'DISABLED'} by user ${userId}`,
+      );
+    }
     if (changes.autoMergeEnabled !== undefined) {
       this.logger.info(
         `Builder auto-merge ${

@@ -41,6 +41,7 @@ import {
   switchesForAutonomyLevel,
 } from '../util/builder-autonomy.util';
 import { BuilderSettingsService } from '../service/builder-settings.service';
+import { AUTO_RELEASE_HELD_PATHS_DEFAULT } from 'src/product-planning/constants/product-planning.constants';
 import { BuilderNotificationService } from '../service/builder-notification.service';
 import { BuilderExemplarService } from '../service/builder-exemplar.service';
 import { BuilderMetricsService } from '../service/builder-metrics.service';
@@ -738,6 +739,11 @@ export class BuilderController {
       trackRecord.unhealthyReleases === 0;
     return {
       ...settings,
+      // Null on the row means the defaults in code; the settings screen shows
+      // the list that applies, not the storage detail.
+      autoReleaseHeldPaths: settings.autoReleaseHeldPaths ?? [
+        ...AUTO_RELEASE_HELD_PATHS_DEFAULT,
+      ],
       autonomyLevel,
       trackRecord,
       suggestedLevel: earned ? nextAutonomyLevel(autonomyLevel) : null,
@@ -825,6 +831,21 @@ export class BuilderController {
           ? {
               builderDirectInterviewEnabled: dto.builderDirectInterviewEnabled,
             }
+          : {}),
+        ...(dto.roadmapV2Enabled !== undefined
+          ? { roadmapV2Enabled: dto.roadmapV2Enabled }
+          : {}),
+        ...(dto.maxLeadCeilingUsd !== undefined
+          ? { maxLeadCeilingUsd: String(dto.maxLeadCeilingUsd) }
+          : {}),
+        ...(dto.awaitingReviewAmberDays !== undefined
+          ? { awaitingReviewAmberDays: dto.awaitingReviewAmberDays }
+          : {}),
+        ...(dto.releaseWindow !== undefined
+          ? { releaseWindow: dto.releaseWindow ?? null }
+          : {}),
+        ...(dto.autoReleaseHeldPaths !== undefined
+          ? { autoReleaseHeldPaths: dto.autoReleaseHeldPaths ?? null }
           : {}),
         // The level sets the switches, and wins over any given alongside it.
         ...(dto.autonomyLevel
