@@ -89,6 +89,8 @@ import {
   PlanEventKind,
   PlanNotificationKind,
   PlanStage,
+  RoadmapNotificationKind,
+  RoadmapWatchLevel,
 } from '../../product-planning/enum/product-planning.enum';
 import {
   CourseCopilotEventType,
@@ -320,6 +322,8 @@ describe('CHECK constraints cover their enums', () => {
       Object.values(RoadmapReviewState),
     ],
     ['CHK_plan_notifications_kind', Object.values(PlanNotificationKind)],
+    ['CHK_roadmap_notifications_kind', Object.values(RoadmapNotificationKind)],
+    ['CHK_roadmap_watches_level', Object.values(RoadmapWatchLevel)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],
     ['CHK_builder_build_runs_status', Object.values(BuilderRunStatus)],
     ['CHK_builder_build_runs_mode', Object.values(BuilderRunMode)],

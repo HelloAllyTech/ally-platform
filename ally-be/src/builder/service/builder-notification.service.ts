@@ -8,6 +8,7 @@ import { SlackService } from 'src/notification/service/slack.service';
 import { AppConfigService } from 'src/config/config.service';
 import { BUILDER_ANNOUNCED_KINDS } from '../constants/builder.constants';
 import { BuilderLiveService } from './builder-live.service';
+import { RoadmapInboxService } from 'src/product-planning/service/roadmap-inbox.service';
 
 /**
  * What happened while the admin was elsewhere.
@@ -32,6 +33,12 @@ export class BuilderNotificationService {
     private readonly slack: SlackService,
     private readonly configService: AppConfigService,
     @Optional() private readonly liveService?: BuilderLiveService,
+    /**
+     * Roadmap v2's one inbox (plans/roadmap-builder-merge §5.6). Dual-written
+     * beside this table, which stays the one Builder reads until cutover.
+     * Never throws.
+     */
+    @Optional() private readonly inbox?: RoadmapInboxService,
   ) {}
 
   private async notify(
@@ -56,6 +63,8 @@ export class BuilderNotificationService {
         }`,
       );
     }
+
+    await this.inbox?.fromBuilderNotification(session, kind, message);
 
     // Every notification is a session moving: the Builder tab refetches.
     this.liveService?.changed('sessionsChanged', 'decisionsChanged');

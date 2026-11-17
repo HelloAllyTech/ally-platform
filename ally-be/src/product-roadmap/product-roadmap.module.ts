@@ -67,6 +67,8 @@ import { RoadmapUpNextController } from './controller/roadmap-up-next.controller
 import { BuilderModule } from 'src/builder/builder.module';
 import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
 import { RoadmapPlanController } from './controller/roadmap-plan.controller';
+import { RoadmapItemController } from './item/roadmap-item.controller';
+import { RoadmapItemLookupService } from './item/roadmap-item-lookup.service';
 import { PlanSessionStore } from './plan/plan-session.store';
 import { PlanStageService } from './plan/plan-stage.service';
 import { PlanReadinessService } from './plan/plan-readiness.service';
@@ -201,6 +203,8 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     AwsModule,
   ],
   controllers: [
+    // Roadmap v2 (plans/roadmap-builder-merge): 404 while roadmap_v2 is off.
+    RoadmapItemController,
     RoadmapOpportunityController,
     RoadmapCollaborationController,
     RoadmapAdminController,
@@ -210,6 +214,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapItemReleaseController,
   ],
   providers: [
+    RoadmapItemLookupService,
     // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
     PlanSessionStore,
     PlanStageService,

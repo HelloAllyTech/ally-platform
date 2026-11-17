@@ -99,6 +99,34 @@ describe('RoadmapAllocationService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  describe('the voter watch (Roadmap v2, §4.8)', () => {
+    it('adds a milestones watch after a vote commits', async () => {
+      const watchOnVote = jest.fn().mockResolvedValue(undefined);
+      (service as any).inbox = { watchOnVote };
+      givenExistingAllocation(null);
+      grantRepository.availableBalance.mockResolvedValue(40);
+
+      await service.setVotes(USER, OPP_ID, 3);
+
+      expect(watchOnVote).toHaveBeenCalledWith(USER, OPP_ID);
+    });
+
+    it('adds nothing when the vote is withdrawn or refused', async () => {
+      const watchOnVote = jest.fn().mockResolvedValue(undefined);
+      (service as any).inbox = { watchOnVote };
+      givenExistingAllocation(30);
+      await service.setVotes(USER, OPP_ID, 0);
+
+      givenExistingAllocation(null);
+      grantRepository.availableBalance.mockResolvedValue(1);
+      await expect(service.setVotes(USER, OPP_ID, 5)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+
+      expect(watchOnVote).not.toHaveBeenCalled();
+    });
+  });
+
   describe('the vote-grant balance', () => {
     it('allows spending exactly the available balance', async () => {
       givenExistingAllocation(null);
