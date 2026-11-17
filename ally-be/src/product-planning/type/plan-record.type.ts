@@ -86,8 +86,21 @@ export interface PlanRecord {
   /** Questions whose answers conflict and wait for the settler (P3b), for the read model. */
   openConflicts?: number;
 
+  /**
+   * The build brief was sent to Claude Code (Roadmap v2, D18): who and when.
+   * Sending again re-stamps it. Its presence lets code-matched PRs drive
+   * release and moves the idea to Building once such a PR exists.
+   */
+  externalBuild?: PlanExternalBuild | null;
+
   /** Last stage written, with when — mirrors the planStage column. */
   lastStage?: PlanStage;
+}
+
+export interface PlanExternalBuild {
+  tool: 'claude_code';
+  byUserId: number;
+  at: string;
 }
 
 export interface PlanIdeaState {

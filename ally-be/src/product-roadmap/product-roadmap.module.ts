@@ -67,6 +67,10 @@ import { BuilderModule } from 'src/builder/builder.module';
 import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
 import { RoadmapPlanController } from './controller/roadmap-plan.controller';
 import { RoadmapItemController } from './item/roadmap-item.controller';
+import { RoadmapItemBuildController } from './item/roadmap-item-build.controller';
+import { RoadmapItemBuildService } from './item/roadmap-item-build.service';
+import { RoadmapPeopleController } from './item/roadmap-people.controller';
+import { RoadmapRoleAdminService } from './item/roadmap-role-admin.service';
 import { RoadmapItemLookupService } from './item/roadmap-item-lookup.service';
 import { RoadmapItemReadService } from './item/roadmap-item-read.service';
 import { RoadmapItemEditService } from './item/roadmap-item-edit.service';
@@ -231,6 +235,8 @@ import { RoadmapReviewService } from './review/roadmap-review.service';
     // P3: New idea, drafts, dictation, review and the lead.
     RoadmapDraftController,
     RoadmapReviewController,
+    RoadmapItemBuildController,
+    RoadmapPeopleController,
     RoadmapOpportunityController,
     RoadmapCollaborationController,
     RoadmapAdminController,
@@ -249,6 +255,8 @@ import { RoadmapReviewService } from './review/roadmap-review.service';
     RoadmapDraftService,
     RoadmapDictationService,
     RoadmapReviewService,
+    RoadmapItemBuildService,
+    RoadmapRoleAdminService,
     // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
     PlanSessionStore,
     PlanStageService,

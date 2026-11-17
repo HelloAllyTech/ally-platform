@@ -989,9 +989,10 @@ export class ItemReleaseService {
 
   /**
    * Release every in-flight opportunity whose linked work is all live and
-   * that has a link allowed to drive release — its Builder/plan session's PR
-   * or one linked by hand (`linkDrivesRelease`). A code match alone records
-   * the link and can hold a release back, but never releases.
+   * that has a link allowed to drive release — its Builder/plan session's PR,
+   * one linked by hand, or (once the brief went to Claude Code) one carrying
+   * its code (`linkDrivesRelease`). Otherwise a code match records the link
+   * and can hold a release back, but never releases.
    */
   async releaseShipped(): Promise<number> {
     const linked = await this.linkRepository
@@ -1007,9 +1008,10 @@ export class ItemReleaseService {
     const ids = linked.map((row) => row.opportunityId);
     if (ids.length === 0) return 0;
 
-    const [links, releases] = await Promise.all([
+    const [links, releases, externalBuilds] = await Promise.all([
       this.linkRepository.find({ where: { opportunityId: In(ids) } }),
       this.releaseRepository.find({ where: { opportunityId: In(ids) } }),
+      this.externallyBuilt(ids),
     ]);
 
     let released = 0;
@@ -1017,11 +1019,29 @@ export class ItemReleaseService {
       const verdict = opportunityShipped(
         links.filter((link) => link.opportunityId === id),
         releases.filter((row) => row.opportunityId === id),
+        { externalBuild: externalBuilds.has(id) },
       );
       if (!verdict.shipped) continue;
       if (await this.markReleased(id, verdict.liveAt)) released += 1;
     }
     return released;
+  }
+
+  /**
+   * Which of these opportunities had their brief sent to Claude Code: the
+   * plan session's `externalBuild` (D18). Their code-matched PRs drive release.
+   */
+  private async externallyBuilt(ids: string[]): Promise<Set<string>> {
+    const rows: { id: string }[] = await this.dataSource.query(
+      `SELECT o.id
+         FROM "roadmap_opportunities" o
+         JOIN "builder_sessions" s
+           ON s.id = o."builderSessionId" AND s."deletedAt" IS NULL
+        WHERE o.id = ANY($1::uuid[])
+          AND jsonb_typeof(s.plan->'externalBuild') = 'object'`,
+      [ids],
+    );
+    return new Set((rows ?? []).map((row) => String(row.id)));
   }
 
   /**

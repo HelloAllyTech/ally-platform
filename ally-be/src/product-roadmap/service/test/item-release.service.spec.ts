@@ -469,6 +469,49 @@ describe('ItemReleaseService.releaseShipped', () => {
     expect(await built.service.releaseShipped()).toBe(1);
   });
 
+  /**
+   * P4 (D18): once the brief went to Claude Code, the work arrives only as
+   * PRs carrying the code, so those drive release like Builder's own.
+   */
+  it('releases on a live code-matched PR once the brief was sent to Claude Code', async () => {
+    const built = withLinkedIds(
+      build({
+        opportunities: [
+          { id: 'o-1', code: 'OPP-0388', stage: RoadmapOpportunityStage.NEW },
+        ],
+        links: [mergedLink({ source: ItemLinkSource.CODE_MATCH })],
+        releases: [pendingRow({ state: ItemReleaseState.LIVE })],
+      }),
+      ['o-1'],
+    );
+    built.dataSource.query.mockImplementation((async (sql: string) =>
+      sql.includes('externalBuild') ? [{ id: 'o-1' }] : []) as never);
+
+    expect(await built.service.releaseShipped()).toBe(1);
+  });
+
+  it('still holds an externally built idea while a code-matched PR is open', async () => {
+    const built = withLinkedIds(
+      build({
+        links: [
+          mergedLink({ source: ItemLinkSource.CODE_MATCH }),
+          mergedLink({
+            id: 'l-2',
+            prNumber: 13,
+            source: ItemLinkSource.CODE_MATCH,
+            state: ItemLinkState.OPEN,
+          }),
+        ],
+        releases: [pendingRow({ state: ItemReleaseState.LIVE })],
+      }),
+      ['o-1'],
+    );
+    built.dataSource.query.mockImplementation((async (sql: string) =>
+      sql.includes('externalBuild') ? [{ id: 'o-1' }] : []) as never);
+
+    expect(await built.service.releaseShipped()).toBe(0);
+  });
+
   it('does not release while a linked PR is still open', async () => {
     const built = withLinkedIds(
       build({
