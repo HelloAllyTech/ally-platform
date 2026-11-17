@@ -2410,7 +2410,8 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'before (at most two rejections, then a pass offered only edit and turn-ending tools). Off, ' +
       'the prior streamed loop runs. A session opened from a roadmap opportunity also carries ' +
       "the opportunity's hand-off (description, copilot brief, filing interview) as a third " +
-      'cached system block on every turn.',
+      'cached system block on every turn. With roadmap_v2 on, a plan session past its one idea ' +
+      'ceiling (ledger + runner spend) does not start a turn at all (PlanCeilingService).',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
