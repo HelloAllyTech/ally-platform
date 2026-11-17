@@ -42,7 +42,13 @@ stored result.
     "expected_behaviours": ["Empathy"],                                     // named competencies only, never a custom code
     "helpful_behaviours": ["Asks open questions"],                          // the roleplay's SHOULD_DO + custom competencies' HELPFUL
     "unhelpful_behaviours": ["Gives advice too early"],                     // the roleplay's SHOULD_NOT_DO + custom competencies' UNHELPFUL
-    "competencies": [ { "name": "Empathy", "helpful": ["Reflects feelings"], "unhelpful": [] } ]   // named only; behaviours may be empty
+    "competencies": [ { "name": "Empathy", "helpful": ["Reflects feelings"], "unhelpful": [] } ],  // named only; behaviours may be empty
+    // The roleplay's two Debrief choices (spec DEBRIEF_ACROSS_ROLEPLAYS). All optional; ABSENT = today's behaviour exactly.
+    "framework": { "id": "DG-0100", "name": "Foundational helping skills", "foundational": true,
+                   "skills": [ { "key": "verbal", "name": "Verbal communication", "words": ["open question"] } ],
+                   "areas": [ { "name": "Listening Engagement", "description": "..." } ] },   // no skills = "none"; no areas = no coverage chart
+    "risk_cue": { "key": "standard", "name": "Standard", "handling": "alarm | assessed", "word_list_raises": true },
+    "speaker_labels": "legacy | neutral"                                    // neutral: LEARNER / CHARACTER; set with the release whose prompt texts are neutral (`bundle.settings.neutralWording`)
   },
   "transcript": [ { "turn_index": 0, "role": "counselor | client", "text": "...", "message_id": "..." } ],
   "context": {
@@ -79,6 +85,16 @@ Response:
   "language": "hi"                         // the debrief's language: the recorded one, or the one read from the learner's turns
 }
 ```
+
+**Skill framework and risk-cue option (spec DEBRIEF_ACROSS_ROLEPLAYS).** `session.framework` replaces the 14 foundational
+skills wherever the graph named them: the Analyst's `{{skill_framework}}`, the progress agent's allowed keys (with
+`context.progress_profile.skill_names`, which adds the roleplay's named competencies), the SKILL COVERAGE areas and the
+Foundational Skills levels (used only when `framework.foundational`). `session.risk_cue` sets `word_list_raises` (the word
+list may raise a cue to clear; nothing ever lowers one) and `handling`: under `assessed` the Writer, Reviser and
+Evaluator's fix notes get `{{risk_handling}}` (no important-moment card; the learner's handling is assessed in the
+coaching cards), and `POST /gateway/checks` carries `risk_handling` so ally-be does not require an important moment. The
+option's wording still arrives through `prompts["debrief_risk_cue_definition"]`. The run records
+`workspace.frameworkUsed` (id, name, area names) and `workspace.riskCueOption` (key, version, handling, support-lines flag, wording); the graph adds its own `workspace.framework`, `risk_cue` and `speaker_labels`.
 
 **Language (v9 FR-39; moved into the graph 2026-11-11, spec §D1).** ally-be sends what it knows: the session's
 configured language (its default `en` when none is recorded), `language_recorded`, and `language_source:

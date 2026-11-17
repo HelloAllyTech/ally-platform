@@ -15,6 +15,7 @@ import {
   SafetyReading,
   withPointIds,
 } from '../util/debrief-cards.util';
+import { SKILL_FRAMEWORK_KIND } from '../constants/debrief-framework.constants';
 import { guidancePassage, guidanceSearch } from '../util/debrief-guidance.util';
 import { DebriefAggregatesService } from './debrief-aggregates.service';
 import { DebriefContextRepository } from './debrief-context.repository';
@@ -137,6 +138,8 @@ export class DebriefGatewayService {
         if (noConfidentMatch) continue;
         confident = true;
         for (const { chunk, band } of results) {
+          // A skill framework is read directly for the roleplay that chose it, never as guidance.
+          if (chunk.facets?.kind === SKILL_FRAMEWORK_KIND) continue;
           if (seen.has(chunk.id)) continue;
           seen.add(chunk.id);
           const { title, text } = guidancePassage(chunk);
@@ -171,9 +174,13 @@ export class DebriefGatewayService {
       language: string;
       short_form?: boolean;
       has_progress?: boolean;
+      /** The roleplay's risk-cue handling; absent reads the run's own record, then alarm. */
+      risk_handling?: string;
     },
   ) {
     const transcript = await this.context.transcript(run.scenarioSessionId);
+    const handling =
+      body.risk_handling ?? run.workspace?.riskCueOption?.handling;
     const failures = runDebriefChecks({
       cards: body.cards,
       transcript,
@@ -184,6 +191,7 @@ export class DebriefGatewayService {
       language: body.language,
       shortForm: !!body.short_form,
       hasProgress: !!body.has_progress,
+      riskHandling: handling === 'assessed' ? 'assessed' : 'alarm',
       clinical:
         (await this.clinicalLists
           ?.patterns(body.language)

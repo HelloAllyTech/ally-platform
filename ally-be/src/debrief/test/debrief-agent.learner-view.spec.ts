@@ -327,6 +327,36 @@ describe('DebriefAgentService.learnerView', () => {
     expect((view as any).supportLines.length).toBeGreaterThan(0);
   });
 
+  it('does not bring the support lines for a character’s risk cue when the roleplay’s option says not to, but still for the learner’s own distress', async () => {
+    const run = (extra: Record<string, unknown>) => ({
+      mode: 'live',
+      status: 'published',
+      cards: { opening: 'x' },
+      language: 'en',
+      steps: [],
+      hasRiskCue: true,
+      workspace: {
+        riskCueOption: { key: 'part_of_practice', supportLinesOnCue: false },
+      },
+      ...extra,
+    });
+    const quiet = await build({ runs: [run({})] }).learnerView('s', 7);
+    expect(quiet).toMatchObject({
+      state: 'ready',
+      riskCue: false,
+      distress: false,
+    });
+    const distressed = await build({
+      runs: [run({ learnerDistress: true })],
+    }).learnerView('s', 7);
+    expect(distressed).toMatchObject({ riskCue: false, distress: true });
+    // A run with no record of an option (every run before them) behaves as today.
+    const legacy = await build({
+      runs: [run({ workspace: {} })],
+    }).learnerView('s', 7);
+    expect(legacy).toMatchObject({ riskCue: true });
+  });
+
   it('gives Tele-MANAS when the organisation set no support lines', async () => {
     const view = await build({
       runs: [

@@ -84,7 +84,11 @@ export class DebriefPublishService {
       };
       const { positives, improvements } = claimsFromCards(cards);
       const evidence = run.workspace?.evidence;
-      const skillCoverage = skillCoverageFromEvidence(evidence);
+      const areas = run.workspace?.frameworkUsed?.areas;
+      const skillCoverage = skillCoverageFromEvidence(
+        evidence,
+        Array.isArray(areas) ? areas.map(String) : undefined,
+      );
       const { messageFor, startFor } = await this.transcriptIndex(
         run.scenarioSessionId,
       );

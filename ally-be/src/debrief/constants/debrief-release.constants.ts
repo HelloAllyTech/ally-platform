@@ -116,6 +116,12 @@ export interface DebriefSettings {
    * bands, not similarities. Releases made before it still carry the value; nothing reads it.
    */
   guidanceMinSimilarity?: number;
+  /**
+   * The release's prompt texts are the neutral ones ("the learner", "the character"), so the
+   * transcript says LEARNER and CHARACTER instead of COUNSELLOR and CLIENT. Set by the release
+   * that publishes the neutral texts, so prompts and labels never disagree. Absent: legacy labels.
+   */
+  neutralWording?: boolean;
 }
 
 /** Ask Ally in conversation mode (v9 FR-43): part of the release, like every step. */

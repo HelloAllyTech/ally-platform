@@ -1294,7 +1294,11 @@ export class DebriefAgentService implements OnModuleInit {
           // The safety reading found something. The apps show the support
           // lines on their own when the Writer judged it ordinary low mood or
           // grief and wrote no important moment.
-          riskCue: run.hasRiskCue === true,
+          // The roleplay's risk-cue option decides whether a character's cue brings the support
+          // lines (recorded on the run); the learner's own distress always does.
+          riskCue:
+            run.hasRiskCue === true &&
+            run.workspace?.riskCueOption?.supportLinesOnCue !== false,
           supportLines: await this.supportLines(s.tenant_id, run.language),
           practice: available.filter((p) => linked.has(p.id)),
           askAlly: askAllyState(run),

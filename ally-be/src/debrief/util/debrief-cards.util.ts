@@ -334,6 +334,12 @@ export function runDebriefChecks(input: {
   language: string;
   shortForm: boolean;
   hasProgress: boolean;
+  /**
+   * How the roleplay handles a risk cue (its risk-cue option). `assessed`: the cue is what the
+   * roleplay practises, so no important-moment card is required for it (its handling is judged in
+   * the coaching cards, and a missed clear cue is still the judge's hard fail). Absent: alarm.
+   */
+  riskHandling?: 'alarm' | 'assessed';
   /** The clinical lists for this language; the defaults when absent. */
   clinical?: ClinicalPatterns;
 }): DebriefCheckFailure[] {
@@ -371,7 +377,7 @@ export function runDebriefChecks(input: {
       fail(
         DebriefCheckCode.WRONG_SPEAKER,
         section,
-        `turn ${turnIndex} is the ${turn.role === 'client' ? 'client' : 'counsellor'}'s`,
+        `turn ${turnIndex} is the ${turn.role === 'client' ? 'character' : 'learner'}'s`,
       );
     }
     // Speech-to-text often splits one spoken turn across consecutive
@@ -516,7 +522,7 @@ export function runDebriefChecks(input: {
         .map((c) => c.turn_index),
     ),
   ];
-  if (cueTurns.length > 0) {
+  if (cueTurns.length > 0 && input.riskHandling !== 'assessed') {
     if (!cards.important_moment) {
       fail(
         DebriefCheckCode.RISK_CUE_UNCOVERED,

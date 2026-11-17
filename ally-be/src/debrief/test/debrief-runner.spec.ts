@@ -100,6 +100,11 @@ function build(
     /** The ally-ai model catalogue; the seed's models by default. */
     catalog?: string[];
     debriefTabOff?: boolean;
+    /** The roleplay's two Debrief choices, and what the services answer for them. */
+    skillFramework?: string | null;
+    riskCueOption?: string | null;
+    framework?: unknown;
+    riskCue?: unknown;
   } = {},
 ) {
   const saved: any[] = [];
@@ -162,6 +167,8 @@ function build(
             inCase: opts.inCase ?? false,
             languageRecorded: opts.languageRecorded ?? true,
             debriefTabOff: opts.debriefTabOff ?? false,
+            skillFramework: opts.skillFramework ?? null,
+            riskCueOption: opts.riskCueOption ?? null,
           },
     ),
     caseMemory: jest.fn(async () => 'Meena told you about her exams.'),
@@ -250,6 +257,13 @@ function build(
     agentLogs as any,
     ownerSettings as any,
     progressResults as any,
+    undefined,
+    opts.framework
+      ? ({ resolve: jest.fn(async () => opts.framework) } as any)
+      : undefined,
+    opts.riskCue
+      ? ({ resolve: jest.fn(async () => opts.riskCue) } as any)
+      : undefined,
   );
   const request = () => (graph.run.mock.calls as any[][])[0]?.[0];
   return {
@@ -280,6 +294,93 @@ describe('DebriefRunnerService', () => {
     } as any);
     expect(release).toBeNull();
     expect(bundle).toBe(DEBRIEF_SEED_BUNDLE);
+  });
+
+  describe('what the roleplay chose (skill framework and risk-cue option)', () => {
+    const custom = {
+      id: 'DG-0300',
+      name: 'Palliative skills',
+      foundational: false,
+      skills: [{ key: 'presence', name: 'Presence', words: ['present'] }],
+      areas: [],
+    };
+    const option = {
+      key: 'part_of_practice',
+      name: 'Part of the practice',
+      version: 4,
+      handling: 'assessed',
+      wordListRaises: true,
+      supportLinesOnCue: false,
+      wording: 'A cue here is the practice itself.',
+    };
+
+    it('sends today’s behaviour when nothing is chosen: foundational skills, Standard, legacy labels', async () => {
+      const { svc, request } = build();
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      const s = request().session;
+      expect(s.framework).toMatchObject({ foundational: true });
+      expect(s.framework.skills.map((k: { key: string }) => k.key)).toContain(
+        'verbal',
+      );
+      expect(s.risk_cue).toEqual({
+        key: 'standard',
+        name: 'Standard',
+        handling: 'alarm',
+        word_list_raises: true,
+      });
+      expect(s.speaker_labels).toBe('legacy');
+      // Standard reads the pinned definition: the prompt is the store's live text, untouched.
+      expect(request().prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition]).toMatch(
+        /^live /,
+      );
+    });
+
+    it('sends the chosen framework and option, and an option’s own wording replaces the pinned definition', async () => {
+      const { svc, request, context, saved } = build({
+        skillFramework: 'DG-0300',
+        riskCueOption: 'part_of_practice',
+        framework: custom,
+        riskCue: option,
+      });
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      const s = request().session;
+      expect(s.framework).toEqual(custom);
+      expect(s.risk_cue).toEqual({
+        key: 'part_of_practice',
+        name: 'Part of the practice',
+        handling: 'assessed',
+        word_list_raises: true,
+      });
+      expect(request().prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition]).toBe(
+        'A cue here is the practice itself.',
+      );
+      // The progress profile is built for this roleplay's skills and named competencies.
+      expect(context.progressProfile).toHaveBeenCalledWith(
+        7,
+        't1',
+        's1',
+        expect.anything(),
+        { framework: custom, competencies: ['open questions'] },
+      );
+      // The run records what it used, so a later edit never changes a past debrief.
+      const ws = saved[saved.length - 1]?.workspace ?? {};
+      expect(ws.frameworkUsed).toMatchObject({ id: 'DG-0300', areas: [] });
+      expect(ws.riskCueOption).toMatchObject({
+        key: 'part_of_practice',
+        version: 4,
+        handling: 'assessed',
+        supportLinesOnCue: false,
+        wording: 'A cue here is the practice itself.',
+      });
+    });
+
+    it('sends neutral labels only when the release says its prompt texts are the neutral ones', async () => {
+      const bundle = JSON.parse(JSON.stringify(FIXED_RECIPES));
+      bundle.settings.neutralWording = true;
+      const { svc, request } = build({ bundle });
+      await svc.run('s1', { mode: DebriefRunMode.LIVE });
+      expect(request().session.speaker_labels).toBe('neutral');
+    });
   });
 
   describe('prepare', () => {
@@ -720,12 +821,22 @@ describe('DebriefRunnerService', () => {
       });
       await svc.run('s1', { mode: DebriefRunMode.LIVE });
       expect(request().context.progress_profile).toEqual(profile);
-      expect(context.progressProfile).toHaveBeenCalledWith(7, 't1', 's1', {
-        window: 8,
-        cardEvery: 3,
-        useFhs: true,
-        showWorseToLearners: false,
-      });
+      expect(context.progressProfile).toHaveBeenCalledWith(
+        7,
+        't1',
+        's1',
+        {
+          window: 8,
+          cardEvery: 3,
+          useFhs: true,
+          showWorseToLearners: false,
+        },
+        // The roleplay's framework (default: foundational) and its named competencies.
+        expect.objectContaining({
+          framework: expect.objectContaining({ foundational: true }),
+          competencies: expect.any(Array),
+        }),
+      );
       expect(request().prompts).toHaveProperty(DEBRIEF_PROMPT_CODES.progress);
     });
 

@@ -1,4 +1,8 @@
-import { FHS_RUBRIC } from '../../foundational-skills/constants/helping-skills-rubric.constants';
+import {
+  DebriefSkillFramework,
+  FOUNDATIONAL_FRAMEWORK,
+} from '../constants/debrief-framework.constants';
+import { skillKeyOf, skillNamesOf } from './debrief-framework.util';
 
 /**
  * Learner progress in debriefs: the pure half of the progress profile. The
@@ -87,6 +91,11 @@ export interface ProgressProfile {
     string,
     Array<{ date: string; session_id: string; level: number }>
   > | null;
+  /**
+   * Key → name of every skill that may be trended for this roleplay: its framework's skills and
+   * its named competencies (keys `competency:<name>`). The progress agent's allowed keys.
+   */
+  skill_names?: Record<string, string>;
 }
 
 /** One past published debrief in the window, as the repository reads it. */
@@ -152,56 +161,17 @@ export interface ProgressFhsRow {
 // --- Skill keys ---------------------------------------------------------------------
 
 /**
- * The Analyst names skills in free text. Map a name to a foundational skill
- * key (`helping-skills-rubric.constants.ts`) where it is obvious, else
- * `other` (sent, never trended). Order matters: the first match wins, so the
- * narrow skills come before the broad "verbal communication".
+ * The Analyst names skills in free text. Map a name to a skill key of the roleplay's framework
+ * (default: the foundational helping skills, `helping-skills-rubric.constants.ts`), or to a named
+ * competency of the roleplay, where it is obvious; else `other` (sent, never trended). The words
+ * that identify a skill live with the framework (a Context Library entry), narrow skills first.
  */
-const SKILL_PATTERNS: ReadonlyArray<[string, RegExp]> = [
-  ['harm', /\bharm\b|suicid|self[- ]?harm|\brisk\b|safety plan|response plan/],
-  ['confidentiality', /confidential|privacy/],
-  ['feelings', /feeling|emotion|normali[sz]|validat/],
-  ['empathy', /empath|warmth|genuine/],
-  ['rapport', /rapport|self[- ]disclos|trust[- ]?build|building trust/],
-  [
-    'functioning',
-    /function|daily life|impact on (?:their |the client'?s? )?life/,
-  ],
-  [
-    'explanation',
-    /explanation|client'?s? (?:own )?(?:understanding|view|beliefs?) (?:of|about)/,
-  ],
-  [
-    'family',
-    /family|significant other|loved ones?|support (?:system|network)|social support/,
-  ],
-  ['goals', /goal/],
-  ['hope', /hope|optimis/],
-  ['coping', /coping|prior solution|what (?:has )?helped|worked before/],
-  ['psychoeducation', /psycho-?education|psycho education/],
-  ['feedback', /feedback/],
-  [
-    'verbal',
-    /verbal|open[- ]ended|open questions?|reflect|paraphras|summar|active listening|listening|clarif/,
-  ],
-];
-
-const KEY_BY_NAME = new Map<string, string>(
-  FHS_RUBRIC.flatMap((s) => [
-    [s.key, s.key],
-    [s.name.trim().toLowerCase(), s.key],
-  ]),
-);
-
-export function progressSkillKey(name: unknown): string {
-  const n = String(name ?? '')
-    .trim()
-    .toLowerCase();
-  if (!n) return 'other';
-  const exact = KEY_BY_NAME.get(n);
-  if (exact) return exact;
-  for (const [key, re] of SKILL_PATTERNS) if (re.test(n)) return key;
-  return 'other';
+export function progressSkillKey(
+  name: unknown,
+  framework: DebriefSkillFramework = FOUNDATIONAL_FRAMEWORK,
+  competencies: ReadonlyArray<string> = [],
+): string {
+  return skillKeyOf(name, framework, competencies);
 }
 
 // --- Review signals -----------------------------------------------------------------
@@ -338,8 +308,14 @@ export function assembleProgressProfile(input: {
   /** Newest first. */
   voice: ProgressVoiceRow[];
   fhs: ProgressFhsRow[] | null;
+  /** The roleplay's skill framework; absent means the foundational helping skills. */
+  framework?: DebriefSkillFramework;
+  /** The roleplay's named competencies, trended alongside the framework's skills. */
+  competencies?: ReadonlyArray<string>;
 }): ProgressProfile {
   const { settings } = input;
+  const framework = input.framework ?? FOUNDATIONAL_FRAMEWORK;
+  const competencies = input.competencies ?? [];
   const rows = input.rows.slice(0, progressWindow(settings));
   const sessionNumber = Math.max(0, input.eligiblePast) + 1;
   const { verdicts, wrongTurns, learnerFlags } = reviewSignals(
@@ -411,7 +387,7 @@ export function assembleProgressProfile(input: {
     for (const b of list(r.behaviours)) {
       const name = String(b.skill ?? '').trim();
       if (!name || !OBSERVATIONS.has(String(b.observation))) continue;
-      const key = progressSkillKey(name);
+      const key = progressSkillKey(name, framework, competencies);
       const turn = intOrNull(b.turn_index);
       const obs: ProgressSkillObservation = {
         run_id: r.run_id,
@@ -503,7 +479,8 @@ export function assembleProgressProfile(input: {
     }));
 
   let fhs: ProgressProfile['fhs'] = null;
-  if (settings.useFhs && input.fhs?.length) {
+  // The Foundational Skills levels are the foundational framework's own assessment.
+  if (settings.useFhs && framework.foundational && input.fhs?.length) {
     const out: NonNullable<ProgressProfile['fhs']> = {};
     // Oldest cut first, like the skills.
     const cuts = [...input.fhs].sort(
@@ -533,6 +510,7 @@ export function assembleProgressProfile(input: {
     last_report: input.lastReport,
     learner_voice: voice,
     fhs,
+    skill_names: skillNamesOf(framework, competencies),
   };
 }
 

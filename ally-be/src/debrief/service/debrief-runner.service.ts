@@ -51,6 +51,12 @@ import {
   PromptVersions,
 } from './debrief-run-logs.service';
 import { DebriefPracticeService } from './debrief-practice.service';
+import { DebriefFrameworkService } from './debrief-framework.service';
+import {
+  DebriefRiskCueOptionService,
+  STANDARD_RISK_CUE,
+} from './debrief-risk-cue-option.service';
+import { FOUNDATIONAL_FRAMEWORK } from '../constants/debrief-framework.constants';
 import {
   DEBRIEF_ORCHESTRATOR_TOOLS,
   DEBRIEF_GATEWAY_TOOLS,
@@ -204,6 +210,10 @@ export class DebriefRunnerService {
     private readonly progressResults?: Repository<DebriefProgressResult>,
     /** V2_AUTONOMY A9: a language pinned to another release. Absent in unit tests. */
     @Optional() private readonly holds?: DebriefChangeHoldsService,
+    /** The roleplay's skill framework (Context Library). Absent in unit tests: the foundational one. */
+    @Optional() private readonly frameworks?: DebriefFrameworkService,
+    /** The roleplay's risk-cue option. Absent in unit tests: Standard. */
+    @Optional() private readonly riskCueOptions?: DebriefRiskCueOptionService,
   ) {}
 
   /**
@@ -575,6 +585,15 @@ export class DebriefRunnerService {
 
     // The context the graph's steps read. The optional reads never block a
     // debrief: unreadable means none.
+    // What the roleplay chose (spec DEBRIEF_ACROSS_ROLEPLAYS §4–5); unset or unreadable reads as
+    // today's behaviour, so neither can stop a debrief.
+    const framework = this.frameworks
+      ? await this.frameworks.resolve(session.skillFramework)
+      : FOUNDATIONAL_FRAMEWORK;
+    const riskCue = this.riskCueOptions
+      ? await this.riskCueOptions.resolve(session.riskCueOption)
+      : STANDARD_RISK_CUE;
+    const competencyNames = (session.competencies ?? []).map((c) => c.name);
     const [
       liveDetections,
       caseMemory,
@@ -623,11 +642,37 @@ export class DebriefRunnerService {
                 session.tenantId,
                 sessionId,
                 progressSettings(owner),
+                { framework, competencies: competencyNames },
               ),
             null,
           )
         : Promise.resolve(null),
     ]);
+    // An option with its own wording replaces the pinned definition; null keeps the pinned one.
+    if (riskCue.wording) {
+      prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition] = riskCue.wording;
+    }
+    run.workspace = {
+      ...run.workspace,
+      // What this run used, kept so a later edit never changes how a past debrief reads.
+      // Not `framework`: the graph's answer writes its own key of that name into the workspace.
+      frameworkUsed: {
+        id: framework.id,
+        name: framework.name,
+        areas: framework.areas.map((a) => a.name),
+      },
+      riskCueOption: {
+        key: riskCue.key,
+        name: riskCue.name,
+        version: riskCue.version,
+        handling: riskCue.handling,
+        supportLinesOnCue: riskCue.supportLinesOnCue,
+        wordListRaises: riskCue.wordListRaises,
+        // The option's own definition (null: the pinned one), so the judge reads what the run read.
+        wording: riskCue.wording,
+      },
+      speakerLabels: bundle.settings?.neutralWording ? 'neutral' : 'legacy',
+    };
     if (liveDetections.length) {
       run.workspace = { ...run.workspace, liveDetections };
     }
@@ -659,7 +704,19 @@ export class DebriefRunnerService {
           ? { allow_over_ceiling: true }
           : {}),
         prices: modelPrices(models),
-        session: sessionForGraph(session),
+        session: {
+          ...sessionForGraph(session),
+          framework,
+          risk_cue: {
+            key: riskCue.key,
+            name: riskCue.name,
+            handling: riskCue.handling,
+            word_list_raises: riskCue.wordListRaises,
+          },
+          speaker_labels: bundle.settings?.neutralWording
+            ? 'neutral'
+            : 'legacy',
+        },
         transcript,
         context: {
           live_detections: liveDetections,

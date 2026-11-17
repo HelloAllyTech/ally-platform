@@ -768,6 +768,33 @@ export class UpdateScenarioDto {
   pauseEnabled?: boolean;
 
   @ApiProperty({
+    description:
+      'The skill framework the Debrief assesses beyond this roleplay\'s own competencies: a ' +
+      'Context Library code (Debrief Guidance, kind Skill framework), "none", or null for the ' +
+      'default (the foundational helping skills).',
+    example: 'DG-0100',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  debriefSkillFramework?: string | null;
+
+  @ApiProperty({
+    description:
+      'The risk-cue option this roleplay\'s Debrief applies: the key of an approved option ' +
+      '(Debriefs › roleplay options), or null for Standard.',
+    example: 'part_of_practice',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  debriefRiskCueOption?: string | null;
+
+  @ApiProperty({
     description: 'Enable current state for the scenario',
     example: true,
     required: false,

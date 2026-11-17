@@ -1450,6 +1450,7 @@ export const DEBRIEF_EVALUATOR_FIX_SYSTEM = definePrompt(
   {
     pass_bar: 'required',
     fix_sections: 'required',
+    risk_handling: 'optional',
   },
   {
     name: "Debrief Evaluator's fix notes",
@@ -1541,6 +1542,7 @@ export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
     scenario: 'optional',
     expected_behaviours: 'optional',
     roleplay_expectations: 'optional',
+    skill_framework: 'optional',
     live_detections: 'optional',
     case_memory: 'optional',
     transcript: 'required',
@@ -1602,6 +1604,7 @@ export const DEBRIEF_WRITER_SYSTEM = definePrompt(
     learner_distress: 'optional',
     checked_rules: 'optional',
     risk_cue_turns: 'required',
+    risk_handling: 'optional',
     possible_risk_cue_turns: 'optional',
     missed_feelings_turns: 'optional',
     course_scenario_id: 'optional',
@@ -1632,6 +1635,7 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
     risk_cue_definition: 'required',
     session_language: 'optional',
     risk_cue_turns: 'required',
+    risk_handling: 'optional',
     checked_rules: 'optional',
     draft: 'optional',
     critique: 'optional',

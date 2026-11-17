@@ -133,6 +133,47 @@ describe('Scenario Util', () => {
       expect(SCENARIO_METADATA_FIELDS).toContain('textChatEnabled');
     });
 
+    it('keeps the roleplay’s two Debrief choices in its metadata, on create, on update and in versions', () => {
+      const created = mapCreateScenarioRequestToEntity(
+        {
+          title: 'Debrief choices',
+          description: 'd',
+          status: ScenarioStatus.DRAFT,
+          debriefSkillFramework: 'DG-0100',
+          debriefRiskCueOption: 'part_of_practice',
+        } as CreateScenarioDto,
+        1,
+      );
+      expect(created.metadata).toMatchObject({
+        debriefSkillFramework: 'DG-0100',
+        debriefRiskCueOption: 'part_of_practice',
+      });
+      expect(SCENARIO_METADATA_FIELDS).toEqual(
+        expect.arrayContaining([
+          'debriefSkillFramework',
+          'debriefRiskCueOption',
+        ]),
+      );
+      // A save that does not send them leaves them alone; null puts a roleplay back on the default.
+      const existing = {
+        metadata: { debriefRiskCueOption: 'part_of_practice' },
+      } as any;
+      expect(
+        mapUpdateScenarioRequestToEntity(
+          { title: 't' } as UpdateScenarioDto,
+          existing,
+          1,
+        ).metadata,
+      ).toBeUndefined();
+      expect(
+        mapUpdateScenarioRequestToEntity(
+          { debriefRiskCueOption: null } as UpdateScenarioDto,
+          existing,
+          1,
+        ).metadata,
+      ).toMatchObject({ debriefRiskCueOption: null });
+    });
+
     it('should not carry turnMin/MaxEndpointingDelay even if present on the DTO', () => {
       const userId = 111;
       const scenario: CreateScenarioDto = {
