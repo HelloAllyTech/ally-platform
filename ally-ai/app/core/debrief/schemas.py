@@ -35,22 +35,18 @@ class BehaviourEvidence(BaseModel):
     )
     turn_index: Optional[int] = Field(
         default=None,
-        description="The counsellor turn that shows it; null if missed outright.",
+        description="The learner turn that shows it; null if missed outright.",
     )
     quote: Optional[str] = Field(
         default=None, description="Exact words from that turn, as written."
     )
     note: str = Field(description="One sentence: what happened and why it mattered.")
-    coverage_category: Optional[
-        Literal["Listening Engagement", "Emotional Attunement", "Supportive Engagement"]
-    ] = Field(
+    coverage_category: Optional[str] = Field(
         default=None,
         description=(
-            "Which of the three skill-coverage areas this behaviour belongs to: "
-            "Listening Engagement (listening and engaging with what the client "
-            "said), Emotional Attunement (recognising and responding to the "
-            "client's emotions) or Supportive Engagement (offering support and a "
-            "safe, non-judgmental space). Null if none fits."
+            "The one skill-coverage area this behaviour belongs to, named "
+            "exactly as the SKILL COVERAGE rule names it. Null if none fits "
+            "or the rule is not given; any other value is set to null."
         ),
     )
     detector_agreement: Optional[Literal["agrees", "disagrees"]] = Field(
@@ -93,7 +89,7 @@ class EvidenceMap(BaseModel):
     emotional_arc: str = ""
     ai_faults: List[AiFault] = Field(default_factory=list)
     detected_language: str = Field(
-        default="", description="ISO 639-1 code of the counsellor's main language."
+        default="", description="ISO 639-1 code of the learner's main language."
     )
     # What today's debrief wrote and the new one now must (v9 FR-4): ally-be
     # maps each turn to its message for the session's emotional movement.
@@ -153,7 +149,7 @@ class ProgressEvidenceRef(BaseModel):
         )
     )
     turn_index: Optional[int] = Field(
-        default=None, description="The counsellor turn of that observation, if any."
+        default=None, description="The learner turn of that observation, if any."
     )
 
 
@@ -269,7 +265,7 @@ class WorkedCard(BaseModel):
     skill: str
     turn_index: int
     quote: str = Field(
-        description="The counsellor's words, exactly as in the transcript."
+        description="The learner's words, exactly as in the transcript."
     )
     lead: str
     body: str
@@ -281,7 +277,7 @@ class WorkOnThisCard(BaseModel):
     quote: str = Field(description="Words from the transcript, exactly as written.")
     lead: str
     why: str = Field(description="Why it mattered, at most 40 words.")
-    try_saying: str = Field(description="One thing the counsellor could say next time.")
+    try_saying: str = Field(description="One thing the learner could say next time.")
     scenario_id: Optional[int] = Field(
         default=None,
         description="A roleplay from PRACTICE OPTIONS for this skill, or null.",

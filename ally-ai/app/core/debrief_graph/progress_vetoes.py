@@ -14,26 +14,12 @@ advisor corrected or rejected never counts, and `other` is never trended.
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
-#: The 14 foundational helping skills: key → name, as ally-be's
-#: `helping-skills-rubric.constants.ts` has them and the Analyst names them.
-FOUNDATIONAL_SKILLS: Dict[str, str] = {
-    "verbal": "Verbal communication",
-    "confidentiality": "Explain and promote confidentiality",
-    "rapport": "Rapport-building and self-disclosure",
-    "feelings": "Exploration and normalisation of feelings",
-    "empathy": "Empathy, warmth and genuineness",
-    "harm": "Assessment of harm and developing a response plan",
-    "functioning": "Connect to social functioning and impact on life",
-    "explanation": "Explore the client's explanation for the problem",
-    "family": "Involvement of family and significant others",
-    "goals": "Collaborative goal-setting",
-    "hope": "Promote realistic hope for change",
-    "coping": "Incorporate coping mechanisms and prior solutions",
-    "psychoeducation": "Psychoeducation with local terminology",
-    "feedback": "Elicitation of feedback",
-}
+from app.core.debrief.framework import DEFAULT_FOUNDATIONAL_SKILLS
+
+#: The 14 foundational helping skills: key -> name (the default framework).
+FOUNDATIONAL_SKILLS: Dict[str, str] = DEFAULT_FOUNDATIONAL_SKILLS
 
 OTHER = "other"
 THIS_RUN = "this"
@@ -45,22 +31,28 @@ def _norm(text: str) -> str:
     return " ".join(str(text or "").lower().replace("’", "'").replace("_", " ").split())
 
 
-_BY_NAME = {_norm(name): key for key, name in FOUNDATIONAL_SKILLS.items()}
-
-
-def skill_key(name: Optional[str]) -> str:
-    """A skill key or the Analyst's name for it → its key; anything else → other."""
+def skill_key(
+    name: Optional[str], names: Optional[Mapping[str, str]] = None
+) -> str:
+    """A skill key or the Analyst's name for it -> its key; anything else ->
+    other. ``names`` is the run's key -> name mapping (the framework's skills
+    and the profile's named competencies); default the 14 foundational."""
+    names = FOUNDATIONAL_SKILLS if names is None else names
     norm = _norm(name or "")
-    if norm in FOUNDATIONAL_SKILLS:
-        return norm
-    return _BY_NAME.get(norm, OTHER)
+    by_key = {_norm(k): k for k in names}
+    if norm in by_key:
+        return by_key[norm]
+    by_name = {_norm(v): k for k, v in names.items()}
+    return by_name.get(norm, OTHER)
 
 
 # --- the observations ------------------------------------------------------------
 
 
 def this_session_observations(
-    evidence: Dict[str, Any], analyst_version: Optional[int] = None
+    evidence: Dict[str, Any],
+    analyst_version: Optional[int] = None,
+    names: Optional[Mapping[str, str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """This session's evidence map, one observation per foundational skill (the
     most important behaviour the Analyst gave it), in the profile's shape."""
@@ -70,7 +62,7 @@ def this_session_observations(
         key=lambda b: -(b.get("importance") or 0),
     )
     for b in ranked:
-        key = skill_key(b.get("skill"))
+        key = skill_key(b.get("skill"), names)
         if key == OTHER or key in out:
             continue
         out[key] = {
@@ -180,13 +172,15 @@ def skill_vetoes(
     item: Dict[str, Any],
     profile: Dict[str, Any],
     this: Dict[str, Dict[str, Any]],
+    names: Optional[Mapping[str, str]] = None,
+    foundational: bool = True,
 ) -> List[Dict[str, str]]:
     """Every veto that fires on one proposed skill trend (none for too_early)."""
     trend = item.get("trend")
     if trend == "too_early":
         return []
     raw = str(item.get("skill") or "")
-    key = skill_key(raw)
+    key = skill_key(raw, names)
     out: List[Dict[str, str]] = []
 
     def veto(code: str, detail: str) -> None:
@@ -199,7 +193,7 @@ def skill_vetoes(
         )
 
     if key == OTHER:
-        veto("other_skill", "not one of the foundational skills, so never trended.")
+        veto("other_skill", "not one of the skills in play, so never trended.")
         return out
     obs = countable(profile, this, key)
     sessions = {str(o.get("run_id")) for o in obs}
@@ -225,7 +219,11 @@ def skill_vetoes(
                 f"earlier ones ({early:.1f}).",
             )
     settings = profile.get("settings") or {}
-    if trend == "more_consistent" and settings.get("useFhs", True):
+    if (
+        trend == "more_consistent"
+        and settings.get("useFhs", True)
+        and foundational
+    ):
         fell = _fhs_fell(profile.get("fhs"), key)
         if fell:
             veto(
@@ -263,19 +261,23 @@ def apply_vetoes(
     report: Dict[str, Any],
     profile: Dict[str, Any],
     evidence: Dict[str, Any],
+    names: Optional[Mapping[str, str]] = None,
+    foundational: bool = True,
 ) -> Tuple[Dict[str, Any], List[Dict[str, str]]]:
     """The report after the vetoes, and the vetoes that fired.
 
     Each skill gains `hidden_from_learner`; `shown_as` is `card` only when the
     profile says the card is due; at most 3 skills are kept."""
     out = copy.deepcopy(report or {})
-    this = this_session_observations(evidence, profile.get("analyst_version"))
+    this = this_session_observations(
+        evidence, profile.get("analyst_version"), names
+    )
     show_worse = bool((profile.get("settings") or {}).get("showWorseToLearners"))
     vetoes: List[Dict[str, str]] = []
     skills = []
     for item in (out.get("skills") or [])[:3]:
-        fired = skill_vetoes(item, profile, this)
-        key = skill_key(item.get("skill"))
+        fired = skill_vetoes(item, profile, this, names, foundational)
+        key = skill_key(item.get("skill"), names)
         if key != OTHER:
             item["skill"] = key
         if fired:
@@ -292,7 +294,7 @@ def apply_vetoes(
     out["skills"] = skills
     focus = out.get("focus")
     if isinstance(focus, dict):
-        key = skill_key(focus.get("skill"))
+        key = skill_key(focus.get("skill"), names)
         if key != OTHER:
             focus["skill"] = key
     out["shown_as"] = "card" if profile.get("card_due") else "line"

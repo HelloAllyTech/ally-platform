@@ -312,7 +312,9 @@ async def after_reading(
         # Each cue keeps every field the reader returned, plus how sure it is
         # (cue_strength.py): only a clear cue must become the important moment.
         # Every cue still counts for has_risk_cue below.
-        "risk_cues": with_strength(safety_res.get("risk_cues") or []),
+        "risk_cues": with_strength(
+            safety_res.get("risk_cues") or [], ctx.risk_cue["word_list_raises"]
+        ),
         "learner_distress": safety_res.get("learner_distress") or [],
     }
     analyst_step = ctx.step_of(state["recipe_key"], Step.ANALYST)
@@ -330,7 +332,18 @@ async def after_reading(
         "evidence": evidence,
         "has_risk_cue": len(safety["risk_cues"]) > 0,
         "learner_distress": len(safety["learner_distress"]) > 0,
-        "workspace": {"safety": safety, "evidence": evidence},
+        "workspace": {
+            "safety": safety,
+            "evidence": evidence,
+            # What this run used (ally-be stores it with the run).
+            "risk_cue": {
+                k: ctx.risk_cue[k] for k in ("key", "handling", "word_list_raises")
+            },
+            "framework": {
+                k: ctx.framework[k] for k in ("id", "name", "foundational")
+            },
+            "speaker_labels": ctx.speaker_labels,
+        },
         "progress": None,
         "progress_result": None,
         "history": None,
@@ -596,6 +609,8 @@ async def checks(
         "language": ctx.language,
         "short_form": bool(recipe.get("shortForm")),
         "has_progress": bool(state.get("progress")),
+        # Under `assessed`, ally-be does not require an important_moment card.
+        "risk_handling": ctx.risk_cue["handling"],
     }
     answer = await ctx.gateway.call("run_checks", check_input)
     fails = [_failure(f) for f in answer.get("failures") or []]
@@ -706,6 +721,7 @@ async def score_draft(
         clear_missed, possible_missed = split_missed_cues(
             ev.get("risk_cues") or [],
             (state.get("safety") or {}).get("risk_cues") or [],
+            ctx.risk_cue["word_list_raises"],
         )
         hard_fails = ev["hard_fails"]
         if possible_missed and not clear_missed:
@@ -857,6 +873,7 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
             cards,
             ev.get("riskCues") or [],
             (state.get("safety") or {}).get("risk_cues") or [],
+            ctx.risk_cue["word_list_raises"],
         )
     final = await ctx.gateway.call(
         "finalise_cards", {"cards": cards, "offered": offered, "fallback": fallback}

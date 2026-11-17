@@ -120,13 +120,18 @@ ANALYST = ModelStep(
 def _progress_agent_done(state: State, ctx: Ctx, res: Dict[str, Any]):
     profile = body.progress_profile(ctx) or {}
     t0 = ctx.clock()
+    names = ctx.skill_names()
     report, vetoes = apply_vetoes(
-        res.get("report") or {}, profile, state.get("evidence") or {}
+        res.get("report") or {},
+        profile,
+        state.get("evidence") or {},
+        names,
+        bool(ctx.framework.get("foundational")),
     )
     if res.get("reasoning"):
         report["reasoning"] = res["reasoning"]
     record = progress.response_record(report, vetoes, profile, res.get("model"))
-    reading = progress.writer_reading(report, profile)
+    reading = progress.writer_reading(report, profile, names)
     update: Dict[str, Any] = {
         "progress_result": record,
         "progress": reading,

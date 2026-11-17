@@ -106,6 +106,7 @@ class InProcessSteps:
             scenario_session_id=session_id,
             model=model,
             risk_cue_definition=body.get("risk_cue_definition"),
+            speaker_labels=body.get("speaker_labels"),
         )
         if reading is None:
             return None
@@ -130,6 +131,8 @@ class InProcessSteps:
             scenario_session_id=session_id,
             live_detections=body.get("live_detections") or [],
             case_memory=body.get("case_memory"),
+            framework=body.get("framework"),
+            speaker_labels=body.get("speaker_labels"),
         )
         if out is None:
             return None
@@ -164,6 +167,7 @@ class InProcessSteps:
             model or settings.DEBRIEF.PROGRESS_AGENT_MODEL,
             system=body.get("system_prompt"),
             scenario_session_id=session_id,
+            framework=body.get("framework"),
         )
         if out is None:
             return None
@@ -193,6 +197,8 @@ class InProcessSteps:
             cohort=body.get("cohort"),
             findings=body.get("findings"),
             risk_cue_definition=body.get("risk_cue_definition"),
+            risk_cue=body.get("risk_cue"),
+            speaker_labels=body.get("speaker_labels"),
         )
         if out is None:
             return None
@@ -217,6 +223,9 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             fix_system=body.get("fix_prompt"),
             pass_score=body.get("pass_score") or 8,
+            risk_cue=body.get("risk_cue"),
+            speaker_labels=body.get("speaker_labels"),
+            roleplay_expectations=body.get("roleplay_expectations"),
         )
         if out is None:
             return None
@@ -239,6 +248,8 @@ class InProcessSteps:
             findings=body.get("findings"),
             risk_cue_definition=body.get("risk_cue_definition"),
             safety=body.get("safety") or {},
+            risk_cue=body.get("risk_cue"),
+            speaker_labels=body.get("speaker_labels"),
         )
         if out is None:
             return None
@@ -283,6 +294,7 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             focus_turns=body.get("focus_turns") or [],
             scenario_session_id=session_id,
+            speaker_labels=body.get("speaker_labels"),
         )
         if out is None:
             return None

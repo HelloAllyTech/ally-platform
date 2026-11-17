@@ -481,7 +481,7 @@ async def test_writer_may_use_the_cohort_only_to_normalise(dispatch_returns):
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT, cohort=cohort)
     prompt = calls["prompt"]
-    assert prompt.count("<cohort>") == 1 and "Never compare this trainee" in prompt
+    assert prompt.count("<cohort>") == 1 and "Never compare this learner" in prompt
     assert "few trainees show this" in prompt
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
