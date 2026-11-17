@@ -9,8 +9,9 @@ import { en, ROUTES } from "@constants";
 import { BuilderExemplar } from "@types";
 import { asAgentTextList } from "@utils";
 
-import { BUILDER_OUTCOME_TAG_TYPE } from "./builderMotion";
+import { useAgentEmbed } from "./agentEmbed";
 import { formatHours, formatScoreboardCost } from "./scoreboardChart";
+import { BUILDER_OUTCOME_TAG_TYPE } from "../../motion/builderMotion";
 
 /** The Context Library collection Builder's lessons live in (PLAN §2.2, phase 5). */
 export const BUILDER_LESSONS_COLLECTION = "builder_lessons";
@@ -108,13 +109,16 @@ const ExemplarsTab: React.FC = () => {
 export const BuilderKnowledge: React.FC = () => {
   const strings = en.builder.knowledge;
   const navigate = useNavigate();
+  const { embedded } = useAgentEmbed();
 
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col gap-4 overflow-y-auto md:p-6">
       <header>
-        <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER)}>
-          ← {strings.backToBuilder}
-        </Button>
+        {!embedded && (
+          <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER)}>
+            ← {strings.backToBuilder}
+          </Button>
+        )}
         <h1 className="mt-2 text-xl font-semibold text-typography-900">{strings.title}</h1>
         <p className="mt-1 text-sm text-typography-600">{strings.subtitle}</p>
       </header>

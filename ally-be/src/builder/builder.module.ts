@@ -29,6 +29,9 @@ import { BuilderSettings } from './entity/builder-settings.entity';
 import { BuilderNotification } from './entity/builder-notification.entity';
 import { BuilderRepoCatalog } from './entity/builder-repo-catalog.entity';
 import { BuilderEvidence } from './entity/builder-evidence.entity';
+import { BuilderPlanReadGuard } from './guard/builder-plan-read.guard';
+import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+import { FeatureToggleGuard } from 'src/auth/guards/feature-toggle.guard';
 import { BuilderController } from './controller/builder.controller';
 import { BuilderPrinciplesController } from './controller/builder-principles.controller';
 import { BuilderPipelineController } from './controller/builder-pipeline.controller';
@@ -108,6 +111,8 @@ import {
   BuilderPullRequestRepository,
   BuilderPrFeedbackRepository,
 } from './repository/builder-build.repository';
+import { BuilderPlanConversationController } from './controller/builder-plan-conversation.controller';
+import { BuilderPlanConversationService } from './service/builder-plan-conversation.service';
 
 /**
  * Builder: the admin agent that interviews an admin into a PRD and then
@@ -192,9 +197,16 @@ import {
     BuilderCorrectionsController,
     BuilderRoomController,
     BuilderPrinciplesController,
+    // Roadmap v2 P3b: answers, comments and Use this answer on a shared plan.
+    BuilderPlanConversationController,
   ],
   providers: [
+    // Roadmap v2 D2: read-only way into a shared plan session for Idea people.
+    BuilderPlanReadGuard,
+    PermissionsGuard,
+    FeatureToggleGuard,
     BuilderPrinciplesService,
+    BuilderPlanConversationService,
     BuilderSlackService,
     BuilderGateway,
     BuilderSessionService,

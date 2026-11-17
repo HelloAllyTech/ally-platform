@@ -421,7 +421,8 @@ export interface DebriefAttention {
       | "agent_off"
       | "cap"
       | "provider_down"
-      | "language_not_recorded";
+      | "language_not_recorded"
+      | "risk_cue_option";
     level: "red" | "yellow";
     count?: number;
     oldestSince?: string;

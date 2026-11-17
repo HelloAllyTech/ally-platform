@@ -852,7 +852,9 @@ export class DebriefConsoleController {
 
   @Get('pm-agent')
   @DebriefRead()
-  @ApiOperation({ summary: "The PM agent's latest report and its ideas" })
+  @ApiOperation({
+    summary: "The Debrief PM agent's latest report and its ideas",
+  })
   async pmAgentState(
     @Req() req: AuthedRequest,
     @Query('state') state?: string,
@@ -890,7 +892,7 @@ export class DebriefConsoleController {
   @DebriefRead()
   @ApiOperation({
     summary:
-      'The one PM agent conversation, newest page oldest first: { messages, more }. `about` (a change id) narrows it to that change; the clinical advisor sees pinned-rule changes only',
+      'The one Debrief PM agent conversation, newest page oldest first: { messages, more }. `about` (a change id) narrows it to that change; the clinical advisor sees pinned-rule changes only',
   })
   async pmConversation(
     @Req() req: AuthedRequest,
@@ -911,7 +913,7 @@ export class DebriefConsoleController {
   @DebriefAct('comment')
   @ApiOperation({
     summary:
-      "Talk to the PM agent: { text, about? } → { messages: [the person's, the agent's reply] }. It answers and acts; an approval waits for an explicit yes. Takes 10–30 s",
+      "Talk to the Debrief PM agent: { text, about? } → { messages: [the person's, the agent's reply] }. It answers and acts; an approval waits for an explicit yes. Takes 10–30 s",
   })
   async pmConversationPost(
     @Req() req: AuthedRequest,
@@ -927,7 +929,7 @@ export class DebriefConsoleController {
   @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
-      "The PM agent's weekly reports and monthly reviews, newest first (months with records but no review yet included)",
+      "The Debrief PM agent's weekly reports and monthly reviews, newest first (months with records but no review yet included)",
   })
   pmAgentReports() {
     return this.pmReports.list();
@@ -937,7 +939,7 @@ export class DebriefConsoleController {
   @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
-      "One report: what changed in the period (from the records) and the PM agent's text",
+      "One report: what changed in the period (from the records) and the Debrief PM agent's text",
   })
   pmAgentReport(@Param('kind') kind: string, @Param('period') period: string) {
     return this.pmReports.get(kind, period);
@@ -947,7 +949,7 @@ export class DebriefConsoleController {
   @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
-      'Start a PM agent run now (it also runs weekly, and monthly in depth); the report lands when it finishes',
+      'Start a Debrief PM agent run now (it also runs weekly, and monthly in depth); the report lands when it finishes',
   })
   analyse(@Req() req: AuthedRequest) {
     return this.pmRuns.start(req.user.id);
@@ -987,7 +989,7 @@ export class DebriefConsoleController {
   @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
-      'Where an idea handed to Builder stands: stage (interviewing, building, PR open, merged, closed), the question waiting for a person, the PM agent answers, pull requests',
+      'Where an idea handed to Builder stands: stage (interviewing, building, PR open, merged, closed), the question waiting for a person, the Debrief PM agent answers, pull requests',
   })
   builderProgress(@Param('id', ParseUUIDPipe) id: string) {
     return this.builderRequester.progress(id);
@@ -1209,7 +1211,7 @@ export class DebriefConsoleController {
   @DebriefRead()
   @ApiOperation({
     summary:
-      'Banners and counts for Debriefs home and the PM agent, only for roles that can act',
+      'Banners and counts for Debriefs home and the Debrief PM agent, only for roles that can act',
   })
   async attention(@Req() req: AuthedRequest) {
     return this.view.attention(await this.view.viewer(req.user.id));
@@ -1330,7 +1332,7 @@ export class DebriefConsoleController {
   @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
-      '"Ask a question" on an item waiting for approval; the PM agent reads it on its next run',
+      '"Ask a question" on an item waiting for approval; the Debrief PM agent reads it on its next run',
   })
   async ask(
     @Param('id', ParseUUIDPipe) id: string,
@@ -1387,7 +1389,7 @@ export class DebriefConsoleController {
   @DebriefAct('approvePinnedRule')
   @ApiOperation({
     summary:
-      'Reject a pinned-rule change from the PM agent or another person (clinical advisor or owner), with a reason the PM agent reads. Never a first version',
+      'Reject a pinned-rule change from the Debrief PM agent or another person (clinical advisor or owner), with a reason the Debrief PM agent reads. Never a first version',
   })
   rejectPinnedRule(
     @Param('id', ParseUUIDPipe) id: string,
@@ -1401,7 +1403,7 @@ export class DebriefConsoleController {
   @DebriefAct('approvePinnedRule')
   @ApiOperation({
     summary:
-      "Propose a change to a pinned rule (safety rules, rubric, judge's instructions), clinical advisor or owner; it waits in PM agent › Ideas for one of them",
+      "Propose a change to a pinned rule (safety rules, rubric, judge's instructions), clinical advisor or owner; it waits in Debrief PM agent › Ideas for one of them",
   })
   proposePinnedRule(
     @Req() req: AuthedRequest,
@@ -1425,7 +1427,7 @@ export class DebriefConsoleController {
   @DebriefRead()
   @ApiOperation({
     summary:
-      'What the PM agent may do alone: kind × step matrix with eligibility, per-organisation overrides, re-locks',
+      'What the Debrief PM agent may do alone: kind × step matrix with eligibility, per-organisation overrides, re-locks',
   })
   async autonomyView(@Req() req: AuthedRequest) {
     return this.view.autonomyView(await this.view.viewer(req.user.id));

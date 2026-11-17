@@ -45,6 +45,13 @@ class DebriefQualityRequest(BaseModel):
     # The pinned risk cue definition (`debrief_risk_cue_definition`); the
     # code's default when absent.
     risk_cue_definition: Optional[str] = None
+    # What this roleplay expects of the learner: {helpful_behaviours: [],
+    # unhelpful_behaviours: [], competencies: [{name, helpful, unhelpful}]}.
+    # When present, practice_alignment is judged against it too.
+    roleplay_expectations: Optional[Dict[str, Any]] = None
+    # "legacy" (COUNSELLOR / AI_CLIENT, the default) or "neutral" (LEARNER /
+    # CHARACTER); ally-be switches it together with the prompt text.
+    speaker_labels: Optional[str] = None
     # Attribution only: carried onto the call's llm_usage row.
     scenario_session_id: Optional[str] = None
 
@@ -110,6 +117,8 @@ async def judge(req: DebriefQualityRequest) -> DebriefQualityResponse:
                 rubric=req.rubric,
                 instructions=req.judge_instructions,
                 risk_cue_definition=req.risk_cue_definition,
+                speaker_labels=req.speaker_labels,
+                roleplay_expectations=req.roleplay_expectations,
                 scenario_session_id=req.scenario_session_id,
             )
     except Exception as exc:  # noqa: BLE001 - surface as 500, keep caller decoupled

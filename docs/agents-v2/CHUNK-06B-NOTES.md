@@ -19,7 +19,7 @@ Item 31 (assistant-only access) and the "Assistants" rename were added by Shehba
 | 9 | Time zone per assistant | ✅ | `settings.timeZone`, `assistantZone` (`list-tools.ts`), home field `timeZone`, How it works select; hand-over hours start in it |
 | 10 | No "I'll pass it on" without a way | ✅ code + text | `check/fixes.py` `_trim_pass_on_promises`, `REACH_TEAM`; `purpose_enquiries*.txt` |
 | 11 | Hand-over summary | ✅ | `tools/hand_over.py`: 160 characters at a word, field description |
-| 12 | Overview "Handed to a person" | ✅ | `scorecard.service.ts` (chats with the hand-over message); migration `1982000000500` recounts stored days |
+| 12 | Overview "Handed to a person" | ✅ | `scorecard.service.ts` (chats with the hand-over message); migration `1983900000000` recounts stored days |
 | 13 | Erasure reaches list entries | ✅ | `conversation.service.ts` `dropListEntries`, explicit erase only; Postgres test incl. retention untouched |
 | 14 | Every search logged | ✅ | `nodes/tools.py` |
 | 15 | Helpline lint | ✅ | prettier |
@@ -33,7 +33,7 @@ Item 31 (assistant-only access) and the "Assistants" rename were added by Shehba
 | 28 | Pharmacy prices | ✅ live | onboarding eval: pharmacy published with no hard fail (no uncited stock list) |
 | 29 | Taking a lead | ✅ code + text | `purpose_answer_takes_details.txt`, `takes_details` on definitions, `bookingPurposePromptCodes` |
 | 30 | Example choices never reach visitors | ✅ | `offeredWriteFields`, `stillExamples` (now and earlier sets); Leads' examples "A demo / Pricing / Something else"; required ones kept (none exist, tested) |
-| 31 | Assistant-only access (added) | ✅ | ally-be `isAssistantMemberRoute`; migration `1982000000600`; ally-web `useAssistantOnly`, `AssistantOnlyHeader`, `AdminShell`, `DefaultRedirect` |
+| 31 | Assistant-only access (added) | ✅ | ally-be `isAssistantMemberRoute`; migration `1983900000100`; ally-web `useAssistantOnly`, `AssistantOnlyHeader`, `AdminShell`, `DefaultRedirect` |
 | — | "Assistants" everywhere (added) | ✅ | `en.ts` (59 strings), the toggle's label; "No organisation" = Ally's own |
 
 ## Item 3: where the time goes (17 Nov, local, gpt-5-mini through the Skills Store)

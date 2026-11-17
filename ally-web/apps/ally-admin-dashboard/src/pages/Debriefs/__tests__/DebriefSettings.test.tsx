@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
@@ -50,6 +50,11 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefAutonomyQuery: () => h.autonomy(),
   useSetDebriefOrgAutonomyMutation: () => [h.setOrg, { isLoading: false }],
   useGetDebriefPinnedRulesQuery: () => ({ data: { rules: [] } }),
+  useGetRiskCueOptionsForReviewQuery: () => ({ isLoading: false, data: [] }),
+  useReviewTestRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
+  useApproveRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
+  useRejectRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
+  useRetireRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
 }));
 vi.mock("react-redux", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -395,6 +400,23 @@ describe("Debrief settings page: who can change what", () => {
     expect(shown()).toEqual([`settings-section-${id}`]);
   });
 
+  it("Risk-cue options open for someone who can approve pinned rules, by hash or a banner's category", () => {
+    h.permissions = ["review:admin:debriefs"];
+    renderPage("#risk-cues");
+    expect(shown()).toEqual(["settings-section-risk-cues"]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Risk-cue options");
+  });
+
+  it("opens Risk-cue options from ?category=risk_cue_options, and not for someone who can't review", () => {
+    h.permissions = ["review:admin:debriefs"];
+    renderPage("?category=risk_cue_options");
+    expect(shown()).toEqual(["settings-section-risk-cues"]);
+    cleanup();
+    h.permissions = [];
+    renderPage("#risk-cues");
+    expect(shown()).toEqual(["settings-section-orgs"]);
+  });
+
   it("an unknown hash, or Schedules without the toggle, opens Organisations", () => {
     h.permissions = [];
     renderPage("#nope");
@@ -676,7 +698,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     },
     lastChanges: {
       gateCases: {
-        lastChangedBy: "PM agent",
+        lastChangedBy: "Debrief PM agent",
         lastChangedAt: "2026-11-12T00:00:00Z",
         why: "Was 30: 4 changes passed here and then failed the next test",
         changeId: "c-tests",
@@ -703,7 +725,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     h.permissions = ["manage:admin:debrief-settings"];
     renderPage("#autonomy");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-      "Autonomy: the PM agent ships changes on its own, except these",
+      "Autonomy: the Debrief PM agent ships changes on its own, except these",
     );
     expect(screen.getByTestId("autonomy-v2")).toHaveTextContent("watched for 14 days");
     const rows = within(screen.getByTestId("always-asks")).getAllByTestId("always-asks-row");
@@ -712,7 +734,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
       "Crisis lines and support copy",
       "Pinned rules: rubric, judge and Evaluator instructions",
       "Budget increases",
-      "Anything the PM agent is not confident about",
+      "Anything the Debrief PM agent is not confident about",
       "New models or providers",
     ]);
     for (const r of rows.slice(0, 4)) {
@@ -776,7 +798,9 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     h.permissions = ["manage:admin:debrief-settings"];
     renderPage("#weights");
     const page = screen.getByTestId("score-settings");
-    expect(page).toHaveTextContent("Score: what the PM agent improves, and what undoes a change");
+    expect(page).toHaveTextContent(
+      "Score: what the Debrief PM agent improves, and what undoes a change",
+    );
     expect(page).toHaveTextContent("No new missed clear risk cue · undoes a change at once");
     expect(page).toHaveTextContent("Cost within the session budget");
     expect(screen.getByLabelText("Quality score (judge) (%)")).toHaveValue(40);
@@ -798,7 +822,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     renderPage("#tests");
     const row = screen.getByTestId("test-setting-gateCases");
     expect(row).toHaveTextContent("100");
-    expect(row).toHaveTextContent("PM agent ·");
+    expect(row).toHaveTextContent("Debrief PM agent ·");
     expect(row).toHaveTextContent("Was 30: 4 changes passed here and then failed the next test");
     expect(within(row).getByRole("link", { name: "See change" })).toHaveAttribute(
       "href",
@@ -813,7 +837,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     h.permissions = [];
     renderPage("#budget");
     expect(screen.getByTestId("settings-section-budget")).toHaveTextContent(
-      "The PM agent may propose a lower budget; a higher one always waits for you.",
+      "The Debrief PM agent may propose a lower budget; a higher one always waits for you.",
     );
   });
 });

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { PmAgentRun } from '../entity/pm-agent-run.entity';
 import { PmAgentSettings } from '../entity/pm-agent-settings.entity';
 import {
@@ -31,6 +31,8 @@ import {
   PmAgentRunTrigger,
 } from './pm-agent-run-trigger';
 import { PmAgentSettingsService } from './pm-agent-settings.service';
+import { PmAgentImpactService } from '../impact/pm-agent-impact.service';
+import { PmAgentLessonsService } from '../lessons/pm-lessons.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -40,8 +42,6 @@ const STOP_REASON_TEXT: Record<string, string> = {
     'The queue is full. The agent pauses until you decide on some cards.',
   [PmAgentState.BUDGET_EXHAUSTED]:
     "This month's budget is used up. It resets on the 1st (IST), or raise it in Settings.",
-  [PmAgentState.PAUSED]:
-    'Auto-build is paused. Cards are still generated; accepted cards wait.',
 };
 
 const round2 = (value: number) => Number(value.toFixed(2));
@@ -64,6 +64,8 @@ export class PmAgentStateService {
     private readonly presenter: PmAgentPresenterService,
     @Inject(PM_AGENT_RUN_TRIGGER)
     private readonly runTrigger: PmAgentRunTrigger,
+    @Optional() private readonly impact?: PmAgentImpactService,
+    @Optional() private readonly lessons?: PmAgentLessonsService,
   ) {}
 
   /**
@@ -73,10 +75,7 @@ export class PmAgentStateService {
    * so it is the one worth saying first only when it is the blocker).
    */
   static deriveState(input: {
-    settings: Pick<
-      PmAgentSettings,
-      'enabled' | 'pauseAutoBuild' | 'autoBuildPaused' | 'queueCap'
-    >;
+    settings: Pick<PmAgentSettings, 'enabled' | 'queueCap'>;
     running: boolean;
     openCards: number;
     spentUsd: number;
@@ -91,9 +90,7 @@ export class PmAgentStateService {
     if (input.openCards >= input.settings.queueCap) {
       return PmAgentState.QUEUE_FULL;
     }
-    if (input.settings.pauseAutoBuild || input.settings.autoBuildPaused) {
-      return PmAgentState.PAUSED;
-    }
+    // PAUSED (auto-build paused) went with Accept → Builder: nothing is built any more.
     return PmAgentState.IDLE;
   }
 
@@ -171,6 +168,7 @@ export class PmAgentStateService {
         ...PM_IN_PROGRESS_STATUSES,
         ...PM_NEEDS_YOU_STATUSES,
         PmCardStatus.RELEASED,
+        PmCardStatus.ROADMAP_ARCHIVED,
         PmCardStatus.HANDED_OFF,
       ],
       200,
@@ -201,9 +199,12 @@ export class PmAgentStateService {
   async health(now: Date = new Date()): Promise<PmHealthResponse> {
     const since30 = new Date(now.getTime() - 30 * DAY_MS);
     const since7 = new Date(now.getTime() - 7 * DAY_MS);
-    const [decided, spendByLane] = await Promise.all([
+    const [decided, spendByLane, impact] = await Promise.all([
       this.cards.listDecidedSince(since30),
       this.runSteps.spendByLaneSince(since30),
+      this.impact
+        ? this.impact.healthFigures()
+        : { impactMeasuredCount: 0, impactImprovedRate: null },
     ]);
     const isAccepted = (status: PmCardStatus, path?: string | null) =>
       Boolean(path) &&
@@ -222,10 +223,14 @@ export class PmAgentStateService {
     const accepted = decided.filter((card) =>
       isAccepted(card.status, card.acceptPath),
     );
-    const builderAccepted = accepted.filter(
-      (card) => card.acceptPath === PmAcceptPath.BUILDER,
+    // Shipped = released, over the accepts that could ship: filed to the roadmap, or (legacy)
+    // sent to Builder. A plan.md hand-off never came back to us.
+    const shippable = accepted.filter(
+      (card) =>
+        card.acceptPath === PmAcceptPath.ROADMAP ||
+        card.acceptPath === PmAcceptPath.BUILDER,
     );
-    const shipped = builderAccepted.filter(
+    const shipped = shippable.filter(
       (card) => card.status === PmCardStatus.RELEASED,
     );
     const spend = spendByLane.reduce((sum, row) => sum + row.costUsd, 0);
@@ -251,12 +256,16 @@ export class PmAgentStateService {
     return {
       acceptRate7d: acceptRate(since7),
       acceptRate30d: acceptRate(since30),
-      shippedRate: ratio(shipped.length, builderAccepted.length),
+      shippedRate: ratio(shipped.length, shippable.length),
       costPerAcceptedCardUsd: accepted.length
         ? round2(spend / accepted.length)
         : null,
       spendByLane,
       repeatedRejectionRate: ratio(repeats, rejected.length),
+      ...impact,
+      ...(this.lessons
+        ? await this.lessons.healthFields()
+        : { activeLessons: 0, proposedLessons: 0, lessonAgreementDelta: null }),
     };
   }
 

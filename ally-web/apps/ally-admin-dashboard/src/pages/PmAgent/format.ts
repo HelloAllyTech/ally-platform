@@ -93,24 +93,21 @@ export const nextRunLabel = (iso: string | null | undefined, now = Date.now()): 
 };
 
 /** Index (0-5) into the six-step stepper for a status, or -1 when it is not on the path. */
-export const stepIndex = (status: PmCardStatus): number => {
+/**
+ * Where an accepted card is on its way through the roadmap (copy.tracking.steps: Accepted,
+ * On the roadmap, Prioritised, Released). -1 = no stepper: archived on the roadmap, handed off,
+ * or a legacy Builder status.
+ */
+export const stepIndex = (status: PmCardStatus, roadmapStage?: string | null): number => {
   switch (status) {
     case "accepted_pending":
     case "queued":
-      return 0;
-    case "designing":
-      return 1;
-    case "building":
-    case "failed":
     case "needs_attention":
-      return 2;
-    case "pr_open":
-      return 3;
-    case "merged":
-    case "merged_not_released":
-      return 4;
+      return 0;
+    case "filed":
+      return roadmapStage === "prioritised" ? 2 : 1;
     case "released":
-      return 5;
+      return 3;
     default:
       return -1;
   }
@@ -141,3 +138,24 @@ export const slugify = (text: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60) || "plan";
+
+/** A metric value in its unit: percent/ratio as "38%", ms as "120 ms", usd as "$4.20". */
+export const formatMetricValue = (
+  value: number | null | undefined,
+  unit?: "percent" | "count" | "ms" | "usd" | "ratio",
+): string => {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  const round = (n: number) => (Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10);
+  switch (unit) {
+    case "percent":
+      return `${round(value)}%`;
+    case "ratio":
+      return `${round(value * 100)}%`;
+    case "ms":
+      return `${round(value)} ms`;
+    case "usd":
+      return formatUsd(value);
+    default:
+      return String(round(value));
+  }
+};

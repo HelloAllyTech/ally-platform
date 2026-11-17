@@ -1255,6 +1255,22 @@ export const PM_AGENT_CRITIC = definePrompt(
   },
 );
 
+/** src/prompts/pm_agent/lessons.txt */
+export const PM_AGENT_LESSONS = definePrompt(
+  'pm_agent_lessons',
+  {},
+  {
+    name: 'PM Agent: Weekly lessons',
+    description:
+      "System prompt for the PM Agent's weekly reflection: reads an anonymised pack of the last 90 " +
+      'days of card decisions and outcomes (fenced as data) and proposes candidate lessons through ' +
+      'submit_lessons, each with a structured predicate. Code recomputes support from the data, ' +
+      'classifies which need an admin confirm, and replays the critic before any lesson is used.',
+    category: 'PM Agent',
+    runtimes: ['ally-be'],
+  },
+);
+
 /** Every contract, by prompt code. */
 /** src/prompts/agent_template_translation.txt */
 export const AGENT_TEMPLATE_TRANSLATION = definePrompt(
@@ -1450,6 +1466,7 @@ export const DEBRIEF_EVALUATOR_FIX_SYSTEM = definePrompt(
   {
     pass_bar: 'required',
     fix_sections: 'required',
+    risk_handling: 'optional',
   },
   {
     name: "Debrief Evaluator's fix notes",
@@ -1541,6 +1558,7 @@ export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
     scenario: 'optional',
     expected_behaviours: 'optional',
     roleplay_expectations: 'optional',
+    skill_framework: 'optional',
     live_detections: 'optional',
     case_memory: 'optional',
     transcript: 'required',
@@ -1591,6 +1609,26 @@ export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/debrief/guidance_agent_system.txt */
+export const DEBRIEF_GUIDANCE_AGENT_SYSTEM = definePrompt(
+  'debrief_guidance_agent_system',
+  {
+    guidance_index: 'optional',
+    moments: 'required',
+    skills: 'optional',
+    baseline_passages: 'optional',
+    learner_level: 'optional',
+    max_calls: 'optional',
+  },
+  {
+    name: 'Debrief Guidance Agent',
+    description:
+      "The debrief agent's guidance agent: given the Analyst's moments, the skills in play and the baseline passages already found, it browses an index of Debrief Guidance (code, kind, level, title, hint) and may search or fetch more entries by code, within a call budget, so the Writer gets the guidance that fits this learner's level and moments. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/debrief/writer_system.txt */
 export const DEBRIEF_WRITER_SYSTEM = definePrompt(
   'debrief_writer_system',
@@ -1602,6 +1640,7 @@ export const DEBRIEF_WRITER_SYSTEM = definePrompt(
     learner_distress: 'optional',
     checked_rules: 'optional',
     risk_cue_turns: 'required',
+    risk_handling: 'optional',
     possible_risk_cue_turns: 'optional',
     missed_feelings_turns: 'optional',
     course_scenario_id: 'optional',
@@ -1632,6 +1671,7 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
     risk_cue_definition: 'required',
     session_language: 'optional',
     risk_cue_turns: 'required',
+    risk_handling: 'optional',
     checked_rules: 'optional',
     draft: 'optional',
     critique: 'optional',

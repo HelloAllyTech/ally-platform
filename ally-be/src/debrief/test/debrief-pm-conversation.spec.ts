@@ -243,7 +243,7 @@ const CLAIMS = {
   exp: 0,
 };
 
-describe('PM agent conversation: rules', () => {
+describe('Debrief PM agent conversation: rules', () => {
   it('only a clear yes counts', () => {
     for (const yes of [
       'yes',
@@ -298,7 +298,7 @@ describe('PM agent conversation: rules', () => {
   });
 });
 
-describe('PM agent conversation: who may read and post', () => {
+describe('Debrief PM agent conversation: who may read and post', () => {
   it('the clinical advisor posts only about a pinned-rule change', async () => {
     const { svc } = build({
       person: { authorUserId: 9, text: 'hi' },
@@ -339,7 +339,7 @@ describe('PM agent conversation: who may read and post', () => {
   });
 });
 
-describe('PM agent conversation: approvals pause for a yes, from someone allowed', () => {
+describe('Debrief PM agent conversation: approvals pause for a yes, from someone allowed', () => {
   const approved = (tool: string, ideaId: string) => ({
     ...CLAIMS,
     approved: [{ tool, ideaId }],
@@ -409,7 +409,7 @@ describe('PM agent conversation: approvals pause for a yes, from someone allowed
     expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
   });
 
-  it('a turn-down needs a reason the PM agent reads', async () => {
+  it('a turn-down needs a reason the Debrief PM agent reads', async () => {
     const t = build({
       person: { authorUserId: 1, text: 'yes' },
       perms: { 1: TEAM },
@@ -444,7 +444,7 @@ describe('PM agent conversation: approvals pause for a yes, from someone allowed
   });
 });
 
-describe('PM agent conversation: a turn, paused and resumed (ally-ai human-in-the-loop)', () => {
+describe('Debrief PM agent conversation: a turn, paused and resumed (ally-ai human-in-the-loop)', () => {
   const pending = (tool = 'change_approve', ideaId = PINNED, extra = {}) => ({
     interrupt_id: 'int-1',
     actions: [
@@ -670,7 +670,7 @@ describe('PM agent conversation: a turn, paused and resumed (ally-ai human-in-th
   });
 });
 
-describe('PM agent conversation: the quote check', () => {
+describe('Debrief PM agent conversation: the quote check', () => {
   const RULE = 'Name the moment the learner noticed risk, in their own words.';
 
   it('a reply quoting text no tool returned is not shown, and kept for the Ally team', async () => {
@@ -767,7 +767,7 @@ describe('PM agent conversation: the quote check', () => {
   });
 });
 
-describe('PM agent conversation: actions that act at once', () => {
+describe('Debrief PM agent conversation: actions that act at once', () => {
   it('undo for everyone is the console’s Undo now', async () => {
     const t = build({
       person: { authorUserId: 1, text: 'Undo the warmer openings' },

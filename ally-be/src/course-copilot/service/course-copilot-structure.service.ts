@@ -663,6 +663,9 @@ export class CourseCopilotStructureService {
     switch (bpItem.type) {
       case TrackItemType.ROLEPLAY: {
         const rule = {
+          ...(criteria.completionLogic !== undefined
+            ? { completionLogic: criteria.completionLogic }
+            : {}),
           ...(criteria.minScore !== undefined
             ? { minScore: criteria.minScore }
             : {}),

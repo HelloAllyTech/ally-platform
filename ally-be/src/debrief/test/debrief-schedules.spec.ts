@@ -454,7 +454,7 @@ describe('DebriefScheduleService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('a PM agent frequency change needs the budget confirmation, with the spend effect', async () => {
+  it('a Debrief PM agent frequency change needs the budget confirmation, with the spend effect', async () => {
     await svc.rows(now);
     const err = await svc
       .update('debrief-pm-agent', { frequency: 'daily' }, 1, false, now)
@@ -473,7 +473,7 @@ describe('DebriefScheduleService', () => {
     });
   });
 
-  it('a time change on the PM agent, or any change to other jobs, needs no confirmation', async () => {
+  it('a time change on the Debrief PM agent, or any change to other jobs, needs no confirmation', async () => {
     await svc.rows(now);
     await svc.update('debrief-pm-agent', { time: '09:00' }, 1, false, now);
     await svc.update(

@@ -453,7 +453,7 @@ describe('The orchestrator’s gateway tools (spec A4)', () => {
   });
 });
 
-describe('comments_read (the PM agent reads expert comments)', () => {
+describe('comments_read (the Debrief PM agent reads expert comments)', () => {
   it('answers an agent token that lists it, passing the filters through', async () => {
     const { controller, tokens, reviews, runs } = build();
     const token = tokens.signAgent('pm-run-1');

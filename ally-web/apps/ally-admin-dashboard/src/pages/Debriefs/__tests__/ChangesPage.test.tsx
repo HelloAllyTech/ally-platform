@@ -193,7 +193,7 @@ describe("Changes (v2, U3)", () => {
       "Undone1",
     ]);
     expect(screen.getByTestId("changes-headline")).toHaveTextContent(
-      "The PM agent is improving debriefs on its own: one change went live this week, one is being tried, and one waits for you.",
+      "The Debrief PM agent is improving debriefs on its own: one change went live this week, one is being tried, and one waits for you.",
     );
   });
 
@@ -261,20 +261,20 @@ describe("Changes (v2, U3)", () => {
     expect(screen.getByTestId("where").textContent).toBe("?change=c-undone");
   });
 
-  it("has no Run the PM agent now button", () => {
+  it("has no Run the Debrief PM agent now button", () => {
     renderAt();
-    expect(screen.queryByRole("button", { name: "Run the PM agent now" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Run the Debrief PM agent now" })).toBeNull();
   });
 });
 
-describe("the PM agent conversation beside Changes", () => {
+describe("the Debrief PM agent conversation beside Changes", () => {
   it("All messages shows the one thread: who, what each message was about, and each action's status", () => {
     renderAt();
     fireEvent.click(screen.getByTestId("changes-pm-scope"));
     const pm = screen.getByTestId("changes-pm");
     const msgs = within(pm).getAllByTestId("pm-message");
     expect(msgs).toHaveLength(3);
-    expect(msgs[0]).toHaveTextContent("PM agent · about Writer on a cheaper model");
+    expect(msgs[0]).toHaveTextContent("Debrief PM agent · about Writer on a cheaper model");
     expect(msgs[1]).toHaveTextContent("Gopi · about Safety reader: indirect self-harm cues");
     const actions = within(pm).getAllByTestId("pm-message-action");
     expect(actions[0]).toHaveTextContent("Done: undone automatically");
@@ -290,7 +290,7 @@ describe("the PM agent conversation beside Changes", () => {
     expect(within(pm).getByTestId("pm-looking-at")).toHaveTextContent(
       "“Work on this” cards are at most two sentences.",
     );
-    fireEvent.change(within(pm).getByLabelText("Reply to the PM agent about this change"), {
+    fireEvent.change(within(pm).getByLabelText("Reply to the Debrief PM agent about this change"), {
       target: { value: "Undo it for Tamil only" },
     });
     fireEvent.click(within(pm).getByRole("button", { name: "Send" }));
@@ -381,7 +381,7 @@ describe("who sees which changes", () => {
     expect(screen.getByTestId("changes-list")).not.toHaveTextContent("Writer on a cheaper model");
   });
 
-  it("someone with neither the PM agent nor pinned rules gets no conversation", () => {
+  it("someone with neither the Debrief PM agent nor pinned rules gets no conversation", () => {
     h.permissions = [];
     renderAt();
     expect(screen.queryByTestId("changes-pm")).toBeNull();

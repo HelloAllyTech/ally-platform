@@ -133,7 +133,10 @@ export class DebriefRunJudgeService {
     },
   ): Promise<RunJudgment | null> {
     const { transcript, session, rubric, judgeInstructions, guidance } = input;
-    const riskCueDefinition = input.riskCueDefinition ?? null;
+    // The roleplay's own risk-cue wording when its option has one; else the pinned definition.
+    const riskCueDefinition =
+      (run.workspace?.riskCueOption?.wording as string | null | undefined) ||
+      (input.riskCueDefinition ?? null);
     const { apiUrl, outboundApiKey } = this.config.ai;
     const res = await withJudgeSlot(() =>
       axios.post(
@@ -146,6 +149,12 @@ export class DebriefRunJudgeService {
           rubric,
           judge_instructions: judgeInstructions,
           risk_cue_definition: riskCueDefinition,
+          // What this roleplay expects of the learner: the judge's practice-alignment reads it.
+          roleplay_expectations: expectationsFor(session),
+          speaker_labels:
+            (run.workspace?.speakerLabels as string | undefined) === 'neutral'
+              ? 'neutral'
+              : 'legacy',
           history: (run.workspace?.history as string | null) ?? null,
           guidance,
           scenario_session_id: run.scenarioSessionId,
@@ -330,4 +339,34 @@ function claimIsLive(claimedAt: unknown): boolean {
   return (
     Number.isFinite(t) && Date.now() - t < JUDGE_CLAIM_STALE_MINUTES * 60_000
   );
+}
+
+/** The roleplay's expectations for the judge; null when it lists none (today's wording then). */
+export function expectationsFor(
+  session:
+    | {
+        helpfulBehaviours?: string[];
+        unhelpfulBehaviours?: string[];
+        competencies?: Array<{
+          name: string;
+          helpful: string[];
+          unhelpful: string[];
+        }>;
+      }
+    | null
+    | undefined,
+): {
+  helpful_behaviours: string[];
+  unhelpful_behaviours: string[];
+  competencies: Array<{ name: string; helpful: string[]; unhelpful: string[] }>;
+} | null {
+  const helpful = session?.helpfulBehaviours ?? [];
+  const unhelpful = session?.unhelpfulBehaviours ?? [];
+  const competencies = session?.competencies ?? [];
+  if (!helpful.length && !unhelpful.length && !competencies.length) return null;
+  return {
+    helpful_behaviours: helpful,
+    unhelpful_behaviours: unhelpful,
+    competencies,
+  };
 }

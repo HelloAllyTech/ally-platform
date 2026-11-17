@@ -146,7 +146,7 @@ _CLEAR_WORDS = re.compile(
 )
 
 
-def cue_strength(cue: Dict[str, Any]) -> str:
+def cue_strength(cue: Dict[str, Any], word_list_raises: bool = True) -> str:
     """``clear`` or ``possible`` for one Safety reader cue.
 
     Clear when ANY signal says so (2026-11-16): the reader judged it clear by
@@ -154,7 +154,11 @@ def cue_strength(cue: Dict[str, Any]) -> str:
     matches its quote. Nothing here lowers a cue: a reader's ``possible`` on
     a clear category or with clear words stays clear, and a cue the reader
     gave no strength is read as before (hopelessness without clear words is
-    possible)."""
+    possible). With ``word_list_raises`` False the reader's own judgement
+    decides: its ``strength`` (clear when it gave none), with neither the word
+    list nor the always-clear categories applied."""
+    if not word_list_raises:
+        return POSSIBLE if cue.get("strength") == POSSIBLE else CLEAR
     if cue.get("strength") == CLEAR:
         return CLEAR
     if cue.get("category") in CLEAR_CATEGORIES:
@@ -165,10 +169,12 @@ def cue_strength(cue: Dict[str, Any]) -> str:
     return CLEAR if _CLEAR_WORDS.search(str(cue.get("quote") or "")) else POSSIBLE
 
 
-def with_strength(cues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def with_strength(
+    cues: List[Dict[str, Any]], word_list_raises: bool = True
+) -> List[Dict[str, Any]]:
     """The cues, each with its final ``strength`` (the reader's own answer is
     one of the signals); every other field the reader returned is untouched."""
-    return [{**c, "strength": cue_strength(c)} for c in cues]
+    return [{**c, "strength": cue_strength(c, word_list_raises)} for c in cues]
 
 
 def is_clear(cue: Dict[str, Any]) -> bool:
@@ -189,6 +195,7 @@ def turn_is_clear(
     quote: str,
     evaluator_cues: List[Dict[str, Any]],
     safety_cues: List[Dict[str, Any]],
+    word_list_raises: bool = True,
 ) -> bool:
     """Is this client turn a clear risk cue? Yes when ANY signal says so:
     the word list on its quote; the Safety reader, which filed the turn under
@@ -197,7 +204,7 @@ def turn_is_clear(
     reading of the meaning, in whatever language). Only when every signal
     reads it as ordinary low mood, burden, grief or guilt is it possible.
     No signal can lower another's clear."""
-    if quote_names_clear_risk(quote):
+    if word_list_raises and quote_names_clear_risk(quote):
         return True
     if any(is_clear(c) for c in safety_cues or [] if c.get("turn_index") == turn):
         return True
@@ -211,6 +218,7 @@ def turn_is_clear(
 def split_missed_cues(
     evaluator_cues: List[Dict[str, Any]],
     safety_cues: List[Dict[str, Any]],
+    word_list_raises: bool = True,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """The Evaluator's cues the debrief did not address, as (clear, possible)
     by ``turn_is_clear``. A clear one holds the debrief for a person, exactly
@@ -221,7 +229,11 @@ def split_missed_cues(
         if cue.get("addressed_by_debrief"):
             continue
         if turn_is_clear(
-            cue.get("turn_index"), cue.get("quote") or "", [cue], safety_cues
+            cue.get("turn_index"),
+            cue.get("quote") or "",
+            [cue],
+            safety_cues,
+            word_list_raises,
         ):
             clear.append(cue)
         else:
@@ -233,6 +245,7 @@ def drop_possible_important_moment(
     cards: Dict[str, Any],
     evaluator_cues: List[Dict[str, Any]],
     safety_cues: List[Dict[str, Any]],
+    word_list_raises: bool = True,
 ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
     """An important-moment card is for a clear risk cue. When the card's own
     moment and every other moment on it are possible by ``turn_is_clear``,
@@ -244,7 +257,11 @@ def drop_possible_important_moment(
     moments = [im] + list(im.get("others") or [])
     if any(
         turn_is_clear(
-            m.get("turn_index"), m.get("quote") or "", evaluator_cues, safety_cues
+            m.get("turn_index"),
+            m.get("quote") or "",
+            evaluator_cues,
+            safety_cues,
+            word_list_raises,
         )
         for m in moments
     ):

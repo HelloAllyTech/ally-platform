@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { PlanCeilingService } from 'src/product-planning/service/plan-ceiling.service';
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
 import { PlanSpendService } from 'src/product-planning/service/plan-spend.service';
@@ -28,6 +29,9 @@ export class PlanAiService {
     private readonly prompts: PromptSharedService,
     private readonly llm: LlmCompletionService,
     private readonly spend: PlanSpendService,
+    /** Roadmap v2's one ceiling per idea; a no-op while the flag is off. */
+    @Optional()
+    private readonly ceiling?: PlanCeilingService,
   ) {}
 
   async json<T>(input: {
@@ -39,6 +43,10 @@ export class PlanAiService {
     actorUserId: number | null;
     specialist: string;
   }): Promise<T | null> {
+    // Every specialist (checks, launch, outcome and research planners) is a
+    // spend point on its plan. A call with no session (the signal scout) has
+    // no plan to charge and is not checked.
+    await this.ceiling?.assertWithinCeiling(input.sessionId, 'specialist');
     const system = await this.prompts.getPromptByCode(input.promptCode);
     if (!system)
       throw new NotFoundException(`Prompt not found: ${input.promptCode}`);

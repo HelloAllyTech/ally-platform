@@ -74,7 +74,7 @@ export class DebriefChangesController {
   @DebriefRead()
   @ApiOperation({
     summary:
-      "The PM agent's changes in plain words, newest activity first; ?state=waits|trying|building|testing|live|undone|stopped|turned_down",
+      "The Debrief PM agent's changes in plain words, newest activity first; ?state=waits|trying|building|testing|live|undone|stopped|turned_down",
   })
   async list(@Req() req: AuthedRequest, @Query('state') state?: string) {
     // The clinical advisor gets only the pinned-rule changes they take part in, never the rest.

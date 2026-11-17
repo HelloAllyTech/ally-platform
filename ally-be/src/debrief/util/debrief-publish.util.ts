@@ -45,14 +45,19 @@ const OBSERVATION_WEIGHT: Record<string, number> = {
  */
 export function skillCoverageFromEvidence(
   evidence: Record<string, any> | null | undefined,
-): Array<{ category: CoverageCategory; percentage: number }> {
+  /**
+   * The chart areas of the roleplay's skill framework; absent means today's three. A framework
+   * with no areas (None) reports no coverage.
+   */
+  areas: readonly string[] = COVERAGE_CATEGORIES,
+): Array<{ category: string; percentage: number }> {
   const behaviours: Array<Record<string, any>> = Array.isArray(
     evidence?.behaviours,
   )
     ? evidence!.behaviours
     : [];
-  const out: Array<{ category: CoverageCategory; percentage: number }> = [];
-  for (const category of COVERAGE_CATEGORIES) {
+  const out: Array<{ category: string; percentage: number }> = [];
+  for (const category of areas) {
     const chances = behaviours.filter(
       (b) =>
         b?.coverage_category === category &&

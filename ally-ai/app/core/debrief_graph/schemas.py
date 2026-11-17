@@ -49,6 +49,8 @@ class DebriefRunResponse(BaseModel):
     estimated_cost_usd: float = 0.0
     fallback_rung: int = 0
     has_risk_cue: bool = False
+    # Any risk cue the reader did not mark as part of the practice.
+    has_alarm_risk_cue: bool = False
     learner_distress: bool = False
     revision_rounds: int = 0
     evaluator_overall: Optional[float] = None

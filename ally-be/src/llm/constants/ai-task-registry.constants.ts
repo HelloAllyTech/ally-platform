@@ -937,6 +937,22 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'debrief release bundle (recipes.standard.steps[progress_reader].model)',
   },
   {
+    id: 'debrief-guidance-agent',
+    // No LlmTask label: adding one is outside the Debrief system (src/learn). ally-ai records its usage under the step name.
+    task: null,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Debrief runs whose release sets guidanceAgentMaxCalls above 0, before the Writer',
+    detail:
+      'The guidance agent (prompt debrief_guidance_agent_system): a bounded tool loop that browses the Debrief Guidance index (guidance_index), searches it (guidance_search) and fetches entries by code (guidance_fetch), at most guidanceAgentMaxCalls tool calls, then hands the passages to the Writer. The tools it is offered come from the release setting guidanceTools.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (settings.guidanceAgentMaxCalls, settings.guidanceTools); model DEBRIEF_MODELS.guidanceAgent',
+    promptOverride: 'debrief_guidance_agent_system',
+  },
+  {
     id: 'debrief-writer',
     task: LlmTask.DEBRIEF_WRITER,
     runtime: LlmRuntime.ALLY_AI,
@@ -1109,7 +1125,7 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'Weekly, a deeper review monthly, on demand from the Debrief Console, and when a Builder ' +
       'interview handed over with "Hand to Builder" asks a question',
     detail:
-      'The PM agent, one Deep Agent in ally-ai (app/core/pm_agent): reads expert comments, metric failure points ' +
+      'The Debrief PM agent, one Deep Agent in ally-ai (app/core/pm_agent): reads expert comments, metric failure points ' +
       'and redacted reporting views (never transcripts), plans, investigates with read-only subagents, and proposes ' +
       'ideas routed to itself, Builder, Bug Hunter or a person through ally-be gateway tools that refuse the ' +
       'never-list. A reviewer subagent (fresh context, read-only tools, structured verdict) checks each proposed ' +
@@ -1134,9 +1150,9 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     task: LlmTask.DEBRIEF_PM_AGENT,
     runtime: LlmRuntime.ALLY_AI,
     trigger:
-      'A person posts in the Debrief console’s PM agent conversation (POST v1/debriefs/console/pm-agent/conversation)',
+      'A person posts in the Debrief console’s Debrief PM agent conversation (POST v1/debriefs/console/pm-agent/conversation)',
     detail:
-      'The PM agent answering one message (V2_AUTONOMY C1–C3, POST /pm-agent/conversation): the same Deep Agent ' +
+      'The Debrief PM agent answering one message (V2_AUTONOMY C1–C3, POST /pm-agent/conversation): the same Deep Agent ' +
       'harness as the weekly run (shared /memories/ store namespace, read-only skills, investigator and reviewer ' +
       'subagents) on a Postgres checkpoint thread per console thread, over the conversation’s gateway tools (read ' +
       'changes, sessions and metrics; propose; stop, undo, retry, hold a language, pause a kind of change). Approve, ' +
@@ -1772,6 +1788,24 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configPath: 'openai.transcriptionModel',
   },
   {
+    id: 'roadmap-dictation',
+    task: LlmTask.ROADMAP_DICTATION,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Someone presses the mic on a Roadmap v2 draft, answer box or comment box and stops talking',
+    detail:
+      'One call per clip, capped at 2 minutes (and 10MB) before it is sent; mixed Hindi–English ' +
+      'is expected, so the language is auto-detected. The words come back as editable text and ' +
+      'are never sent on their own. Same OpenAI transcription path as the scribe voice note. A ' +
+      "draft's clips count against its $1 idea-stage cap (refused at the cap); a shared idea's " +
+      'against its plan ceiling. Audio is never stored.',
+    kind: AiTaskKind.TRANSCRIPTION,
+    provider: 'openai',
+    defaultModel: 'whisper-1',
+    configuredBy: 'OPENAI_TRANSCRIPTION_MODEL',
+    configPath: 'openai.transcriptionModel',
+  },
+  {
     id: 'roadmap-idea-transcribe',
     task: LlmTask.TRANSCRIPTION,
     runtime: LlmRuntime.ALLY_BE,
@@ -1982,7 +2016,9 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       detail:
         `PM Agent ${lane} lane: a read-only tool loop over ${reads}, at most 6 passes of ` +
         '4,000 output tokens, ending in one submit_candidates call (one repair retry). ' +
-        'Mandate, strategy page and product map ride in a cached system block.',
+        'Mandate, strategy page, product map, the roadmap filing checklist and a digest of what ' +
+        'the roadmap already holds ride in a cached system block. It proposes; an accepted card ' +
+        'is filed to the roadmap, never built.',
       kind: AiTaskKind.COMPLETION,
       provider: 'openai',
       defaultModel: 'gpt-5-mini',
@@ -1998,8 +2034,10 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     trigger:
       'A PM Agent run has candidate cards that passed the deterministic and dedupe gates',
     detail:
-      'One call per run reviews up to 12 candidates against a written rubric (submit_verdicts, ' +
-      '3,000 output tokens). Fail-closed: if it cannot run, no card reaches the feed. Its ' +
+      'One call per run reviews up to 12 candidates against a written rubric and grades each ' +
+      "recommendation's roadmap entry against the roadmap's readiness checklist (submit_verdicts, " +
+      '3,000 output tokens). Fail-closed: if it cannot run, or any readiness item is not met, the ' +
+      'card does not reach the feed. Its ' +
       'share of the run budget is held back from the lanes. Pick a different model family ' +
       'from the lanes in Skills Store to reduce correlated blind spots.',
     kind: AiTaskKind.COMPLETION,
@@ -2007,6 +2045,26 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-5-mini',
     configuredBy: 'LLM_REASONING_MODEL',
     promptOverride: 'pm_agent_critic',
+  },
+  {
+    id: 'pm-agent-lessons',
+    task: LlmTask.PM_AGENT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Weekly on the PM Agent’s lessons weekday at its run hour (IST), or Run lessons now, while ' +
+      'the agent and lessons are enabled and the month has budget',
+    detail:
+      'One reflection call over an anonymised pack of the last 90 days of card decisions and ' +
+      'outcomes (submit_lessons, 3,000 output tokens, one repair). Each surviving candidate is ' +
+      'then evaluated by replaying the pm-agent-critic row (same prompt and model) over up to 20 ' +
+      'past decided cards: one baseline call plus one per candidate, all counted in llm_usage ' +
+      'and the monthly budget; the eval share (60% of the job cap) is held back from the reflection.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'pm_agent_lessons',
   },
   {
     id: 'foundational-skills-judge',
@@ -2169,12 +2227,20 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger:
-      'The roadmap board classifies, de-duplicates or assesses an opportunity',
+      'The roadmap board classifies, de-duplicates or assesses an opportunity (including one the PM Agent files)',
     detail:
       "Goal classification, the duplicate check's confirmation pass, goal-impact assessment, " +
+      '(the PM Agent runs the duplicate check once per accepted card before filing it, and its ' +
+      "filing is assessed like any other; that spend is the roadmap's, not the PM Agent budget), " +
       "interview-note summaries, Claude-prompt generation, and the Builder drawer's split/merge " +
       'guard. Filing itself moved to the opportunity copilot (its own row). The standalone ' +
-      'readiness check, review and enhance calls were removed with the blank filing form.',
+      'readiness check, review and enhance calls were removed with the blank filing form. ' +
+      "Goal-impact assessment re-runs when an idea's text changes, whether from the drawer or " +
+      "from Roadmap v2's inline edit (PATCH /v1/roadmap/items/:code), which reuses the same update path. " +
+      "Roadmap v2 reuses the duplicate check twice more: a draft page's Similar ideas (GET /v1/roadmap/drafts/:code/similar, " +
+      "debounced by the client after typing stops) and the Owner's triage pane (GET /v1/roadmap/items/:code/similar). " +
+      "The Roadmap cutover (POST /v1/roadmap/cutover, an Owner's one-off switch-on) assesses each idea it files for a " +
+      'live direct Builder session once, after its commit, as any filing is (and embeds it for the duplicate check).',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
@@ -2205,11 +2271,15 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     task: LlmTask.ROADMAP_OPPORTUNITY_COPILOT,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'Someone files a roadmap opportunity — every turn of the "New opportunity" conversation',
+      'Someone files a roadmap opportunity — every turn of the "New opportunity" conversation, ' +
+      "and (Roadmap v2) Check my idea and every reply on a private draft's page",
     detail:
       'A tool loop per turn: up to 8 research passes (the board, user-interview notes, the ' +
       'Analytics Agent, UX signals, Bug Hunter findings, repo docs, GitHub code and wiki, ' +
-      'First Principles from the Context Library), then a structured turn — question, readiness verdicts, draft and brief. One ' +
+      'First Principles from the Context Library), then a structured turn — question, readiness verdicts, draft and brief. ' +
+      'On the Roadmap v2 draft page the same submit_turn also returns, per met check, the verbatim words that met it, ' +
+      'and a product-goal suggestion — structured output of this call, never a second call. Each draft turn is priced ' +
+      'into the plan spend ledger at the idea stage ($1 wrap-up cap). One ' +
       'llm_usage row per pass. Two cached system blocks: a product map (repos, admin ' +
       'surfaces, the head of each Builder knowledge pack, the wiki and repo-docs index — ' +
       '~10k tokens, re-rendered at most every 30 min) and the Vision & strategy page, goals ' +
@@ -2384,7 +2454,12 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'before (at most two rejections, then a pass offered only edit and turn-ending tools). Off, ' +
       'the prior streamed loop runs. A session opened from a roadmap opportunity also carries ' +
       "the opportunity's hand-off (description, copilot brief, filing interview) as a third " +
-      'cached system block on every turn.',
+      'cached system block on every turn. With roadmap_v2 on, a plan session past its one idea ' +
+      'ceiling (ledger + runner spend) does not start a turn at all (PlanCeilingService). ' +
+      "Roadmap v2 (P3b): after Start planning the plan interview runs in the idea's one session, and " +
+      'each turn also reads every answer, comment and settled choice posted since the last turn by anyone ' +
+      'with Roadmap access, attributed as [Name · role] (no extra call; a longer user message). ' +
+      'Conflicting answers are withheld until the settler chooses.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',

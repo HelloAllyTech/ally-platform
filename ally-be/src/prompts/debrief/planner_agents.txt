@@ -15,6 +15,11 @@ description: The skills learners on the same course miss most (groups of five or
 use_when: A course session with a miss that may be common across the course.
 skip_when: Not a course session, or the session missed nothing notable.
 
+## guidance_agent
+description: Reads the index of practice guidance (the organisation's protocols, level guides and style guides) and decides, within a call limit, which entries the Writer should read for this session's moments.
+use_when: A moment, the organisation's protocols or the learner's level guide could change how the learner is coached.
+skip_when: A short session with nothing worth guidance. Never skip when a risk cue or an organisation protocol applies.
+
 ## guidance_lookup
 description: Looks up practice guidance (the organisation's and Ally's Debrief Guidance) for up to three pivotal moments; the Writer may use it where it fits. An organisation's protocols come back labelled.
 use_when: A moment where practice guidance would help the learner.

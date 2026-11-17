@@ -299,7 +299,7 @@ describe("Debriefs tab: each agent", () => {
     expect(kappaWords(0.95)).toBe("Almost perfect");
   });
 
-  it("shows the PM agent's outcomes and the writer's failures as bars", () => {
+  it("shows the Debrief PM agent's outcomes and the writer's failures as bars", () => {
     render(<MetricsTab />);
     expect(screen.getByTestId("pm-outcome")).toHaveTextContent("Waiting 10");
     const failures = screen.getByTestId("writer-failures");
@@ -420,7 +420,7 @@ describe("Debriefs tab: states", () => {
       }),
     );
     expect(screen.getByTestId("metrics-unfiltered-note")).toHaveTextContent(
-      "Not filtered: baselines, uptake lift and the PM agent.",
+      "Not filtered: baselines, uptake lift and the Debrief PM agent.",
     );
     expect(screen.getByTestId("metrics-filter-more-button-count")).toHaveTextContent("2");
     const chips = screen.getByTestId("metrics-filter-chips");

@@ -53,7 +53,7 @@ Branch `feat/agents-v2-6b` → `master`. All three apps. Brief: `chunk-6b.md`; n
 
 ## After merge (`LAUNCH-CHECKLIST.md`, 6b)
 
-1. Deploy ally-ai, then ally-be. Migrations: `1982000000500-RecountHandedOver` and `1982000000600-ChatbotsOffForAllyAdmins`.
+1. Deploy ally-ai, then ally-be. Migrations: `1983900000000-RecountHandedOver` and `1983900000100-ChatbotsOffForAllyAdmins`.
 2. Clear `admin:feature-toggles:v2:*` in Redis.
 3. Publish the lists prompt and the other approved texts to production's Skills Store before deploying. (`6B-PROMPTS.md`; locally: Lists v8, Instructions v5, Memory v3, Answer questions (takes details) v2, Bring in customers v3 and (can book) v3, each matching its seed.)
 4. Tell support about Assistants access.

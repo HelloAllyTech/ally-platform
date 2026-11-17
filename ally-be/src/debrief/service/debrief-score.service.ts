@@ -129,6 +129,7 @@ export class DebriefScoreService {
               COALESCE(r.workspace->'judge'->'hardFails', '[]'::jsonb) AS hard_fails,
               (r.status IN ('published','below_bar')) AS shown,
               r.workspace->'safety'->'risk_cues' AS risk_cues,
+              r.workspace->'riskCueOption'->>'handling' AS risk_handling,
               r.cards->'important_moment' AS important_moment,
               COALESCE(r."actualCostUsd", r."estimatedCostUsd")::float
                 + COALESCE((r.workspace->>'askAllySpentUsd')::float, 0) AS session_cost,
@@ -293,7 +294,13 @@ export function toScoredRun(r: Record<string, any>): ScoredRun {
     dims: dimsOf(r.dims),
     missedClearRiskCue:
       !!r.shown &&
-      (uncoveredClearCue(r.risk_cues, r.important_moment) ||
+      // A roleplay that assesses risk cues as its practice has no important moment to cover them:
+      // only the judge's own missed clear cue counts there.
+      (uncoveredClearCue(
+        r.risk_cues,
+        r.important_moment,
+        r.risk_handling === 'assessed',
+      ) ||
         hardFails.some(
           (h: { code?: string }) => h?.code === 'missed_risk_cue',
         )),
@@ -309,7 +316,12 @@ export function toScoredRun(r: Record<string, any>): ScoredRun {
  * count. (Before 2026-11-17 the gate read the Evaluator's `reviewReason`,
  * which on older releases flagged possible cues too: three false alarms.)
  */
-export function uncoveredClearCue(cues: unknown, moment: unknown): boolean {
+export function uncoveredClearCue(
+  cues: unknown,
+  moment: unknown,
+  /** The roleplay assesses cues as part of the practice: a cue the reader marked so needs no moment. */
+  assessed = false,
+): boolean {
   if (!Array.isArray(cues)) return false;
   const m = (moment ?? null) as {
     turn_index?: unknown;
@@ -324,9 +336,16 @@ export function uncoveredClearCue(cues: unknown, moment: unknown): boolean {
       covered.add(Number(o.turn_index));
     }
   }
-  return (cues as Array<{ strength?: unknown; turn_index?: unknown }>).some(
+  return (
+    cues as Array<{
+      strength?: unknown;
+      turn_index?: unknown;
+      part_of_practice?: unknown;
+    }>
+  ).some(
     (c) =>
       c?.strength !== 'possible' &&
+      !(assessed && c?.part_of_practice === true) &&
       c?.turn_index != null &&
       Number.isInteger(Number(c.turn_index)) &&
       !covered.has(Number(c.turn_index)),

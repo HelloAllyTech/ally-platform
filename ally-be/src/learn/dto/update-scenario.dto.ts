@@ -768,6 +768,19 @@ export class UpdateScenarioDto {
   pauseEnabled?: boolean;
 
   @ApiProperty({
+    description:
+      "The risk-cue option this roleplay's Debrief applies: the key of an approved option " +
+      '(Debriefs › roleplay options), or null for Standard.',
+    example: 'part_of_practice',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  debriefRiskCueOption?: string | null;
+
+  @ApiProperty({
     description: 'Enable current state for the scenario',
     example: true,
     required: false,

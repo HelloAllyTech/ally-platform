@@ -42,7 +42,14 @@ stored result.
     "expected_behaviours": ["Empathy"],                                     // named competencies only, never a custom code
     "helpful_behaviours": ["Asks open questions"],                          // the roleplay's SHOULD_DO + custom competencies' HELPFUL
     "unhelpful_behaviours": ["Gives advice too early"],                     // the roleplay's SHOULD_NOT_DO + custom competencies' UNHELPFUL
-    "competencies": [ { "name": "Empathy", "helpful": ["Reflects feelings"], "unhelpful": [] } ]   // named only; behaviours may be empty
+    "competencies": [ { "name": "Empathy", "helpful": ["Reflects feelings"], "unhelpful": [] } ],  // named only; behaviours may be empty
+    // The organisation's skill frameworks, merged (every active `skill_framework` Context Library entry it can read; no roleplay choice,
+    // no built-in fallback) and the roleplay's risk-cue option (spec DEBRIEF_ACROSS_ROLEPLAYS). All optional; ABSENT or no skills = no framework.
+    "framework": { "id": "DG-0100", "name": "Foundational helping skills", "foundational": true,
+                   "skills": [ { "key": "verbal", "name": "Verbal communication" } ],   // the Analyst writes the exact key (or name); no keyword matching
+                   "areas": [ { "name": "Listening Engagement", "description": "..." } ] },   // no skills = "none"; no areas = no coverage chart
+    "risk_cue": { "key": "standard", "name": "Standard", "handling": "alarm | assessed", "word_list_raises": true },
+    "speaker_labels": "legacy | neutral"                                    // neutral: LEARNER / CHARACTER; set with the release whose prompt texts are neutral (`bundle.settings.neutralWording`)
   },
   "transcript": [ { "turn_index": 0, "role": "counselor | client", "text": "...", "message_id": "..." } ],
   "context": {
@@ -79,6 +86,22 @@ Response:
   "language": "hi"                         // the debrief's language: the recorded one, or the one read from the learner's turns
 }
 ```
+
+**Skill framework and risk-cue option (spec DEBRIEF_ACROSS_ROLEPLAYS).** `session.framework` (the merged `skill_framework` entries the learner's
+organisation can read; empty when there are none, and the 14 foundational skills are only data in such an entry) is what the graph
+names wherever it needs skills: the Analyst's `{{skill_framework}}`, the progress agent's allowed keys (with
+`context.progress_profile.skill_names`, which adds the roleplay's named competencies), the SKILL COVERAGE areas and the
+Foundational Skills levels (used only when `framework.foundational`). `session.risk_cue` sets `word_list_raises` (the word
+list may raise a cue to clear; nothing ever lowers one; `false` leaves the Safety reader's own `strength` as the only
+judgement, no word list and no always-clear categories) and `handling`: under `assessed` the Safety reader also returns
+`part_of_practice` for each cue (its own judgement of whether the cue is the skill being practised; under `alarm` it is
+ignored). Cues it marks true are handled in the coaching cards (no important-moment card, no uncovered-cue check, no support
+lines), every other cue keeps the alarm path. The Writer, Reviser and Evaluator's fix notes get `{{risk_handling}}`, and
+`POST /gateway/checks` carries `risk_handling` and each cue's `part_of_practice`. The response's `has_alarm_risk_cue` says
+whether any cue stayed on the alarm path. The Evaluator also judges progress claims against `PROGRESS` (an unsupported
+"consistent strength" is a hard fail; no keyword list). The
+option's wording still arrives through `prompts["debrief_risk_cue_definition"]`. The run records
+`workspace.frameworkUsed` (id, ids, name, area names) and `workspace.riskCueOption` (key, version, handling, support-lines flag, wording); the graph adds its own `workspace.framework`, `risk_cue` and `speaker_labels`.
 
 **Language (v9 FR-39; moved into the graph 2026-11-11, spec §D1).** ally-be sends what it knows: the session's
 configured language (its default `en` when none is recorded), `language_recorded`, and `language_source:
@@ -209,6 +232,70 @@ Recorded by the ally-be build (2026-11-10).
 12. **Gateway errors**: 401 for a missing, malformed, wrongly signed or expired token; 403 for a tool not in
     `tools` or a run that does not exist, is for another session, or is not `running`; 404 for an unknown tool.
 13. **Timeout**: ally-be waits `riskDeadlineMs + 60 s` (the bundle's settings with run overrides) for the graph.
+
+### Settings › Agents (2026-11-17)
+
+Both under `/api/v1/debriefs/agents-config`. Read: Debrief console read access (`DebriefRead`). Change: the Debrief owner's `manage:admin:debrief-settings` (`DebriefAct('ownerSettings')`); `canEdit` mirrors it. A change is never a live edit: it makes a DRAFT release and a person's proposed change (`DebriefReleasesService.proposeBundle`, the path "Propose a change" uses), so it climbs the same ladder as the PM agent's changes. Every read is of the CURRENT GA release (no cache).
+
+`GET /v1/debriefs/agents-config` -> 200
+
+```
+{ "release": {"id","version","status"},          // live GA; id/version null and status "seed" when running the code seed
+  "canEdit": boolean,
+  "canary": {"id","version","share"} | null,     // share = % of new sessions
+  "recipes": [ {"key","shortForm","maxRevisionRounds",
+                "steps":[{"step","label","model"|null,"backupModel"|null,"promptCode"|null,"optional"}]} ],
+  "settings": {"guidanceAgentMaxCalls":3,"guidanceTools":{"guidance_agent":[..],"writer":[],"reviser":[]}},
+  "limits": {"guidanceAgentMaxCalls":{"min":0,"max":5},"guidanceToolSteps":[..],"guidanceToolNames":[..]},
+  "orchestratorAgents": [ {"id","version","enabled"} ],   // every registry agent; enabled = in the live release
+  "models": [ {"id","provider","label"} ],                // approved, active, priced; the only ones to offer
+  "pendingDraft": null | {"id","version","status","note","author":{"kind":"pm_agent|person|system","name":string|null}},
+  "recentChanges": [ {"releaseId","version","status","author":{kind,name},"at":ISO,"summary":["Setting · Guidance tools","Model · writer"],"source":"pm_agent|person|seed"} ]  // last 10 releases, newest first, each against its parent
+}
+```
+
+`POST /v1/debriefs/agents-config/changes` body `{ "changes": [ {"kind":"model","recipe","step","model","backupModel"|null} | {"kind":"setting","key":"guidanceAgentMaxCalls"|"guidanceTools","value"} | {"kind":"orchestrator_agent","id","enabled"} ], "note": "<=500 chars" }`
+-> 201 `{ "draft": {"id","version","status","note","author"}, "waitsForPerson": boolean, "reason": string|null }`.
+`waitsForPerson` follows the owner setting "New models or providers" (`askModels`) and the locked always-ask kinds (`alwaysAsk`); the draft is made either way. -> 400 `{ "message", "refusals":[{"index","reason"}] }` with nothing created when any change is refused (unknown recipe or step, a step with no model slot such as `checks` and `guidance_lookup`, a model not on the approved list, bad `guidanceTools`, `guidanceAgentMaxCalls` outside 0–5, unknown registry agent, or a bundle that fails `validateDebriefBundle`). -> 403 without the permission.
+
+### Guidance tools and the guidance agent (2026-11-17)
+
+Agentic RAG: a bounded tool loop browses an index of Debrief Guidance and fetches more before the Writer. Any
+Debrief step can be given the tools; the tools belong to no one agent. All three are `POST /tools/<name>` with
+the run token, in every debrief run's token. Every call may carry `"step"` (the calling step's name, e.g.
+`guidance_agent`, `writer`, `reviser`); without one, `guidance_index` / `guidance_fetch` are the `guidance_agent`'s
+and `guidance_search` is the plain lookup (always allowed, unchanged).
+
+- **`guidance_index`** `{ "step"? }` -> `{ "version": "<12-hex>", "entries": [ { "code": "DG-0012", "kind": "level_guide|style_guide|practice_guideline|protocol|...|null", "level": ["lay"], "title": "<=120 chars (protocol keeps the ORGANISATION PROTOCOL: label)", "hint": "<=160 chars: the entry's situations joined with \"; \", else the first sentence of body/statement" } ] }`.
+  Active Debrief Guidance the run's organisation may read (global, or its tenant in `tenantIds`; a non-UUID tenant
+  reads global only), never `skill_framework`, sorted by code. Cached in memory per tenant; every call runs one
+  `SELECT count(*), max("updatedAt")` over the collection's active chunks and reuses the cache only while that is
+  unchanged (an edit, delete or add in the Context Library shows on the next call). `version` is that signature
+  hashed. Never throws: `{ "version": "unavailable", "entries": [], "unavailable": true }`.
+- **`guidance_search`** unchanged: `{ "topics": [ { "situation" } ], "per_moment" }` -> `{ passages, no_confident_match }`.
+- **`guidance_fetch`** `{ "codes": ["DG-0012", ...], "step"? }` (at most 5, extra ignored; codes trimmed,
+  case-insensitive) -> `{ "passages": [ { "id", "code", "title", "text", "citation", "band": "direct" } ], "not_found": ["DG-9999"] }`.
+  Only entries the organisation may read, active, not `skill_framework`; a hidden code is simply `not_found`.
+  Never throws: `{ "passages": [], "not_found": <codes>, "unavailable": true }`. A fetch records a Context Library
+  usage event (`read`, with the step); index and search/fetch also log a debug line (step, tool, count; no text).
+- **Per-step enforcement:** the run token carries `settings.guidanceTools`; a call whose `step` is not enabled for
+  that tool is refused with 403 (ally-ai hands the model the error). A malformed step name is 403 too.
+- **Settings** (release `settings`, both optional so older releases work): `guidanceAgentMaxCalls` (integer 0-5,
+  default 3; tool calls per run; 0 = the agent is off; PM-agent range `PM_AGENT_SETTINGS`) and `guidanceTools`, an
+  object keyed by step, each a list drawn from
+  `guidance_index`, `guidance_search`, `guidance_fetch`. Valid keys today: `guidance_agent`, `writer`,
+  `reviser` (`GUIDANCE_TOOL_STEPS`: a step enters that list when ally-ai wires the toolbox into it, so nothing can be
+  switched on that does nothing). Absent = `{ "guidance_agent": [all three] }` (writer and reviser off). New seed
+  releases ship `guidance_agent` all three and `writer`, `reviser` empty. To try the Writer or Reviser with tools in
+  a replay: `settingOverrides: { "guidanceTools": { "guidance_agent": [...], "writer": ["guidance_index", "guidance_fetch"] } }`
+  (the override replaces the whole map).
+- **Model and prompt:** `DEBRIEF_MODELS.guidanceAgent = gemini-2.5-flash`, run as the optional recipe step
+  `guidance_agent` (label "Choosing guidance…", in the standard and short seed recipes, after `guidance_lookup` in
+  standard). It is a model step like the others: a release may change its model or backup, the organisation
+  provider allowlist is applied to it (substituted or blocked), and a release without the step stays valid
+  (`guidanceAgentMaxCalls`/`guidanceTools` still govern whether it runs). Skills Store prompt `debrief_guidance_agent_system`, variables `guidance_index`, `moments`, `skills`,
+  `baseline_passages`, `learner_level`, `max_calls` (`moments` required); sent to ally-ai with the graph's prompts.
+  AI task registry row `debrief-guidance-agent`.
 
 ### Recorded by the ally-ai build (2026-11-10)
 

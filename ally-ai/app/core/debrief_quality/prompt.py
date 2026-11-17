@@ -11,7 +11,8 @@ is their fallback, the same way. Keep both defaults identical to ally-be's files
 
 from __future__ import annotations
 
-from typing import List, Optional, TypedDict
+import re
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class TranscriptTurn(TypedDict, total=False):
@@ -101,6 +102,49 @@ The debrief to score:
 """
 
 
+#: The practice_alignment wording today, and with roleplay expectations.
+PRACTICE_ALIGNMENT_TODAY = "consistent with sound helping-skills practice"
+PRACTICE_ALIGNMENT_EXPECTED = (
+    "consistent with what this roleplay expects of the learner (ROLEPLAY "
+    "EXPECTATIONS) and with sound practice for this kind of conversation"
+)
+PRACTICE_ALIGNMENT_NOTE = (
+    "For practice_alignment, judge the debrief as "
+    + PRACTICE_ALIGNMENT_EXPECTED
+    + ", and any guidance or protocol supplied; it recommends nothing unsafe. "
+    "When this roleplay's own expectations ask for something that general "
+    "guidance for the learner's level discourages, the roleplay's "
+    "expectations decide: following them is not a contradiction. An "
+    "ORGANISATION PROTOCOL always applies."
+)
+
+
+def neutral_speakers(text: str) -> str:
+    """The rubric or instruction text with the legacy speaker words replaced
+    by the neutral ones (AI_CLIENT, then COUNSELLOR and CLIENT in capitals)."""
+    return re.sub(
+        r"\bCLIENT\b",
+        "CHARACTER",
+        text.replace("AI_CLIENT", "CHARACTER").replace("COUNSELLOR", "LEARNER"),
+    )
+
+
+def _expectations(raw: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The expectations to show, or None when there is nothing in them."""
+    if not isinstance(raw, dict):
+        return None
+    out = {
+        "helpful_behaviours": [b for b in raw.get("helpful_behaviours") or [] if b],
+        "unhelpful_behaviours": [b for b in raw.get("unhelpful_behaviours") or [] if b],
+        "competencies": [
+            c
+            for c in raw.get("competencies") or []
+            if isinstance(c, dict) and c.get("name")
+        ],
+    }
+    return out if any(out.values()) else None
+
+
 #: What the judge is told to do last; the store's `debrief_quality_judge_system`
 #: when ally-be sends it. The Evaluator (inside a debrief run) has its own
 #: pinned code, `debrief_evaluator_system` (steps.DEFAULT_EVALUATOR_SYSTEM), so
@@ -129,22 +173,31 @@ def build_judge_prompt(
     history: Optional[str] = None,
     instructions: Optional[str] = None,
     risk_cue_definition: Optional[str] = None,
+    speaker_labels: Optional[str] = None,
+    roleplay_expectations: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Assemble the debrief-quality prompt for one session's debrief: the
-    rubric with the session filled in, then the closing instructions."""
-    from app.core.debrief.render import NONE, render
+    rubric with the session filled in, then the closing instructions. With
+    ``roleplay_expectations`` the roleplay's own expectations join the
+    prompt and practice_alignment is judged against them as well."""
+    from app.core.debrief.framework import NEUTRAL, normalise_labels, speaker
+    from app.core.debrief.render import NONE, block, render
     from app.core.debrief.risk_cue_definition import definition_block
 
     lines = ["<transcript>"]
     for turn in transcript:
-        speaker = "AI_CLIENT" if turn.get("role") == "client" else "COUNSELLOR"
+        who = speaker(turn.get("role") or "", speaker_labels, judge=True)
         idx = turn.get("turn_index")
         tag = f"[turn {idx}] " if idx is not None else ""
-        lines.append(f"{tag}{speaker}: {turn.get('text', '')}")
+        lines.append(f"{tag}{who}: {turn.get('text', '')}")
     lines.append("</transcript>")
+    neutral = normalise_labels(speaker_labels) == NEUTRAL
+    template = rubric or DEFAULT_JUDGE_RUBRIC
+    if neutral:
+        template = neutral_speakers(template)
     body = render(
         RUBRIC_CODE,
-        rubric or DEFAULT_JUDGE_RUBRIC,
+        template,
         {
             # The rubric's risk list and its missed_risk_cue hard fail point to it.
             "risk_cue_definition": definition_block(risk_cue_definition)[1],
@@ -166,4 +219,19 @@ def build_judge_prompt(
         required=RUBRIC_REQUIRED,
     )
     closing = (instructions or "").strip() or DEFAULT_JUDGE_INSTRUCTIONS
-    return body.rstrip() + "\n\n" + closing
+    if neutral:
+        closing = neutral_speakers(closing)
+    expectations = _expectations(roleplay_expectations)
+    if expectations is None:
+        return body.rstrip() + "\n\n" + closing
+    body = body.replace(PRACTICE_ALIGNMENT_TODAY, PRACTICE_ALIGNMENT_EXPECTED, 1)
+    return (
+        body.rstrip()
+        + "\n\nROLEPLAY EXPECTATIONS (what this roleplay expects of the "
+        + "learner):\n"
+        + block("roleplay_expectations", expectations)
+        + "\n\n"
+        + PRACTICE_ALIGNMENT_NOTE
+        + "\n\n"
+        + closing
+    )

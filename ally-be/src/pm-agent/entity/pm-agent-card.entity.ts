@@ -111,4 +111,14 @@ export class PmAgentCard extends BaseWithoutTenantEntity {
 
   @Column({ type: 'uuid', nullable: true })
   roadmapOpportunityId?: string | null;
+
+  /**
+   * Filing to the roadmap (PmRoadmapFiling): `readiness` is the critic's grading of
+   * `payload.opportunity` against the roadmap's readiness checklist — filing mints the roadmap's
+   * readiness token from it, so it is the verdict the card was persisted under; `duplicates` is
+   * what the roadmap's own duplicate check found at filing; `fileAnyway` who overrode that.
+   * Null on questions and on cards from before filing to the roadmap (migration 1982100000100).
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  roadmapFiling?: Record<string, any> | null;
 }

@@ -159,6 +159,8 @@ def offered_agents(
         ):
             continue
         try:
+            if m.offered_when is not None and not m.offered_when(ctx):
+                continue
             if m.available(profile):
                 out.append(m.id)
         except Exception:  # noqa: BLE001 - an availability check never fails a run
@@ -769,8 +771,10 @@ async def dispatch(state: State, runtime: Runtime[Ctx]) -> Command:
     update["workspace"] = workspace
     if "analyst" in (state.get("actions") or {}) and not ok_map.get("analyst"):
         update["rung"] = int(FallbackRung.WRITER_AND_CHECKS_ONLY)
-    update["logs"] = [dispatch_log("prepare_writer")] + logs
-    return Command(update=update, goto="prepare_writer")
+    update["logs"] = [dispatch_log("guidance_agent")] + logs
+    # The guidance agent (a no-op unless the release turns it on) runs between
+    # the agents and the Writer, as it does after guidance_lookup.
+    return Command(update=update, goto="guidance_agent")
 
 
 # --- the one evidence top-up (D3) ---------------------------------------------------

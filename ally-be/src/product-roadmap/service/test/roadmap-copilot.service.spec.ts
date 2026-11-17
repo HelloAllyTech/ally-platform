@@ -416,6 +416,72 @@ describe('RoadmapCopilotService', () => {
     });
   });
 
+  describe('Check my idea (Roadmap v2): the same call, structured', () => {
+    const withEvidence = (over: Record<string, any> = {}) =>
+      allMet({
+        gates: allIds.map((id) => ({
+          id,
+          met: id !== 'outcome',
+          note: 'n',
+          evidence: id === 'outcome' ? 'not met' : `words for ${id}`,
+        })),
+        suggestedGoal: 'Reliability & Trust',
+        ...over,
+      });
+
+    it('leaves every existing caller untouched: no checks option, no extras, base schema', async () => {
+      const { service, tools } = build([submit(withEvidence())]);
+      const turn = turnOf(
+        await collect(
+          service.streamTurn(
+            { messages: [{ role: 'admin', content: 'Idea.' }] },
+            7,
+          ),
+        ),
+      );
+      expect(turn).not.toHaveProperty('checkTurn');
+      expect(tools.getToolDefinitions).toHaveBeenCalledWith(undefined);
+      expect(Object.keys(turn).sort()).toEqual(
+        ['brief', 'draft', 'gates', 'readinessToken', 'reply'].sort(),
+      );
+    });
+
+    it("returns met checks' quotes and a live goal suggestion from one call", async () => {
+      const { service, tools, requests } = build([submit(withEvidence())]);
+      const turn = turnOf(
+        await collect(
+          service.streamTurn(
+            {
+              messages: [{ role: 'admin', content: 'Idea.' }],
+              checks: { reopened: ['clear_why'] },
+            },
+            7,
+          ),
+        ),
+      );
+      expect(tools.getToolDefinitions).toHaveBeenCalledWith({ checks: true });
+      expect(requests).toHaveLength(1);
+      expect(turn.checkTurn?.suggestedGoal).toBe('Reliability & Trust');
+      expect(turn.checkTurn?.evidence).not.toHaveProperty('outcome');
+      expect(turn.checkTurn?.evidence.who_it_affects).toBe(
+        'words for who_it_affects',
+      );
+      const userTurn = String(requests[0].messages[0].content);
+      expect(userTurn).toContain('not quite met yet');
+      expect(userTurn).toContain('clear_why');
+    });
+
+    it('drops a suggested goal that is not a live product goal', () => {
+      const { service } = build([]);
+      const submitted = withEvidence({ suggestedGoal: 'Made up', draft: null });
+      const built = service.buildTurn(submitted, ['Reliability & Trust'], null);
+      expect(
+        service.checkTurnOf(submitted, built, ['Reliability & Trust'])
+          .suggestedGoal,
+      ).toBeNull();
+    });
+  });
+
   describe('buildTurn — what the model said, made safe to show and to sign', () => {
     const goals = ['Reliability & Trust'];
     const { service, issue } = build([]);

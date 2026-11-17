@@ -19,6 +19,7 @@ import {
   DebriefModelCatalog,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
   DEBRIEF_SESSION_BUDGET_DEFAULT,
+  GUIDANCE_TOOLS_DEFAULT,
   isOrchestrated,
   orchestratorModels,
   validateDebriefBundle,
@@ -51,6 +52,12 @@ import {
   PromptVersions,
 } from './debrief-run-logs.service';
 import { DebriefPracticeService } from './debrief-practice.service';
+import { DebriefFrameworkService } from './debrief-framework.service';
+import {
+  DebriefRiskCueOptionService,
+  STANDARD_RISK_CUE,
+} from './debrief-risk-cue-option.service';
+import { emptyFramework } from '../constants/debrief-framework.constants';
 import {
   DEBRIEF_ORCHESTRATOR_TOOLS,
   DEBRIEF_GATEWAY_TOOLS,
@@ -107,6 +114,7 @@ const GRAPH_PROMPT_CODES: readonly string[] = [
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
   DEBRIEF_PROMPT_CODES.progress,
+  DEBRIEF_PROMPT_CODES.guidanceAgent,
   DEBRIEF_PROMPT_CODES.writer,
   DEBRIEF_PROMPT_CODES.reviser,
   DEBRIEF_PROMPT_CODES.rubric,
@@ -204,6 +212,10 @@ export class DebriefRunnerService {
     private readonly progressResults?: Repository<DebriefProgressResult>,
     /** V2_AUTONOMY A9: a language pinned to another release. Absent in unit tests. */
     @Optional() private readonly holds?: DebriefChangeHoldsService,
+    /** The organisation's skill frameworks (Context Library). Absent in unit tests: none. */
+    @Optional() private readonly frameworks?: DebriefFrameworkService,
+    /** The roleplay's risk-cue option. Absent in unit tests: Standard. */
+    @Optional() private readonly riskCueOptions?: DebriefRiskCueOptionService,
   ) {}
 
   /**
@@ -342,6 +354,9 @@ export class DebriefRunnerService {
             isOrchestrated(bundle)
               ? [...DEBRIEF_GATEWAY_TOOLS, ...DEBRIEF_ORCHESTRATOR_TOOLS]
               : DEBRIEF_GATEWAY_TOOLS,
+            // Which step may call which guidance tool, enforced by the gateway.
+            (bundle.settings.guidanceTools as Record<string, string[]>) ??
+              GUIDANCE_TOOLS_DEFAULT,
           ),
           gateway_url: `${this.config.publicApiBaseUrl.replace(/\/+$/, '')}/api/v1/internal/debrief`,
         },
@@ -575,6 +590,15 @@ export class DebriefRunnerService {
 
     // The context the graph's steps read. The optional reads never block a
     // debrief: unreadable means none.
+    // The skill frameworks the learner's organisation can read (spec DEBRIEF_ACROSS_ROLEPLAYS §4);
+    // none or unreadable means only the roleplay's own competencies, so it can never stop a debrief.
+    const framework = this.frameworks
+      ? await this.frameworks.forTenant(session.tenantId)
+      : emptyFramework();
+    const riskCue = this.riskCueOptions
+      ? await this.riskCueOptions.resolve(session.riskCueOption)
+      : STANDARD_RISK_CUE;
+    const competencyNames = (session.competencies ?? []).map((c) => c.name);
     const [
       liveDetections,
       caseMemory,
@@ -623,11 +647,38 @@ export class DebriefRunnerService {
                 session.tenantId,
                 sessionId,
                 progressSettings(owner),
+                { framework, competencies: competencyNames },
               ),
             null,
           )
         : Promise.resolve(null),
     ]);
+    // An option with its own wording replaces the pinned definition; null keeps the pinned one.
+    if (riskCue.wording) {
+      prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition] = riskCue.wording;
+    }
+    run.workspace = {
+      ...run.workspace,
+      // What this run used, kept so a later edit never changes how a past debrief reads.
+      // Not `framework`: the graph's answer writes its own key of that name into the workspace.
+      frameworkUsed: {
+        id: framework.id,
+        ids: framework.ids,
+        name: framework.name,
+        areas: framework.areas.map((a) => a.name),
+      },
+      riskCueOption: {
+        key: riskCue.key,
+        name: riskCue.name,
+        version: riskCue.version,
+        handling: riskCue.handling,
+        supportLinesOnCue: riskCue.supportLinesOnCue,
+        wordListRaises: riskCue.wordListRaises,
+        // The option's own definition (null: the pinned one), so the judge reads what the run read.
+        wording: riskCue.wording,
+      },
+      speakerLabels: bundle.settings?.neutralWording ? 'neutral' : 'legacy',
+    };
     if (liveDetections.length) {
       run.workspace = { ...run.workspace, liveDetections };
     }
@@ -659,7 +710,19 @@ export class DebriefRunnerService {
           ? { allow_over_ceiling: true }
           : {}),
         prices: modelPrices(models),
-        session: sessionForGraph(session),
+        session: {
+          ...sessionForGraph(session),
+          framework,
+          risk_cue: {
+            key: riskCue.key,
+            name: riskCue.name,
+            handling: riskCue.handling,
+            word_list_raises: riskCue.wordListRaises,
+          },
+          speaker_labels: bundle.settings?.neutralWording
+            ? 'neutral'
+            : 'legacy',
+        },
         transcript,
         context: {
           live_detections: liveDetections,

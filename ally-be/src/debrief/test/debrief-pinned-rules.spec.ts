@@ -450,7 +450,7 @@ describe('pinned rules: proposals', () => {
     );
   });
 
-  it('reject: someone else, with a reason kept on the idea for the PM agent', async () => {
+  it('reject: someone else, with a reason kept on the idea for the Debrief PM agent', async () => {
     const { svc, lessons, audit } = build();
     const { id } = await propose(svc, ADVISOR);
     await expect(svc.rejectPinnedRule(id, OWNER, '  ')).rejects.toThrow(

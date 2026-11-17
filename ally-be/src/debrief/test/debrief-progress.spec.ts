@@ -1,3 +1,8 @@
+import { FHS_RUBRIC } from '../../foundational-skills/constants/helping-skills-rubric.constants';
+import {
+  DebriefSkillFramework,
+  emptyFramework,
+} from '../constants/debrief-framework.constants';
 import {
   assembleProgressProfile,
   progressCardDue,
@@ -67,29 +72,41 @@ const assemble = (
     lastReport: null,
     voice: [],
     fhs: [],
+    framework: TEST_FRAMEWORK,
     ...over,
   });
+
+/** A framework as the Context Library entry would carry it (data, not code). */
+const TEST_FRAMEWORK: DebriefSkillFramework = {
+  ...emptyFramework(),
+  id: 'DG-0100',
+  ids: ['DG-0100'],
+  name: 'Foundational helping skills',
+  foundational: true,
+  skills: FHS_RUBRIC.map((r) => ({ key: r.key, name: r.name })),
+  areas: [{ name: 'Listening Engagement', description: 'listening' }],
+};
 
 describe('progressSkillKey', () => {
   it.each([
     ['Empathy', 'empathy'],
     ['empathy', 'empathy'],
     ['Empathy, warmth and genuineness', 'empathy'],
-    ['Reflecting feelings', 'feelings'],
-    ['Open-ended questions', 'verbal'],
-    ['Active listening', 'verbal'],
-    ['Asking about suicidal thoughts', 'harm'],
-    ['Explaining confidentiality', 'confidentiality'],
-    ['Collaborative goal-setting', 'goals'],
-    ['Exploring risk and safety', 'harm'],
-    ['Validation', 'feelings'],
-    ['Exploring support systems', 'family'],
-    ['Warmth and rapport', 'empathy'],
+    ['Exploration and normalisation of feelings', 'feelings'],
+    ['Verbal communication', 'verbal'],
+    // No keyword matching: loose names are not guessed at.
+    ['Reflecting feelings', 'other'],
+    ['Open-ended questions', 'other'],
+    ['Active listening', 'other'],
+    ['Asking about suicidal thoughts', 'other'],
     ['Pacing', 'other'],
-    ['Time management', 'other'],
     ['', 'other'],
   ])('%s → %s', (name, key) => {
-    expect(progressSkillKey(name)).toBe(key);
+    expect(progressSkillKey(name, TEST_FRAMEWORK)).toBe(key);
+  });
+
+  it('knows no skill at all without a framework', () => {
+    expect(progressSkillKey('Empathy', emptyFramework())).toBe('other');
   });
 });
 

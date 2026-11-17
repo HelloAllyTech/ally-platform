@@ -168,6 +168,8 @@ describe('Builder session visibility — every reader is accounted for', () => {
     'builder/repository/builder-session.repository.ts': 'defines the rule',
     'builder/interceptor/builder-session-visibility.interceptor.ts':
       'enforces the rule on every :sessionId route',
+    'builder/guard/builder-plan-read.guard.ts':
+      'read-only GET on a SHARED plan for Idea+ (D2); private and non-plan stay refused',
     'builder/eval/sandbox/builder-eval-stores.ts':
       'eval sandbox: in-memory fixtures, no real sessions',
     'builder/service/builder-session.service.ts':
@@ -190,14 +192,12 @@ describe('Builder session visibility — every reader is accounted for', () => {
       'updates by id inside a turn on a :sessionId route the interceptor checked',
     'builder/service/builder-outcome.service.ts':
       'injects the repository for its sweep; returns nothing to a viewer',
+    'product-roadmap/cutover/roadmap-cutover.service.ts':
+      "Owner-only switch-on: the preview names live direct sessions (id, status, creator) and a run files an idea for each and moves old drafts; never returns a session's content",
     'product-roadmap/plan/plan-session.store.ts':
       'plan reads by id; every list scopes its own WHERE to the author or to shared plans (product-roadmap/plan/*)',
     'builder/service/builder-pull-request.service.ts':
       'by id for a pull request, and the failed-run sweep; returns nothing to a viewer',
-    'pm-agent/service/pm-agent-builder-port.service.ts':
-      "by id (and by requester + card id) for the PM Agent's own pm_agent sessions; never lists, returns status only",
-    'pm-agent/service/pm-agent-presenter.service.ts':
-      "status and cost of the PM Agent's own linked sessions, by id; never lists",
   };
 
   const root = join(__dirname, '..', '..', '..');

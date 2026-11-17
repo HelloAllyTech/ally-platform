@@ -45,6 +45,8 @@ export type SettingsSection =
   | "clinical"
   | "progress"
   | "schedules"
+  | "risk-cues"
+  | "agents"
   | "guidance";
 export const settingsPath = (section?: SettingsSection): string =>
   `${ROUTES.DEBRIEFS_SETTINGS}${section ? `#${section}` : ""}`;

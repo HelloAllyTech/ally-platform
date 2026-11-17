@@ -75,6 +75,25 @@ describe("summarizeCompletion", () => {
     ).toEqual(["Min score 60", "Pass mark 70", "Watch 90%", "Read for 2 min"]);
   });
 
+  it("shows only the gates a roleplay's completion logic applies", () => {
+    const gates = { minScore: 60, minDurationSeconds: 120 };
+    expect(summarizeCompletion({ ...gates, completionLogic: "SCORE_AND_DURATION" })).toEqual([
+      "Min score 60",
+      "At least 2 min",
+    ]);
+    expect(summarizeCompletion({ ...gates, completionLogic: "SCORE" })).toEqual([
+      "Score only",
+      "Min score 60",
+    ]);
+    expect(summarizeCompletion({ ...gates, completionLogic: "DURATION" })).toEqual([
+      "Duration only",
+      "At least 2 min",
+    ]);
+    expect(summarizeCompletion({ ...gates, completionLogic: "PARTICIPATION" })).toEqual([
+      "Completes on start",
+    ]);
+  });
+
   it("ignores anything that is not a finite number", () => {
     expect(summarizeCompletion({ passScore: "70", watchPct: null, minScore: Number.NaN })).toEqual(
       [],
@@ -91,7 +110,15 @@ describe("asHttpUrl", () => {
   });
 
   it("refuses anything that would run script or is not a link at all", () => {
-    for (const value of ["javascript:alert(1)", "data:text/html,<script>", "//evil.test", "nope", "", null, 7]) {
+    for (const value of [
+      "javascript:alert(1)",
+      "data:text/html,<script>",
+      "//evil.test",
+      "nope",
+      "",
+      null,
+      7,
+    ]) {
       expect(asHttpUrl(value)).toBeNull();
     }
   });

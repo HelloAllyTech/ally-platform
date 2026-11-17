@@ -5,6 +5,13 @@ import { AuditModule } from '../audit/audit.module';
 import { LlmUsageModule } from '../analytics/llm-usage.module';
 import { AwsModule } from '../aws/aws.module';
 import { ContextLibraryModule } from '../context-library/context-library.module';
+import { ClChunk } from '../context-library/entity/cl-chunk.entity';
+import { DebriefRiskCueOption } from './entity/debrief-risk-cue-option.entity';
+import { DebriefFrameworkService } from './service/debrief-framework.service';
+import { DebriefGuidanceIndexService } from './service/debrief-guidance-index.service';
+import { DebriefRiskCueOptionService } from './service/debrief-risk-cue-option.service';
+import { DebriefRiskCueTestService } from './service/debrief-risk-cue-test.service';
+import { DebriefRoleplayOptionsController } from './controller/debrief-roleplay-options.controller';
 import { NotificationModule } from '../notification/notification.module';
 import { GuideCrisisResponse } from '../guide/entity/guide-crisis-response.entity';
 import { GuideSignal } from '../guide/entity/guide-signal.entity';
@@ -74,6 +81,8 @@ import { DebriefRunLogsService } from './service/debrief-run-logs.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
 
+import { DebriefAgentsConfigController } from './controller/debrief-agents-config.controller';
+import { DebriefAgentsConfigService } from './service/debrief-agents-config.service';
 import { DebriefAdvisorsController } from './controller/debrief-advisors.controller';
 import { DebriefAdvisorsService } from './service/debrief-advisors.service';
 
@@ -117,6 +126,10 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
       // The Guide's approved crisis copy, for a learner in crisis in Ask Ally.
       GuideCrisisResponse,
       GuideSignal,
+      // Risk-cue options (what a roleplay's Debrief counts as a risk cue), and the Context
+      // Library entries that hold skill frameworks.
+      DebriefRiskCueOption,
+      ClChunk,
     ]),
     AiChatModule,
     // v9 FR-38: every Debrief Console view writes an audit event.
@@ -136,6 +149,8 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
   ],
   controllers: [
     DebriefConsoleController,
+    // Simulation Studio's Debrief choices and the clinical advisor's review of risk-cue options.
+    DebriefRoleplayOptionsController,
     // Debrief v2: Home, Changes (Undo now, Stop now) and the cumulative score.
     DebriefChangesController,
     DebriefLearnerController,
@@ -147,9 +162,16 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     DebriefSchedulesController,
     // User Management › Clinical advisors (gated like Ally admins).
     DebriefAdvisorsController,
+    DebriefAgentsConfigController,
   ],
   providers: [
     DebriefAdvisorsService,
+    DebriefAgentsConfigService,
+    // Spec DEBRIEF_ACROSS_ROLEPLAYS: the skill framework and risk-cue option a roleplay chose.
+    DebriefFrameworkService,
+    DebriefGuidanceIndexService,
+    DebriefRiskCueOptionService,
+    DebriefRiskCueTestService,
     // Debrief v2: the cumulative score, Changes and the watch, Slack posts.
     DebriefScoreService,
     DebriefChangesService,

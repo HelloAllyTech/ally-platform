@@ -22,6 +22,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.errors import NodeError, NodeTimeoutError
 from langgraph.runtime import Runtime
 from langgraph.types import Command, RetryPolicy
@@ -35,6 +36,7 @@ from app.core.debrief_graph.circuit import (
 )
 from app.core.debrief_graph.constants import STEP_TIMEOUT_S
 from app.core.debrief_graph.context import DebriefRunContext
+from app.core.debrief_graph import guidance_toolbox
 from app.core.debrief_graph.findings import agent_findings
 from app.core.debrief_graph.records import iso, progress_event, safe_summary
 from app.core.debrief_graph.state import DebriefState
@@ -85,6 +87,10 @@ class ModelStep:
     #: The Skills Store prompt this step's message carries (its system prompt,
     #: or the Evaluator's rubric): the Agent logs name it instead of copying it.
     prompt_code: Optional[str] = None
+    #: The step's name in the `guidanceTools` setting when it may call the
+    #: guidance toolbox before its structured call ("writer", "reviser");
+    #: None = never. Empty/absent entry = off: nothing about the call changes.
+    tools_for: Optional[str] = None
 
     def key(self, state: State) -> str:
         return f"{self.path}#{self.round_of(state) or 0}"
@@ -118,7 +124,7 @@ def _reasoning(spec: ModelStep, res: Dict[str, Any]) -> Optional[str]:
 def make_model_step(spec: ModelStep):
     """The node, its error handler and its policies, for `add_node`."""
 
-    async def node(state: State, runtime: Runtime[Ctx]):
+    async def node(state: State, runtime: Runtime[Ctx], config: RunnableConfig):
         ctx = runtime.context
         key = spec.key(state)
         rnd = spec.round_of(state)
@@ -240,6 +246,36 @@ def make_model_step(spec: ModelStep):
                 }
                 return _route(update, spec.on_success(state, ctx, res))
             sent = {**state, "fetched": fetched}
+        tools_update: Dict[str, Any] = {}
+        if spec.tools_for:
+            # Tool-loop phase (guidanceTools[step]); the fetched passages join
+            # the GUIDANCE the step reads. Kept across a retry of this node.
+            if "tools" not in scratch:
+                phase = await guidance_toolbox.run_phase(
+                    state,
+                    ctx,
+                    config,
+                    spec.tools_for,
+                    recipe_step.get("model"),
+                )
+                scratch["tools"] = (
+                    guidance_toolbox.phase_update(
+                        state, ctx, phase, recipe_step.get("label", "")
+                    )
+                    if phase is not None
+                    else {}
+                )
+            tools_update = scratch["tools"]
+            if "passages" in tools_update:
+                # `passages` is what the Writer reads; `tool_passages` is only
+                # what this step fetched (the Reviser reads that alone).
+                sent = {
+                    **sent,
+                    "passages": tools_update["passages"],
+                    "tool_passages": tools_update["passages"][
+                        len(state.get("passages") or []) :
+                    ],
+                }
         sent_body.update(spec.body(sent, ctx))
         try:
             with capture_calls() as captured:
@@ -292,9 +328,14 @@ def make_model_step(spec: ModelStep):
             origin=origin_of(state, spec.step),
         )
         update: Dict[str, Any] = {
-            "steps": scratch["failed"] + [done],
-            "logs": scratch.get("logs", []) + logs,
+            "steps": tools_update.get("steps", []) + scratch["failed"] + [done],
+            "logs": tools_update.get("logs", []) + scratch.get("logs", []) + logs,
             "results": {key: res},
+            **{
+                k: tools_update[k]
+                for k in ("passages", "workspace", "estimated")
+                if k in tools_update
+            },
         }
         if spec.findings is not None and state.get("orchestrated"):
             update["findings"] = {

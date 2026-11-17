@@ -133,6 +133,7 @@ const STEP_NAMES: Record<string, string> = {
   [DEBRIEF_PROMPT_CODES.languageSpecialist]: 'Language specialist',
   [DEBRIEF_PROMPT_CODES.progress]: 'Progress',
   [DEBRIEF_PROMPT_CODES.progressReader]: 'Progress',
+  [DEBRIEF_PROMPT_CODES.guidanceAgent]: 'Guidance agent',
   debrief_quality_judge_system: 'Judge',
 };
 
@@ -542,7 +543,7 @@ export function changeResult(
       ].includes(String(idea.change?.ideaKind));
       return drafted
         ? 'Not tested yet: its first check starts on the next hourly run.'
-        : 'An idea, not a change yet: the PM agent drafts it on its next run.';
+        : 'An idea, not a change yet: the Debrief PM agent drafts it on its next run.';
     }
     case 'testing':
     default: {

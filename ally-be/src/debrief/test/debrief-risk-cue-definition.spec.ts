@@ -27,7 +27,7 @@ describe('debrief_risk_cue_definition', () => {
     expect(seed).toContain('you cannot tell, it is a clear risk cue');
   });
 
-  it('is pinned, a pinned rule in the Console, and on the PM agent never-list', () => {
+  it('is pinned, a pinned rule in the Console, and on the Debrief PM agent never-list', () => {
     expect(PINNED_PROMPTS.get(code)).toBe('guard');
     expect(PINNED_RULE_CODES.has(code)).toBe(true);
     expect(promptEditRefusal(code, 'a', 'b', 'a')?.neverList).toBe('safety');

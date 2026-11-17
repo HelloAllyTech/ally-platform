@@ -46,7 +46,7 @@ const CLAIMS = {
   exp: 0,
 };
 
-describe('PM agent never-list and limits (spec C4, FR-53)', () => {
+describe('Debrief PM agent never-list and limits (spec C4, FR-53)', () => {
   it('refuses the rubric, the Safety reader and its own instructions as never-list', () => {
     expect(
       promptEditRefusal('debrief_quality_rubric', 'a', 'b', 'a')?.neverList,
@@ -362,7 +362,7 @@ function tools(opts: {
   return { svc, pm, ds, reviews, queries };
 }
 
-describe('the PM agent’s gateway tools enforce the rules', () => {
+describe('the Debrief PM agent’s gateway tools enforce the rules', () => {
   const routeA = {
     id: IDEA,
     status: 'proposed',
@@ -871,7 +871,7 @@ describe('content safety for every self-made change (R2-18, FR-56)', () => {
     );
   });
 
-  it('approval re-checks the PM agent’s own prompt edits before learners see them', () => {
+  it('approval re-checks the Debrief PM agent’s own prompt edits before learners see them', () => {
     const idea = {
       authorKind: 'curator',
       change: { ideaKind: 'prompt_edit', find: 'a b', replace: 'a b c' },
@@ -1049,7 +1049,7 @@ describe('planted-idea fixtures (ally-ai tests/fixtures/pm_agent_planted_ideas.j
   });
 });
 
-describe('agent tokens list every PM agent tool', () => {
+describe('agent tokens list every Debrief PM agent tool', () => {
   it('signs all of them by default and only them', () => {
     const tokens = new DebriefRunTokenService(
       {

@@ -34,8 +34,15 @@ export const PM_PIPELINE = {
   /** Wall clock per lane and per run. */
   LANE_TIMEOUT_MS: 4 * 60_000,
   RUN_TIMEOUT_MS: 20 * 60_000,
-  /** A `running` row older than this is a crashed run; the scheduler fails it. */
-  STALE_RUN_MS: 45 * 60_000,
+  /**
+   * A `running` row older than this is a crashed run (usually a deploy killed the task
+   * mid-run); the scheduler's 10-minute tick fails it, and until then the UI shows the
+   * agent as running and Run now stays disabled. A live run cannot outlast
+   * RUN_TIMEOUT_MS by much: lanes are clamped to the run deadline, then the critic gets
+   * one call plus one fallback (2 × CALL_TIMEOUT_MS) — about 23.5 min in all. Keep this
+   * just above that, not far above it.
+   */
+  STALE_RUN_MS: 30 * 60_000,
   /** Tool results the model reads, after fencing. */
   TOOL_RESULT_MAX_CHARS: 12_000,
   /** Evidence snapshot kept per item (internal; never in a compiled PRD). */
@@ -82,8 +89,20 @@ export const PM_BANDIT = {
 export const PM_DEDUPE = {
   /** Similarity at or above which two items are the same idea. */
   DUPLICATE_THRESHOLD: 0.6,
-  /** Roadmap opportunities and bug findings compared against, newest first. */
+  /** Bug findings compared against, newest first. */
   CORPUS_LIMIT: 400,
+  /**
+   * Roadmap opportunities compared against, newest first: every stage, archived included
+   * (an archived idea is one the team already decided on). The whole live roadmap fits.
+   */
+  ROADMAP_CORPUS_LIMIT: 3000,
+  /**
+   * Opportunity text against opportunity text. Both are full paragraphs about the same
+   * product, so the shared domain vocabulary alone pushes containment up; a higher bar than
+   * DUPLICATE_THRESHOLD keeps "both mention learners and roleplays" from reading as a match.
+   * The semantic check is the roadmap's own duplicate detection, run again at filing.
+   */
+  ROADMAP_DESCRIPTION_THRESHOLD: 0.75,
 } as const;
 
 /** Memory and exemplar retrieval per lane (plan §9, §9b loop 2). */
@@ -96,15 +115,15 @@ export const PM_CONTEXT = {
   MANDATE_MAX_CHARS: 4000,
   STRATEGY_MAX_CHARS: 8000,
   PRODUCT_MAP_MAX_CHARS: 24_000,
+  /**
+   * The "already on the roadmap" digest in the shared block: the newest live opportunities,
+   * one line each. The deterministic dedupe gate checks the whole roadmap regardless; this is
+   * so a lane learns what is planned before it spends a pass proposing it again.
+   */
+  ROADMAP_DIGEST_ITEMS: 250,
+  ROADMAP_DIGEST_LINE_CHARS: 140,
+  ROADMAP_DIGEST_MAX_CHARS: 30_000,
 } as const;
-
-/** Repos a card may target. `ally-mobile` has no release pipeline (plan §8). */
-export const PM_RELEASABLE_REPOS = [
-  'ally-be',
-  'ally-web',
-  'ally-ai',
-  'ally-ai-learn',
-] as const;
 
 /** The forced tool every lane ends with, and the critic's. */
 export const PM_SUBMIT_TOOL = 'submit_candidates';

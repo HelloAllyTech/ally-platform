@@ -193,6 +193,7 @@ describe("Settings › Schedules: engineering only", () => {
       en.debriefs.settingsPage.nav.pinned,
       en.debriefs.settingsPage.nav.clinical,
       en.debriefs.settingsPage.nav.progress,
+      en.debriefs.settingsPage.nav.agents,
     ]);
     expect(screen.queryByText(en.debriefs.settingsPage.nav.schedules)).toBeNull();
     expect(screen.queryByTestId("schedules-table")).toBeNull();
@@ -220,6 +221,7 @@ describe("Settings › Schedules: engineering only", () => {
       en.debriefs.settingsPage.nav.clinical,
       en.debriefs.settingsPage.nav.progress,
       en.debriefs.settingsPage.nav.schedules,
+      en.debriefs.settingsPage.nav.agents,
     ]);
     fireEvent.click(
       within(menu).getByRole("menuitem", { name: en.debriefs.settingsPage.nav.schedules }),
@@ -246,6 +248,7 @@ describe("Settings › Schedules: engineering only", () => {
       en.debriefs.settingsPage.nav.pinned,
       en.debriefs.settingsPage.nav.clinical,
       en.debriefs.settingsPage.nav.progress,
+      en.debriefs.settingsPage.nav.agents,
       en.debriefs.settingsPage.guidanceLink,
     ]);
   });
@@ -288,7 +291,7 @@ describe("Schedules table", () => {
     expect(screen.queryByText(s.budgetBody)).toBeNull();
   });
 
-  it("the PM agent's frequency asks to confirm, with the spend effect, then saves confirmed", async () => {
+  it("the Debrief PM agent's frequency asks to confirm, with the spend effect, then saves confirmed", async () => {
     render(<SchedulesSection />);
     const name = s.jobs["debrief-pm-agent"].name;
     fireEvent.change(screen.getByLabelText(s.oftenLabel(name)), {

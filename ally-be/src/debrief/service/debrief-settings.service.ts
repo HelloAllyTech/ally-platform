@@ -154,7 +154,7 @@ export class DebriefSettingsService {
     row.values = values;
     row.updatedBy = userId;
     const at = new Date().toISOString();
-    const name = source === 'pm_agent' ? 'PM agent' : null;
+    const name = source === 'pm_agent' ? 'Debrief PM agent' : null;
     row.changes = {
       ...(row.changes ?? {}),
       ...Object.fromEntries(

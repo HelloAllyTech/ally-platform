@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/user/entity/user.entity';
@@ -35,9 +35,11 @@ import {
   RoadmapReferenceImage,
 } from '../entity/roadmap-opportunity.entity';
 import {
+  PM_AGENT_AUTHOR_NAME,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
+  RoadmapReviewState,
 } from '../enum/roadmap-opportunity.enum';
 import {
   RoadmapOpportunityRepository,
@@ -165,6 +167,9 @@ export class RoadmapOpportunityService {
     if (!existing) throw new NotFoundException(`Opportunity ${id} not found`);
     await this.opportunityRepository.update(id, {
       directorStarred: starred,
+      // Who gave the star (Roadmap v2, D16). Written beside the flag so the attribution the
+      // P0 migration backfilled stays true until the Owner star replaces this route.
+      starredByUserId: starred ? userId : null,
       updatedBy: userId,
     });
     this.strategyGoalService.invalidate(userId);
@@ -243,6 +248,12 @@ export class RoadmapOpportunityService {
        * property of the IDEA-filing path, not of this table.
        */
       enforceReadiness?: boolean;
+      /**
+       * Roadmap v2's Submit only: the code its draft was given when New idea created it
+       * (session-first, §4.2), so the idea keeps one code for life. Allocated from the same
+       * sequence as the column default. Everyone else leaves it out and the default fires.
+       */
+      code?: string;
     },
   ): Promise<OpportunityResponseDto> {
     // Assigning at filing time is a MANAGE action on a route gated at the VOTE tier, so it is
@@ -301,6 +312,7 @@ export class RoadmapOpportunityService {
         referenceImages,
         brief,
         interviewTranscript,
+        ...(extra?.code ? { code: extra.code } : {}),
         createdBy: userId,
         updatedBy: userId,
         source: extra?.source ?? RoadmapOpportunitySource.STAFF,
@@ -443,6 +455,77 @@ export class RoadmapOpportunityService {
         `This opportunity is not ready to file yet (${failed.join(', ')}). ` +
           `Keep the interview going until every item is met.`,
       );
+    }
+  }
+
+  /**
+   * The Roadmap cutover's one filing door (Roadmap v2 P6, plans/roadmap-builder-merge §6): an
+   * idea for an in-flight direct Builder session that never had one, so every live build sits
+   * on the Roadmap from switch-on day.
+   *
+   * A labelled path of its own rather than a flag on `create()`:
+   * - it runs inside the cutover's transaction (`manager`), so the idea, its link to the
+   *   session and the flag commit or fail together;
+   * - the readiness gate does not apply, because the work is already under way and the idea
+   *   records it rather than proposing it — the row says so with
+   *   `source = 'migrated_builder_session'`;
+   * - it is already accepted (`reviewState`), Prioritised (as "Open in Builder Agent" makes a
+   *   linked idea) and linked by `builderSessionId`, the same column every other link uses.
+   *   `UQ_roadmap_opps_builder_session` is the backstop against a second idea for one session.
+   *
+   * The vector index and goal-impact assessment run after the commit, best-effort, through
+   * `afterMigratedFiling` — as `create()` runs them after its own save.
+   */
+  async fileMigratedBuilderSession(
+    manager: EntityManager,
+    input: {
+      sessionId: string;
+      description: string;
+      productGoal: string;
+      /** The session's creator: the idea's author, and its lead. */
+      creatorUserId: number;
+      /** The Owner running the cutover: the reviewer of record. */
+      actorUserId: number;
+    },
+  ): Promise<{ id: string; code: string }> {
+    const repository = manager.getRepository(RoadmapOpportunity);
+    const saved = await repository.save(
+      repository.create({
+        description: input.description,
+        type: RoadmapOpportunityType.IDEA,
+        stage: RoadmapOpportunityStage.PRIORITISED,
+        productGoal: input.productGoal,
+        effort: null,
+        ownerUserId: null,
+        referenceImages: [],
+        builderSessionId: input.sessionId,
+        reviewState: RoadmapReviewState.ACCEPTED,
+        reviewedBy: input.actorUserId,
+        reviewedAt: new Date(),
+        createdBy: input.creatorUserId,
+        updatedBy: input.actorUserId,
+        source: RoadmapOpportunitySource.MIGRATED_BUILDER_SESSION,
+        tenantId: null,
+        reporterContext: null,
+      }),
+    );
+    // `code` comes from the column default; read it back inside the same transaction.
+    const [row] = await manager.query(
+      `SELECT code FROM "roadmap_opportunities" WHERE id = $1`,
+      [saved.id],
+    );
+    return { id: saved.id, code: String(row?.code ?? saved.code ?? '') };
+  }
+
+  /**
+   * What `create()` does after its save, for ideas the cutover filed: index each one for the
+   * duplicate check and score it against the strategy. Both are best-effort and swallow their
+   * own failures, so a model outage never undoes a committed cutover.
+   */
+  async afterMigratedFiling(ids: string[], actorUserId: number): Promise<void> {
+    for (const id of ids) {
+      await this.vectorService.indexQuietly(id);
+      await this.goalImpactService.assessQuietly(id, actorUserId);
     }
   }
 
@@ -785,7 +868,12 @@ export class RoadmapOpportunityService {
       source: row.source,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      creator: users.get(row.createdBy) ?? this.unknownUser(row.createdBy),
+      // A PM Agent filing is authored by the agent; `createdBy` (the admin who accepted the
+      // card) stays on the row for audit but is not who the board says posted it.
+      creator:
+        row.source === RoadmapOpportunitySource.PM_AGENT
+          ? { id: row.createdBy, email: '', name: PM_AGENT_AUTHOR_NAME }
+          : (users.get(row.createdBy) ?? this.unknownUser(row.createdBy)),
     }));
   }
 

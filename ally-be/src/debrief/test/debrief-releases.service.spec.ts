@@ -13,7 +13,7 @@ function build() {
       version: 2,
       status: 'retired',
       authorKind: 'human',
-      notes: 'PM agent idea (canary): x',
+      notes: 'Debrief PM agent idea (canary): x',
       promotedAt: '2026-11-05',
     },
     {

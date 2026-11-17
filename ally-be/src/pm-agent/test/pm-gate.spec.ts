@@ -71,28 +71,29 @@ describe('gate layer 1 — deterministic', () => {
     expect(gate(rec({ size: 'L' })).pass).toBe(false);
   });
 
-  it('fails libs/-only and mobile changes', () => {
+  it('fails a roadmap entry whose product goal is not on the roadmap', () => {
+    const goals = ['Engagement', 'Quality'];
+    expect(deterministicGate(rec(), evidence, [], goals).pass).toBe(true);
+    const off = rec({
+      opportunity: { ...recFor(0, [E1]).opportunity, productGoal: 'Growth' },
+    });
+    expect(
+      deterministicGate(off, evidence, [], goals).reasons.join(),
+    ).toContain('opportunity.productGoal');
+  });
+
+  it('no longer refuses mobile or libs/ work: the agent proposes, it does not ship', () => {
     expect(
       gate(
         rec({
-          repos: ['ally-web'],
-          plan: {
-            ...recFor(0, [E1]).plan,
-            files: ['ally-web/libs/ui-shared/src/x.ts'],
-          },
-        }),
-      ).reasons.join(),
-    ).toContain('libs/-only');
-    expect(
-      gate(
-        rec({
+          repos: ['ally-mobile'],
           plan: {
             ...recFor(0, [E1]).plan,
             files: ['ally-mobile/lib/main.dart'],
           },
         }),
-      ).reasons.join(),
-    ).toContain('ally-mobile');
+      ).pass,
+    ).toBe(true);
   });
 
   it('fails tenant names, secrets and contact details (a public PRD must not need scrubbing)', () => {

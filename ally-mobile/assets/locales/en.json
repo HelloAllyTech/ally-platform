@@ -765,6 +765,13 @@
       "prompts_other": "{{count}} prompts",
       "roleplay": "Role play",
       "minScore": "min score {{score}}%",
+      "requireScore": "Score at least {{score}}",
+      "requireDuration": "At least {{duration}}",
+      "requireScoreAndDuration": "Score at least {{score}} · at least {{duration}}",
+      "requireParticipation": "Completes when you start it",
+      "durationMin": "{{min}} min",
+      "durationSec": "{{sec}} sec",
+      "durationMinSec": "{{min}} min {{sec}} sec",
       "case": "Case",
       "game": "Game · just for fun",
       "branchingScenario": "Scenario quiz",
@@ -875,7 +882,12 @@
       "assessmentNotice": "You get one attempt. When you end the role play, your attempt is submitted and can't be retaken.",
       "assessmentSubmitted": "Submitted on {{date}}",
       "assessmentNotPassed": "This attempt didn't meet the passing requirements.",
-      "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer."
+      "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer.",
+      "lastAttemptTitle": "Your last attempt didn't complete this role play",
+      "lastAttemptDuration": "It lasted {{actual}}; this role play needs at least {{required}}.",
+      "lastAttemptScore": "You scored {{score}}; this role play needs at least {{required}}.",
+      "lastAttemptScoreUnknown": "It didn't reach the minimum score of {{required}}.",
+      "lastAttemptFooter": "Try again when you're ready."
     },
     "quiz": {
       "intro": {

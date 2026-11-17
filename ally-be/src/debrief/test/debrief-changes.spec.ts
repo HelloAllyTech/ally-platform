@@ -46,7 +46,7 @@ describe('a change in the owner’s words (v2 Changes)', () => {
             trial: { status: 'passed', decidedAt: '2026-11-11' },
             ask: {
               kind: 'low_confidence',
-              waitsBecause: 'The PM agent is not sure about it.',
+              waitsBecause: 'The Debrief PM agent is not sure about it.',
             },
           },
         }),
@@ -408,7 +408,7 @@ describe('the ladder runs on its own (v2 A3)', () => {
     expect(await off.svc.advance(ID)).toBe('started_canary');
   });
 
-  it('nothing moves while the PM agent is switched off, for hand-offs, budgets or a stopped change', async () => {
+  it('nothing moves while the Debrief PM agent is switched off, for hand-offs, budgets or a stopped change', async () => {
     expect(
       await pm(passedTrial, { pmAgentEnabled: false }).svc.advance(ID),
     ).toBe('nothing');

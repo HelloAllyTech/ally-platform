@@ -167,7 +167,7 @@ describe("Builder mission control — archive", () => {
       render(<Builder />, { wrapper: MemoryRouter });
       expect(screen.getByText("From the PM agent")).toBeInTheDocument();
       expect(screen.getAllByTestId("builder-session-requested-for")).toHaveLength(1);
-      expect(screen.getByText("Requested for the PM agent")).toBeInTheDocument();
+      expect(screen.getByText("Requested for the Debrief PM agent")).toBeInTheDocument();
     });
   });
 

@@ -10,9 +10,11 @@ import { RoadmapBuilderService } from './roadmap-builder.service';
  * something already live in production, and a person had to notice and move it
  * by hand. `openSession` now marks the start; this marks the finish.
  *
- * Every 15 minutes rather than every 5: nothing here is urgent, the answer only
- * changes when a release lands, and the 5-minute slot already carries Builder's
- * own reconcile.
+ * Every 15 minutes rather than every 5: this is the full release-tracking
+ * pass (ItemReleaseService.reconcile — linking pull requests, reading their
+ * files, comparing against releases). The 5-minute slot carries only its quick
+ * re-check of waiting rows (ItemReleaseSchedulerRegistrationService), so a
+ * finished release still shows within minutes.
  */
 @Injectable()
 export class RoadmapBuilderSchedulerRegistrationService implements OnModuleInit {

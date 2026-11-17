@@ -92,6 +92,11 @@ vi.mock("@components/action-confirmation-popup", () => ({
     ) : null,
 }));
 
+// Roadmap v2 P6's switch-on section has its own test (Roadmap/__tests__/RoadmapSwitchOnSection).
+vi.mock("../../Roadmap/cutover/RoadmapSwitchOnSection", () => ({
+  RoadmapSwitchOnSection: () => <div data-testid="roadmap-switch-on" />,
+}));
+
 const updateSettings = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 let settingsResult: any;
 let repoMapsResult: any;
@@ -108,6 +113,8 @@ vi.mock("@api", () => ({
   useUpdateBuilderSettingsMutation: () => [updateSettings, { isLoading: false }],
 }));
 
+// eslint-disable-next-line import/first
+import { AgentEmbedContext } from "../agentEmbed";
 // eslint-disable-next-line import/first
 import { BuilderSettings } from "../BuilderSettings";
 
@@ -138,6 +145,19 @@ describe("BuilderSettings", () => {
         ],
       },
     };
+  });
+
+  it("carries the Roadmap switch-on section on its own page only", () => {
+    const { unmount } = render(<BuilderSettings />);
+    expect(screen.getByTestId("roadmap-switch-on")).toBeInTheDocument();
+    unmount();
+    // Embedded in Roadmap → Settings, which renders the section itself.
+    render(
+      <AgentEmbedContext.Provider value={{ embedded: true, readOnly: false }}>
+        <BuilderSettings />
+      </AgentEmbedContext.Provider>,
+    );
+    expect(screen.queryByTestId("roadmap-switch-on")).not.toBeInTheDocument();
   });
 
   it("shows a skeleton while loading", () => {

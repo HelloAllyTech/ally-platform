@@ -18,6 +18,7 @@ const FILES: Record<string, string> = {
   debrief_analyst_system: 'debrief/analyst_system.txt',
   debrief_progress_reader_system: 'debrief/progress_reader_system.txt',
   debrief_progress_system: 'debrief/progress_system.txt',
+  debrief_guidance_agent_system: 'debrief/guidance_agent_system.txt',
   debrief_writer_system: 'debrief/writer_system.txt',
   debrief_reviser_system: 'debrief/reviser_system.txt',
   debrief_quality_rubric: 'debrief_quality/rubric.txt',

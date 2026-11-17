@@ -59,6 +59,12 @@ export const recommendationPayload = (over: Record<string, any> = {}) => ({
   alternativesDropped: ['A push notification'],
   repos: ['ally-web'],
   evidenceIds: ['0b7e7c1e-2f7a-4a43-9a6b-2a6d1f1c0001'],
+  opportunity: {
+    description:
+      'Learners starting a roleplay cannot see their streak, so the habit loop is invisible at the moment it matters. Why it matters: next-day return is the engagement number we steer by.',
+    productGoal: 'Engagement',
+    effort: 's',
+  },
   ...over,
 });
 
@@ -248,9 +254,9 @@ export class FakeOutboxRepository {
     const id = `ob-${row.cardId}`;
     this.rows.set(id, {
       id,
-      action: PmOutboxAction.BUILD,
+      action: PmOutboxAction.FILE_ROADMAP,
       status: PmOutboxStatus.PENDING,
-      step: PmOutboxStep.CREATE_SESSION,
+      step: PmOutboxStep.FILE_ROADMAP,
       attempts: 0,
       lastError: null,
       lockedUntil: null,

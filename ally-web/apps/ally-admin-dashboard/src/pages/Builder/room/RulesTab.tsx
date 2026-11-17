@@ -13,6 +13,8 @@ import {
 import { en } from "@constants";
 import { BuilderRule } from "@types";
 
+import { useAgentEmbed } from "../agentEmbed";
+
 const strings = en.builder.room.rules;
 const kindLabels = en.builder.decisions.kinds;
 
@@ -50,6 +52,7 @@ export const RulesTab: React.FC<RulesTabProps> = ({
   const [createRule] = useCreateBuilderRuleMutation();
   const [dismiss] = useDismissBuilderRuleProposalMutation();
   const [menu, setMenu] = useState<string | null>(null);
+  const { readOnly } = useAgentEmbed();
 
   const areas = useMemo(() => {
     const map = new Map<string, BuilderRule[]>();
@@ -78,16 +81,18 @@ export const RulesTab: React.FC<RulesTabProps> = ({
           <h1 className="text-[28px] font-normal leading-9">{strings.title}</h1>
           <p className="mt-1 max-w-[62ch] text-sm text-typography-600">{strings.subtitle}</p>
         </div>
-        <button
-          type="button"
-          className="min-h-[40px] border border-typography-900 px-4 text-sm"
-          onClick={onNewRule}
-        >
-          {strings.newRule}
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            className="min-h-[40px] border border-typography-900 px-4 text-sm"
+            onClick={onNewRule}
+          >
+            {strings.newRule}
+          </button>
+        )}
       </header>
 
-      {proposals.length > 0 && (
+      {proposals.length > 0 && !readOnly && (
         <section aria-label={strings.proposals.title} className="flex flex-col gap-2">
           <h2 className="text-xs font-semibold tracking-wide text-typography-600">
             {strings.proposals.title}
@@ -149,7 +154,7 @@ export const RulesTab: React.FC<RulesTabProps> = ({
       ) : isLoading ? null : !areas.length ? (
         <div className="max-w-[60ch] text-sm text-typography-700">
           <p>{strings.emptyBody}</p>
-          {lastHistoryId && (
+          {lastHistoryId && !readOnly && (
             <button
               type="button"
               className="mt-4 min-h-[40px] border border-typography-900 px-4"
@@ -209,25 +214,29 @@ export const RulesTab: React.FC<RulesTabProps> = ({
                         role="menu"
                         className="absolute right-0 top-10 z-20 flex min-w-[160px] flex-col border border-border-light bg-white text-sm text-typography-900 shadow"
                       >
-                        <button
-                          role="menuitem"
-                          type="button"
-                          className="px-4 py-2.5 text-left hover:bg-neutral-100"
-                          onClick={() => {
-                            setMenu(null);
-                            onEdit(rule);
-                          }}
-                        >
-                          {strings.edit}
-                        </button>
-                        <button
-                          role="menuitem"
-                          type="button"
-                          className="px-4 py-2.5 text-left hover:bg-neutral-100"
-                          onClick={() => toggle(rule)}
-                        >
-                          {rule.active ? strings.turnOff : strings.turnOn}
-                        </button>
+                        {!readOnly && (
+                          <>
+                            <button
+                              role="menuitem"
+                              type="button"
+                              className="px-4 py-2.5 text-left hover:bg-neutral-100"
+                              onClick={() => {
+                                setMenu(null);
+                                onEdit(rule);
+                              }}
+                            >
+                              {strings.edit}
+                            </button>
+                            <button
+                              role="menuitem"
+                              type="button"
+                              className="px-4 py-2.5 text-left hover:bg-neutral-100"
+                              onClick={() => toggle(rule)}
+                            >
+                              {rule.active ? strings.turnOff : strings.turnOn}
+                            </button>
+                          </>
+                        )}
                         <button
                           role="menuitem"
                           type="button"

@@ -263,7 +263,7 @@ export class DebriefBaselineService implements OnModuleInit {
       });
     }
     this.logger.info(
-      `[debrief] PM agent tuned ${picked.length} test setting(s): ${picked.join(', ')}`,
+      `[debrief] Debrief PM agent tuned ${picked.length} test setting(s): ${picked.join(', ')}`,
     );
     return picked.length;
   }

@@ -36,10 +36,9 @@ export const usePmAgentControls = () => {
     [updateSettings],
   );
 
-  const resumeBuilds = useCallback(() => save({ pauseAutoBuild: false }, copy.resumed), [save]);
   const turnOn = useCallback(() => save({ enabled: true }), [save]);
 
-  return { runNow, running, save, saving, resumeBuilds, turnOn };
+  return { runNow, running, save, saving, turnOn };
 };
 
 /** `navigator.onLine`, kept current. */

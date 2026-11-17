@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { PlanNotification } from '../entity/plan-notification.entity';
 import { PlanNotificationKind } from '../enum/product-planning.enum';
+import { RoadmapInboxService } from './roadmap-inbox.service';
 
 /**
  * In-app notices for plan authors and leads (see PlanNotification).
@@ -17,6 +18,12 @@ export class PlanNotificationService {
   constructor(
     @InjectRepository(PlanNotification)
     private readonly repository: Repository<PlanNotification>,
+    /**
+     * Roadmap v2's one inbox (plans/roadmap-builder-merge §5.6). Dual-written
+     * beside this table, which stays the one My ideas reads until cutover.
+     * Never throws.
+     */
+    @Optional() private readonly inbox?: RoadmapInboxService,
   ) {}
 
   async notify(
@@ -32,14 +39,25 @@ export class PlanNotificationService {
       });
       if (unread) {
         await this.repository.update({ id: unread.id }, { message });
-        return;
+      } else {
+        await this.repository.save(
+          this.repository.create({
+            recipientUserId,
+            sessionId,
+            kind,
+            message,
+          }),
+        );
       }
-      await this.repository.save(
-        this.repository.create({ recipientUserId, sessionId, kind, message }),
-      );
     } catch {
       // Best effort by design; see the class comment.
     }
+    await this.inbox?.fromPlanNotification(
+      recipientUserId,
+      sessionId,
+      kind,
+      message,
+    );
   }
 
   listFor(recipientUserId: number, limit = 50): Promise<PlanNotification[]> {

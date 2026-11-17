@@ -468,9 +468,18 @@ export type TrackItemContent =
   | BranchingScenarioContent
   | BucketSortContent;
 
+/**
+ * Which gates complete a roleplay item. Absent on the server reads as
+ * SCORE_AND_DURATION, the rule every roleplay had before this existed.
+ */
+export type RoleplayCompletionLogic = "SCORE" | "DURATION" | "SCORE_AND_DURATION" | "PARTICIPATION";
+
 export interface CompletionCriteria {
+  /** Roleplay only: which of minScore / minDurationSeconds apply. */
+  completionLogic?: RoleplayCompletionLogic;
   /** Roleplay, 0 or above (score depends on configured behaviours and can exceed 100). */
   minScore?: number;
+  /** Roleplay: total seconds. Absent = the platform default; 0 = no minimum. */
   minDurationSeconds?: number;
   /** Roleplay: one attempt only, locked once submitted. Sent only when on. */
   assessmentMode?: boolean;

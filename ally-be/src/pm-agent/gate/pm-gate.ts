@@ -1,9 +1,6 @@
 import { validateCardPayload } from '../dto/pm-card-payload.dto';
 import { PmCardKind, PmCardStatus } from '../enum/pm-agent.enum';
-import {
-  PM_DEDUPE,
-  PM_RELEASABLE_REPOS,
-} from '../constants/pm-agent-pipeline.constants';
+import { PM_DEDUPE } from '../constants/pm-agent-pipeline.constants';
 import {
   PmCandidate,
   PmDedupeItem,
@@ -43,18 +40,24 @@ export function candidateText(candidate: Pick<PmCandidate, 'payload'>): string {
 /**
  * Gate layer 1 — deterministic, cheapest first (plan §6). Pure: same input, same verdict.
  *
- *  - the payload contract (lengths, enums, unknown keys);
+ *  - the payload contract (lengths, enums, unknown keys; an optional `metricRef` must name a
+ *    measurable-metric catalog entry with that entry's params — impact/metric-catalog.ts);
  *  - every cited evidence id exists AND was fetched in this run;
- *  - repos have a release pipeline, and the change is not `libs/`-only or mobile;
+ *  - the roadmap entry names a product goal that exists on the roadmap right now;
  *  - nothing a public-repo scrubber would redact (tenant names, contact details, secrets,
- *    internal hosts, long quoted user content): a card is compiled into a public PRD, so a
- *    candidate that needs redacting is dropped, not silently edited;
- *  - nothing instruction-shaped (a card is Builder's brief; injected text must not ride along).
+ *    internal hosts, long quoted user content): an accepted card is filed to the roadmap,
+ *    which is published, so a candidate that needs redacting is dropped, not silently edited;
+ *  - nothing instruction-shaped (a card becomes a roadmap entry other agents read).
+ *
+ * The release-pipeline rules (no ally-mobile, no libs/-only) went with Accept → Builder:
+ * the agent proposes, it no longer ships.
  */
 export function deterministicGate(
   candidate: PmCandidate,
   runEvidence: ReadonlyMap<string, PmEvidenceRef>,
   tenantNames: string[],
+  /** The roadmap's product goal names. Omitted = not checked (unit tests of other rules). */
+  productGoals?: readonly string[],
 ): PmGateVerdict {
   const reasons = [...validateCardPayload(candidate.kind, candidate.payload)];
   const p = candidate.payload ?? {};
@@ -69,21 +72,15 @@ export function deterministicGate(
         );
       }
     }
-    const repos: string[] = Array.isArray(p.repos) ? p.repos : [];
-    for (const repo of repos) {
-      if (!(PM_RELEASABLE_REPOS as readonly string[]).includes(repo)) {
-        reasons.push(`repos: ${repo} has no release pipeline`);
-      }
-    }
-    const files: string[] = Array.isArray(p.plan?.files) ? p.plan.files : [];
-    if (files.some((file) => /(^|\/)ally-mobile(\/|$)/.test(file))) {
-      reasons.push('repos: touches ally-mobile, which has no release pipeline');
-    }
+    const goal = p.opportunity?.productGoal;
     if (
-      files.length > 0 &&
-      files.every((file) => /^(?:ally-web\/)?libs\//.test(file))
+      productGoals &&
+      typeof goal === 'string' &&
+      !productGoals.includes(goal)
     ) {
-      reasons.push('repos: libs/-only change has no release of its own');
+      reasons.push(
+        `opportunity.productGoal: "${goal.slice(0, 60)}" is not a roadmap product goal`,
+      );
     }
   }
 
@@ -113,7 +110,8 @@ const BLOCKING_CARD_STATUSES = new Set<string>(
 
 /**
  * Gate layer 2 — dedupe (plan §6). Against open/accepted/shipped cards, rejected cards (with
- * the new-evidence rule), roadmap opportunities and Bug Hunter findings; and within the batch.
+ * the new-evidence rule), the whole roadmap (every stage, archived included: the agent learns
+ * from the roadmap and never re-proposes it) and Bug Hunter findings; and within the batch.
  *
  * A near-duplicate of a REJECTED card passes only when it cites evidence the rejected card did
  * not (a different source/label) — the "stated new evidence delta". A revision is never a
@@ -143,13 +141,24 @@ export function dedupeGate(
         reasons: [`duplicate: same question as ${item.label}`],
       };
     }
-    if (similarity(text, item.text) < threshold) continue;
     if (item.type === 'opportunity') {
+      const drafted = String(candidate.payload?.opportunity?.description ?? '');
+      const same =
+        similarity(text, item.text) >= threshold ||
+        (drafted.length > 0 &&
+          similarity(drafted, item.text) >=
+            PM_DEDUPE.ROADMAP_DESCRIPTION_THRESHOLD);
+      if (!same) continue;
       return {
         pass: false,
-        reasons: [`duplicate: already on the roadmap as ${item.label}`],
+        reasons: [
+          item.stage === 'archived'
+            ? `duplicate: the roadmap already archived this idea as ${item.label}`
+            : `duplicate: already on the roadmap as ${item.label}`,
+        ],
       };
     }
+    if (similarity(text, item.text) < threshold) continue;
     if (item.type === 'finding') {
       return {
         pass: false,

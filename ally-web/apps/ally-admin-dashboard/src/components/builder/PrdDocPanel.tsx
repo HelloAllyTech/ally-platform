@@ -21,11 +21,7 @@ import { CitedText, citationMarkdownComponents, linkCitations } from "../context
 import { downloadPrdMarkdown, downloadPrdPdf, PrdExportMeta } from "./prdExport";
 import { PrdReviewFindings } from "./PrdReviewFindings";
 import { ReadinessRing } from "./ReadinessRing";
-import {
-  BUILDER_DURATION,
-  BUILDER_EASING,
-  prefersReducedMotion,
-} from "../../pages/Builder/builderMotion";
+import { BUILDER_DURATION, BUILDER_EASING, prefersReducedMotion } from "../../motion/builderMotion";
 
 /**
  * Every list in this panel is written by the agent, so none of it can be

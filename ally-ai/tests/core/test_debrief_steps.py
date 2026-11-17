@@ -16,6 +16,7 @@ from app.core.debrief.schemas import (
     ProgressReading,
 )
 from app.core.debrief_quality.schemas import DimensionScore
+from tests.core.debrief_graph.fakes import FOUNDATIONAL_FRAMEWORK as FOUNDATIONAL
 
 TRANSCRIPT = [
     TranscriptTurn(turn_index=1, role="counselor", text="What brings you in?"),
@@ -481,7 +482,7 @@ async def test_writer_may_use_the_cohort_only_to_normalise(dispatch_returns):
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT, cohort=cohort)
     prompt = calls["prompt"]
-    assert prompt.count("<cohort>") == 1 and "Never compare this trainee" in prompt
+    assert prompt.count("<cohort>") == 1 and "Never compare this learner" in prompt
     assert "few trainees show this" in prompt
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
@@ -507,7 +508,7 @@ async def test_analyst_tags_behaviours_for_skill_coverage(dispatch_returns):
     from app.core.debrief.steps import analyse
 
     calls = dispatch_returns(EvidenceMap())
-    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro", framework=FOUNDATIONAL)
     assert "SKILL COVERAGE" in calls["prompt"]
     b = BehaviourEvidence(
         skill="reflections",

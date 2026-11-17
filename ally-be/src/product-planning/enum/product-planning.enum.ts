@@ -48,6 +48,26 @@ export enum PlanEventKind {
   OUTCOME_REVIEWED = 'outcome_reviewed',
   CLOSED = 'closed',
   REOPENED = 'reopened',
+  /**
+   * An inline edit on the Roadmap v2 idea page (§4.11): title, goal, summary,
+   * lead or planned month. `detail` is { field, from?, to? }.
+   */
+  ITEM_EDITED = 'item_edited',
+  /** The Owner accepted, declined or reopened a submitted idea (D10). detail: { decision, undo? }. */
+  REVIEWED = 'reviewed',
+  /** The Owner picked or changed the lead (D11). detail: { from, to }. */
+  LEAD_ASSIGNED = 'lead_assigned',
+  /** The lead handed the idea back to the Owner (D11). detail: { note? }. */
+  LEAD_HANDED_BACK = 'lead_handed_back',
+  /** Start planning: the plan interview begins in the same session (§2.1a). */
+  PLANNING_STARTED = 'planning_started',
+  /** "Use this answer": the settler chose between conflicting answers (D13). */
+  ANSWER_SETTLED = 'answer_settled',
+  /**
+   * The build brief went to Claude Code (D18, §4.5b). `detail` is { tool }.
+   * The idea's PRs carrying its code then drive release (linkDrivesRelease).
+   */
+  EXTERNAL_BUILD = 'external_build',
 }
 
 /** What a plan notification says (plan_notifications.kind). */
@@ -69,4 +89,36 @@ export enum PlanNotificationKind {
   AUTHOR_ANSWERED = 'author_answered',
   CEILING_WARNING = 'ceiling_warning',
   CHECK_FINDING = 'check_finding',
+}
+
+/**
+ * What a Roadmap v2 notification is about (roadmap_notifications.kind): the
+ * §4.8 events, plus `budget` (a ceiling reached) and `activity` (anything
+ * else an older writer reports, delivered to its original recipient only).
+ */
+export enum RoadmapNotificationKind {
+  SUBMITTED = 'submitted',
+  ACCEPTED = 'accepted',
+  DECLINED = 'declined',
+  LEAD_ASSIGNED = 'lead_assigned',
+  ASSIGNED_TO_YOU = 'assigned_to_you',
+  HANDED_BACK = 'handed_back',
+  AGENT_QUESTION = 'agent_question',
+  MENTION = 'mention',
+  ANSWERS_CONFLICT = 'answers_conflict',
+  DECISION_NEEDED = 'decision_needed',
+  SHIPPED = 'shipped',
+  OUTCOME_REVIEWED = 'outcome_reviewed',
+  RELEASE_HELD = 'release_held',
+  RELEASE_FAILED = 'release_failed',
+  BREAKER_OPEN = 'breaker_open',
+  BUDGET = 'budget',
+  ACTIVITY = 'activity',
+}
+
+/** How closely someone follows one idea (§4.8). */
+export enum RoadmapWatchLevel {
+  ALL = 'all',
+  MILESTONES = 'milestones',
+  NONE = 'none',
 }

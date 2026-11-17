@@ -6,8 +6,12 @@ import type { PmCardCategory, PmReasonChip, PmRiskLevel } from "@types";
  */
 export const copy = {
   title: "PM Agent",
-  subtitle: "An AI product manager that proposes a few changes a day for you to decide on.",
+  subtitle:
+    "An AI product manager that proposes a few ideas a day. The ones you accept go on the roadmap.",
   views: { review: "Review", tracking: "Tracking", agent: "Agent" },
+  agentBadge: (n: number) => `Agent (${n})`,
+  agentBadgeLabel: (n: number) =>
+    `Agent, ${n} lesson${n === 1 ? "" : "s"} waiting for you to confirm`,
   viewSwitcher: "PM Agent views",
   today: (toReview: number, needsYou: number) =>
     `Today · ${toReview} to review${needsYou > 0 ? ` · ${needsYou} needs you` : ""}`,
@@ -68,24 +72,23 @@ export const copy = {
   evidenceStale: (when: string) => `Data from ${when}. It may be out of date.`,
   reviewedByCritic: "Plan checked by the quality gate",
 
-  accept: "Accept and build",
-  shipsAuto: "Ships to production automatically",
-  acceptMenu: "More ways to accept",
-  downloadPlan: "Download plan.md",
+  accept: "Accept and add to roadmap",
+  filesToRoadmap: "Goes on the roadmap as posted by Product Manager Agent",
+  notFileable: "Written before roadmap filing, so it can't be added. Reject it or give feedback.",
   reject: "Reject",
   feedback: "Give feedback",
-  confirmTitle: (risk: string) => `This card is ${risk.toLowerCase()}.`,
-  confirmBody: (why: string) =>
-    `${why ? `${why} ` : ""}Build and release it to production automatically?`,
-  confirmYes: "Build and release",
-  confirmNo: "Cancel",
 
-  acceptedToast: (title: string) => `Accepted: ${title}`,
+  roadmapEntry: "Roadmap entry",
+  roadmapEntryTip:
+    "Accepting adds exactly this text to the roadmap. The agent checked it against the roadmap's filing checklist.",
+  roadmapGoal: (goal: string) => `Goal: ${goal}`,
+  roadmapEffort: (effort: string) => `Size: ${effort.toUpperCase()}`,
+  readinessMet: "Meets the roadmap's filing checklist",
+
+  acceptedToast: (title: string) => `Accepted: ${title}. Adding it to the roadmap.`,
   undo: "Undo",
   undone: "Accept undone. The card is back in your queue.",
-  undoTooLate: "Too late to undo. The build has started.",
-  downloadedToast: "Plan downloaded. The card is now handed off.",
-  downloadFailed: "Couldn't download the plan. The card is handed off; try again from Tracking.",
+  undoTooLate: "Too late to undo. It's being added to the roadmap.",
   rejectedToast: (title: string) => `Rejected: ${title}`,
   reasonPrompt: "Tell the agent why (optional)",
   reasonSaved: "Reason saved.",
@@ -131,18 +134,13 @@ export const copy = {
 
   needsYouTitle: "Needs you",
   retry: "Retry",
-  openPr: "Open PR",
+  fileAnyway: "Add to roadmap anyway",
+  filedAnyway: "Adding it to the roadmap anyway.",
+  duplicatesLabel: "Possible duplicates already on the roadmap",
   dismiss: "Dismiss",
-  retried: "Retrying. The card is queued again.",
+  retried: "Trying again to add it to the roadmap.",
   dismissed: "Dismissed.",
   actionFailed: "Couldn't do that. Try again.",
-
-  breakerTitle: "Builds are paused",
-  breakerBody:
-    "Several builds in a row failed, or a release failed its health check. The agent will not start new builds until you resume.",
-  breakerResume: "Resume builds",
-  pausedAutoBuild: "Auto-build is paused. Accepted cards wait in Tracking until you resume.",
-  resumed: "Builds resumed.",
 
   setupTitle: "Set up the PM Agent",
   setupBody:
@@ -164,11 +162,8 @@ export const copy = {
   stateDisabled: "The agent is off.",
   stateDisabledBody: "Nothing runs and nothing is spent while it is off.",
   turnOn: "Turn on",
-  statePaused: "The agent is paused.",
   stateBudget: "The monthly budget is used up.",
   stateBudgetBody: "Raise the budget under Agent to let it run again. It resets next month.",
-  statePausedBody: "Resume it to let the next run go ahead.",
-  resume: "Resume",
   openSettings: "Open settings",
   runFailedTitle: "The last run failed",
   runFailedBody: "No cards were lost. You can try again.",
@@ -187,7 +182,7 @@ export const copy = {
   keys: [
     { keys: ["J", "↓"], label: "Next card" },
     { keys: ["K", "↑"], label: "Previous card" },
-    { keys: ["A"], label: "Accept and build" },
+    { keys: ["A"], label: "Accept and add to roadmap" },
     { keys: ["R"], label: "Reject" },
     { keys: ["F"], label: "Give feedback" },
     { keys: ["1", "–", "4"], label: "Pick a question option" },
@@ -210,16 +205,25 @@ export const copy = {
   },
 
   tracking: {
-    empty: "Nothing accepted yet. Cards you accept show up here with their progress.",
+    empty: "Nothing accepted yet. Cards you accept show up here as they move through the roadmap.",
     groups: {
       needsYou: "Needs you",
-      inProgress: "In progress",
-      shipped: "Shipped",
-      other: "Handed off and other",
+      inProgress: "On the roadmap",
+      shipped: "Released",
+      other: "Archived and other",
     },
     emptyGroup: "Nothing here.",
-    steps: ["Queued", "Designing", "Building", "PR open", "Merged", "Released"],
-    stepsLabel: "Build progress",
+    steps: ["Accepted", "On the roadmap", "Prioritised", "Released"],
+    stepsLabel: "Roadmap progress",
+    stage: {
+      new: "New",
+      prioritised: "Prioritised",
+      released: "Released",
+      archived: "Archived",
+    } as Record<string, string>,
+    opportunityFallback: "Roadmap opportunity",
+    removedFromRoadmap: (code: string | null) =>
+      `${code ?? "The opportunity"} was removed from the roadmap.`,
     stepDone: "done",
     stepCurrent: "current step",
     stepNext: "not reached",
@@ -228,21 +232,43 @@ export const copy = {
     prState: "Open PR",
     loadError: "Couldn't load tracking.",
     noRevert: "",
+    impact: {
+      label: "Impact",
+      notMeasurable: "Impact not measurable",
+      notMeasurableTip:
+        "The agent couldn't tie this change to a metric it can read, so it won't check the result.",
+      baseline: (v: string) => `Baseline ${v}`,
+      baselineTip: "The metric over the 14 days before release.",
+      verdict: { improved: "Improved", flat: "Flat", worse: "Worse" } as Record<string, string>,
+      verdictIcon: { improved: "▲", flat: "■", worse: "▼" } as Record<string, string>,
+      checksLabel: "Impact checks",
+      pending: (rel: string) => `Due ${rel}`,
+      insufficient: "Not enough data to tell",
+      unavailable: "Couldn't read this metric",
+      measured: (v: string) => v,
+      measuredNoValue: "Measured",
+      day: (d: number) => `+${d} d`,
+      waiting: "Checking 14 and 30 days after release",
+    },
   },
 
   agent: {
     sections: { settings: "Settings", memory: "Memory", history: "History", health: "Health" },
+    lessonsEnabled: "Weekly lessons",
+    lessonsEnabledTip:
+      "Once a week the agent looks back over your decisions and writes down patterns it can use. Off means it stops learning new lessons; active ones stay in use.",
+    lessonsWeekday: "Lesson day",
+    lessonsWeekdayTip: "The weekday the agent reviews your decisions, in India time.",
+    weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    invalidWeekday: "Pick a day of the week.",
     switcher: "Agent sections",
     enabled: "Agent on",
     enabledTip: "The kill switch. Off means no runs and no spend.",
-    pauseAutoBuild: "Pause auto-build",
-    pauseAutoBuildTip:
-      "Stops the agent from starting new builds from accepted cards. Cards you accept wait until you resume. Builds already running finish.",
     slackNotify: "Notify in Slack",
     slackNotifyTip: "Posts a short note to Slack when cards need a decision.",
     budget: "Monthly budget (USD)",
     budgetTip:
-      "Covers the agent's own analysis. Builds are counted separately. When it is used up the agent stops until next month.",
+      "Covers the agent's own analysis. When it is used up the agent stops until next month.",
     budgetMeter: (spent: string, total: string) => `${spent} of ${total} used this month`,
     budgetReserved: (r: string) => `${r} reserved for runs in progress`,
     queueCap: "Queue cap",
@@ -273,7 +299,51 @@ export const copy = {
     memoryFailed: "Couldn't update memory.",
     memoryInactive: "Not in use",
     lessonsTitle: "What I've learned",
-    lessonsEmpty: "No lessons yet. They appear once the agent has seen enough of your decisions.",
+    lessonsEmpty: "Lessons appear after a few weeks of decisions",
+    lessonsIntro:
+      "Patterns the agent found in your decisions. Active lessons shape what it proposes.",
+    lessonGroups: {
+      proposed: "Proposed (needs you)",
+      active: "Active",
+      expired: "Expired",
+    },
+    lessonScopeLabel: (scope: string, category?: string) => {
+      if (scope === "global") return "All cards";
+      const name = (category ?? "").replace(/_/g, " ");
+      const kind = scope === "lane" ? "Area" : "Category";
+      return name ? `${kind}: ${name}` : kind;
+    },
+    lessonSupport: (n: number, pct: string) => `Based on ${n} decisions (${pct} consistent)`,
+    lessonEvalPassed: (n: number, before: string, after: string) =>
+      `Checked against ${n} past decisions: agreement ${before} to ${after}`,
+    lessonEvalFailed: (n: number, before: string, after: string) =>
+      `Checked against ${n} past decisions: agreement ${before} to ${after}, so it was not activated`,
+    lessonEvalNone: "Not checked yet",
+    lessonManual: "Edited by you",
+    lessonKeep: "Keep",
+    lessonKeepTip:
+      "Makes this lesson active so the agent follows it. It needs your confirmation because it changes what whole groups of cards the agent proposes, or touches risk or size limits.",
+    lessonKeepTipPlain: "Makes this lesson active so the agent follows it.",
+    lessonConfirmed: "Lesson kept.",
+    lessonConfirmFailed: "Couldn't keep this lesson. It may have changed; reload and try again.",
+    lessonEdit: "Edit",
+    lessonSave: "Save",
+    lessonCancel: "Cancel",
+    lessonRemove: "Remove",
+    lessonRemoveConfirm: "Remove lesson",
+    lessonRemovePrompt: "Remove this lesson? The agent will stop using it.",
+    lessonEmptyText: "Write the lesson before saving.",
+    lessonSaved: "Lesson saved.",
+    lessonRemoved: "Lesson removed.",
+    lessonFailed: "Couldn't update the lesson.",
+    lessonsRun: "Run now",
+    lessonsRunning: "Running",
+    lessonsRunTip:
+      "Reviews your last 90 days of decisions now instead of waiting for the weekly run. It uses part of the monthly budget.",
+    lessonsRunStarted: "The agent started reviewing your decisions.",
+    lessonsRunNotStarted: (reason?: string) =>
+      reason ? `The review didn't start: ${reason}` : "The review didn't start.",
+    lessonsRunFailed: "Couldn't start the review.",
     historyEmpty: "No decided cards yet.",
     historyIntro: "Cards you rejected, answered, skipped or sent feedback on.",
     historyOutcome: {
@@ -292,6 +362,11 @@ export const copy = {
       shippedRate: "Shipped rate",
       costPerAcceptedCardUsd: "Cost per accepted card",
       repeatedRejectionRate: "Repeated rejection rate",
+      impactMeasuredCount: "Changes with measured impact",
+      impactImprovedRate: "Changes that improved their metric",
+      activeLessons: "Active lessons",
+      proposedLessons: "Lessons waiting for you",
+      lessonAgreementDelta: "Lessons effect on agreement",
     },
     metricTips: {
       acceptRate7d: "Share of decided cards you accepted in the last 7 days.",
@@ -300,6 +375,13 @@ export const copy = {
       costPerAcceptedCardUsd: "Agent spend divided by cards you accepted.",
       repeatedRejectionRate:
         "Share of rejections on ideas close to ones you rejected before. Lower is better.",
+      impactMeasuredCount:
+        "Shipped changes whose metric the agent has read at least once after release.",
+      impactImprovedRate: "Share of measured changes whose metric moved the right way.",
+      activeLessons: "Lessons the agent is following now.",
+      proposedLessons: "Lessons that need your confirmation before the agent follows them.",
+      lessonAgreementDelta:
+        "Average change in how often the agent's review agrees with your real decisions, from adding lessons. Above zero is better.",
     },
     spendByLane: "Spend by area",
     loadError: "Couldn't load settings.",

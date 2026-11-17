@@ -17,7 +17,8 @@ import { ProductUpdatePipelineService } from './product-update-pipeline.service'
  *  - hourly, the digest — which sends only in its business-timezone hour.
  *
  * Both no-op while `PRODUCT_UPDATES_ENABLED` is off (the digest also while no
- * recipients are configured).
+ * recipients are configured). A third, hourly too, sends Roadmap v2's weekly
+ * "Your ideas this week" on Mondays to the people who turned it on.
  */
 @Injectable()
 export class ProductUpdatesSchedulerRegistrationService implements OnModuleInit {
@@ -61,6 +62,30 @@ export class ProductUpdatesSchedulerRegistrationService implements OnModuleInit 
         } catch (error) {
           this.logger.error(
             `[PRODUCT-UPDATES] Digest tick failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+      },
+    );
+
+    // Roadmap v2's weekly "Your ideas this week" (§5.7b). Its own task, not
+    // gated on the pipeline switch: it reads only the Roadmap, and sends only
+    // to people who turned it on.
+    scheduledTaskRegistry.register(
+      'hourly',
+      'roadmap-weekly-ideas-digest',
+      async () => {
+        try {
+          const outcome = await this.digest.sendWeeklyIdeasIfDue();
+          if (typeof outcome === 'object') {
+            this.logger.info(
+              `[ROADMAP] Weekly ideas digest: ${outcome.sent} sent, ${outcome.skipped} with no news, ${outcome.failed} failed.`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `[ROADMAP] Weekly ideas digest tick failed: ${
               error instanceof Error ? error.message : String(error)
             }`,
           );

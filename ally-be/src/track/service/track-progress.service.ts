@@ -7,7 +7,6 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager, Not } from 'typeorm';
 import { SessionItemStatus } from 'src/common/type/common.type';
-import { meetsMinimumScore } from 'src/common/util/progression.util';
 import { AppConfigService } from 'src/config/config.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { TrackEnrollment } from '../entity/track-enrollment.entity';
@@ -17,7 +16,20 @@ import { TrackSection } from '../entity/track-section.entity';
 import { TrackTenant } from '../entity/track-tenant.entity';
 import { TrackItemProgressRepository } from '../repository/track-item-progress.repository';
 import { TrackItemRepository } from '../repository/track-item.repository';
-import { TrackItemProgressMeta, TrackItemType } from '../type/track.type';
+import {
+  RoleplayAttemptFailureReason,
+  TrackItemCompletionCriteria,
+  TrackItemCompletionLogic,
+  TrackItemProgressMeta,
+  TrackItemType,
+} from '../type/track.type';
+import {
+  parseDefaultMinDurationSeconds,
+  resolveRoleplayGate,
+  RoleplayGate,
+  roleplayCompletionLogic,
+  roleplayFailureReasons,
+} from '../util/roleplay-gate.util';
 
 export const TRACK_EVENTS = {
   ITEM_COMPLETED: 'track.item.completed',
@@ -48,7 +60,10 @@ export interface TrackRoleplayAttemptEndedEvent {
   trackEnrollmentId: string;
   trackItemId: string;
   trackItemProgressId: string;
+  /** Kept for listeners that predate failureReasons; too_short wins a tie. */
   outcome: 'completed' | 'too_short' | 'below_score';
+  /** Every gate the attempt missed; empty when it completed the item. */
+  failureReasons: RoleplayAttemptFailureReason[];
   score: number | null;
   callDurationMs: number;
 }
@@ -263,9 +278,11 @@ export class TrackProgressService {
 
   /**
    * Roleplay played inside a track has ended. Mirrors the legacy
-   * scenario-path semantics: callDuration arrives in **milliseconds**;
-   * completion requires minimum duration AND (when set) minimum score.
-   * A miss is not an error — the item stays UNLOCKED for a retry.
+   * scenario-path semantics: callDuration arrives in **milliseconds**. Which
+   * gates apply — minimum score, minimum duration, both, or neither — is the
+   * item's `completionLogic` (see resolveRoleplayGate). A miss is not an
+   * error: the item stays UNLOCKED for a retry, and the reasons are kept on
+   * the progress row so the learner can be told which bar they missed.
    */
   async handleRoleplayEnd({
     trackItemProgressId,
@@ -296,42 +313,56 @@ export class TrackProgressService {
     });
     const assessment =
       !!item?.completionCriteria?.assessmentMode && learnerTookPart;
-    const submitted = assessment
-      ? {
-          meta: {
-            ...(progress.meta ?? {}),
-            assessmentSubmittedAt: new Date().toISOString(),
-          },
-        }
+    const submittedMeta: Partial<TrackItemProgressMeta> = assessment
+      ? { assessmentSubmittedAt: new Date().toISOString() }
       : {};
 
     if (progress.status === SessionItemStatus.COMPLETED) {
       // A passed assessment a trainer reopened: the new attempt is submitted
       // too, but it never un-completes the item or replaces its score.
       if (assessment) {
-        await this.trackItemProgressRepository.update(progress.id, submitted);
+        await this.trackItemProgressRepository.update(progress.id, {
+          meta: { ...(progress.meta ?? {}), ...submittedMeta },
+        });
       }
       return { ...NOOP_RESULT, completed: true };
     }
+
+    const durationSeconds = (callDuration ?? 0) / 1000;
+    const gate = item ? this.getRoleplayGate(item.completionCriteria) : null;
+    const failureReasons = gate
+      ? roleplayFailureReasons(gate, { score, durationSeconds })
+      : [];
+    const lastAttemptMeta: Partial<TrackItemProgressMeta> =
+      gate && failureReasons.length > 0
+        ? {
+            lastRoleplayAttempt: {
+              failureReasons,
+              score: score ?? null,
+              durationSeconds: Math.round(durationSeconds),
+              requiredScore: gate.minScore,
+              requiredDurationSeconds: gate.minDurationSeconds,
+              endedAt: new Date().toISOString(),
+            },
+          }
+        : {};
+    const metaPatch = { ...submittedMeta, ...lastAttemptMeta };
 
     // In assessment mode the ended attempt is final whatever its outcome, so
     // the score is kept here too — completeItem only writes it on a pass.
     await this.trackItemProgressRepository.update(progress.id, {
       attemptCount: progress.attemptCount + 1,
-      ...(assessment ? { score: score ?? undefined, ...submitted } : {}),
+      ...(assessment ? { score: score ?? undefined } : {}),
+      ...(Object.keys(metaPatch).length > 0
+        ? { meta: { ...(progress.meta ?? {}), ...metaPatch } }
+        : {}),
     });
 
-    if (!item) {
+    if (!item || !gate) {
       this.logger.error(`Track item not found: ${progress.trackItemId}`);
       return NOOP_RESULT;
     }
 
-    const callDurationInSeconds = (callDuration ?? 0) / 1000;
-    const minDurationSeconds =
-      item.completionCriteria?.minDurationSeconds ??
-      this.configService.simulationPath
-        ?.simulationPathItemMinDurationForCompletion ??
-      0;
     const attemptEnded = (outcome: TrackRoleplayAttemptEndedEvent['outcome']) =>
       this.emitSafely(TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED, {
         userId: progress.userId,
@@ -339,30 +370,77 @@ export class TrackProgressService {
         trackItemId: progress.trackItemId,
         trackItemProgressId,
         outcome,
+        failureReasons,
         score: score ?? null,
         callDurationMs: callDuration ?? 0,
       } satisfies TrackRoleplayAttemptEndedEvent);
 
-    if (callDurationInSeconds < minDurationSeconds) {
+    if (failureReasons.length > 0) {
       this.logger.info(
-        `Track roleplay too short (${callDurationInSeconds}s < ${minDurationSeconds}s) for progress ${trackItemProgressId}`,
+        `Track roleplay did not complete progress ${trackItemProgressId}: ` +
+          `${failureReasons.join(', ')} (logic ${gate.completionLogic}, ` +
+          `${durationSeconds}s vs ${gate.minDurationSeconds ?? '-'}s, ` +
+          `score ${score ?? '-'} vs ${gate.minScore ?? '-'})`,
       );
-      attemptEnded('too_short');
+      attemptEnded(
+        failureReasons.includes(
+          RoleplayAttemptFailureReason.INSUFFICIENT_DURATION,
+        )
+          ? 'too_short'
+          : 'below_score',
+      );
       return NOOP_RESULT;
     }
 
-    const minScore = item.completionCriteria?.minScore;
-    if (!meetsMinimumScore(score, minScore)) {
-      this.logger.info(
-        `Track roleplay score ${score} below minScore ${minScore} for progress ${trackItemProgressId}`,
-      );
-      attemptEnded('below_score');
-      return NOOP_RESULT;
-    }
-
-    const result = await this.completeItem(trackItemProgressId, { score });
+    const result = await this.completeItem(trackItemProgressId, {
+      score,
+      meta: { lastRoleplayAttempt: undefined },
+    });
     attemptEnded('completed');
     return result;
+  }
+
+  /**
+   * A roleplay session has just been created for this track item. A
+   * PARTICIPATION item completes here — launching it is the whole
+   * requirement — so a learner who ends the call at once has still done it.
+   * Every other logic waits for the attempt to end.
+   */
+  async handleRoleplayLaunch(
+    trackItemProgressId: string,
+  ): Promise<CompleteItemResult> {
+    const progress = await this.trackItemProgressRepository.findOne({
+      where: { id: trackItemProgressId },
+    });
+    if (!progress || progress.status === SessionItemStatus.COMPLETED) {
+      return NOOP_RESULT;
+    }
+    const item = await this.trackItemRepository.findOne({
+      where: { id: progress.trackItemId },
+    });
+    if (
+      item?.type !== TrackItemType.ROLEPLAY ||
+      roleplayCompletionLogic(item.completionCriteria) !==
+        TrackItemCompletionLogic.PARTICIPATION
+    ) {
+      return NOOP_RESULT;
+    }
+    return this.completeItem(trackItemProgressId, {
+      meta: { lastRoleplayAttempt: undefined },
+    });
+  }
+
+  /** The gates a roleplay item applies, with the platform default filled in. */
+  getRoleplayGate(
+    criteria: TrackItemCompletionCriteria | null | undefined,
+  ): RoleplayGate {
+    return resolveRoleplayGate(
+      criteria,
+      parseDefaultMinDurationSeconds(
+        this.configService.simulationPath
+          ?.simulationPathItemMinDurationForCompletion,
+      ),
+    );
   }
 
   /**

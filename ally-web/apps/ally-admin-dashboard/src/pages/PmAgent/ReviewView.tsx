@@ -8,8 +8,8 @@ import {
   useAnswerPmAgentCardMutation,
   useDismissPmAgentCardMutation,
   useFeedbackPmAgentCardMutation,
+  useFileAnywayPmAgentCardMutation,
   useGetPmAgentCardsQuery,
-  useLazyGetPmAgentPlanMdQuery,
   useReasonPmAgentCardMutation,
   useRejectPmAgentCardMutation,
   useRetryPmAgentCardMutation,
@@ -21,22 +21,14 @@ import type { PmAgentStateResponse, PmCard, PmReasonChip } from "@types";
 import { ActionBar } from "./ActionBar";
 import { copy } from "./copy";
 import { FeedbackDraft, FeedbackPanel } from "./FeedbackPanel";
-import {
-  isNeedsYou,
-  isQuestion,
-  isRecommendation,
-  isTypingTarget,
-  riskOf,
-  saveTextFile,
-  slugify,
-} from "./format";
+import { isNeedsYou, isQuestion, isRecommendation, isTypingTarget } from "./format";
 import { KeyboardHelp } from "./KeyboardHelp";
 import { NeedsYouPanel } from "./NeedsYouPanel";
 import { QuestionCard } from "./QuestionCard";
 import { QueueRail } from "./QueueRail";
 import { ReasonToast } from "./ReasonToast";
 import { RecommendationCard } from "./RecommendationCard";
-import { BreakerBanner, EmptyPanel, SetupPanel, StatusBanner, isFirstRun } from "./statePanels";
+import { EmptyPanel, SetupPanel, StatusBanner, isFirstRun } from "./statePanels";
 import { useOnline, usePmAgentControls } from "./usePmAgentControls";
 import { InfoTip } from "../../components/ally-guide/InfoTip";
 
@@ -80,7 +72,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
   const [skipCard] = useSkipPmAgentCardMutation();
   const [retryCard] = useRetryPmAgentCardMutation();
   const [dismissCard] = useDismissPmAgentCardMutation();
-  const [fetchPlan] = useLazyGetPmAgentPlanMdQuery();
+  const [fileAnywayCard] = useFileAnywayPmAgentCardMutation();
   const controls = usePmAgentControls();
   const online = useOnline();
 
@@ -88,7 +80,6 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [decided, setDecided] = useState(0);
   const [focus, setFocus] = useState(false);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, FeedbackDraft>>({});
   const [helpOpen, setHelpOpen] = useState(false);
@@ -127,7 +118,6 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
 
   const select = useCallback((id: string) => {
     setSelectedId(id);
-    setConfirmingId(null);
     setFeedbackId(null);
   }, []);
 
@@ -156,7 +146,6 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
       setHidden(prev => new Set(prev).add(card.id));
       setDecided(n => n + 1);
       setSelectedId(next ? next.id : null);
-      setConfirmingId(null);
       setFeedbackId(null);
       announce(opts.announcement);
       try {
@@ -205,12 +194,8 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
 
   const accept = useCallback(
     (card: PmCard) => {
-      if (actionsDisabled || !isRecommendation(card)) return;
-      if (riskOf(card) !== "low" && confirmingId !== card.id) {
-        setConfirmingId(card.id);
-        return;
-      }
-      decide(card, () => acceptCard({ id: card.id, path: "builder" }).unwrap(), {
+      if (actionsDisabled || !isRecommendation(card) || !card.payload.opportunity) return;
+      decide(card, () => acceptCard({ id: card.id, versionHash: card.versionHash }).unwrap(), {
         announcement: copy.announce.accepted(card.title),
         onSuccess: result => {
           const until = (result as PmCard | undefined)?.undoUntil;
@@ -223,28 +208,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
         },
       });
     },
-    [actionsDisabled, confirmingId, decide, acceptCard, undoAccept],
-  );
-
-  const downloadPlan = useCallback(
-    (card: PmCard) => {
-      if (actionsDisabled || !isRecommendation(card)) return;
-      decide(
-        card,
-        async () => {
-          await acceptCard({ id: card.id, path: "download" }).unwrap();
-          try {
-            const markdown = await fetchPlan(card.id).unwrap();
-            saveTextFile(`${slugify(card.title)}-plan.md`, markdown);
-            toast.success(copy.downloadedToast);
-          } catch {
-            toast.error(copy.downloadFailed);
-          }
-        },
-        { announcement: copy.announce.accepted(card.title) },
-      );
-    },
-    [actionsDisabled, decide, acceptCard, fetchPlan],
+    [actionsDisabled, decide, acceptCard, undoAccept],
   );
 
   const pickReason = useCallback(
@@ -346,6 +310,18 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
     [cards, actionsDisabled, decide, retryCard],
   );
 
+  const fileAnyway = useCallback(
+    (id: string) => {
+      const card = cards.find(c => c.id === id);
+      if (!card || actionsDisabled) return;
+      decide(card, () => fileAnywayCard(id).unwrap(), {
+        announcement: copy.filedAnyway,
+        onSuccess: () => toast.success(copy.filedAnyway),
+      });
+    },
+    [cards, actionsDisabled, decide, fileAnywayCard],
+  );
+
   const dismiss = useCallback(
     (id: string) => {
       const card = cards.find(c => c.id === id);
@@ -359,7 +335,6 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
   );
 
   const toggleFeedback = useCallback((card: PmCard) => {
-    setConfirmingId(null);
     setFeedbackId(id => (id === card.id ? null : card.id));
   }, []);
 
@@ -378,10 +353,8 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
         return;
       }
       if (key === "Escape") {
-        if (feedbackId || confirmingId) {
-          setFeedbackId(null);
-          setConfirmingId(null);
-        } else if (focus) setFocus(false);
+        if (feedbackId) setFeedbackId(null);
+        else if (focus) setFocus(false);
         return;
       }
       if (lower === "z") {
@@ -422,7 +395,6 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
   }, [
     helpOpen,
     feedbackId,
-    confirmingId,
     focus,
     current,
     actionsDisabled,
@@ -452,7 +424,6 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
       state={state}
       disabled={actionsDisabled}
       onRunNow={controls.runNow}
-      onResume={controls.resumeBuilds}
       onTurnOn={controls.turnOn}
       onOpenSettings={onOpenSettings}
     />
@@ -503,6 +474,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
             disabled={actionsDisabled}
             onRetry={retry}
             onDismiss={dismiss}
+            onFileAnyway={fileAnyway}
           />
         </>
       ) : isRecommendation(current) ? (
@@ -521,11 +493,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
             card={current}
             sticky
             disabled={actionsDisabled}
-            confirming={confirmingId === current.id}
             onAccept={() => accept(current)}
-            onConfirmAccept={() => accept(current)}
-            onCancelConfirm={() => setConfirmingId(null)}
-            onDownload={() => downloadPlan(current)}
             onReject={() => reject(current)}
             onFeedback={() => toggleFeedback(current)}
           />
@@ -550,7 +518,6 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
       <div aria-live="polite" role="status" className="sr-only">
         {announcement}
       </div>
-      <BreakerBanner state={state} disabled={actionsDisabled} onResume={controls.resumeBuilds} />
       {statusBanner}
       {!online && (
         <InlineNotification

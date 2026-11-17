@@ -14,7 +14,7 @@ import {
   summarizeCompletion,
 } from "./courseCopilotFormat";
 import { getItemTypeIcon, getItemTypeLabel } from "./courseItemMeta";
-import { prefersReducedMotion } from "../../pages/Builder/builderMotion";
+import { prefersReducedMotion } from "../../motion/builderMotion";
 
 export interface ItemPreviewCardProps {
   item: CourseOutlineItem;

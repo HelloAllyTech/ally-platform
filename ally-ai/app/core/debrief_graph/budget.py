@@ -21,6 +21,8 @@ OUTPUT_TOKENS: Dict[str, int] = {
     # The progress agent answers up to 3 skills, follow-ups and a focus.
     Step.PROGRESS_READER: 1200,
     Step.GUIDANCE_LOOKUP: 0,
+    # Per model pass of the guidance agent (a tool call or a stop).
+    Step.GUIDANCE_AGENT: 400,
     Step.WRITER: 2500,
     Step.CHECKS: 0,
     Step.EVALUATOR: 2000,

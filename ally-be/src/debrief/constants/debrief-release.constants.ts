@@ -54,6 +54,8 @@ export enum DebriefStep {
   ANALYST = 'analyst',
   PROGRESS_READER = 'progress_reader',
   GUIDANCE_LOOKUP = 'guidance_lookup',
+  /** The guidance agent: optional, between the lookup and the Writer (its tools: `settings.guidanceTools`). */
+  GUIDANCE_AGENT = 'guidance_agent',
   WRITER = 'writer',
   CHECKS = 'checks',
   EVALUATOR = 'evaluator',
@@ -92,6 +94,48 @@ export interface DebriefRecipe {
   shortForm: boolean;
 }
 
+/** The Debrief Guidance tools the guidance agent may be given (gateway tools). */
+export const GUIDANCE_TOOL_NAMES = [
+  'guidance_index',
+  'guidance_search',
+  'guidance_fetch',
+] as const;
+export type GuidanceToolName = (typeof GUIDANCE_TOOL_NAMES)[number];
+
+/**
+ * The steps `settings.guidanceTools` may name: only steps ally-ai wires to the toolbox, so nobody
+ * (the PM agent included) can switch on a step that would do nothing. The Writer and Reviser take
+ * the tools only when their own entry lists some (off by default). Wiring another step later: one
+ * toolbox call in that node, plus its key here.
+ */
+export const GUIDANCE_TOOL_STEPS = [
+  'guidance_agent',
+  'writer',
+  'reviser',
+] as const;
+
+export type GuidanceToolsSetting = Partial<Record<string, GuidanceToolName[]>>;
+
+/** Absent setting: only the guidance agent has the tools, all three. */
+export const GUIDANCE_TOOLS_DEFAULT: GuidanceToolsSetting = {
+  guidance_agent: [...GUIDANCE_TOOL_NAMES],
+};
+
+/** The guidance tools one step may call under a release's settings (none for an unlisted step). */
+export function guidanceToolsFor(
+  setting: unknown,
+  step: string,
+): GuidanceToolName[] {
+  const map =
+    setting && typeof setting === 'object' && !Array.isArray(setting)
+      ? (setting as GuidanceToolsSetting)
+      : GUIDANCE_TOOLS_DEFAULT;
+  const list = map[step];
+  return Array.isArray(list)
+    ? list.filter((t) => (GUIDANCE_TOOL_NAMES as readonly string[]).includes(t))
+    : [];
+}
+
 export interface DebriefSettings {
   /** Learner turns at or above this get the Standard recipe. */
   standardMinLearnerTurns: number;
@@ -103,6 +147,18 @@ export interface DebriefSettings {
   deadlineMs: number;
   riskDeadlineMs: number;
   guidancePassagesPerMoment: number;
+  /**
+   * Tool calls the guidance agent may make in one run (2026-11-17); 0 = the agent is off. Absent
+   * in releases made before it: ally-ai reads it as 0.
+   */
+  guidanceAgentMaxCalls?: number;
+  /**
+   * The guidance tools each step is offered: an object keyed by step name (`GUIDANCE_TOOL_STEPS`),
+   * each a subset of `GUIDANCE_TOOL_NAMES`; a step not listed has none. Absent:
+   * `GUIDANCE_TOOLS_DEFAULT` (the guidance agent, all three). The gateway refuses a call a step
+   * is not enabled for. The PM agent may later switch a tool off for a step.
+   */
+  guidanceTools?: GuidanceToolsSetting;
   /**
    * Everything one session may spend: its debrief run and every Ask Ally
    * reply after it (Sandeep, 2026-11-16). Absent in releases made before it:
@@ -116,6 +172,12 @@ export interface DebriefSettings {
    * bands, not similarities. Releases made before it still carry the value; nothing reads it.
    */
   guidanceMinSimilarity?: number;
+  /**
+   * The release's prompt texts are the neutral ones ("the learner", "the character"), so the
+   * transcript says LEARNER and CHARACTER instead of COUNSELLOR and CLIENT. Set by the release
+   * that publishes the neutral texts, so prompts and labels never disagree. Absent: legacy labels.
+   */
+  neutralWording?: boolean;
 }
 
 /** Ask Ally in conversation mode (v9 FR-43): part of the release, like every step. */
@@ -164,6 +226,7 @@ export const DEBRIEF_REGISTRY_AGENTS = {
   analyst: { version: 1 },
   progress_reader: { version: 1 },
   guidance_lookup: { version: 1 },
+  guidance_agent: { version: 1 },
   case_memory: { version: 1 },
   assessment_anchoring: { version: 1 },
   protocol_check: { version: 1 },
@@ -205,6 +268,8 @@ export const DEBRIEF_PROMPT_CODES = {
   progressReader: 'debrief_progress_reader_system',
   /** The progress agent (learner progress over past sessions); its step key stays `progress_reader`. */
   progress: 'debrief_progress_system',
+  /** The guidance agent: browses the Debrief Guidance index and fetches entries before the Writer. */
+  guidanceAgent: 'debrief_guidance_agent_system',
   writer: 'debrief_writer_system',
   reviser: 'debrief_reviser_system',
   rubric: 'debrief_quality_rubric',
@@ -279,6 +344,7 @@ export const PM_AGENT_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
 export const PM_AGENT_SETTINGS: Record<string, { min: number; max: number }> = {
   maxRevisionRounds: { min: 0, max: 3 },
   guidancePassagesPerMoment: { min: 0, max: 3 },
+  guidanceAgentMaxCalls: { min: 0, max: 5 },
   standardMinLearnerTurns: { min: 3, max: 10 },
 };
 
@@ -292,6 +358,8 @@ export const DEBRIEF_MODELS = {
   safetyReaderBackup: 'gemini-3-flash-preview',
   analyst: 'gemini-2.5-pro',
   progressReader: 'gemini-2.5-flash',
+  /** The guidance agent (its own step key `guidance_agent`; not a recipe step). */
+  guidanceAgent: 'gemini-2.5-flash',
   writer: 'gemini-3-flash-preview',
   // Only three Gemini models are priced, and 2.5-pro is the judge's. A run
   // that falls back to this shares the Evaluator's model; the run records it.
@@ -349,6 +417,11 @@ const SEED_RECIPES_BASE = {
         ),
         step(DebriefStep.GUIDANCE_LOOKUP, 'Looking up guidance…'),
         step(
+          DebriefStep.GUIDANCE_AGENT,
+          'Choosing guidance…',
+          DEBRIEF_MODELS.guidanceAgent,
+        ),
+        step(
           DebriefStep.WRITER,
           'Writing your debrief…',
           DEBRIEF_MODELS.writer,
@@ -385,6 +458,11 @@ const SEED_RECIPES_BASE = {
           DebriefStep.ANALYST,
           'Reading your session…',
           DEBRIEF_MODELS.analyst,
+        ),
+        step(
+          DebriefStep.GUIDANCE_AGENT,
+          'Choosing guidance…',
+          DEBRIEF_MODELS.guidanceAgent,
         ),
         step(
           DebriefStep.WRITER,
@@ -428,6 +506,13 @@ const SEED_RECIPES_BASE = {
     deadlineMs: 150_000,
     riskDeadlineMs: 180_000,
     guidancePassagesPerMoment: 2,
+    guidanceAgentMaxCalls: 3,
+    // The guidance agent has all three; the Writer and Reviser can take them but ship off.
+    guidanceTools: {
+      guidance_agent: [...GUIDANCE_TOOL_NAMES],
+      writer: [],
+      reviser: [],
+    } as GuidanceToolsSetting,
   },
   reply: DEBRIEF_REPLY_DEFAULT,
 };
@@ -717,6 +802,38 @@ export function validateDebriefBundle(
       problems.push('settings: monthly cap must be set');
     if (!(s.riskDeadlineMs > 0 && s.deadlineMs > 0)) {
       problems.push('settings: deadlines must be set');
+    }
+    if (s.guidanceAgentMaxCalls != null) {
+      const r = PM_AGENT_SETTINGS.guidanceAgentMaxCalls;
+      if (
+        !Number.isInteger(s.guidanceAgentMaxCalls) ||
+        s.guidanceAgentMaxCalls < r.min ||
+        s.guidanceAgentMaxCalls > r.max
+      ) {
+        problems.push(
+          `settings: guidanceAgentMaxCalls must be a whole number ${r.min}–${r.max}`,
+        );
+      }
+    }
+    if (s.guidanceTools != null) {
+      const g = s.guidanceTools as unknown;
+      const bad =
+        !g ||
+        typeof g !== 'object' ||
+        Array.isArray(g) ||
+        Object.entries(g).some(
+          ([step, tools]) =>
+            !(GUIDANCE_TOOL_STEPS as readonly string[]).includes(step) ||
+            !Array.isArray(tools) ||
+            tools.some(
+              (t) => !(GUIDANCE_TOOL_NAMES as readonly string[]).includes(t),
+            ),
+        );
+      if (bad) {
+        problems.push(
+          `settings: guidanceTools must map a step (${GUIDANCE_TOOL_STEPS.join(', ')}) to a list of ${GUIDANCE_TOOL_NAMES.join(', ')}`,
+        );
+      }
     }
   }
   return problems;

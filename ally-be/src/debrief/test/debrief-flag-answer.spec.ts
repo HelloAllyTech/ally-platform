@@ -171,7 +171,7 @@ describe('DebriefFlagAnswerService', () => {
     return { svc, feedbackSvc, pm, listeners };
   }
 
-  it('sends the card, transcript and language; applies the answer; records it for the PM agent', async () => {
+  it('sends the card, transcript and language; applies the answer; records it for the Debrief PM agent', async () => {
     const { svc, feedbackSvc, pm } = build({
       status: 'finished',
       action: 'correct',

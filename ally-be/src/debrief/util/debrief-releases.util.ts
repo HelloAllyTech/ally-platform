@@ -337,6 +337,7 @@ export const OPTIONAL_STEPS: readonly DebriefStep[] = [
   DebriefStep.ANALYST,
   DebriefStep.PROGRESS_READER,
   DebriefStep.GUIDANCE_LOOKUP,
+  DebriefStep.GUIDANCE_AGENT,
   DebriefStep.REVISER,
 ];
 
@@ -444,10 +445,11 @@ export function promptLabel(code: string): string {
     debrief_analyst_system: 'Analyst',
     debrief_progress_reader_system: 'Progress reader',
     debrief_progress_system: 'Progress agent',
+    debrief_guidance_agent_system: 'Guidance agent',
     debrief_writer_system: 'Writer',
     debrief_reviser_system: 'Reviser',
     debrief_quality_rubric: 'Rubric',
-    debrief_improver_system: 'PM agent',
+    debrief_improver_system: 'Debrief PM agent',
     debrief_reply_system: 'Ask Ally',
     debrief_planner_system: 'Planner',
     debrief_protocol_check_system: 'Protocol check',
@@ -457,8 +459,8 @@ export function promptLabel(code: string): string {
     debrief_evaluator_system: "Evaluator's instructions",
     debrief_evaluator_fix_system: "Evaluator's fix notes",
     debrief_planner_agents: 'Planner agents',
-    debrief_pm_investigator_system: 'PM agent investigator',
-    debrief_pm_reviewer_system: 'PM agent reviewer',
+    debrief_pm_investigator_system: 'Debrief PM agent investigator',
+    debrief_pm_reviewer_system: 'Debrief PM agent reviewer',
   };
   if (known[code]) return known[code];
   const words = code

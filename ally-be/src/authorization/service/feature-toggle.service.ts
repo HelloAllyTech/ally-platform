@@ -214,6 +214,17 @@ export class FeatureToggleService {
     }));
   }
 
+  /**
+   * Ids of users holding an enabled ROW for this key. Rows only: a
+   * defaultEnabled key's implicit holders are not listed, so call this for
+   * keys that are granted per person (the Roadmap v2 role preview reads the
+   * Builder and Manage holders this way).
+   */
+  async listEnabledHolderIds(featureKey: string): Promise<number[]> {
+    const rows = await this.toggleRepository.findEnabledUserIds(featureKey);
+    return [...new Set(rows.map((row) => row.userId))];
+  }
+
   async countEnabledHolders(featureKey: string): Promise<number> {
     const rows = await this.toggleRepository.findEnabledUserIds(featureKey);
     return rows.length;

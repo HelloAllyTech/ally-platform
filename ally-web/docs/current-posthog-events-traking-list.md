@@ -371,3 +371,30 @@ no paywall or upgrade surface today. `useAnalytics()` exposes `trackUpgradePromp
 re-deriving the property names.
 
 `sidebar_interaction` sends `action` as `pinned` or `unpinned`.
+
+### Roadmap v2 time targets (admin, dark behind `roadmap_v2`)
+
+One pair of events times each core job in the plan's time-targets table; `job` tells them apart.
+The Owner's **Measures** view (`/roadmap/measures`) shows each job's target beside its name and
+points here: the medians are read in PostHog, never queried from the browser.
+
+| Constant                | Event Name              | Description                                                                                                                                         | Fires at                                                                  |
+| ----------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `ROADMAP_JOB_STARTED`   | `roadmap_job_started`   | An attempt at one core job began. Sends `job`, `role` (the Roadmap role) and `item_id` (the idea's code) where there is one                         | `apps/ally-admin-dashboard/src/pages/Roadmap/hooks/useRoadmapJobTimer.ts` |
+| `ROADMAP_JOB_COMPLETED` | `roadmap_job_completed` | That attempt finished. Adds `duration_ms`. An abandoned attempt (never finished, or finished 30 minutes or more after it began) sends no completion | `apps/ally-admin-dashboard/src/pages/Roadmap/hooks/useRoadmapJobTimer.ts` |
+
+Where each job starts and ends:
+
+| `job`                      | Starts                                                                        | Completes                                             |
+| -------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `find_my_idea`             | The Queue opens from outside the Roadmap                                      | The first idea you wrote opens (page or reading pane) |
+| `capture_idea`             | New idea opens                                                                | The first save creates the draft                      |
+| `draft_to_submitted`       | A draft's page opens (the earliest open in this tab counts)                   | Submit succeeds                                       |
+| `answer_from_notification` | An idea opens from a For you row that is an agent question                    | You send an answer on that idea                       |
+| `triage_one`               | A row in _To triage → Awaiting review_ takes focus (J/K, opened, or the card) | Accept (with or without a lead) or Decline succeeds   |
+| `settle_answers`           | A question card with conflicting answers is shown to its settler              | Use this answer succeeds                              |
+| `brief_to_claude_code`     | Build ▾ is shown on a Ready-to-build idea to someone who can send the brief   | Open in Claude Code opens the app                     |
+
+They never carry a title, an answer, a reason or a name. They call `captureEvent` directly rather
+than `useAnalytics()`, so `user_role` is not added: `role` is the Roadmap role, which is what the
+targets are split by.

@@ -6,6 +6,8 @@ import {
   PmCardsResponse,
   PmFeedbackInput,
   PmHealth,
+  PmLesson,
+  PmLessonsRunResponse,
   PmMemoryFact,
   PmMemoryResponse,
   PmReasonChip,
@@ -48,11 +50,12 @@ export const pmAgentAPI = baseAPI.injectEndpoints({
       query: id => ({ url: ApiEndpoints.PM_AGENT.CARD(id), method: HttpMethod.GET }),
     }),
 
-    acceptPmAgentCard: builder.mutation<PmCard, { id: string; path: "builder" | "download" }>({
-      query: ({ id, path }) => ({
+    /** Accept = file the card to the roadmap once the 10-second undo window closes. */
+    acceptPmAgentCard: builder.mutation<PmCard, { id: string; versionHash?: string }>({
+      query: ({ id, versionHash }) => ({
         url: ApiEndpoints.PM_AGENT.ACCEPT(id),
         method: HttpMethod.POST,
-        body: { path },
+        body: versionHash ? { versionHash } : {},
       }),
       invalidatesTags: CARD_TAGS,
     }),
@@ -121,14 +124,10 @@ export const pmAgentAPI = baseAPI.injectEndpoints({
       invalidatesTags: CARD_TAGS,
     }),
 
-    /** The compiled plan as text, for Download plan.md. */
-    getPmAgentPlanMd: builder.query<string, string>({
-      query: id => ({
-        url: ApiEndpoints.PM_AGENT.PLAN_MD(id),
-        method: HttpMethod.GET,
-        responseHandler: "text",
-      }),
-      keepUnusedDataFor: 0,
+    /** File a card the roadmap's duplicate check stopped, over that check. */
+    fileAnywayPmAgentCard: builder.mutation<PmCard, string>({
+      query: id => ({ url: ApiEndpoints.PM_AGENT.FILE_ANYWAY(id), method: HttpMethod.POST }),
+      invalidatesTags: CARD_TAGS,
     }),
 
     getPmAgentTracking: builder.query<PmTrackingResponse, void>({
@@ -182,6 +181,16 @@ export const pmAgentAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.PM_AGENT_MEMORY],
     }),
 
+    confirmPmAgentLesson: builder.mutation<PmLesson, string>({
+      query: id => ({ url: ApiEndpoints.PM_AGENT.LESSON_CONFIRM(id), method: HttpMethod.POST }),
+      invalidatesTags: [TAG_TYPES.PM_AGENT_MEMORY, TAG_TYPES.PM_AGENT_HEALTH],
+    }),
+
+    runPmAgentLessons: builder.mutation<PmLessonsRunResponse, void>({
+      query: () => ({ url: ApiEndpoints.PM_AGENT.LESSONS_RUN, method: HttpMethod.POST }),
+      invalidatesTags: [TAG_TYPES.PM_AGENT_MEMORY, TAG_TYPES.PM_AGENT_HEALTH],
+    }),
+
     getPmAgentHistory: builder.query<{ cards: PmCard[] }, { limit?: number } | void>({
       query: arg => ({
         url: ApiEndpoints.PM_AGENT.HISTORY,
@@ -211,7 +220,7 @@ export const {
   useSkipPmAgentCardMutation,
   useRetryPmAgentCardMutation,
   useDismissPmAgentCardMutation,
-  useLazyGetPmAgentPlanMdQuery,
+  useFileAnywayPmAgentCardMutation,
   useGetPmAgentTrackingQuery,
   useRunPmAgentNowMutation,
   useGetPmAgentRunsQuery,
@@ -220,6 +229,8 @@ export const {
   useGetPmAgentMemoryQuery,
   useUpdatePmAgentMemoryMutation,
   useDeletePmAgentMemoryMutation,
+  useConfirmPmAgentLessonMutation,
+  useRunPmAgentLessonsMutation,
   useGetPmAgentHistoryQuery,
   useGetPmAgentHealthQuery,
 } = pmAgentAPI;

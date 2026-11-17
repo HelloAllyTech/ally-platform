@@ -8,6 +8,8 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
+import { DataSource } from 'typeorm';
+import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { WebSocketAuthMiddleware } from 'src/auth/middlewares/ws-auth.middleware';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { LoggerService } from 'src/logger/logger.service';
@@ -24,6 +26,19 @@ import { RoadmapCommentService } from '../service/roadmap-comment.service';
 const BOARD_ROOM = 'roadmap:board';
 const opportunityRoom = (opportunityId: string) =>
   `roadmap:opportunity:${opportunityId}`;
+/** Roadmap v2's per-idea room, keyed by code: the idea page and the reading pane. */
+const itemRoom = (code: string) => `roadmap:item:${code}`;
+const ITEM_CODE = /^[A-Z]{1,8}-?\d{1,9}$/;
+const PRESENCE_KINDS = ['viewing', 'typing'] as const;
+/** How long the gateway trusts its last read of the roadmap_v2 flag. */
+const FLAG_TTL_MS = 30_000;
+
+/** A code as the client sent it, or null when it is not one. */
+const itemCode = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const code = value.trim().toUpperCase();
+  return code.length <= 20 && ITEM_CODE.test(code) ? code : null;
+};
 
 /**
  * Live updates for the roadmap board, replacing the standalone app's Supabase Realtime
@@ -57,10 +72,14 @@ export class RoadmapGateway
 {
   private readonly logger = LoggerService.getInstance(RoadmapGateway.name);
 
+  private v2Flag: { at: number; on: boolean } | null = null;
+
   constructor(
     private readonly webSocketAuthMiddleware: WebSocketAuthMiddleware,
     private readonly notifications: RoadmapNotificationService,
     private readonly commentService: RoadmapCommentService,
+    private readonly planSettings: PlanSettingsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   @WebSocketServer()
@@ -143,6 +162,93 @@ export class RoadmapGateway
     await client.leave(opportunityRoom(payload.opportunityId));
   }
 
+  // ── Roadmap v2: idea rooms and presence (§4.12, §5.7b) ─────────────────────
+
+  @SubscribeMessage(RoadmapEvents.JOIN_ITEM)
+  @WithExecutionContext(ExecutionContextPropagation.SUPPORTS)
+  async handleJoinItem(client: any, payload: { code?: string }): Promise<void> {
+    const code = itemCode(payload?.code);
+    if (!client.data?.user || !code || !(await this.roadmapV2On())) return;
+    await client.join(itemRoom(code));
+  }
+
+  @SubscribeMessage(RoadmapEvents.LEAVE_ITEM)
+  @WithExecutionContext(ExecutionContextPropagation.SUPPORTS)
+  async handleLeaveItem(
+    client: any,
+    payload: { code?: string },
+  ): Promise<void> {
+    const code = itemCode(payload?.code);
+    if (!code) return;
+    await client.leave(itemRoom(code));
+  }
+
+  /**
+   * "Ana is answering…" and who else has the idea open. Relayed to the idea's
+   * room, never to the sender, and never stored: a presence is only as fresh
+   * as its last message, and the client lets one lapse after 30 s.
+   */
+  @SubscribeMessage(RoadmapEvents.PRESENCE)
+  @WithExecutionContext(ExecutionContextPropagation.SUPPORTS)
+  async handlePresence(
+    client: any,
+    payload: { code?: string; kind?: string; questionId?: string },
+  ): Promise<void> {
+    const user = client.data?.user;
+    const code = itemCode(payload?.code);
+    const kind = PRESENCE_KINDS.find((k) => k === payload?.kind);
+    if (!user || !code || !kind || !(await this.roadmapV2On())) return;
+    const questionId =
+      typeof payload?.questionId === 'string' && payload.questionId.length <= 64
+        ? payload.questionId
+        : undefined;
+    const room = itemRoom(code);
+    await client.join(room);
+    client.to(room).emit(RoadmapEvents.PRESENCE, {
+      code,
+      userId: user.id,
+      name: await this.displayName(client),
+      kind,
+      ...(questionId ? { questionId } : {}),
+      at: new Date().toISOString(),
+    });
+  }
+
+  private async roadmapV2On(): Promise<boolean> {
+    const now = Date.now();
+    if (this.v2Flag && now - this.v2Flag.at < FLAG_TTL_MS)
+      return this.v2Flag.on;
+    let on = false;
+    try {
+      on = (await this.planSettings.getRoadmapV2()).enabled;
+    } catch (error) {
+      this.logger.warn(
+        `[ROADMAP] Could not read the roadmap_v2 flag: ${(error as Error)?.message}`,
+      );
+    }
+    this.v2Flag = { at: now, on };
+    return on;
+  }
+
+  /** The person's name, read once per socket. Never the username, which can be an email. */
+  private async displayName(client: any): Promise<string> {
+    if (typeof client.data?.roadmapName === 'string') {
+      return client.data.roadmapName;
+    }
+    let name = '';
+    try {
+      const rows: { name: string | null }[] = await this.dataSource.query(
+        `SELECT name FROM "users" WHERE id = $1`,
+        [client.data.user.id],
+      );
+      name = rows[0]?.name?.trim() ?? '';
+    } catch {
+      // A presence without a name is still a presence.
+    }
+    client.data.roadmapName = name || 'Someone';
+    return client.data.roadmapName;
+  }
+
   /**
    * Fan out one service event.
    *
@@ -185,6 +291,17 @@ export class RoadmapGateway
         this.server
           .to(opportunityRoom(event.opportunityId))
           .emit(RoadmapEvents.COMMENT_CHANGED, event);
+        break;
+
+      case 'ITEM_CHANGED':
+        this.server
+          .to(BOARD_ROOM)
+          .to(itemRoom(event.code))
+          .emit(RoadmapEvents.ITEM_CHANGED, {
+            code: event.code,
+            fields: event.fields,
+            actorId: event.actorId,
+          });
         break;
 
       case 'ROADMAP_INVALIDATED':

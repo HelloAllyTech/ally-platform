@@ -34,6 +34,7 @@ import { PM_HOLD_DAYS } from '../util/debrief-outcome.util';
 import {
   changeEvidenceRefusal,
   introducedInjectionPattern,
+  settingValueOf,
 } from '../util/debrief-pm-agent-rules.util';
 import {
   metricValues,
@@ -276,7 +277,7 @@ export class DebriefPmAgentService
     promptTexts: Record<string, string>,
   ): {
     promptOverrides?: Record<string, string>;
-    settingOverrides?: Record<string, number>;
+    settingOverrides?: Record<string, unknown>;
     maxRevisionRounds?: number;
   } {
     if (change.ideaKind === 'prompt_edit') {
@@ -293,9 +294,9 @@ export class DebriefPmAgentService
       };
     }
     if (change.ideaKind === 'setting') {
-      const v = Number(change.settingValue);
+      const v = settingValueOf(change.settingKey, change.settingValue);
       if (change.settingKey === 'maxRevisionRounds')
-        return { maxRevisionRounds: v };
+        return { maxRevisionRounds: v as number };
       return { settingOverrides: { [change.settingKey]: v } };
     }
     throw new BadRequestException(
@@ -623,7 +624,7 @@ export class DebriefPmAgentService
     const idea = await this.getIdea(ideaId);
     if ((await this.stepPolicy(idea, step)) === 'off') {
       throw new ConflictException(
-        `${step === 'gate_test' ? 'pass tests' : 'side-by-side trials'} are off while the PM agent is switched off`,
+        `${step === 'gate_test' ? 'pass tests' : 'side-by-side trials'} are off while the Debrief PM agent is switched off`,
       );
     }
     if (step === 'gate_test') {
@@ -721,7 +722,7 @@ export class DebriefPmAgentService
   }
 
   /** The models the live release already runs (a model in it is not new, A1). */
-  private async liveModels(): Promise<Set<string>> {
+  async liveModels(): Promise<Set<string>> {
     try {
       const { bundle } = await this.gaBundle();
       const out = new Set<string>();
@@ -982,11 +983,11 @@ export class DebriefPmAgentService
       next.prompts[code] = version.version;
     } else {
       const key = idea.change.settingKey as string;
-      const v = Number(idea.change.settingValue);
+      const v = settingValueOf(key, idea.change.settingValue);
       if (key === 'maxRevisionRounds') {
-        next.recipes[DebriefRecipeKey.STANDARD].maxRevisionRounds = v;
+        next.recipes[DebriefRecipeKey.STANDARD].maxRevisionRounds = v as number;
       } else {
-        (next.settings as unknown as Record<string, number>)[key] = v;
+        (next.settings as unknown as Record<string, unknown>)[key] = v;
       }
     }
     const problems = validateDebriefBundle(
@@ -1001,7 +1002,7 @@ export class DebriefPmAgentService
       DEBRIEF_AGENT_KEY,
       next as unknown as Record<string, unknown>,
       userId,
-      `PM agent idea (learner try-out): ${idea.text}`,
+      `Debrief PM agent idea (learner try-out): ${idea.text}`,
     );
     // Plan §8.8: the exact prompt versions it runs, recorded now.
     await this.runner.pinPrompts(draft);
@@ -1141,7 +1142,7 @@ export class DebriefPmAgentService
       draft.id,
       Math.max(1, Math.round(canaryShare * 100)),
       userId,
-      `PM agent idea ${ideaId}: ${idea.text}`.slice(0, 300),
+      `Debrief PM agent idea ${ideaId}: ${idea.text}`.slice(0, 300),
       actorOf(userId),
     );
     await this.writeEvidence(ideaId, 'canary', {
@@ -1249,7 +1250,7 @@ export class DebriefPmAgentService
     const kind = idea.change?.ideaKind;
     if (!h || h.status !== 'waiting') {
       throw new ConflictException(
-        'the PM agent has not written its hand-off yet',
+        'the Debrief PM agent has not written its hand-off yet',
       );
     }
     let stage: 'builder' | 'bug_hunter' | 'answered' = 'answered';
@@ -1333,8 +1334,8 @@ export class DebriefPmAgentService
             ? 'Debriefs: a Builder session was filed'
             : 'Debriefs: a bug was filed for Bug Hunter',
         body: auto
-          ? `Started on its own from PM agent idea “${idea.text}”.${stage === 'builder' ? ' Its pull request still waits for an engineer.' : ''}`
-          : `From PM agent idea “${idea.text}”.`,
+          ? `Started on its own from Debrief PM agent idea “${idea.text}”.${stage === 'builder' ? ' Its pull request still waits for an engineer.' : ''}`
+          : `From Debrief PM agent idea “${idea.text}”.`,
         data: { ideaId: idea.id, filedId: id },
         excludeUserId: auto ? undefined : userId,
       });
@@ -1679,7 +1680,7 @@ export class DebriefPmAgentService
     );
     if (!rows?.[0]?.id) {
       throw new ConflictException(
-        'This change has already been proposed. Find it in PM agent › Ideas.',
+        'This change has already been proposed. Find it in Debrief PM agent › Ideas.',
       );
     }
     await this.audit('proposed', rows[0].id, userId, { kind: 'pinned_rule' });

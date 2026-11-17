@@ -26,6 +26,7 @@ vi.mock("@api", () => ({
   useGetCharacterLibraryEnabledQuery: vi.fn(() => ({ data: false, isLoading: false })),
   // The assistants they're on (chunk 6b): none unless a test says so.
   useGetChatbotsQuery: vi.fn(() => ({ data: { chatbots: [] }, isLoading: false })),
+  useGetRoadmapMeRoleQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
   // Feature-gated tabs can be the landing tab, so this screen fetches the
   // per-user toggles. Default to content_management on, matching the backfill
   // every platform admin gets, plus the per-tab toggles ally-be grants by default.

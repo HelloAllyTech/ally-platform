@@ -31,6 +31,7 @@ import {
   ScenarioBehaviourRow,
 } from '../util/debrief-competencies.util';
 import { FHS_RUBRIC_VERSION } from '../../foundational-skills/constants/helping-skills-rubric.constants';
+import { DebriefSkillFramework } from '../constants/debrief-framework.constants';
 
 export interface DebriefSessionContext {
   id: string;
@@ -68,6 +69,8 @@ export interface DebriefSessionContext {
    * run, nothing to tell the learner.
    */
   debriefTabOff?: boolean;
+  /** `scenarios.metadata.debriefRiskCueOption`: an option's key, or unset (Standard). */
+  riskCueOption?: string | null;
 }
 
 /** One event the live detector watched for during the roleplay. */
@@ -110,6 +113,7 @@ export class DebriefContextRepository {
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
               s."caseSessionItemId" IS NOT NULL AS in_case,
               COALESCE(sc.metadata->'feedbackTabs'->>'debrief', '') = 'false' AS debrief_tab_off,
+              NULLIF(sc.metadata->>'debriefRiskCueOption', '') AS risk_cue_option,
               COALESCE((ti."completionCriteria"->>'assessmentMode')::boolean, false) AS assessment,
               -- PRD §6.1: a blank line (an empty transcription) is not a
               -- learner turn; the transcript the Writer reads skips it too.
@@ -152,6 +156,7 @@ export class DebriefContextRepository {
       inCase: r.in_case === true,
       languageRecorded: r.language_recorded === true,
       debriefTabOff: r.debrief_tab_off === true,
+      riskCueOption: r.risk_cue_option ?? null,
     };
   }
 
@@ -566,6 +571,11 @@ export class DebriefContextRepository {
     tenantId: string | null,
     beforeSessionId: string,
     settings: ProgressSettings,
+    /** The roleplay's framework and named competencies: which skills are trended. */
+    skills?: {
+      framework?: DebriefSkillFramework;
+      competencies?: ReadonlyArray<string>;
+    },
   ): Promise<ProgressProfile | null> {
     const window = progressWindow(settings);
     const rows: Array<ProgressWindowRow & { total: number }> =
@@ -742,6 +752,8 @@ export class DebriefContextRepository {
       lastReport,
       voice,
       fhs,
+      framework: skills?.framework,
+      competencies: skills?.competencies,
     });
   }
 

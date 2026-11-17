@@ -101,7 +101,14 @@ const mockAdminSimulation = vi.hoisted(() => ({ data: null as any }));
 // callbacks (open a version, create one) without the real panel.
 const mockVersionPanel = vi.hoisted(() => ({ props: null as any }));
 
+// Whether the new Debrief is on for the roleplay, and the args the availability query got.
+const mockDebriefAvailability = vi.hoisted(() => ({ enabled: false, args: [] as any[] }));
+
 vi.mock("@api", () => ({
+  useGetDebriefOptionsAvailabilityQuery: (arg: any) => {
+    mockDebriefAvailability.args.push(arg);
+    return { data: { enabled: mockDebriefAvailability.enabled } };
+  },
   useCreateSimulationMutation: () => [mockCreateSimulation, { isLoading: false }],
   useUpdateSimulationByIdMutation: () => [mockUpdateSimulation],
   useLazyGetAdminSimulationByIdQuery: () => [
@@ -354,6 +361,8 @@ describe("CreateSimulation", () => {
     mockParams.id = undefined;
     mockMappedEvents.count = 0;
     mockAdminSimulation.data = null;
+    mockDebriefAvailability.enabled = false;
+    mockDebriefAvailability.args = [];
     mockVersionPanel.props = null;
 
     // Mock scrollTo function for containerRef
@@ -1020,6 +1029,42 @@ describe("CreateSimulation", () => {
         },
         { timeout: 500 },
       );
+    });
+  });
+
+  describe("Debrief choices in the save", () => {
+    const save = async () => {
+      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+      renderCreateSimulation();
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+      await waitFor(() => expect(mockCreateSimulation).toHaveBeenCalled(), { timeout: 500 });
+      return mockCreateSimulation.mock.calls[0][0].scenarios[0];
+    };
+    const values = {
+      title: "Test",
+      triggerWarningIds: [],
+      debriefRiskCueOption: null,
+    };
+
+    it("leaves the key out when the new Debrief is not on for the roleplay", async () => {
+      mockDebriefAvailability.enabled = false;
+      mockFormMethods.getValues.mockReturnValue(values);
+      const scenario = await save();
+      expect(scenario).not.toHaveProperty("debriefRiskCueOption");
+    });
+
+    it("sends it, default as null, when it is on", async () => {
+      mockDebriefAvailability.enabled = true;
+      mockFormMethods.getValues.mockReturnValue(values);
+      const scenario = await save();
+      expect(scenario.debriefRiskCueOption).toBeNull();
+      expect(mockDebriefAvailability.args).toContainEqual({ scenarioId: undefined });
+    });
+
+    it("asks about the roleplay being edited", () => {
+      mockParams.id = "existing-id";
+      renderCreateSimulation();
+      expect(mockDebriefAvailability.args).toContainEqual({ scenarioId: "existing-id" });
     });
   });
 

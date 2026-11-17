@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
+  Optional,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
@@ -24,6 +25,7 @@ import {
 } from '../dto/roadmap-response.dto';
 import { RoadmapNotificationService } from './roadmap-notification.service';
 import { RoadmapMultiplierService } from './roadmap-multiplier.service';
+import { RoadmapInboxService } from 'src/product-planning/service/roadmap-inbox.service';
 
 @Injectable()
 export class RoadmapAllocationService {
@@ -37,6 +39,8 @@ export class RoadmapAllocationService {
     private readonly grantRepository: RoadmapVoteGrantRepository,
     private readonly notifications: RoadmapNotificationService,
     private readonly multipliers: RoadmapMultiplierService,
+    /** Roadmap v2's inbox, for the voter's milestones watch. Optional for fixtures. */
+    @Optional() private readonly inbox?: RoadmapInboxService,
   ) {}
 
   /** The caller's live, spendable vote balance. */
@@ -75,7 +79,7 @@ export class RoadmapAllocationService {
     const periodKey = currentPeriodKey();
 
     try {
-      return await this.dataSource.transaction(async (manager) => {
+      const result = await this.dataSource.transaction(async (manager) => {
         await this.allocationRepository.lockUser(manager, userId);
 
         const opportunity = await manager.findOne(RoadmapOpportunity, {
@@ -202,6 +206,11 @@ export class RoadmapAllocationService {
           qualifying: breadth.qualifying,
         };
       });
+      // Roadmap v2 (§4.8): a voter follows the idea's milestones unless they
+      // already chose a watch level. After the commit, never throws, and
+      // nothing reads it while roadmap_v2 is off.
+      if (votes > 0) await this.inbox?.watchOnVote(userId, opportunityId);
+      return result;
     } catch (error) {
       throw this.translateBalanceError(error);
     }

@@ -47,7 +47,7 @@ const pair = (
 });
 const settings = defaultOwnerSettings();
 
-describe('the PM agent test ladder (v9 FR-52, FR-59)', () => {
+describe('the Debrief PM agent test ladder (v9 FR-52, FR-59)', () => {
   it('quick test: passes on the minimum lift with no new hard fails', () => {
     const up = [pair(7, 7.5), pair(7, 7.4), pair(8, 8.2), pair(6, 6.5)];
     expect(quickTestResult(up, 4, settings).passed).toBe(true);
@@ -344,7 +344,7 @@ describe('owner settings (v9 FR-60)', () => {
   });
 });
 
-describe('the PM agent reads only its redacted views (owner-approved, v9 G-4)', () => {
+describe('the Debrief PM agent reads only its redacted views (owner-approved, v9 G-4)', () => {
   const svc = new DebriefReportingService({} as any);
 
   it('refuses any other table, a refused column and anything but one SELECT, before running it', async () => {

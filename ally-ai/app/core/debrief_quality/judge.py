@@ -7,7 +7,7 @@ token usage is emitted so the backfill's cost is visible.
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.config import settings
 from app.core.debrief_quality.prompt import TranscriptTurn, build_judge_prompt
@@ -28,6 +28,8 @@ async def judge_debrief(
     history: Optional[str] = None,
     instructions: Optional[str] = None,
     risk_cue_definition: Optional[str] = None,
+    speaker_labels: Optional[str] = None,
+    roleplay_expectations: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[DebriefQualityOutput], str]:
     """Score one debrief against its transcript.
 
@@ -54,6 +56,8 @@ async def judge_debrief(
         history=history,
         instructions=instructions,
         risk_cue_definition=risk_cue_definition,
+        speaker_labels=speaker_labels,
+        roleplay_expectations=roleplay_expectations,
     )
 
     from app.core.llm.dispatch import PROVIDER_GEMINI, generate_structured

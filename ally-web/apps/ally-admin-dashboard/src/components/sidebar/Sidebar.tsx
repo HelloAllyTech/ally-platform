@@ -68,6 +68,7 @@ import { ColorModeToggle } from "@components/color-mode-toggle/ColorModeToggle";
 import { useCommandPalette } from "@components/command-palette/CommandPaletteContext";
 import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
 import { NotificationBell } from "@components/notification-bell/NotificationBell";
+import { ReduceMotionMenuItem } from "@components/reduce-motion/ReduceMotionMenuItem";
 import type { NavigationItem } from "@components/types";
 import { SIDEBAR_ITEMS, ROUTES, en, profileSettings, USER_MODAL_FIELDS_IDS } from "@constants";
 import { useClickOutside, useUser } from "@hooks";
@@ -75,6 +76,7 @@ import { groupNavigationItems, isNavItemActive } from "@utils/navigation";
 
 import { BuilderNavBadge } from "./BuilderNavBadge";
 import { PmAgentNavBadge } from "./PmAgentNavBadge";
+import { RoadmapNavBadge } from "./RoadmapNavBadge";
 import { SortableNavItem } from "./SortableNavItem";
 import { useCollapsedSections } from "./useCollapsedSections";
 import { FeatureToggleKey } from "../../constants/featureToggles";
@@ -353,6 +355,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <LibraryBig size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
         return <Roadmap size={20} />;
+      // The same glyph: it is the same Roadmap, rebuilt, and replaces the entry above at cutover.
+      case SIDEBAR_ITEMS.ROADMAP_V2:
+        return <Roadmap size={20} />;
+      case SIDEBAR_ITEMS.USER_INTERVIEWS:
+        return <Users size={20} />;
       case SIDEBAR_ITEMS.SETTINGS:
         return <Settings size={20} />;
       // Deliberately NOT the List icon that ROLEPLAY_SESSION_LOGS uses. These are raw CloudWatch
@@ -392,6 +399,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <BuilderNavBadge />;
       case SIDEBAR_ITEMS.PM_AGENT:
         return <PmAgentNavBadge />;
+      case SIDEBAR_ITEMS.ROADMAP_V2:
+        return <RoadmapNavBadge />;
       // The inbox lives in AI Chatbots (chunk 11a): its unread chats show on that tab.
       case SIDEBAR_ITEMS.WHATSAPP_BOT:
         return <InboxNavBadge />;
@@ -618,6 +627,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
                 <ManageAccounts />
                 <span>{en.auth.profileSettings}</span>
               </button>
+              <ReduceMotionMenuItem />
               <button
                 onClick={handleLogout}
                 className="flex flex-row items-center w-full px-4 py-2 gap-2 text-left text-sm text-typography-900 hover:bg-background-secondary transition-colors"

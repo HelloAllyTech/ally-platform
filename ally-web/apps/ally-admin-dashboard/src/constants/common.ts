@@ -449,6 +449,73 @@ export const ApiEndpoints = {
       `/v1/product-roadmap/opportunities/${opportunityId}/builder-session`,
     ADMIN_REINDEX: "/v1/product-roadmap/admin/reindex",
   },
+  /**
+   * Roadmap v2's idea flow (P3 contract): New idea and drafts, dictation, the Owner's review and
+   * lead, and the answers and comments on a shared plan session. 404 while `roadmap_v2` is off.
+   */
+  ROADMAP_V2_FLOW: {
+    DRAFTS: "/v1/roadmap/drafts",
+    DRAFT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}`,
+    DRAFT_RESTORE: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/restore`,
+    DRAFT_TURN: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/turn`,
+    DRAFT_REOPEN_CHECK: (code: string, checkId: string) =>
+      `/v1/roadmap/drafts/${encodeURIComponent(code)}/checks/${encodeURIComponent(checkId)}/reopen`,
+    DRAFT_SELF_CHECK: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/self-check`,
+    DRAFT_SIMILAR: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/similar`,
+    DRAFT_ADD_TO: (code: string, target: string) =>
+      `/v1/roadmap/drafts/${encodeURIComponent(code)}/add-to/${encodeURIComponent(target)}`,
+    DRAFT_SUBMIT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/submit`,
+    DICTATION: "/v1/roadmap/dictation",
+    REVIEW: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/review`,
+    REVIEW_BATCH: "/v1/roadmap/items/review:batch",
+    REVIEW_UNDO: "/v1/roadmap/items/review:undo",
+    LEAD: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/lead`,
+    LEAD_SUGGESTIONS: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/lead-suggestions`,
+    ITEM_SIMILAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/similar`,
+    START_PLANNING: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/start-planning`,
+    SESSION_ANSWERS: (sessionId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/answers`,
+    SESSION_COMMENTS: (sessionId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/comments`,
+    SESSION_USE_ANSWER: (sessionId: string, postId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/answers/${encodeURIComponent(postId)}/use`,
+  },
+  /**
+   * Roadmap v2 (plans/roadmap-builder-merge §5.2, P2 contract). Every route answers 404 while the
+   * `roadmap_v2` flag is off, which is how the frontend learns the flag: `ME_ROLE` succeeding.
+   */
+  /** Roadmap v2 P4: build brief, roles, preferences; P5: the release policy. 404 while the flag is off. */
+  ROADMAP_V2_OPS: {
+    ITEM_BRIEF: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/brief`,
+    ITEM_EXTERNAL_BUILD: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/external-build`,
+    ROLES: "/v1/roadmap/roles",
+    ROLE: (userId: number) => `/v1/roadmap/roles/${userId}`,
+    MY_PREFERENCES: "/v1/roadmap/me/preferences",
+    RELEASE_PLAN: "/v1/roadmap/release/plan",
+    RELEASE: "/v1/roadmap/release",
+    RELEASE_RESUME: "/v1/roadmap/release/resume",
+  },
+  /** Roadmap v2 P6: Switch on Roadmap. Owner only; these two answer while the flag is off. */
+  ROADMAP_V2_CUTOVER: {
+    PREVIEW: "/v1/roadmap/cutover/preview",
+    RUN: "/v1/roadmap/cutover",
+  },
+  ROADMAP_V2: {
+    ME_ROLE: "/v1/roadmap/me/role",
+    ITEMS: "/v1/roadmap/items",
+    ITEM: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}`,
+    ITEM_READ: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/read`,
+    ITEM_WATCH: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/watch`,
+    ITEM_STAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/star`,
+    SEARCH: "/v1/roadmap/search",
+  },
+  /** Roadmap v2 P8: the Owner's Measures. 404 while the flag is off, 403 for anyone but an Owner. */
+  ROADMAP_V2_MEASURES: {
+    METRICS: "/v1/roadmap/metrics",
+  },
   AI_LAB: {
     SKILLS: "/v1/lab/skills",
     SKILL_BY_ID: (id: string) => `/v1/lab/skills/${id}`,
@@ -477,6 +544,22 @@ export const ApiEndpoints = {
     QUESTION_SET_BY_ID: (id: string) => `/v1/lab/question-sets/${id}`,
     QUESTION_SET_PUBLISH: (id: string) => `/v1/lab/question-sets/${id}/publish`,
     QUESTION_SET_ARCHIVE: (id: string) => `/v1/lab/question-sets/${id}/archive`,
+  },
+  /** Debrief Settings › Agents: recipes, models and tools of the live release. */
+  DEBRIEF_AGENTS: {
+    CONFIG: "/v1/debriefs/agents-config",
+    CHANGES: "/v1/debriefs/agents-config/changes",
+  },
+  /** Debrief choices per roleplay: risk-cue options. */
+  DEBRIEF_ROLEPLAY_OPTIONS: {
+    AVAILABILITY: "/v1/debriefs/roleplay-options/availability",
+    RISK_CUES: "/v1/debriefs/roleplay-options/risk-cue-options",
+    RISK_CUES_REVIEW: "/v1/debriefs/roleplay-options/risk-cue-options/review",
+    RISK_CUE: (id: string) => `/v1/debriefs/roleplay-options/risk-cue-options/${id}`,
+    RISK_CUE_ACTION: (
+      id: string,
+      action: "test" | "submit" | "review-test" | "approve" | "reject" | "retire",
+    ) => `/v1/debriefs/roleplay-options/risk-cue-options/${id}/${action}`,
   },
   DEBRIEF_CONSOLE: {
     OVERVIEW: "/v1/debriefs/console/overview",
@@ -720,8 +803,8 @@ export const ApiEndpoints = {
     FEEDBACK: (id: string) => `/v1/pm-agent/cards/${id}/feedback`,
     ANSWER: (id: string) => `/v1/pm-agent/cards/${id}/answer`,
     SKIP: (id: string) => `/v1/pm-agent/cards/${id}/skip`,
-    PLAN_MD: (id: string) => `/v1/pm-agent/cards/${id}/plan.md`,
     RETRY: (id: string) => `/v1/pm-agent/cards/${id}/retry`,
+    FILE_ANYWAY: (id: string) => `/v1/pm-agent/cards/${id}/file-anyway`,
     DISMISS: (id: string) => `/v1/pm-agent/cards/${id}/dismiss`,
     TRACKING: "/v1/pm-agent/tracking",
     RUN: "/v1/pm-agent/run",
@@ -729,6 +812,8 @@ export const ApiEndpoints = {
     SETTINGS: "/v1/pm-agent/settings",
     MEMORY: "/v1/pm-agent/memory",
     MEMORY_BY_ID: (id: string) => `/v1/pm-agent/memory/${id}`,
+    LESSON_CONFIRM: (id: string) => `/v1/pm-agent/lessons/${id}/confirm`,
+    LESSONS_RUN: "/v1/pm-agent/lessons/run",
     HISTORY: "/v1/pm-agent/history",
     HEALTH: "/v1/pm-agent/health",
   },
@@ -1259,6 +1344,14 @@ export const ROUTES = {
   PRODUCT_UPDATES: "/product-updates",
   AI_LAB: "/ai-lab",
   PRODUCT_ROADMAP: "/product-roadmap",
+  /** Roadmap v2's Queue (dark behind `roadmap_v2`; the old pages stay as they are). */
+  ROADMAP: "/roadmap",
+  /** My drafts: Roadmap's own tab (§4.4). */
+  ROADMAP_DRAFTS: "/roadmap/drafts",
+  /** New idea: an empty draft page; the draft and its code exist once there are words (§4.2). */
+  ROADMAP_NEW_IDEA: "/roadmap/new",
+  /** One idea's page, by code (OPP-388). The read model also accepts the uuid. */
+  ROADMAP_IDEA: (code: string) => `/roadmap/i/${code}`,
   BUG_HUNTER: "/bug-hunter",
   PM_AGENT: "/pm-agent",
   BUILDER: "/builder",
@@ -1272,6 +1365,17 @@ export const ROUTES = {
   BUILDER_PIPELINE: "/builder/pipeline",
   BUILDER_KNOWLEDGE: "/builder/knowledge",
   BUILDER_EVAL: "/builder/eval",
+  /** Roadmap v2's Agent tab: Builder's pages, mounted under the Roadmap (§4.1). */
+  ROADMAP_AGENT: "/roadmap/agent",
+  ROADMAP_AGENT_SECTION: (section: string) => `/roadmap/agent/${section}`,
+  /** Roadmap v2's Settings tab (Owner). */
+  ROADMAP_SETTINGS: "/roadmap/settings",
+  /** Roadmap v2's Bugs tab: Bug Hunter's table, read-only. */
+  ROADMAP_BUGS: "/roadmap/bugs",
+  /** Roadmap v2's Measures (Owner, P8): funnel, stage times, review wait, releases, spend. */
+  ROADMAP_MEASURES: "/roadmap/measures",
+  /** User Interviews, out of the Roadmap into its own sidebar entry (D14). */
+  USER_INTERVIEWS: "/user-interviews",
   COURSE_COPILOT: "/course-copilot",
   // Registered before the session route in RouteLayout: "new" would otherwise match `:sessionId`.
   // Optional `?trackId=` binds the session to an existing course (EDIT mode).
@@ -1457,6 +1561,12 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_IDEA_DRAFTS: "productRoadmapIdeaDrafts",
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
+  // Roadmap v2 (also registered in baseApi.ts's `tagTypes`).
+  ROADMAP_V2_ROLES: "roadmapV2Roles",
+  ROADMAP_V2_PREFERENCES: "roadmapV2Preferences",
+  ROADMAP_V2_RELEASE: "roadmapV2Release",
+  ROADMAP_V2_ROLE: "roadmapV2Role",
+  ROADMAP_V2_ITEMS: "roadmapV2Items",
   // PM Agent (also registered in baseApi.ts's `tagTypes`).
   PM_AGENT_STATE: "pmAgentState",
   PM_AGENT_CARDS: "pmAgentCards",

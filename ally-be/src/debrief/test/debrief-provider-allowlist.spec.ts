@@ -3,6 +3,7 @@ import {
   DebriefBundle,
   DebriefRecipeKey,
   DebriefStep,
+  validateDebriefBundle,
 } from '../constants/debrief-release.constants';
 import {
   allowlistFromValues,
@@ -80,6 +81,33 @@ describe('per-organisation provider allowlist', () => {
     );
     expect(bundleFitsProviders(b, ['gemini'], DebriefRecipeKey.STANDARD)).toBe(
       true,
+    );
+  });
+
+  it('covers the guidance agent step like any other model step, and a release without it stays valid', () => {
+    const b = seed();
+    for (const key of [DebriefRecipeKey.STANDARD, DebriefRecipeKey.SHORT]) {
+      expect(
+        b.recipes[key]!.steps.find(
+          (s) => s.step === DebriefStep.GUIDANCE_AGENT,
+        ),
+      ).toMatchObject({ model: 'gemini-2.5-flash' });
+    }
+    expect(restrictBundleToProviders(b, ['openai']).blockedSteps).toContain(
+      `${DebriefRecipeKey.STANDARD}.guidance_agent`,
+    );
+    const r = restrictBundleToProviders(b, ['openai'], ['gpt-4.1-mini']);
+    expect(
+      r.substitutedSteps[`${DebriefRecipeKey.STANDARD}.guidance_agent`],
+    ).toBeTruthy();
+    // Optional: an older release without the step is valid.
+    for (const key of Object.keys(b.recipes)) {
+      b.recipes[key as DebriefRecipeKey]!.steps = b.recipes[
+        key as DebriefRecipeKey
+      ]!.steps.filter((s) => s.step !== DebriefStep.GUIDANCE_AGENT);
+    }
+    expect(validateDebriefBundle(b).filter((p) => /guidance/.test(p))).toEqual(
+      [],
     );
   });
 

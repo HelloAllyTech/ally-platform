@@ -5,9 +5,11 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   forwardRef,
 } from '@nestjs/common';
 import { In, IsNull, Like, MoreThan } from 'typeorm';
+import { PlanCeilingService } from 'src/product-planning/service/plan-ceiling.service';
 import { LoggerService } from 'src/logger/logger.service';
 import {
   CheckRollup,
@@ -136,6 +138,9 @@ export class BuilderPullRequestService {
     // so this edge is one-way rather than a cycle.
     @Inject(forwardRef(() => BuilderBuildService))
     private readonly buildService: BuilderBuildService,
+    /** Roadmap v2's one ceiling per idea; a no-op while the flag is off. */
+    @Optional()
+    private readonly planCeiling?: PlanCeilingService,
   ) {}
 
   /**
@@ -2542,6 +2547,20 @@ export class BuilderPullRequestService {
    * the limit.
    */
   private async budgetSpent(pullRequest: BuilderPullRequest): Promise<boolean> {
+    // A plan's review and fix runs count against its one idea ceiling too
+    // (Roadmap v2, §5.6). Null with the flag off and for non-plan sessions.
+    const plan = await this.planCeiling?.checkAt(
+      pullRequest.sessionId,
+      'pr_automation',
+    );
+    if (plan?.exceeded) {
+      await this.escalate(
+        pullRequest,
+        `This idea has spent $${plan.spentUsd.toFixed(2)} of its $${plan.ceilingUsd.toFixed(2)} ceiling` +
+          (await this.openProblemsClause(pullRequest)),
+      );
+      return true;
+    }
     const settings = await this.settingsService.get();
     const limit = Number(settings.maxPrAutomationUsd ?? 0);
     const spent = Number(pullRequest.automationCostUsd ?? 0);

@@ -598,6 +598,10 @@ const validateItem = (item: TrackItemFormValue): string[] => {
       if (minScore != null && minScore < 0) {
         errors.push("Roleplay: minimum score must be 0 or above");
       }
+      const minDuration = item.completionCriteria?.minDurationSeconds;
+      if (minDuration != null && (minDuration < 0 || !Number.isInteger(minDuration))) {
+        errors.push("Roleplay: minimum duration must be whole minutes and seconds, 0 or above");
+      }
       break;
     }
     case TrackItemType.CASE:
@@ -860,8 +864,15 @@ export const validateTrackForPublish = (values: TrackFormValues): PublishError[]
 const compactCriteria = (criteria?: CompletionCriteria): CompletionCriteria | undefined => {
   if (!criteria) return undefined;
   const compact: CompletionCriteria = {};
-  if (criteria.minScore != null) compact.minScore = criteria.minScore;
-  if (criteria.minDurationSeconds != null) {
+  // Roleplay: keep only the gates the chosen logic reads, so the stored rule
+  // says exactly what applies. Other types never carry a logic, and read
+  // minScore (CASE) as before.
+  const logic = criteria.completionLogic;
+  if (logic) compact.completionLogic = logic;
+  const scoreGated = !logic || logic === "SCORE" || logic === "SCORE_AND_DURATION";
+  const durationGated = !logic || logic === "DURATION" || logic === "SCORE_AND_DURATION";
+  if (scoreGated && criteria.minScore != null) compact.minScore = criteria.minScore;
+  if (durationGated && criteria.minDurationSeconds != null) {
     compact.minDurationSeconds = criteria.minDurationSeconds;
   }
   if (criteria.watchPct != null) compact.watchPct = criteria.watchPct;

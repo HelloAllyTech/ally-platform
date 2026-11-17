@@ -301,7 +301,7 @@ describe('BuilderSessionService', () => {
 
     it('stores who requested the session and their ref', async () => {
       await service.createSession(1, {
-        title: 'From the PM agent',
+        title: 'From the Debrief PM agent',
         requestedBy: DEBRIEF_PM_AGENT_REQUESTER,
         requestRef: 'idea-1',
       });

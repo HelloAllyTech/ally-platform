@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
@@ -15,6 +16,7 @@ import {
 import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
 import { PlanSpendService } from 'src/product-planning/service/plan-spend.service';
+import { PlanCeilingService } from 'src/product-planning/service/plan-ceiling.service';
 import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { PlanNotificationService } from 'src/product-planning/service/plan-notification.service';
 import {
@@ -87,6 +89,9 @@ export class PlanIdeaService {
     private readonly opportunities: Repository<RoadmapOpportunity>,
     @InjectRepository(RoadmapIdeaDraft)
     private readonly drafts: Repository<RoadmapIdeaDraft>,
+    /** Roadmap v2's one ceiling per idea; a no-op while the flag is off. */
+    @Optional()
+    private readonly ceiling?: PlanCeilingService,
   ) {}
 
   /** Park it (`park: true`, no AI) or work it up: either way a private plan session. */
@@ -143,6 +148,8 @@ export class PlanIdeaService {
     const plan = await this.editableDraft(sessionId, userId);
     const content = (text ?? '').trim();
     if (!content) throw new BadRequestException('Write something first.');
+    // Before anything is written, so a refused turn leaves the draft as it was.
+    await this.ceiling?.assertWithinCeiling(sessionId, 'copilot_turn');
 
     await this.messages.appendMessage(sessionId, {
       role: BuilderMessageRole.USER,
@@ -386,7 +393,11 @@ export class PlanIdeaService {
     now = new Date(),
   ): Promise<{ archived: number; purged: number }> {
     const settings = await this.settings.get();
-    if (!settings.enabled) return { archived: 0, purged: 0 };
+    // Roadmap v2's drafts (P3) are the same private plan sessions and expire
+    // the same way (§4.4), so the sweep also runs while roadmap_v2 is on.
+    if (!settings.enabled && !(await this.settings.getRoadmapV2()).enabled) {
+      return { archived: 0, purged: 0 };
+    }
     const drafts = await this.store.repository
       .createQueryBuilder('s')
       .addSelect('s.plan')
@@ -468,11 +479,18 @@ export class PlanIdeaService {
    * Once, when planning is switched on: every parked `roadmap_idea_drafts`
    * row becomes a parked private plan, and the old row is retired. Idempotent
    * by `migratedFromDraftId`.
+   *
+   * Skips a row the Roadmap cutover already copied (`migratedAt`): that row is
+   * kept on purpose so turning Roadmap off shows it unchanged, and retiring or
+   * copying it again here would undo that or move it twice.
    */
   async migrateIdeaDrafts(): Promise<number> {
     const settings = await this.settings.get();
     if (!settings.enabled) return 0;
-    const drafts = await this.drafts.find({ where: {}, take: 1000 });
+    const drafts = await this.drafts.find({
+      where: { migratedAt: IsNull() },
+      take: 1000,
+    });
     let moved = 0;
     for (const draft of drafts) {
       const existing: { id: string }[] = await this.dataSource.query(

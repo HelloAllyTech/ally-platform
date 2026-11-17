@@ -175,6 +175,11 @@ export const ANALYTICS_EVENTS = {
   IDEA_CAPTURE_SESSION_STARTED: "idea_capture_session_started",
   IDEA_CAPTURE_DRAFT_SAVED: "idea_capture_draft_saved",
   IDEA_CAPTURE_SESSION_ABANDONED: "idea_capture_session_abandoned",
+  // Roadmap v2 time targets (plans §4.16): one started/completed pair per core job, told apart
+  // by `job`. Completed carries `duration_ms`. Both carry `role` (the Roadmap role) and, where
+  // there is one, `item_id` (the idea's code). Never a title, an answer or a name.
+  ROADMAP_JOB_STARTED: "roadmap_job_started",
+  ROADMAP_JOB_COMPLETED: "roadmap_job_completed",
 } as const;
 
 /** `source` values for the /v2 homepage's `home_v2_*` events. */
@@ -391,4 +396,10 @@ export const ANALYTICS_PROPS = {
 
   // Idea capture: "voice" when any of the text was dictated, else "typed"
   CAPTURE_MODE: "capture_mode",
+
+  // Roadmap v2 job timing (roadmap_job_*): which job, how long, and the Roadmap role
+  // (none | viewer | idea | builder | owner). The idea's code goes in ITEM_ID.
+  ROADMAP_JOB: "job",
+  DURATION_MS: "duration_ms",
+  ROADMAP_ROLE: "role",
 } as const;

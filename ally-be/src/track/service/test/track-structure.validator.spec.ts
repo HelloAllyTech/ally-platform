@@ -177,6 +177,72 @@ describe('validateTrackStructure', () => {
 });
 
 describe('computeStructuralSignature', () => {
+  describe('roleplay completion rule on a live course', () => {
+    const roleplay = (
+      completionCriteria: Record<string, unknown> | undefined,
+    ) =>
+      [
+        {
+          id: 's1',
+          title: 'S',
+          order: 1,
+          items: [
+            {
+              id: 'i1',
+              type: TrackItemType.ROLEPLAY,
+              order: 1,
+              title: 'Try out a roleplay',
+              scenarioId: 7,
+              completionCriteria,
+            },
+          ],
+        },
+      ] as unknown as UpsertTrackSectionDto[];
+
+    it('lets a trainer change the logic, minimum score and minimum duration', () => {
+      const before = computeStructuralSignature(
+        roleplay({
+          completionLogic: 'SCORE_AND_DURATION',
+          minScore: 60,
+          minDurationSeconds: 180,
+        }),
+      );
+      expect(
+        computeStructuralSignature(
+          roleplay({ completionLogic: 'PARTICIPATION' }),
+        ),
+      ).toEqual(before);
+      expect(
+        computeStructuralSignature(
+          roleplay({ completionLogic: 'DURATION', minDurationSeconds: 90 }),
+        ),
+      ).toEqual(before);
+      // An older client that never sends completionLogic.
+      expect(computeStructuralSignature(roleplay({ minScore: 60 }))).toEqual(
+        before,
+      );
+      expect(computeStructuralSignature(roleplay(undefined))).toEqual(before);
+    });
+
+    it('still locks assessment mode', () => {
+      expect(
+        computeStructuralSignature(
+          roleplay({ completionLogic: 'SCORE', assessmentMode: true }),
+        ),
+      ).not.toEqual(
+        computeStructuralSignature(roleplay({ completionLogic: 'SCORE' })),
+      );
+    });
+
+    it('still locks swapping the simulation', () => {
+      const swapped = roleplay({ minScore: 60 });
+      (swapped[0].items[0] as { scenarioId: number }).scenarioId = 8;
+      expect(computeStructuralSignature(swapped)).not.toEqual(
+        computeStructuralSignature(roleplay({ minScore: 60 })),
+      );
+    });
+  });
+
   it('is stable across content-safe edits', () => {
     const before = baseSections();
     before[0].id = 's1';

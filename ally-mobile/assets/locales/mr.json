@@ -1934,6 +1934,13 @@
       "prompts_other": "{{count}} प्रॉम्प्ट्स",
       "roleplay": "रोल-प्ले",
       "minScore": "किमान स्कोर {{score}}%",
+      "requireScore": "किमान {{score}} स्कोर करा",
+      "requireDuration": "किमान {{duration}}",
+      "requireScoreAndDuration": "किमान {{score}} स्कोर करा · किमान {{duration}}",
+      "requireParticipation": "सुरू केल्यावर लगेच पूर्ण होते",
+      "durationMin": "{{min}} मिनिट",
+      "durationSec": "{{sec}} सेकंद",
+      "durationMinSec": "{{min}} मिनिट {{sec}} सेकंद",
       "case": "केस",
       "game": "गेम · फक्त मौजेसाठी",
       "branchingScenario": "प्रसंग प्रश्नमंजुषा",
@@ -2044,7 +2051,12 @@
       "assessmentNotice": "तुम्हाला एकच संधी मिळेल. रोल-प्ले संपवताच तुमचा प्रयत्न सबमिट होईल आणि पुन्हा करता येणार नाही.",
       "assessmentSubmitted": "{{date}} रोजी सबमिट केले",
       "assessmentNotPassed": "हा प्रयत्न उत्तीर्ण होण्याच्या अटी पूर्ण करू शकला नाही.",
-      "assessmentLocked": "तुमचे मूल्यांकन सबमिट झाले आहे. पुन्हा प्रयत्न हवा असल्यास तुमच्या ट्रेनरला सांगा."
+      "assessmentLocked": "तुमचे मूल्यांकन सबमिट झाले आहे. पुन्हा प्रयत्न हवा असल्यास तुमच्या ट्रेनरला सांगा.",
+      "lastAttemptTitle": "तुमचा मागील प्रयत्न हा रोलप्ले पूर्ण करू शकला नाही",
+      "lastAttemptDuration": "तो {{actual}} चालला; या रोलप्लेसाठी किमान {{required}} लागतात.",
+      "lastAttemptScore": "तुमचा स्कोर {{score}} होता; या रोलप्लेसाठी किमान {{required}} लागतात.",
+      "lastAttemptScoreUnknown": "तो किमान स्कोर {{required}} पर्यंत पोहोचला नाही.",
+      "lastAttemptFooter": "तयार झाल्यावर पुन्हा प्रयत्न करा."
     },
     "quiz": {
       "intro": {

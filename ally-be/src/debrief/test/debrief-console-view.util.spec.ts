@@ -123,7 +123,7 @@ describe('approvals expire after 14 days as "no decision"', () => {
   });
 });
 
-describe('PM agent autonomy policy', () => {
+describe('Debrief PM agent autonomy policy', () => {
   it('v2: no step can be set; the learner try-out runs on its own; pinned rules never', () => {
     // v2 A3: what waits for a person is the always-ask list, not this table.
     expect(

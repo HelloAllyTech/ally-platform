@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional, Protocol
 
 from pydantic import TypeAdapter
 
-from app.core.debrief.render import PromptVariableMissing
 from app.core.config import settings
 from app.core.debrief import steps
+from app.core.debrief.render import PromptVariableMissing
 from app.core.debrief.safety_reader import (
     LearnerDistress,
     RiskCue,
@@ -106,12 +106,22 @@ class InProcessSteps:
             scenario_session_id=session_id,
             model=model,
             risk_cue_definition=body.get("risk_cue_definition"),
+            speaker_labels=body.get("speaker_labels"),
+            risk_cue=body.get("risk_cue"),
+            scenario=body.get("scenario"),
+            roleplay_expectations=body.get("roleplay_expectations"),
         )
         if reading is None:
             return None
+        cues = _dump(List[RiskCue], reading.risk_cues)
+        for c in cues:
+            # Null (not asked for) stays out, so a run that does not assess
+            # risk cues keeps today's cue objects.
+            if c.get("part_of_practice") is None:
+                c.pop("part_of_practice", None)
         return {
             "model": ran,
-            "risk_cues": _dump(List[RiskCue], reading.risk_cues),
+            "risk_cues": cues,
             "learner_distress": _dump(List[LearnerDistress], reading.learner_distress),
         }
 
@@ -130,6 +140,8 @@ class InProcessSteps:
             scenario_session_id=session_id,
             live_detections=body.get("live_detections") or [],
             case_memory=body.get("case_memory"),
+            framework=body.get("framework"),
+            speaker_labels=body.get("speaker_labels"),
         )
         if out is None:
             return None
@@ -164,6 +176,7 @@ class InProcessSteps:
             model or settings.DEBRIEF.PROGRESS_AGENT_MODEL,
             system=body.get("system_prompt"),
             scenario_session_id=session_id,
+            framework=body.get("framework"),
         )
         if out is None:
             return None
@@ -193,6 +206,8 @@ class InProcessSteps:
             cohort=body.get("cohort"),
             findings=body.get("findings"),
             risk_cue_definition=body.get("risk_cue_definition"),
+            risk_cue=body.get("risk_cue"),
+            speaker_labels=body.get("speaker_labels"),
         )
         if out is None:
             return None
@@ -217,6 +232,10 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             fix_system=body.get("fix_prompt"),
             pass_score=body.get("pass_score") or 8,
+            progress=body.get("progress"),
+            risk_cue=body.get("risk_cue"),
+            speaker_labels=body.get("speaker_labels"),
+            roleplay_expectations=body.get("roleplay_expectations"),
         )
         if out is None:
             return None
@@ -239,6 +258,9 @@ class InProcessSteps:
             findings=body.get("findings"),
             risk_cue_definition=body.get("risk_cue_definition"),
             safety=body.get("safety") or {},
+            risk_cue=body.get("risk_cue"),
+            speaker_labels=body.get("speaker_labels"),
+            passages=body.get("passages") or None,
         )
         if out is None:
             return None
@@ -283,6 +305,7 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             focus_turns=body.get("focus_turns") or [],
             scenario_session_id=session_id,
+            speaker_labels=body.get("speaker_labels"),
         )
         if out is None:
             return None

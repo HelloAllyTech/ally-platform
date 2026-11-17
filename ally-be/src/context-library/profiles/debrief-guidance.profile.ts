@@ -18,6 +18,9 @@ export const DEBRIEF_GUIDELINE_KINDS = [
   'style_guide',
   'level_guide',
   'protocol',
+  // A skill framework: the skills the Debrief assesses beyond a roleplay's own competencies, chosen
+  // per roleplay in Simulation Studio. Read directly by the Debrief, never retrieved as guidance.
+  'skill_framework',
 ] as const;
 
 /**
@@ -68,6 +71,7 @@ export const DEBRIEF_GUIDANCE_PROFILE: CollectionProfile = {
         style_guide: 'Style guide',
         level_guide: 'Level guide',
         protocol: 'Protocol',
+        skill_framework: 'Skill framework',
       },
       multi: false,
     },
@@ -92,6 +96,25 @@ export const DEBRIEF_GUIDANCE_PROFILE: CollectionProfile = {
     },
     // Information only, now that sign-off is dropped (PLAN.md §1, decision 8; §13).
     clinical: { label: 'Clinical', type: 'bool', shown: true },
+    // Skill frameworks only (kind = Skill framework). One line per skill: key | Skill name | words
+    // that identify it when a behaviour is named loosely (comma-separated, optional).
+    skills: {
+      label: 'Framework skills (key | name | identifying words)',
+      type: 'text[]',
+      shown: true,
+    },
+    // One line per chart area a behaviour is tagged with: name | what it covers. None = no chart.
+    areas: {
+      label: 'Framework chart areas (name | what it covers)',
+      type: 'text[]',
+      shown: true,
+    },
+    // The separate Foundational Skills levels apply to this framework (only the foundational one).
+    foundational: {
+      label: 'Foundational Skills levels apply',
+      type: 'bool',
+      shown: true,
+    },
   },
   extraction: {
     promptCode: 'context_library_extract_debrief_guidance_system',

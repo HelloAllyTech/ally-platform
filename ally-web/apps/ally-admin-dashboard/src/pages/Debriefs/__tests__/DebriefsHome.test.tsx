@@ -269,7 +269,7 @@ describe("Debriefs home (v2, U1): answer first", () => {
     expect(scoreTrend(7.4, 7.8)).toBe("down 0.4");
   });
 
-  it("Home has no This week and no PM agent conversation: both live on the PM agent page", () => {
+  it("Home has no This week and no Debrief PM agent conversation: both live on the Debrief PM agent page", () => {
     renderAt();
     expect(screen.queryByTestId("home-this-week")).toBeNull();
     expect(screen.queryByTestId("home-pm-accordion")).toBeNull();
@@ -277,11 +277,11 @@ describe("Debriefs home (v2, U1): answer first", () => {
   });
 });
 
-describe("Needs you: listed on Home, decided on the PM agent page", () => {
+describe("Needs you: listed on Home, decided on the Debrief PM agent page", () => {
   it("lists each waiting change in one line: Your call, the title, why it asks", () => {
     renderAt();
     const needs = screen.getByTestId("home-needs-you");
-    expect(needs).toHaveTextContent("Needs you: one change the PM agent won’t make alone");
+    expect(needs).toHaveTextContent("Needs you: one change the Debrief PM agent won’t make alone");
     const row = within(needs).getByTestId("home-needs-item");
     expect(row).toHaveTextContent("Your call");
     expect(row).toHaveTextContent("Safety reader text always asks a person.");
@@ -290,19 +290,19 @@ describe("Needs you: listed on Home, decided on the PM agent page", () => {
     expect(h.change).not.toHaveBeenCalled();
   });
 
-  it("a row opens that change on the PM agent page", () => {
+  it("a row opens that change on the Debrief PM agent page", () => {
     renderAt();
     fireEvent.click(screen.getByTestId("home-needs-item"));
     expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
   });
 
-  it("the headline's 'needs you' links to the PM agent", () => {
+  it("the headline's 'needs you' links to the Debrief PM agent", () => {
     renderAt();
     fireEvent.click(screen.getByTestId("home-needs-link"));
     expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent");
   });
 
-  it("an old Home link to a change opens it on the PM agent page", () => {
+  it("an old Home link to a change opens it on the Debrief PM agent page", () => {
     renderAt("/debriefs?change=c-safety");
     expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
   });
@@ -313,7 +313,7 @@ describe("the clinical advisor's home", () => {
     h.sessions.mockReturnValue(page(ITEMS, ADVISOR));
   });
 
-  it("leads with their decision; no Changes, Analytics, Settings, This week or PM agent", () => {
+  it("leads with their decision; no Changes, Analytics, Settings, This week or Debrief PM agent", () => {
     renderAt();
     expect(screen.getByTestId("home-headline")).toHaveTextContent("1 change needs your decision.");
     expect(screen.getByTestId("home-needs-you")).toHaveTextContent(
@@ -326,7 +326,7 @@ describe("the clinical advisor's home", () => {
     expect(screen.queryByTestId("home-pm-accordion")).toBeNull();
   });
 
-  it("a deep link opens their change on the PM agent page", () => {
+  it("a deep link opens their change on the Debrief PM agent page", () => {
     renderAt("/debriefs?change=c-safety");
     expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
   });
@@ -368,13 +368,13 @@ describe("all debriefs by day", () => {
 });
 
 describe("rows never wrap", () => {
-  it("PM agent and Analytics, Settings in More", () => {
+  it("Debrief PM agent and Analytics, Settings in More", () => {
     renderAt();
     const actions = screen.getByTestId("home-actions");
     const links = within(actions)
       .getAllByRole("link")
       .map(a => a.textContent);
-    expect(links[0]).toMatch(/^PM agent/);
+    expect(links[0]).toMatch(/^Debrief PM agent/);
     expect(links[1]).toMatch(/Analytics/);
     expect(within(actions).queryByRole("link", { name: "Settings" })).toBeNull();
     fireEvent.click(

@@ -1112,6 +1112,27 @@ export class DebriefConsoleViewService implements OnModuleInit {
       });
     }
 
+    // Risk-cue options a creator sent for approval: the clinical advisor or the owner decides.
+    if (viewer.roles.clinicalAdvisor || viewer.roles.owner) {
+      try {
+        const [waiting] = await this.dataSource.query(
+          `SELECT count(*)::int AS n FROM debrief_risk_cue_options WHERE status = 'awaiting_approval'`,
+        );
+        const n = Number(waiting?.n ?? 0);
+        if (n > 0) {
+          banners.push({
+            kind: 'risk_cue_option',
+            level: 'yellow',
+            count: n,
+            message: `${n} risk-cue option${n === 1 ? ' is' : 's are'} waiting for your approval.`,
+            link: { page: 'settings', category: 'risk_cue_options' },
+          });
+        }
+      } catch {
+        // The table is new; an unreadable one is no banner, never a broken home.
+      }
+    }
+
     // Canaries reverted on their own in the last 7 days.
     const reverted: Array<Record<string, any>> = await this.dataSource.query(
       `SELECT id, text, evidence->'canary' AS canary FROM agent_lessons
