@@ -13,6 +13,8 @@ import {
 import { ROUTES, en } from "@constants";
 import type { RoadmapItemDetail, RoadmapWatchLevel } from "@types";
 
+import { BuildMenu } from "./BuildMenu";
+import { ShipActions } from "./ReleaseDialog";
 import { VoteControl } from "./VoteControl";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
 import { IdeaFlowAction, hasIdeaFlowAction } from "../triage/ReviewActions";
@@ -302,7 +304,11 @@ export const PrimaryAction: React.FC<{
   item: RoadmapItemDetail;
   onApproveDesign: () => void;
   fullWidth?: boolean;
-}> = ({ item, onApproveDesign, fullWidth }) => {
+  /** Opens the side panel on a tab (Merge opens Build, where the pull requests are). */
+  onOpenDetails?: (tab: "build" | "ship") => void;
+  /** Phone: Build ▾ shows the Claude Code hint; Release slides to confirm. */
+  phone?: boolean;
+}> = ({ item, onApproveDesign, fullWidth, onOpenDetails, phone }) => {
   const action = primaryActionFor(item);
   // Accept, Pick a lead, Start planning, and a declined idea's Reopen / New idea (P3, P3b).
   if (hasIdeaFlowAction(item)) return <IdeaFlowAction item={item} fullWidth={fullWidth} />;
@@ -321,12 +327,18 @@ export const PrimaryAction: React.FC<{
         // Rendered by IdeaFlowAction above (P3b).
         return null;
       case "build":
-        // TODO(P4): Build ▾ — Build here · Open in Claude Code · Copy brief · Download brief.
-        return null;
+        return <BuildMenu item={item} phone={phone} fullWidth={fullWidth} />;
       case "merge":
       case "release":
-        // TODO(P4): Merge and Release from the idea page (the release policy lands with P5).
-        return null;
+        return (
+          <ShipActions
+            item={item}
+            kind={action}
+            phone={phone}
+            fullWidth={fullWidth}
+            onOpenBuild={onOpenDetails ? () => onOpenDetails("build") : undefined}
+          />
+        );
       default:
         return null;
     }

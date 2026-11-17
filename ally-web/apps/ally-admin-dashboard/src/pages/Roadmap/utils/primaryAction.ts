@@ -33,7 +33,9 @@ export const primaryActionFor = (
       return can.startPlanning ? "startPlanning" : null;
     case "planning":
       if (p.designAwaitingApproval && can.approveDesign) return "approveDesign";
-      if (p.step === "ready" && can.startBuild) return "build";
+      // Build ▾ holds Build here (startBuild) and the brief (exportBrief): either one is enough,
+      // so a paused agent still leaves Open in Claude Code (§4.7).
+      if (p.step === "ready" && (can.startBuild || can.exportBrief)) return "build";
       return null;
     case "building":
       if (p.heldReason && can.release) return "release";
