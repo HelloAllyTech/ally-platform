@@ -3,9 +3,10 @@ import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Close, Search } from "@icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 
 import { useSearchRoadmapQuery } from "@api";
-import { en } from "@constants";
+import { ROUTES, en } from "@constants";
 import type { RoadmapItemRow, RoadmapQueueView } from "@types";
 
 import { dialogVariants, motionTransition, useReducedMotionPreference } from "../../../motion";
@@ -13,6 +14,7 @@ import { useDebouncedValue } from "../../ProductRoadmap/useDebouncedValue";
 import { stageWord } from "../utils/copy";
 
 type Entry =
+  | { kind: "newIdea"; label: string }
   | { kind: "idea"; row: RoadmapItemRow }
   | { kind: "view"; view: RoadmapQueueView; label: string };
 
@@ -29,7 +31,7 @@ interface QuickOpenProps {
 /**
  * Quick open, ⌘K / Ctrl K (§4.11): jump to an idea by code, title or author, or to a view. With
  * nothing typed, it lists your last 5 ideas. Arrow keys move, Enter opens, Esc closes; focus returns
- * to where it was. TODO(P3): "New idea" joins the list once the draft page exists.
+ * to where it was. "New idea" heads the list (and matches when typed).
  */
 export const QuickOpen: React.FC<QuickOpenProps> = ({
   open,
@@ -47,6 +49,7 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const listId = useId();
+  const navigate = useNavigate();
 
   const { data, isFetching } = useSearchRoadmapQuery(debounced.trim(), { skip: !open });
 
@@ -59,7 +62,12 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
     const ideaEntries: Entry[] = (Array.isArray(ideas) ? ideas : [])
       .slice(0, q ? 20 : 5)
       .map(row => ({ kind: "idea" as const, row }));
-    return [...viewEntries, ...ideaEntries];
+    const newIdeaLabel = en.roadmapV2.newIdea.button;
+    const newIdea: Entry[] =
+      !q || newIdeaLabel.toLowerCase().includes(q)
+        ? [{ kind: "newIdea", label: newIdeaLabel }]
+        : [];
+    return [...newIdea, ...viewEntries, ...ideaEntries];
   }, [data, debounced, views]);
 
   useEffect(() => setHighlight(0), [debounced]);
@@ -78,7 +86,8 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
   const choose = (entry: Entry | undefined) => {
     if (!entry) return;
     onClose();
-    if (entry.kind === "idea") onOpenIdea(entry.row.code);
+    if (entry.kind === "newIdea") navigate(ROUTES.ROADMAP_NEW_IDEA);
+    else if (entry.kind === "idea") onOpenIdea(entry.row.code);
     else onOpenView(entry.view);
   };
 
@@ -168,7 +177,13 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
                   const selected = index === highlight;
                   return (
                     <li
-                      key={entry.kind === "idea" ? entry.row.code : `view-${entry.view}`}
+                      key={
+                        entry.kind === "idea"
+                          ? entry.row.code
+                          : entry.kind === "view"
+                            ? `view-${entry.view}`
+                            : "new-idea"
+                      }
                       id={optionId(index)}
                       role="option"
                       aria-selected={selected}
@@ -194,9 +209,13 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
                             {stageWord(entry.row.shownStage)}
                           </span>
                         </span>
-                      ) : (
+                      ) : entry.kind === "view" ? (
                         <span className="relative">
                           {copy.views}: {entry.label}
+                        </span>
+                      ) : (
+                        <span className="relative font-semibold text-primary-700">
+                          ＋ {entry.label}
                         </span>
                       )}
                     </li>

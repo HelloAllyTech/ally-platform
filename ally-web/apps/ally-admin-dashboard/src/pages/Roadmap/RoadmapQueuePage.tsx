@@ -27,6 +27,7 @@ import {
 } from "./components/FilterControls";
 import { ideaUrl } from "./components/IdeaControls";
 import { IdeaView } from "./components/IdeaView";
+import { NewIdeaButton } from "./components/NewIdeaButton";
 import { QueueBoard } from "./components/QueueBoard";
 import { QueueList } from "./components/QueueList";
 import { QuickOpen } from "./components/QuickOpen";
@@ -45,6 +46,7 @@ import { hasReadingPane, useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoi
 import { useRoadmapRealtime } from "./hooks/useRoadmapRealtime";
 import { useKeyboardInset } from "./hooks/useVisualViewport";
 import { useRoadmapRole } from "./RoadmapGate";
+import { TriageView } from "./triage/TriageView";
 import { queueKeyAction, stepSelection } from "./utils/keyboard";
 import { ROADMAP_PREF_KEYS, readPref, writePref } from "./utils/prefs";
 import {
@@ -178,7 +180,11 @@ export const RoadmapQueuePage: React.FC = () => {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [actionSheetFor, setActionSheetFor] = useState<string | null>(null);
-  const overlayOpen = quickOpen || shortcutsOpen || filterSheetOpen || !!actionSheetFor;
+  const [triageOverlay, setTriageOverlay] = useState(false);
+  const overlayOpen =
+    quickOpen || shortcutsOpen || filterSheetOpen || !!actionSheetFor || triageOverlay;
+  // To triage, for an Owner, is the triage screen (§4.6): its own rows, keys and Summary pane.
+  const triageMode = state.view === "to-triage" && !!can.review && layout === "list";
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -426,9 +432,8 @@ export const RoadmapQueuePage: React.FC = () => {
                 <span className="font-semibold text-typography-primary" aria-current="page">
                   {copy.mobile.queue}
                 </span>
-                {/* TODO(P3): My drafts becomes Roadmap's own tab; until then it opens the old page. */}
                 <Link
-                  to={`${ROUTES.PRODUCT_ROADMAP}?tab=drafts`}
+                  to={ROUTES.ROADMAP_DRAFTS}
                   className="text-typography-secondary hover:underline"
                 >
                   {copy.mobile.drafts}
@@ -443,7 +448,7 @@ export const RoadmapQueuePage: React.FC = () => {
               </nav>
             )}
           </div>
-          {/* TODO(P3): the one primary button, New idea, with Report a bug in its menu. */}
+          {!isPhone && <NewIdeaButton />}
           {isPhone && <SearchButton compact onClick={() => setQuickOpen(true)} />}
         </header>
 
@@ -453,6 +458,19 @@ export const RoadmapQueuePage: React.FC = () => {
           <div className="min-h-0 flex-1 overflow-auto">
             <QueueBoard onOpen={openIdea} />
           </div>
+        ) : triageMode ? (
+          <TriageView
+            data={data}
+            isLoading={isLoading}
+            isError={isError}
+            onRetry={() => void refetch()}
+            breakpoint={breakpoint}
+            selected={selected}
+            open={withPane ? state.open : undefined}
+            onOpen={openIdea}
+            onVisibleCodes={onVisibleCodes}
+            onOverlay={setTriageOverlay}
+          />
         ) : withPane ? (
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,2fr)_3fr]">
             <div className="flex min-h-0 flex-col border-r border-border-light">{list}</div>
@@ -511,7 +529,11 @@ export const RoadmapQueuePage: React.FC = () => {
           views={views}
           fullScreen={isPhone}
         />
-        <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        <ShortcutsDialog
+          open={shortcutsOpen}
+          onClose={() => setShortcutsOpen(false)}
+          triage={triageMode}
+        />
         {touch && (
           <FilterSheet
             open={filterSheetOpen}

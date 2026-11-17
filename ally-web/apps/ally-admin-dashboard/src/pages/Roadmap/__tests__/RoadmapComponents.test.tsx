@@ -182,7 +182,24 @@ describe("primaryActionFor", () => {
   it("renders nothing for the actions later phases build", () => {
     const { container } = wrap(
       <PrimaryAction
-        item={detail({ review: true }, { shownStage: "submitted" })}
+        item={detail(
+          { merge: true },
+          {
+            shownStage: "building",
+            statusParts: {
+              stage: "building",
+              where: "here",
+              leadUserId: 2,
+              externalBuild: null,
+              repos: [],
+              openPrs: [],
+              mergedPrs: 0,
+              waitingForPr: false,
+              releasing: false,
+              heldReason: null,
+            },
+          },
+        )}
         onApproveDesign={vi.fn()}
       />,
     );
