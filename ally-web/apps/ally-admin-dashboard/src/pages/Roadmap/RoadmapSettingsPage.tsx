@@ -27,6 +27,7 @@ import {
 import { ROUTES, en } from "@constants";
 import type { RoadmapV2SettingsFields } from "@types";
 
+import { useRoadmapRole } from "./RoadmapGate";
 import { AgentEmbedContext } from "../Builder/agentEmbed";
 import { BuilderSettings } from "../Builder/BuilderSettings";
 import { ProductGoalsManager } from "../ProductRoadmap/ProductGoalsManager";
@@ -34,8 +35,8 @@ import { StrategyContextManager } from "../ProductRoadmap/StrategyContextManager
 import { StrategyRankingManager } from "../ProductRoadmap/StrategyRankingManager";
 import { RoadmapAreaHeader } from "./components/RoadmapAreaHeader";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
+import { RoadmapSwitchOnSection } from "./cutover/RoadmapSwitchOnSection";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
-import { useRoadmapRole } from "./RoadmapGate";
 import { shortDate } from "./utils/copy";
 import { canSeeSettings } from "./utils/redirects";
 import {
@@ -178,7 +179,11 @@ export const RoadmapFlagCard: React.FC<{ enabled: boolean }> = ({ enabled }) => 
           setConfirm(null);
           if (next === null) return;
           try {
-            await update({ roadmapV2Enabled: next }).unwrap();
+            const saved = (await update({ roadmapV2Enabled: next }).unwrap()) as
+              | { roadmapV2Off?: { message?: string } }
+              | undefined;
+            // Switching off is the rollback: the server says what was kept.
+            if (!next && saved?.roadmapV2Off?.message) toast.success(saved.roadmapV2Off.message);
           } catch {
             toast.error(copy.roadmapFlagFailed);
           }
@@ -439,6 +444,10 @@ export const RoadmapSettingsPage: React.FC = () => {
               </>
             )}
           </Group>
+
+          {/* Roadmap v2 P6: what the switch-on moved, and a catch-up run for anything made
+              through the old pages since. */}
+          <RoadmapSwitchOnSection />
         </div>
       </div>
       {phone && <RoadmapBottomBar hidden={false} />}

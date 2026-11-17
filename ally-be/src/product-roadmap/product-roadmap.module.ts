@@ -12,6 +12,9 @@ import { RoadmapAllocation } from './entity/roadmap-allocation.entity';
 import { RoadmapVoteGrant } from './entity/roadmap-vote-grant.entity';
 import { RoadmapInterviewNote } from './entity/roadmap-interview-note.entity';
 import { RoadmapIdeaDraft } from './entity/roadmap-idea-draft.entity';
+import { RoadmapCutoverLog } from './entity/roadmap-cutover-log.entity';
+import { RoadmapCutoverController } from './cutover/roadmap-cutover.controller';
+import { RoadmapCutoverService } from './cutover/roadmap-cutover.service';
 import { RoadmapIdeaDraftController } from './controller/roadmap-idea-draft.controller';
 import { RoadmapIdeaDraftService } from './service/roadmap-idea-draft.service';
 import { RoadmapIdeaTranscriptionService } from './service/roadmap-idea-transcription.service';
@@ -171,6 +174,7 @@ import { RoadmapReviewService } from './review/roadmap-review.service';
       RoadmapOpportunityComment,
       RoadmapInterviewNote,
       RoadmapIdeaDraft,
+      RoadmapCutoverLog,
       RoadmapSavedView,
       RoadmapUserTabOrder,
       RoadmapUserMap,
@@ -232,6 +236,8 @@ import { RoadmapReviewService } from './review/roadmap-review.service';
   controllers: [
     // Roadmap v2 (plans/roadmap-builder-merge): 404 while roadmap_v2 is off.
     RoadmapItemController,
+    // P6: Switch on Roadmap. The one pair that answers while roadmap_v2 is off.
+    RoadmapCutoverController,
     // P3: New idea, drafts, dictation, review and the lead.
     RoadmapDraftController,
     RoadmapReviewController,
@@ -257,6 +263,8 @@ import { RoadmapReviewService } from './review/roadmap-review.service';
     RoadmapReviewService,
     RoadmapItemBuildService,
     RoadmapRoleAdminService,
+    // Roadmap v2 P6: the Owner's switch-on action.
+    RoadmapCutoverService,
     // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
     PlanSessionStore,
     PlanStageService,

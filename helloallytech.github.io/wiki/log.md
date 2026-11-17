@@ -501,3 +501,6 @@ The old corpus's Weaviate collection is dropped only by ally-be's confirmed reti
 
 ## [2026-10-29] update | Debriefs: every risk cue covered, learner flags, review queue, live on session end.
 - `repos/ally-be.md`: the Debrief agent's learner feedback (`debrief_run_feedback`), the Review tab, risk-cue coverage, and live runs starting on session end.
+
+## [2026-11-17] update | Roadmap v2: the Owner's switch-on action.
+- `repos/ally-be.md`: `product-roadmap/cutover/` — the preview and the idempotent cutover run, the only `/v1/roadmap/*` routes that answer while the flag is off.

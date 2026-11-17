@@ -154,8 +154,11 @@ def problem_with(decision: FlagDecision, req: FlagAnswerRequest) -> Optional[str
 
 
 def render_request(req: FlagAnswerRequest) -> str:
+    def speaker(role: str) -> str:
+        return "Learner" if role == "counselor" else "Character"
+
     transcript = "\n".join(
-        f"[{t.turn_index}] {'Learner' if t.role == 'counselor' else 'Character'}: {t.text}"
+        f"[{t.turn_index}] {speaker(t.role)}: {t.text}"
         for t in req.transcript
     )
     card = {k: v for k, v in req.card.items() if k != "point_id"}

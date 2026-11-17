@@ -1,14 +1,16 @@
 """The test behind a risk-cue option (spec DEBRIEF_ACROSS_ROLEPLAYS §5).
 
-A creator gives an option example lines that ARE risk cues and lines that are NOT. Each line is
-put in a character's mouth inside a short synthetic session and read by the real Safety reader
-with the option's own definition. The option passes only when, on EVERY run:
+A creator gives an option example lines that ARE risk cues and lines that are NOT. Each
+line is put in a character's mouth inside a short synthetic session and read by the real
+Safety reader with the option's own definition. The option passes only when, on EVERY
+run:
 
 - every cue example is found as a risk cue at the character's turn (any category), and
-- no non-cue example is flagged as a CLEAR risk cue (a ``possible`` one is allowed: it is the
-  Writer's call, as in a real debrief).
+- no non-cue example is flagged as a CLEAR risk cue (a ``possible`` one is allowed: it
+  is the Writer's call, as in a real debrief).
 
-With ``word_list_raises`` off, the word list never raises a cue to clear, as in a real run.
+With ``word_list_raises`` off, the word list never raises a cue to clear, as in a real
+run.
 Synthetic sessions only.
 """
 
