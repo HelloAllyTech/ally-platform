@@ -69,6 +69,8 @@ import { ProductPlanningModule } from 'src/product-planning/product-planning.mod
 import { RoadmapPlanController } from './controller/roadmap-plan.controller';
 import { RoadmapItemController } from './item/roadmap-item.controller';
 import { RoadmapItemLookupService } from './item/roadmap-item-lookup.service';
+import { RoadmapItemReadService } from './item/roadmap-item-read.service';
+import { RoadmapItemEditService } from './item/roadmap-item-edit.service';
 import { PlanSessionStore } from './plan/plan-session.store';
 import { PlanStageService } from './plan/plan-stage.service';
 import { PlanReadinessService } from './plan/plan-readiness.service';
@@ -215,6 +217,9 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
   ],
   providers: [
     RoadmapItemLookupService,
+    // Roadmap v2's read model and its inline edits (P2).
+    RoadmapItemReadService,
+    RoadmapItemEditService,
     // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
     PlanSessionStore,
     PlanStageService,
