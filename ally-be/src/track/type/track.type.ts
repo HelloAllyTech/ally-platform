@@ -218,6 +218,13 @@ export interface JournalContent {
   prompts: JournalPrompt[];
 }
 
+export enum TrackItemCompletionLogic {
+  SCORE = 'SCORE',
+  DURATION = 'DURATION',
+  SCORE_AND_DURATION = 'SCORE_AND_DURATION',
+  PARTICIPATION = 'PARTICIPATION',
+}
+
 /**
  * Per-item completion rule. Only the keys relevant to the item's type are
  * read; the rest are ignored:
@@ -243,6 +250,7 @@ export interface TrackItemCompletionCriteria {
   passScore?: number;
   watchPct?: number;
   minReadSeconds?: number;
+  completionLogic?: TrackItemCompletionLogic;
 }
 
 export interface AnsweredArticleQuestion {

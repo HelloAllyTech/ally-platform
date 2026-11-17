@@ -6,7 +6,11 @@ import {
   TRACK_MAX_COMPETENCIES,
 } from 'src/track/constants/track.constant';
 import { TrackGameKey } from 'src/track/type/game.type';
-import { TrackItemType, VideoSource } from 'src/track/type/track.type';
+import {
+  TrackItemCompletionLogic,
+  TrackItemType,
+  VideoSource,
+} from 'src/track/type/track.type';
 import {
   COURSE_COPILOT_DEFAULT_ITEM_MINUTES,
   COURSE_COPILOT_LIMITS,
@@ -182,6 +186,13 @@ function toItemType(raw: unknown): TrackItemType | null {
     .replace(/[\s-]+/g, '_');
   if (ITEM_TYPES.has(key)) return key as TrackItemType;
   return TYPE_ALIASES[key] ?? null;
+}
+
+function toCompletionLogic(raw: unknown): TrackItemCompletionLogic | null {
+  const key = text(raw).toUpperCase();
+  const values = Object.values(TrackItemCompletionLogic) as string[];
+  if (values.includes(key)) return key as TrackItemCompletionLogic;
+  return null;
 }
 
 function videoSourceFor(url: string, declared?: unknown): VideoSource {
@@ -585,6 +596,10 @@ function applyCompletionDefaults(
             practiceSlotMinScore(item, brief) ??
             capstoneThreshold(item) ??
             COURSE_COPILOT_DEFAULT_ROLEPLAY_MIN_SCORE,
+          completionLogic:
+            toCompletionLogic(given.completionLogic) ??
+            toCompletionLogic(item.spec.completionLogic) ??
+            TrackItemCompletionLogic.SCORE_AND_DURATION,
         };
         if (minDuration !== undefined && minDuration >= 0) {
           criteria.minDurationSeconds = Math.round(minDuration);

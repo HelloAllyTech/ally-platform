@@ -307,13 +307,46 @@ describe('normaliseBlueprint', () => {
       expect(
         blueprint.sections[0].items.map((item) => item.completionCriteria),
       ).toEqual([
-        { minScore: 0, minDurationSeconds: 120 },
-        { minScore: 55 },
-        { minScore: 40 },
-        { minScore: 50 },
-        { minScore: 60 },
+        {
+          minScore: 0,
+          minDurationSeconds: 120,
+          completionLogic: 'SCORE_AND_DURATION',
+        },
+        { minScore: 55, completionLogic: 'SCORE_AND_DURATION' },
+        { minScore: 40, completionLogic: 'SCORE_AND_DURATION' },
+        { minScore: 50, completionLogic: 'SCORE_AND_DURATION' },
+        { minScore: 60, completionLogic: 'SCORE_AND_DURATION' },
         undefined,
-        { minScore: 75 },
+        { minScore: 75, completionLogic: 'SCORE_AND_DURATION' },
+      ]);
+    });
+
+    it('resolves completionLogic for roleplays', () => {
+      const blueprint = normaliseBlueprint(
+        rawPlan([
+          rawItem('ROLEPLAY', {
+            completionCriteria: {
+              completionLogic: 'DURATION',
+              minDurationSeconds: 120,
+            },
+          }),
+          rawItem('ROLEPLAY', {
+            completionCriteria: { completionLogic: 'PARTICIPATION' },
+          }),
+          rawItem('ROLEPLAY', {
+            spec: { completionLogic: 'SCORE' },
+          }),
+          rawItem('ROLEPLAY'),
+        ]),
+        brief(),
+      );
+      expect(
+        blueprint.sections[0].items.map((item) => item.completionCriteria),
+      ).toEqual([
+        { minScore: 60, minDurationSeconds: 120, completionLogic: 'DURATION' },
+        { minScore: 60, completionLogic: 'PARTICIPATION' },
+        { minScore: 60, completionLogic: 'SCORE' },
+        { minScore: 75, completionLogic: 'SCORE_AND_DURATION' },
       ]);
     });
 

@@ -130,6 +130,7 @@ import {
 } from '../type/scenario-session-leaderboard-event.type';
 import { CaseSharedService } from 'src/case/service/case-shared.service';
 import { CaseSessionService } from 'src/case/service/case-session.service';
+import { TrackItemCompletionLogic } from 'src/track/type/track.type';
 import { TrackProgressService } from 'src/track/service/track-progress.service';
 import { TrackMemoryService } from 'src/track/service/track-memory.service';
 import { CommonUtil } from 'src/common/util/common.util';
@@ -602,7 +603,7 @@ export class ScenarioSessionService {
       await this.assertTextChatAllowed(scenario);
     }
 
-    await this.validateStartScenarioSession(
+    const { trackItem } = await this.validateStartScenarioSession(
       counselorId,
       scenario.id,
       startScenarioSessionDto,
@@ -933,6 +934,16 @@ export class ScenarioSessionService {
         languageDetails?.value,
       );
 
+      if (
+        trackItem?.completionCriteria?.completionLogic ===
+        TrackItemCompletionLogic.PARTICIPATION
+      ) {
+        await this.trackProgressService.completeItem(
+          startScenarioSessionDto.trackItemProgressId!,
+          {},
+        );
+      }
+
       return {
         scenarioSession,
         accessToken,
@@ -1017,13 +1028,14 @@ export class ScenarioSessionService {
     counselorId: number,
     scenarioId: number,
     startScenarioSessionDto: StartScenarioSessionRequestDto,
-  ) {
+  ): Promise<{ trackItem?: any }> {
     await this.validateGlobalSimulationCapacity();
 
     const tenantId = ExecutionManager.getTenantId();
     if (!tenantId) {
       throw new NotFoundException('TenantId not found');
     }
+    let trackItem: any = undefined;
     if (startScenarioSessionDto.scenarioPathSessionItemId) {
       const scenarioPathSessionItem =
         await this.scenarioPathSharedService.getPermittedPathSessionItemBySessionItemId(
@@ -1058,7 +1070,7 @@ export class ScenarioSessionService {
       // Track 2.0: validate the roleplay belongs to an unlocked track item
       // visible to the caller's tenant.
       const userIdStr = ExecutionManager.getUserId();
-      await this.trackProgressService.validateRoleplayStart(
+      trackItem = await this.trackProgressService.validateRoleplayStart(
         startScenarioSessionDto.trackItemProgressId,
         scenarioId,
         { userId: Number(userIdStr), tenantId },
@@ -1156,6 +1168,8 @@ export class ScenarioSessionService {
         'You have insufficient credits to start a new scenario session',
       );
     }
+
+    return { trackItem };
   }
 
   private getEgressRecordingStartedAt(egressInfo?: EgressInfo) {

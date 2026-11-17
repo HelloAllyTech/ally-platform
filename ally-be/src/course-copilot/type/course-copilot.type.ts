@@ -1,4 +1,7 @@
-import { TrackItemType } from 'src/track/type/track.type';
+import {
+  TrackItemType,
+  TrackItemCompletionLogic,
+} from 'src/track/type/track.type';
 
 /**
  * The distilled interview — what the trainer has told the copilot so far.
@@ -111,6 +114,7 @@ export interface CourseBlueprintCompletionCriteria {
   watchPct?: number;
   minReadSeconds?: number;
   minDurationSeconds?: number;
+  completionLogic?: TrackItemCompletionLogic;
 }
 
 export interface CourseBlueprintItem {

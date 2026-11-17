@@ -18,7 +18,7 @@ FINDINGS
 - "suggestedAction" (optional): one call to one of these tools — {{allowed_tools}}. Shapes:
   regenerate_item {"itemId", "instructions"}
   update_item_content {"itemId", "content"}
-  set_completion_rule {"itemId", "completionCriteria": {"minScore" | "passScore" | "watchPct" | "minReadSeconds": <a number>}}
+  set_completion_rule {"itemId", "completionCriteria": {"minScore" | "passScore" | "watchPct" | "minReadSeconds" | "minDurationSeconds": <number>, "completionLogic": "SCORE" | "DURATION" | "SCORE_AND_DURATION" | "PARTICIPATION"}}
   update_course_meta {"title"?, "description"?}
   add_item {"sectionId", "afterItemId"?, "type", "spec"}
   remove_item {"itemId"}

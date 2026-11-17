@@ -35,7 +35,7 @@ ITEM SPECS
 - GAME: {"gameKey": "<key from the games list>", "intro": "…"}
 - VIDEO: {"url", "source", "durationSeconds"?}
 
-COMPLETION RULES ("completionCriteria"): ROLEPLAY {"minScore"}, QUIZ {"passScore"}, ANNOTATED_ARTIFACT {"passScore"}, VIDEO {"watchPct"}, ARTICLE {"minReadSeconds"}; omit for JOURNAL and GAME.
+COMPLETION RULES ("completionCriteria"): ROLEPLAY {"minScore", "minDurationSeconds", "completionLogic": "SCORE" | "DURATION" | "SCORE_AND_DURATION" | "PARTICIPATION"}, QUIZ {"passScore"}, ANNOTATED_ARTIFACT {"passScore"}, VIDEO {"watchPct"}, ARTICLE {"minReadSeconds"}; omit for JOURNAL and GAME.
 
 OUTPUT
 Return ONLY a JSON object — no code fences, no commentary — in exactly this shape:

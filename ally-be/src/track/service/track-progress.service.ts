@@ -17,7 +17,11 @@ import { TrackSection } from '../entity/track-section.entity';
 import { TrackTenant } from '../entity/track-tenant.entity';
 import { TrackItemProgressRepository } from '../repository/track-item-progress.repository';
 import { TrackItemRepository } from '../repository/track-item.repository';
-import { TrackItemProgressMeta, TrackItemType } from '../type/track.type';
+import {
+  TrackItemCompletionLogic,
+  TrackItemProgressMeta,
+  TrackItemType,
+} from '../type/track.type';
 
 export const TRACK_EVENTS = {
   ITEM_COMPLETED: 'track.item.completed',
@@ -65,6 +69,7 @@ export interface CompleteItemResult {
   unlockedItemIds: string[];
   sectionCompleted: boolean;
   trackCompleted: boolean;
+  failureReasons?: Array<'INSUFFICIENT_SCORE' | 'INSUFFICIENT_DURATION'>;
 }
 
 const NOOP_RESULT: CompleteItemResult = {
@@ -104,7 +109,7 @@ export class TrackProgressService {
     trackItemProgressId: string,
     scenarioId: number,
     { userId, tenantId }: { userId: number; tenantId: string },
-  ): Promise<void> {
+  ): Promise<TrackItem> {
     const progress = await this.trackItemProgressRepository.findOne({
       where: { id: trackItemProgressId },
     });
@@ -133,6 +138,7 @@ export class TrackProgressService {
     if (item.completionCriteria?.assessmentMode) {
       await this.assertAssessmentAttemptAvailable(progress);
     }
+    return item;
   }
 
   /**
@@ -326,12 +332,47 @@ export class TrackProgressService {
       return NOOP_RESULT;
     }
 
+    const logic =
+      item.completionCriteria?.completionLogic ??
+      TrackItemCompletionLogic.SCORE_AND_DURATION;
     const callDurationInSeconds = (callDuration ?? 0) / 1000;
     const minDurationSeconds =
       item.completionCriteria?.minDurationSeconds ??
       this.configService.simulationPath
         ?.simulationPathItemMinDurationForCompletion ??
       0;
+    const minScore = item.completionCriteria?.minScore;
+
+    const hasSufficientDuration = callDurationInSeconds >= minDurationSeconds;
+    const hasSufficientScore = meetsMinimumScore(score, minScore);
+
+    const failureReasons: Array<
+      'INSUFFICIENT_SCORE' | 'INSUFFICIENT_DURATION'
+    > = [];
+    let passed = false;
+
+    switch (logic) {
+      case TrackItemCompletionLogic.PARTICIPATION:
+        passed = true;
+        break;
+      case TrackItemCompletionLogic.DURATION:
+        passed = hasSufficientDuration;
+        if (!hasSufficientDuration)
+          failureReasons.push('INSUFFICIENT_DURATION');
+        break;
+      case TrackItemCompletionLogic.SCORE:
+        passed = hasSufficientScore;
+        if (!hasSufficientScore) failureReasons.push('INSUFFICIENT_SCORE');
+        break;
+      case TrackItemCompletionLogic.SCORE_AND_DURATION:
+      default:
+        passed = hasSufficientDuration && hasSufficientScore;
+        if (!hasSufficientDuration)
+          failureReasons.push('INSUFFICIENT_DURATION');
+        if (!hasSufficientScore) failureReasons.push('INSUFFICIENT_SCORE');
+        break;
+    }
+
     const attemptEnded = (outcome: TrackRoleplayAttemptEndedEvent['outcome']) =>
       this.emitSafely(TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED, {
         userId: progress.userId,
@@ -343,21 +384,18 @@ export class TrackProgressService {
         callDurationMs: callDuration ?? 0,
       } satisfies TrackRoleplayAttemptEndedEvent);
 
-    if (callDurationInSeconds < minDurationSeconds) {
+    if (!passed) {
       this.logger.info(
-        `Track roleplay too short (${callDurationInSeconds}s < ${minDurationSeconds}s) for progress ${trackItemProgressId}`,
+        `Track roleplay failed (logic: ${logic}, score: ${score}/${minScore}, duration: ${callDurationInSeconds}s/${minDurationSeconds}s) for progress ${trackItemProgressId}`,
       );
-      attemptEnded('too_short');
-      return NOOP_RESULT;
-    }
-
-    const minScore = item.completionCriteria?.minScore;
-    if (!meetsMinimumScore(score, minScore)) {
-      this.logger.info(
-        `Track roleplay score ${score} below minScore ${minScore} for progress ${trackItemProgressId}`,
+      attemptEnded(
+        !hasSufficientDuration
+          ? 'too_short'
+          : !hasSufficientScore
+            ? 'below_score'
+            : 'below_score', // fallback
       );
-      attemptEnded('below_score');
-      return NOOP_RESULT;
+      return { ...NOOP_RESULT, failureReasons };
     }
 
     const result = await this.completeItem(trackItemProgressId, { score });

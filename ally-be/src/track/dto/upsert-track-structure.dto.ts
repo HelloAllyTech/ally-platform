@@ -16,7 +16,7 @@ import {
   ValidateNested,
   IsBoolean,
 } from 'class-validator';
-import { TrackItemType } from '../type/track.type';
+import { TrackItemType, TrackItemCompletionLogic } from '../type/track.type';
 
 export class UpsertTrackItemCompletionCriteriaDto {
   @ApiPropertyOptional({ description: 'Minimum score (ROLEPLAY/CASE)' })
@@ -58,6 +58,14 @@ export class UpsertTrackItemCompletionCriteriaDto {
   @IsNumber()
   @Min(0)
   minReadSeconds?: number;
+
+  @ApiPropertyOptional({
+    enum: TrackItemCompletionLogic,
+    description: 'Completion logic (ROLEPLAY)',
+  })
+  @IsOptional()
+  @IsEnum(TrackItemCompletionLogic)
+  completionLogic?: TrackItemCompletionLogic;
 }
 
 export class BreathingExerciseContentDto {
