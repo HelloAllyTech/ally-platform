@@ -41,17 +41,15 @@ const answer = (data: unknown, extra: Record<string, unknown> = {}) => ({
 describe("Debriefs tab: headline tiles", () => {
   beforeEach(() => h.metrics.mockReturnValue(answer(fullView())));
 
-  it("shows pass rate with its 95% range and count, and the other five headline numbers", () => {
+  it("shows the four numbers the chart above does not: hard fails, debriefs, outages, unscored", () => {
     const view = fullView();
     const n = headlineNumbers(view);
     render(<MetricsTab />);
     const tiles = screen.getByTestId("metrics-tiles");
-    const ci = wilson(n.pass.n, n.pass.of);
-    expect(tiles).toHaveTextContent(`${Math.round((n.pass.n / n.pass.of) * 1000) / 10}%`);
-    expect(tiles).toHaveTextContent(`${n.pass.n} of ${n.pass.of} scored debriefs passed`);
-    expect(ci.low).not.toBeNull();
+    // Pass rate and the judge score lead the page in "What Debrief improves".
+    expect(tiles).not.toHaveTextContent("scored debriefs passed");
+    expect(tiles).not.toHaveTextContent("Judge score, mean");
     expect(tiles).toHaveTextContent("Hard-fail rate");
-    expect(tiles).toHaveTextContent("Judge score, mean");
     expect(tiles).toHaveTextContent(String(n.debriefs));
     expect(tiles).toHaveTextContent("Not ready: model unreachable");
     expect(tiles).toHaveTextContent("Not scored yet");
@@ -68,22 +66,10 @@ describe("Debriefs tab: headline tiles", () => {
 describe("Debriefs tab: pass rate", () => {
   beforeEach(() => h.metrics.mockReturnValue(answer(fullView())));
 
-  it("plots pass rate and hard-fail rate by week with a 95% band, and names thin weeks", () => {
+  it("plots the hard-fail rate by week; pass rate by week is the chart above, not repeated", () => {
     render(<MetricsTab />);
-    const pass = JSON.parse(
-      within(screen.getByTestId("metrics-pass-by-week"))
-        .getByTestId("area-chart")
-        .getAttribute("data-series")!,
-    );
-    expect(pass).toHaveLength(12);
-    expect(pass[11]).toMatchObject({ group: "Pass rate", key: "2026-11-09" });
-    expect(pass[11].min).toBeLessThan(pass[11].value);
-    expect(pass[11].max).toBeGreaterThan(pass[11].value);
+    expect(screen.queryByTestId("metrics-pass-by-week")).toBeNull();
     expect(screen.getByTestId("metrics-hard-fail-by-week")).toBeInTheDocument();
-    // The first week has 13 scored debriefs.
-    expect(screen.getByTestId("metrics-quality")).toHaveTextContent(
-      "Too few to read (under 20 scored): 2026-08-24",
-    );
   });
 
   it("keeps the exact numbers in a table view, with the window total summed in the browser", () => {
@@ -115,9 +101,6 @@ describe("Debriefs tab: pass rate", () => {
     render(<MetricsTab />);
     expect(screen.getByTestId("metrics-quality-headline")).toHaveTextContent(
       "80% (95% range 62.7%–90.5%, 24 of 30)",
-    );
-    expect(screen.getByTestId("metrics-tiles")).toHaveTextContent(
-      "95% range 62.7%–90.5%. 24 of 30 scored debriefs passed.",
     );
     expect(screen.getByTestId("metrics-quality-weeks")).toHaveTextContent("95% range 62%–90%");
   });
@@ -169,21 +152,6 @@ describe("Debriefs tab: pass rate", () => {
     );
   });
 
-  it("keeps the headline tiles on the whole pass rate while a segment is set", () => {
-    const v = fullView();
-    const whole = {
-      ...v.quality!,
-      byWeek: v.quality!.byWeek.map(w => ({
-        ...w,
-        passRate: { n: 9, of: 10, value: 0.9, low: 0.6, high: 0.98 },
-      })),
-    };
-    h.metrics.mockReturnValue(answer({ ...v, qualityAll: whole }));
-    render(<MetricsTab />);
-    const totalOf = whole.byWeek.length * 10;
-    expect(screen.getByTestId("metrics-tiles")).toHaveTextContent(`of ${totalOf} scored`);
-  });
-
   it("leaves out a pass-rate filter with nothing to offer", () => {
     const v = fullView();
     v.filterOptions = { ...v.filterOptions!, courses: [] };
@@ -206,7 +174,9 @@ describe("Debriefs tab: steering, guardrails, experience, uptake", () => {
     render(<MetricsTab />);
     const g = screen.getByTestId("metrics-guardrails");
     expect(g).toHaveTextContent("Below today's debrief: 13.7%");
-    expect(g).toHaveTextContent("Not above before launch: 7%");
+    // Judge score and thumbs-down repeat the quality score and "Found it helpful" above.
+    expect(g).not.toHaveTextContent("Judge score, median");
+    expect(g).not.toHaveTextContent("Thumbs-down rate");
     // the slowest 10% took 131 s against 120 s
     expect(screen.getByTestId("metrics-guardrails-visible")).toHaveTextContent("Off target");
     expect(screen.getByTestId("metrics-guardrails-cost")).toHaveTextContent("On target");
