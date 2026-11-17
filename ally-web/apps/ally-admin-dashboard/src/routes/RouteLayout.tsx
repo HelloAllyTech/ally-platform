@@ -41,7 +41,9 @@ import {
   ProductUpdates,
   AILab,
   ProductRoadmap,
+  RoadmapDraftsPage,
   RoadmapGate,
+  RoadmapNewIdeaPage,
   RoadmapIdeaPage,
   RoadmapQueuePage,
   Settings,
@@ -586,6 +588,34 @@ export const RouteLayout: React.FC = () => {
               >
                 <RoadmapGate fallback={<NotFound />}>
                   <RoadmapQueuePage />
+                </RoadmapGate>
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.ROADMAP_DRAFTS}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+                fullBleed
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapDraftsPage />
+                </RoadmapGate>
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.ROADMAP_NEW_IDEA}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+                fullBleed
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapNewIdeaPage />
                 </RoadmapGate>
               </PrivateLayout>
             }

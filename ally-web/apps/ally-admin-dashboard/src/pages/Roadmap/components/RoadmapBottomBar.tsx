@@ -1,6 +1,6 @@
 import React from "react";
 
-import { Debug, Document, List } from "@icons";
+import { Debug, Document, List, Plus } from "@icons";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
@@ -13,17 +13,22 @@ interface RoadmapBottomBarProps {
   hidden: boolean;
   /** For you → Needs you count, on the Queue item. */
   forYouCount?: number;
+  /** Which tab the page is (Queue by default). */
+  active?: "queue" | "drafts";
 }
 
 /**
  * The phone's bottom bar, within thumb reach: Queue · Drafts · ＋ New idea · Bugs · ⋯. It hides
  * while the keyboard is open (the caller passes `hidden`) and keeps clear of the home indicator.
  *
- * Drafts and Bugs open the existing pages until Roadmap has its own tabs for them.
- * TODO(P3): the raised ＋ New idea button (56 px) and Drafts as Roadmap's own tab.
+ * Drafts is Roadmap's own tab; ＋ is New idea, raised and 56 px. Bugs opens the existing page.
  * TODO(P4): ⋯ with Agent and Settings, for the roles that have them.
  */
-export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({ hidden, forYouCount }) => {
+export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
+  hidden,
+  forYouCount,
+  active = "queue",
+}) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.mobile;
   const item = "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs";
@@ -41,8 +46,8 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({ hidden, forY
         <li className="flex flex-1">
           <Link
             to={ROUTES.ROADMAP}
-            className={`${item} font-semibold text-primary-700`}
-            aria-current="page"
+            className={`${item} ${active === "queue" ? "font-semibold text-primary-700" : "text-typography-secondary"}`}
+            aria-current={active === "queue" ? "page" : undefined}
             tabIndex={hidden ? -1 : 0}
           >
             <span className="relative">
@@ -59,12 +64,23 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({ hidden, forY
         </li>
         <li className="flex flex-1">
           <Link
-            to={`${ROUTES.PRODUCT_ROADMAP}?tab=drafts`}
-            className={`${item} text-typography-secondary`}
+            to={ROUTES.ROADMAP_DRAFTS}
+            className={`${item} ${active === "drafts" ? "font-semibold text-primary-700" : "text-typography-secondary"}`}
+            aria-current={active === "drafts" ? "page" : undefined}
             tabIndex={hidden ? -1 : 0}
           >
             <Document size={20} aria-hidden />
             {copy.drafts}
+          </Link>
+        </li>
+        <li className="flex flex-1 items-start justify-center">
+          <Link
+            to={ROUTES.ROADMAP_NEW_IDEA}
+            aria-label={en.roadmapV2.newIdea.button}
+            tabIndex={hidden ? -1 : 0}
+            className="-mt-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg"
+          >
+            <Plus size={24} aria-hidden />
           </Link>
         </li>
         <li className="flex flex-1">
