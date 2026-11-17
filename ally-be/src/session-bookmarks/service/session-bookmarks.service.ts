@@ -81,7 +81,10 @@ export class SessionBookmarksService {
     const bookmark = await this.bookmarks.findOne({ where: { id, userId } });
     if (!bookmark) throw new NotFoundException('Saved session not found');
 
-    await this.bookmarks.remove(bookmark);
+    const result = await this.bookmarks.delete({ id, userId });
+    if (!result.affected)
+      throw new NotFoundException('Saved session not found');
+
     this.captureBookmarkEvent(
       userId,
       SESSION_BOOKMARKS_ANALYTICS_EVENTS.REMOVED,
