@@ -1,6 +1,7 @@
 import type { ShownStage } from '../plan-stage.util';
 import {
   capabilitiesFor,
+  editCapabilitiesFor,
   globalCapabilities,
   NO_CAPABILITIES,
   RoadmapCapabilities,
@@ -358,5 +359,66 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
       submit: true,
     });
     expect(globalCapabilities('viewer').submit).toBe(false);
+  });
+});
+
+describe('editCapabilitiesFor (§4.11)', () => {
+  const none = { isAuthor: false, isLead: false };
+  const author = { isAuthor: true, isLead: false };
+  const lead = { isAuthor: false, isLead: true };
+
+  it('lets the author edit the text only while the idea waits for review', () => {
+    expect(editCapabilitiesFor('idea', author, 'submitted')).toEqual({
+      editTitle: true,
+      editGoal: true,
+      editSummary: true,
+      editLead: false,
+      editMonth: false,
+    });
+    expect(editCapabilitiesFor('idea', author, 'accepted').editTitle).toBe(
+      false,
+    );
+  });
+
+  it('hands the text to the lead once accepted', () => {
+    expect(editCapabilitiesFor('builder', lead, 'planning').editSummary).toBe(
+      true,
+    );
+    expect(editCapabilitiesFor('builder', none, 'planning').editSummary).toBe(
+      false,
+    );
+    expect(editCapabilitiesFor('builder', lead, 'submitted').editTitle).toBe(
+      false,
+    );
+  });
+
+  it('gives an Owner the lead and the month, and the month stops at Shipped', () => {
+    expect(editCapabilitiesFor('owner', none, 'accepted')).toEqual({
+      editTitle: true,
+      editGoal: true,
+      editSummary: true,
+      editLead: true,
+      editMonth: true,
+    });
+    expect(editCapabilitiesFor('owner', none, 'shipped')).toMatchObject({
+      editLead: false,
+      editMonth: false,
+      editTitle: true,
+    });
+  });
+
+  it('makes Declined, Closed and drafts read-only, and Viewers never edit', () => {
+    for (const stage of ['declined', 'closed', 'draft'] as const) {
+      expect(
+        Object.values(editCapabilitiesFor('owner', author, stage)).some(
+          Boolean,
+        ),
+      ).toBe(false);
+    }
+    expect(
+      Object.values(editCapabilitiesFor('viewer', author, 'submitted')).some(
+        Boolean,
+      ),
+    ).toBe(false);
   });
 });
