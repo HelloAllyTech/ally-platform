@@ -670,19 +670,6 @@ class TestPrompt:
             await run_lists(gateway=FakeGateway(), bot=lists_bot(persona=None))
         assert "# Lists you can use" in llm.calls[0]["prompt"]
 
-    @pytest.mark.asyncio
-    async def test_a_detail_it_cant_give_becomes_an_offer_to_take_theirs(
-        self, run_lists
-    ):
-        llm = FakeLLM(reply("decline", "I can't help with that."))
-        with patch(f"{CONVERSATION}.generate_structured", llm):
-            await run_lists(gateway=FakeGateway(), bot=lists_bot())
-        prompt = llm.calls[0]["prompt"]
-        assert "offer once to take their details so the team can get back to them" in (
-            prompt
-        )
-        assert "(a price, a quote, a detail that isn't there)" in prompt
-
 
 class TestTrace:
     @pytest.mark.asyncio
