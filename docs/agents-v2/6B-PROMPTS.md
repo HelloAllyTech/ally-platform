@@ -18,7 +18,9 @@ Added after "Offer only times and items…":
 Changed:
 
 > - ~~Book or change something only after the person has confirmed exactly what: which item, which time. If they haven't, ask first.~~
-> - Book or change something only after the person has confirmed exactly what: which item, which time. If they haven't, ask first. **Once they have, book it yourself straight away: don't ask again, and don't pass it to the team instead.**
+> - Book or change something only after the person has **said yes to exactly what you offered**: which item, which time. **A question such as "can I book Thursday at 11?" is not a yes: look it up, offer it and ask first. Once they've said yes, book it yourself straight away: don't ask again, and don't pass it to the team instead.**
+>
+> *(Tightened after the live runs: the first draft, "once they have [confirmed]", booked on "can I book Thursday at 11:00?".)*
 
 Added:
 
@@ -99,6 +101,10 @@ The summary field gets its own description, and the summary is cut at a word to 
 - A choice that still holds a ready-made list's examples is left out of create and update, so their text no longer lists "Consultation / Follow-up / Check-up".
 - Leads' examples are now "A demo", "Pricing", "Something else".
 - No template wording changed.
+
+## 7b. Found in the live runs: the lists prompt never came from the Skills Store
+
+ally-be didn't send `ally_ai_agent_lists` with a run, so ally-ai always used the default in its code, never the live version. Fixed in 6b. Publish the lists text below before deploying, or the live version 7 runs instead of the new text.
 
 ## 8. The check's send-back notes (model-facing)
 

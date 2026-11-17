@@ -313,6 +313,8 @@ describe('ChatbotEngineService in Agent mode', () => {
       expect(promptShared.getPromptsByOptions).toHaveBeenCalledWith({
         promptCode: [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES],
       });
+      // 6b: the lists prompt's live version is sent too, never ally-ai's default.
+      expect(AGENT_PROMPT_CODES).toContain('ally_ai_agent_lists');
       const prompts = aiService.runAgent.mock.calls[0][0].prompts;
       expect(prompts.ally_ai_agent_system).toMatchObject({
         prompt: 'Agent rules.',

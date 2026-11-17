@@ -70,6 +70,9 @@ export const AGENT_PROMPT_CODES = [
   AGENT_SYSTEM_PROMPT_CODE,
   // What it knows about the person (chunk 8a); used only when the bot's memory is on.
   'ally_ai_agent_memory',
+  // How it uses the business's lists (chunk 6). Missing until 6b, so a run always used the
+  // default text in ally-ai's code, never the Skills Store's live version.
+  'ally_ai_agent_lists',
 ];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 
