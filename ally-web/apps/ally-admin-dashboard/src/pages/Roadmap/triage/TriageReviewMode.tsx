@@ -17,6 +17,7 @@ import {
   springTransition,
   useReducedMotionPreference,
 } from "../../../motion";
+import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
 
 /** The card tilts up to this many degrees as it follows the finger (§4.18 "Triage card"). */
 const MAX_TILT_DEG = 4;
@@ -66,6 +67,18 @@ export const TriageReviewMode: React.FC<TriageReviewModeProps> = ({
 
   const queue = rows.filter(r => !decided.has(r.code));
   const current = queue[0];
+
+  // P8: the card in front starts "triage one" for it (§4.16); the decision ends it.
+  const jobs = useRoadmapJobTimer();
+  const currentCode = open ? current?.code : undefined;
+  const currentAwaiting = !!currentCode && sectionOf(currentCode) === "awaitingReview";
+  useEffect(() => {
+    if (currentCode && currentAwaiting) {
+      jobs.start("triage_one", { itemId: currentCode, restart: true });
+    }
+    // Per card.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCode, currentAwaiting]);
   const next = queue[1];
   const total = Math.max(totalRef.current, rows.length);
   const index = Math.min(total, total - queue.length + 1);

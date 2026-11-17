@@ -18,6 +18,7 @@ import { DrawnCheck, shakeAnimation } from "../components/FlowMotion";
 import { typeInText } from "../hooks/useDictation";
 import { PendingSend } from "../hooks/useOutbox";
 import { useRoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
+import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
 import { isTypingTarget } from "../utils/keyboard";
 
 import type { RoadmapConversationPost, RoadmapQuestionAnswers } from "../../../types/roadmapV2Flow";
@@ -98,10 +99,21 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const [sheetOpen, setSheetOpen] = useState(false);
   const cardRef = useRef<HTMLLIElement>(null);
 
+  // P8 job timing (§4.16): a conflict in front of its settler starts "settle answers", Use this
+  // answer ends it; an answer sent ends "answer from a notification" if a For you open began it.
+  const jobs = useRoadmapJobTimer();
+  const settling = conflict && isSettler;
+  useEffect(() => {
+    if (settling) jobs.start("settle_answers", { itemId: item.code });
+    // When the conflict reaches its settler.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settling, item.code]);
+
   const sendText = () => {
     const text = freeText.trim();
     if (!text || !canAnswer) return;
     session.answer(question.id, { text });
+    jobs.complete("answer_from_notification", { itemId: item.code });
     setFreeText("");
     setSheetOpen(false);
     setExpanded(false);
@@ -111,6 +123,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     if (!canAnswer) return;
     const label = options.find(o => o.id === optionId)?.label;
     session.answer(question.id, { optionIds: [optionId], ...(label ? { text: label } : {}) });
+    jobs.complete("answer_from_notification", { itemId: item.code });
     setExpanded(false);
     haptic(10);
   };
@@ -139,6 +152,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const onUse = async (postId: string) => {
     try {
       await session.chooseAnswer(postId);
+      jobs.complete("settle_answers", { itemId: item.code });
       haptic(10);
     } catch {
       toast.error(copy.chooseFailed);
