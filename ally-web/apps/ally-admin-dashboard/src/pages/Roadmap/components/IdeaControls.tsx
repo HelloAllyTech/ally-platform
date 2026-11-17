@@ -6,8 +6,6 @@ import { toast } from "sonner";
 
 import { Button, OverflowMenu, OverflowMenuItem } from "@ally-ui-mono/ui-shared";
 import {
-  useGetRoadmapOpportunityQuery,
-  useGetRoadmapVoteBudgetQuery,
   usePatchRoadmapItemMutation,
   useSetRoadmapStarMutation,
   useSetRoadmapWatchMutation,
@@ -15,9 +13,8 @@ import {
 import { ROUTES, en } from "@constants";
 import type { RoadmapItemDetail, RoadmapWatchLevel } from "@types";
 
+import { VoteControl } from "./VoteControl";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
-import { useSetVotes } from "../../ProductRoadmap/useSetVotes";
-import { VoteButton } from "../../ProductRoadmap/VoteButton";
 import { quietLine } from "../utils/copy";
 import { PRIMARY_ACTIONS_BUILT, primaryActionFor } from "../utils/primaryAction";
 
@@ -76,34 +73,16 @@ export const CopyLinkButton: React.FC<{ code: string; compact?: boolean }> = ({
   );
 };
 
-/**
- * Votes, unchanged (D17): the existing VoteButton on the existing vote endpoint, optimistic, with
- * its own debounce. It needs the opportunity's uuid; where the read model hasn't sent one yet the
- * count shows read-only rather than a control that can't work.
- */
-export const IdeaVotes: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
-  const canVote = !!item.can?.vote && !!item.id;
-  const { data: opportunity } = useGetRoadmapOpportunityQuery(item.id ?? "", { skip: !canVote });
-  const { data: budget } = useGetRoadmapVoteBudgetQuery(undefined, { skip: !canVote });
-  const allocate = useSetVotes({ kind: "detail" });
-  const copy = en.roadmapV2.row;
-  if (canVote && opportunity && budget) {
-    return (
-      <div className="flex items-center gap-1">
-        <VoteButton opportunity={opportunity} budget={budget} onSetVotes={allocate} />
-        <span className="text-xs tabular-nums text-typography-secondary">
-          {copy.votes(item.votes)}
-        </span>
-      </div>
-    );
-  }
-  return (
-    <span className="text-sm tabular-nums text-typography-secondary">
-      <span aria-hidden>▲{item.votes}</span>
-      <span className="sr-only">{copy.votes(item.votes)}</span>
-    </span>
-  );
-};
+/** The idea's votes: the real VoteButton straight away (one record to load, not one per row). */
+export const IdeaVotes: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => (
+  <VoteControl
+    id={item.id}
+    code={item.code}
+    votes={item.votes}
+    votedByMe={item.votedByMe}
+    canVote={!!item.can?.vote}
+  />
+);
 
 /** Star (Owner only, D16): fills and scales 1 → 1.2 → 1. Others see who starred it, read-only. */
 export const IdeaStar: React.FC<{ item: RoadmapItemDetail; compact?: boolean }> = ({

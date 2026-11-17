@@ -11,18 +11,29 @@ import type { RoadmapCan, RoadmapItemDetail, RoadmapItemRow } from "@types";
 const mockPatch = vi.fn();
 const mockStar = vi.fn();
 const mockWatch = vi.fn();
+const mockAllocate = vi.fn();
+const mockOpportunity = vi.fn((_id: string, opts?: { skip?: boolean }) =>
+  opts?.skip ? { data: undefined } : { data: { id: "opp-uuid-388", myVotes: 0, stage: "new" } },
+);
 
 // Partial: the real module keeps baseAPI and the store intact; only the hooks under test are stubbed.
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGetRoadmapOpportunityQuery: () => ({ data: undefined }),
-  useGetRoadmapVoteBudgetQuery: () => ({ data: undefined }),
+  useGetRoadmapOpportunityQuery: (id: string, opts?: { skip?: boolean }) => mockOpportunity(id, opts),
+  useGetRoadmapVoteBudgetQuery: (_arg: unknown, opts?: { skip?: boolean }) =>
+    opts?.skip ? { data: undefined } : { data: { available: 10 } },
+  useSetRoadmapAllocationMutation: () => [mockAllocate],
   usePatchRoadmapItemMutation: () => [mockPatch],
   useSetRoadmapStarMutation: () => [mockStar],
   useSetRoadmapWatchMutation: () => [mockWatch],
 }));
-vi.mock("../../ProductRoadmap/useSetVotes", () => ({ useSetVotes: () => vi.fn() }));
-vi.mock("../../ProductRoadmap/VoteButton", () => ({ VoteButton: () => <div>vote-button</div> }));
+vi.mock("../../ProductRoadmap/VoteButton", () => ({
+  VoteButton: ({ onSetVotes }: { onSetVotes: (id: string, next: number, prev: number) => void }) => (
+    <button type="button" onClick={() => onSetVotes("opp-uuid-388", 1, 0)}>
+      vote-button
+    </button>
+  ),
+}));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import { deriveNavigationItems } from "../../../utils/navigation";
@@ -51,6 +62,7 @@ afterAll(() => {
 });
 
 const row = (overrides: Partial<RoadmapItemRow> = {}): RoadmapItemRow => ({
+  id: "opp-uuid-388",
   code: "OPP-388",
   title: "Streak on start screen",
   shownStage: "planning",
@@ -129,9 +141,16 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows votes read-only until the read model sends the opportunity id", () => {
+  it("gives the idea page the real VoteButton, keyed by the opportunity id", () => {
+    mockOpportunity.mockClear();
     wrap(<IdeaVotes item={detail({ vote: true })} />);
-    expect(screen.queryByText("vote-button")).toBeNull();
+    expect(screen.getByRole("button", { name: "vote-button" })).toBeInTheDocument();
+    expect(mockOpportunity).toHaveBeenCalledWith("opp-uuid-388", { skip: false });
+  });
+
+  it("shows the count without a control to someone who can't vote", () => {
+    wrap(<IdeaVotes item={detail({ vote: false })} />);
+    expect(screen.queryByRole("button", { name: "vote-button" })).toBeNull();
     expect(screen.getByText(en.roadmapV2.row.votes(23))).toBeInTheDocument();
   });
 
@@ -192,6 +211,15 @@ describe("QueueRow", () => {
     fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.row.openUnread("OPP-388", "Streak on start screen") }));
     expect(actions.onOpen).toHaveBeenCalledWith("OPP-388");
     expect(screen.getByText("Plan agent asks: which learners first?")).toBeInTheDocument();
+  });
+
+  it("loads a row's vote record only when the reader reaches for it, then shows VoteButton", () => {
+    mockOpportunity.mockClear();
+    renderRow();
+    expect(screen.queryByRole("button", { name: "vote-button" })).toBeNull();
+    expect(mockOpportunity).toHaveBeenLastCalledWith("opp-uuid-388", { skip: true });
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${en.roadmapV2.row.vote}:`) }));
+    expect(screen.getByRole("button", { name: "vote-button" })).toBeInTheDocument();
   });
 
   it("prefetches after a 150 ms mouse hover, but not for a touch", () => {

@@ -19,6 +19,7 @@ import { queueKeyAction, stepSelection } from "../utils/keyboard";
 import { clampPanelWidth, readPref, writePref } from "../utils/prefs";
 
 const row = (code: string, title = code): RoadmapItemRow => ({
+  id: `uuid-${code}`,
   code,
   title,
   shownStage: "submitted",

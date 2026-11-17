@@ -16,6 +16,7 @@ const ravi: RoadmapPersonRef = { id: 1, name: "Ravi", role: "idea", relation: "a
 const priya: RoadmapPersonRef = { id: 2, name: "Priya", role: "builder", relation: "lead" };
 
 const row = (overrides: Partial<RoadmapItemRow>): RoadmapItemRow => ({
+  id: "uuid-1",
   code: "OPP-1",
   title: "Streak",
   shownStage: "submitted",

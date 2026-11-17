@@ -8676,6 +8676,8 @@ export const en = {
       snooze: "Snooze",
       copyLink: "Copy link",
       openRow: "Open",
+      vote: "Vote",
+      voteFailed: "Couldn't save your vote. Refresh to see your current balance.",
     },
     filter: {
       button: "Filter",

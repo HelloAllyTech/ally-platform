@@ -132,11 +132,8 @@ export type RoadmapWhyHere =
   | { kind: "shipped"; at: string };
 
 export interface RoadmapItemRow {
-  /**
-   * The opportunity's uuid. Not in the contract's first draft; the existing vote endpoint
-   * (unchanged, D17) is keyed by it, so voting is offered only where it is present.
-   */
-  id?: string;
+  /** The opportunity uuid: what the existing vote endpoint (unchanged, D17) takes. */
+  id: string;
   code: string;
   title: string;
   shownStage: RoadmapShownStage;

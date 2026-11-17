@@ -180,7 +180,7 @@ type Dispatch = (action: unknown) => unknown;
  * Apply `mutate` to the row with `code` in every cached list (the args trap: a patch keyed by the
  * wrong args silently no-ops, so this walks every cached args instead of guessing one).
  */
-const patchEveryCachedRow = (
+export const patchEveryCachedRow = (
   dispatch: Dispatch,
   getState: () => unknown,
   code: string,

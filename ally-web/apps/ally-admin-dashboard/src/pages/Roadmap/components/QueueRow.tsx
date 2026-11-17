@@ -7,6 +7,7 @@ import { OverflowMenu, OverflowMenuItem } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 import type { RoadmapItemRow } from "@types";
 
+import { VoteControl } from "./VoteControl";
 import {
   haptic,
   motionTransition,
@@ -33,6 +34,8 @@ interface QueueRowProps extends QueueRowActions {
   gone?: boolean;
   /** Phone and tablet: swipe-reveal and long-press are on. */
   touch: boolean;
+  /** Every Roadmap role may vote (§3.1); false only where the caller has none. */
+  canVote?: boolean;
   index: number;
 }
 
@@ -56,6 +59,7 @@ export const QueueRow: React.FC<QueueRowProps> = ({
   selected,
   gone = false,
   touch,
+  canVote = true,
   index,
   onOpen,
   onMarkRead,
@@ -262,16 +266,14 @@ export const QueueRow: React.FC<QueueRowProps> = ({
 
         <span className="relative flex shrink-0 items-center gap-2 pr-1 text-xs text-typography-secondary">
           <span className="hidden sm:inline">{stageWord(row.shownStage)}</span>
-          <span
-            className={`tabular-nums ${row.votedByMe ? "font-semibold text-primary-700" : ""}`}
-            title={row.votedByMe ? copy.row.votedByMe : undefined}
-          >
-            <span aria-hidden>▲{row.votes}</span>
-            <span className="sr-only">
-              {copy.row.votes(row.votes)}
-              {row.votedByMe ? `, ${copy.row.votedByMe}` : ""}
-            </span>
-          </span>
+          <VoteControl
+            id={row.id}
+            code={row.code}
+            votes={row.votes}
+            votedByMe={row.votedByMe}
+            canVote={canVote}
+            lazy
+          />
           {row.starred && (
             <span
               title={row.starredBy ? copy.people.starredBy(row.starredBy.name) : copy.row.starred}
