@@ -46,7 +46,7 @@ describe("CompletionRuleFields", () => {
     render(
       <Wrapper defaultValues={{ sections: [{ items: [{ completionCriteria: {} }] }] }}>
         <CompletionRuleFields sectionIndex={0} itemIndex={0} type={TrackItemType.ROLEPLAY} />
-      </Wrapper>
+      </Wrapper>,
     );
 
     const select = screen.getByLabelText(/Completion logic/);
@@ -58,7 +58,7 @@ describe("CompletionRuleFields", () => {
       "Minimum score",
       "Minimum duration",
       "Minimum score AND duration",
-      "Participation only"
+      "Participation only",
     ]);
   });
 
@@ -80,7 +80,7 @@ describe("CompletionRuleFields", () => {
         }}
       >
         <CompletionRuleFields sectionIndex={0} itemIndex={0} type={TrackItemType.ROLEPLAY} />
-      </Wrapper>
+      </Wrapper>,
     );
 
     expect(screen.getByLabelText(/Minimum score/)).toBeInTheDocument();
@@ -92,7 +92,9 @@ describe("CompletionRuleFields", () => {
 
     expect(screen.queryByLabelText(/Minimum score/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Minimum duration")).not.toBeInTheDocument();
-    expect(screen.getByText(/Learners complete this item just by launching it/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Learners complete this item just by launching it/),
+    ).toBeInTheDocument();
   });
 
   it("handles duration input correctly", () => {
@@ -114,7 +116,7 @@ describe("CompletionRuleFields", () => {
         }}
       >
         <CompletionRuleFields sectionIndex={0} itemIndex={0} type={TrackItemType.ROLEPLAY} />
-      </Wrapper>
+      </Wrapper>,
     );
 
     const minutesInput = screen.getByPlaceholderText("Min") as HTMLInputElement;
