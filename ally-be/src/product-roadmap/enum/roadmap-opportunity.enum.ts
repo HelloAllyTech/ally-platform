@@ -22,7 +22,6 @@ export enum RoadmapOpportunityType {
 export enum RoadmapOpportunityStage {
   NEW = 'new',
   PRIORITISED = 'prioritised',
-  UNDER_DEVELOPMENT = 'under_development',
   RELEASED = 'released',
   ARCHIVED = 'archived',
 }

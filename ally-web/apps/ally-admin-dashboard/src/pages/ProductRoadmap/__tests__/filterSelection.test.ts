@@ -130,10 +130,13 @@ describe("buildFacetSections", () => {
 
   it("labels options for reading, not with wire values", () => {
     const stage = buildFacetSections([], undefined).find(s => s.id === "stage");
-    expect(stage?.options).toContainEqual({
-      label: "In development",
-      value: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
-    });
+    // Three stages, not five: Idea (stored `new`), Prioritised, Released. Archived is a toggle and
+    // under_development is retired.
+    expect(stage?.options).toEqual([
+      { label: "Idea", value: RoadmapOpportunityStage.NEW },
+      { label: "Prioritised", value: RoadmapOpportunityStage.PRIORITISED },
+      { label: "Released", value: RoadmapOpportunityStage.RELEASED },
+    ]);
   });
 
   it("offers a trailing 'Not sized' option alongside the real effort sizes", () => {
@@ -180,7 +183,7 @@ describe("describeActiveFacets", () => {
     const chips = describeActiveFacets(
       state({ stageFilter: [RoadmapOpportunityStage.UNDER_DEVELOPMENT] }),
     );
-    expect(chips).toEqual([{ id: "stage", label: "Stage", values: ["In development"] }]);
+    expect(chips).toEqual([{ id: "stage", label: "Stage", values: ["Prioritised"] }]);
   });
 
   it("resolves creator ids to names, and keeps an unresolvable one visible", () => {

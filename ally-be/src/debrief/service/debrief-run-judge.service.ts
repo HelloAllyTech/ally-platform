@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Raw, Repository } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import {
@@ -292,6 +292,10 @@ export class DebriefRunJudgeService {
           DebriefRunStatus.NEEDS_PERSON,
         ]),
         cards: Not(IsNull()),
+        // Only runs with no score: taking the newest runs and skipping the
+        // scored ones starved every older run (one cleared for re-scoring
+        // after a rubric change was never reached).
+        workspace: Raw((w) => `NOT (coalesce(${w}, '{}'::jsonb) ? 'judge')`),
       },
       order: { createdAt: 'DESC' },
       take: limit * 3,

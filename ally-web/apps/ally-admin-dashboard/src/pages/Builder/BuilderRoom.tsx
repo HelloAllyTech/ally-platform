@@ -1131,6 +1131,25 @@ export const BuilderRoom: React.FC = () => {
         </div>
       </header>
 
+      {/* The six Builder sub-pages were only in the ⋯ menu, so nobody who had not
+          opened it knew they existed. Shown as a labelled row (scrolls on a phone);
+          the menu stays for keyboard users and for muscle memory. */}
+      <nav
+        aria-label={strings.subPages}
+        data-testid="builder-subpages"
+        className="flex gap-1 overflow-x-auto border-b border-border-light bg-white px-4 py-1 text-sm sm:px-6"
+      >
+        {overflow.map(([label, path]) => (
+          <Link
+            key={path}
+            to={path}
+            className="whitespace-nowrap px-2.5 py-1.5 text-typography-600 hover:bg-neutral-100 hover:text-typography-900"
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+
       {!online && (
         <p
           role="status"

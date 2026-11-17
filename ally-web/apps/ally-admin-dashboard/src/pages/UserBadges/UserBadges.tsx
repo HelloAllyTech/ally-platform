@@ -106,6 +106,14 @@ export const UserBadges = () => {
     }
   }, [userBadges?.data]);
 
+  // A selection made under one search/filter must not survive into another: the delete bar would
+  // act on rows that are no longer on screen. Remounting the table (key) clears its own
+  // checkbox state; the effect clears the parent's copy.
+  const selectionScopeKey = JSON.stringify([debouncedSearch, filters]);
+  useEffect(() => {
+    setSelectedBadges([]);
+  }, [selectionScopeKey]);
+
   const handleSelectionChange = useCallback((markedRows: any[]) => {
     const rows = markedRows.map(row => {
       const rowData: Partial<UserBadge> = {};
@@ -360,6 +368,7 @@ export const UserBadges = () => {
           />
         ) : (
           <NotionTable
+            key={selectionScopeKey}
             hasResizer={false}
             tableData={tableData}
             tableStyle={{

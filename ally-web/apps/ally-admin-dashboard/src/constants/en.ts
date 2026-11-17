@@ -14,6 +14,112 @@ const LANDING_ITEM_NOUNS: Record<string, [string, string]> = {
 const formatHours = (hours: number): string => `${Number(hours.toFixed(2))} h`;
 
 export const en = {
+  /**
+   * The admin shell's canonical names (sidebar, command palette, page titles, breadcrumbs).
+   * One name per concept: see plans/admin-ux/naming.md. Page copy elsewhere may still say
+   * "Skills Store" or "Model Catalog"; the nav does not.
+   */
+  nav: {
+    appName: "Ally Admin",
+    mainNavLabel: "Main navigation",
+    breadcrumbLabel: "Breadcrumb",
+    expandSection: (label: string) => `Expand ${label}`,
+    collapseSection: (label: string) => `Collapse ${label}`,
+    sections: {
+      create: "Create",
+      people: "People",
+      insights: "Insights",
+      aiLanguages: "AI & Languages",
+      product: "Product",
+      settingsLogs: "Settings & Logs",
+    },
+    items: {
+      rolePlays: "Roleplays",
+      events: "Events",
+      characters: "Characters",
+      componentLibrary: "Component Library",
+      competencies: "Competencies",
+      courseCopilot: "Course Copilot",
+      blog: "Blog",
+      productUpdates: "Product Updates",
+      users: "Users",
+      badges: "Badges",
+      debriefs: "Debriefs",
+      roleplayLogs: "Roleplay Logs",
+      analytics: "Analytics",
+      conversationDrift: "Conversation Drift",
+      prompts: "Prompts",
+      guardrails: "Guardrails",
+      // TODO(admin-ux/providers): the Providers page merges these three; collapse them into one
+      // "Providers" item then.
+      speechRecognition: "Speech Recognition",
+      languageModels: "Language Models",
+      voices: "Voices",
+      aiTasks: "AI Tasks",
+      languages: "Languages",
+      translations: "Translations",
+      tooltips: "Tooltips",
+      agentTestCases: "Agent Test Cases",
+      aiLab: "AI Lab",
+      roadmap: "Roadmap",
+      bugHunter: "Bug Hunter",
+      builder: "Builder",
+      mobileReleases: "Mobile Releases",
+      contextLibrary: "Context Library",
+      aiChatbots: "AI Chatbots",
+      allyConsole: "Ally Console",
+      settings: "Settings",
+      logs: "Logs",
+    },
+    /** Detail / sub pages that have no nav item of their own (breadcrumb + title only). */
+    pages: {
+      newRoleplay: "New roleplay",
+      editRoleplay: "Edit roleplay",
+      viewRoleplay: "View roleplay",
+      newPathway: "New pathway",
+      editPathway: "Edit pathway",
+      newCase: "New case",
+      editCase: "Edit case",
+      newTrack: "New course",
+      editTrack: "Edit course",
+      characterInterview: "Character interview",
+      organization: "Organization",
+      languageGlossary: "Glossary",
+      builderSession: "Session",
+      builderSessions: "All sessions",
+      builderSettings: "Settings",
+      builderPipeline: "Pipeline",
+      builderScoreboard: "Scoreboard",
+      builderKnowledge: "Knowledge",
+      builderEval: "Eval",
+      courseCopilotNew: "New session",
+      courseCopilotSession: "Session",
+      chatbotNew: "New assistant",
+      chatbotDetail: "Assistant",
+      debriefSession: "Session",
+      debriefSessionLogs: "Agent logs",
+      debriefPmAgent: "PM agent",
+      debriefSettings: "Settings",
+      roleplayLogDetail: "Session",
+      notFound: "Page not found",
+    },
+    palette: {
+      open: "Search pages (Ctrl+K)",
+      title: "Go to a page",
+      placeholder: "Go to a page…",
+      empty: "No page matches that.",
+      recent: "Recent",
+      allPages: "Pages",
+      hint: "↑↓ to move, Enter to open, Esc to close",
+    },
+    notFound: {
+      title: "We couldn't find that page",
+      body: "The link may be out of date, or the page may have moved.",
+      home: "Go to your home page",
+    },
+    pageLoading: "Loading page…",
+    skipToContent: "Skip to content",
+  },
   orgBranding: {
     tabLabel: "Branding",
     switchLabel: "Organization branding",
@@ -80,6 +186,37 @@ export const en = {
     saved: "Branding saved",
     failedToSave: "Failed to save branding",
     saving: "Saving...",
+  },
+  // Shared admin building blocks (ConfirmDialog, autosave indicator, bulk bar, publish blockers).
+  adminUx: {
+    confirm: {
+      cancel: "Cancel",
+      irreversibleLabel: "This cannot be undone",
+      reversibleHint: "You can undo this afterwards.",
+      acknowledge: "I understand this cannot be undone",
+    },
+    autosave: {
+      saving: "Saving…",
+      saved: "Saved",
+      savedAt: (time: string) => `Saved ${time}`,
+      failed: "Couldn't save. Retrying on your next change.",
+      restoreTitle: "Restore your unsaved draft?",
+      restoreBody: "We found changes from an earlier session that were never saved.",
+      restore: "Restore draft",
+      discard: "Discard draft",
+    },
+    bulk: {
+      selected: (n: number) => `${n} selected`,
+      clear: "Clear selection",
+      selectAll: "Select all rows",
+      selectRow: "Select row",
+    },
+    blockers: {
+      readyTitle: "Ready to publish",
+      blockedTitle: (n: number) =>
+        n === 1 ? "1 thing is blocking publish" : `${n} things are blocking publish`,
+      fix: "Fix",
+    },
   },
   common: {
     apply: "Apply",
@@ -170,6 +307,8 @@ export const en = {
     OrganizationNotFound: "Organization not found",
     minimumScoreError: "Minimum score must be a positive integer",
     failedToCreateEvent: "Failed to create event",
+    failedToCreateLanguage: "Failed to create language",
+    failedToUpdateLanguage: "Failed to update language",
     failedToProceed: "Fill atleast title field to proceed to Event Configuration!",
     failedToSaveEvents: "Failed to save events. Please try again.",
     failedToBulkAddEvents: (count: number) =>
@@ -291,11 +430,31 @@ export const en = {
     pleaseWait: "Please wait while we verify your link",
     magicLinkExpired: "Invalid or Expired Link",
     redirectingToLogin: "Redirecting to login page...",
+    backToLogin: "Back to login",
+    magicLinkMissingToken:
+      "This sign-in link is incomplete. Open the link from your email again, or request a new one.",
     redirectingToDashboard: "Redirecting to dashboard...",
   },
   // Per-admin content toggles (Create Roleplays / Cases / Courses). A type whose
   // toggle is off is view-only; the copy names the toggle to ask for, matching
   // ally-be's refusal (ContentAccessService).
+  organizationAccess: {
+    bulk: {
+      enableAll: "Enable all",
+      enableAllHint: (noun: string) =>
+        `Turn on every published ${noun} this organisation does not have yet`,
+      enableAllTitle: "Enable everything published?",
+      copyFrom: "Copy access from…",
+      copy: "Copy",
+      copyTitle: (from: string) => `Copy access from ${from}?`,
+      consequence: (n: number, noun: string) =>
+        `This turns on ${n} ${noun} for this organisation. Nothing is switched off, and you can turn any of them off again one by one.`,
+      confirm: (n: number) => `Enable ${n}`,
+      nothingToChange: (noun: string) => `Nothing to change: no ${noun} to add.`,
+      done: (n: number, noun: string) => `Enabled ${n} ${noun}`,
+      failed: "Couldn't update access. Nothing may have changed, so check the list.",
+    },
+  },
   contentAccess: {
     view: "View",
     viewOnlyEmptyTitle: (plural: string) => `No ${plural} to show`,
@@ -897,6 +1056,25 @@ export const en = {
     loadingToggles: "Loading feature access...",
   },
   userManagement: {
+    bulkSuspend: "Suspend",
+    bulkActivate: "Activate",
+    bulkSuspendTitle: (n: number) => `Suspend ${n} ${n === 1 ? "user" : "users"}?`,
+    bulkSuspendConsequence:
+      "They are signed out and cannot sign in until activated again. Their data is kept, and you can activate them at any time.",
+    bulkActivateTitle: (n: number) => `Activate ${n} ${n === 1 ? "user" : "users"}?`,
+    bulkActivateConsequence: "They can sign in again straight away.",
+    bulkStatusDone: (n: number, status: string) =>
+      `${n} ${n === 1 ? "user" : "users"} set to ${status.toLowerCase()}`,
+    bulkStatusFailed: (names: string[]) =>
+      `Couldn't update ${names.length} ${names.length === 1 ? "user" : "users"}: ${names.slice(0, 5).join(", ")}${names.length > 5 ? ` and ${names.length - 5} more` : ""}`,
+    roleHelpHeading: "What each role can do",
+    roleHelp: {
+      COUNSELOR: "Counsellor: works the helpline and practises in the app. No admin access.",
+      ADMIN: "Admin: manages one organisation's users, content access and results.",
+      LEARNER: "Learner: practises roleplays and courses in the app. No admin access.",
+      MULTI_TENANT_ADMIN:
+        "Multi-tenant admin: an admin across several organisations. Choose which ones after the account exists.",
+    } as Record<string, string>,
     organizationCreated: "Organization created successfully",
     organizationUpdated: "Organization updated successfully",
     failedUpdateOrganization: "Failed to update organization",
@@ -928,6 +1106,10 @@ export const en = {
     bulkAddUsersSuccess: (count: number) =>
       `${count} ${count === 1 ? "user" : "users"} added successfully`,
     bulkAddUsersFailed: "Failed to add users",
+    creditFloorRaised: (min: number) =>
+      `Learners always get at least ${min} credits, so the limit was set to ${min}.`,
+    bulkAddUsersInvalidRows: (rows: string[]) =>
+      `${rows.length} ${rows.length === 1 ? "row isn't a valid email" : "rows aren't valid emails"}, so nothing was added: ${rows.slice(0, 5).join(", ")}${rows.length > 5 ? ` and ${rows.length - 5} more` : ""}`,
     bulkAddUsersEmptyError: "Enter at least one email address",
     bulkAddUsersHint:
       "Users are created without a name — they'll be asked to complete their profile on first login.",
@@ -1145,6 +1327,8 @@ export const en = {
     mapFailed:
       "Couldn't sort memories into states, so your knowledge sources were copied over as they are. Check them below.",
     remap: "Re-map from knowledge sources",
+    remapTitle: "Re-map memories?",
+    remapAction: "Re-map",
     remapConfirm:
       "Re-map memories from your knowledge sources? This replaces every memory below, including any edits you made to them.",
     remapFailed: "Couldn't re-map memories. Your memories were left as they were.",
@@ -1590,6 +1774,8 @@ export const en = {
         assign: "Use for this chatbot",
         assigned: "Channel moved.",
         unassign: "Remove from chatbot",
+        unassignTitle: "Remove this channel?",
+        unassignAction: "Remove channel",
         unassignConfirm:
           "Remove this channel from its chatbot? It stops answering until you add it to a chatbot.",
         unassigned: "Channel removed from its chatbot.",
@@ -1787,6 +1973,8 @@ export const en = {
       subscribed: "Subscribed. Send a test message to your number.",
       subscribeFailed: "Could not subscribe the app.",
       checking: "Checking…",
+      disconnectTitle: "Disconnect this number?",
+      disconnectAction: "Disconnect",
       disconnectConfirm:
         "Disconnect this number? Its stored token and secret are deleted and messages to it stop being answered.",
       disconnected: "Number disconnected.",
@@ -4468,6 +4656,7 @@ export const en = {
       tabTitle: (count: number) =>
         count ? `(${count}) Builder · Ally Admin` : "Builder · Ally Admin",
       more: "More Builder pages",
+      subPages: "Builder pages",
       principlesLink: "Principles",
       principlesLinkLabel: "Open First Principles in the Context Library",
       overflow: {
@@ -6152,6 +6341,12 @@ export const en = {
       "The control room for Ally, the AI course companion: how it is doing, what it said, which release is live, and the switches that turn it off.",
     viewOnly:
       "View only. Changing anything here needs the edit permission for the Ally guide, and yours is read-only.",
+    groups: {
+      label: "Ally Console areas",
+      monitor: "Monitor",
+      release: "Release",
+      configure: "Configure",
+    },
     tabs: {
       overview: "Overview",
       conversations: "Conversations",
@@ -8386,6 +8581,76 @@ export const en = {
     closeAnyway: "Close without saving",
     keepEditing: "Keep editing",
   },
+  // Roadmap triage: keyboard shortcuts, one-key decisions and their Undo toasts, the peek panel and
+  // the rank-score explainer. Kept in one block, here, rather than inline in the page.
+  roadmapTriage: {
+    shortcutsTitle: "Keyboard shortcuts",
+    shortcutsIntro:
+      "Work down the list without the mouse. Keys do nothing while you are typing in a field or while a panel is open over the list.",
+    shortcutsClose: "Close",
+    shortcutsHint: "Press ? for keyboard shortcuts",
+    shortcutsGroupMove: "Move",
+    shortcutsGroupAct: "Decide",
+    shortcutsMoveDown: "Next opportunity",
+    shortcutsMoveUp: "Previous opportunity",
+    shortcutsOpen: "Open the peek panel",
+    shortcutsOpenFull: "Open the full drawer (from the peek panel)",
+    shortcutsSearch: "Search",
+    shortcutsEscape: "Close the panel",
+    shortcutsHelp: "Show this card",
+    shortcutsAccept: "Accept — move to Prioritised",
+    shortcutsReject: "Reject — archive, with an optional reason",
+    shortcutsAssignToMe: "Assign to me",
+    shortcutsUndo: "Undo the last change",
+    accepted: (code: string) => `Accepted ${code}.`,
+    rejected: (code: string) => `Archived ${code}.`,
+    restored: (code: string) => `Restored ${code}.`,
+    assigned: (code: string) => `${code} is now yours.`,
+    fieldChanged: (code: string, field: string) => `Changed ${field} on ${code}.`,
+    undo: "Undo",
+    undone: "Undone.",
+    saveFailed: "Could not save that change.",
+    undoFailed: "Could not undo that change.",
+    nothingToUndo: "Nothing to undo.",
+    rejectTitle: "Why are you rejecting this?",
+    rejectHint: "Optional. Saved as a comment so the next person sees why.",
+    rejectSkip: "No reason",
+    rejectCancel: "Cancel",
+    rejectReasons: {
+      duplicate: "Duplicate",
+      outOfScope: "Out of scope",
+      notNow: "Not now",
+      needsInfo: "Needs info",
+    },
+    rejectComment: (reason: string) => `Archived: ${reason}`,
+    sizeNudge: "Size?",
+    sizeNudgeTip: "Not sized yet. Unsized ideas rank as if they were a 50. Click to pick a size.",
+    ownerNudge: "Owner?",
+    ownerNudgeTip: "Nobody owns this yet. Click to choose an owner.",
+    effortTip: "Effort. Click to change it.",
+    goalTip: "Product goal. Click to change it.",
+    ownerTip: "Owner. Click to change it.",
+    unowned: "Unassigned",
+    peekTitle: "Opportunity details",
+    peekClose: "Close the peek panel",
+    peekOpenFull: "Open full",
+    peekAccept: "Accept",
+    peekReject: "Reject",
+    peekRestore: "Restore",
+    peekFacts: "Details",
+    peekDuplicates: "Possible duplicates",
+    peekDuplicatesNone: "No close matches found.",
+    peekDuplicatesError: "Could not check for duplicates.",
+    peekDuplicatesTip:
+      "Other opportunities with a similar description. Open one to compare, then merge from the full drawer if they are the same thing.",
+    peekNoRows: "Select an opportunity to see its details here.",
+    rankWhy: "Why this rank?",
+    rankWhyTip: "How the rank score was made: each factor's value, weight and share of the score.",
+    rankUnsizedNote: "Not sized: counted as 50.",
+    rankNoVotes: "No votes yet — this ranks on effort and goal coverage alone.",
+    rankWeightsLink: "Change the weights in Roadmap settings.",
+    rankWeightsUnavailable: "Weights are not available to you.",
+  },
   productUpdates: {
     title: "Product updates",
     description:
@@ -9600,6 +9865,55 @@ export const en = {
         loadFailed: "the changes",
         changeFailed: "Couldn't load this change.",
       },
+      improve: {
+        heading: "What Debrief improves",
+        headline: (v: string) => `The overall score is ${v} over the last 4 weeks.`,
+        headlineUp: (by: string, v: string) =>
+          `The overall score rose ${by} to ${v} over the last 4 weeks.`,
+        headlineDown: (by: string, v: string) =>
+          `The overall score fell ${by} to ${v} over the last 4 weeks.`,
+        headlineNone: "No overall score yet: no judged debriefs in the last 4 weeks.",
+        chartLabel: "The overall score and its parts, each point over 4 weeks",
+        lines: {
+          overall: "Overall score",
+          pass: "Pass rate",
+          helpful: "Found it helpful",
+          notFlagged: "Not flagged",
+        } as Record<string, string>,
+        lineHelp: {
+          overall:
+            "What the system improves and what decides whether a change stays. Out of 10, shown ×10.",
+          pass: "Reached the learner with no failed check and no serious error found by the reviewer.",
+          helpful: "Learners who rated the debrief, and said it helped.",
+          notFlagged: "Debriefs where the learner flagged no card.",
+        } as Record<string, string>,
+        weight: (pct: number) => `${pct}%`,
+        note: "Each point covers the 4 weeks ending that week. A hollow point has fewer than 20 debriefs. Green line: a change went live. Red: a change was undone.",
+        tipDebriefs: (n: number) => `${n} debriefs in these 4 weeks`,
+        weekOf: (d: string) => `4 weeks to ${d}`,
+        quality: "Quality score",
+        qualityHelp:
+          "The reviewer's eight checks, weighted. Each colour is one check's share; grey is what was lost.",
+        qualityVs: (d: string) => `${d} vs the 4 weeks before`,
+        qualityN: (n: number) => `${n} judged debriefs`,
+        qualityNone: "No judged debriefs in the last 4 weeks.",
+        lost: (v: string) => `${v} lost`,
+        dims: {
+          evidence_specificity: "Evidence",
+          accuracy: "Accuracy",
+          actionability: "Actionability",
+          prioritisation: "Prioritisation",
+          personalisation_progress: "Personalisation and progress",
+          practice_alignment: "Practice alignment",
+          tone: "Tone",
+          clarity: "Clarity",
+        } as Record<string, string>,
+        dimTip: (name: string, got: string, of: string) => `${name}: ${got} of a possible ${of}`,
+        gatesLabel: "Never traded off",
+        gateOk: "Holding",
+        gateBroken: "Broken",
+        moreDetail: "More detail",
+      },
       score: {
         label: "Overall score",
         held: (v: string) => `The overall score held at ${v} this week.`,
@@ -9986,6 +10300,11 @@ export const en = {
     },
     // v9 §3.3 / PRD §4: the success metrics.
     metrics: {
+      rangeCapNote: {
+        "12m":
+          "Success metrics cover the last 12 months. The operator numbers and judge agreement below cover the last 90 days, the most this view holds.",
+        all: "Success metrics show up to the last 12 months. The operator numbers and judge agreement below cover the last 90 days, the most this view holds.",
+      } as Record<string, string>,
       heading: "Metrics",
       help: "How the debrief is doing for learners in switched-on organisations, week by week. Each number is shown with how many debriefs it counts; below 20 it is marked as too few to read.",
       steering: {
@@ -10665,6 +10984,8 @@ export const en = {
     },
     // One session's page (redesign 2026-11-12): the roleplay beside the debrief, and the review.
     session: {
+      nextUp: "Done. Opening the next one.",
+      queueClear: "That was the last one in this queue.",
       turn: (n: number) => `Turn ${n}`,
       turns: (n: number) => `${n} ${n === 1 ? "turn" : "turns"}`,
       roleplay: "Roleplay",

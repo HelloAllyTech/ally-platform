@@ -12,6 +12,7 @@ import reportUploadReducer from "@reducer/reportUploadReducer";
 import * as api from "@api";
 
 import { PrivateLayout } from "../PrivateLayout";
+import { ShellContext } from "../ShellContext";
 
 vi.mock("@components", async importOriginal => {
   const actual = await importOriginal<typeof import("@components")>();
@@ -531,6 +532,58 @@ describe("PrivateLayout", () => {
 
       expect(screen.getByText("OpenContent")).toBeInTheDocument();
       expect(screen.queryByTestId("entitlements-failed")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("under the shared AdminShell", () => {
+    const renderInShell = (layout: React.ReactElement) =>
+      render(
+        <Provider store={mockStore}>
+          <MemoryRouter initialEntries={["/protected"]}>
+            <ShellContext.Provider value>
+              <Routes>
+                <Route path="/protected" element={layout} />
+              </Routes>
+            </ShellContext.Provider>
+          </MemoryRouter>
+        </Provider>,
+      );
+
+    it("only gates: it draws no sidebar or frame of its own", () => {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+      renderInShell(
+        <PrivateLayout>
+          <div>ShellContent</div>
+        </PrivateLayout>,
+      );
+      expect(screen.getByText("ShellContent")).toBeInTheDocument();
+      expect(screen.queryByText("Sidebar")).not.toBeInTheDocument();
+    });
+
+    it("still refuses access with the reason", async () => {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+      // Earlier tests leave their error/loading mocks behind; start from a healthy load.
+      const healthy = (data: unknown) => ({
+        data,
+        isLoading: false,
+        isError: false,
+        refetch: refetchSpy,
+      });
+      (api.useGetUserQuery as ReturnType<typeof vi.fn>).mockReturnValue(healthy({ id: 1 }));
+      (api.useGetPermissionsQuery as ReturnType<typeof vi.fn>).mockReturnValue(
+        healthy([Permissions.EDIT_USER]),
+      );
+      (api.useGetFeatureTogglesQuery as ReturnType<typeof vi.fn>).mockReturnValue(healthy([]));
+      const { hasPermissions } = await import("@utils");
+      (hasPermissions as unknown as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      renderInShell(
+        <PrivateLayout requiredPermissions={[Permissions.EDIT_EVENT]}>
+          <div>BlockedInShell</div>
+        </PrivateLayout>,
+      );
+      expect(screen.queryByText("BlockedInShell")).not.toBeInTheDocument();
+      expect(screen.getByText("This page is not accessible")).toBeInTheDocument();
+      expect(screen.queryByText("Sidebar")).not.toBeInTheDocument();
     });
   });
 });

@@ -1,5 +1,6 @@
 import { FC, useEffect, useRef, useState } from "react";
 
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
@@ -139,7 +140,24 @@ export const MobileReleases: FC = () => {
   const iosLastReleaseDate = testflightHistory[0]?.uploadedDate ?? null;
   const releaseInProgress = isReleaseInProgress(runs);
 
-  const [tabIndex, setTabIndex] = useState(0);
+  // The open history tab lives in `?tab=<id>` so a link opens it. The first is
+  // the default and so the absent value; an unknown id falls back to it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const tabIndex = Math.max(
+    0,
+    HISTORY_TABS.findIndex(t => t.id === requestedTab),
+  );
+  const setTabIndex = (index: number) =>
+    setSearchParams(
+      current => {
+        const next = new URLSearchParams(current);
+        if (index === 0) next.delete("tab");
+        else next.set("tab", HISTORY_TABS[index].id);
+        return next;
+      },
+      { replace: true },
+    );
 
   const [isConfirmingTrigger, setIsConfirmingTrigger] = useState(false);
   const [triggerRelease, { isLoading: isTriggering }] = useTriggerMobileReleaseMutation();

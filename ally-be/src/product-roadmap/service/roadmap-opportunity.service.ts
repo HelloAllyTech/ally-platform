@@ -585,8 +585,10 @@ export class RoadmapOpportunityService {
     }
 
     if (dto.stage !== undefined) {
-      patch.stage = dto.stage;
-      patch.releasedAt = this.resolveReleasedAt(existing, dto.stage);
+      // A retired stage value never reaches here: the DTO's @IsEnum rejects it with a 400.
+      const nextStage = dto.stage;
+      patch.stage = nextStage;
+      patch.releasedAt = this.resolveReleasedAt(existing, nextStage);
     }
 
     if (

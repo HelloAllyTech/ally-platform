@@ -19,6 +19,7 @@ import {
 } from "@types";
 
 import {
+  cloneSectionWithNewIds,
   createItemOfType,
   createQuestionOfType,
   deserializeTrack,
@@ -816,5 +817,22 @@ describe("Breathing Exercise", () => {
     expect(content.gameKey).toBe(TrackGameKey.BREATHING_EXERCISE);
     expect(content.intro).toBe("Take a break");
     expect(content.breathingExercise).toEqual(form.sections[0].items[0].game!.breathingExercise);
+  });
+});
+
+describe("cloneSectionWithNewIds", () => {
+  it("copies content but gives the section and every item a new localId", () => {
+    const section = {
+      localId: "s1",
+      title: "Intro",
+      description: "",
+      items: [{ localId: "i1", type: "ARTICLE", title: "A" }],
+    } as any;
+    const copy = cloneSectionWithNewIds(section);
+    expect(copy.title).toBe("Intro (copy)");
+    expect(copy.localId).not.toBe("s1");
+    expect(copy.items[0].localId).not.toBe("i1");
+    expect(copy.items[0].title).toBe("A");
+    expect(section.items[0].localId).toBe("i1");
   });
 });

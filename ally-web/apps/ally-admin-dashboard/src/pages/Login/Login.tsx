@@ -189,6 +189,9 @@ export const Login: React.FC = () => {
       return (
         <motion.div
           key="email"
+          onKeyDown={e => {
+            if (e.key === "Enter" && !isLoading && !isSubmitDisabled) handleNext();
+          }}
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 50 }}
@@ -286,6 +289,9 @@ export const Login: React.FC = () => {
     return (
       <motion.div
         key="otp"
+        onKeyDown={e => {
+          if (e.key === "Enter" && !isLoading && !isSubmitDisabled) handleVerify();
+        }}
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -50 }}
@@ -312,7 +318,14 @@ export const Login: React.FC = () => {
           </span>
         </div>
         <div className="flex flex-col gap-2">
-          <OTP value={otp} onChange={setOtp} />
+          <OTP
+            value={otp}
+            onChange={setOtp}
+            autoFocus
+            onComplete={code => {
+              if (!isLoading) verifyOTP({ email: email.trim(), otp: code });
+            }}
+          />
           <div className="text-xs text-typography-900">
             {en.auth.codeWillExpire}{" "}
             <span className="font-[700]">{`${generateOTPData?.expiresIn ? generateOTPData?.expiresIn / 60 : DEFAULT_EXPIRES_IN} ${en.auth.minutes}`}</span>

@@ -107,6 +107,9 @@ const mockFetchVersions = vi.fn();
 /** Wrap a value the way an RTK mutation's return does. */
 const resolved = (value: unknown) => ({ unwrap: () => Promise.resolve(value) });
 const rejected = (error: unknown) => ({ unwrap: () => Promise.reject(error) });
+// The runner has its own tests; it needs endpoints this suite does not stub.
+vi.mock("../PromptTestRunner", () => ({ PromptTestRunner: () => null }));
+
 vi.mock("@api", () => ({
   useGetPromptVersionsQuery: () => ({
     data: mockVersions,

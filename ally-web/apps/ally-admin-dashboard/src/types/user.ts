@@ -150,6 +150,14 @@ export interface UserListProps {
   formatDate: (iso: string) => string;
   onOptionSelect?: (option: string, user: UserListUser) => void;
   canEditUser?: boolean;
+  /** Row selection for bulk actions; omit for a list with no checkboxes. */
+  selection?: {
+    isSelected: (id: number) => boolean;
+    toggle: (id: number) => void;
+    toggleAll: () => void;
+    allSelected: boolean;
+    someSelected: boolean;
+  };
 }
 
 export interface OrganizationListProps {

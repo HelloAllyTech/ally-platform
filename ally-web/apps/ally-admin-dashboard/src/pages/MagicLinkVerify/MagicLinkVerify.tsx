@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { useVerifyMagicLinkMutation } from "@api";
@@ -19,8 +19,7 @@ export const MagicLinkVerify: React.FC = () => {
 
   useEffect(() => {
     if (!token) {
-      toast.error("Invalid magic link. Redirecting to login...");
-      setTimeout(() => navigate(ROUTES.LOGIN), 2000);
+      toast.error(en.auth.magicLinkMissingToken);
       return;
     }
 
@@ -55,6 +54,26 @@ export const MagicLinkVerify: React.FC = () => {
     })();
   }, [isSuccess, error, data, checkAuth, navigate]);
 
+  const backToLogin = (
+    <Link to={ROUTES.LOGIN} className="text-sm text-primary-500 hover:text-primary-600 underline">
+      {en.auth.backToLogin}
+    </Link>
+  );
+
+  if (!token) {
+    return (
+      <div className="flex items-center justify-center min-h-dvh px-4 md:px-0 bg-background">
+        <div className="flex flex-col items-center gap-4 p-6 md:p-8 rounded-lg bg-white shadow-lg text-center">
+          <h2 className="text-2xl font-secondary text-typography-900">
+            {en.auth.magicLinkExpired}
+          </h2>
+          <p className="text-sm text-typography-600">{en.auth.magicLinkMissingToken}</p>
+          {backToLogin}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-center min-h-dvh px-4 md:px-0 bg-background">
       {(error || (!error && !isSuccess && isLoading)) && (
@@ -68,6 +87,7 @@ export const MagicLinkVerify: React.FC = () => {
                 {en.auth.magicLinkExpired}
               </h2>
               <p className="text-sm text-typography-600">{en.auth.redirectingToLogin}</p>
+              {backToLogin}
             </>
           )}
           {!error && !isSuccess && isLoading && (

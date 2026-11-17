@@ -28,14 +28,15 @@ const STAGE_BY_STATUS: Record<BugFindingStatus, RoadmapOpportunityStage> = {
   [BugFindingStatus.APPROVED]: RoadmapOpportunityStage.PRIORITISED,
   [BugFindingStatus.QUEUED]: RoadmapOpportunityStage.PRIORITISED,
 
-  // Work is genuinely underway. NEEDS_INPUT belongs here rather than back at New:
-  // the work started and is blocked on an answer, which is a different thing from
-  // nobody having picked it up.
-  [BugFindingStatus.FIXING]: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
-  [BugFindingStatus.NEEDS_INPUT]: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
-  [BugFindingStatus.PR_OPENED]: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
-  [BugFindingStatus.BLOCKED]: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
-  [BugFindingStatus.COORDINATING]: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
+  // Work is genuinely underway. The roadmap ladder no longer has an "in development" rung
+  // (retired 2026-11), so these read as Prioritised: someone has committed to the bug, and the
+  // pipeline status beside the stage is what says it is being fixed, blocked or in review.
+  // NEEDS_INPUT stays out of New: the work started and is blocked on an answer.
+  [BugFindingStatus.FIXING]: RoadmapOpportunityStage.PRIORITISED,
+  [BugFindingStatus.NEEDS_INPUT]: RoadmapOpportunityStage.PRIORITISED,
+  [BugFindingStatus.PR_OPENED]: RoadmapOpportunityStage.PRIORITISED,
+  [BugFindingStatus.BLOCKED]: RoadmapOpportunityStage.PRIORITISED,
+  [BugFindingStatus.COORDINATING]: RoadmapOpportunityStage.PRIORITISED,
 
   // MERGED and RELEASING read as Released deliberately. The roadmap ladder has no
   // "merged but not deployed" rung, and the honest coarse answer for a fix that has

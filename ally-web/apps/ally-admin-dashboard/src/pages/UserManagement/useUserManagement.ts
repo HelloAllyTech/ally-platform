@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useForm } from "react-hook-form";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
   useAddUserMutation,
   useBulkAddUsersMutation,
   useDeleteUserMutation,
+  useGetTenantsQuery,
   useGetUsersQuery,
   useEditUserMutation,
   useUpdateUserStatusMutation,
@@ -15,6 +17,7 @@ import {
   useAddSimulationCreditLimitMutation,
   useGetUserImpersonatedTokenMutation,
 } from "@api";
+import { useRowSelection } from "@components/bulk-action-bar";
 import { FilterValues } from "@components/types";
 import {
   SORT_BY,
@@ -35,7 +38,9 @@ import {
   UserListUser,
   UserRoles,
 } from "@types";
-import { getChipValue, getErrorMessage, parseEmailList } from "@utils";
+import { getChipValue, getErrorMessage, parseEmailList, validateEmail } from "@utils";
+
+import { MIN_LEARNER_CREDITS, resolveLearnerCreditLimit } from "./learnerCredits";
 
 export const USERS_PAGE_SIZE = 20;
 const IMPERSONATION_APP_URL = import.meta.env.VITE_IMPERSONATION_APP_URL;
@@ -51,22 +56,74 @@ const IMPERSONATION_APP_URL = import.meta.env.VITE_IMPERSONATION_APP_URL;
  * Ally admins sub-tab, and ally-be refuses the users list — so the query is
  * skipped rather than left to 403 on mount.
  */
+/** One request that holds every organisation (the Organisations tab pages 100 at a time). */
+const ALL_TENANTS_LIMIT = 1000;
+
 export function useUserManagement(
-  tenants: Tenant[],
+  pagedTenants: Tenant[],
   canListPlatformAdmins = false,
   canListUsers = true,
 ) {
-  const [search, setSearch] = useState<string>("");
+  // The org filter and the "Add user" organisation picker need EVERY organisation, not just the
+  // 100 the Organisations tab has paged in so far; otherwise an org past the first page cannot be
+  // chosen. Falls back to the paged list until the full one arrives.
+  const { data: allTenantsPage } = useGetTenantsQuery(
+    { limit: ALL_TENANTS_LIMIT, sortBy: SORT_BY.CREATED_AT, sortOrder: SORT_ORDER.DESC },
+    { skip: !canListUsers },
+  );
+  const tenants: Tenant[] = allTenantsPage?.data?.length ? allTenantsPage.data : pagedTenants;
+  // Search and filters live in the URL (?q, ?org, ?role, ?status) so a refresh, the back button or
+  // a link to a colleague lands on the same list. replace: typing must not fill the history.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const search = urlParams.get("q") ?? "";
+  const setSearch = useCallback(
+    (value: string) =>
+      setUrlParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          if (value) next.set("q", value);
+          else next.delete("q");
+          return next;
+        },
+        { replace: true },
+      ),
+    [setUrlParams],
+  );
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [addUsermodalOpen, setAddUserModalOpen] = useState<boolean>(false);
   const [bulkAddModalOpen, setBulkAddModalOpen] = useState<boolean>(false);
 
-  const [filters, setFilters] = useState<FilterValues>({
-    organizations: [],
-    roles: [],
-    statuses: [],
-  });
-  const [tenantIdFilters, setTenantIdFilters] = useState<string[]>([]);
+  const orgParam = urlParams.getAll("org");
+  const roleParam = urlParams.getAll("role");
+  const statusParam = urlParams.getAll("status");
+  const filters = useMemo<FilterValues>(
+    () => ({ organizations: orgParam, roles: roleParam, statuses: statusParam }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orgParam.join("\u0001"), roleParam.join("\u0001"), statusParam.join("\u0001")],
+  );
+  const setFilters = useCallback(
+    (update: FilterValues | ((prev: FilterValues) => FilterValues)) =>
+      setUrlParams(
+        prev => {
+          const current: FilterValues = {
+            organizations: prev.getAll("org"),
+            roles: prev.getAll("role"),
+            statuses: prev.getAll("status"),
+          };
+          const value = typeof update === "function" ? update(current) : update;
+          const next = new URLSearchParams(prev);
+          next.delete("org");
+          next.delete("role");
+          next.delete("status");
+          value.organizations.forEach(v => next.append("org", v));
+          value.roles.forEach(v => next.append("role", v));
+          value.statuses.forEach(v => next.append("status", v));
+          return next;
+        },
+        { replace: true },
+      ),
+    [setUrlParams],
+  );
 
   const [users, setUsers] = useState<UserListUser[]>([]);
   const [usersCount, setUsersCount] = useState<number>(0);
@@ -120,6 +177,14 @@ export function useUserManagement(
   // No opt-in: a viewer who is allowed to see platform accounts sees them in
   // the list like any other account.
   const includePlatformAdmins = canListPlatformAdmins;
+  // Filter by id. Two organisations can share a name, so every match counts.
+  const tenantIdFilters = useMemo(
+    () =>
+      filters.organizations.flatMap(name =>
+        tenants.filter(tenant => tenant.name === name).map(tenant => tenant.id),
+      ),
+    [filters.organizations, tenants],
+  );
   const userParams = {
     limit: USERS_PAGE_SIZE,
     offset: usersOffset,
@@ -194,7 +259,6 @@ export function useUserManagement(
         allValue: filters.organizations,
         onClear: () => {
           setFilters(previousFilters => ({ ...previousFilters, organizations: [] }));
-          setTenantIdFilters([]);
         },
       });
     }
@@ -219,10 +283,6 @@ export function useUserManagement(
 
   const handleApplyFilters = (newFilters: FilterValues) => {
     setFilters(newFilters);
-    const organizationIds = newFilters.organizations
-      .map(name => tenants.find(tenant => tenant.name === name)?.id)
-      .filter((id): id is string => Boolean(id));
-    setTenantIdFilters(organizationIds);
   };
 
   const getField = (userData: FieldProps[]) => {
@@ -286,7 +346,9 @@ export function useUserManagement(
         tenantId: data?.tenantId,
       };
       if (data?.roles?.includes(UserRole.LEARNER)) {
-        payload.simulationCreditLimit = Math.max(Number(data?.simulationCreditLimit || 0), 20);
+        const { limit, raised } = resolveLearnerCreditLimit(data?.simulationCreditLimit);
+        payload.simulationCreditLimit = limit;
+        if (raised) toast.info(en.userManagement.creditFloorRaised(MIN_LEARNER_CREDITS));
       }
       await addUserdata(payload).unwrap();
       setAddUserModalOpen(false);
@@ -323,13 +385,22 @@ export function useUserManagement(
         toast.error(en.userManagement.bulkAddUsersEmptyError);
         return;
       }
+      // The server accepts or rejects the whole batch, so catch malformed rows here and name
+      // them, instead of one generic failure for a list of fifty.
+      const badRows = emails.filter(email => !validateEmail(email));
+      if (badRows.length > 0) {
+        toast.error(en.userManagement.bulkAddUsersInvalidRows(badRows));
+        return;
+      }
+      const credit = data?.roles?.includes(UserRole.LEARNER)
+        ? resolveLearnerCreditLimit(data?.simulationCreditLimit)
+        : null;
+      if (credit?.raised) toast.info(en.userManagement.creditFloorRaised(MIN_LEARNER_CREDITS));
       const payload = {
         emails,
         roles: data?.roles,
         tenantId: data?.tenantId,
-        ...(data?.roles?.includes(UserRole.LEARNER)
-          ? { simulationCreditLimit: Math.max(Number(data?.simulationCreditLimit || 0), 20) }
-          : {}),
+        ...(credit ? { simulationCreditLimit: credit.limit } : {}),
       };
       const response = await bulkAddUsers(payload).unwrap();
       handleBulkAddClose();
@@ -409,6 +480,34 @@ export function useUserManagement(
     }
   };
 
+  // Row selection + bulk status change. There is no bulk endpoint, so each user is updated on its
+  // own and the result names the ones that failed. A search or filter change clears the selection:
+  // the bar must never act on rows that are no longer on screen.
+  const rowSelection = useRowSelection<number>(users.map(user => user.id));
+  const clearSelection = rowSelection.clear;
+  const selectionScope = JSON.stringify([search, filters]);
+  useEffect(() => {
+    clearSelection();
+  }, [selectionScope, clearSelection]);
+
+  const handleBulkStatus = async (status: string) => {
+    const targets = users.filter(user => rowSelection.isSelected(user.id));
+    const results = await Promise.allSettled(
+      targets.map(user => updateUserStatus({ userId: user.id, status }).unwrap()),
+    );
+    const failed = targets.filter((_, index) => results[index].status === "rejected");
+    const ok = targets.length - failed.length;
+    if (ok > 0) toast.success(en.userManagement.bulkStatusDone(ok, status));
+    if (failed.length > 0) {
+      toast.error(
+        en.userManagement.bulkStatusFailed(
+          failed.map(user => user.name || user.email || `#${user.id}`),
+        ),
+      );
+    }
+    rowSelection.clear();
+  };
+
   const handleChangeRole = async (data: any) => {
     try {
       const selectedRoleNames: string[] = data.roles || [];
@@ -473,6 +572,9 @@ export function useUserManagement(
 
   return {
     // state
+    allTenants: tenants,
+    rowSelection,
+    handleBulkStatus,
     search,
     setSearch,
     isFilterOpen,

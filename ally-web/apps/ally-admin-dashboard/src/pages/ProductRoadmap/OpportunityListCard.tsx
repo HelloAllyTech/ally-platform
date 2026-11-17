@@ -1,22 +1,25 @@
 import React from "react";
 
-import { RoadmapVoteBudget, RoadmapOpportunity } from "@types";
+import { en } from "@constants/en";
+import { RoadmapVoteBudget, RoadmapOpportunity, RoadmapOpportunityEffort } from "@types";
 
+import { DirectorStarButton } from "./DirectorStarButton";
+import { InlineChipMenu } from "./InlineChipMenu";
 import { NewColleagueTag } from "./NewToYouChip";
 import { RankScore } from "./RankBreakdown";
+import { RankWhy } from "./RankWhy";
 import { useScoreUnit } from "./useScoreUnit";
-import { monthLabel } from "./utils/monthBoard";
 import { personName } from "./utils/people";
 import { formatPoints } from "./utils/points";
 import { priorityBorderColour } from "./utils/priorityColour";
 import {
+  EFFORT_LABEL,
   isConsumerSourced,
   SOURCE_BADGE_STYLE,
   SOURCE_LABEL,
   stageLabel,
   stageStyle,
 } from "./utils/stages";
-import { DirectorStarButton } from "./DirectorStarButton";
 import { VoteButton } from "./VoteButton";
 
 /**
@@ -41,9 +44,24 @@ const GOAL_CHIP_STYLE = `${CHIP_BASE} bg-primary-50 text-primary-700`;
  * Owner — purple. Shares its pair with SOURCE_BADGE_STYLE, which is safe here because the source
  * badge is non-queue only (see the meta row below), so the two never appear on one card.
  */
-const OWNER_CHIP_STYLE = `${CHIP_BASE} bg-purple-50 text-purple-700`;
-/** Planned month — Carbon's yellow-10/80 sand. Warm, and distinct from the two cool chips. */
-const MONTH_CHIP_STYLE = `${CHIP_BASE} bg-warning-50 text-warning-700`;
+const EFFORT_CHIP_STYLE = `${CHIP_BASE} bg-purple-50 text-purple-700`;
+
+/**
+ * What a row needs in order to edit in place. Absent for a reader who cannot edit, in which case
+ * every chip below is plain text and there are no decision buttons — the controls are not merely
+ * disabled, they are not there.
+ */
+export interface RowEditor {
+  goals: string[];
+  owners: { id: number; name: string }[];
+  /** Inbox only: show a dashed "Owner?" chip on rows nobody owns. */
+  showOwnerNudge: boolean;
+  onSetEffort: (opportunity: RoadmapOpportunity, effort: RoadmapOpportunityEffort | null) => void;
+  onSetGoal: (opportunity: RoadmapOpportunity, goal: string) => void;
+  onSetOwner: (opportunity: RoadmapOpportunity, ownerUserId: number | null) => void;
+  onAccept: (opportunity: RoadmapOpportunity) => void;
+  onReject: (opportunity: RoadmapOpportunity) => void;
+}
 
 interface OpportunityListCardProps {
   opportunity: RoadmapOpportunity;
@@ -62,6 +80,14 @@ interface OpportunityListCardProps {
   canVote: boolean;
   onSetVotes: (opportunityId: string, next: number, previous: number) => void;
   onOpen: () => void;
+  /** The keyboard cursor is on this row — draws the ring. See useRoadmapShortcuts. */
+  isCursor?: boolean;
+  /** Whether this row is the one Tab lands on (roving tabindex: exactly one row is). */
+  isTabStop?: boolean;
+  /** Fired when the row takes focus, so the cursor follows a click or a Tab. */
+  onCursor?: () => void;
+  /** In-place editing and decisions. See RowEditor. */
+  editor?: RowEditor;
 }
 
 /**
@@ -81,6 +107,10 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
   canVote,
   onSetVotes,
   onOpen,
+  isCursor = false,
+  isTabStop = false,
+  onCursor,
+  editor,
 }) => {
   const { unit, enabled } = useScoreUnit();
   const isQueueCard = isQueue;
@@ -89,11 +119,33 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
   const rank = opportunity.queueRank;
   const [heading, ...rest] = opportunity.description.split("\n");
   const body = rest.join(" ").trim();
+  const effortChipStyle = opportunity.effort
+    ? EFFORT_CHIP_STYLE
+    : `${CHIP_BASE} border border-dashed border-border-light text-typography-secondary`;
+  // Accept applies to Ideas only; Reject to anything not already archived or shipped.
+  const canAccept = opportunity.stage === "new";
+  const canReject = opportunity.stage !== "archived" && opportunity.stage !== "released";
 
   return (
     <div
       onClick={onOpen}
-      className="border-border-light bg-background-primary flex cursor-pointer items-start gap-3 border border-l-4 p-3 md:gap-4 md:p-4"
+      // A focusable row: j/k move the cursor, Enter opens. Roving tabindex, so Tab visits the
+      // list once rather than stopping on every one of up to 200 cards.
+      data-roadmap-row={opportunity.id}
+      tabIndex={isTabStop || isCursor ? 0 : -1}
+      aria-current={isCursor ? "true" : undefined}
+      onFocus={event => {
+        if (event.target === event.currentTarget) onCursor?.();
+      }}
+      onKeyDown={event => {
+        if (event.target === event.currentTarget && event.key === "Enter") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`group border-border-light bg-background-primary flex cursor-pointer items-start gap-3 border border-l-4 p-3 outline-none md:gap-4 md:p-4 ${
+        isCursor ? "ring-primary-500 ring-2 ring-inset" : ""
+      }`}
       // Inline, not a Tailwind class: the ramp is continuous, and Tailwind's JIT can only emit
       // classes it can see as literals at build time. `border-l-4` sets the width; only the
       // colour is dynamic.
@@ -131,6 +183,7 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
               four factors that produced it — votes included — are one hover away, which is what
               keeps a blended number arguable rather than merely believed. */}
           <RankScore opportunity={opportunity} />
+          <RankWhy opportunity={opportunity} />
         </div>
       )}
 
@@ -174,47 +227,78 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
             owner, source and vote count, where a single chip among separators would be the odd
             one out instead.
           */}
-          {isQueueCard ? (
+          {isQueueCard && editor ? (
+            <InlineChipMenu
+              label={opportunity.productGoal}
+              tip={en.roadmapTriage.goalTip}
+              className={GOAL_CHIP_STYLE}
+              options={editor.goals.map(goal => ({ value: goal, label: goal }))}
+              selectedValue={opportunity.productGoal}
+              onSelect={goal => editor.onSetGoal(opportunity, goal)}
+            />
+          ) : isQueueCard ? (
             <span className={GOAL_CHIP_STYLE}>{opportunity.productGoal}</span>
           ) : (
             <span className="text-typography-secondary truncate">{opportunity.productGoal}</span>
           )}
 
           {/*
-            Owner and planned month, queue-only. The two questions a triage pass asks after "what
-            is it" are "whose is it" and "when is it meant to land", and both were a drawer click
-            away. The non-queue card already carries owner in its meta line and does not need
-            these.
-
-            RENDERED ONLY WHEN SET. No "No owner" / "Unscheduled" placeholder, because on this
-            board unowned and unscheduled ARE the common case — a chip on every one of 159 rows
-            saying so is noise rather than signal, the same reasoning that keeps the 'staff'
-            source badge off every row ("Default to Common Case, Hide Alternatives"). The
-            absence of a chip is the fact. Those two labels exist in laneLabel for the board's
-            catch-all lanes, where a lane must be named even when its contents are defined by
-            what they lack.
+            Queue row facts, per the triage decisions: title, rank score, votes + backers, effort
+            and goal. Owner, planned month and poster moved to the peek panel — they are not what
+            a triager decides on, and the old three-chip row made every queue card the same busy
+            line. An UNSIZED row gets a dashed "Size?" chip rather than silence: it is the one
+            missing fact that changes the rank (unsized counts as 50), so absence has to be loud.
           */}
-          {isQueueCard && !!opportunity.owner && (
-            <span className={OWNER_CHIP_STYLE}>{opportunity.owner}</span>
+          {isQueueCard &&
+            (editor ? (
+              <InlineChipMenu
+                label={
+                  opportunity.effort ? EFFORT_LABEL[opportunity.effort] : en.roadmapTriage.sizeNudge
+                }
+                tip={
+                  opportunity.effort ? en.roadmapTriage.effortTip : en.roadmapTriage.sizeNudgeTip
+                }
+                className={effortChipStyle}
+                options={[
+                  ...Object.values(RoadmapOpportunityEffort).map(value => ({
+                    value,
+                    label: EFFORT_LABEL[value],
+                  })),
+                  { value: "", label: "Not sized" },
+                ]}
+                selectedValue={opportunity.effort ?? ""}
+                onSelect={value =>
+                  editor.onSetEffort(
+                    opportunity,
+                    (value || null) as RoadmapOpportunityEffort | null,
+                  )
+                }
+              />
+            ) : (
+              <span
+                className={effortChipStyle}
+                title={
+                  opportunity.effort
+                    ? `Effort ${EFFORT_LABEL[opportunity.effort]}`
+                    : "Not sized yet — it ranks as if it were a 50"
+                }
+              >
+                {opportunity.effort ? EFFORT_LABEL[opportunity.effort] : en.roadmapTriage.sizeNudge}
+              </span>
+            ))}
+          {isQueueCard && editor?.showOwnerNudge && !opportunity.owner && (
+            <InlineChipMenu
+              label={en.roadmapTriage.ownerNudge}
+              tip={en.roadmapTriage.ownerNudgeTip}
+              className={`${CHIP_BASE} border border-dashed border-border-light text-typography-secondary`}
+              options={editor.owners.map(owner => ({ value: String(owner.id), label: owner.name }))}
+              onSelect={value => editor.onSetOwner(opportunity, Number(value))}
+            />
           )}
-          {isQueueCard && !!opportunity.plannedMonth && (
-            // monthLabel, not the raw "2026-08": it renders "Aug 2026", and it is the same helper
-            // the month board's lane headings use, so a card and its lane cannot disagree.
-            <span className={MONTH_CHIP_STYLE}>{monthLabel(opportunity.plannedMonth)}</span>
-          )}
-          {/*
-            Who posted it, queue-only — the non-queue card has it in its "Filed …" line below.
-            Plain text, NOT a fourth chip: owner (who will build it) and poster (who asked for it)
-            are different people with different roles, and two purple-ish name chips side by side
-            would be read as the same kind of fact. "Posted by" says which one this is.
-
-            Always set: ally-be resolves every row's creator and falls back to "Unknown user"
-            when the account is gone, so there is no empty case to hide. Never the email — see
-            personName for accounts with a blank name.
-          */}
-          {isQueueCard && opportunity.creator && (
-            <span className="text-typography-secondary truncate">
-              Posted by {personName(opportunity.creator)}
+          {isQueueCard && (
+            <span className="text-typography-secondary tabular-nums">
+              {formatPoints(opportunity.priorityScore)} {unit} · {opportunity.voterCount}{" "}
+              {opportunity.voterCount === 1 ? "backer" : "backers"}
             </span>
           )}
           {!isQueueCard && !!opportunity.owner && (
@@ -231,7 +315,8 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
               queue placement: a number, not just the edge colour. */}
           {!isQueueCard && (
             <span className="text-typography-secondary tabular-nums">
-              · {formatPoints(opportunity.priorityScore)} {unit}
+              · {formatPoints(opportunity.priorityScore)} {unit} · {opportunity.voterCount}{" "}
+              {opportunity.voterCount === 1 ? "backer" : "backers"}
               {/* Outside the queue there is no rank badge for a score to sit under, so the vote
                   total stays the headline and the composite is not shown at all. A rank score
                   with nothing to be a rank IN would invite comparison across two different
@@ -251,6 +336,34 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
 
       {/* stopPropagation on BOTH events, matching the board card: click alone would still let a
           vote button pointerdown reach the row's own click handler first. */}
+      {editor && (canAccept || canReject) && (
+        // Hover or focus reveals them: buttons on every row would be noise on the rows you are
+        // not deciding about. Always in the DOM so Tab, `a` and `r` find them regardless.
+        <div
+          className="flex shrink-0 gap-1.5 opacity-0 focus-within:opacity-100 group-hover:opacity-100"
+          onClick={event => event.stopPropagation()}
+          onPointerDown={event => event.stopPropagation()}
+        >
+          {canAccept && (
+            <button
+              type="button"
+              onClick={() => editor.onAccept(opportunity)}
+              className="border-border-light hover:border-primary-500 text-typography-primary cursor-pointer border px-2 py-1 text-xs"
+            >
+              {en.roadmapTriage.peekAccept}
+            </button>
+          )}
+          {canReject && (
+            <button
+              type="button"
+              onClick={() => editor.onReject(opportunity)}
+              className="border-border-light hover:border-primary-500 text-typography-secondary cursor-pointer border px-2 py-1 text-xs"
+            >
+              {en.roadmapTriage.peekReject}
+            </button>
+          )}
+        </div>
+      )}
       <div
         className="shrink-0"
         onClick={event => event.stopPropagation()}

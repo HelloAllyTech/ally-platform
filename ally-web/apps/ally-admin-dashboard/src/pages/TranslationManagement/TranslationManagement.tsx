@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 
-import { Info, Plus, RefreshCw, RotateCcw, UploadCloud } from "@icons";
+import { Download, Info, Plus, RefreshCw, RotateCcw, UploadCloud } from "@icons";
 import { toast } from "sonner";
 
 import {
@@ -23,11 +23,21 @@ import {
   useRollbackI18nMutation,
   useUpdateI18nTranslationsMutation,
 } from "@api";
-import { Button } from "@components";
+import { ActionConfirmationPopup, Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { Permissions } from "@constants";
 import { useUser } from "@hooks";
 import { DynamicI18nAggregatedRow } from "@types";
+
+import {
+  computePendingChanges,
+  ImportPlan,
+  isMissing,
+  MISSING_ANY,
+  parseCsv,
+  planImport,
+  toCsv,
+} from "./translationTools";
 
 const PLACEHOLDER_REGEX = /\{\{\s*[\w.-]+\s*\}\}/g;
 
@@ -83,6 +93,36 @@ const FALLBACK_LANGUAGES = ["en", "hi", "mr", "ta", "kn"];
 
 const labelForLanguage = (code: string) => LANGUAGE_LABELS[code] ?? code.toUpperCase();
 
+const PREVIEW_LIMIT = 40;
+
+const ChangeList: React.FC<{
+  changes: Array<{ fullKey: string; language: string; live: string; draft: string }>;
+  beforeLabel?: string;
+}> = ({ changes, beforeLabel = "Live" }) => {
+  if (changes.length === 0) return null;
+  return (
+    <div className="mt-2 max-h-64 w-full overflow-auto rounded-md border border-neutral-200 text-left text-xs">
+      {changes.slice(0, PREVIEW_LIMIT).map(change => (
+        <div
+          key={`${change.fullKey}|${change.language}`}
+          className="border-b border-neutral-100 p-2"
+        >
+          <div className="font-medium">
+            {change.fullKey} · {labelForLanguage(change.language)}
+          </div>
+          <div className="text-typography-600">
+            {beforeLabel}: {change.live || "—"}
+          </div>
+          <div>Draft: {change.draft || "—"}</div>
+        </div>
+      ))}
+      {changes.length > PREVIEW_LIMIT && (
+        <div className="p-2 text-typography-600">…and {changes.length - PREVIEW_LIMIT} more</div>
+      )}
+    </div>
+  );
+};
+
 export const TranslationManagement: React.FC = () => {
   const { permissions } = useUser();
   const canEdit = permissions.includes(Permissions.EDIT_I18N_TRANSLATIONS);
@@ -105,11 +145,22 @@ export const TranslationManagement: React.FC = () => {
   const [addKeyValues, setAddKeyValues] = useState<Record<string, string>>({});
   const [addingKey, setAddingKey] = useState(false);
   const [addKeyAutoTranslate, setAddKeyAutoTranslate] = useState(true);
+  const [missingFilter, setMissingFilter] = useState("");
+  const [confirmAction, setConfirmAction] = useState<"publish" | "rollback" | null>(null);
+  const [importPlanState, setImportPlanState] = useState<ImportPlan | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
-  const languages = aggregated?.languages ?? [];
-  const rows = aggregated?.rows ?? [];
+  const languages = useMemo(() => aggregated?.languages ?? [], [aggregated?.languages]);
+  const rows = useMemo(() => aggregated?.rows ?? [], [aggregated?.rows]);
 
   const sections = useMemo(() => [...new Set(rows.map(row => row.namespace))].sort(), [rows]);
+
+  const pendingChanges = useMemo(() => computePendingChanges(rows, languages), [rows, languages]);
+  const pendingKeyCount = useMemo(
+    () => new Set(pendingChanges.map(change => change.fullKey)).size,
+    [pendingChanges],
+  );
 
   const isLiveSelected = useMemo(() => {
     if (rollbackVersion === "") return false;
@@ -127,6 +178,7 @@ export const TranslationManagement: React.FC = () => {
     return rows.filter(row => {
       if (sectionSelected && row.namespace !== sectionSelected) return false;
       if (keyFilter && !row.fullKey.toLowerCase().includes(keyFilter)) return false;
+      if (missingFilter && !isMissing(row, languages, missingFilter, SOURCE_LANGUAGE)) return false;
 
       for (const { lang, query } of langFilters) {
         if (!query) continue;
@@ -135,7 +187,7 @@ export const TranslationManagement: React.FC = () => {
       }
       return true;
     });
-  }, [rows, filters, edits, languages]);
+  }, [rows, filters, edits, languages, missingFilter]);
 
   const setFilter = (column: string, value: string) =>
     setFilters(prev => ({ ...prev, [column]: value }));
@@ -304,6 +356,7 @@ export const TranslationManagement: React.FC = () => {
   };
 
   const publish = async () => {
+    setConfirmAction(null);
     try {
       const manifest = await publishI18n({}).unwrap();
       toast.success(`Published ${manifest.currentVersion}`);
@@ -316,6 +369,7 @@ export const TranslationManagement: React.FC = () => {
 
   const rollback = async () => {
     if (!rollbackVersion) return;
+    setConfirmAction(null);
     try {
       const manifest = await rollbackI18n({ version: Number(rollbackVersion) }).unwrap();
       toast.success(`Rolled back to ${manifest.currentVersion}`);
@@ -331,6 +385,73 @@ export const TranslationManagement: React.FC = () => {
     void refetchStatus();
   };
 
+  const exportCsv = () => {
+    const blob = new Blob([toCsv(rows, languages)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `translations-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const plan = planImport(parseCsv(await file.text()), rows, languages);
+    if (plan.changes.length === 0) {
+      toast.info(
+        plan.unknownKeys.length
+          ? `Nothing to import: ${plan.unknownKeys.length} key(s) in the file don't exist here.`
+          : "Nothing to import: the file matches the current drafts.",
+      );
+      return;
+    }
+    setImportPlanState(plan);
+  };
+
+  const applyImport = async () => {
+    if (!importPlanState) return;
+    setIsImporting(true);
+    const failed: string[] = [];
+    for (const change of importPlanState.changes) {
+      const sourceValue =
+        change.language === SOURCE_LANGUAGE
+          ? change.draft
+          : (rows.find(r => r.fullKey === change.fullKey)?.values[SOURCE_LANGUAGE] ?? "");
+      if (
+        change.language !== SOURCE_LANGUAGE &&
+        !samePlaceholders(extractPlaceholders(sourceValue), extractPlaceholders(change.draft))
+      ) {
+        failed.push(`${change.fullKey} (${change.language}): placeholder mismatch`);
+        continue;
+      }
+      try {
+        await updateTranslation({
+          language: change.language,
+          namespace: change.namespace,
+          key: change.innerKey,
+          value: change.draft,
+        }).unwrap();
+      } catch (error) {
+        failed.push(`${change.fullKey} (${change.language}): ${getErrorMessage(error)}`);
+      }
+    }
+    setIsImporting(false);
+    setImportPlanState(null);
+    const applied = importPlanState.changes.length - failed.length;
+    if (failed.length)
+      toast.error(
+        `Imported ${applied}; ${failed.length} skipped: ${failed.slice(0, 3).join(" | ")}`,
+      );
+    else
+      toast.success(
+        `Imported ${applied} change${applied === 1 ? "" : "s"} as drafts. Publish to make them live.`,
+      );
+    void refetch();
+  };
+
   const pendingEditCount = Object.keys(edits).length;
 
   return (
@@ -344,6 +465,12 @@ export const TranslationManagement: React.FC = () => {
               <span>Languages: {languages.length}</span>
               <span>Keys: {rows.length}</span>
               <span>Retention: last {status?.retentionLimit ?? 5}</span>
+              <span
+                className={pendingKeyCount > 0 ? "text-amber-700" : ""}
+                title="Saved drafts that differ from what is live. Publish to release them."
+              >
+                {pendingKeyCount} key{pendingKeyCount === 1 ? "" : "s"} unpublished
+              </span>
               {pendingEditCount > 0 && (
                 <span className="text-amber-700">{pendingEditCount} unsaved</span>
               )}
@@ -406,8 +533,51 @@ export const TranslationManagement: React.FC = () => {
               ))}
             </Select>
             <Button
+              variant={ButtonVariant.TEXT}
+              onClick={exportCsv}
+              disabled={rows.length === 0}
+              className="h-9 rounded-md px-3"
+              title="Download every key and language as CSV"
+            >
+              <Download size={16} />
+              Export
+            </Button>
+            <Button
+              variant={ButtonVariant.TEXT}
+              onClick={() => importInputRef.current?.click()}
+              disabled={!canEdit || isUpdating || isImporting}
+              className="h-9 rounded-md px-3"
+              title="Upload a CSV in the exported format; you review the changes before they are saved as drafts"
+            >
+              <UploadCloud size={16} />
+              Import
+            </Button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              data-testid="i18n-import-input"
+              onChange={onImportFile}
+            />
+            <Select
+              id="i18n-missing-filter"
+              labelText="Missing translations"
+              hideLabel
+              value={missingFilter}
+              onChange={event => setMissingFilter(event.target.value)}
+            >
+              <SelectItem value="" text="All keys" />
+              <SelectItem value={MISSING_ANY} text="Missing a translation" />
+              {languages
+                .filter(lang => lang !== SOURCE_LANGUAGE)
+                .map(lang => (
+                  <SelectItem key={lang} value={lang} text={`Missing ${labelForLanguage(lang)}`} />
+                ))}
+            </Select>
+            <Button
               variant={ButtonVariant.SECONDARY}
-              onClick={rollback}
+              onClick={() => setConfirmAction("rollback")}
               disabled={!canEdit || !rollbackVersion || isLiveSelected || isRollingBack}
               className="h-9 rounded-md px-3"
             >
@@ -425,7 +595,7 @@ export const TranslationManagement: React.FC = () => {
             </Button>
             <Button
               variant={ButtonVariant.PRIMARY}
-              onClick={publish}
+              onClick={() => setConfirmAction("publish")}
               disabled={!canEdit || isPublishing}
               className="h-9 rounded-md px-3 text-white"
             >
@@ -594,6 +764,74 @@ export const TranslationManagement: React.FC = () => {
           </section>
         </div>
       </div>
+
+      <ActionConfirmationPopup
+        isOpen={confirmAction === "publish"}
+        onClose={() => setConfirmAction(null)}
+        title="Publish translations?"
+        description={
+          pendingChanges.length === 0
+            ? "There are **no unpublished changes**: publishing will re-release the current drafts."
+            : `This makes **${pendingChanges.length} change${pendingChanges.length === 1 ? "" : "s"} across ${pendingKeyCount} key${pendingKeyCount === 1 ? "" : "s"}** live for every user.`
+        }
+        primaryButton={{ label: "Publish", onClick: publish, variant: ButtonVariant.PRIMARY }}
+        secondaryButton={{
+          label: "Cancel",
+          onClick: () => setConfirmAction(null),
+          variant: ButtonVariant.SECONDARY,
+        }}
+      >
+        <ChangeList changes={pendingChanges} />
+      </ActionConfirmationPopup>
+      <ActionConfirmationPopup
+        isOpen={confirmAction === "rollback"}
+        onClose={() => setConfirmAction(null)}
+        title="Roll back translations?"
+        description={`The live translations will be replaced by **${
+          status?.versions?.find(v => v.version === Number(rollbackVersion))?.name ??
+          "the selected version"
+        }**. Drafts are kept, so use Publish to go forward again.`}
+        primaryButton={{ label: "Roll back", onClick: rollback, variant: ButtonVariant.PRIMARY }}
+        secondaryButton={{
+          label: "Cancel",
+          onClick: () => setConfirmAction(null),
+          variant: ButtonVariant.SECONDARY,
+        }}
+      />
+      <ActionConfirmationPopup
+        isOpen={!!importPlanState}
+        onClose={() => !isImporting && setImportPlanState(null)}
+        title="Import translations?"
+        description={
+          importPlanState
+            ? `**${importPlanState.changes.length} change${importPlanState.changes.length === 1 ? "" : "s"}** will be saved as drafts${
+                importPlanState.unknownKeys.length
+                  ? `; ${importPlanState.unknownKeys.length} unknown key(s) are ignored`
+                  : ""
+              }${
+                importPlanState.unknownLanguages.length
+                  ? `; unknown language column(s) ignored: ${importPlanState.unknownLanguages.join(", ")}`
+                  : ""
+              }. Nothing goes live until you publish.`
+            : ""
+        }
+        primaryButton={{
+          label: isImporting ? "Importing..." : "Import",
+          onClick: applyImport,
+          variant: ButtonVariant.PRIMARY,
+          disabled: isImporting,
+        }}
+        secondaryButton={{
+          label: "Cancel",
+          onClick: () => setImportPlanState(null),
+          variant: ButtonVariant.SECONDARY,
+        }}
+      >
+        <ChangeList
+          changes={(importPlanState?.changes ?? []).map(c => ({ ...c, live: c.current }))}
+          beforeLabel="Now"
+        />
+      </ActionConfirmationPopup>
 
       {showAddKey && (
         <div

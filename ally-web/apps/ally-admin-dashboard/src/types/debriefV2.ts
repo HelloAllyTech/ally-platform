@@ -134,6 +134,28 @@ export interface DebriefScoreView {
   }>;
   gates: Array<{ key: "risk" | "cost"; label: string; ok: boolean; display: string }>;
   byLanguage: Array<{ language: string; score: number | null; n: number }>;
+  /** One point a week, each over the four weeks ending that week. Shares are 0–1; overall 0–10. */
+  rolling?: Array<{
+    week: string;
+    n: number;
+    overall: number | null;
+    pass: number | null;
+    helpful: number | null;
+    notFlagged: number | null;
+  }>;
+  /** The quality score in detail over the last four weeks, against the four before. */
+  quality?: {
+    current: number | null;
+    previous: number | null;
+    n: number;
+    dimensions: Array<{
+      key: string;
+      weight: number;
+      score: number | null;
+      previous: number | null;
+      lost: number | null;
+    }>;
+  };
 }
 
 /** A learner flag's answer from the Debrief agent (session view, each flag). */

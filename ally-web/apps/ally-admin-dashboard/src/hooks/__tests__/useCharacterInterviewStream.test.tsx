@@ -228,13 +228,7 @@ describe("useCharacterInterviewStream — a refused turn", () => {
   it("shows a generic error when the stream fails", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          sseResponse([
-            'event: error\ndata: {"message": ""}\n\n',
-          ]),
-        ),
+      vi.fn().mockResolvedValue(sseResponse(['event: error\ndata: {"message": ""}\n\n'])),
     );
     const { result } = renderHook(() => useCharacterInterviewStream({ sessionId: "sess-1" }));
 

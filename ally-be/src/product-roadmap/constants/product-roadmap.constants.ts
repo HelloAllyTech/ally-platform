@@ -240,7 +240,6 @@ export const ROADMAP_RANK = {
 export const ROADMAP_QUEUE_STAGES = [
   RoadmapOpportunityStage.NEW,
   RoadmapOpportunityStage.PRIORITISED,
-  RoadmapOpportunityStage.UNDER_DEVELOPMENT,
 ] as const;
 
 export const ROADMAP_LIST_DEFAULTS = {
@@ -427,6 +426,13 @@ export const ROADMAP_FILEABLE_EFFORTS = ['s', 'm', 'l', 'xl', 'xxl'] as const;
  * sized yet" means.
  */
 export const ROADMAP_EFFORT_UNSIZED = 'unsized';
+
+/**
+ * Sentinel the owner FILTER accepts alongside owner names, meaning "nobody owns this" — no linked
+ * user and no legacy owner text. Same idea as ROADMAP_EFFORT_UNSIZED: a filter-only value, never
+ * stored. It exists for the triage Inbox, which needs to find work that has no owner yet.
+ */
+export const ROADMAP_OWNER_UNASSIGNED = 'unassigned';
 
 /**
  * How long a signed readiness verdict stays spendable.

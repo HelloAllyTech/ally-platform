@@ -64,6 +64,8 @@ export interface ScoreRun {
   helpful: boolean | null;
   /** A learner flagged a card (not withdrawn). */
   flagged: boolean;
+  /** The judge's 0–10 score per rubric dimension, when judged. */
+  dims?: Record<string, number> | null;
 }
 
 /** One run's score (S1 "per run"). */
@@ -286,4 +288,128 @@ const LANGUAGES: Record<string, string> = {
 export function languageName(code: string | null | undefined): string {
   if (!code || code === 'unknown') return 'an unrecorded language';
   return LANGUAGES[code] ?? code;
+}
+
+/** Weeks in each point of the improvement chart: one quiet week can't fake a trend. */
+export const ROLLING_WEEKS = 4;
+
+/** One point of the improvement chart: the four weeks ending with `week`. */
+export interface RollingPoint {
+  /** Monday of the last week in the window (YYYY-MM-DD). */
+  week: string;
+  /** Debriefs in the window. */
+  n: number;
+  /** The cumulative score, 0–10. */
+  overall: number | null;
+  /** Shares 0–1; `notFlagged` is 1 − the flag rate, so up is better on every line. */
+  pass: number | null;
+  helpful: number | null;
+  notFlagged: number | null;
+}
+
+const addDays = (isoDay: string, days: number) =>
+  new Date(Date.parse(`${isoDay}T00:00:00Z`) + days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+
+/** Every Monday from `first` to `last` inclusive (both Mondays, YYYY-MM-DD). */
+export function mondays(first: string, last: string): string[] {
+  const out: string[] = [];
+  for (let d = first; d <= last; d = addDays(d, 7)) out.push(d);
+  return out;
+}
+
+/**
+ * The improvement chart's points: for each of `weeks`, the runs of that week
+ * and the `ROLLING_WEEKS - 1` before it. A window without runs has nulls.
+ */
+export function rollingSeries(
+  runs: Array<ScoreRun & { week: string }>,
+  weeks: string[],
+  w: ScoreWeights,
+): RollingPoint[] {
+  return weeks.map((week) => {
+    const from = addDays(week, -7 * (ROLLING_WEEKS - 1));
+    const rs = runs.filter((r) => r.week >= from && r.week <= week);
+    const f = sliceFacts(rs);
+    const r3 = (x: number | null) =>
+      x == null ? null : Math.round(x * 1000) / 1000;
+    return {
+      week,
+      n: rs.length,
+      overall: cumulativeScore(f, w),
+      pass: r3(f.pass),
+      helpful: r3(f.helpful),
+      notFlagged: f.flags == null ? null : r3(1 - f.flags),
+    };
+  });
+}
+
+/** One rubric dimension's mean over judged runs, or null when none scored it. */
+function dimMean(runs: ScoreRun[], key: string): number | null {
+  const xs = runs
+    .map((r) => r.dims?.[key])
+    .filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
+  return xs.length
+    ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 100) / 100
+    : null;
+}
+
+export interface QualityBreakdown {
+  /** The judge's mean overall, 0–10, over the window. */
+  current: number | null;
+  /** The window before, when both have `minRuns` judged debriefs. */
+  previous: number | null;
+  /** Judged debriefs in the window. */
+  n: number;
+  dimensions: Array<{
+    key: string;
+    weight: number;
+    score: number | null;
+    previous: number | null;
+    /** weight × (10 − score): what this dimension costs the quality score. */
+    lost: number | null;
+  }>;
+}
+
+/**
+ * The quality score in detail: the mean of each rubric dimension over the
+ * window, with what it costs the score, against the window before.
+ */
+export function qualityBreakdown(
+  now: ScoreRun[],
+  before: ScoreRun[],
+  dimensions: ReadonlyArray<{ dimension: string; weight: number }>,
+  minRuns: number,
+): QualityBreakdown {
+  const judgedNow = now.filter((r) => r.quality != null);
+  const judgedBefore = before.filter((r) => r.quality != null);
+  const mean = (rs: ScoreRun[]) =>
+    rs.length
+      ? Math.round(
+          (rs.reduce((a, r) => a + (r.quality as number), 0) / rs.length) * 10,
+        ) / 10
+      : null;
+  const comparable =
+    judgedNow.length >= minRuns && judgedBefore.length >= minRuns;
+  return {
+    current: mean(judgedNow),
+    previous: comparable ? mean(judgedBefore) : null,
+    n: judgedNow.length,
+    dimensions: dimensions
+      .map(({ dimension, weight }) => {
+        const score = dimMean(judgedNow, dimension);
+        return {
+          key: dimension,
+          weight,
+          score,
+          previous: comparable ? dimMean(judgedBefore, dimension) : null,
+          lost:
+            score == null
+              ? null
+              : Math.round(weight * (10 - score) * 100) / 100,
+        };
+      })
+      .sort((a, b) => (b.lost ?? -1) - (a.lost ?? -1)),
+  };
 }

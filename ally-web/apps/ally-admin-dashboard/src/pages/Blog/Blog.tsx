@@ -94,7 +94,7 @@ export const BlogManagement: React.FC = () => {
   }, []);
 
   const handleSave = useCallback(
-    async (values: BlogFormValues, publish: boolean) => {
+    async (values: BlogFormValues, publish: boolean, keepEditing = false) => {
       const payload = {
         title: values.title.trim(),
         slug: emptyToUndefined(values.slug),
@@ -119,8 +119,10 @@ export const BlogManagement: React.FC = () => {
         return;
       }
 
-      toast.success(publish ? "Post published." : "Draft saved.");
-      closePanel();
+      toast.success(publish ? "Post saved." : "Draft saved.");
+      const saved = "data" in result ? (result.data as BlogPost | undefined) : undefined;
+      if (keepEditing && saved?.id) setSelectedBlog(saved);
+      else closePanel();
     },
     [selectedBlog, createBlog, updateBlog, closePanel],
   );

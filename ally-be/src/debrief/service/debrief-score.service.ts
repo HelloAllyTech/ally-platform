@@ -5,9 +5,16 @@ import {
   DEBRIEF_AGENT_KEY,
   DEBRIEF_SESSION_BUDGET_DEFAULT,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_QUALITY_DIMENSIONS } from '../../analytics/constants/debrief-quality.constants';
 import { debriefOutcome } from '../util/debrief-outcome.util';
 import {
   GateRun,
+  mondays,
+  QualityBreakdown,
+  qualityBreakdown,
+  RollingPoint,
+  rollingSeries,
+  ROLLING_WEEKS,
   SCORE_MEASURE_LABELS,
   SCORE_MEASURES,
   ScoreFacts,
@@ -62,6 +69,10 @@ export interface DebriefScoreView {
     display: string;
   }>;
   byLanguage: Array<{ language: string; score: number | null; n: number }>;
+  /** The improvement chart: one point a week, each over the four weeks ending then. */
+  rolling: RollingPoint[];
+  /** The quality score in detail over the last four weeks, against the four before. */
+  quality: QualityBreakdown;
 }
 
 const DAY_MS = 86_400_000;
@@ -114,9 +125,11 @@ export class DebriefScoreService {
               r."checkFailures" AS check_failures,
               (r.workspace ? 'judge') AS judged,
               (r.workspace->'judge'->>'overall')::float AS quality,
+              r.workspace->'judge'->'dimensions' AS dims,
               COALESCE(r.workspace->'judge'->'hardFails', '[]'::jsonb) AS hard_fails,
-              (r.status IN ('published','below_bar')
-                AND r.workspace->'decision'->>'reviewReason' = 'missed_risk_cue') AS missed_clear,
+              (r.status IN ('published','below_bar')) AS shown,
+              r.workspace->'safety'->'risk_cues' AS risk_cues,
+              r.cards->'important_moment' AS important_moment,
               COALESCE(r."actualCostUsd", r."estimatedCostUsd")::float
                 + COALESCE((r.workspace->>'askAllySpentUsd')::float, 0) AS session_cost,
               h.up, h.down,
@@ -146,7 +159,20 @@ export class DebriefScoreService {
   async view(days = 56, now = new Date()): Promise<DebriefScoreView> {
     const d = Math.max(14, Math.min(365, Math.round(days)));
     const w = await this.weights();
-    const runs = await this.runs(new Date(now.getTime() - d * DAY_MS));
+    const from = new Date(now.getTime() - d * DAY_MS);
+    // The chart's first point reads the three weeks before the range too.
+    const lead = (ROLLING_WEEKS - 1) * 7 + 7;
+    const allRuns = await this.runs(new Date(from.getTime() - lead * DAY_MS));
+    const runs = allRuns.filter((r) => r.createdAt >= from);
+    const window = ROLLING_WEEKS * 7 * DAY_MS;
+    const lastWindow = allRuns.filter(
+      (r) => r.createdAt.getTime() >= now.getTime() - window,
+    );
+    const windowBefore = allRuns.filter(
+      (r) =>
+        r.createdAt.getTime() >= now.getTime() - 2 * window &&
+        r.createdAt.getTime() < now.getTime() - window,
+    );
     const weekAgo = now.getTime() - 7 * DAY_MS;
     const twoWeeksAgo = now.getTime() - 14 * DAY_MS;
     const thisWeek = runs.filter((r) => r.createdAt.getTime() >= weekAgo);
@@ -192,6 +218,13 @@ export class DebriefScoreService {
           n: rs.length,
         }))
         .sort((a, b) => b.n - a.n),
+      rolling: rollingSeries(allRuns, mondays(weekOf(from), weekOf(now)), w),
+      quality: qualityBreakdown(
+        lastWindow,
+        windowBefore,
+        DEBRIEF_QUALITY_DIMENSIONS,
+        SCORE_COMPARE_MIN_DEBRIEFS,
+      ),
     };
   }
 
@@ -257,9 +290,60 @@ export function toScoredRun(r: Record<string, any>): ScoredRun {
     pass: outcome.pass,
     helpful: r.up ? true : r.down ? false : null,
     flagged: !!r.flagged,
-    missedClearRiskCue: !!r.missed_clear,
+    dims: dimsOf(r.dims),
+    missedClearRiskCue:
+      !!r.shown &&
+      (uncoveredClearCue(r.risk_cues, r.important_moment) ||
+        hardFails.some(
+          (h: { code?: string }) => h?.code === 'missed_risk_cue',
+        )),
     sessionCostUsd: Number.isFinite(cost as number) ? cost : null,
   };
+}
+
+/**
+ * Whether the learner was shown a debrief that left out a clear risk cue: a
+ * cue the safety reading rated clear (a cue with no strength counts as clear,
+ * as in ally-ai's cue_strength) whose turn the important moment does not
+ * cover, neither as its own turn nor among its `others`. Possible cues never
+ * count. (Before 2026-11-17 the gate read the Evaluator's `reviewReason`,
+ * which on older releases flagged possible cues too: three false alarms.)
+ */
+export function uncoveredClearCue(cues: unknown, moment: unknown): boolean {
+  if (!Array.isArray(cues)) return false;
+  const m = (moment ?? null) as {
+    turn_index?: unknown;
+    others?: Array<{ turn_index?: unknown }>;
+  } | null;
+  const covered = new Set<number>();
+  if (m && Number.isInteger(Number(m.turn_index)) && m.turn_index != null) {
+    covered.add(Number(m.turn_index));
+  }
+  for (const o of Array.isArray(m?.others) ? m.others : []) {
+    if (o?.turn_index != null && Number.isInteger(Number(o.turn_index))) {
+      covered.add(Number(o.turn_index));
+    }
+  }
+  return (cues as Array<{ strength?: unknown; turn_index?: unknown }>).some(
+    (c) =>
+      c?.strength !== 'possible' &&
+      c?.turn_index != null &&
+      Number.isInteger(Number(c.turn_index)) &&
+      !covered.has(Number(c.turn_index)),
+  );
+}
+
+/** The judge's `[{dimension, score}]` as a map; null when not judged. */
+export function dimsOf(v: unknown): Record<string, number> | null {
+  if (!Array.isArray(v)) return null;
+  const out: Record<string, number> = {};
+  for (const x of v as Array<{ dimension?: unknown; score?: unknown }>) {
+    const n = Number(x?.score);
+    if (typeof x?.dimension === 'string' && Number.isFinite(n)) {
+      out[x.dimension] = n;
+    }
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /** Monday of the date's week (UTC, as Postgres' date_trunc('week') gives it). */
