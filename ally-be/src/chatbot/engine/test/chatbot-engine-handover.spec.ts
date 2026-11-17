@@ -1,3 +1,4 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import { WaTemplateKind } from '../../../whatsapp/enum/whatsapp.enum';
 import { WaHandledBy } from '../../../whatsapp/enum/whatsapp.enum';
 import { DEFAULT_WHATSAPP_SETTINGS } from '../../../whatsapp/type/whatsapp-settings.type';
@@ -84,7 +85,7 @@ describe('ChatbotEngineService: a person holding the chat', () => {
       h.turn("I don't want to be here any more"),
     );
     expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-    expect(decision.body).toBe(CRISIS_TEXT);
+    expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
     expect(decision.held).toBeUndefined();
     expect(decision.alert).toBeDefined();
     expect(h.aiService.runAgent).not.toHaveBeenCalled();

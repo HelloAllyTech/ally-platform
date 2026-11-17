@@ -552,3 +552,33 @@ class TestMoreTimeAfterAWrite:
             later = cap.when()
             extend_after_write(time.time() - 100)  # would be earlier: ignored
             assert cap.when() == later
+
+
+class TestSystemChannel:
+    """Chunk 6b: the system prompt's first line names the run's channel; on WhatsApp
+    it's exactly what it was, and nothing else in the prompt changes."""
+
+    BEFORE = (
+        "You are the assistant described above, chatting with someone over WhatsApp "
+        "on behalf of the organisation that runs you."
+    )
+
+    def test_whatsapp_is_byte_identical_to_before(self):
+        whatsapp = prompt_for(make_bot(channel="whatsapp"))
+        assert self.BEFORE in whatsapp
+
+    def test_other_channels_change_only_those_words(self):
+        whatsapp = prompt_for(make_bot(channel="whatsapp"))
+        web = prompt_for(make_bot(channel="web"))
+        test = prompt_for(make_bot(channel="test"))
+        assert "chatting with someone on the website on behalf" in web
+        assert "chatting with someone in this chat on behalf" in test
+        assert web.replace("on the website", "over WhatsApp", 1) == whatsapp
+        assert test.replace("in this chat", "over WhatsApp", 1) == whatsapp
+
+    def test_the_seed_differs_from_before_only_in_the_channel(self):
+        from pathlib import Path
+
+        seed = Path("app/prompts/agent/system.txt").read_text()
+        assert seed.replace("{channel}", "over WhatsApp", 1).startswith(self.BEFORE)
+        assert seed.count("{channel}") == 1

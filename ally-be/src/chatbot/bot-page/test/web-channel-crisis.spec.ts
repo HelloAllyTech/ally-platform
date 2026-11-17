@@ -1,3 +1,4 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import type {
   AgentRunResponse,
   AgentStreamEvent,
@@ -89,7 +90,7 @@ describe('crisis on the web channel', () => {
     });
     const decision = await engine.respond(turn('I want to kill myself'), live);
     expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-    expect(decision.body).toBe('Please call a crisis line now.');
+    expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
     expect(decision.alert).toBeDefined();
     expect(visible).toEqual([]);
     expect(aiService.runAgentStreaming).not.toHaveBeenCalled();

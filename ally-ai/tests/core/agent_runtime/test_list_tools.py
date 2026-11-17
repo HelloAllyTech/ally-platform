@@ -1404,3 +1404,52 @@ def test_a_find_that_returned_the_nearest_is_not_offered_again():
     ]
     assert answered_finds({"tool_calls": calls}) == {"find_slots"}
     assert answered_finds({"tool_calls": calls[1:]}) == set()
+
+
+@pytest.mark.asyncio
+async def test_the_plain_yes_shortcut_still_goes_through_the_time_check(graph):
+    """Chunk 6b (Shehbaz's check): the carried slots for a plain yes don't skip the
+    confirmed-time check. A "yes" after an offer of 11:00 can't book 10:00."""
+    gateway = FakeGateway(
+        found((THU_10, "Thu 19 Nov 2026, 10:00"), (THU_11, "Thu 19 Nov 2026, 11:00")),
+        BOOKED,
+    )
+    llm = FakeLLM(
+        find(starts_at_from="2026-11-19T10:00:00+05:30"),
+        reply(
+            "clarify",
+            "Thursday 19 Nov at 11:00 is free. Shall I book it?",
+            citations=[2],
+        ),
+        # The plain yes: the model books the wrong carried slot, straight away.
+        create(THU_10),
+        reply("clarify", "Just to check: did you want 11:00?"),
+    )
+    args = dict(
+        conversation_id="conv-yes",
+        chatbot_id="bot-1",
+        bot=booking_bot(),
+        gateway=gateway,
+    )
+    offered = [
+        {"role": "user", "content": "what's free on Thursday morning?"},
+        {
+            "role": "assistant",
+            "content": "Thursday 19 Nov at 11:00 is free. Shall I book it?",
+        },
+    ]
+    with patch(f"{CONVERSATION}.generate_structured", llm):
+        await run_agent(
+            graph,
+            run_id="run-y1",
+            question="what's free on Thursday morning?",
+            history=[],
+            **args,
+        )
+        state = await run_agent(
+            graph, run_id="run-y2", question="yes", history=offered, **args
+        )
+    assert state["carried_records"]  # the shortcut was taken
+    assert [c["name"] for c in gateway.calls] == ["find_slots"]  # no create sent
+    refused = [c for c in state["tool_calls"] if c.get("tool") == "create_appointments"]
+    assert refused and refused[0]["error"] == "unconfirmed_time"

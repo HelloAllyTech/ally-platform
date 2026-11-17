@@ -1,3 +1,4 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import {
   WaHandledBy,
   WaTemplateKind,
@@ -70,7 +71,7 @@ describe('ChatbotEngineService: the crisis check reads earlier messages', () => 
       expect.objectContaining({ message: 'I mean it', history: [DISCLOSURE] }),
     );
     expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-    expect(decision.body).toBe(CRISIS_TEXT);
+    expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
   });
 
   it('refuse: a sender the bot is not for is checked with history too', async () => {

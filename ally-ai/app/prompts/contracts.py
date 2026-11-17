@@ -333,6 +333,9 @@ class AgentSystemInputs(PromptInputs):
     output_format: ClassVar[Optional[str]] = "structured"
 
     answer_scope: Optional[str] = None
+    #: Where the chat is (chunk 6b): "over WhatsApp", "on the website" or "in this
+    #: chat". Supplied by the code before the text uses it.
+    channel: Optional[str] = None
     decline_text: Optional[str] = None
     feedback: Optional[str] = None
     history: Optional[str] = None

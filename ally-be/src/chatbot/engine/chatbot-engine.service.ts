@@ -1,5 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { packCrisisText } from '../../bot-draft/safety-pack/safety-packs';
+import { crisisReply } from '../../bot-draft/safety-pack/safety-packs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type {
@@ -77,15 +77,30 @@ export const AGENT_PROMPT_CODES = [
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 
 /**
- * The crisis reply that fits the assistant (chunk 6b, item 25): the bot's own crisis wording if it
- * has some, else its safety pack's (`packCrisisText`), else null for the platform's text. The same
- * on the keyword and the classifier paths.
+ * The crisis reply (chunk 6b, item 25): `crisisReply`, which always carries a phone number. The
+ * bot's own wording is its crisis text, or its own crisis keyword template on the keyword path; the
+ * platform's text and templates are never sent. The same on the keyword and the classifier paths.
  */
 export function crisisTextFor(
   turn: Pick<ChatTurn, 'chatbot' | 'settings'>,
-): string | null {
-  if (turn.chatbot.settings?.crisisEscalationText?.trim()) return null;
-  return packCrisisText(turn.chatbot.safetyPack, turn.settings.helplineNumbers);
+  template?: { chatbotId?: string | null; responseText?: string | null } | null,
+): string {
+  const fill = (text: string) =>
+    text.replace(
+      /\{helpline_numbers\}/g,
+      turn.settings.helplineNumbers || 'your local crisis line',
+    );
+  const ownTemplate =
+    template?.chatbotId && template.chatbotId === turn.chatbot.id
+      ? template.responseText?.trim()
+      : '';
+  const ownText = turn.chatbot.settings?.crisisEscalationText?.trim();
+  const own = ownTemplate || ownText;
+  return crisisReply({
+    pack: turn.chatbot.safetyPack,
+    helplineNumbers: turn.settings.helplineNumbers,
+    own: own ? fill(own) : null,
+  });
 }
 
 /** Purposes with a section of their own in the Skills Store (chunk 20a-2). */
@@ -271,17 +286,16 @@ export class ChatbotEngineService {
   /** The fixed safety reply for a crisis keyword, with its Slack alert. */
   private keywordCrisis(
     turn: ChatTurn,
-    template: { id: string; responseText?: string | null },
+    template: {
+      id: string;
+      responseText?: string | null;
+      chatbotId?: string | null;
+    },
   ): ChatbotDecision {
-    const { chatbot, settings, sender } = turn;
+    const { chatbot, sender } = turn;
     return {
       handledBy: WaHandledBy.CRISIS,
-      body:
-        crisisTextFor(turn) ??
-        this.settingsService.renderPlaceholders(
-          template.responseText || settings.crisisEscalationText,
-          settings,
-        ),
+      body: crisisTextFor(turn, template),
       templateId: template.id,
       alert: this.alert(
         200,
@@ -529,7 +543,7 @@ export class ChatbotEngineService {
     ran: PromptsRan,
     { notOnList }: { notOnList: boolean },
   ): ChatbotDecision {
-    const { chatbot, settings, sender } = turn;
+    const { chatbot, sender } = turn;
     const who = notOnList ? ' for a sender who is not on its list' : '';
     const outcome = notOnList
       ? 'The fixed safety reply was sent. The sender is not linked to an Ally account, so the ' +
@@ -537,12 +551,7 @@ export class ChatbotEngineService {
       : 'The fixed safety reply was sent and the answer was discarded.';
     return {
       handledBy: WaHandledBy.CRISIS,
-      body:
-        crisisTextFor(turn) ??
-        this.settingsService.renderPlaceholders(
-          settings.crisisEscalationText,
-          settings,
-        ),
+      body: crisisTextFor(turn),
       retrievalMeta: { ...ran },
       alert: this.alert(
         200,

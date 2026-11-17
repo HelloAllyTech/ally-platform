@@ -1,4 +1,4 @@
-# Chunk 6b: every changed prompt and tool-description text
+# Chunk 6b: every changed prompt and tool-description text (approved 17 Nov)
 
 For Shehbaz's OK. Each change is shown as before → after, with the item it's for. Until you approve:
 - these texts are only in the seed files (`ally-ai/app/prompts/agent/*.txt`) and the code;
@@ -85,7 +85,7 @@ Out-of-scope requests:
 
 > … say warmly that it's not something you can help with, and what you can**, in general terms only. Add no specific facts to that reply: no phone numbers, prices, times, links or offers.**
 
-**Not changed, for your call:** the first line still says "over WhatsApp" on every channel (8a's open item).
+**First line, as approved:** "chatting with someone {channel} on behalf of…". The new `{channel}` variable ships with the code: "over WhatsApp" (byte-identical to before), "on the website" for the bot page and the bubble, and "in this chat" elsewhere. Nothing else in the prompt changes (tested).
 
 ## 7. Tool descriptions
 
@@ -112,17 +112,14 @@ New, `REACH_TEAM` (item 10), sent once when a reply promised to pass something o
 
 > It promised to pass something on to the team, or that the team will get back to them. You can't pass anything on here. Instead, tell them how to reach the team themselves, from the information, citing it, and keep the rest.
 
-## 9. The crisis reply (ally-be, not a prompt; item 25)
+## 9. The crisis reply (ally-be, not a prompt; item 25), as approved
 
-Chosen in code on the keyword and the classifier paths. A bot's own crisis wording (How it works → its crisis text) always wins, and bots with no safety pack keep the platform text.
-
-**Medical and pharmacy**, as you wrote it, plus the bot's helplines when it has some:
-
-> If this is an emergency, call 112 or an ambulance (108) now. If you're thinking of harming yourself, call Tele-MANAS 14416. *(You can also call: {helplines}.)*
-
-**Every other packed assistant**, the platform's wording without "a supervisor":
-
-> It sounds like this may be urgent. This assistant can't help in a crisis. Please contact emergency services or a crisis line now. *(You can also call: {helplines}.)*
+Every crisis reply carries a real number, on every assistant, on both paths (keyword and classifier).
+- **Medical and pharmacy:** "If this is an emergency, call 112 or an ambulance (108) now. If you're thinking of harming yourself, call Tele-MANAS 14416."
+- **Every other assistant**, packed or not, replacing the platform text and its "your local crisis line": "It sounds like this may be urgent. This assistant can't help in a crisis. If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7)."
+- **"You can also call: {helplines}."** follows when the bot has some.
+- **The bot's own wording** (its crisis text, or its own crisis keyword reply) still wins. If it has no phone number, or says "your local crisis line", the numbers line follows it.
+- **Tested:** no crisis reply on any path is sent without a phone number.
 
 ## 10. Bot page words (not model-facing, for completeness)
 

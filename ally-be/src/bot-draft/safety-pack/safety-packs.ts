@@ -364,29 +364,46 @@ export function packRulesBlock(
 }
 
 /**
- * The crisis reply on an assistant with a safety pack (chunk 6b, item 25), when the bot has no
- * crisis wording of its own. The platform's default is written for counsellors ("contact a
- * supervisor"), so a business's assistant gets its own:
- * - medical and pharmacy cover both kinds of emergency, since the classifier can't reliably tell a
- *   physical one (chest pain, an overdose) from a mental-health one;
- * - every other pack the platform's wording without "a supervisor".
- * The bot's helpline numbers follow when it has some. Null for a bot with no pack: the platform's
- * text (and its keyword template) as before.
+ * The crisis reply (chunk 6b, item 25, as Shehbaz approved it): every one carries a real number, on
+ * every assistant.
+ * - Medical and pharmacy cover both kinds of emergency (the classifier can't reliably tell a
+ *   physical one from a mental-health one).
+ * - Every other assistant, packed or not, gets the general text, which replaces the platform's
+ *   ("contact a supervisor…", "your local crisis line").
+ * - A bot's own wording still wins; if it has no phone number, or says "your local crisis line",
+ *   the numbers line is added after it.
+ * - The bot's helpline numbers follow when it has some.
  */
 export const MEDICAL_CRISIS_TEXT =
   "If this is an emergency, call 112 or an ambulance (108) now. If you're thinking of harming yourself, call Tele-MANAS 14416.";
-export const PACK_CRISIS_TEXT =
-  "It sounds like this may be urgent. This assistant can't help in a crisis. Please contact emergency services or a crisis line now.";
+export const CRISIS_NUMBERS_LINE =
+  "If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7).";
+export const GENERAL_CRISIS_TEXT = `It sounds like this may be urgent. This assistant can't help in a crisis. ${CRISIS_NUMBERS_LINE}`;
 
-export function packCrisisText(
-  id: SafetyPackId | string | null | undefined,
-  helplineNumbers: string | null | undefined,
-): string | null {
-  if (!packFor(id)) return null;
+/** A phone number: three or more digits, spaces or dashes between them ("112", "1800-599-0019"). */
+export const hasPhoneNumber = (text: string): boolean =>
+  /\d(?:[\s-]?\d){2,}/.test(text);
+
+export function crisisReply(options: {
+  pack: SafetyPackId | string | null | undefined;
+  helplineNumbers?: string | null;
+  /** The bot's own crisis wording, placeholders filled; null for none. */
+  own?: string | null;
+}): string {
+  const helplines = (options.helplineNumbers ?? '').trim();
+  const alsoCall = helplines ? ` You can also call: ${helplines}.` : '';
+  const own = (options.own ?? '').trim();
+  if (own) {
+    if (/your local crisis line/i.test(own) || !hasPhoneNumber(own)) {
+      const extra = helplines && !own.includes(helplines) ? alsoCall : '';
+      return `${own} ${CRISIS_NUMBERS_LINE}${extra}`;
+    }
+    return own;
+  }
   const base =
-    id === SafetyPackId.MEDICAL || id === SafetyPackId.PHARMACY
+    options.pack === SafetyPackId.MEDICAL ||
+    options.pack === SafetyPackId.PHARMACY
       ? MEDICAL_CRISIS_TEXT
-      : PACK_CRISIS_TEXT;
-  const helplines = (helplineNumbers ?? '').trim();
-  return helplines ? `${base} You can also call: ${helplines}.` : base;
+      : GENERAL_CRISIS_TEXT;
+  return `${base}${alsoCall}`;
 }

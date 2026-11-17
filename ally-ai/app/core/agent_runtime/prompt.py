@@ -149,6 +149,18 @@ def format_tools(tools: Sequence[Tool]) -> str:
     return "\n".join(blocks)
 
 
+def system_channel(channel: Optional[str]) -> str:
+    """Where the chat is, as the system prompt's first line says it (chunk 6b):
+    "over WhatsApp" (the words before 6b, byte for byte), "on the website" for the bot
+    page and the bubble, else "in this chat" (Try it, an eval)."""
+    value = (channel or "").strip().lower()
+    if value == "whatsapp":
+        return "over WhatsApp"
+    if value == "web":
+        return "on the website"
+    return "in this chat"
+
+
 def build_agent_prompt(
     message: str,
     *,
@@ -195,6 +207,7 @@ def build_agent_prompt(
         knowledge_topics=format_topics(knowledge_topics),
         decline_text=(decline_text or "").strip() or "I don't have that information.",
         max_chars=max_chars,
+        channel=system_channel(channel),
     )
     if not body:
         return body

@@ -1,3 +1,4 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import type { AgentRunResponse } from '../../../ai/dto/knowledge.dto';
 import { WaKeywordTemplate } from '../../../whatsapp/entity/wa-keyword-template.entity';
 import {
@@ -414,9 +415,7 @@ describe('ChatbotEngineService in Agent mode', () => {
         turn({ text: "hi, I can't go on" }),
       );
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-      expect(decision.body).toBe(
-        DEFAULT_WHATSAPP_SETTINGS.crisisEscalationText,
-      );
+      expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
       expect(decision.isWelcome).toBeUndefined();
       expect(decision.agent?.runId).toBe('run-1');
     });
