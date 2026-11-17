@@ -22,6 +22,10 @@ export const en = {
     resend: "Send a new code",
     resendIn: "Send a new code in {seconds}s",
     changeEmail: "Use a different email",
+    // Says nothing about whether this address is allowed in: the server answers the same either way,
+    // so the page can't be used to find out who has access.
+    noCode:
+      "No code? Only people who've been given access to this chat get one. Try the email address you were given access with.",
     invalidEmail: "Enter a valid email address.",
   },
   prechat: {
