@@ -224,7 +224,7 @@ describe('VoiceNoteService', () => {
         size: 100,
       } as Express.Multer.File;
       const chunkTexts = ['first part', 'second part', 'third part'];
-      const delaysMs = [30, 20, 10];
+      const delaysMs = [100, 50, 20];
       let callIndex = 0;
       mockTranscriptionsCreate.mockImplementation(() => {
         const index = callIndex++;
@@ -242,8 +242,8 @@ describe('VoiceNoteService', () => {
 
       expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(3);
       expect(result.transcript).toBe('first part second part third part');
-      // Concurrent: ~max(delays)=30ms. Sequential would be ~sum(delays)=60ms.
-      expect(elapsedMs).toBeLessThan(50);
+      // Concurrent: ~max(delays)=100ms. Sequential would be ~sum(delays)=170ms.
+      expect(elapsedMs).toBeLessThan(150);
     });
 
     it('does not chunk a long non-WAV (web) recording — a single request, same as before', async () => {
