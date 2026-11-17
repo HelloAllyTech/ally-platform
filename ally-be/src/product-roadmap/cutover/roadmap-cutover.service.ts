@@ -252,18 +252,22 @@ export class RoadmapCutoverService {
     this.logger.info(
       `Roadmap v2 ENABLED by cutover, user ${userId}: ${JSON.stringify(outcome.counts)}`,
     );
-    // After the commit, best-effort, as create() does after its save.
-    try {
-      await this.opportunities.afterMigratedFiling(
-        outcome.filed.map((f) => f.id),
-        userId,
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Cutover follow-up (index, goal impact) failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+    // After the commit, best-effort, as create() does after its save. Not awaited: one model
+    // call per filed idea must not hold the Owner's request open, and a failure changes nothing
+    // that has committed.
+    if (outcome.filed.length) {
+      void this.opportunities
+        .afterMigratedFiling(
+          outcome.filed.map((f) => f.id),
+          userId,
+        )
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `Cutover follow-up (index, goal impact) failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          ),
+        );
     }
 
     return {
