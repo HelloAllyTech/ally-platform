@@ -93,7 +93,7 @@ class RoleplayAttemptNotice extends ConsumerWidget {
         children: [
           Text(
             ref.t('courses.roleplay.lastAttemptTitle'),
-            style: base.copyWith(fontWeight: FontWeight.w600),
+            style: base.copyWith(fontFamily: 'CupertinoSystemText', fontWeight: FontWeight.w600),
           ),
           for (final line in lines) ...[const SizedBox(height: 4), Text(line, style: base)],
           const SizedBox(height: 4),
