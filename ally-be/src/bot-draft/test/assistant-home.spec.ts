@@ -330,6 +330,8 @@ function harness(
     ai?: Record<string, jest.Mock>;
     chatbots?: Record<string, jest.Mock>;
     settings?: Record<string, jest.Mock>;
+    query?: (sql: string) => Promise<unknown[]>;
+    botSettings?: Record<string, unknown>;
   } = {},
 ) {
   const chatbot = {
@@ -337,7 +339,7 @@ function harness(
     name: 'Sunrise Mind',
     description: null,
     persona: { displayName: 'Sunrise assistant', greeting: 'Hi.' },
-    settings: {},
+    settings: over.botSettings ?? {},
     safetyPack: over.safetyPack ?? null,
     rules: { never: [] as string[] },
   } as unknown as Chatbot;
@@ -383,7 +385,7 @@ function harness(
       return result;
     },
     // The History's names (chunk 20d-2).
-    query: async () => [{ id: 7, name: 'Asha' }],
+    query: over.query ?? (async () => [{ id: 7, name: 'Asha' }]),
   };
   const pages = {
     view: async (bot: Chatbot) => ({
@@ -999,14 +1001,19 @@ describe('Your instructions, checked like the builder checks (chunk 20d-2)', () 
 });
 
 describe('How it works (chunk 20d-2)', () => {
+  const instructions = {
+    full: 'OWNER TEXT ALLY BASE TEXT',
+    parts: [
+      { layer: 'instructions', text: 'OWNER TEXT ', owner: true },
+      { layer: 'safety', text: 'ALLY SAFETY TEXT', owner: false },
+      { layer: 'base', text: 'ALLY BASE TEXT', owner: false },
+    ],
+    placeholders: { question: '(q)', passages: '(p)' },
+    search: { searches: 2, max_passages: 8, documents: 3 },
+  };
+
   it("asks ally-ai to build the instructions from the engine's own request", async () => {
     const request = { question: "(the visitor's message)", persona: {} };
-    const instructions = {
-      full: 'text',
-      parts: [],
-      placeholders: {},
-      search: {},
-    };
     const chatbots = { agentRequestFor: jest.fn(async () => request) };
     const aiService = {
       agentInstructions: jest.fn(async () => instructions),
@@ -1016,6 +1023,61 @@ describe('How it works (chunk 20d-2)', () => {
     const view = await service.howItWorks('bot-1');
     expect(chatbots.agentRequestFor).toHaveBeenCalledWith('bot-1');
     expect(aiService.agentInstructions).toHaveBeenCalledWith(request);
-    expect(view).toMatchObject({ full: 'text', safetyPack: null });
+    expect(view).toMatchObject({
+      safetyPack: null,
+      search: instructions.search,
+    });
+  });
+
+  it("never sends Ally's own text, the whole prompt or its placeholders; the owner's parts stay", async () => {
+    const { service } = harness({
+      ai: {
+        agentInstructions: jest.fn(async () => instructions),
+        checkOwnerText: jest.fn(),
+      },
+      chatbots: { agentRequestFor: jest.fn(async () => ({})) },
+    });
+    const view = await service.howItWorks('bot-1');
+    const sent = JSON.stringify(view);
+    expect(sent).not.toContain('ALLY');
+    expect(view).not.toHaveProperty('full');
+    expect(view).not.toHaveProperty('placeholders');
+    expect(view.parts).toEqual([
+      { layer: 'instructions', text: 'OWNER TEXT ', owner: true },
+      { layer: 'safety', text: '', owner: false },
+      { layer: 'base', text: '', owner: false },
+    ]);
+  });
+
+  it('lists what the assistant can do with each list, only where the ability is Do it', async () => {
+    const lists = [
+      { key: 'leads', name: 'Leads', agent_read: true, agent_write: true },
+      { key: 'menu', name: 'Menu', agent_read: true, agent_write: false },
+      { key: 'notes', name: 'Notes', agent_read: true, agent_write: true },
+    ];
+    const { service } = harness({
+      ai: {
+        agentInstructions: jest.fn(async () => instructions),
+        checkOwnerText: jest.fn(),
+      },
+      chatbots: { agentRequestFor: jest.fn(async () => ({})) },
+      query: async () => lists,
+      botSettings: {
+        abilities: {
+          find_leads: 'do_it',
+          create_leads: 'do_it',
+          update_leads: 'never',
+          find_menu: 'do_it',
+          find_notes: 'never',
+          create_notes: 'never',
+          update_notes: 'never',
+        },
+      },
+    });
+    const view = await service.howItWorks('bot-1');
+    expect(view.tools).toEqual([
+      { list: 'Leads', can: ['find', 'create'] },
+      { list: 'Menu', can: ['find'] },
+    ]);
   });
 });
