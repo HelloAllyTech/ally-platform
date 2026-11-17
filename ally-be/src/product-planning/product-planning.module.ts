@@ -20,6 +20,7 @@ import { RoadmapNotification } from './entity/roadmap-notification.entity';
 import { RoadmapWatch } from './entity/roadmap-watch.entity';
 import { RoadmapUserPreference } from './entity/roadmap-user-preference.entity';
 import { RoadmapPreferenceService } from './service/roadmap-preference.service';
+import { RoadmapDigestFeedService } from './service/roadmap-digest-feed.service';
 import { RoadmapItemRead } from './entity/roadmap-item-read.entity';
 
 const ENTITIES = TypeOrmModule.forFeature([
@@ -64,6 +65,7 @@ const ENTITIES = TypeOrmModule.forFeature([
     // Builder and the roadmap import, so there is exactly one instance.
     RoadmapNotificationService,
     RoadmapPreferenceService,
+    RoadmapDigestFeedService,
   ],
   exports: [
     // Re-exported so the plan flow injects these repositories without registering them twice.
@@ -78,6 +80,7 @@ const ENTITIES = TypeOrmModule.forFeature([
     RoadmapInboxService,
     RoadmapNotificationService,
     RoadmapPreferenceService,
+    RoadmapDigestFeedService,
   ],
 })
 export class ProductPlanningModule {}

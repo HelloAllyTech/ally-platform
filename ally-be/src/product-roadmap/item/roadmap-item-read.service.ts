@@ -1117,7 +1117,12 @@ export class RoadmapItemReadService {
     }
     const people = await this.resolvePeople([...ids]);
     const person = (id: number, relation?: ItemRelation): PersonRef => ({
-      ...(people.get(id) ?? { id, name: '', role: 'none' as RoadmapRole }),
+      ...(people.get(id) ?? {
+        id,
+        name: '',
+        role: 'none' as RoadmapRole,
+        ideasShipped: 0,
+      }),
       ...(relation ? { relation } : {}),
     });
     return cores.map((c) => {
@@ -1186,11 +1191,12 @@ export class RoadmapItemReadService {
   private async resolvePeople(ids: number[]): Promise<Map<number, PersonRef>> {
     const unique = [...new Set(ids.filter((id) => id > 0))];
     if (!unique.length) return new Map();
-    const [rows, roles] = await Promise.all([
+    const [rows, shipped, roles] = await Promise.all([
       this.dataSource.query(
         `SELECT id, name FROM "users" WHERE id = ANY($1::int[])`,
         [unique],
       ) as Promise<{ id: number; name: string | null }[]>,
+      this.ideasShipped(unique),
       Promise.all(
         unique.map((id) =>
           this.roles.roleOf(id).catch(() => 'none' as RoadmapRole),
@@ -1206,9 +1212,41 @@ export class RoadmapItemReadService {
           // A removed account keeps its history: a placeholder, never a bare id.
           name: names.get(id)?.trim() || 'Former member',
           role: roles[i],
+          ideasShipped: shipped.get(id) ?? 0,
         },
       ]),
     );
+  }
+
+  /**
+   * Ideas each person filed that are Released: the chip's "ideas shipped"
+   * (§4.14). Bugs are not ideas. A failed count reads as none rather than
+   * failing the page.
+   */
+  private async ideasShipped(ids: number[]): Promise<Map<number, number>> {
+    try {
+      const rows: { userId: number; shipped: string | number }[] =
+        await this.dataSource.query(
+          `SELECT "createdBy" AS "userId", count(*) AS shipped
+             FROM "roadmap_opportunities"
+            WHERE "createdBy" = ANY($1::int[])
+              AND stage = 'released'
+              AND type <> 'bug'
+              AND "deletedAt" IS NULL
+            GROUP BY "createdBy"`,
+          [ids],
+        );
+      return new Map(
+        (rows ?? []).map((r) => [Number(r.userId), Number(r.shipped)]),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not count ideas shipped: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return new Map();
+    }
   }
 
   private noAccess(): ForbiddenException {
