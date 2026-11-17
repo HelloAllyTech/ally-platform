@@ -55,6 +55,7 @@ export const ANSWER_RUN_TOOLS = [
   'reporting_query',
   'comments_read',
   'metrics_view',
+  'guidance_report',
 ] as const;
 
 /** A run is minutes; past this ally-be stops waiting (the token lives 2 h). */

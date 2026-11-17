@@ -124,11 +124,21 @@ class GuidanceCalls:
         self.calls.append(rec)
         return rec
 
-    def merge(self, rows: List[Dict[str, Any]]) -> int:
+    def via(self, tool: str) -> str:
+        """How a passage reached the Writer (workspace.guidanceGiven)."""
+        if self.step in ("writer", "reviser"):
+            return self.step
+        return "agent_fetch" if tool == "guidance_fetch" else "agent_search"
+
+    def merge(self, rows: List[Dict[str, Any]], tool: str = "guidance_search") -> int:
         new = 0
         for p in rows:
             pid = str(p.get("id") or p.get("code"))
-            passage = passage_of(p)
+            passage = {
+                **passage_of(p),
+                "code": str(p.get("code") or ""),
+                "via": self.via(tool),
+            }
             if (
                 pid in self.seen_ids
                 or pid in self.added_ids
@@ -157,7 +167,7 @@ class GuidanceCalls:
             logger.warning("[debrief-guidance] %s failed: %s", tool, e)
             found = {"unavailable": True, "passages": []}
         rows = _rows(found)
-        new = self.merge(rows)
+        new = self.merge(rows, tool)
         self.record(
             tool=tool,
             args=args,
@@ -169,6 +179,44 @@ class GuidanceCalls:
         if rows and not new:
             text += "\n(Already with the writer, or the limit was reached.)"
         return text
+
+
+def for_writer(passages: Any) -> List[Dict[str, Any]]:
+    """What the model reads of a passage: title and text only (the code and
+    `via` stay in state for the run record)."""
+    return [
+        {"title": p.get("title"), "text": p.get("text")}
+        for p in passages or []
+        if isinstance(p, dict)
+    ]
+
+
+def guidance_record(
+    passages: Sequence[Dict[str, Any]], timings: Dict[str, Any]
+) -> Dict[str, Any]:
+    """`workspace.guidanceMode`, `guidanceGiven` and `guidanceTimings` from the
+    passages handed to the Writer so far (deduped by code, first via kept)."""
+    vias = [p.get("via") for p in passages if isinstance(p, dict)]
+    from_lookup = "lookup" in vias
+    from_agent = any(v and v != "lookup" for v in vias)
+    mode = (
+        "both"
+        if from_lookup and from_agent
+        else "lookup" if from_lookup else "agent" if from_agent else "none"
+    )
+    given: List[Dict[str, Any]] = []
+    for p in passages:
+        code = (p or {}).get("code")
+        if code and all(g["code"] != code for g in given):
+            given.append({"code": code, "via": p.get("via")})
+    return {
+        "guidanceMode": mode,
+        "guidanceGiven": given,
+        "guidanceTimings": {
+            "lookupMs": timings.get("lookupMs"),
+            "agentMs": timings.get("agentMs"),
+        },
+    }
 
 
 def _rows(found: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -719,6 +767,12 @@ def phase_update(
         "guidanceIndexVersion": res.index_version
         or (state.get("workspace") or {}).get("guidanceIndexVersion"),
     }
+    timings = dict(((state.get("workspace") or {}).get("guidanceTimings")) or {})
+    if res.step == Step.GUIDANCE_AGENT:
+        timings["agentMs"] = res.ms
+    workspace.update(
+        guidance_record(list(state.get("passages") or []) + res.added, timings)
+    )
     update: Dict[str, Any] = {
         "steps": [record],
         "estimated": estimated + res.est,
@@ -757,6 +811,8 @@ __all__ = [
     "ALL_TOOLS",
     "TOOL_STEPS",
     "GuidanceCalls",
+    "for_writer",
+    "guidance_record",
     "PhaseResult",
     "build_chat_model",
     "build_tool_loop",

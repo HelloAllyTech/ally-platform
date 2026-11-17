@@ -24,6 +24,7 @@ READ_TOOLS = (
     "reporting_query",
     "comments_read",
     "metrics_view",
+    "guidance_report",
     "questions_read",
     "change_read",
     "prompt_read",
@@ -87,6 +88,13 @@ class MetricsViewArgs(BaseModel):
     language: Optional[str] = Field(None, description="e.g. 'hi'; narrows every rate.")
     recipe: Optional[str] = Field(
         None, description="standard | short | case | assessment"
+    )
+
+
+class GuidanceReportArgs(BaseModel):
+    days: int = Field(30, ge=1, le=90, description="How many days back to read.")
+    mode: Optional[Literal["all", "live", "shadow"]] = Field(
+        None, description="all (default) | live runs only | shadow runs only"
     )
 
 
@@ -361,6 +369,11 @@ def make_tools(
             "metrics_view", MetricsViewArgs(**a).model_dump(exclude_none=True)
         )
 
+    async def guidance_report(**a: Any) -> str:
+        return await call(
+            "guidance_report", GuidanceReportArgs(**a).model_dump(exclude_none=True)
+        )
+
     async def idea_propose(**a: Any) -> str:
         return await call("idea_propose", IdeaProposeArgs(**a).model_dump())
 
@@ -460,6 +473,14 @@ def make_tools(
             "Metric failure points: experience rates off target, guardrails breached, "
             "efficiency drift, steering falling, stages with more failures. Each has a "
             "name you can cite as evidence and as an expected effect.",
+        ),
+        (
+            guidance_report,
+            GuidanceReportArgs,
+            "How the guidance lookup and the guidance agent are used: runs, "
+            "planner choices and skip reasons, tool latency, which entries are "
+            "fetched and given to the Writer, and score and cost with and "
+            "without the agent.",
         ),
         (
             idea_propose,

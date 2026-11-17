@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 from app.core.debrief import framework
 from app.core.debrief_graph.constants import PROMPT_CODES, Recipe, Step
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
+from app.core.debrief_graph.guidance_toolbox import for_writer as passages_for_writer
 from app.core.debrief_graph.state import DebriefState as State
 
 
@@ -168,7 +169,7 @@ def writer_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "evidence": state.get("evidence") or {},
         "safety": state["safety"],
         "transcript": ctx.transcript,
-        "passages": state.get("passages") or [],
+        "passages": passages_for_writer(state.get("passages")),
         "progress": state.get("progress"),
         "language": ctx.language,
         "learner_level": ctx.sess("learner_level"),
@@ -275,7 +276,9 @@ def reviser_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         **contract_extras(ctx, "risk_cue", "speaker_labels"),
         # Guidance the tool phase fetched for the Reviser (only when it did).
         **(
-            {"passages": state["tool_passages"]} if state.get("tool_passages") else {}
+            {"passages": passages_for_writer(state["tool_passages"])}
+            if state.get("tool_passages")
+            else {}
         ),
         # What the evidence top-up found (D3), for an orchestrated run only.
         **(

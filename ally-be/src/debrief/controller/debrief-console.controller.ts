@@ -81,6 +81,7 @@ import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
 import { DebriefSettingsService } from '../service/debrief-settings.service';
+import { DebriefGuidanceMetricsService } from '../service/debrief-guidance-metrics.service';
 import { DebriefMetricsService } from '../service/debrief-metrics.service';
 import { DebriefBaselineService } from '../service/debrief-baseline.service';
 import { DebriefBuilderRequesterService } from '../service/debrief-builder-requester.service';
@@ -625,6 +626,7 @@ export class DebriefConsoleController {
     private readonly agentLogs: DebriefRunLogsService,
     private readonly nightly: DebriefNightlyService,
     private readonly conversation: DebriefPmConversationService,
+    private readonly guidanceMetrics: DebriefGuidanceMetricsService,
   ) {}
 
   /** Release settings (budgets, the evaluator bar) are the owner's. */
@@ -761,6 +763,19 @@ export class DebriefConsoleController {
     // Organisation, language, learner level, recipe, release version, judge
     // version: one set, applied to every live metric (malformed values dropped).
     return this.metrics.view(weeks, parseMetricsFilter(q));
+  }
+
+  @Get('guidance-metrics')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'Debrief Guidance analytics: lookup and guidance agent use, planner choices, tool calls, entries, latency, with/without the agent (aggregate only)',
+  })
+  guidanceMetricsView(
+    @Query('days') days?: string,
+    @Query('mode') mode?: string,
+  ) {
+    return this.guidanceMetrics.report({ days, mode });
   }
 
   @Get('settings')

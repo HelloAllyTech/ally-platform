@@ -95,6 +95,7 @@ export const CONVERSATION_TURN_TOOLS: readonly PmAgentGatewayTool[] = [
   'comments_read',
   'reporting_query',
   'metrics_view',
+  'guidance_report',
   'idea_propose',
   'release_draft',
   'ladder_start_quick_test',

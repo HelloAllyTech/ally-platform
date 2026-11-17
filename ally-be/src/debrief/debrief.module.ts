@@ -74,6 +74,7 @@ import { DebriefOwnerSettings } from './entity/debrief-owner-settings.entity';
 import { DebriefProbeResult } from './entity/debrief-probe-result.entity';
 import { DebriefLearnerEvent } from './entity/debrief-learner-event.entity';
 import { DebriefLearnerEventsService } from './service/debrief-learner-events.service';
+import { DebriefGuidanceMetricsService } from './service/debrief-guidance-metrics.service';
 import { DebriefMetricsService } from './service/debrief-metrics.service';
 import { DebriefConsoleAuditInterceptor } from './interceptor/debrief-console-audit.interceptor';
 import { DebriefRunJudgeService } from './service/debrief-run-judge.service';
@@ -223,6 +224,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     DebriefConsoleViewService,
     DebriefLearnerEventsService,
     DebriefMetricsService,
+    DebriefGuidanceMetricsService,
     DebriefConsoleAuditInterceptor,
     DebriefAudioService,
     DebriefNotifier,

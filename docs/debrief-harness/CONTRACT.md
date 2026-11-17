@@ -147,6 +147,7 @@ above. Builder and Bug Hunter are never given a token, so they never receive com
 | `comments_read` | `{ "since"?: ISO date (exclusive, on `created_at`), "status"?: "open" \| "resolved" (default both), "ids"?: [uuid, ...], "limit"?: 1–200 (default 100) }` | `{ "comments": [ { "id", "run_id", "session_type", "language", "anchor": { "kind": "transcript" \| "card" \| "debrief", "turn_index", "section", "span_start", "span_end" }, "quoted_text", "body", "tag", "status", "idea": { "id", "status" } \| null, "repeat_of_id", "created_at", "replies": [ { "id", "body", "tag", "created_at" } ] } ], "next_since": ISO \| null }` — expert comment threads, oldest first (spec D8). Never the transcript, the cards or who wrote a comment. `next_since` is set when the page was full; pass it back as `since` |
 | `reporting_query` | `{ "sql": "SELECT …" }` | `ReportingQueryResult` `{ sql, ok, rows?, truncated?, refused? }` — the existing Analytics Agent guard and read-only executor over the redacted `debrief_reporting.*` views only. A refused query answers `refused` (the agent reads it as a tool error) |
 | `metrics_view` | `{ "weeks"?: 4–52 (default 8), "language"?, "recipe"?, …metric filters }` | `{ weeks, failure_points: [ { kind, name, segment, value, n, target, why } ], metrics: { <name>: value }, metric_names }` — spec C2 failure points from `DebriefMetricsService.view()` (`debrief-metric-failures.util.ts`): experience rates off the v9 targets (all, per language, per device), guardrails (hard-fail and thumbs-down above pre-launch, fabricated quotes, judge median below 8), efficiency drift (cost, revision rounds, visible seconds), steering falling, stages failing. Thin samples (n < 20) are left out |
+| `guidance_report` | `{ "days"?: 1–90 (default 30), "mode"?: "all"\|"live"\|"shadow" (default all) }` | The Console's guidance-metrics payload (below), unchanged. Read only; counts, timings and entry titles, no transcript text |
 | `idea_propose` | `{ "problem": { title, summary, comment_ids[], metrics: [ { name, value, segment? } ] }, "route": "A"\|"B"\|"C"\|"D", "title", "hypothesis", "expected_effect": { metric, direction: "up"\|"down", by?, note? }, "confidence": { level: "high"\|"low", why } }` | `{ idea_id, route, linked_comments, unknown_comment_ids, baseline: { metric, value }, next }` — writes an `agent_lessons` idea (`change.route`, `change.ideaKind` = `route_a` / `needs_code` / `defect` / `needs_person`; `evidence.problem`, `commentIds`, `metrics`, `forecast` with the named metric's value now, `confidence` `{level, why}` (V2_AUTONOMY A2; one left out is stored as low, so it never skips the always-ask list); `release_draft` may restate it), links the cited comments (`DebriefReviewService.linkIdea`). Refused: no evidence (no existing comment id and no metric), a metric not in `PM_AGENT_METRICS`, more than 5 ideas in one run, a duplicate, autonomy off |
 | `release_draft` | `{ "idea_id", "kind": "prompt_edit"\|"setting"\|"registry_agent", prompt_code/find/replace \| setting_key/setting_value \| agent: { id, description, use_when, skip_when, prompt, tools[], scopes[], eval_cases, model? } }` | `{ ok, idea_id, kind, next }` — route A only; draft only (nothing reaches learners). Refused: the never-list (C4: the rubric and judge prompts, the Safety reader, the PM agent's own instructions, budgets, `passScore`, every owner setting), prompts outside `PM_AGENT_EDITABLE_PROMPTS` (orchestrator prompts only while GA runs the orchestrator), a `find` not exactly once in the live text, a change to `{variables}`, settings outside `PM_AGENT_SETTINGS` ranges, a change that does not apply to GA or fails bundle validation; FR-53 for registry agents (registered tools and A2 scopes only, ≥ 10 eval cases, ≤ 10 experimental, approved model). Registry agents are stored as drafts: the build defines the agents a release can enable, so they are not tested yet |
 | `ladder_start_quick_test` | `{ "idea_id" }` | `{ status: "running", startedAt, note }` — requests `DebriefPmAgentService.screen` (the deterministic ladder: quick test → gate → paired trials → canary watch; a person starts the canary and promotes). Refused: autonomy `propose_only` (a person starts it in the Console) or `off`, no drafted change, a registry agent, the learning budget spent, a quick test already running |
@@ -296,6 +297,13 @@ and `guidance_search` is the plain lookup (always allowed, unchanged).
   (`guidanceAgentMaxCalls`/`guidanceTools` still govern whether it runs). Skills Store prompt `debrief_guidance_agent_system`, variables `guidance_index`, `moments`, `skills`,
   `baseline_passages`, `learner_level`, `max_calls` (`moments` required); sent to ally-ai with the graph's prompts.
   AI task registry row `debrief-guidance-agent`.
+- **Guidance: lookup off / agent as the mechanism (ally-ai):** the lookup's per-moment `guidance_search` calls run
+  concurrently (results in moment order). With `guidancePassagesPerMoment` 0 the guidance agent is the mechanism: on
+  the orchestrated path it is not offered to the planner (nor is `guidance_lookup`) and runs as the fixed step after
+  dispatch for any session with pivotal moments; with it above 0 the planner may choose or skip the agent as before.
+  `workspace` gains `guidanceMode` (`both|lookup|agent|none`: what produced passages this run), `guidanceGiven`
+  (`[{ "code", "via" }]` for every passage handed to the Writer, deduped by code, `via` = `lookup|agent_search|
+  agent_fetch|writer|reviser`) and `guidanceTimings` (`{ "lookupMs", "agentMs" }`, null when that node did not run).
 
 ### Recorded by the ally-ai build (2026-11-10)
 
@@ -341,7 +349,7 @@ and `guidance_search` is the plain lookup (always allowed, unchanged).
 
 Gopi: "as much as possible the learner should get the debrief; in the worst case fall back to the old debrief
 (today's debrief)". Nothing leaves the learner on "working", "on its way" or "taking longer" for good:
-
+ The seed default is now `guidancePassagesPerMoment` 0 (2026-11-17): in a local comparison on eight sessions the agent alone matched the lookup plus agent on judge score (paired mean difference -0.07, noise) and cost, and was 5-16 s faster; the Guidance analytics (Analytics › Debriefs) show whether the entries it chooses differ.
 - **Past the month's cap.** A **live** run whose ceiling (the cap, what is left of it, or the session budget) is
   below `settings.runFloorUsd` runs with `ceiling_usd = runFloorUsd` and `allow_over_ceiling: true`; when the
   month's cap is what stopped it, ally-be marks `workspace.overCap = true` and `workspace.overCapSpend
@@ -791,7 +799,7 @@ for each promoted idea that has stood 14 days, the named metric now against the 
 (`POST /v1/debriefs/console/pm-agent/ideas/:id/questions`), ally-be queues a short run with `review: "questions"`,
 `inputs: { open_questions: [ { idea_id, question_id, title, question, at } ], ideas: [ ... ] }`, a budget of
 min(`pmAgentRunCapUsd`, $0.50, learning budget left), and only the tools `questions_read`, `question_answer`,
-`reporting_query`, `comments_read`, `metrics_view`. One run at a time; a question that arrives during a run is
+`reporting_query`, `comments_read`, `metrics_view`, `guidance_report`. One run at a time; a question that arrives during a run is
 answered after it. Skipped while `pmAgentEnabled` is off or the learning budget is spent. Its `curator_run` row carries
 `review: "questions"` and is not shown as the latest report. Weekly and monthly runs also get both tools and
 `open_questions`. Gateway tools: `questions_read {}` → `{ questions: [...] }`; `question_answer { idea_id,
@@ -974,3 +982,31 @@ rule (`debrief-ladder.util.ts` `gateResult`), and also fails it when the judge m
 challenger debrief on the gate set `missed_risk_cue`. The reading is kept on the idea's
 `evidence.gate.safetyRecall` (with `cases`, `planted`, `model`, `ranAt`) and is what Analytics › Debriefs
 shows as "Safety recall on the seeded set" (CONSOLE_API.md).
+
+## Debrief Guidance analytics
+
+`GET /v1/debriefs/console/guidance-metrics?days=30&mode=all` (`@DebriefRead()`, the same read permission as `metrics`;
+`days` 1–90, default 30; `mode` `all` = live + shadow | `live` | `shadow`; replays are never counted). The PM agent reads
+the same payload with `guidance_report`. Served by `DebriefGuidanceMetricsService`; aggregation in
+`debrief-guidance-metrics.util.ts`. The newest 5000 non-skipped runs in the window are read. Aggregate only: no
+transcript text, quotes or learner data; entries carry their library title and kind.
+
+```
+{ window: { from, to, days }, mode,
+  runs: { total, withAgent, withLookup, agentOnly, lookupOnly, neither },
+  planner: { decided, chose, skipped, skipReasons: [ { why, count } ] },   // top 5, planner `considered` why_not for guidance_agent
+  tools: [ { step, tool, calls, ok, avgMs, p90Ms, avgCodes } ],           // per step + tool, from workspace.guidanceCalls
+  entries: [ { code, title, kind|null, fetched, given, runs } ],          // top 15 by given
+  latency: { lookup: { n, p50Ms, p90Ms }, agent: { n, p50Ms, p90Ms } },
+  compare: { withAgent: { n, avgJudge|null, avgCostUsd|null }, withoutAgent: { … } },
+  daily: [ { date, runs, withAgent, avgLookupMs|null, avgAgentMs|null } ] }
+```
+
+Sources, newer field first, older run falls back: `workspace.guidanceMode` (`both|lookup|agent|none`) → agent ran =
+`guidance_agent` calls or a `guidance_agent` log of kind `model` (the planner's marker entry is kind `code` and does not
+count), lookup ran = a `guidance_lookup` log; `workspace.guidanceTimings {lookupMs, agentMs}` → the step log `ms` (agent:
+sum of its call `ms`); `workspace.guidanceGiven [{code, via}]` → codes in `workspace.passages`. `fetched` counts codes a
+`guidance_fetch` call returned (index and search lists are not fetches); `given` counts runs where the code reached the
+Writer; `runs` counts runs where it was fetched or given. `planner.decided` = runs whose planner chose the agent
+(`actions`) or listed it in `considered`. Judge = `evaluatorOverall`, else `workspace.judge.overall`; cost =
+`estimatedCostUsd`.

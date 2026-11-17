@@ -505,7 +505,10 @@ const SEED_RECIPES_BASE = {
     monthlyCapUsd: 50,
     deadlineMs: 150_000,
     riskDeadlineMs: 180_000,
-    guidancePassagesPerMoment: 2,
+    // 0: the fixed per-moment lookup is off and the guidance agent is the guidance step (local
+    // comparison 2026-11-17: same judge scores, 5-16 s faster). Above 0 the lookup runs and the
+    // planner may choose the agent besides it.
+    guidancePassagesPerMoment: 0,
     guidanceAgentMaxCalls: 3,
     // The guidance agent has all three; the Writer and Reviser can take them but ship off.
     guidanceTools: {

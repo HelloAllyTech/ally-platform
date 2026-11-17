@@ -69,6 +69,8 @@ export const PM_AGENT_GATEWAY_TOOLS = [
   'comments_read',
   'reporting_query',
   'metrics_view',
+  // Debrief Guidance analytics (lookup + guidance agent): read only.
+  'guidance_report',
   'idea_propose',
   'release_draft',
   'ladder_start_quick_test',

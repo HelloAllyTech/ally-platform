@@ -6,6 +6,7 @@ import { AnalyticsRange } from "@types";
 
 import { MetricsTab } from "../MetricsTab";
 import { ConsoleOverviewSection } from "./ConsoleOverviewSection";
+import { GuidanceSection } from "./GuidanceSection";
 import { ImprovementSection } from "./ImprovementSection";
 import { JudgeAgreementSection } from "./JudgeAgreementSection";
 import { NightlyCheckSection } from "./NightlyCheckSection";
@@ -49,6 +50,7 @@ export const DebriefAnalytics: React.FC<{ range?: AnalyticsRange }> = ({ range =
             error={q.isError ? q.error : null}
             onRetry={() => void q.refetch()}
           />
+          <GuidanceSection />
           <NightlyCheckSection />
         </div>
       </details>
