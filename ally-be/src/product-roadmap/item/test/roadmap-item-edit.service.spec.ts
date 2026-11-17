@@ -233,8 +233,8 @@ describe('RoadmapItemEditService.setStar', () => {
   it('stars as the Owner and invalidates the board rank', async () => {
     const { service, dataSource, strategyGoals, notifications } = build();
     const result = await service.setStar(ME, 'OPP-0388', true);
-    const update = dataSource.query.mock.calls.find((c: any[]) =>
-      String(c[0]).includes('"directorStarred" = $2'),
+    const update: unknown[] | undefined = dataSource.query.mock.calls.find(
+      (c: any[]) => String(c[0]).includes('"directorStarred" = $2'),
     );
     expect(update?.[1]).toEqual([ITEM_ID, true, ME, ME]);
     expect(strategyGoals.invalidate).toHaveBeenCalledWith(ME);

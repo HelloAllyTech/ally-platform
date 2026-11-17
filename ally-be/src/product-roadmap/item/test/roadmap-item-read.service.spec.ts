@@ -231,7 +231,9 @@ describe('RoadmapItemReadService.list', () => {
     const result = (await service.list(
       ME,
       parseItemQuery({ view: 'for-you' }),
-    )) as { sections: Record<string, { code: string; whyHere?: unknown }[]> };
+    )) as unknown as {
+      sections: Record<string, { code: string; whyHere?: unknown }[]>;
+    };
     const codes = (k: string) => result.sections[k].map((r) => r.code);
     expect(codes('needsYou')).toEqual(['OPP-0001']);
     expect(result.sections.needsYou[0].whyHere).toMatchObject({
@@ -265,7 +267,7 @@ describe('RoadmapItemReadService.list', () => {
     const result = (await service.list(
       ME,
       parseItemQuery({ view: 'for-you' }),
-    )) as {
+    )) as unknown as {
       sections: Record<string, { whyHere?: unknown; statusParts: unknown }[]>;
     };
     expect(result.sections.needsYou[0].whyHere).toMatchObject({
@@ -306,7 +308,9 @@ describe('RoadmapItemReadService.list', () => {
     const result = (await service.list(
       ME,
       parseItemQuery({ view: 'to-triage' }),
-    )) as { sections: Record<string, { code: string; whyHere?: any }[]> };
+    )) as unknown as {
+      sections: Record<string, { code: string; whyHere?: any }[]>;
+    };
     expect(result.sections.awaitingReview.map((r) => r.code)).toEqual([
       'OPP-0001',
     ]);
