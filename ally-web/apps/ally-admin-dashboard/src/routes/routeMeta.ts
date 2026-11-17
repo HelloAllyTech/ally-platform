@@ -179,6 +179,15 @@ const buildTable = (): RouteMetaEntry[] => {
     { path: ROUTES.AI_LAB, title: i.aiLab, section: "ai-languages" },
     // Product
     { path: ROUTES.PRODUCT_ROADMAP, title: i.roadmap, section: "product" },
+    // Roadmap v2 (dark behind roadmap_v2): its own frame and scrolling, edge to edge.
+    { path: ROUTES.ROADMAP, title: i.roadmapV2, section: "product", fullBleed: true },
+    {
+      path: ROUTES.ROADMAP_IDEA(":code"),
+      title: p.roadmapIdea,
+      section: "product",
+      parent: ROUTES.ROADMAP,
+      fullBleed: true,
+    },
     { path: ROUTES.BUG_HUNTER, title: i.bugHunter, section: "product" },
     { path: ROUTES.BUILDER, title: i.builder, section: "product" },
     {

@@ -55,6 +55,7 @@ vi.mock("@src/api", () => {
     useGetTenantByIdQuery: () => ({ data: undefined }),
     useUpdateTenantMutation: noopMutation,
     useGetCharacterLibraryEnabledQuery: () => ({ data: false }),
+    useGetRoadmapMeRoleQuery: () => ({ data: undefined }),
     useUpdateCharacterLibraryEnabledMutation: noopMutation,
     useGetProgressDashboardEnabledQuery: () => ({ data: false }),
     useUpdateProgressDashboardEnabledMutation: noopMutation,

@@ -150,6 +150,7 @@ const buildNavigationItems = (): NavigationItem[] => {
     { id: S.AI_LAB, label: l.aiLab, path: ROUTES.AI_LAB, section: "ai-languages" },
     // Product
     { id: S.PRODUCT_ROADMAP, label: l.roadmap, path: ROUTES.PRODUCT_ROADMAP, section: "product" },
+    { id: S.ROADMAP_V2, label: l.roadmapV2, path: ROUTES.ROADMAP, section: "product" },
     { id: S.BUG_HUNTER, label: l.bugHunter, path: ROUTES.BUG_HUNTER, section: "product" },
     { id: S.PM_AGENT, label: en.pmAgent.tabLabel, path: ROUTES.PM_AGENT, section: "product" },
     { id: S.BUILDER, label: l.builder, path: ROUTES.BUILDER, section: "product" },
@@ -283,6 +284,7 @@ export const deriveNavigationItems = ({
   features,
   savedOrder,
   orgToggles,
+  roadmapV2 = false,
 }: {
   // Accepts `string[]` to match how permissions/features are stored in Redux;
   // enum members compare cleanly against the string entries.
@@ -296,6 +298,11 @@ export const deriveNavigationItems = ({
    * omitted or empty map behaves exactly as before.
    */
   orgToggles?: Partial<Record<OrgToggle, boolean>>;
+  /**
+   * Roadmap v2 is on for this caller: `GET /v1/roadmap/me/role` answered. Absent or false hides
+   * the entry, so with the flag off the sidebar is exactly what it was.
+   */
+  roadmapV2?: boolean;
 }): NavigationItem[] => {
   const navigationItems = buildNavigationItems();
   if (isChatbotsOnly(features)) {
@@ -432,6 +439,13 @@ export const deriveNavigationItems = ({
             );
           case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
             return (
+              permissions!.includes(Permissions.VIEW_PRODUCT_ROADMAP) &&
+              hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP)
+            );
+          // Same grant as the board, and only while the flag is on (the role read succeeded).
+          case SIDEBAR_ITEMS.ROADMAP_V2:
+            return (
+              roadmapV2 &&
               permissions!.includes(Permissions.VIEW_PRODUCT_ROADMAP) &&
               hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP)
             );

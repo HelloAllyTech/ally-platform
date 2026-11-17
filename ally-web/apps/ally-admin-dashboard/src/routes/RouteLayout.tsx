@@ -41,6 +41,9 @@ import {
   ProductUpdates,
   AILab,
   ProductRoadmap,
+  RoadmapGate,
+  RoadmapIdeaPage,
+  RoadmapQueuePage,
   Settings,
   Logs,
   MobileReleases,
@@ -566,6 +569,38 @@ export const RouteLayout: React.FC = () => {
                 requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
               >
                 <ProductRoadmap />
+              </PrivateLayout>
+            }
+          />
+          {/* Roadmap v2 (plans/roadmap-builder-merge), dark behind roadmap_v2. The gate asks
+            /v1/roadmap/me/role, which answers 404 while the flag is off: then these URLs are the
+            ordinary not-found page and nothing else changes. Product Roadmap and Builder above
+            are untouched. */}
+          <Route
+            path={ROUTES.ROADMAP}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+                fullBleed
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapQueuePage />
+                </RoadmapGate>
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.ROADMAP_IDEA(":code")}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+                fullBleed
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapIdeaPage />
+                </RoadmapGate>
               </PrivateLayout>
             }
           />

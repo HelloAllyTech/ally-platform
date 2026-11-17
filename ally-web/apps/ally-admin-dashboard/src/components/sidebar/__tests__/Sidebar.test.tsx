@@ -200,6 +200,9 @@ vi.mock("@constants", () => ({
       noMenuAccess: "Your account can't open any page here yet.",
       clearSearch: "Clear search",
     },
+    roadmapV2: {
+      reduceMotion: { label: "Reduce motion", help: "Replaces movement with quick fades." },
+    },
     auth: {
       logout: "Logout",
       profileSettings: "Profile Settings",
