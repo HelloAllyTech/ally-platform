@@ -78,6 +78,10 @@ class RunWorking(TypedDict, total=False):
     hits: List[Dict[str, Any]]  # the run's first search, best first
     retrieval: Dict[str, Any]
     passages: List[Dict[str, Any]]
+    #: List entries the previous message's run found (chunk 6b): the run starts with
+    #: them as passages, so "yes, book it" books the slot it just showed without a
+    #: find first. ally-be still checks every rule on the write.
+    carried_records: Optional[List[Dict[str, Any]]]
     turn_type: Optional[TurnType]
     # The gate verdict on the run's first search (a DeclineReason value); None when
     # it found something relevant or no search ran.

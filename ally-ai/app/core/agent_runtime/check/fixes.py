@@ -38,7 +38,7 @@ logger = get_logger(__package__)
 def _looked(ctx: CheckContext) -> bool:
     """Whether the run looked anything up: a search or a list find (or it has
     passages, which only a look-up adds)."""
-    return ctx.searched or ctx.looked_up or bool(ctx.passages)
+    return ctx.searched or ctx.looked_up or bool(ctx.found)
 
 
 def _keep_out_of_scope_declines_generic(verdict: Verdict, ctx: CheckContext) -> None:

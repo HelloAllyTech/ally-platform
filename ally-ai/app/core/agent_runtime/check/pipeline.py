@@ -59,6 +59,7 @@ def check_reply(
     looked_up: bool = False,
     found_nothing: bool = False,
     can_pass_on: bool = True,
+    carried: int = 0,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -90,6 +91,7 @@ def check_reply(
         looked_up=looked_up,
         found_nothing=found_nothing,
         can_pass_on=can_pass_on,
+        carried=carried,
     )
     verdict = _read_draft(step, ctx)
     # A list's times are cited from the run's records before grounding (chunk 6).
@@ -178,7 +180,7 @@ def _relabel(
         verdict.intent == AgentIntent.ANSWER
         and not step.get("citations")
         and ctx.turn_type in ("smalltalk", "about_bot")
-        and not ctx.passages
+        and not ctx.found
         and not factual
         and not about_organisation
     ):
@@ -186,7 +188,7 @@ def _relabel(
         # nothing searched or cited, is small talk: the same text sent as
         # `smalltalk` would pass, so refusing it only swaps in the fixed wording.
         verdict.intent = AgentIntent.SMALLTALK
-    elif verdict.intent == AgentIntent.SMALLTALK and (factual or ctx.passages):
+    elif verdict.intent == AgentIntent.SMALLTALK and (factual or ctx.found):
         # Small talk does not need a source, but this one either states something
         # checkable (a time, a price) or was written after a search found passages:
         # ground it like an answer. Phone numbers, links and emails are checked
@@ -210,9 +212,7 @@ def _require_sources(
             # source; there is no entry to cite, and the reply states no detail a
             # record of this run doesn't show.
             verdict.rejection = None
-        elif (
-            ctx.general and ctx.searched and not ctx.passages and not about_organisation
-        ):
+        elif ctx.general and ctx.searched and not ctx.found and not about_organisation:
             # General knowledge, on a bot allowed it: about something other than
             # the organisation, and only once a search found nothing. Flagged as
             # ungrounded, as today.
@@ -229,14 +229,14 @@ def _require_sources(
             # "Does Ally store audio?" → "I don't have that": it never looked.
             logger.info("Agent declined about the organisation without searching")
             verdict.rejection = Rejection.SEARCH_FIRST
-        elif ctx.passages and names_it:
+        elif ctx.found and names_it:
             # It searched, found passages about the organisation, and still said
             # it doesn't have it.
             logger.info("Agent declined although a search found passages")
             # A nudge: the passages may be about something else, so a decline the
             # rewrite still chooses is kept in its own words.
             verdict.rejection, verdict.keeps_text = Rejection.USE_FOUND, True
-        elif ctx.can_search_again and ctx.passages and ctx.turn_type == "question":
+        elif ctx.can_search_again and ctx.found and ctx.turn_type == "question":
             # One search, it found passages but not the answer, and the agent gave
             # up. On short web pages the first query often lands on a heading; a
             # second query with other words found the answer every time in the
@@ -293,7 +293,7 @@ def _build_result(
         # unanswered queue reads the same as in v1.
         decline_reason = (
             DeclineReason(ctx.search_gate)
-            if ctx.search_gate and not ctx.passages
+            if ctx.search_gate and not ctx.found
             else DeclineReason.MODEL_DECLINED
         )
     else:

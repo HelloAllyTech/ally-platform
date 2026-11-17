@@ -52,7 +52,9 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             # First step of the run: the working keys the rest of the path reads.
             start = {
                 "limits": service.resolve_limits(**bot.get("limits", {})),
-                "passages": [],
+                # The previous message's list entries (chunk 6b), so a confirmation
+                # can book without looking the slot up again.
+                "passages": list(state.get("carried_records") or []),
                 "tool_calls": [],
                 "activity": [],
                 "revisions": 0,

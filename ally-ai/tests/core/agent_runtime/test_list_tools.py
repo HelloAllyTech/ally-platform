@@ -1288,3 +1288,74 @@ class TestNothingAtTheTimeAsked:
             looked_up=True,
         )
         assert rejection != Rejection.SEARCH_FIRST
+
+
+class TestCarriedRecords:
+    """Chunk 6b, item 3: "yes, book it" books the slot the previous message showed,
+    without a find first (one model step fewer). ally-be still checks every rule."""
+
+    @pytest.mark.asyncio
+    async def test_a_confirmation_books_the_slot_found_a_message_before(self, graph):
+        gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")), BOOKED)
+        llm = FakeLLM(
+            find(starts_at_from="2026-11-19T11:00:00+05:30"),
+            reply(
+                "clarify", "Thursday 19 Nov at 11:00 is free. Book it?", citations=[1]
+            ),
+            # Second message: books straight from the carried slot.
+            create(THU_11),
+            reply("answer", "Booked: Thursday 19 Nov at 11:00.", citations=[2]),
+        )
+        args = dict(
+            conversation_id="conv-carry",
+            chatbot_id="bot-1",
+            bot=booking_bot(),
+            gateway=gateway,
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_agent(
+                graph,
+                run_id="run-c1",
+                question="can I book Thursday at 11:00?",
+                history=[],
+                **args,
+            )
+            state = await run_agent(
+                graph,
+                run_id="run-c2",
+                question="yes, please book it",
+                history=ASKED_11,
+                **args,
+            )
+        assert [c["name"] for c in gateway.calls] == [
+            "find_slots",
+            "create_appointments",
+        ]
+        assert state["result"]["intent"] == "answer"
+        assert state["passages"][0]["record_id"] == THU_11
+
+    @pytest.mark.asyncio
+    async def test_thanks_after_a_booking_is_not_sent_back(self, graph):
+        gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")))
+        llm = FakeLLM(
+            find(starts_at_from="2026-11-19T11:00:00+05:30"),
+            reply(
+                "clarify", "Thursday 19 Nov at 11:00 is free. Book it?", citations=[1]
+            ),
+            reply("smalltalk", "You're welcome!", turn_type="smalltalk"),
+        )
+        args = dict(
+            conversation_id="conv-thanks",
+            chatbot_id="bot-1",
+            bot=booking_bot(),
+            gateway=gateway,
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_agent(
+                graph, run_id="run-t1", question="thursday 11?", history=[], **args
+            )
+            state = await run_agent(
+                graph, run_id="run-t2", question="thanks", history=[], **args
+            )
+        assert state["result"]["answer"] == "You're welcome!"
+        assert len(llm.calls) == 3

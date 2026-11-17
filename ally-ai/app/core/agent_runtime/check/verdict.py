@@ -55,6 +55,14 @@ class CheckContext:
     #: `hand_over` tool, or a create tool on a list that takes their details (a
     #: callback or a lead). Without either, it never promises to pass anything on.
     can_pass_on: bool = True
+    #: How many of `passages`, from the start, were carried over from the previous
+    #: message (chunk 6b): citable, but not found by this run.
+    carried: int = 0
+
+    @property
+    def found(self) -> List[Dict[str, Any]]:
+        """The passages this run looked up itself: carried list entries left out."""
+        return self.passages[self.carried :]
 
 
 @dataclass

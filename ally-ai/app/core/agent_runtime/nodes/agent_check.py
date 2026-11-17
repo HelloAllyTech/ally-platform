@@ -91,6 +91,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             personal=personal_context(state["bot"]),
             looked_up=bool(finds),
             can_pass_on=can_pass_on(state["bot"]),
+            carried=len(state.get("carried_records") or []),
             found_nothing=any(
                 call.get("nearest") or not (call.get("added") or call.get("aggregate"))
                 for call in finds
