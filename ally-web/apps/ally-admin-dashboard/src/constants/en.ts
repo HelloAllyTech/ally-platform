@@ -9482,6 +9482,70 @@ export const en = {
       help: "Replaces movement with quick fades. Your device's reduced-motion setting does this too.",
     },
   },
+  /**
+   * Switch on Roadmap (Roadmap v2 P6): the Owner's switch-on action, on Builder settings while the
+   * flag is off and on Roadmap → Settings once it is on. Kept in one block.
+   */
+  roadmapV2Cutover: {
+    title: "Switch on Roadmap",
+    intro:
+      "Moves everyone onto one Roadmap tab for ideas and builds, at once. Check who gets which role and what moves, then switch it on.",
+    introOn:
+      "Roadmap is on. Run this again to move anything made through the old pages since: it only moves what hasn't moved yet.",
+    loading: "Checking who gets which role and what moves",
+    loadFailed: "Couldn't load the switch-on check.",
+    retry: "Try again",
+    rolesTitle: "Who gets which role",
+    rolesHelp:
+      "Builders lead ideas, start builds and merge pull requests on real code. Owners also accept ideas, assign leads and change these settings. Everyone else with Product Roadmap access gets the Idea role.",
+    owners: (n: number) => `Owners (${n})`,
+    builders: (n: number) => `Builders (${n})`,
+    nobody: "No one",
+    withoutAccess: (names: string) =>
+      `${names} will get the role but can't open the Roadmap: their Product Roadmap access is off. Give them a Roadmap role on Users.`,
+    movesTitle: "What moves",
+    drafts: (n: number) =>
+      n === 1
+        ? "1 parked idea becomes a private draft in its author's My drafts"
+        : `${n} parked ideas become private drafts in their authors' My drafts`,
+    sessions: (n: number, goal: string) =>
+      n === 1
+        ? `1 live Builder session gets an idea of its own, led by whoever started it, under ${goal}`
+        : `${n} live Builder sessions get an idea each, led by whoever started them, under ${goal}`,
+    sessionsHelp:
+      "Only sessions still running or waiting. Finished, failed, cancelled and archived sessions stay as they are and stay readable.",
+    reviews: (n: number) =>
+      n === 1
+        ? "1 idea filed before review existed is marked Accepted"
+        : `${n} ideas filed before review existed are marked Accepted`,
+    more: (n: number) => `and ${n} more`,
+    nothingToMove:
+      "Nothing to move: no parked ideas, no live Builder sessions without an idea, and every idea is reviewed.",
+    noGoal:
+      "Add a product goal in Product Roadmap settings first. Each live Builder session's idea is filed under one.",
+    switchOn: "Switch on Roadmap",
+    moveLeft: "Move what's left",
+    confirmTitle: "Switch everyone to Roadmap?",
+    confirmTitleOn: "Move what's left?",
+    confirmEveryone:
+      "Product Roadmap and Builder become one tab, Roadmap, for everyone with Roadmap access, the next time they load a page.",
+    confirmKept:
+      "Nothing is deleted. Switching Roadmap off in its settings brings Product Roadmap and Builder back with their data.",
+    confirm: "Switch on Roadmap",
+    confirmOn: "Move it",
+    cancel: "Cancel",
+    running: "Switching on…",
+    conflict: "Access changed since you looked. Review the list again.",
+    failed: "Couldn't switch Roadmap on. Nothing changed. Try again.",
+    doneTitle: "Roadmap is on",
+    doneSummary: (drafts: number, sessions: number, reviews: number) =>
+      `${drafts} ${drafts === 1 ? "draft" : "drafts"} moved, ${sessions} Builder ${
+        sessions === 1 ? "session" : "sessions"
+      } filed as ideas, ${reviews} ${reviews === 1 ? "idea" : "ideas"} marked Accepted.`,
+    openRoadmap: "Open Roadmap",
+    lastRun: (date: string, name: string | null) =>
+      name ? `Last run on ${date} by ${name}.` : `Last run on ${date}.`,
+  },
   roadmapTriage: {
     shortcutsTitle: "Keyboard shortcuts",
     shortcutsIntro:

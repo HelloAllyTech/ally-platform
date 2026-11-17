@@ -498,6 +498,11 @@ export const ApiEndpoints = {
     RELEASE: "/v1/roadmap/release",
     RELEASE_RESUME: "/v1/roadmap/release/resume",
   },
+  /** Roadmap v2 P6: Switch on Roadmap. Owner only; these two answer while the flag is off. */
+  ROADMAP_V2_CUTOVER: {
+    PREVIEW: "/v1/roadmap/cutover/preview",
+    RUN: "/v1/roadmap/cutover",
+  },
   ROADMAP_V2: {
     ME_ROLE: "/v1/roadmap/me/role",
     ITEMS: "/v1/roadmap/items",
