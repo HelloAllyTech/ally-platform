@@ -21,6 +21,11 @@ export interface PersonRef {
   name: string;
   role: RoadmapRole;
   relation?: ItemRelation;
+  /**
+   * Ideas this person filed that are Released (§4.14, "ideas shipped: 3" on
+   * a chip). Positive only: nothing anywhere counts declined ideas.
+   */
+  ideasShipped?: number;
 }
 
 export type ItemCan = RoadmapCapabilities & RoadmapEditCapabilities;

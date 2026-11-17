@@ -1,31 +1,41 @@
-import React from "react";
+import React, { useState } from "react";
 
-import { Debug, Document, List } from "@icons";
+import { Debug, Document, List, Plus, ThreeDot } from "@icons";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
 import { ROUTES, en } from "@constants";
 
+import { BottomSheet } from "./BottomSheet";
+import { MoreSheetContent } from "./RoadmapAreaNav";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
+import { useRoadmapRole } from "../RoadmapGate";
 
 interface RoadmapBottomBarProps {
   /** Slides away while scrolling down, back on scroll up (§4.17). */
   hidden: boolean;
   /** For you → Needs you count, on the Queue item. */
   forYouCount?: number;
+  /** Which tab the page is (Queue by default). */
+  active?: "queue" | "drafts";
 }
 
 /**
  * The phone's bottom bar, within thumb reach: Queue · Drafts · ＋ New idea · Bugs · ⋯. It hides
  * while the keyboard is open (the caller passes `hidden`) and keeps clear of the home indicator.
  *
- * Drafts and Bugs open the existing pages until Roadmap has its own tabs for them.
- * TODO(P3): the raised ＋ New idea button (56 px) and Drafts as Roadmap's own tab.
- * TODO(P4): ⋯ with Agent and Settings, for the roles that have them.
+ * Drafts is Roadmap's own tab; ＋ is New idea, raised and 56 px.
+ * ⋯ opens Agent and Settings for the roles that have them, plus the weekly email and What moved.
  */
-export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({ hidden, forYouCount }) => {
+export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
+  hidden,
+  forYouCount,
+  active = "queue",
+}) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.mobile;
+  const { role } = useRoadmapRole();
+  const [moreOpen, setMoreOpen] = useState(false);
   const item = "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs";
   return (
     <motion.nav
@@ -41,8 +51,8 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({ hidden, forY
         <li className="flex flex-1">
           <Link
             to={ROUTES.ROADMAP}
-            className={`${item} font-semibold text-primary-700`}
-            aria-current="page"
+            className={`${item} ${active === "queue" ? "font-semibold text-primary-700" : "text-typography-secondary"}`}
+            aria-current={active === "queue" ? "page" : undefined}
             tabIndex={hidden ? -1 : 0}
           >
             <span className="relative">
@@ -59,17 +69,28 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({ hidden, forY
         </li>
         <li className="flex flex-1">
           <Link
-            to={`${ROUTES.PRODUCT_ROADMAP}?tab=drafts`}
-            className={`${item} text-typography-secondary`}
+            to={ROUTES.ROADMAP_DRAFTS}
+            className={`${item} ${active === "drafts" ? "font-semibold text-primary-700" : "text-typography-secondary"}`}
+            aria-current={active === "drafts" ? "page" : undefined}
             tabIndex={hidden ? -1 : 0}
           >
             <Document size={20} aria-hidden />
             {copy.drafts}
           </Link>
         </li>
+        <li className="flex flex-1 items-start justify-center">
+          <Link
+            to={ROUTES.ROADMAP_NEW_IDEA}
+            aria-label={en.roadmapV2.newIdea.button}
+            tabIndex={hidden ? -1 : 0}
+            className="-mt-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg"
+          >
+            <Plus size={24} aria-hidden />
+          </Link>
+        </li>
         <li className="flex flex-1">
           <Link
-            to={`${ROUTES.PRODUCT_ROADMAP}?tab=bugs`}
+            to={ROUTES.ROADMAP_BUGS}
             className={`${item} text-typography-secondary`}
             tabIndex={hidden ? -1 : 0}
           >
@@ -77,7 +98,27 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({ hidden, forY
             {copy.bugs}
           </Link>
         </li>
+        <li className="flex flex-1">
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className={`${item} text-typography-secondary`}
+            tabIndex={hidden ? -1 : 0}
+            aria-haspopup="dialog"
+          >
+            <ThreeDot size={20} aria-hidden />
+            {en.roadmapV2Tools.tabs.more}
+          </button>
+        </li>
       </ul>
+      <BottomSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        title={en.roadmapV2Tools.tabs.moreTitle}
+        closeLabel={copy.close}
+      >
+        <MoreSheetContent role={role} onNavigate={() => setMoreOpen(false)} />
+      </BottomSheet>
     </motion.nav>
   );
 };

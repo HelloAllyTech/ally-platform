@@ -56,7 +56,6 @@ import { RoadmapAllocationService } from './service/roadmap-allocation.service';
 import { RoadmapMultiplierService } from './service/roadmap-multiplier.service';
 import { RoadmapCommentService } from './service/roadmap-comment.service';
 import { RoadmapInterviewNoteService } from './service/roadmap-content.service';
-import { RoadmapNotificationService } from './service/roadmap-notification.service';
 import { RoadmapImportService } from './service/roadmap-import.service';
 import { RoadmapOpportunityService } from './service/roadmap-opportunity.service';
 import { RoadmapSavedViewService } from './service/roadmap-saved-view.service';
@@ -68,6 +67,10 @@ import { BuilderModule } from 'src/builder/builder.module';
 import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
 import { RoadmapPlanController } from './controller/roadmap-plan.controller';
 import { RoadmapItemController } from './item/roadmap-item.controller';
+import { RoadmapItemBuildController } from './item/roadmap-item-build.controller';
+import { RoadmapItemBuildService } from './item/roadmap-item-build.service';
+import { RoadmapPeopleController } from './item/roadmap-people.controller';
+import { RoadmapRoleAdminService } from './item/roadmap-role-admin.service';
 import { RoadmapItemLookupService } from './item/roadmap-item-lookup.service';
 import { RoadmapItemReadService } from './item/roadmap-item-read.service';
 import { RoadmapItemEditService } from './item/roadmap-item-edit.service';
@@ -122,6 +125,11 @@ import {
 import { ReleasePolicySchedulerRegistrationService } from './service/release-policy-scheduler-registration.service';
 import { AwsModule } from 'src/aws/aws.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
+import { RoadmapDraftController } from './draft/roadmap-draft.controller';
+import { RoadmapDraftService } from './draft/roadmap-draft.service';
+import { RoadmapDictationService } from './draft/roadmap-dictation.service';
+import { RoadmapReviewController } from './review/roadmap-review.controller';
+import { RoadmapReviewService } from './review/roadmap-review.service';
 
 /**
  * Product Roadmap — the internal vote-based prioritisation board, rebuilt from the standalone
@@ -224,6 +232,11 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
   controllers: [
     // Roadmap v2 (plans/roadmap-builder-merge): 404 while roadmap_v2 is off.
     RoadmapItemController,
+    // P3: New idea, drafts, dictation, review and the lead.
+    RoadmapDraftController,
+    RoadmapReviewController,
+    RoadmapItemBuildController,
+    RoadmapPeopleController,
     RoadmapOpportunityController,
     RoadmapCollaborationController,
     RoadmapAdminController,
@@ -238,6 +251,12 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     // Roadmap v2's read model and its inline edits (P2).
     RoadmapItemReadService,
     RoadmapItemEditService,
+    // Roadmap v2 P3: drafts, dictation, review and the lead.
+    RoadmapDraftService,
+    RoadmapDictationService,
+    RoadmapReviewService,
+    RoadmapItemBuildService,
+    RoadmapRoleAdminService,
     // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
     PlanSessionStore,
     PlanStageService,
@@ -265,8 +284,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapInterviewNoteRepository,
     RoadmapSavedViewRepository,
     RoadmapUserTabOrderRepository,
-    // services
-    RoadmapNotificationService,
+    // services (RoadmapNotificationService now comes from ProductPlanningModule)
     RoadmapAccessService,
     // Signs the readiness verdict on the way out of ai/readiness and verifies it on the way
     // into POST /opportunities — the readiness gate's server-side half.

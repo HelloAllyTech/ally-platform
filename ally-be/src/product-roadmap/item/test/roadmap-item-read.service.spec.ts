@@ -110,6 +110,7 @@ function build(
         return [1, 2, 3, 9, ME].map((id) => ({ id, name: `Person ${id}` }));
       }
       if (sql.includes('FROM "roadmap_item_reads"')) return opts.reads ?? [];
+      if (sql.includes('AS shipped')) return [{ userId: 1, shipped: '3' }];
       if (sql.includes('SELECT "createdBy" FROM "builder_sessions"')) {
         return [{ createdBy: 1 }];
       }
@@ -364,8 +365,14 @@ describe('RoadmapItemReadService.list', () => {
       name: 'Person 1',
       role: 'builder',
       relation: 'author',
+      // Released ideas they filed (§4.14), counted once for the page.
+      ideasShipped: 3,
     });
-    expect(result.rows[0].lead).toMatchObject({ id: 2, relation: 'lead' });
+    expect(result.rows[0].lead).toMatchObject({
+      id: 2,
+      relation: 'lead',
+      ideasShipped: 0,
+    });
   });
 });
 

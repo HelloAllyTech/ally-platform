@@ -6,6 +6,8 @@ import { useAllySocket } from "@hooks";
 import { store } from "@store";
 import type { RoadmapItemChangedEvent, RoadmapPresenceEvent } from "@types";
 
+import { publishRoadmapPresence } from "../session/presenceContext";
+
 /** Wire names on the existing roadmap namespace (P2 contract). */
 export const ROADMAP_V2_SOCKET = {
   /** The board room, as today; item changes fan out to it. */
@@ -21,6 +23,8 @@ export const PRESENCE_TTL_MS = 30_000;
 const COALESCE_MS = 250;
 /** The contract asks for a re-send about every 20 s; a little under keeps us inside the 30 s TTL. */
 const VIEWING_BEAT_MS = 18_000;
+/** A typing beat at most this often; a presence shows for a few seconds after the last one. */
+const TYPING_BEAT_MS = 4_000;
 
 export interface PresenceEntry {
   userId: number;
@@ -154,5 +158,34 @@ export const useRoadmapRealtime = ({ enabled, currentUserId, openCode }: Options
     [],
   );
 
-  return { presence };
+  /**
+   * "Ana is answering…" (§4.12): tell the item room you're typing in one question's box (or the
+   * comment box). Throttled here, so callers can call it on every keystroke.
+   */
+  const lastTyping = useRef<{ key: string; at: number } | null>(null);
+  const announceTyping = useCallback(
+    (questionId?: string) => {
+      const code = openRef.current;
+      if (!enabled || !code) return;
+      const key = `${code}:${questionId ?? ""}`;
+      const now = Date.now();
+      if (lastTyping.current?.key === key && now - lastTyping.current.at < TYPING_BEAT_MS) return;
+      lastTyping.current = { key, at: now };
+      emit(ROADMAP_V2_SOCKET.PRESENCE, {
+        code,
+        kind: "typing",
+        ...(questionId ? { questionId } : {}),
+      });
+    },
+    [enabled, emit],
+  );
+
+  // The question cards and the comment box read presence from here (session/presenceContext).
+  useEffect(() => {
+    if (!enabled) return undefined;
+    publishRoadmapPresence({ presence, announceTyping });
+    return () => publishRoadmapPresence(null);
+  }, [enabled, presence, announceTyping]);
+
+  return { presence, announceTyping };
 };

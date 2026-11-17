@@ -1,3 +1,10 @@
 export { RoadmapGate, useRoadmapRole } from "./RoadmapGate";
 export { RoadmapQueuePage } from "./RoadmapQueuePage";
 export { RoadmapIdeaPage } from "./RoadmapIdeaPage";
+export { RoadmapDraftsPage } from "./RoadmapDraftsPage";
+export { RoadmapNewIdeaPage } from "./RoadmapNewIdeaPage";
+export { RoadmapFrame } from "./RoadmapFrame";
+export { RoadmapAgentPage } from "./RoadmapAgentPage";
+export { RoadmapSettingsPage } from "./RoadmapSettingsPage";
+export { RoadmapBugsPage, UserInterviewsPage } from "./RoadmapAreaPages";
+export { RoadmapLegacyRedirect } from "./RoadmapLegacyRedirect";

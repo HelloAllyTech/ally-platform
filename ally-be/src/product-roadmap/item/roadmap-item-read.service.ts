@@ -261,6 +261,22 @@ export class RoadmapItemReadService {
     return { ...paged, rows: await this.toRows(loaded, paged.rows) };
   }
 
+  /**
+   * Queue rows for these ideas, in the order given (P3: similar ideas, the
+   * review batch's answer). Ids that are not on the board are left out.
+   */
+  async rowsFor(userId: number, ids: string[]): Promise<ItemRow[]> {
+    if (!ids.length) return [];
+    const role = await this.roles.roleOf(userId);
+    if (role === 'none') throw this.noAccess();
+    const loaded = await this.loadAll(userId, role);
+    const byId = new Map(loaded.cores.map((c) => [c.id, c]));
+    const cores = ids
+      .map((id) => byId.get(id))
+      .filter((c): c is ItemCore => !!c);
+    return this.toRows(loaded, cores);
+  }
+
   /** Quick open: by code, title or author; the caller's recent ideas when empty. */
   async search(userId: number, q: string): Promise<ItemSearchResponse> {
     const role = await this.roles.roleOf(userId);
@@ -354,7 +370,7 @@ export class RoadmapItemReadService {
             core.stage.statusParts.step === 'ready',
           awaitingMerge: core.decisions.some((d) => d.kind === 'pr_merge'),
           releaseHeld: false,
-          answersConflict: false,
+          answersConflict: (session?.openConflicts ?? 0) > 0,
         },
       ),
       ...editCapabilitiesFor(role, { isAuthor, isLead }, core.shownStage),
@@ -674,6 +690,7 @@ export class RoadmapItemReadService {
               s.plan->'reviews' AS "planReviews",
               s.plan->'externalBuild' AS "externalBuild",
               s.plan->'planningStarted' AS "planningStarted",
+              s.plan->>'openConflicts' AS "openConflicts",
               w.level AS "watchLevel",
               r."lastSeenAt",
               EXISTS (SELECT 1 FROM "roadmap_allocations" a
@@ -799,6 +816,7 @@ export class RoadmapItemReadService {
               typeof asJson(f.planningStarted) === 'boolean'
                 ? (asJson(f.planningStarted) as boolean)
                 : null,
+            openConflicts: num(f.openConflicts),
             totalCostUsd: num(f.totalCostUsd),
             budgetUsd: f.budgetUsd == null ? null : num(f.budgetUsd),
           }
@@ -1099,7 +1117,12 @@ export class RoadmapItemReadService {
     }
     const people = await this.resolvePeople([...ids]);
     const person = (id: number, relation?: ItemRelation): PersonRef => ({
-      ...(people.get(id) ?? { id, name: '', role: 'none' as RoadmapRole }),
+      ...(people.get(id) ?? {
+        id,
+        name: '',
+        role: 'none' as RoadmapRole,
+        ideasShipped: 0,
+      }),
       ...(relation ? { relation } : {}),
     });
     return cores.map((c) => {
@@ -1143,7 +1166,11 @@ export class RoadmapItemReadService {
       entries.push([c.opp.starredById, 'owner']);
     }
     const parts = c.stage.statusParts;
-    if (parts.stage === 'building' && parts.externalBuild) {
+    // "Brief sent to Claude Code by …" (planning) and "Building in Claude Code" both name the sender.
+    if (
+      (parts.stage === 'building' || parts.stage === 'planning') &&
+      parts.externalBuild
+    ) {
       entries.push([parts.externalBuild.byUserId, 'builder']);
     }
     if (parts.stage === 'closed' && parts.byUserId) {
@@ -1164,11 +1191,12 @@ export class RoadmapItemReadService {
   private async resolvePeople(ids: number[]): Promise<Map<number, PersonRef>> {
     const unique = [...new Set(ids.filter((id) => id > 0))];
     if (!unique.length) return new Map();
-    const [rows, roles] = await Promise.all([
+    const [rows, shipped, roles] = await Promise.all([
       this.dataSource.query(
         `SELECT id, name FROM "users" WHERE id = ANY($1::int[])`,
         [unique],
       ) as Promise<{ id: number; name: string | null }[]>,
+      this.ideasShipped(unique),
       Promise.all(
         unique.map((id) =>
           this.roles.roleOf(id).catch(() => 'none' as RoadmapRole),
@@ -1184,9 +1212,41 @@ export class RoadmapItemReadService {
           // A removed account keeps its history: a placeholder, never a bare id.
           name: names.get(id)?.trim() || 'Former member',
           role: roles[i],
+          ideasShipped: shipped.get(id) ?? 0,
         },
       ]),
     );
+  }
+
+  /**
+   * Ideas each person filed that are Released: the chip's "ideas shipped"
+   * (§4.14). Bugs are not ideas. A failed count reads as none rather than
+   * failing the page.
+   */
+  private async ideasShipped(ids: number[]): Promise<Map<number, number>> {
+    try {
+      const rows: { userId: number; shipped: string | number }[] =
+        await this.dataSource.query(
+          `SELECT "createdBy" AS "userId", count(*) AS shipped
+             FROM "roadmap_opportunities"
+            WHERE "createdBy" = ANY($1::int[])
+              AND stage = 'released'
+              AND type <> 'bug'
+              AND "deletedAt" IS NULL
+            GROUP BY "createdBy"`,
+          [ids],
+        );
+      return new Map(
+        (rows ?? []).map((r) => [Number(r.userId), Number(r.shipped)]),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not count ideas shipped: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return new Map();
+    }
   }
 
   private noAccess(): ForbiddenException {

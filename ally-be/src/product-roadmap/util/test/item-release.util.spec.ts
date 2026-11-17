@@ -335,5 +335,15 @@ describe('linkDrivesRelease', () => {
     expect(linkDrivesRelease({ source: 'builder' })).toBe(true);
     expect(linkDrivesRelease({ source: 'manual' })).toBe(true);
     expect(linkDrivesRelease({ source: 'code_match' })).toBe(false);
+    expect(
+      linkDrivesRelease({ source: 'code_match' }, { externalBuild: null }),
+    ).toBe(false);
+  });
+
+  it('lets a code match drive release once the brief went to Claude Code (P4)', () => {
+    const sent = { externalBuild: { tool: 'claude_code', byUserId: 7 } };
+    expect(linkDrivesRelease({ source: 'code_match' }, sent)).toBe(true);
+    expect(linkDrivesRelease({ source: 'builder' }, sent)).toBe(true);
+    expect(linkDrivesRelease({ source: 'other' }, sent)).toBe(false);
   });
 });

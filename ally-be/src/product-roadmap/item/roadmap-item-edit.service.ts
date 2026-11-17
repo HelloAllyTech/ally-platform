@@ -286,6 +286,12 @@ export class RoadmapItemEditService {
       updatedBy: actorUserId,
     });
     await this.planStore.patchPlan(sessionId, { nudgedAt: null });
+    await this.events.record({
+      sessionId,
+      kind: PlanEventKind.LEAD_ASSIGNED,
+      actorUserId,
+      detail: { to: leadUserId },
+    });
     await this.planStage.sync(sessionId, actorUserId);
     const payload = { leadUserId };
     await this.inbox.deliver({

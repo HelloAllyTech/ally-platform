@@ -6,7 +6,9 @@ import { en } from "@constants";
 import type { BuilderSessionDetail, RoadmapItemDetail } from "@types";
 
 import { CodeText } from "./CodeChip";
+import { ShipActions } from "./ReleaseDialog";
 import { IdeaPanelTab, shortDate, usd } from "../utils/copy";
+import { outcomeLine } from "../utils/delight";
 
 const noopSave = async () => undefined;
 
@@ -232,6 +234,12 @@ export const ShipPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
   const services = en.roadmapV2.filter.services;
   return (
     <div className="flex flex-col gap-4">
+      {/* Release lists every commit it would ship before it ships (P5's plan). */}
+      {item.can?.release && (
+        <div>
+          <ShipActions item={item} kind="release" />
+        </div>
+      )}
       <div className="flex flex-col gap-1">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-typography-secondary">
           {copy.releases}
@@ -262,12 +270,12 @@ export const ShipPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
           </ul>
         )}
       </div>
-      {typeof item.outcome?.review === "string" && item.outcome.review && (
+      {outcomeLine(item.outcome?.review) && (
         <div className="flex flex-col gap-1">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-typography-secondary">
             {copy.outcome}
           </h4>
-          <p className="m-0 text-sm text-typography-primary">{item.outcome.review}</p>
+          <p className="m-0 text-sm text-typography-primary">{outcomeLine(item.outcome?.review)}</p>
         </div>
       )}
     </div>

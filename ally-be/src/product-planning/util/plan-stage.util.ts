@@ -179,6 +179,12 @@ export type ItemStatusParts =
       prdPercent: number | null;
       openQuestions: number;
       designAwaitingApproval: boolean;
+      /**
+       * "Brief sent to Claude Code by … · waiting for a PR" (D18, §4.5b).
+       * Null unless the brief was sent. The idea moves to Building in Claude
+       * Code once a pull request exists.
+       */
+      externalBuild: { byUserId: number; at: string } | null;
     }
   | {
       stage: 'building';
@@ -188,7 +194,10 @@ export type ItemStatusParts =
       repos: string[];
       openPrs: { number: number; ci: ItemCiState }[];
       mergedPrs: number;
-      /** Brief sent to Claude Code and no pull request yet. */
+      /**
+       * Kept for the P2 contract; always false since P4. A brief sent with no
+       * pull request yet is Planning with `externalBuild` set.
+       */
       waitingForPr: boolean;
       releasing: boolean;
       heldReason: string | null;
@@ -238,8 +247,9 @@ const SHIPPED_STEP: Partial<
  * 4. Released, or the plan says shipped → Shipped.
  * 5. Awaiting the Owner's review → Submitted.
  * 6. Accepted (or never reviewed, which legacy rows are): Building once any
- *    build ran or the brief went to Claude Code; Planning once planning is
- *    under way; Accepted otherwise.
+ *    build ran here, or once the brief went to Claude Code AND a pull request
+ *    exists for the idea (P4, §4.5b); Planning once planning is under way, or
+ *    the brief was sent and no pull request exists yet; Accepted otherwise.
  *
  * A legacy idea with no plan session is derived from `opportunity.stage` and
  * any Builder session opened from it. It never writes anything:
@@ -318,10 +328,14 @@ export function deriveItemStage(facts: ItemStageFacts): ItemStage {
   const buildStarted = plan
     ? planStage === PlanStage.BUILDING
     : !!facts.legacySession?.buildStarted;
-  if (buildStarted || externalBuild) {
-    const openPrs = facts.build?.openPrs ?? [];
-    const mergedPrs = facts.build?.mergedPrs ?? 0;
-    const where = !buildStarted && externalBuild ? 'claude_code' : 'here';
+  const openPrs = facts.build?.openPrs ?? [];
+  const mergedPrs = facts.build?.mergedPrs ?? 0;
+  // Sent to Claude Code counts as building only once its work shows up as a
+  // pull request: until then nothing is being built that anyone can see.
+  const builtElsewhere =
+    !!externalBuild && (openPrs.length > 0 || mergedPrs > 0);
+  if (buildStarted || builtElsewhere) {
+    const where = buildStarted ? 'here' : 'claude_code';
     return {
       shownStage: 'building',
       statusParts: {
@@ -332,21 +346,24 @@ export function deriveItemStage(facts: ItemStageFacts): ItemStage {
         repos: facts.build?.repos ?? [],
         openPrs,
         mergedPrs,
-        waitingForPr:
-          where === 'claude_code' && openPrs.length === 0 && mergedPrs === 0,
+        waitingForPr: false,
         releasing: facts.build?.releasing ?? false,
         heldReason: facts.build?.heldReason ?? null,
       },
     };
   }
 
-  const step = plan
-    ? planStage && plan.planningStarted !== false
-      ? PLANNING_STEP[planStage]
-      : undefined
-    : facts.legacySession
-      ? 'prd'
-      : undefined;
+  const step =
+    (plan
+      ? planStage && plan.planningStarted !== false
+        ? PLANNING_STEP[planStage]
+        : undefined
+      : facts.legacySession
+        ? 'prd'
+        : undefined) ??
+    // The brief only goes out from Ready to build, so a sent brief with no
+    // pull request yet is still that step.
+    (externalBuild ? 'ready' : undefined);
   if (step) {
     return {
       shownStage: 'planning',
@@ -357,6 +374,7 @@ export function deriveItemStage(facts: ItemStageFacts): ItemStage {
         prdPercent: facts.planning?.prdPercent ?? null,
         openQuestions: facts.planning?.openQuestions ?? 0,
         designAwaitingApproval: facts.planning?.designAwaitingApproval ?? false,
+        externalBuild,
       },
     };
   }

@@ -168,6 +168,8 @@ describe('Builder session visibility — every reader is accounted for', () => {
     'builder/repository/builder-session.repository.ts': 'defines the rule',
     'builder/interceptor/builder-session-visibility.interceptor.ts':
       'enforces the rule on every :sessionId route',
+    'builder/guard/builder-plan-read.guard.ts':
+      'read-only GET on a SHARED plan for Idea+ (D2); private and non-plan stay refused',
     'builder/eval/sandbox/builder-eval-stores.ts':
       'eval sandbox: in-memory fixtures, no real sessions',
     'builder/service/builder-session.service.ts':

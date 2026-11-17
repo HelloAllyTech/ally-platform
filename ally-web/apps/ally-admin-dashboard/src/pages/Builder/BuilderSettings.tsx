@@ -27,6 +27,8 @@ import { en, ROUTES } from "@constants";
 import { BuilderAutonomyLevel, BuilderSettings as BuilderSettingsType } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
+import { useAgentEmbed } from "./agentEmbed";
+
 /** Local editable copy of the fields this page actually exposes. */
 type SettingsDraft = Pick<
   BuilderSettingsType,
@@ -142,6 +144,7 @@ export const BuilderSettings: React.FC = () => {
   const strings = en.builder.settings;
   const autonomy = strings.autonomy;
   const navigate = useNavigate();
+  const { embedded } = useAgentEmbed();
 
   const { data, isLoading, isError } = useGetBuilderSettingsQuery();
   const { data: repoMapsData } = useGetBuilderRepoMapsQuery();
@@ -307,13 +310,17 @@ export const BuilderSettings: React.FC = () => {
 
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col gap-6 overflow-y-auto md:p-6">
-      <header>
-        <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER)}>
-          ← {strings.backToBuilder}
-        </Button>
-        <h1 className="mt-2 text-xl font-semibold text-typography-900">{strings.title}</h1>
-        <p className="mt-1 text-sm text-typography-600">{strings.subtitle}</p>
-      </header>
+      {/* Embedded in the Roadmap's Settings tab, the tab's own header and Emergency group (with
+          this kill switch) stand in for these. */}
+      {!embedded && (
+        <header>
+          <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER)}>
+            ← {strings.backToBuilder}
+          </Button>
+          <h1 className="mt-2 text-xl font-semibold text-typography-900">{strings.title}</h1>
+          <p className="mt-1 text-sm text-typography-600">{strings.subtitle}</p>
+        </header>
+      )}
 
       {isError && (
         <InlineNotification kind="error" lowContrast hideCloseButton title={strings.loadFailed} />
@@ -326,21 +333,23 @@ export const BuilderSettings: React.FC = () => {
           {/* The kill switch sits first and alone, same as WhatsApp's settings
               page — it's the control someone reaches for in an incident and
               shouldn't be buried under thresholds. */}
-          <section className="rounded-md border border-border-light p-4">
-            <CarbonToggle
-              id="builder-settings-enabled"
-              labelText={strings.enabledLabel}
-              size="sm"
-              toggled={draft.enabled}
-              disabled={isSaving}
-              onToggle={(checked: boolean) =>
-                checked
-                  ? setConfirmEnable(true)
-                  : void applySwitch("enabled", strings.enabledLabel, false)
-              }
-            />
-            <p className="pt-1 text-xs text-typography-500">{strings.enabledHelp}</p>
-          </section>
+          {!embedded && (
+            <section className="rounded-md border border-border-light p-4">
+              <CarbonToggle
+                id="builder-settings-enabled"
+                labelText={strings.enabledLabel}
+                size="sm"
+                toggled={draft.enabled}
+                disabled={isSaving}
+                onToggle={(checked: boolean) =>
+                  checked
+                    ? setConfirmEnable(true)
+                    : void applySwitch("enabled", strings.enabledLabel, false)
+                }
+              />
+              <p className="pt-1 text-xs text-typography-500">{strings.enabledHelp}</p>
+            </section>
+          )}
 
           {/* The interview loop's own kill switch, directly under Builder's. It
               changes what every admin sees in the chat — the reply arrives whole,

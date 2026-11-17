@@ -23,6 +23,7 @@ import {
 import { Response } from 'express';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
+import { RequireBuilderOrPlanRead } from '../guard/builder-plan-read.guard';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
@@ -168,7 +169,7 @@ export class BuilderController {
   }
 
   @Get('sessions/:sessionId')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
     alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
@@ -359,7 +360,7 @@ export class BuilderController {
   }
 
   @Get('sessions/:sessionId/prd/versions')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
     alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
@@ -551,7 +552,7 @@ export class BuilderController {
   }
 
   @Get('sessions/:sessionId/runs')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
     alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
@@ -562,7 +563,7 @@ export class BuilderController {
   }
 
   @Get('runs/:runId/events')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
   })
   @ApiOperation({

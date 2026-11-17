@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Close, DockToRight, Maximize } from "@icons";
+import { Chat, Close, DockToRight, Maximize } from "@icons";
 import { AnimatePresence, PanInfo, motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
@@ -22,6 +22,7 @@ import {
   useMarkRoadmapItemReadMutation,
 } from "@api";
 import { ROUTES, en } from "@constants";
+import { useUser } from "@hooks";
 import type { RoadmapItemDetail } from "@types";
 
 import { BottomSheet } from "./BottomSheet";
@@ -35,11 +36,17 @@ import {
   PrimaryAction,
 } from "./IdeaControls";
 import { IdeaPanelContent } from "./IdeaPanels";
+import { PeopleChips } from "./PeopleChips";
+import { ShippedCard } from "./ShippedCard";
 import { Tracker } from "./Tracker";
 import { motionTransition, paneVariants, useReducedMotionPreference } from "../../../motion";
+import { DraftView } from "../drafts/DraftView";
 import { RoadmapBreakpoint, sidePanelMode } from "../hooks/useRoadmapBreakpoint";
 import { PresenceEntry } from "../hooks/useRoadmapRealtime";
 import { useKeyboardInset } from "../hooks/useVisualViewport";
+import { CommentBox } from "../session/CommentBox";
+import { FirstSubmitNote } from "../session/FirstSubmitNote";
+import { useSessionAnswers } from "../session/useSessionAnswers";
 import {
   IDEA_PANEL_TABS,
   IdeaPanelTab,
@@ -132,6 +139,7 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
 }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
+  const { user } = useUser();
   const {
     data: item,
     isLoading,
@@ -242,6 +250,10 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   );
 
   if (isLoading) return <IdeaSkeleton />;
+  // Not an idea (yet): the contract says try it as one of your drafts (§4.2: the same page for life).
+  if (isError && notFound(error)) {
+    return <DraftView code={code} breakpoint={breakpoint} headingRef={headingRef} />;
+  }
   if (isError || !item) {
     return (
       <div className="flex flex-col items-start gap-3 p-6" role="alert">
@@ -294,18 +306,27 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   );
 
   const conversation = (
-    <Conversation
-      item={item}
-      messages={session?.messages}
-      isLoading={!!sessionId && sessionLoading}
-      isError={!!sessionId && sessionError}
-      showAgentWork={showAgentWork}
-      onShowAgentWorkChange={onShowAgentWork}
-    />
+    <>
+      <ShippedCard item={item} currentUserId={user?.id} />
+      <Conversation
+        item={item}
+        messages={session?.messages}
+        isLoading={!!sessionId && sessionLoading}
+        isError={!!sessionId && sessionError}
+        showAgentWork={showAgentWork}
+        onShowAgentWorkChange={onShowAgentWork}
+      />
+    </>
   );
 
   const primary = (
-    <PrimaryAction item={item} onApproveDesign={() => openDetails("design")} fullWidth={isPhone} />
+    <PrimaryAction
+      item={item}
+      onApproveDesign={() => openDetails("design")}
+      onOpenDetails={openDetails}
+      fullWidth={isPhone}
+      phone={isPhone}
+    />
   );
 
   // ── header ──────────────────────────────────────────────────────────────────────────────────
@@ -364,9 +385,10 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
           {status}
         </p>
       </div>
+      <FirstSubmitNote code={item.code} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col">
-          {people && <p className="m-0 text-xs text-typography-secondary">{people}</p>}
+          {people && <PeopleChips item={item} />}
           <Presence presence={presence} />
         </div>
         <div className="flex items-center gap-2">
@@ -463,17 +485,18 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
           {/* Room for the sticky bar. */}
           <div className="h-24" aria-hidden />
         </div>
-        {/* Sticky action bar: the one primary action at full width, or the quiet line. It follows
-            the keyboard and keeps clear of the home indicator. TODO(P3b): the 💬 comment button and
-            its sheet (with mic and @mentions) join the bar. */}
+        {/* Sticky action bar: 💬 opens the comment sheet (mic, @mentions), and the one primary
+            action at full width, or the quiet line. It follows the keyboard and keeps clear of the
+            home indicator. */}
         <div
-          className="fixed inset-x-0 z-[20] border-t border-border-light bg-white px-4 py-2"
+          className="fixed inset-x-0 z-[20] flex items-center gap-3 border-t border-border-light bg-white px-4 py-2"
           style={{
             bottom: keyboardInset,
             paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))",
           }}
         >
-          {primary}
+          <PhoneCommentButton item={item} />
+          <div className="min-w-0 flex-1">{primary}</div>
         </div>
       </div>
     );
@@ -612,5 +635,33 @@ const PhoneHeader: React.FC<{
         <IdeaWatch item={item} />
       </div>
     </header>
+  );
+};
+
+/** The phone's 💬: the comment sheet, with the 56 px mic and @mentions (§4.17). */
+const PhoneCommentButton: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
+  const copy = en.roadmapV2.session;
+  const session = useSessionAnswers(item);
+  const [open, setOpen] = useState(false);
+  if (!item.can?.comment || !session.enabled) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={copy.commentOpen}
+        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border-light"
+      >
+        <Chat size={20} aria-hidden />
+      </button>
+      <BottomSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={copy.commentSheet}
+        closeLabel={en.roadmapV2.mobile.close}
+      >
+        <CommentBox item={item} session={session} large autoFocus onSent={() => setOpen(false)} />
+      </BottomSheet>
+    </>
   );
 };

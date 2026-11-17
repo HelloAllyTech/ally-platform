@@ -358,6 +358,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // The same glyph: it is the same Roadmap, rebuilt, and replaces the entry above at cutover.
       case SIDEBAR_ITEMS.ROADMAP_V2:
         return <Roadmap size={20} />;
+      case SIDEBAR_ITEMS.USER_INTERVIEWS:
+        return <Users size={20} />;
       case SIDEBAR_ITEMS.SETTINGS:
         return <Settings size={20} />;
       // Deliberately NOT the List icon that ROLEPLAY_SESSION_LOGS uses. These are raw CloudWatch

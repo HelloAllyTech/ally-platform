@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 
+import { useSelector } from "react-redux";
 import { toast } from "sonner";
 
 import {
   useAddClinicalAdvisorMutation,
   useAddDebriefOwnerMutation,
   useGetAdminTenantsQuery,
+  useGetRoadmapRoleForQuery,
   useGetUserFeatureTogglesQuery,
   useListClinicalAdvisorsQuery,
   useRemoveClinicalAdvisorMutation,
@@ -22,7 +24,10 @@ import {
   DEFAULT_FEATURE_TOGGLE_SECTION,
   FeatureToggleKey,
 } from "@constants";
+import type { RootState } from "@store";
 import { PlatformAdmin, UserFeatureToggle } from "@types";
+
+import { ROADMAP_ROLE_TOGGLE_KEYS, RoadmapRoleRadio } from "../Roadmap/components/RoadmapRoleRadio";
 
 const strings = en.superAdmins;
 
@@ -146,6 +151,11 @@ export const PlatformAdminDetail: React.FC<PlatformAdminDetailProps> = ({ admin,
   const { data: adminTenantsData } = useGetAdminTenantsQuery(admin.id);
   const isRestricted = (adminTenantsData?.count ?? 0) > 0;
 
+  // Roadmap v2 (§3.2): one "Roadmap role" radio in place of the three toggles it writes together.
+  // Answers only for an Owner while roadmap_v2 is on; otherwise the toggles stay as they are.
+  const me = useSelector((state: RootState) => state.user.user);
+  const { data: roadmapRole } = useGetRoadmapRoleForQuery(admin.id);
+
   const handleToggle = async (key: string, enabled: boolean) => {
     setToggles(prev => prev.map(t => (t.key === key ? { ...t, enabled } : t)));
     try {
@@ -166,6 +176,7 @@ export const PlatformAdminDetail: React.FC<PlatformAdminDetailProps> = ({ admin,
         // The Debriefs console access follows the Debrief roles (on with the first, off with
         // the last), so it is not a switch of its own here; the Debriefs section sets it.
         t.key !== FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF &&
+        !(roadmapRole && ROADMAP_ROLE_TOGGLE_KEYS.includes(t.key)) &&
         (FEATURE_TOGGLE_KEY_TO_SECTION[t.key] ?? DEFAULT_FEATURE_TOGGLE_SECTION) === section,
     ),
   })).filter(group => group.items.length > 0);
@@ -224,6 +235,13 @@ export const PlatformAdminDetail: React.FC<PlatformAdminDetailProps> = ({ admin,
               </div>
             </section>
           ))}
+
+          {roadmapRole && (
+            <RoadmapRoleRadio
+              entry={roadmapRole}
+              isSelf={me?.id != null && String(me.id) === String(admin.id)}
+            />
+          )}
 
           <DebriefRoleSwitches userId={admin.id} name={admin.name || admin.email} />
 

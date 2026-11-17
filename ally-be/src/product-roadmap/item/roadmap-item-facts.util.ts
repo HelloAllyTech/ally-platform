@@ -56,6 +56,8 @@ export interface SessionFacts {
   reviews: { dueDates?: string[]; done?: number } | null;
   externalBuild: { byUserId?: number; at?: string } | null;
   planningStarted: boolean | null;
+  /** Questions whose answers conflict and wait for the settler (P3b). */
+  openConflicts?: number;
   totalCostUsd: number;
   budgetUsd: number | null;
 }

@@ -236,31 +236,37 @@ export interface LinkForShipping {
   servicesResolvedAt?: Date | null;
 }
 
-/** What `linkDrivesRelease` may know about the opportunity. Empty today; P4 adds `externalBuild`. */
-export type OpportunityForShipping = Record<string, unknown>;
+/** What `linkDrivesRelease` may know about the opportunity. */
+export interface OpportunityForShipping {
+  /**
+   * The brief was sent to Claude Code (D18): the plan session's
+   * `externalBuild`. Truthy when set; its content is not read here.
+   */
+  externalBuild?: unknown;
+}
 
 /**
  * Whether a merged link may, by itself, move its opportunity to Released.
  *
- * Only links that say "this PR is the work": the opportunity's Builder (or
- * plan) session opened it, or a person linked it as "Built elsewhere". A
- * code in a PR title or branch does not: features are built slice by slice
+ * Links that say "this PR is the work": the opportunity's Builder (or plan)
+ * session opened it, or a person linked it as "Built elsewhere". A code in a
+ * PR title or branch does not, by default: features are built slice by slice
  * under one code (OPP-0785 spans five commits over several PRs), and the
  * first slice going live is not the feature shipping. Code-matched links are
- * still recorded and still HOLD a release back while open or not yet live —
- * they just never start one.
+ * still recorded and still HOLD a release back while open or not yet live.
  *
- * The seam for P4: an idea marked "Brief sent to Claude Code"
- * (`externalBuild`) is built entirely through code-matched PRs, so that rule
- * widens here and nowhere else.
+ * Except for an idea whose brief was sent to Claude Code (`externalBuild`,
+ * P4): that work arrives only as code-matched PRs, which the brief told the
+ * builder to title with the code, so they drive release like Builder's own.
+ * The rest of the shipped rule is unchanged: every linked PR merged or
+ * closed, and every touched service live.
  */
 export function linkDrivesRelease(
   link: Pick<LinkForShipping, 'source'>,
-  // Unread until P4 widens the rule for `externalBuild` ideas; the seam is the signature.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _opportunity: OpportunityForShipping = {},
+  opportunity: OpportunityForShipping = {},
 ): boolean {
-  return link.source === 'builder' || link.source === 'manual';
+  if (link.source === 'builder' || link.source === 'manual') return true;
+  return link.source === 'code_match' && !!opportunity.externalBuild;
 }
 
 export interface ReleaseForShipping {

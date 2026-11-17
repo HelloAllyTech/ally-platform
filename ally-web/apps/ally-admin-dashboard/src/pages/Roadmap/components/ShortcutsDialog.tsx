@@ -6,10 +6,12 @@ import { en } from "@constants";
 interface ShortcutsDialogProps {
   open: boolean;
   onClose: () => void;
+  /** To triage is open: its single keys join the list. */
+  triage?: boolean;
 }
 
-/** "?" lists the Queue's keys (§4.10). TODO(P3): A / L / D / X / U join this list with triage. */
-export const ShortcutsDialog: React.FC<ShortcutsDialogProps> = ({ open, onClose }) => {
+/** "?" lists the Queue's keys (§4.10); in To triage, A / L / D / X / U join them (§4.6). */
+export const ShortcutsDialog: React.FC<ShortcutsDialogProps> = ({ open, onClose, triage }) => {
   const copy = en.roadmapV2.shortcuts;
   const rows: [string, string][] = [
     ["J", copy.next],
@@ -19,6 +21,10 @@ export const ShortcutsDialog: React.FC<ShortcutsDialogProps> = ({ open, onClose 
     ["⌘K / Ctrl K", copy.quickOpen],
     ["?", copy.help],
   ];
+  if (triage) {
+    const t = en.roadmapV2.triage.shortcuts;
+    rows.push(["A", t.accept], ["L", t.lead], ["D", t.decline], ["X", t.select], ["U", t.undo]);
+  }
   return (
     <Modal
       open={open}

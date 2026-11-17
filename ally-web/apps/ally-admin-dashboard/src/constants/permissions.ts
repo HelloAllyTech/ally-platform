@@ -119,6 +119,8 @@ export const SIDEBAR_ITEMS = {
   PRODUCT_ROADMAP: "product-roadmap",
   /** Roadmap v2, shown only while `roadmap_v2` is on (GET /v1/roadmap/me/role succeeds). */
   ROADMAP_V2: "roadmap-v2",
+  /** User Interviews, its own entry while `roadmap_v2` is on (D14); inside the old board before. */
+  USER_INTERVIEWS: "user-interviews",
   COMPETENCIES: "competencies",
   ROLEPLAY_SESSION_LOGS: "roleplay-session-logs",
   BLOG: "blog",

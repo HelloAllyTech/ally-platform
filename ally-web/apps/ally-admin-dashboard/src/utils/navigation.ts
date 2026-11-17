@@ -151,6 +151,12 @@ const buildNavigationItems = (): NavigationItem[] => {
     // Product
     { id: S.PRODUCT_ROADMAP, label: l.roadmap, path: ROUTES.PRODUCT_ROADMAP, section: "product" },
     { id: S.ROADMAP_V2, label: l.roadmapV2, path: ROUTES.ROADMAP, section: "product" },
+    {
+      id: S.USER_INTERVIEWS,
+      label: l.userInterviews,
+      path: ROUTES.USER_INTERVIEWS,
+      section: "product",
+    },
     { id: S.BUG_HUNTER, label: l.bugHunter, path: ROUTES.BUG_HUNTER, section: "product" },
     { id: S.PM_AGENT, label: en.pmAgent.tabLabel, path: ROUTES.PM_AGENT, section: "product" },
     { id: S.BUILDER, label: l.builder, path: ROUTES.BUILDER, section: "product" },
@@ -444,6 +450,9 @@ export const deriveNavigationItems = ({
             );
           // Same grant as the board, and only while the flag is on (the role read succeeded).
           case SIDEBAR_ITEMS.ROADMAP_V2:
+          // User Interviews leaves the board for its own entry only with the flag on (D14).
+          // falls through
+          case SIDEBAR_ITEMS.USER_INTERVIEWS:
             return (
               roadmapV2 &&
               permissions!.includes(Permissions.VIEW_PRODUCT_ROADMAP) &&

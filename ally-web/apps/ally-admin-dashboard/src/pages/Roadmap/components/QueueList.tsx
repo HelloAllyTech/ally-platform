@@ -13,6 +13,7 @@ import type {
   RoadmapShownStage,
 } from "@types";
 
+import { NewIdeaButton } from "./NewIdeaButton";
 import { QueueRow, QueueRowActions } from "./QueueRow";
 import { motionTransition, popVariants, useReducedMotionPreference } from "../../../motion";
 import { DisplayRow, freezeOrder, liveRows } from "../utils/frozenOrder";
@@ -206,7 +207,6 @@ export const QueueList: React.FC<QueueListProps> = ({
     }
     if (view === "for-you") {
       // First visit: one line on the five stages, and All ideas one click away (§4.7).
-      // TODO(P3): "New idea" belongs here too, once the draft page exists.
       return (
         <div className="flex flex-col items-start gap-2 p-6">
           <p className="text-sm text-typography-secondary">{copy.empty.needsYou}</p>
@@ -214,9 +214,12 @@ export const QueueList: React.FC<QueueListProps> = ({
             {copy.empty.noIdeasTitle}
           </h3>
           <p className="max-w-prose text-sm text-typography-secondary">{copy.empty.noIdeasBody}</p>
-          <Button kind="tertiary" size="sm" onClick={onSeeAll}>
-            {copy.empty.seeAllIdeas}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <NewIdeaButton />
+            <Button kind="tertiary" size="sm" onClick={onSeeAll}>
+              {copy.empty.seeAllIdeas}
+            </Button>
+          </div>
         </div>
       );
     }
