@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
@@ -50,6 +50,11 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefAutonomyQuery: () => h.autonomy(),
   useSetDebriefOrgAutonomyMutation: () => [h.setOrg, { isLoading: false }],
   useGetDebriefPinnedRulesQuery: () => ({ data: { rules: [] } }),
+  useGetRiskCueOptionsForReviewQuery: () => ({ isLoading: false, data: [] }),
+  useReviewTestRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
+  useApproveRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
+  useRejectRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
+  useRetireRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
 }));
 vi.mock("react-redux", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -393,6 +398,23 @@ describe("Debrief settings page: who can change what", () => {
     renderPage(hash);
     expect(tab(id)).toHaveAttribute("aria-current", "page");
     expect(shown()).toEqual([`settings-section-${id}`]);
+  });
+
+  it("Risk-cue options open for someone who can approve pinned rules, by hash or a banner's category", () => {
+    h.permissions = ["review:admin:debriefs"];
+    renderPage("#risk-cues");
+    expect(shown()).toEqual(["settings-section-risk-cues"]);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Risk-cue options");
+  });
+
+  it("opens Risk-cue options from ?category=risk_cue_options, and not for someone who can't review", () => {
+    h.permissions = ["review:admin:debriefs"];
+    renderPage("?category=risk_cue_options");
+    expect(shown()).toEqual(["settings-section-risk-cues"]);
+    cleanup();
+    h.permissions = [];
+    renderPage("#risk-cues");
+    expect(shown()).toEqual(["settings-section-orgs"]);
   });
 
   it("an unknown hash, or Schedules without the toggle, opens Organisations", () => {

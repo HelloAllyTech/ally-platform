@@ -79,6 +79,10 @@ export type FormData = {
    */
   feedbackTabDebrief?: boolean;
   feedbackTabTranscript?: boolean;
+  /** The Debrief's skill framework for this roleplay: null = the default, "none", or a framework id. */
+  debriefSkillFramework?: string | null;
+  /** The Debrief's risk-cue option for this roleplay: null = Standard, or an option's key. */
+  debriefRiskCueOption?: string | null;
   pauseEnabled?: boolean;
   /** Live in-session coaching hints in the learner's Supervisor sidebar tab. Opt-in. */
   supervisorNotesEnabled?: boolean;

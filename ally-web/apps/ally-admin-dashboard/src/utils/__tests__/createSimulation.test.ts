@@ -267,6 +267,8 @@ describe("createSimulation utils", () => {
         // both tabs ON, mirroring the backend resolver.
         feedbackTabDebrief: true,
         feedbackTabTranscript: true,
+        debriefSkillFramework: null,
+        debriefRiskCueOption: null,
         pauseEnabled: false,
         // Opt-in: a roleplay saved before live supervisor notes existed
         // hydrates as off, which is also the default for new ones.

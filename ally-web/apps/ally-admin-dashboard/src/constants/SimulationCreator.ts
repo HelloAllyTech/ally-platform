@@ -193,6 +193,8 @@ export const FORM_FIELD_TYPES = {
     COMFORT_AUDIO_TRACK: "comfort_audio_track",
     VIDEO_ACTOR_PICKER: "video_actor_picker",
     MEMORIES_EDITOR: "memories_editor",
+    DEBRIEF_SKILL_FRAMEWORK: "debrief_skill_framework",
+    DEBRIEF_RISK_CUE_OPTION: "debrief_risk_cue_option",
   },
   TOGGLE_BUTTON: "toggle_button",
   TAG_AND_DROPDOWN: "tag_and_dropdown",
@@ -987,6 +989,24 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         fullWidth: true,
         defaultValue: true,
         tooltipLocation: TooltipLocation.FEEDBACK_TAB_TRANSCRIPT,
+      },
+      {
+        // The Debrief's two per-roleplay choices, right under the Debrief/Transcript tab
+        // toggles they belong with. Persist to scenarios.metadata.debriefSkillFramework and
+        // .debriefRiskCueOption; null (or unset) is the default for both. Each field carries
+        // its own label and tooltip.
+        id: "debriefSkillFramework",
+        label: "Debrief skill framework",
+        type: FORM_FIELD_TYPES.CUSTOM.DEBRIEF_SKILL_FRAMEWORK,
+        fullWidth: true,
+        isMandatory: false,
+      },
+      {
+        id: "debriefRiskCueOption",
+        label: "Risk cues in this roleplay",
+        type: FORM_FIELD_TYPES.CUSTOM.DEBRIEF_RISK_CUE_OPTION,
+        fullWidth: true,
+        isMandatory: false,
       },
       {
         id: "pauseEnabled",

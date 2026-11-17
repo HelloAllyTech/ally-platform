@@ -36,6 +36,7 @@ import {
   TranslationProgressToast,
   PublishBlockers,
 } from "@components";
+import { useDebriefOptionsVisible } from "@components/debrief-roleplay-options";
 import { ButtonVariant } from "@components/types";
 import {
   ADVANCED_EVENTS_LATENCY_THRESHOLD,
@@ -422,6 +423,8 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // True while the first-switch (or "Re-map") memory mapping runs, ~20-35s.
   // Saving, previewing or publishing in that window would store or run the
   // simulation without the memories the author is waiting for.
+  // The Debrief's two choices are only in the form (and the save) where the new Debrief is on.
+  const debriefOptionsShown = useDebriefOptionsVisible(formMethods, simulationId);
   const isMappingMemories = useIsMappingMemories(formMethods.control as unknown as object);
 
   const uploadsInProgress = useSelector(selectUploadsInProgress);
@@ -832,6 +835,11 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     // extractValidData turns an absent `memories` into null; never send that —
     // ally-be would read it as "clear the Stage Director prompt's memories".
     if (!Array.isArray(restForm.memories)) delete (simulationData as any).memories;
+    // Hidden Debrief choices are left out, so ally-be keeps whatever is stored.
+    if (!debriefOptionsShown) {
+      delete (simulationData as any).debriefSkillFramework;
+      delete (simulationData as any).debriefRiskCueOption;
+    }
 
     if (Array.isArray((simulationData as any).stateNames)) {
       const filtered = ((simulationData as any).stateNames as any[]).filter(sn =>
