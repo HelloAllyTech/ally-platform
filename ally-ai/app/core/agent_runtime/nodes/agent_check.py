@@ -54,8 +54,14 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             translated=None,
             translation_degraded=False,
         )
-        # Searches only: a gateway tool (chunk 3b) is not a search.
+        # Searches only: a gateway tool (chunk 3b) is not a search. A find that
+        # answered did look, though (chunk 6b).
         searched = bool(searches(state))
+        finds = [
+            call
+            for call in state.get("tool_calls") or []
+            if call.get("list_kind") == "find" and call.get("ok")
+        ]
         result, rejection = check_reply(
             state.get("agent_step") or {},
             state.get("agent_meta") or {},
@@ -75,6 +81,11 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             purpose=(state["bot"].get("persona") or {}).get("purpose"),
             can_book=offers_create(state["bot"].get("gateway_definitions")),
             personal=personal_context(state["bot"]),
+            looked_up=bool(finds),
+            found_nothing=any(
+                call.get("nearest") or not (call.get("added") or call.get("aggregate"))
+                for call in finds
+            ),
             can_search_again=len(searches(state)) == 1
             and search_budget(state) > 0
             and (state.get("revisions") or 0) < MAX_REVISIONS

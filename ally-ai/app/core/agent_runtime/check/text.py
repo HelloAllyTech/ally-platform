@@ -46,14 +46,24 @@ def normalise_detail(detail: str) -> str:
     return re.sub(r"[\s+-]", "", detail)
 
 
+# An amount of money ("Rs. 1,600", "₹ 500", "INR 2,000.50"): a price, never a phone
+# number (chunk 6b, Sunrise C4). Taken out before phone numbers are looked for.
+_AMOUNT = re.compile(
+    r"(?:\brs\.?|\binr\b|₹|\$|€|£)\s*\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s*%",
+    re.IGNORECASE,
+)
+
+
 def contact_details(text: str) -> List[str]:
-    """Phone numbers, links and emails in `text`, as written."""
+    """Phone numbers, links and emails in `text`, as written. Amounts of money and
+    percentages are not phone numbers."""
     text = text or ""
     emails = _EMAIL.findall(text)
     without_emails = _EMAIL.sub(" ", text)
     links = _URL.findall(without_emails)
     without_links = _URL.sub(" ", without_emails)
-    return [*emails, *links, *_PHONE.findall(without_links)]
+    without_amounts = _AMOUNT.sub(" ", without_links)
+    return [*emails, *links, *_PHONE.findall(without_amounts)]
 
 
 def without_contact_details(text: str) -> str:
@@ -69,7 +79,18 @@ def unsupported_details(text: str, passages: Sequence[Dict[str, Any]]) -> List[s
     return [d for d in contact_details(text) if normalise_detail(d) not in corpus]
 
 
-SENTENCE_END = re.compile(r"(?<=[.!?।])\s+")
+# A sentence ends at ., ! ? or । and a space, but not after a short form that
+# takes a full stop: "Rs. 500" and "Dr. Mehta" are one sentence (chunk 6b: "Rs."
+# split a price from its number, and the number's half was dropped). "No." only
+# before a number ("No. 5").
+SENTENCE_END = re.compile(
+    r"(?<=[.!?।])"
+    r"(?<!\brs\.)(?<!\binr\.)(?<!\bdr\.)(?<!\bmr\.)(?<!\bmrs\.)(?<!\bms\.)"
+    r"(?<!\bst\.)(?<!\bvs\.)(?<!\bapprox\.)(?<!\be\.g\.)(?<!\bi\.e\.)"
+    r"(?!(?<=\bno\.)\s+\d)"
+    r"\s+",
+    re.IGNORECASE,
+)
 
 
 def without_sentences(text: str, keep: Callable[[str], bool]) -> str:
@@ -176,14 +197,31 @@ _SOURCE_PHRASE = re.compile(
 _PASSAGE_REF = re.compile(
     r"\s*(?:[—–-]\s*)?\(?\s*(?:see\s+)?(?:(?:these|the|those)\s+)?"
     r"(?:details|sources?|passages?|references?)(?:\s+here)?\s*:?\s*"
-    r"\d{1,2}(?:\s*(?:,|and|&|–|-)\s*\d{1,2})*\s*\)?(?!\s*[^\W\d_%₹$])",
+    r"\d{1,2}(?!\d)(?:\s*(?:,|and|&|–|-)\s*\d{1,2}(?!\d))*\s*\)?"
+    r"(?!\s*[^\W\d_%₹$])(?![\d,.]\d)",
     re.IGNORECASE,
+)
+
+
+# A lead-in left pointing at nothing once its citation or id was cut (chunk 6b):
+# "See the slot info:." or "Details here:" at the end. Short and ending in a colon
+# with nothing after it, it goes whole.
+_DANGLING_LEAD_IN = re.compile(
+    r"(?:^|(?<=[.!?।])[ \t]+|(?<=\n))"
+    r"(?:(?:please\s+)?(?:see|check|find|view|here(?:'s|\s+is|\s+are)?)\b"
+    r"[^.!?:\n]{0,40}"
+    r"|[^.!?:\n]{0,30}\b(?:info|information|details|below|here)\b[^.!?:\n]{0,10})"
+    # ":." anywhere, or a colon with nothing after it at the end.
+    r"[ \t]*:[ \t]*(?:[.!?]|(?![\s\S]*\S))",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
 def without_source_phrases(text: str) -> str:
     text = _SOURCE_PHRASE.sub("", text or "")
     text = _PASSAGE_REF.sub("", text)
+    text = _DANGLING_LEAD_IN.sub("", text)
+    text = re.sub(r"[ \t]{2,}", " ", text).strip()
     return re.sub(r"\s+([.,;!?।])", r"\1", text)
 
 

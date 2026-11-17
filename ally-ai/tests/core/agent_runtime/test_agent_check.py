@@ -333,6 +333,7 @@ class TestDeclineThatIgnoresWhatWasFound:
             "decline",
             "I don't have that. Try www.example.org or call 1800 123 456.",
             passages=[],
+            searched=True,
         )
         assert rejection == "unsourced_detail"
         # If the rewrite still has it, the sentence carrying it is removed.
@@ -509,6 +510,7 @@ class TestContactDetailsInEveryReply:
             "Happy to help. Write to help@example.org or call 1800-123-456.",
             turn_type=turn_type,
             passages=[],
+            searched=True,
         )
         assert rejection == "unsourced_detail"
         assert result["answer"] == "Happy to help."
@@ -769,6 +771,7 @@ class TestFallbackContact:
             "I don't have her number. Try 98765 43210.",
             decline_text=self.WORDING,
             passages=[],
+            searched=True,
         )
         assert "98765" not in result["answer"]
         assert result["answer"].endswith("Please call +91 20 0000 4400.")
@@ -938,3 +941,111 @@ class TestSlotOffers:
         for purpose in (None, "answer", "training", "guide"):
             _, rejection = review("answer", text, citations=[1], purpose=purpose)
             assert rejection != Rejection.OFFERS_SLOT, purpose
+
+
+class TestPricesAreNotCutOff:
+    """Chunk 6b, item 26 (Sunrise C4): "Rs." ended a sentence, so the price's number
+    was split off as its own sentence and taken out as an unsourced phone number,
+    leaving "…is Rs." The sum is judged on its answer now."""
+
+    FEES = passage(
+        CHUNK_A,
+        0.8,
+        text="An 8-session pack is Rs. 2,000. Students get a 20% discount.",
+    )
+
+    def test_a_computed_price_keeps_its_number(self):
+        answer = "With the 20% student discount, the 8-session pack comes to Rs. 1,600."
+        result, rejection = review(answer=answer, citations=[1], passages=[self.FEES])
+        assert rejection is None
+        assert result["answer"] == answer
+
+    def test_rs_and_dr_dont_end_a_sentence(self):
+        from app.core.agent_runtime.check.text import SENTENCE_END
+
+        assert SENTENCE_END.split("It is Rs. 500 a session. Dr. Rao sees you.") == [
+            "It is Rs. 500 a session.",
+            "Dr. Rao sees you.",
+        ]
+        assert SENTENCE_END.split("Room No. 5 is upstairs. No. It isn't.") == [
+            "Room No. 5 is upstairs.",
+            "No.",
+            "It isn't.",
+        ]
+
+    def test_amounts_and_percentages_are_not_phone_numbers(self):
+        from app.core.agent_runtime.check.text import contact_details
+
+        assert contact_details("Rs. 1,600, ₹ 500, INR 2000 or 20 %") == []
+        assert contact_details("Call 98200 11223 for Rs. 500") == ["98200 11223"]
+
+    def test_a_passage_number_never_eats_a_price(self):
+        from app.core.agent_runtime.check.text import without_source_phrases
+
+        assert without_source_phrases("See the details: 500 rupees.") == (
+            "See the details: 500 rupees."
+        )
+        assert without_source_phrases("Open daily (source 1).") == "Open daily."
+
+
+class TestStrayLeadIns:
+    """Chunk 6b, item 7: a lead-in left pointing at nothing after cleanup."""
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            (
+                "Booked: Thu 19 Nov, 11:00. See the slot info:.",
+                "Booked: Thu 19 Nov, 11:00.",
+            ),
+            ("Booked. See the slot info:. Anything else?", "Booked. Anything else?"),
+            ("Your booking is done. Details here:", "Your booking is done."),
+            # A lead-in to a list, and an ordinary colon, stay.
+            ("Here are the times:\n1) 10:00", "Here are the times:\n1) 10:00"),
+            ("Note: we close at 6.", "Note: we close at 6."),
+        ],
+    )
+    def test_dangling_lead_ins_go(self, text, expected):
+        from app.core.agent_runtime.check.text import without_source_phrases
+
+        assert without_source_phrases(text) == expected
+
+
+class TestOutOfScopeDeclinesStayGeneric:
+    """Chunk 6b, item 24 (SP1's coaching and real-estate evals): a poem or the
+    weather gets a decline that may say what the assistant helps with in general
+    terms, but no specific facts, and no "Please call …" from the owner's wording."""
+
+    WORDING = "I can't help with that. Please call +91 20 0000 4400."
+
+    def test_no_number_price_or_time_and_no_fallback_contact(self):
+        result, _ = review(
+            "decline",
+            "I can't write poems, but I can help with questions about our courses. "
+            "Our batches start at 7 pm and cost Rs. 4,000. "
+            "Please call 98200 11223.",
+            decline_text=self.WORDING,
+            passages=[],
+        )
+        assert result["intent"] == "decline"
+        assert result["answer"] == (
+            "I can't write poems, but I can help with questions about our courses."
+        )
+
+    def test_a_generic_decline_is_untouched(self):
+        text = (
+            "That's not something I can help with, but I can answer questions "
+            "about our courses."
+        )
+        result, _ = review("decline", text, decline_text=self.WORDING, passages=[])
+        assert result["answer"] == text
+
+    def test_after_a_search_the_owners_contact_is_still_added(self):
+        result, _ = review(
+            "decline",
+            "I don't have that.",
+            decline_text=self.WORDING,
+            passages=[],
+            searched=True,
+        )
+        assert result["answer"].endswith("Please call +91 20 0000 4400.")

@@ -960,14 +960,45 @@ class TestNamedTimesAndDays:
 
         assert named_times(["book Thursday at 11:00"]) == {660}
         assert named_times(["tomorrow at 4 pm"]) == {960}
-        assert named_times(["at 4 please"]) == {240, 960}
+        # 6b: a bare 1 to 7 with no am or pm is the afternoon or evening.
+        assert named_times(["at 4 please"]) == {960}
         assert named_times(["around noon"]) == {720}
         assert named_times(["yes please"]) == set()
         # 8a: "around 1", "by 7", "4 o'clock"; never "for 2" (people).
-        assert named_times(["tomorrow around 1 for two of us"]) == {60, 780}
-        assert named_times(["by 7 please"]) == {420, 1140}
-        assert named_times(["4 o'clock"]) == {240, 960}
+        assert named_times(["tomorrow around 1 for two of us"]) == {780}
+        assert named_times(["by 7 please"]) == {1140}
+        assert named_times(["4 o'clock"]) == {960}
         assert named_times(["a table for 2 tomorrow"]) == set()
+
+    def test_a_bare_hour_from_1_to_7_is_the_afternoon(self):
+        from app.core.agent_runtime.tools.confirmed import named_times
+
+        # Clock times with no am or pm, written with a colon or a dot.
+        assert named_times(["at 4:30"]) == {990}
+        assert named_times(["4:30 works"]) == {990}
+        assert named_times(["at 4.30 please"]) == {990}
+        # Said which half, or a 24-hour time: as written.
+        assert named_times(["at 4 am"]) == {240}
+        assert named_times(["07:30"]) == {450}
+        assert named_times(["16:00"]) == {960}
+        # A bare 8 to 12 stays either way; a clock time from 8 is as written.
+        assert named_times(["at 9"]) == {540, 1260}
+        assert named_times(["11:00"]) == {660}
+        # A dotted number that isn't a time.
+        assert named_times(["Rs. 4.50 a strip"]) == set()
+
+    def test_the_morning_only_when_only_the_morning_time_exists(self):
+        from app.core.agent_runtime.tools.confirmed import (
+            morning_only_hours,
+            named_times,
+        )
+
+        early = [slot_record(SLOT_1, "Thu 19 Nov 2026, 07:00")]
+        both = [*early, slot_record(MON_10, "Thu 19 Nov 2026, 19:00")]
+        assert morning_only_hours(early) == {7}
+        assert morning_only_hours(both) == set()
+        assert named_times(["at 7"], morning_only_hours(early)) == {420, 1140}
+        assert named_times(["at 7"], morning_only_hours(both)) == {1140}
 
     def test_a_plain_yes_confirms_the_one_time_it_answers(self):
         from app.core.agent_runtime.tools.confirmed import confirmed_texts
@@ -997,16 +1028,46 @@ class TestNamedTimesAndDays:
         assert named_days(["Saturday"], today) == {(14, 11)}
         assert named_days(["at 11"], today) is None
 
-    def test_only_the_persons_last_two_messages(self):
+    def test_only_the_persons_last_four_messages(self):
         from app.core.agent_runtime.tools.confirmed import person_messages
 
         history = [
             {"role": "user", "content": "first"},
             {"role": "assistant", "content": "11:00 is free"},
             {"role": "user", "content": "second"},
+            {"role": "assistant", "content": "anything else?"},
+            {"role": "user", "content": "third"},
+            {"role": "assistant", "content": "sure"},
+            {"role": "user", "content": "fourth"},
         ]
-        assert person_messages(history, "third") == ["second", "third"]
-        assert person_messages(history, "second") == ["first", "second"]
+        assert person_messages(history, "fifth") == [
+            "second",
+            "third",
+            "fourth",
+            "fifth",
+        ]
+        assert person_messages(history, "fourth") == [
+            "first",
+            "second",
+            "third",
+            "fourth",
+        ]
+
+    def test_a_time_confirmed_three_turns_back_still_books(self):
+        from app.core.agent_runtime.tools.confirmed import confirmed_texts, unconfirmed
+
+        history = [
+            {"role": "user", "content": "Can I book Thursday at 11:00?"},
+            {"role": "assistant", "content": "Thursday 11:00 is free."},
+            {"role": "user", "content": "Do you take insurance?"},
+            {"role": "assistant", "content": "We don't."},
+            {"role": "user", "content": "And is there parking?"},
+            {"role": "assistant", "content": "Yes, behind the building."},
+        ]
+        said = confirmed_texts(history, "ok, book it")
+        props = {"slot": {"type": "string", "relation": "slots", "dated": "datetime"}}
+        passages = [slot_record(SLOT_1, "Thu 19 Nov 2026, 11:00")]
+        assert unconfirmed(props, {"slot": SLOT_1}, passages, said, TODAY) is None
 
 
 # Site visits and Bookings as ally-be marks them (chunk 5b §9): a visit's own time,
@@ -1103,3 +1164,127 @@ class TestTheTimeCheckFromTheDefinition:
             )
             is None
         )
+
+
+class TestOneRetryAfterInvalidValue:
+    """Chunk 6b, item 6: a shortened id (`invalid_value`) gets one more try; every
+    other failure, and a second one, still stops the tool for the run."""
+
+    def _failed(self, *calls):
+        from app.core.agent_runtime.nodes.agent import failed_tools
+
+        return failed_tools({"tool_calls": list(calls)})
+
+    def call(self, tool, error=None):
+        return {"tool": tool, "kind": "gateway", "ok": error is None, "error": error}
+
+    def test_one_invalid_value_stays_offered(self):
+        assert self._failed(self.call("create_appointments", "invalid_value")) == set()
+
+    def test_a_second_failure_stops_it(self):
+        assert self._failed(
+            self.call("create_appointments", "invalid_value"),
+            self.call("create_appointments", "invalid_value"),
+        ) == {"create_appointments"}
+
+    def test_any_other_failure_stops_it(self):
+        for error in ("unique_taken", "unconfirmed_time", "not_found"):
+            assert self._failed(self.call("create_appointments", error)) == {
+                "create_appointments"
+            }
+
+    def test_successes_and_searches_dont_count(self):
+        assert (
+            self._failed(
+                self.call("find_slots"), {"tool": "search_knowledge", "ok": False}
+            )
+            == set()
+        )
+
+
+class TestNothingAtTheTimeAsked:
+    """Chunk 6b, item 1: "Thursday evening" on a list whose Thursday ends at 16:00.
+    An empty find is an answer, not a missing source."""
+
+    LATEST = slot_record(SLOT_1, "Thu 19 Nov 2026, 16:00")
+
+    def _check(self, answer, citations=(), passages=(), **kw):
+        step = reply("answer", answer, citations=list(citations))
+        return check_reply(
+            step,
+            {},
+            list(passages),
+            turn_type="question",
+            language="en",
+            retrieval=TestTheCheck.RETRIEVAL,
+            general=False,
+            search_gate=None,
+            question="anything free on Thursday evening?",
+            searched=False,
+            organisation=Organisation(terms=("Lakeview Clinic",)),
+            history=(),
+            can_book=True,
+            **kw,
+        )
+
+    def test_nothing_free_after_an_empty_find_is_an_answer(self):
+        result, rejection = self._check(
+            "Nothing's free on Thursday evening.",
+            looked_up=True,
+            found_nothing=True,
+        )
+        assert rejection is None
+        assert result["intent"] == "answer"
+        assert result["answer"] == "Nothing's free on Thursday evening."
+
+    def test_i_dont_have_any_after_an_empty_find_is_not_a_decline(self):
+        result, rejection = self._check(
+            "I don't have any free times on Thursday evening.",
+            looked_up=True,
+            found_nothing=True,
+        )
+        assert rejection is None and result["intent"] == "answer"
+
+    def test_the_latest_time_is_cited_from_the_nearest_record(self):
+        result, rejection = self._check(
+            "Nothing's free on Thursday evening. The latest is 16:00.",
+            passages=[self.LATEST],
+            looked_up=True,
+            found_nothing=True,
+        )
+        assert rejection is None
+        assert [c.get("record_id") for c in result["citations"]] == [SLOT_1]
+        assert "16:00" in result["answer"]
+
+    def test_a_number_no_record_shows_still_needs_a_source(self):
+        result, rejection = self._check(
+            "Nothing's free on Thursday evening; call 98200 11223.",
+            looked_up=True,
+            found_nothing=True,
+        )
+        assert result["intent"] == "decline"
+
+    def test_without_an_empty_find_it_is_still_a_decline(self):
+        result, rejection = self._check("Nothing's free on Thursday evening.")
+        assert result["intent"] == "decline"
+        assert rejection == Rejection.UNCITED
+
+    def test_a_find_counts_as_having_looked(self):
+        step = reply("decline", "I'm not sure about Lakeview Clinic's times.")
+        _, rejection = check_reply(
+            step,
+            {},
+            [],
+            turn_type="question",
+            language="en",
+            retrieval=TestTheCheck.RETRIEVAL,
+            general=False,
+            search_gate=None,
+            question="when is Lakeview Clinic free?",
+            searched=False,
+            organisation=Organisation(terms=("Lakeview Clinic",)),
+            history=(),
+            can_book=True,
+            looked_up=True,
+        )
+        assert rejection != Rejection.SEARCH_FIRST

@@ -44,6 +44,13 @@ class CheckContext:
     #: chat's summary and their name. A source for what they said about themselves,
     #: never for the organisation.
     personal: str = ""
+    #: A list find ran this run and answered (chunk 6b): it looked, even though it
+    #: isn't a search.
+    looked_up: bool = False
+    #: A find this run found nothing at the time asked, or only the nearest entries
+    #: (chunk 6b). "Nothing's free on Thursday evening" is then an answer, from the
+    #: find, not a missing source.
+    found_nothing: bool = False
 
 
 @dataclass

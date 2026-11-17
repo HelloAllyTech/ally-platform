@@ -7,8 +7,10 @@ copy for one yet), only its step: the tool, `ok` or its error code, and ms. One
 that ends the run (`hand_over`) and succeeded sets the run's result, and the graph
 ends without another model step.
 
-The run's first search sets the response's `retrieval` block and is the one
-logged to the retrieval log, as v1's single search is.
+The run's first search sets the response's `retrieval` block, as v1's single
+search does. Every search is logged to the retrieval log (chunk 6b): the first, a
+later one in the same message, and one a rewrite was sent back to make. Before 6b
+only the first was.
 """
 
 from __future__ import annotations
@@ -98,8 +100,8 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     limits=state["limits"],
                     passages=passages,
                     language=step.get("language") or "en",
-                    log_retrieval=first_search
-                    and state["bot"].get("log_retrieval", True),
+                    # Every search, not only the first (chunk 6b, 3a's open item).
+                    log_retrieval=state["bot"].get("log_retrieval", True),
                 ),
             )
             records.append(json_safe(result.record))
