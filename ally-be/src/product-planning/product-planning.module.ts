@@ -12,6 +12,7 @@ import { PlanEventService } from './service/plan-event.service';
 import { PlanSpendService } from './service/plan-spend.service';
 import { PlanNotificationService } from './service/plan-notification.service';
 import { PlanSettingsService } from './service/plan-settings.service';
+import { RoadmapRoleService } from './service/roadmap-role.service';
 
 const ENTITIES = TypeOrmModule.forFeature([
   PlanEvent,
@@ -44,6 +45,7 @@ const ENTITIES = TypeOrmModule.forFeature([
     PlanSpendService,
     PlanNotificationService,
     PlanSettingsService,
+    RoadmapRoleService,
   ],
   exports: [
     // Re-exported so the plan flow injects these repositories without registering them twice.
@@ -53,6 +55,7 @@ const ENTITIES = TypeOrmModule.forFeature([
     PlanSpendService,
     PlanNotificationService,
     PlanSettingsService,
+    RoadmapRoleService,
   ],
 })
 export class ProductPlanningModule {}
