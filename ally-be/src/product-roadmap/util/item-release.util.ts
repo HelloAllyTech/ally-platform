@@ -228,10 +228,39 @@ export function containedIn(status: string | null): boolean {
 export interface LinkForShipping {
   repo: string;
   prNumber: number;
+  /** builder | code_match | manual (`ItemLinkSource`). */
+  source: string;
   /** open | merged | closed. */
   state: string;
   /** Set once the merged PR's services have been written as release rows. */
   servicesResolvedAt?: Date | null;
+}
+
+/** What `linkDrivesRelease` may know about the opportunity. Empty today; P4 adds `externalBuild`. */
+export type OpportunityForShipping = Record<string, unknown>;
+
+/**
+ * Whether a merged link may, by itself, move its opportunity to Released.
+ *
+ * Only links that say "this PR is the work": the opportunity's Builder (or
+ * plan) session opened it, or a person linked it as "Built elsewhere". A
+ * code in a PR title or branch does not: features are built slice by slice
+ * under one code (OPP-0785 spans five commits over several PRs), and the
+ * first slice going live is not the feature shipping. Code-matched links are
+ * still recorded and still HOLD a release back while open or not yet live —
+ * they just never start one.
+ *
+ * The seam for P4: an idea marked "Brief sent to Claude Code"
+ * (`externalBuild`) is built entirely through code-matched PRs, so that rule
+ * widens here and nowhere else.
+ */
+export function linkDrivesRelease(
+  link: Pick<LinkForShipping, 'source'>,
+  // Unread until P4 widens the rule for `externalBuild` ideas; the seam is the signature.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _opportunity: OpportunityForShipping = {},
+): boolean {
+  return link.source === 'builder' || link.source === 'manual';
 }
 
 export interface ReleaseForShipping {
@@ -246,8 +275,8 @@ export interface ReleaseForShipping {
  * Shipped = every touched service is live, for every pull request that
  * delivered the work.
  *
- *  - At least one linked pull request has merged. An opportunity with links
- *    but nothing merged has delivered nothing.
+ *  - At least one merged pull request DRIVES release (`linkDrivesRelease`):
+ *    Builder's own or linked by hand. A code match alone never releases.
  *  - None is still open: an epic whose second milestone is in review has not
  *    shipped.
  *  - A pull request closed without merging is a rejection and is ignored. It
@@ -263,10 +292,11 @@ export interface ReleaseForShipping {
 export function opportunityShipped(
   links: readonly LinkForShipping[],
   releases: readonly ReleaseForShipping[],
+  opportunity: OpportunityForShipping = {},
 ): { shipped: boolean; liveAt: Date | null } {
   const no = { shipped: false, liveAt: null };
   const merged = links.filter((link) => link.state === 'merged');
-  if (merged.length === 0) return no;
+  if (!merged.some((link) => linkDrivesRelease(link, opportunity))) return no;
   if (
     links.some((link) => link.state !== 'merged' && link.state !== 'closed')
   ) {

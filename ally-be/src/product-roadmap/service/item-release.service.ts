@@ -115,7 +115,9 @@ export interface ItemReleaseReconcileResult {
  *    concluded `success`; a failed run still burns its tag (the tag is made
  *    before tests and deploy), so a tag alone proves nothing.
  * 4. **Release** an opportunity once every touched service of every merged
- *    pull request is live — however the release was cut.
+ *    pull request is live — however the release was cut — provided one of
+ *    them drives release (Builder's own, or linked by hand). A code match
+ *    alone never releases: features ship slice by slice under one code.
  *
  * This replaces `reconcileShippedOpportunities`' reading of
  * `builder_pull_requests.releaseState`, which stayed null whenever Builder's
@@ -381,7 +383,7 @@ export class ItemReleaseService {
           repo,
           prNumber: source.pr_number,
           prUrl: source.pr_url,
-          source: ItemLinkSource.CODE,
+          source: ItemLinkSource.CODE_MATCH,
           state: ItemLinkState.MERGED,
           title: source.title,
           branch: source.head_ref,
@@ -449,7 +451,7 @@ export class ItemReleaseService {
           repo: monorepo,
           prNumber: pr.number!,
           prUrl: pr.htmlUrl || null,
-          source: ItemLinkSource.CODE,
+          source: ItemLinkSource.CODE_MATCH,
           state: ItemLinkState.OPEN,
           title: pr.title,
           branch: pr.headRef,
@@ -973,7 +975,12 @@ export class ItemReleaseService {
 
   // ── Releasing opportunities ────────────────────────────────────────────────
 
-  /** Release every in-flight opportunity whose linked work is all live. */
+  /**
+   * Release every in-flight opportunity whose linked work is all live and
+   * that has a link allowed to drive release — its Builder/plan session's PR
+   * or one linked by hand (`linkDrivesRelease`). A code match alone records
+   * the link and can hold a release back, but never releases.
+   */
   async releaseShipped(): Promise<number> {
     const linked = await this.linkRepository
       .createQueryBuilder('link')

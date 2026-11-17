@@ -40,7 +40,7 @@ export class CreateItemReleaseTracking1983100000000 implements MigrationInterfac
         CONSTRAINT "PK_item_linked_prs" PRIMARY KEY ("id"),
         CONSTRAINT "FK_item_linked_prs_opportunity" FOREIGN KEY ("opportunityId")
           REFERENCES "roadmap_opportunities"("id") ON DELETE CASCADE,
-        CONSTRAINT "CHK_item_linked_prs_source" CHECK ("source" IN ('builder', 'code', 'manual')),
+        CONSTRAINT "CHK_item_linked_prs_source" CHECK ("source" IN ('builder', 'code_match', 'manual')),
         CONSTRAINT "CHK_item_linked_prs_state" CHECK ("state" IN ('open', 'merged', 'closed')),
         CONSTRAINT "CHK_item_linked_prs_pr_number" CHECK ("prNumber" > 0)
       )

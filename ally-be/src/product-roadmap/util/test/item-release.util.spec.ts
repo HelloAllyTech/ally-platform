@@ -1,5 +1,6 @@
 import {
   ReleaseRunLike,
+  linkDrivesRelease,
   containedIn,
   extractOpportunityCodes,
   firstReleaseAfter,
@@ -215,6 +216,7 @@ describe('opportunityShipped', () => {
   const merged = (prNumber: number, resolved = true) => ({
     repo: 'o/r',
     prNumber,
+    source: 'builder',
     state: 'merged',
     servicesResolvedAt: resolved ? new Date() : null,
   });
@@ -269,6 +271,43 @@ describe('opportunityShipped', () => {
     ).toBe(true);
   });
 
+  /**
+   * Features are built slice by slice under one code; the first slice going
+   * live is not the feature shipping.
+   */
+  it('never ships on code-matched pull requests alone', () => {
+    expect(
+      opportunityShipped(
+        [{ ...merged(1), source: 'code_match' }],
+        [row(1, 'live', '10T10:00:00')],
+      ).shipped,
+    ).toBe(false);
+  });
+
+  it('ships a hand-linked ("Built elsewhere") pull request', () => {
+    expect(
+      opportunityShipped(
+        [{ ...merged(1), source: 'manual' }],
+        [row(1, 'live', '10T10:00:00')],
+      ).shipped,
+    ).toBe(true);
+  });
+
+  it('lets a code-matched pull request hold back a Builder release', () => {
+    expect(
+      opportunityShipped(
+        [merged(1), { ...merged(2), source: 'code_match' }],
+        [row(1, 'live'), row(2, 'pending')],
+      ).shipped,
+    ).toBe(false);
+    expect(
+      opportunityShipped(
+        [merged(1), { ...merged(2), source: 'code_match', state: 'open' }],
+        [row(1, 'live')],
+      ).shipped,
+    ).toBe(false);
+  });
+
   it('ships nothing when nothing merged', () => {
     expect(opportunityShipped([], []).shipped).toBe(false);
     expect(
@@ -288,5 +327,13 @@ describe('opportunityShipped', () => {
       shipped: true,
       liveAt: null,
     });
+  });
+});
+
+describe('linkDrivesRelease', () => {
+  it('lets Builder and hand-linked pull requests drive release, and not code matches', () => {
+    expect(linkDrivesRelease({ source: 'builder' })).toBe(true);
+    expect(linkDrivesRelease({ source: 'manual' })).toBe(true);
+    expect(linkDrivesRelease({ source: 'code_match' })).toBe(false);
   });
 });

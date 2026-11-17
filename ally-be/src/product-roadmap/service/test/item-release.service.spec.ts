@@ -427,6 +427,48 @@ describe('ItemReleaseService.releaseShipped', () => {
     expect(built.opportunities.update).not.toHaveBeenCalled();
   });
 
+  /**
+   * OPP-style codes ride every slice of a multi-PR feature. A New idea whose
+   * code appears in one PR that has gone live is not shipped: only a Builder
+   * or hand-made link can release it.
+   */
+  it('leaves a New opportunity linked only by a code match unreleased, even when its PR is live', async () => {
+    const built = withLinkedIds(
+      build({
+        opportunities: [
+          { id: 'o-1', code: 'OPP-0388', stage: RoadmapOpportunityStage.NEW },
+        ],
+        links: [mergedLink({ source: ItemLinkSource.CODE_MATCH })],
+        releases: [
+          pendingRow({
+            state: ItemReleaseState.LIVE,
+            releasedAt: new Date('2026-11-11T09:20:00Z'),
+          }),
+        ],
+      }),
+      ['o-1'],
+    );
+
+    expect(await built.service.releaseShipped()).toBe(0);
+    expect(built.opportunities.update).not.toHaveBeenCalled();
+    expect(built.opportunities.rows[0].stage).toBe(RoadmapOpportunityStage.NEW);
+  });
+
+  it('releases the same opportunity once the PR is linked by hand', async () => {
+    const built = withLinkedIds(
+      build({
+        opportunities: [
+          { id: 'o-1', code: 'OPP-0388', stage: RoadmapOpportunityStage.NEW },
+        ],
+        links: [mergedLink({ source: ItemLinkSource.MANUAL })],
+        releases: [pendingRow({ state: ItemReleaseState.LIVE })],
+      }),
+      ['o-1'],
+    );
+
+    expect(await built.service.releaseShipped()).toBe(1);
+  });
+
   it('does not release while a linked PR is still open', async () => {
     const built = withLinkedIds(
       build({
@@ -492,7 +534,7 @@ describe('ItemReleaseService.syncMergedCodeLinks', () => {
       opportunityId: 'o-1',
       repo: MONO,
       prNumber: 40,
-      source: ItemLinkSource.CODE,
+      source: ItemLinkSource.CODE_MATCH,
       state: ItemLinkState.MERGED,
       mergeSha: 'm40',
     });
