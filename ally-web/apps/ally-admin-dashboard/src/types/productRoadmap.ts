@@ -615,6 +615,12 @@ export interface RoadmapViewState {
   layout?: RoadmapBoardLayout;
   /** Archived rows are hidden unless this is on. Absent = hidden, so older views are unchanged. */
   showArchived?: boolean;
+  /**
+   * Roadmap v2's Queue filters, as the URL-safe query params of `GET /v1/roadmap/items` (P2
+   * contract). Only views saved from the new Queue carry it; the old board ignores the key, and
+   * the Queue lists only views that have it.
+   */
+  queue?: Record<string, string>;
 }
 
 export interface RoadmapSavedView {

@@ -43,7 +43,7 @@ import {
   undoCancel,
   updateRow,
 } from "./uploadStore";
-import { BUILDER_DURATION, BUILDER_EASING, builderTransition } from "../../Builder/builderMotion";
+import { BUILDER_DURATION, BUILDER_EASING, builderTransition } from "../../../motion/builderMotion";
 
 const POLL_MS = 3_000;
 /** The live region speaks at most this often, except when a document finishes. */

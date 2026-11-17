@@ -180,7 +180,7 @@ html [data-sonner-toast][data-styled="true"] [data-button] {
  *
  * A single shared keyframe rather than per-component animations so every
  * arriving row moves the same way; the stagger that sequences them lives in
- * pages/Builder/builderMotion.ts. Guarded by prefers-reduced-motion at the
+ * motion/builderMotion.ts. Guarded by prefers-reduced-motion at the
  * call site (staggerDelayMs / prefersReducedMotion) AND here, so a component
  * that forgets the guard still respects the setting.
  */

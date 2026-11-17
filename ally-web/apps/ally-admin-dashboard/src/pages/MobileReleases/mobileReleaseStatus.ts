@@ -9,7 +9,7 @@ import {
 
 /**
  * Status-tag colour + label for a mobile-release CI run, following the same
- * idea as Builder's BUILDER_RUN_STATUS_TAG_TYPE (pages/Builder/builderMotion.ts):
+ * idea as Builder's BUILDER_RUN_STATUS_TAG_TYPE (motion/builderMotion.ts):
  * defined once so the run-history table never drifts into describing the same
  * state two different ways.
  *

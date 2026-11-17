@@ -84,9 +84,19 @@ interface BuildViewProps {
   status: BuilderSessionStatus;
   /** The session-level error, so the run does not repeat it. */
   sessionError?: string | null;
+  /**
+   * Roadmap v2: the build shown to someone who isn't its lead. Merge and Raise budget are absent,
+   * not greyed out (plans/roadmap-builder-merge §4.5c). Builder never sets it.
+   */
+  readOnly?: boolean;
 }
 
-export const BuildView: React.FC<BuildViewProps> = ({ sessionId, status, sessionError }) => {
+export const BuildView: React.FC<BuildViewProps> = ({
+  sessionId,
+  status,
+  sessionError,
+  readOnly = false,
+}) => {
   const strings = en.builder.build;
 
   // One transcript per run, keyed by run id, so switching back to an older
@@ -447,7 +457,7 @@ export const BuildView: React.FC<BuildViewProps> = ({ sessionId, status, session
           `alertdialog`, which moves focus to its action button on every
           render. Escape is off because there is no close button: the banner
           goes when the spend is back under the ceiling. */}
-      {budgetOver && budget && (
+      {budgetOver && budget && !readOnly && (
         <ActionableNotification
           inline
           role="status"
@@ -658,14 +668,16 @@ export const BuildView: React.FC<BuildViewProps> = ({ sessionId, status, session
                         {strings.ciStatus[pullRequest.ciStatus] ?? pullRequest.ciStatus}
                       </Tag>
                     )}
-                    <Button
-                      size="sm"
-                      title={workState ? en.builder.repoChain.mergeBusyHint : undefined}
-                      disabled={isMerging || mergeBlocked}
-                      onClick={() => handleMerge(pullRequest.id)}
-                    >
-                      {mergingId === pullRequest.id ? strings.prMerging : strings.prMerge}
-                    </Button>
+                    {!readOnly && (
+                      <Button
+                        size="sm"
+                        title={workState ? en.builder.repoChain.mergeBusyHint : undefined}
+                        disabled={isMerging || mergeBlocked}
+                        onClick={() => handleMerge(pullRequest.id)}
+                      >
+                        {mergingId === pullRequest.id ? strings.prMerging : strings.prMerge}
+                      </Button>
+                    )}
                   </div>
                   {/* Only opencode pull requests run the bounded review-and-fix loop. */}
                   {issueRun && (
