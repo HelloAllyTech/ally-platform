@@ -83,13 +83,18 @@ export function purposePromptCodes(purpose?: string | null): string[] {
 }
 
 /**
- * Bring in customers' variant for an assistant that can book (chunk 8a): loaded with the purpose,
- * and ally-ai picks it when the run offers a create tool.
+ * A purpose's variant for an assistant with list tools, loaded with the purpose; ally-ai picks it
+ * from the tools the run offers. Bring in customers when it can book (chunk 8a); Answer questions
+ * when it can save a person's details for the team (chunk 6b: a create on a list `takes_details`).
  */
 export function bookingPurposePromptCodes(purpose?: string | null): string[] {
-  return purpose === 'enquiries'
-    ? ['ally_ai_agent_purpose_enquiries_can_book']
-    : [];
+  if (purpose === 'enquiries') {
+    return ['ally_ai_agent_purpose_enquiries_can_book'];
+  }
+  if (purpose === 'answer') {
+    return ['ally_ai_agent_purpose_answer_takes_details'];
+  }
+  return [];
 }
 /** Used by bots allowed to answer beyond their documents. */
 const GENERAL_ANSWER_PROMPT_CODE = 'ally_ai_knowledge_answer_general';

@@ -131,4 +131,75 @@ describe('crisis on the web channel', () => {
     });
     expect(onWhatsApp.body).toContain('Sources:');
   });
+
+  describe('live steps (chunk 6b)', () => {
+    const STEPS: AgentStreamEvent[] = [
+      { event: 'activity', data: { kind: 'find', list: 'Slots' } },
+      {
+        event: 'activity',
+        data: {
+          kind: 'create',
+          list: 'Appointments',
+          title: 'Thu 19 Nov 2026, 11:00',
+          record_id: '33333333-3333-4333-8333-333333333333',
+        },
+      },
+    ];
+    function withSteps() {
+      const ready = setup();
+      ready.aiService.runAgentStreaming.mockImplementation(
+        async (_b: unknown, onEvent: (e: AgentStreamEvent) => void) => {
+          for (const event of [...STEPS, ...LIVE]) onEvent(event);
+          return AGENT_ANSWER;
+        },
+      );
+      return ready;
+    }
+
+    it('a streamed run asks for them; the page sees the kind and a label, never an id', async () => {
+      const { engine, visible, live, turn, aiService } = withSteps();
+      await engine.respond(turn('book thursday 11'), live);
+      expect(aiService.runAgentStreaming.mock.calls[0][0]).toMatchObject({
+        activity: true,
+      });
+      expect(visible.filter((e) => e.event === 'activity')).toEqual([
+        { event: 'activity', data: { kind: 'find', label: 'Slots' } },
+        {
+          event: 'activity',
+          data: { kind: 'create', label: 'Thu 19 Nov 2026, 11:00' },
+        },
+      ]);
+      expect(JSON.stringify(visible)).not.toContain('3333');
+    });
+
+    it('a crisis reply shows no steps', async () => {
+      const { engine, visible, live, turn, aiService } = withSteps();
+      aiService.checkWhatsAppCrisis.mockResolvedValue({
+        is_crisis: true,
+        confidence: 0.9,
+        signal: 'risk',
+      });
+      const decision = await engine.respond(
+        turn('I took too many pills'),
+        live,
+      );
+      expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
+      expect(visible.some((e) => e.event === 'activity')).toBe(false);
+    });
+
+    it('WhatsApp never asks for them', async () => {
+      const { engine, turn, aiService } = withSteps();
+      await engine.respond({
+        ...turn('what are your fees?'),
+        channel: {
+          type: 'whatsapp',
+          capabilities: { maxReplyChars: 4096, streaming: false },
+        },
+      });
+      expect(aiService.runAgentStreaming).not.toHaveBeenCalled();
+      expect(JSON.stringify(aiService.runAgent.mock.calls)).not.toContain(
+        '"activity"',
+      );
+    });
+  });
 });

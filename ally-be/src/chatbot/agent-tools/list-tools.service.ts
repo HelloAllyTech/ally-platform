@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ListDefinitionsService } from '../lists/list-definitions.service';
@@ -45,6 +45,69 @@ export class ListToolsService {
     private readonly definitions: ListDefinitionsService,
     private readonly records: ListRecordsService,
   ) {}
+
+  /**
+   * A booking or change the assistant made in a reply, as its confirmation card shows it (chunk
+   * 6b): read from the stored record, scoped to the person, as the agent may see it. The record's
+   * title (the day and time) and up to three other details the agent may read, never the person
+   * field, a contact or a masked value. Null when it isn't there or isn't theirs (Try it rolls its
+   * writes back).
+   */
+  async confirmation(
+    chatbotId: string,
+    recordId: string,
+    contactId: string | null,
+    runId: string,
+  ): Promise<{
+    list: string;
+    title: string;
+    details: { label: string; value: string }[];
+  } | null> {
+    if (!UUID.test(recordId)) return null;
+    const [row] = (await this.dataSource.query(
+      `SELECT c.key FROM collection_records r
+         JOIN collections c ON c.id = r.collection_id
+        WHERE r.id = $1 AND r.chatbot_id = $2 AND r.deleted_at IS NULL`,
+      [recordId, chatbotId],
+    )) as { key: string }[];
+    if (!row) return null;
+    try {
+      const list = await this.definitions.getList(chatbotId, row.key);
+      const record = await this.records.get(
+        chatbotId,
+        list.key,
+        { kind: 'agent', runId },
+        recordId,
+        { contactId },
+      );
+      const titleKey = list.settings?.title_field;
+      const details = list.fields
+        .filter(
+          (f) =>
+            !f.archived_at &&
+            f.agent_read &&
+            !f.privacy?.masked &&
+            f.key !== titleKey &&
+            f.key !== list.settings?.person_field &&
+            !(
+              f.type === ListFieldType.RELATION &&
+              relationTarget(f) === 'contact'
+            ),
+        )
+        .map((f) => ({ label: f.label, value: record.display?.[f.key] ?? '' }))
+        .filter((d) => d.value !== '')
+        .slice(0, 3);
+      return { list: list.name, title: record.title, details };
+    } catch (error) {
+      if (
+        error instanceof ListRefusalException ||
+        error instanceof NotFoundException
+      ) {
+        return null;
+      }
+      throw error;
+    }
+  }
 
   /** The list tools this run gets. A bot without lists gets none, and its request is today's. */
   async offeredFor(

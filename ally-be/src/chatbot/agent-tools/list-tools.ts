@@ -14,6 +14,7 @@ import type {
   ListRecordView,
   TransitionsConfig,
 } from '../lists/list-types';
+import { stillExamples } from '../lists/ready-made-lists';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 import type { Ability } from './tools';
 
@@ -70,6 +71,14 @@ export interface ListToolDefinition {
   description: string;
   input_schema: ListToolInputSchema;
   kind: ListToolKind;
+  /** The list's name as the owner wrote it, for the bot page's live steps (chunk 6b). */
+  list_name?: string;
+  /**
+   * A create on a list with a phone field the assistant fills in (Leads, Callback requests): it
+   * saves the person's details for the team (chunk 6b). ally-ai then offers to take details when it
+   * can't answer, and lets the assistant say the team will get back to them.
+   */
+  takes_details?: boolean;
 }
 
 type ListView = ListDefinitionView;
@@ -144,6 +153,10 @@ const filterableFields = (list: ListView): FieldView[] =>
 
 const hasPersonField = (list: ListView): boolean =>
   Boolean(list.settings?.person_field);
+
+/** A list the assistant saves someone's details to: a phone field it fills in (chunk 6b). */
+export const takesDetails = (list: ListView): boolean =>
+  writableFields(list).some((f) => f.type === ListFieldType.PHONE);
 
 // ---- schemas ------------------------------------------------------------------------------------
 
@@ -275,6 +288,21 @@ function findSchema(list: ListView): ListToolInputSchema {
   return { type: 'object', properties };
 }
 
+/**
+ * The fields create and update offer: the writable ones, except an optional choice that still
+ * holds the ready-made examples (chunk 6b, item 30). "Make it yours" wasn't done, so those choices
+ * aren't the business's: the assistant isn't given them and never reads them out, and the field
+ * stays empty. A required one is always kept (none of the ready-made lists has one; a test says
+ * so).
+ */
+export const offeredWriteFields = (list: ListView): FieldView[] =>
+  writableFields(list).filter(
+    (f) =>
+      f.required ||
+      f.type !== ListFieldType.SELECT ||
+      !stillExamples(selectValues(f)),
+  );
+
 function writeSchema(
   list: ListView,
   update: boolean,
@@ -286,7 +314,7 @@ function writeSchema(
       `The id of the entry to change, from find_${list.key}`,
     );
   }
-  for (const f of writableFields(list)) {
+  for (const f of offeredWriteFields(list)) {
     if (!(f.key in properties)) {
       properties[f.key] = valueProperty(f, update, dated);
     }
@@ -389,7 +417,7 @@ function findDescription(list: ListView): string {
 
 function createDescription(list: ListView, names: Map<string, string>): string {
   const person = hasPersonField(list) ? ' for the person in this chat' : '';
-  const required = writableFields(list)
+  const required = offeredWriteFields(list)
     .filter((f) => f.required)
     .map((f) => lower(f.label));
   // A list whose new entries wait for the team (Site visits) says so, so the assistant can say the
@@ -456,12 +484,14 @@ export function listToolDefinitions(
 ): ListToolDefinition[] {
   const out: ListToolDefinition[] = [];
   if (list.deleted_at) return out;
+  const listName = list.name.trim();
   if (list.agent_read) {
     out.push({
       name: listToolName('find', list.key),
       description: findDescription(list),
       input_schema: findSchema(list),
       kind: 'find',
+      ...(listName ? { list_name: listName } : {}),
     });
   }
   if (writableFields(list).length) {
@@ -470,12 +500,15 @@ export function listToolDefinitions(
       description: createDescription(list, names),
       input_schema: writeSchema(list, false, dated),
       kind: 'create',
+      ...(listName ? { list_name: listName } : {}),
+      ...(takesDetails(list) ? { takes_details: true } : {}),
     });
     out.push({
       name: listToolName('update', list.key),
       description: updateDescription(list, names),
       input_schema: writeSchema(list, true, dated),
       kind: 'update',
+      ...(listName ? { list_name: listName } : {}),
     });
   }
   return out;

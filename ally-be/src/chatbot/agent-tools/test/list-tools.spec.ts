@@ -496,3 +496,93 @@ describe('at least, for a number range that found nothing (8a)', () => {
     expect(withoutUpperBounds(tables, {})).toBeNull();
   });
 });
+
+describe('chunk 6b: what the definitions carry', () => {
+  const leads = list(
+    'leads',
+    'Leads',
+    [
+      field('name', ListFieldType.TEXT, { required: true, agent_write: true }),
+      field('phone', ListFieldType.PHONE, {
+        required: true,
+        agent_write: true,
+      }),
+      field('interest', ListFieldType.SELECT, {
+        options: { values: ['A demo', 'Pricing', 'Something else'] },
+        agent_write: true,
+      }),
+      field('notes', ListFieldType.LONG_TEXT, { agent_write: true }),
+    ],
+    { agent_read: false, agent_write: true },
+  );
+  const create = (l: ListDefinitionView) =>
+    listToolDefinitions(l).find((d) => d.kind === 'create')!;
+
+  it('names the list as the owner wrote it, for the live steps', () => {
+    expect(
+      listToolDefinitions(slots).map((d) => [d.name, d.list_name]),
+    ).toEqual([['find_slots', 'Slots']]);
+  });
+
+  it('marks a create on a list with a phone the assistant fills in as taking details', () => {
+    expect(create(leads).takes_details).toBe(true);
+    // Appointments has a person field but no phone: it books, it doesn't take details.
+    expect(
+      create({ ...appointments, agent_write: true }).takes_details,
+    ).toBeUndefined();
+    expect(
+      listToolDefinitions(leads).find((d) => d.kind === 'update')!
+        .takes_details,
+    ).toBeUndefined();
+  });
+
+  it('leaves out an optional choice that still holds the ready-made examples (item 30)', () => {
+    expect(Object.keys(create(leads).input_schema.properties)).toEqual([
+      'name',
+      'phone',
+      'notes',
+    ]);
+    // A list installed before 6b, with the clinic's examples, in any order or case.
+    const before = {
+      ...leads,
+      fields: leads.fields.map((f) =>
+        f.key === 'interest'
+          ? {
+              ...f,
+              options: { values: ['check-up', 'Consultation', 'Follow-up'] },
+            }
+          : f,
+      ),
+    };
+    expect(create(before).input_schema.properties.interest).toBeUndefined();
+    expect(JSON.stringify(listToolDefinitions(before))).not.toMatch(
+      /Consultation/i,
+    );
+  });
+
+  it("keeps the owner's own choices", () => {
+    const own = {
+      ...leads,
+      fields: leads.fields.map((f) =>
+        f.key === 'interest'
+          ? { ...f, options: { values: ['Bookkeeping', 'GST filing'] } }
+          : f,
+      ),
+    };
+    expect(create(own).input_schema.properties.interest.enum).toEqual([
+      '',
+      'Bookkeeping',
+      'GST filing',
+    ]);
+  });
+
+  it('never drops a required choice, even with the examples', () => {
+    const required = {
+      ...leads,
+      fields: leads.fields.map((f) =>
+        f.key === 'interest' ? { ...f, required: true } : f,
+      ),
+    };
+    expect(create(required).input_schema.properties.interest).toBeDefined();
+  });
+});

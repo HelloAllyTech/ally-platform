@@ -77,6 +77,13 @@ import { MemoryService } from '../memory/memory.service';
 import { SummaryService } from '../memory/summary.service';
 import { LeadAlertService } from './lead-alert.service';
 import { TurnstileService } from './turnstile.service';
+import { ListToolsService } from '../agent-tools/list-tools.service';
+import {
+  confirmedWrite,
+  doneSteps,
+  type PublicConfirmation,
+  type PublicStep,
+} from './live-steps';
 
 /** What a visitor's browser learns about a page. Nothing internal: no prompts, ids or settings. */
 export interface PublicBotPage {
@@ -164,6 +171,13 @@ export interface PublicFinal {
   rateable: boolean;
   /** A team member has this chat (chunk 11a): no reply now; theirs comes on the visitor stream. */
   held?: boolean;
+  /**
+   * What the assistant did for this reply, for its "what I did" line (chunk 6b). Absent for a v1,
+   * crisis or Safety reply, a template, or one that did nothing worth showing.
+   */
+  steps?: PublicStep[];
+  /** A booking or change made in this reply, from the stored record (chunk 6b). */
+  confirmation?: PublicConfirmation;
 }
 
 /** The bot page's refusals, mapped onto the repo's `ErrorCode` contract (see error-code.enum.ts). */
@@ -273,6 +287,8 @@ export class BotPagePublicService {
     // Memory, light (chunk 8a). Optional so older test wiring still builds the service.
     @Optional() private readonly memory?: MemoryService,
     @Optional() private readonly summaries?: SummaryService,
+    // The confirmation card (chunk 6b). Optional, like memory, for older test wiring.
+    @Optional() private readonly listTools?: ListToolsService,
   ) {}
 
   async page(slug: string): Promise<AvailableBotPage> {
@@ -748,13 +764,53 @@ export class BotPagePublicService {
       } satisfies AgentFallbackEvent);
     }
 
+    const steps = doneSteps(decision);
+    const confirmation = await this.confirmationFor(
+      chatbot.id,
+      contact.id,
+      decision,
+    );
     return {
       reply: decision.body,
       citations: publicCitations(decision.citations),
       messageId: outbound.id,
       conversationId: conversation.id,
       rateable: RATEABLE.has(decision.handledBy),
+      ...(steps.length ? { steps } : {}),
+      ...(confirmation ? { confirmation } : {}),
     };
+  }
+
+  /**
+   * The card under a reply that booked or changed something (chunk 6b): the record as stored and
+   * as this person may see it, never the model's account of it. Nothing if it can't be read.
+   */
+  private async confirmationFor(
+    chatbotId: string,
+    contactId: string,
+    decision: ChatbotDecision,
+  ): Promise<PublicConfirmation | null> {
+    const write = confirmedWrite(decision);
+    if (!write || !this.listTools || !decision.agent) return null;
+    try {
+      const record = await this.listTools.confirmation(
+        chatbotId,
+        write.record_id,
+        contactId,
+        decision.agent.runId,
+      );
+      if (!record) return null;
+      return {
+        action: write.kind as PublicConfirmation['action'],
+        ...record,
+      };
+    } catch (error) {
+      // The reply has gone out; a card that can't be read is left off, never an error.
+      this.logger.warn(
+        `Confirmation card unavailable: ${error instanceof Error ? error.name : 'error'}`,
+      );
+      return null;
+    }
   }
 
   /**
