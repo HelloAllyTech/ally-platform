@@ -97,7 +97,7 @@ describe('TrackProgressService — roleplay assessment mode', () => {
       trackItemRepository.findOne.mockResolvedValue(item(true));
       dataSource.query.mockResolvedValue([{ live: 0, ended: 0 }]);
 
-      await expect(start()).resolves.toBeUndefined();
+      await expect(start()).resolves.toMatchObject(item(true));
       expect(dataSource.query.mock.calls[0][1]).toEqual([PROGRESS_ID, null]);
     });
 
@@ -136,7 +136,7 @@ describe('TrackProgressService — roleplay assessment mode', () => {
       trackItemRepository.findOne.mockResolvedValue(item(true));
       dataSource.query.mockResolvedValue([{ live: 0, ended: 0 }]);
 
-      await expect(start()).resolves.toBeUndefined();
+      await expect(start()).resolves.toMatchObject(item(true));
       expect(dataSource.query.mock.calls[0][1]).toEqual([
         PROGRESS_ID,
         reopenedAt,
@@ -147,7 +147,7 @@ describe('TrackProgressService — roleplay assessment mode', () => {
       trackItemProgressRepository.findOne.mockResolvedValue(progress());
       trackItemRepository.findOne.mockResolvedValue(item(false));
 
-      await expect(start()).resolves.toBeUndefined();
+      await expect(start()).resolves.toMatchObject(item(false));
       expect(dataSource.query).not.toHaveBeenCalled();
     });
   });

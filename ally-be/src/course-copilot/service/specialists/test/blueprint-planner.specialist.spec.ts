@@ -2,6 +2,7 @@ import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.servi
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { SpecialistLlmService } from '../specialist-llm.service';
 import { validate as isUuid } from 'uuid';
+import { TrackItemCompletionLogic } from 'src/track/type/track.type';
 import { courseCopilotGameOptions } from '../../../util/course-blueprint.util';
 import { BlueprintPlannerSpecialist } from '../blueprint-planner.specialist';
 import { BlueprintPlannerInput } from '../specialist.types';
@@ -119,6 +120,7 @@ describe('BlueprintPlannerSpecialist', () => {
     // Slot 1 has no minScore and the roleplay is the capstone → assessment threshold.
     expect(blueprint.sections[0].items[1].completionCriteria).toEqual({
       minScore: 65,
+      completionLogic: TrackItemCompletionLogic.SCORE_AND_DURATION,
     });
     expect(blueprint.estimatedDurationMinutes).toBe(6 + 12 + 4);
     expect(blueprint.competencyIds).toEqual(['c-1', 'c-2']);
