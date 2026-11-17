@@ -96,6 +96,13 @@ import { RoadmapAdminController } from './controller/roadmap-admin.controller';
 import { RoadmapCollaborationController } from './controller/roadmap-collaboration.controller';
 import { RoadmapOpportunityController } from './controller/roadmap-opportunity.controller';
 import { RoadmapGateway } from './gateway/roadmap.gateway';
+import { RoadmapItemReleaseController } from './controller/roadmap-item-release.controller';
+import { ItemReleaseService } from './service/item-release.service';
+import { ItemReleaseSchedulerRegistrationService } from './service/item-release-scheduler-registration.service';
+import { ItemLinkedPr } from './entity/item-linked-pr.entity';
+import { ItemRelease } from './entity/item-release.entity';
+import { BuilderPullRequest } from 'src/builder/entity/builder-pull-request.entity';
+import { GithubModule } from 'src/github/github.module';
 import { AwsModule } from 'src/aws/aws.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 
@@ -155,7 +162,16 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
       // entity rather than SettingsModule, for the same reason as BugFinding above: one row
       // read and written by one service needs no module graph behind it.
       GlobalSettings,
+      // Release tracking (ItemReleaseService): its own two tables, and Builder's pull requests
+      // read (never written) to link an opportunity's Builder work. The entity rather than a
+      // Builder repository export, the same treatment BugFinding gets above.
+      ItemLinkedPr,
+      ItemRelease,
+      BuilderPullRequest,
     ]),
+    // GithubActionsService — release tracking's compare / runs / tags reads, on the shared
+    // client and token. Builder imports it too but does not re-export it.
+    GithubModule,
     // AiService — the Weaviate client for duplicate detection.
     AiModule,
     // PromptSharedService — resolves src/prompts/roadmap/*.txt (with any dashboard override)
@@ -191,6 +207,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapUpNextController,
     RoadmapIdeaDraftController,
     RoadmapPlanController,
+    RoadmapItemReleaseController,
   ],
   providers: [
     // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
@@ -251,6 +268,9 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapCopilotService,
     RoadmapVoteGrantSchedulerRegistrationService,
     RoadmapBuilderSchedulerRegistrationService,
+    // Release tracking: Released from what is actually in production (Roadmap v2, P1).
+    ItemReleaseService,
+    ItemReleaseSchedulerRegistrationService,
     // Classifies a reported bug's repo at intake (RoadmapOpportunityService.create).
     // Provided directly rather than importing BugHunterModule: it constructs
     // itself from AppConfigService (global), PromptSharedService and

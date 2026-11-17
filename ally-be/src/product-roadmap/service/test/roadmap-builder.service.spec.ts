@@ -90,6 +90,7 @@ describe('RoadmapBuilderService', () => {
       builderSessions as never,
       permissions as never,
       toggles as never,
+      { reconcile: jest.fn() } as never,
     );
   });
 
