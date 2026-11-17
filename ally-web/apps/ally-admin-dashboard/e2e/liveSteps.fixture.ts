@@ -1,7 +1,11 @@
 import type { Page } from "@playwright/test";
 
 /** The slowed message stream for the live-steps tests (chunk 6b). */
-export type Frame = { event: string; data: unknown; after?: number };
+/**
+ * `after` waits that long before the frame; `held` waits for `nextStep(page)` instead, so a test
+ * can look at a step for as long as it needs (a 400 ms step is easy to miss when polling).
+ */
+export type Frame = { event: string; data: unknown; after?: number; held?: boolean };
 
 export const BOOKED = {
   reply: "Done: you're booked for Thursday 19 Nov at 11:00 with Dr Rao.",
@@ -41,6 +45,8 @@ export async function slowStream(page: Page, frames: Frame[], final: unknown) {
       let release: () => void = () => undefined;
       const released = new Promise<void>(r => (release = r));
       (window as unknown as { __release: () => void }).__release = () => release();
+      let step: () => void = () => undefined;
+      (window as unknown as { __nextStep: () => void }).__nextStep = () => step();
       window.fetch = async (input, init) => {
         const url = typeof input === "string" ? input : (input as Request).url;
         if (!url.includes("/messages/stream")) return realFetch(input, init);
@@ -48,7 +54,8 @@ export async function slowStream(page: Page, frames: Frame[], final: unknown) {
         const body = new ReadableStream({
           async start(controller) {
             for (const frame of frames) {
-              await new Promise(r => setTimeout(r, frame.after ?? 0));
+              if (frame.held) await new Promise<void>(r => (step = r));
+              else await new Promise(r => setTimeout(r, frame.after ?? 0));
               controller.enqueue(
                 encoder.encode(`event: ${frame.event}\ndata: ${JSON.stringify(frame.data)}\n\n`),
               );
@@ -70,3 +77,6 @@ export async function slowStream(page: Page, frames: Frame[], final: unknown) {
 
 export const release = (page: Page) =>
   page.evaluate(() => (window as unknown as { __release: () => void }).__release());
+
+export const nextStep = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __nextStep: () => void }).__nextStep());

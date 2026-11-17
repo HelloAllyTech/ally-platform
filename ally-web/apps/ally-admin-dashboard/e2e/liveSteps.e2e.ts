@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { expectNoSeriousA11yIssues } from "./a11y";
 import { mockBotPage } from "./botPage.fixture";
-import { BOOKED, CRISIS, release, slowStream } from "./liveSteps.fixture";
+import { BOOKED, CRISIS, nextStep, release, slowStream } from "./liveSteps.fixture";
 
 /**
  * Chunk 6b, section E: the assistant's live steps on the bot page, at 1440 and 390 (the two
@@ -26,7 +26,7 @@ test.describe("live steps", () => {
         {
           event: "activity",
           data: { kind: "create", label: "Thu 19 Nov 2026, 11:00" },
-          after: 300,
+          held: true,
         },
       ],
       BOOKED,
@@ -38,6 +38,7 @@ test.describe("live steps", () => {
     const step = page.getByTestId("live-step");
     await expect(step).toHaveText("Checking free times…");
     await expect(page).toHaveScreenshot("live-step-finding.png");
+    await nextStep(page);
     await expect(step).toHaveText("Booking Thu 19 Nov, 11:00…");
     await expect(page).toHaveScreenshot("live-step-booking.png");
     await expectNoSeriousA11yIssues(page);
