@@ -51,6 +51,10 @@ class CheckContext:
     #: (chunk 6b). "Nothing's free on Thursday evening" is then an answer, from the
     #: find, not a missing source.
     found_nothing: bool = False
+    #: Something in this run can pass the person's request on (chunk 6b): the
+    #: `hand_over` tool, or a create tool on a list that takes their details (a
+    #: callback or a lead). Without either, it never promises to pass anything on.
+    can_pass_on: bool = True
 
 
 @dataclass

@@ -1049,3 +1049,61 @@ class TestOutOfScopeDeclinesStayGeneric:
             searched=True,
         )
         assert result["answer"].endswith("Please call +91 20 0000 4400.")
+
+
+class TestNoPromiseToPassItOn:
+    """Chunk 6b, item 10: with `hand_over` off and no list that takes details, the
+    assistant never says "I'll pass it on" or "the team will get back to you"."""
+
+    WORDING = "I can't help with that. Please call +91 20 0000 4400."
+    INFO = passage(CHUNK_A, 0.8, text="Write to hello@lakeview.in for anything else.")
+
+    def test_the_promise_is_trimmed_and_the_reply_sent_back(self):
+        result, rejection = review(
+            "answer",
+            "We offer home visits on weekdays. I'll pass your request to the team "
+            "and they will get back to you.",
+            citations=[1],
+            passages=[self.INFO],
+            decline_text=self.WORDING,
+            can_pass_on=False,
+        )
+        assert rejection == "reach_team"
+        assert "pass" not in result["answer"]
+        # Meanwhile it says how to reach the team, from the owner's wording.
+        assert result["answer"].endswith("Please call +91 20 0000 4400.")
+
+    def test_a_reply_that_already_says_how_to_reach_them_is_only_trimmed(self):
+        result, rejection = review(
+            "answer",
+            "Write to hello@lakeview.in. The team will get back to you soon.",
+            citations=[1],
+            passages=[self.INFO],
+            can_pass_on=False,
+        )
+        assert rejection is None
+        assert result["answer"] == "Write to hello@lakeview.in."
+
+    def test_with_something_that_passes_it_on_nothing_changes(self):
+        text = "I'll pass your request to the team."
+        result, rejection = review(
+            "smalltalk", text, passages=[], searched=True, can_pass_on=True
+        )
+        assert rejection is None and result["answer"] == text
+
+
+def test_can_pass_on_needs_hand_over_or_a_list_that_takes_details():
+    from app.core.agent_runtime.nodes.agent_check import can_pass_on
+
+    create = {"name": "create_leads", "kind": "create", "description": ""}
+    assert not can_pass_on({})
+    assert not can_pass_on(
+        {"gateway_tools": ["create_leads"], "gateway_definitions": [create]}
+    )
+    assert can_pass_on(
+        {
+            "gateway_tools": ["create_leads"],
+            "gateway_definitions": [{**create, "takes_details": True}],
+        }
+    )
+    assert can_pass_on({"gateway_tools": ["hand_over"]})

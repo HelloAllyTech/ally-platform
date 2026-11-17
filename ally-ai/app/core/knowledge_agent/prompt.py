@@ -135,6 +135,7 @@ def format_purpose(
     *,
     can_book: bool = False,
     channel: Optional[str] = None,
+    takes_details: bool = False,
 ) -> str:
     """What the assistant is for: the purpose's seed section, or for "Something else"
     the owner's own description, fenced like their instructions. Empty when the bot
@@ -142,8 +143,17 @@ def format_purpose(
 
     `can_book` (the run offers a create tool) picks Bring in customers' booking
     variant (chunk 8a), whose rules sit with the lists section's instead of against
-    them."""
+    them. `takes_details` (a create tool on a list that takes the person's details:
+    Leads, Callback requests) picks Answer questions' variant that offers to take
+    their details when it can't answer (chunk 6b). Without either, the section is
+    exactly as before."""
     purpose = (persona.get("purpose") or "").strip()
+    if purpose == "answer" and takes_details:
+        return load_and_format(
+            "agent/purpose_answer_takes_details",
+            prompts=prompts,
+            channel=channel_words(channel),
+        ).strip()
     if purpose == "enquiries" and can_book:
         return load_and_format(
             "agent/purpose_enquiries_can_book",
@@ -175,6 +185,7 @@ def format_persona(
     memory: str = "",
     can_book: bool = False,
     channel: Optional[str] = None,
+    takes_details: bool = False,
 ) -> str:
     """
     Render a chatbot's persona as a block that goes AHEAD of the answer template.
@@ -201,7 +212,13 @@ def format_persona(
         :MAX_PERSONA_PROMPT_CHARS
     ]
     rules = (persona.get("safety_rules") or "").strip()
-    purpose = format_purpose(persona, prompts, can_book=can_book, channel=channel)
+    purpose = format_purpose(
+        persona,
+        prompts,
+        can_book=can_book,
+        channel=channel,
+        takes_details=takes_details,
+    )
     if not (name or tone or instructions or rules or purpose or lists or memory):
         return ""
 

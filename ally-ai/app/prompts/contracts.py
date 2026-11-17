@@ -700,8 +700,12 @@ class AgentListsInputs(PromptInputs):
         description=(
             "How the assistant uses the business's lists through its find_, create_ "
             "and update_ tools: look before claiming, book only once confirmed, cite "
-            "what the tools return (chunk 6). Only for a run with list tools; placed "
-            "after the purpose section."
+            "what the tools return (chunk 6). Since chunk 6b it also holds the "
+            "booking rules every purpose that can book follows (book once confirmed, "
+            "a name asked once, an optional detail asked once, the team confirms "
+            "only when entries start as requested) and saving a lead once its "
+            "details are given. Only for a run with list tools; placed after the "
+            "purpose section."
         ),
     )
 
@@ -717,9 +721,30 @@ class AgentPurposeEnquiriesCanBookInputs(PromptInputs):
         name="Chatbot Agent: Purpose, Bring in Customers (can book)",
         description=(
             'The "Bring in customers" purpose for an assistant that can book: it books '
-            "under the lists rules, asks for a name once and only when it isn't known, "
-            "and still passes on what the lists can't do (chunk 8a). Chosen in code "
-            "when the run offers a create_ tool; otherwise the plain section is used."
+            "under the lists rules and passes on what the lists can't do only when "
+            "a tool can (chunk 8a; since chunk 6b the booking rules themselves are "
+            "in the lists section). Chosen in code when the run offers a create_ "
+            "tool; otherwise the plain section is used."
+        ),
+    )
+
+    #: Where the chat is: "WhatsApp" or "the website".
+    channel: str
+
+
+class AgentPurposeAnswerTakesDetailsInputs(PromptInputs):
+    """`agent/purpose_answer_takes_details.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_answer_takes_details",
+        name="Chatbot Agent: Purpose, Answer Questions (takes details)",
+        description=(
+            'The "Answer questions" purpose for an assistant that can save a '
+            "person's details for the team (a create_ tool on a list with a person "
+            "or phone field: Leads, Callback requests). When it can't answer, it "
+            "offers once to take their details, and saves them once given (chunk "
+            "6b). Chosen in code only then; otherwise the plain section is used, "
+            "byte for byte."
         ),
     )
 

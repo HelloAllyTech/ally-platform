@@ -50,6 +50,21 @@ class ListToolDefinition(BaseModel):
     description: str = Field("", max_length=2000)
     input_schema: Dict[str, Any] = Field(default_factory=dict)
     kind: Literal["find", "create", "update"]
+    #: The list's name as the owner wrote it ("Slots"), for the live steps on the
+    #: bot page (chunk 6b). Never shown to the model.
+    list_name: str = Field("", max_length=120)
+    #: A create on a list with a person or phone field (Leads, Callback requests):
+    #: it saves the person's details for the team (chunk 6b).
+    takes_details: bool = False
+
+    def as_bot_definition(self) -> Dict[str, Any]:
+        """The definition as the run keeps it: the 6b fields only when set, so a
+        definition without them is exactly what it was before."""
+        data = self.model_dump(mode="json")
+        for key in ("list_name", "takes_details"):
+            if not data.get(key):
+                data.pop(key, None)
+        return data
 
 
 AgentGateway.model_rebuild()
@@ -179,7 +194,7 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             # Only when there are some, so a run without list tools is today's.
             if self.gateway.definitions:
                 bot["gateway_definitions"] = [
-                    d.model_dump(mode="json") for d in self.gateway.definitions
+                    d.as_bot_definition() for d in self.gateway.definitions
                 ]
             if self.gateway.omitted:
                 bot["gateway_omitted"] = list(self.gateway.omitted)

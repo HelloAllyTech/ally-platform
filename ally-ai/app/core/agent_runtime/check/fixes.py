@@ -197,6 +197,44 @@ def _send_back_slot_offers(verdict: Verdict, ctx: CheckContext) -> None:
         verdict.rejection, verdict.keeps_text = Rejection.OFFERS_SLOT, True
 
 
+# A promise to pass the request on, or that the team will come back to them
+# ("I'll pass this on to the team", "the team will get back to you", "I've shared
+# your details", "someone will call you").
+_PASSES_ON = re.compile(
+    r"\b(?:i(?:'|’)ll|i\s+will|i\s+can|i(?:'|’)ve|i\s+have|let\s+me|"
+    r"we(?:'|’)ll|we\s+will)"
+    r"\s+(?:also\s+)?(?:pass(?:ed)?|forward(?:ed)?|shar(?:e|ed)|send|sent|"
+    r"let\s+(?:the|our)\s+team\s+know|notif(?:y|ied)|flag(?:ged)?)\b"
+    r"|\b(?:the|our)\s+team\s+(?:will|would|can|should)\s+(?:get\s+back|reach\s+out|"
+    r"contact|call|follow\s+up|be\s+in\s+touch|respond|reply)"
+    r"|\bsomeone\s+(?:from\s+(?:the|our)\s+team\s+)?will\s+(?:get\s+back|reach\s+out|"
+    r"contact|call|follow\s+up|be\s+in\s+touch)",
+    re.IGNORECASE,
+)
+
+
+def passes_on(sentence: str) -> bool:
+    return bool(_PASSES_ON.search(sentence or ""))
+
+
+def _trim_pass_on_promises(verdict: Verdict, ctx: CheckContext) -> None:
+    """With no `hand_over` and no list that takes their details, nothing passes a
+    request on, so the reply never promises to (chunk 6b). The sentence is trimmed;
+    a reply that then gives no way to reach the team gets the owner's contact and
+    is sent back once to say how to reach the team from the information."""
+    if ctx.can_pass_on or not passes_on(verdict.answer):
+        return
+    logger.info("Reply promises to pass something on, with nothing to do it")
+    verdict.answer = without_sentences(verdict.answer, lambda s: not passes_on(s))
+    if contact_details(verdict.answer):
+        return
+    contact = fallback_contact(ctx.decline_text)
+    if contact:
+        verdict.answer = f"{verdict.answer} {contact}".strip()
+    if verdict.rejection is None:
+        verdict.rejection, verdict.keeps_text = Rejection.REACH_TEAM, True
+
+
 def _drop_record_ids(verdict: Verdict, ctx: CheckContext) -> None:
     """A record's id is for the tools, never the person (chunk 6): the model copies
     it from a passage's `id:` line, so it's taken out, with its label, and so is talk
@@ -298,6 +336,7 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _trim_repeated_crisis_wording,
     _trim_repeated_topic_list,
     _trim_booking_offers,
+    _trim_pass_on_promises,
     _send_back_slot_offers,
     _ground_offered_times,
     _cut_source_phrases,

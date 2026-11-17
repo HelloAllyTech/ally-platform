@@ -58,6 +58,7 @@ def check_reply(
     personal: str = "",
     looked_up: bool = False,
     found_nothing: bool = False,
+    can_pass_on: bool = True,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -88,6 +89,7 @@ def check_reply(
         personal=personal,
         looked_up=looked_up,
         found_nothing=found_nothing,
+        can_pass_on=can_pass_on,
     )
     verdict = _read_draft(step, ctx)
     # A list's times are cited from the run's records before grounding (chunk 6).

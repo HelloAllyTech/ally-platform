@@ -28,7 +28,8 @@ from app.core.agent_runtime.check import (
 )
 from app.core.agent_runtime.memory import personal_context
 from app.core.agent_runtime.state import AgentState, json_safe
-from app.core.agent_runtime.tools.lists import offers_create
+from app.core.agent_runtime.tools import gateway_tools
+from app.core.agent_runtime.tools.lists import offers_create, takes_details
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.core.knowledge_agent.schemas import is_general
@@ -42,6 +43,13 @@ def _summary(_: AgentState, update: Dict[str, Any]) -> str:
         f"{result['intent']} ({result['turn_type']}), "
         f"{len(result['citations'])} citations"
     )
+
+
+def can_pass_on(bot: Dict[str, Any]) -> bool:
+    """Whether the run can pass a request on (chunk 6b): `hand_over` is offered, or
+    a create tool on a list that takes the person's details."""
+    names = {tool.name for tool in gateway_tools(bot)}
+    return "hand_over" in names or takes_details(bot.get("gateway_definitions"))
 
 
 def make_agent_check_node(service: KnowledgeAgentService) -> Node:
@@ -82,6 +90,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             can_book=offers_create(state["bot"].get("gateway_definitions")),
             personal=personal_context(state["bot"]),
             looked_up=bool(finds),
+            can_pass_on=can_pass_on(state["bot"]),
             found_nothing=any(
                 call.get("nearest") or not (call.get("added") or call.get("aggregate"))
                 for call in finds
