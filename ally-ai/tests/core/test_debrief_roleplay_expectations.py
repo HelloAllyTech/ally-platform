@@ -65,7 +65,7 @@ async def test_analyst_assesses_the_roleplay_behaviours(dispatch_returns):
 async def test_analyst_falls_back_to_foundational_skills_with_nothing(
     dispatch_returns,
 ):
-    from app.core.debrief.steps import DEFAULT_ANALYST_SYSTEM, analyse
+    from app.core.debrief.steps import analyse
 
     calls = dispatch_returns(EvidenceMap())
     await analyse(

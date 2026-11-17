@@ -83,6 +83,12 @@ export enum RoadmapOpportunitySource {
    * audit. Same create pipeline and the same readiness gate as a person's filing.
    */
   PM_AGENT = 'pm_agent',
+  /**
+   * Filed by the Roadmap cutover (Roadmap v2 P6) for an in-flight direct Builder session that
+   * had no idea: one row per session, lead = the session's creator, already accepted. Written
+   * only by RoadmapOpportunityService.fileMigratedBuilderSession.
+   */
+  MIGRATED_BUILDER_SESSION = 'migrated_builder_session',
 }
 
 /** The author name the board shows for a `pm_agent` opportunity. */

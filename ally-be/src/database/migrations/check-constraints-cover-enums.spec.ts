@@ -125,7 +125,10 @@ import {
   ROADMAP_CATEGORIES,
   ROADMAP_STAGES,
 } from '../../public-roadmap/constants/public-roadmap.constants';
-import { RoadmapReviewState } from '../../product-roadmap/enum/roadmap-opportunity.enum';
+import {
+  RoadmapOpportunitySource,
+  RoadmapReviewState,
+} from '../../product-roadmap/enum/roadmap-opportunity.enum';
 import {
   FhsAssessmentStatus,
   FhsBenchmarkStatus,
@@ -541,6 +544,8 @@ describe('CHECK constraints cover their enums', () => {
       'CHK_item_releases_service',
       [...RELEASE_SERVICE_KEYS, NO_RELEASE_SERVICE],
     ],
+    // Who filed an opportunity, including the cutover's migrated sessions (Roadmap v2, P6).
+    ['CHK_roadmap_opps_source', Object.values(RoadmapOpportunitySource)],
     // The auto-release policy's shadow log (Roadmap v2, P5).
     ['CHK_release_policy_log_kind', Object.values(ReleasePolicyLogKind)],
     ['CHK_release_policy_log_mode', Object.values(ReleasePolicyMode)],

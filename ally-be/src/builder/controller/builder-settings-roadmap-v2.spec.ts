@@ -36,6 +36,21 @@ describe('BuilderController.updateSettings and roadmapV2Enabled', () => {
     );
   });
 
+  it('says data is kept when an Owner switches Roadmap off (the rollback)', async () => {
+    const { controller } = build('owner');
+    const off: any = await controller.updateSettings(
+      { roadmapV2Enabled: false } as any,
+      user,
+    );
+    expect(off.roadmapV2Off).toMatchObject({ dataKept: true });
+    expect(off.roadmapV2Off.message).toMatch(/kept/);
+    const on: any = await controller.updateSettings(
+      { roadmapV2Enabled: true } as any,
+      user,
+    );
+    expect(on.roadmapV2Off).toBeUndefined();
+  });
+
   it('leaves the other settings to Builders, without asking for a role', async () => {
     const { controller, settingsService, roles } = build('builder');
     await controller.updateSettings({ maxConcurrentBuilds: 4 } as any, user);

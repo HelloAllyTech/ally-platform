@@ -119,7 +119,10 @@ async def debrief_safety_recall(req: SafetyRecallRequest) -> SafetyRecallRespons
 
 
 class RiskCueTestRequest(BaseModel):
-    """An option's definition and its own examples (spec DEBRIEF_ACROSS_ROLEPLAYS §5)."""
+    """An option's definition and its own examples.
+
+    Spec DEBRIEF_ACROSS_ROLEPLAYS §5.
+    """
 
     risk_cue_definition: Optional[str] = None
     word_list_raises: bool = True

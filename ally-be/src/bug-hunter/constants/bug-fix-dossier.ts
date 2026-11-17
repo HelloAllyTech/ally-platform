@@ -47,7 +47,7 @@ export interface FixDossier {
   };
   /** Who filed it and what their client captured — human-reported bugs only. */
   reporter: {
-    source: 'staff' | 'consumer' | 'pm_agent';
+    source: 'staff' | 'consumer' | 'pm_agent' | 'migrated_builder_session';
     name: string | null;
     reportedAt: Date;
     context: Record<string, unknown> | null;

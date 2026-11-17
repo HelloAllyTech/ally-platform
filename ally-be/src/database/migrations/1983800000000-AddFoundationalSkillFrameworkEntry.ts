@@ -38,8 +38,8 @@ const AREAS = [
   'Supportive Engagement | offering support and a safe, non-judgmental space',
 ];
 
-export class AddFoundationalSkillFrameworkEntry1983700000000 implements MigrationInterface {
-  name = 'AddFoundationalSkillFrameworkEntry1983700000000';
+export class AddFoundationalSkillFrameworkEntry1983800000000 implements MigrationInterface {
+  name = 'AddFoundationalSkillFrameworkEntry1983800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasTable('cl_chunks'))) return;

@@ -775,7 +775,7 @@ export class BuilderController {
         'Only a Roadmap Owner (Product Roadmap — Manage) can switch Roadmap v2 on or off.',
       );
     }
-    return this.settingsService.update(
+    const saved = await this.settingsService.update(
       {
         ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
         ...(dto.maxConcurrentBuilds !== undefined
@@ -869,6 +869,19 @@ export class BuilderController {
       },
       user.id,
     );
+    // Switching Roadmap off is the rollback (Roadmap v2 P6): say plainly that nothing made
+    // on the Roadmap, nor anything the cutover copied, was deleted. Deletion is P7.
+    if (dto.roadmapV2Enabled === false) {
+      return {
+        ...saved,
+        roadmapV2Off: {
+          dataKept: true,
+          message:
+            'Roadmap is off. Product Roadmap and Builder are back as they were, and everything made on the Roadmap is kept for when it is switched on again.',
+        },
+      };
+    }
+    return saved;
   }
 
   @Get('notifications')
