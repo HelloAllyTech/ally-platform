@@ -97,6 +97,11 @@ export class DebriefQualityRepository {
     return this.livePrompt('debrief_quality_judge_system');
   }
 
+  /** The risk cue definition (pinned); null falls back to ally-ai's default. */
+  fetchRiskCueDefinition(): Promise<string | null> {
+    return this.livePrompt('debrief_risk_cue_definition');
+  }
+
   private async livePrompt(code: string): Promise<string | null> {
     const rows = await this.dataSource.query(
       `SELECT pv.prompt

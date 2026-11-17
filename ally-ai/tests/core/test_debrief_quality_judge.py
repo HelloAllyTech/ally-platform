@@ -71,7 +71,7 @@ class TestPrompt:
 
     def test_optional_context_appears_only_when_given(self):
         bare = build_judge_prompt(TRANSCRIPT, "x", "en")
-        assert "TRAINEE LEVEL" not in bare and "<guidance>" not in bare
+        assert "TRAINEE LEVEL: none" in bare and "<guidance>" not in bare
         full = build_judge_prompt(
             TRANSCRIPT, "x", "en", learner_level="LAY", guidance="Ask directly."
         )
@@ -79,7 +79,8 @@ class TestPrompt:
         assert "<guidance>\nAsk directly.\n</guidance>" in full
 
     def test_a_supplied_rubric_replaces_the_default(self):
-        prompt = build_judge_prompt(TRANSCRIPT, "x", "en", rubric="LIVE RUBRIC")
+        live = "LIVE RUBRIC {{risk_cue_definition}} {{transcript}} {{debrief}}"
+        prompt = build_judge_prompt(TRANSCRIPT, "x", "en", rubric=live)
         assert prompt.startswith("LIVE RUBRIC")
         assert "WHO IS WHO" not in prompt
 
@@ -253,7 +254,7 @@ class TestEndpoint:
         assert r.status_code == 200
         body = r.json()
         assert body["dimensions"] == [] and body["hard_fails"] == []
-        assert body["judge_prompt_version"] == "v1"
+        assert body["judge_prompt_version"] == "v2"
 
     def test_the_endpoint_passes_the_store_instructions(self, client, dispatch_returns):
         calls = dispatch_returns(_output())
@@ -268,7 +269,7 @@ class TestEndpoint:
         assert r.status_code == 200
         assert calls["prompt"].endswith("LIVE INSTRUCTIONS")
         # Same text, same series: the version label does not move.
-        assert r.json()["judge_prompt_version"] == "v1"
+        assert r.json()["judge_prompt_version"] == "v2"
 
 
 class TestAgentLog:

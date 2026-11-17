@@ -153,11 +153,10 @@ describe("Tabs", () => {
     const itemsWithoutCount = [{ id: "tab1", label: "Tab 1" }];
     render(<Tabs items={itemsWithoutCount} activeId="tab1" onChange={onChange} />);
 
-    // When count is undefined, it defaults to "0"
+    // A tab with no count shows no number (it used to show a stray "0")
     expect(screen.getByText(/Tab 1/)).toBeInTheDocument();
-    // Verify that count defaults to "0" when undefined
     const tabButton = screen.getByText(/Tab 1/);
-    expect(tabButton.textContent?.trim()).toBe("Tab 1 0");
+    expect(tabButton.textContent?.trim()).toBe("Tab 1");
   });
 
   it("scrolls an off-screen active tab into view within the strip", () => {

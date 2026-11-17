@@ -65,6 +65,17 @@ def _analyst_inputs(state: State, ctx: Ctx):
         ctx.turns_line,
         "the scenario",
         n(len(ctx.sess("expected_behaviours") or []), "expected behaviour"),
+        *(
+            [
+                n(
+                    len(ctx.sess("helpful_behaviours") or [])
+                    + len(ctx.sess("unhelpful_behaviours") or []),
+                    "roleplay behaviour",
+                )
+            ]
+            if ctx.sess("helpful_behaviours") or ctx.sess("unhelpful_behaviours")
+            else []
+        ),
         *(["the case memory"] if body.case_memory(state, ctx) else []),
         *(
             [f"the live detector’s record ({detected} of {len(live)} detected)"]

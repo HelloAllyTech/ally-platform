@@ -103,12 +103,15 @@ export interface RunOptions {
 /** The prompts the debrief graph's steps run, whether or not a release pins them. */
 const GRAPH_PROMPT_CODES: readonly string[] = [
   DEBRIEF_PROMPT_CODES.safetyReader,
+  DEBRIEF_PROMPT_CODES.riskCueDefinition,
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
   DEBRIEF_PROMPT_CODES.progress,
   DEBRIEF_PROMPT_CODES.writer,
   DEBRIEF_PROMPT_CODES.reviser,
   DEBRIEF_PROMPT_CODES.rubric,
+  DEBRIEF_PROMPT_CODES.evaluator,
+  DEBRIEF_PROMPT_CODES.evaluatorFix,
 ];
 
 /** An optional read that can never fail the run: any error gives the fallback. */
@@ -955,6 +958,9 @@ export function sessionForGraph(
     scenario_id: s.scenarioId,
     scenario: s.scenario,
     expected_behaviours: s.expectedBehaviours,
+    helpful_behaviours: s.helpfulBehaviours ?? [],
+    unhelpful_behaviours: s.unhelpfulBehaviours ?? [],
+    competencies: s.competencies ?? [],
     assessment: s.assessment,
     in_case: s.inCase,
   };

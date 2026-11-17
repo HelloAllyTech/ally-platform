@@ -28,7 +28,9 @@ interface SavedViewTabsProps {
   canSave: boolean;
   onSelect: (id: string | null) => void;
   /** Creates a new, EMPTY view — see createNewView in useSavedViews. */
-  onCreateView: (name: string) => void;
+  onCreateView: (name: string, fromCurrent?: boolean) => void;
+  /** Whether anything is filtered or sorted away from the default — gates "Save filters". */
+  hasCurrentFilters: boolean;
   onRename: (id: string, name: string) => void;
   onTogglePinned: (view: RoadmapSavedView) => void;
   onDelete: (view: RoadmapSavedView) => void;
@@ -62,6 +64,7 @@ export const SavedViewTabs: React.FC<SavedViewTabsProps> = ({
   canSave,
   onSelect,
   onCreateView,
+  hasCurrentFilters,
   onRename,
   onTogglePinned,
   onDelete,
@@ -70,6 +73,8 @@ export const SavedViewTabs: React.FC<SavedViewTabsProps> = ({
   const [isEditingAny, setIsEditingAny] = useState(false);
   const [isNaming, setIsNaming] = useState(false);
   const [newName, setNewName] = useState("");
+  /** Whether the name being typed is for a snapshot of the current filters or an empty view. */
+  const [namingFromCurrent, setNamingFromCurrent] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<RoadmapSavedView | null>(null);
 
   // Press-and-drag: a click under the threshold selects the tab, a press-and-move past it
@@ -94,7 +99,8 @@ export const SavedViewTabs: React.FC<SavedViewTabsProps> = ({
     const name = newName.trim();
     setIsNaming(false);
     setNewName("");
-    if (name) onCreateView(name);
+    if (name) onCreateView(name, namingFromCurrent);
+    setNamingFromCurrent(false);
   };
 
   return (
@@ -170,11 +176,12 @@ export const SavedViewTabs: React.FC<SavedViewTabsProps> = ({
                 if (event.key === "Enter") commitNewName();
                 if (event.key === "Escape") {
                   setIsNaming(false);
+                  setNamingFromCurrent(false);
                   setNewName("");
                 }
               }}
               placeholder="View name"
-              aria-label="New view name"
+              aria-label={namingFromCurrent ? "Name for the saved filters" : "New view name"}
               className="border-border-light w-40 border px-2 py-1 text-sm outline-none"
             />
           ) : (
@@ -186,16 +193,41 @@ export const SavedViewTabs: React.FC<SavedViewTabsProps> = ({
               convention in ally-web/CLAUDE.md. align="bottom" for the same reason the header's
               tooltips use it: pointing up from this row renders off the top of the viewport.
             */
-            <Tooltip label="New view" align="bottom">
-              <button
-                type="button"
-                aria-label="New view"
-                onClick={() => setIsNaming(true)}
-                className="text-typography-secondary hover:text-typography-primary inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
-              >
-                <Add size={18} />
-              </button>
-            </Tooltip>
+            <>
+              {/* Split in two: "+" starts EMPTY, this one keeps what you are looking at. Only
+                  offered once something is actually filtered — saving the unfiltered board as
+                  a view would be a copy of "All". */}
+              {hasCurrentFilters && (
+                <Tooltip
+                  label="Save the filters, sort and layout you have now as a new view."
+                  align="bottom"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNamingFromCurrent(true);
+                      setIsNaming(true);
+                    }}
+                    className="text-typography-secondary hover:text-primary-500 cursor-pointer whitespace-nowrap text-sm"
+                  >
+                    Save filters as view
+                  </button>
+                </Tooltip>
+              )}
+              <Tooltip label="New empty view" align="bottom">
+                <button
+                  type="button"
+                  aria-label="New empty view"
+                  onClick={() => {
+                    setNamingFromCurrent(false);
+                    setIsNaming(true);
+                  }}
+                  className="text-typography-secondary hover:text-typography-primary inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
+                >
+                  <Add size={18} />
+                </button>
+              </Tooltip>
+            </>
           )}
         </div>
       )}

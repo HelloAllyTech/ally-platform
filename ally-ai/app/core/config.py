@@ -282,10 +282,13 @@ class DebriefQualityJudgeSettings(BaseModel):
     """Debrief-quality judge — how good is the whole debrief, scored per rubric
     dimension? The independent judge the debrief quality bar is read from.
     Sibling of the groundedness judge: separate call, separate rubric version,
-    comparisons valid only within one (MODEL, PROMPT_VERSION) pair."""
+    comparisons valid only within one (MODEL, PROMPT_VERSION) pair.
+
+    v2 (2026-11-16): the rubric and the judge read the RISK CUE DEFINITION;
+    only a missed clear risk cue is the missed_risk_cue hard fail."""
 
     MODEL: str = Field("gemini-2.5-pro")
-    PROMPT_VERSION: str = Field("v1")
+    PROMPT_VERSION: str = Field("v2")
 
 
 class DebriefSettings(BaseModel):

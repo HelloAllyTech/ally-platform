@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { DebriefClinicalListsService } from './debrief-clinical-lists.service';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ContextRetrievalService } from '../../context-library/service/context-retrieval.service';
@@ -8,6 +9,7 @@ import {
   checkWeight,
   DebriefCards,
   keepOfferedPractice,
+  publishableCards,
   renderCards,
   runDebriefChecks,
   SafetyReading,
@@ -17,6 +19,7 @@ import { guidancePassage, guidanceSearch } from '../util/debrief-guidance.util';
 import { DebriefAggregatesService } from './debrief-aggregates.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefRunClaims } from './debrief-run-token.service';
+import { customCodesIn } from '../util/debrief-competencies.util';
 
 /** At most this many moments are looked up per call, as the in-process runner did. */
 const MAX_TOPICS = 3;
@@ -43,6 +46,8 @@ export class DebriefGatewayService {
     private readonly context: DebriefContextRepository,
     private readonly guidance: ContextRetrievalService,
     private readonly aggregates: DebriefAggregatesService,
+    /** Settings › Clinical lists; the checks use the defaults without it. */
+    @Optional() private readonly clinicalLists?: DebriefClinicalListsService,
   ) {}
 
   /** The session the run is for, as the orchestrator's data tools scope to it. */
@@ -179,6 +184,10 @@ export class DebriefGatewayService {
       language: body.language,
       shortForm: !!body.short_form,
       hasProgress: !!body.has_progress,
+      clinical:
+        (await this.clinicalLists
+          ?.patterns(body.language)
+          .catch(() => undefined)) ?? undefined,
     });
     return {
       failures,
@@ -194,9 +203,11 @@ export class DebriefGatewayService {
   /**
    * Point ids, and roleplay links kept only for roleplays the learner was
    * offered; "Practise next" falls back to `fallback` (this same roleplay,
-   * else the first option) rather than losing its button.
+   * else the first option) rather than losing its button. The last resort
+   * against a custom competency code: whatever the revisions left is
+   * replaced by the competency's first helpful behaviour, or removed.
    */
-  finaliseCards(body: {
+  async finaliseCards(body: {
     cards: DebriefCards;
     offered?: number[];
     fallback?: number | null;
@@ -206,8 +217,18 @@ export class DebriefGatewayService {
       body.fallback != null
         ? Number(body.fallback)
         : (body.offered?.[0] ?? null);
+    const codes = customCodesIn(body.cards);
+    const resolved = codes.length
+      ? await this.context.resolveCustomCodes(codes)
+      : undefined;
     return {
-      cards: withPointIds(keepOfferedPractice(body.cards, offered, fallback)),
+      cards: withPointIds(
+        keepOfferedPractice(
+          publishableCards(body.cards, resolved),
+          offered,
+          fallback,
+        ),
+      ),
     };
   }
 

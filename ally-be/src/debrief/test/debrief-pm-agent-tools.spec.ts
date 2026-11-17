@@ -1134,3 +1134,27 @@ describe('the scheduler packs the inputs and calls ally-ai with an agent token',
     expect(t.svc.call).not.toHaveBeenCalled();
   });
 });
+
+describe('prompt_read (review 2026-11-16)', () => {
+  it('reads a Debrief prompt as the next run reads it', async () => {
+    const { svc } = tools({});
+    const out = await svc.call('prompt_read', CLAIMS, {
+      code: 'debrief_risk_cue_definition',
+    });
+    expect(out).toMatchObject({
+      code: 'debrief_risk_cue_definition',
+      version: 'current',
+      text: expect.any(String),
+    });
+  });
+
+  it('refuses a prompt that is not the Debrief’s', async () => {
+    const { svc } = tools({});
+    const out = await svc.call('prompt_read', CLAIMS, {
+      code: 'some_other_product_prompt',
+    });
+    expect(out).toMatchObject({
+      refused: expect.stringContaining('unknown prompt code'),
+    });
+  });
+});

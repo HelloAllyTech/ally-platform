@@ -149,6 +149,15 @@ function build(
             scenarioId: 41,
             scenario: { title: 'x', description: 'y' },
             expectedBehaviours: ['open questions'],
+            helpfulBehaviours: ['Uses the client name'],
+            unhelpfulBehaviours: ['Interrupts the client'],
+            competencies: [
+              {
+                name: 'open questions',
+                helpful: ['Asks open questions'],
+                unhelpful: [],
+              },
+            ],
             assessment: false,
             inCase: opts.inCase ?? false,
             languageRecorded: opts.languageRecorded ?? true,
@@ -311,6 +320,16 @@ describe('DebriefRunnerService', () => {
         learner_turns: 8,
         scenario_id: 41,
         expected_behaviours: ['open questions'],
+        // The competencies' content goes with the names (review 2026-11-16).
+        helpful_behaviours: ['Uses the client name'],
+        unhelpful_behaviours: ['Interrupts the client'],
+        competencies: [
+          {
+            name: 'open questions',
+            helpful: ['Asks open questions'],
+            unhelpful: [],
+          },
+        ],
         assessment: false,
         in_case: false,
       });

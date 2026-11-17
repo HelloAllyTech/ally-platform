@@ -222,7 +222,9 @@ export class DebriefConsoleViewService implements OnModuleInit {
     const undo = p(Math.round(FLAG_UNDO_MS / 1000));
     const pass = p(DEBRIEF_SEED_BUNDLE.settings.passScore);
     const where: string[] = [];
-    if (f.mode === 'production') where.push(`r.mode IN ('shadow','live')`);
+    // What people see is what learners got: live runs only. Shadow runs
+    // (by hand, "Debrief one session now") stay for analysis, never listed.
+    if (f.mode === 'production') where.push(`r.mode = 'live'`);
     else if (f.mode !== 'any') where.push(`r.mode = ${p(f.mode)}`);
     if (f.tenantId) where.push(`r.tenant_id = ${p(f.tenantId)}`);
     if (f.language) where.push(`r.language = ${p(f.language)}`);

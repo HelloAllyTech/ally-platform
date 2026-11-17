@@ -27,6 +27,7 @@ import {
   ROADMAP_EFFORT_UNSIZED,
   SOURCE_LABEL,
   STAGE_LABEL,
+  VISIBLE_STAGES,
   typeLabel,
 } from "./stages";
 
@@ -174,7 +175,7 @@ export const buildFacetSections = (
           {
             id: "stage" as const,
             label: "Stage",
-            options: Object.values(RoadmapOpportunityStage).map(value => ({
+            options: VISIBLE_STAGES.map(value => ({
               label: STAGE_LABEL[value] ?? value,
               value,
             })),

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { Search as CarbonSearch, Tooltip } from "@ally-ui-mono/ui-shared";
 import { Add, Close, Plus } from "@assets";
@@ -6,6 +6,8 @@ import { Button } from "@components";
 import { ListToolbarProps, FilterChipProps } from "@components/types";
 import { en } from "@constants";
 import { formatCapitalizedEnum } from "@utils";
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 export const ListToolbar: React.FC<ListToolbarProps> = ({
   searchValue,
@@ -19,7 +21,43 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
   tertiaryAction,
   className,
   addFilterButtonRef,
+  searchDebounceMs = SEARCH_DEBOUNCE_MS,
 }) => {
+  /**
+   * The input is driven by local state so typing never waits on the parent; the parent is told
+   * after `searchDebounceMs` of quiet. Without this every keystroke fired a refetch on Events,
+   * Characters, Component Library, Blog and Users. Clear is immediate. An external change to
+   * `searchValue` (e.g. a URL reset) is adopted unless it is just the echo of what we sent.
+   */
+  const [localValue, setLocalValue] = useState(searchValue);
+  const lastSentRef = useRef(searchValue);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (searchValue !== lastSentRef.current) {
+      lastSentRef.current = searchValue;
+      setLocalValue(searchValue);
+    }
+  }, [searchValue]);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const sendSearch = (value: string) => {
+    clearTimeout(timerRef.current);
+    lastSentRef.current = value;
+    onSearchChange(value);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setLocalValue(value);
+    clearTimeout(timerRef.current);
+    if (value === "" || searchDebounceMs <= 0) {
+      sendSearch(value);
+      return;
+    }
+    timerRef.current = setTimeout(() => sendSearch(value), searchDebounceMs);
+  };
+
   /**
    * Carbon's Search, replacing a hand-rolled input that reimplemented what Carbon already
    * ships: the magnifier, the conditional clear button, and the focus treatment. Those three
@@ -42,9 +80,9 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
         size="md"
         labelText={placeholder}
         placeholder={placeholder}
-        value={searchValue}
-        onChange={event => onSearchChange(event.target.value)}
-        onClear={() => onSearchChange("")}
+        value={localValue}
+        onChange={event => handleSearchChange(event.target.value)}
+        onClear={() => handleSearchChange("")}
       />
     </div>
   );

@@ -129,7 +129,7 @@ export class DebriefConsoleService {
               percentile_cont(0.9) WITHIN GROUP (ORDER BY extract(epoch FROM "finishedAt" - "startedAt"))
                 FILTER (WHERE status <> 'skipped') AS secs_p90
          FROM debrief_runs
-        WHERE mode IN ('shadow','live') AND "createdAt" >= now() - make_interval(days => $1)`,
+        WHERE mode = 'live' AND "createdAt" >= now() - make_interval(days => $1)`,
       [days],
     );
     const [today] = await this.dataSource.query(
@@ -199,7 +199,7 @@ export class DebriefConsoleService {
               count(*) FILTER (WHERE r.workspace->>'languageSource' = 'detected_low_confidence')::int AS unsure
          FROM debrief_runs r
          LEFT JOIN tenants t ON t.id::text = r.tenant_id
-        WHERE r.mode IN ('shadow','live') AND r.status <> 'skipped'
+        WHERE r.mode = 'live' AND r.status <> 'skipped'
           AND r."createdAt" >= date_trunc('day', now())
         GROUP BY r.tenant_id, t.name
        HAVING count(*) FILTER (WHERE r.workspace->>'languageSource' LIKE 'detected%')

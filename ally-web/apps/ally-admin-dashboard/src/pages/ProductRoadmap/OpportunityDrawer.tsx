@@ -28,22 +28,29 @@ import {
   RoadmapOpportunityEffort,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
-  RoadmapReferenceImage,
   RoadmapTaxonomyItem,
   RoadmapVoteBudget,
 } from "@types";
 import { hasFeature } from "@utils";
+import { absoluteAppUrl } from "@utils/absoluteAppUrl";
 
 import { CopilotBrief } from "./CopilotBrief";
+import { DirectorStarButton } from "./DirectorStarButton";
 import { RankBreakdownPanel } from "./RankBreakdown";
 import { ReferenceImagesField } from "./ReferenceImagesField";
 import { useScoreUnit } from "./useScoreUnit";
 import { AllocationTarget, useSetVotes } from "./useSetVotes";
+import {
+  DrawerDraft,
+  EMPTY_DRAFT,
+  diffDraft,
+  draftFromOpportunity,
+  isDraftDirty,
+} from "./utils/drawerPatch";
 import { monthKeyOf, monthLabel, shiftMonthKey } from "./utils/monthBoard";
 import { personName } from "./utils/people";
 import { formatPoints } from "./utils/points";
-import { sameReferenceImages } from "./utils/referenceImages";
-import { EFFORT_LABEL, STAGE_LABEL } from "./utils/stages";
+import { EFFORT_LABEL, STAGE_LABEL, displayStage } from "./utils/stages";
 import { isVotable } from "./utils/votes";
 import { VoteButton } from "./VoteButton";
 
@@ -59,7 +66,14 @@ const PRD_MAX = 20000;
 const AUTOSAVE_DEBOUNCE_MS = 800;
 const COMMENT_MAX = 500;
 
-const STAGES = Object.values(RoadmapOpportunityStage);
+// Idea, Prioritised, Released, and Archived (the hide/restore state). `under_development` is
+// retired and never offered; a row still carrying it displays as Prioritised (see displayStage).
+const STAGES = [
+  RoadmapOpportunityStage.NEW,
+  RoadmapOpportunityStage.PRIORITISED,
+  RoadmapOpportunityStage.RELEASED,
+  RoadmapOpportunityStage.ARCHIVED,
+];
 /** Smallest-first — EFFORT_LABEL's key order is the scale's order. See the note there. */
 const EFFORTS = Object.values(RoadmapOpportunityEffort);
 
@@ -145,26 +159,13 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
   const [createComment, { isLoading: isCommenting }] = useCreateRoadmapCommentMutation();
   const [deleteOpportunity, { isLoading: isDeleting }] = useDeleteRoadmapOpportunityMutation();
 
-  const [draft, setDraft] = useState({
-    description: "",
-    stage: RoadmapOpportunityStage.NEW as RoadmapOpportunityStage,
-    productGoal: "",
-    /** "" means unassigned. Holds an Ally user id as a string, matching the dropdown's values. */
-    ownerUserId: "",
-    prd: "",
-    claudePrompt: "",
-    /** 'YYYY-MM', or "" for Unscheduled. */
-    plannedMonth: "",
-    /** A shirt size, or "" for unsized — the same ""-means-null shape plannedMonth uses. */
-    effort: "",
-    /**
-     * Attached images. Part of the DRAFT rather than written straight through, so they ride the
-     * same debounce, the same dirty check and the same "Unsaved changes" line as every other
-     * field — an attachment that saved by its own path would be the one edit the status line
-     * lied about.
-     */
-    referenceImages: [] as RoadmapReferenceImage[],
-  });
+  const [draft, setDraft] = useState<DrawerDraft>(EMPTY_DRAFT);
+  /**
+   * What the draft was loaded from, and then what it was last saved as. Saves send only the
+   * difference from this (see diffDraft), so a field nobody here edited can never overwrite a
+   * change another admin made while the drawer was open.
+   */
+  const [baseline, setBaseline] = useState<DrawerDraft>(EMPTY_DRAFT);
   const [commentBody, setCommentBody] = useState("");
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   /** Set when a save is rejected, cleared on the next edit. See the autosave effect. */
@@ -199,18 +200,9 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
     if (!opportunity) return;
     if (hydratedFor.current === opportunity.id) return;
     hydratedFor.current = opportunity.id;
-    setDraft({
-      description: opportunity.description,
-      stage: opportunity.stage,
-      productGoal: opportunity.productGoal,
-      ownerUserId: opportunity.ownerUserId ? String(opportunity.ownerUserId) : "",
-      prd: opportunity.prd ?? "",
-      claudePrompt: opportunity.claudePrompt ?? "",
-      plannedMonth: opportunity.plannedMonth ?? "",
-      effort: opportunity.effort ?? "",
-      // `?? []` for a row read from a cache written before the field existed.
-      referenceImages: opportunity.referenceImages ?? [],
-    });
+    const loaded = draftFromOpportunity(opportunity);
+    setDraft(loaded);
+    setBaseline(loaded);
   }, [opportunity]);
 
   // A deleted or unknown id should not leave an empty drawer stuck open.
@@ -307,20 +299,7 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
     );
   }, []);
 
-  const isDirty =
-    !!opportunity &&
-    (draft.description !== opportunity.description ||
-      draft.stage !== opportunity.stage ||
-      draft.productGoal !== opportunity.productGoal ||
-      draft.ownerUserId !== (opportunity.ownerUserId ? String(opportunity.ownerUserId) : "") ||
-      draft.prd !== (opportunity.prd ?? "") ||
-      draft.claudePrompt !== (opportunity.claudePrompt ?? "") ||
-      draft.plannedMonth !== (opportunity.plannedMonth ?? "") ||
-      draft.effort !== (opportunity.effort ?? "") ||
-      // By VALUE, not identity. Every keystroke in a caption rebuilds the array, so an identity
-      // check would leave this drawer permanently dirty and re-arm the autosave every 800ms for
-      // as long as it stayed open — see sameReferenceImages.
-      !sameReferenceImages(draft.referenceImages, opportunity.referenceImages ?? []));
+  const isDirty = !!opportunity && isDraftDirty(draft, baseline);
 
   /**
    * Soft-delete. The backend also returns every contributor's votes to them, soft-deletes the
@@ -366,29 +345,15 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
   }, [onOpenBuilderSession, openBuilderSession, opportunityId]);
 
   const save = useCallback(async () => {
+    // Only what changed — see diffDraft. Nothing changed means nothing to send.
+    const body = diffDraft(draft, baseline);
+    if (Object.keys(body).length === 0) return;
+    const sent = draft;
     try {
-      await updateOpportunity({
-        id: opportunityId,
-        body: {
-          description: draft.description.trim(),
-          stage: draft.stage,
-          productGoal: draft.productGoal,
-          // null un-assigns. The legacy free-text `owner` is no longer writable — an owner must be
-          // one of the named accounts the picker lists, and the backend answers 422 for anyone
-          // else it has not already got on the row.
-          ownerUserId: draft.ownerUserId ? Number(draft.ownerUserId) : null,
-          prd: draft.prd || null,
-          claudePrompt: draft.claudePrompt || null,
-          // "" is the Unscheduled option, which must send null — sending "" would fail the
-          // month-key @Matches with a 400 instead of clearing the plan.
-          plannedMonth: draft.plannedMonth || null,
-          // "" is the Not-sized option and must send null, the same way plannedMonth's
-          // Unscheduled does — the column is nullable and "" would fail the enum check.
-          effort: (draft.effort || null) as RoadmapOpportunityEffort | null,
-          // The full resulting list, which is what the API takes — `[]` clears them.
-          referenceImages: draft.referenceImages,
-        },
-      }).unwrap();
+      await updateOpportunity({ id: opportunityId, body }).unwrap();
+      // The sent snapshot becomes the new baseline, so edits typed while the request was in flight
+      // still differ from it and ride the next autosave.
+      setBaseline(sent);
       setHasSavedOnce(true);
       // No success toast. It fired on every manual save, which was once per visit; on a debounce
       // it would fire on every pause in typing. The status line below the fields carries it
@@ -399,7 +364,7 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
       toast.error(message);
       setSaveFailed(true);
     }
-  }, [draft, opportunityId, updateOpportunity]);
+  }, [draft, baseline, opportunityId, updateOpportunity]);
 
   /**
    * Any edit clears the failure flag, so the retry is the user's next keystroke rather than a
@@ -520,7 +485,7 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
   }, [canManage, isDirty, saveFailed, save, onClose]);
 
   const copyLink = async () => {
-    const url = `${window.location.origin}${ROUTES.PRODUCT_ROADMAP}?opportunity=${opportunityId}`;
+    const url = absoluteAppUrl(`${ROUTES.PRODUCT_ROADMAP}?opportunity=${opportunityId}`);
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Link copied.");
@@ -635,6 +600,8 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
               First in the set and fenced off from the drawer-level icons by a rule: it acts on
               the opportunity, they act on the drawer.
             */}
+            {/* Renders only for the Prod Director; null (hidden) for everyone else. */}
+            {opportunity && <DirectorStarButton opportunity={opportunity} />}
             {canVote && budget && opportunity && isVotable(opportunity) && (
               <>
                 <VoteButton opportunity={opportunity} budget={budget} onSetVotes={setVotes} />
@@ -786,7 +753,9 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
                 label="Choose a stage"
                 items={stageItems}
                 itemToString={item => item?.label ?? ""}
-                selectedItem={stageItems.find(item => item.value === draft.stage) ?? null}
+                selectedItem={
+                  stageItems.find(item => item.value === displayStage(draft.stage)) ?? null
+                }
                 disabled={!canManage}
                 onChange={({ selectedItem }) => {
                   if (!selectedItem) return;

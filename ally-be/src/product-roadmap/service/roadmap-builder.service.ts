@@ -127,19 +127,16 @@ export class RoadmapBuilderService {
       };
     }
 
-    // Handing work to Builder IS starting it, so the board should say so
-    // rather than leaving the row sitting in `new` while a build runs against
-    // it. Only forward, and only from the two stages that precede development:
-    // a row someone has already marked released or archived is not something
-    // this should reopen.
-    if (
-      opportunity.stage === RoadmapOpportunityStage.NEW ||
-      opportunity.stage === RoadmapOpportunityStage.PRIORITISED
-    ) {
+    // Handing work to Builder IS committing to it, so an Idea is accepted (Prioritised) rather
+    // than left sitting in `new` while a build runs against it. There is no "in development"
+    // stage any more (retired 2026-11): "being built" is the linked builder session, not a rung.
+    // Only forward from `new`: a Prioritised row already says it, and a row someone has marked
+    // released or archived is not something this should reopen.
+    if (opportunity.stage === RoadmapOpportunityStage.NEW) {
       await this.opportunityRepository.update(
         { id: opportunityId },
         {
-          stage: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
+          stage: RoadmapOpportunityStage.PRIORITISED,
           updatedBy: userId,
         },
       );

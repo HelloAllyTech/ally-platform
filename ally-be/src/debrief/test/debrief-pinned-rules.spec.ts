@@ -40,6 +40,8 @@ function build(opts: { versions?: Record<string, number> } = {}) {
     [SAFETY]: 'Find every risk cue. Name the moment. Say how they responded.',
     [RUBRIC]: 'Score eight dimensions.',
     [JUDGE]: 'List the risk cues first.',
+    debrief_risk_cue_definition:
+      'A clear risk cue is wanting to die. Low mood is possible.',
   };
   const lessons: Row[] = [];
   const audit: Row[] = [];
@@ -141,6 +143,9 @@ function build(opts: { versions?: Record<string, number> } = {}) {
       }
       return [];
     }
+    if (s.startsWith('SELECT "currentVersion" FROM prompts WHERE id = $1')) {
+      return [{ currentVersion: 1 }];
+    }
     if (s.startsWith('SELECT id FROM prompts WHERE "promptCode"')) {
       return [{ id: `prompt-${p[0]}` }];
     }
@@ -150,7 +155,10 @@ function build(opts: { versions?: Record<string, number> } = {}) {
     prompts: { [SAFETY]: null, [RUBRIC]: null },
   };
   const createVersion = jest.fn(async () => ({ version: 2 }));
+  const promote = jest.fn(async () => ({}));
   const createDraft = jest.fn(async () => ({ id: 'rel-draft', version: 12 }));
+  const makeGa = jest.fn(async () => ({ id: 'rel-draft', version: 12 }));
+  const getGa = jest.fn(async () => ({ id: 'ga' }));
   const svc = new DebriefPmAgentService(
     { query } as any,
     {
@@ -162,13 +170,22 @@ function build(opts: { versions?: Record<string, number> } = {}) {
     } as any,
     {} as any,
     {} as any,
-    { createDraft } as any,
-    { latestVersionOf: jest.fn(async () => 1), createVersion } as any,
-    {} as any,
+    { createDraft, makeGa, getGa } as any,
+    { latestVersionOf: jest.fn(async () => 1), createVersion, promote } as any,
+    { get: jest.fn(async () => ({ watchDays: 14 })) } as any,
     {} as any,
     {} as any,
   );
-  return { svc, lessons, audit, versions, createVersion, createDraft };
+  return {
+    svc,
+    lessons,
+    audit,
+    versions,
+    createVersion,
+    createDraft,
+    makeGa,
+    promote,
+  };
 }
 
 const firstVersions = (lessons: Row[]) =>
@@ -332,13 +349,16 @@ describe('pinned rules: proposals', () => {
       expect.objectContaining({
         body: 'Proposed change to the Safety rules: Clearer',
         excludeUserId: ADVISOR,
-        data: expect.objectContaining({ url: `/debriefs/pm-agent?change=${id}` }),
+        data: expect.objectContaining({
+          url: `/debriefs/pm-agent?change=${id}`,
+        }),
       }),
     );
   });
 
-  it('the proposer may approve their own proposal: a new version and a DRAFT release', async () => {
-    const { svc, lessons, createVersion, createDraft } = build();
+  it('the proposer may approve their own proposal: a new version, live for everyone at once and watched', async () => {
+    const { svc, lessons, createVersion, createDraft, makeGa, promote } =
+      build();
     const { id } = await propose(svc, ADVISOR);
     const res = await svc.approvePinnedRule(id, ADVISOR);
     expect(createVersion).toHaveBeenCalledWith(
@@ -350,12 +370,60 @@ describe('pinned rules: proposals', () => {
     );
     expect(createDraft).toHaveBeenCalled();
     expect(res.releaseId).toBe('rel-draft');
+    // Every reader (the judge reads the store) sees the signed-off version.
+    expect(promote).toHaveBeenCalledWith(
+      `prompt-${SAFETY}`,
+      2,
+      1,
+      expect.objectContaining({ signedOffPinnedRule: true }),
+    );
+    // The sign-off is the gate: no learner try-out at this volume (2026-11-16).
+    expect(makeGa).toHaveBeenCalledWith(
+      'rel-draft',
+      ADVISOR,
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
     const idea = lessons.find((l) => l.id === id)!;
-    expect(idea.status).toBe('approved');
+    expect(idea.status).toBe('active');
+    expect(idea.evidence.canary).toMatchObject({ status: 'skipped' });
+    expect(idea.evidence.watch).toMatchObject({
+      status: 'watching',
+      releaseId: 'rel-draft',
+      previousReleaseId: 'ga',
+    });
     expect(idea.evidence.signoff).toMatchObject({
       by: ADVISOR,
       promptVersion: 2,
     });
+  });
+
+  it('a pinned rule read from the Skills Store (the risk cue definition) goes live by promoting it there', async () => {
+    const { svc, lessons, promote, createDraft, makeGa } = build();
+    const { id } = await svc.proposePinnedRule(
+      {
+        promptCode: 'debrief_risk_cue_definition',
+        find: 'Low mood is possible.',
+        replace: 'Low mood or hopelessness about one part of life is possible.',
+        why: 'Clearer',
+      },
+      ADVISOR,
+    );
+    await svc.approvePinnedRule(id, OWNER);
+    expect(promote).toHaveBeenCalledWith(
+      'prompt-debrief_risk_cue_definition',
+      2,
+      1,
+      expect.objectContaining({
+        confirmPinnedChange: true,
+        signedOffPinnedRule: true,
+      }),
+    );
+    // Not in the release bundle: no draft release, nothing to promote there.
+    expect(createDraft).not.toHaveBeenCalled();
+    expect(makeGa).not.toHaveBeenCalled();
+    expect(lessons.find((l) => l.id === id)!.status).toBe('approved');
   });
 
   it('withdraw: only by the person who proposed it, closed as withdrawn and audited', async () => {

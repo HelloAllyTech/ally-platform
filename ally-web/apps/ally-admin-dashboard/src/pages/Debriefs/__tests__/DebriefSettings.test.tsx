@@ -353,6 +353,7 @@ describe("Debrief settings page: who can change what", () => {
       "Autonomy",
       "Score",
       "Pinned rules",
+      "Clinical lists",
       "Progress",
     ]);
     expect(nav.className).toContain("sticky");
@@ -418,7 +419,7 @@ describe("Debrief settings page: who can change what", () => {
     expect(note).toHaveClass("truncate");
     expect(screen.getByTestId("settings-tabs")).toHaveClass("flex-nowrap");
     // Score, Pinned rules and Progress are tabs at lg and up, More items below it.
-    for (const id of ["weights", "pinned", "progress"])
+    for (const id of ["weights", "pinned", "clinical", "progress"])
       expect(tab(id)).toHaveClass("hidden", "min-[1056px]:inline");
     expect(tab("orgs")).not.toHaveClass("hidden");
     fireEvent.click(screen.getByRole("button", { name: "More" }));

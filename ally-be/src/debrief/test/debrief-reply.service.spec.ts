@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { firstValueFrom, toArray } from 'rxjs';
 import { AskAllyError, ReplyTrace } from '../service/ask-ally.client';
 import {
@@ -5,8 +7,12 @@ import {
   REPLY_FAILED,
   REPLY_LENGTH_REMINDER,
   REPLY_LIMIT,
+  renderReplySystem,
   replyAllowance,
 } from '../service/debrief-reply.service';
+
+const REPLY_TEMPLATE: string =
+  'REPLY PROMPT\n{{session_language}}\n{{debrief}}\n{{transcript}}\n{{organisation}}\nREPLY LIMIT: {{reply_word_limit}} words.';
 
 const RUN = {
   id: 'run-1',
@@ -95,7 +101,7 @@ function build(opts: {
     promptText: jest.fn(async (code: string) =>
       code === 'debrief_safety_reader_system'
         ? 'SAFETY PROMPT'
-        : 'REPLY PROMPT',
+        : REPLY_TEMPLATE,
     ),
     pastWorkOnThis: jest.fn(async () => []),
     orgWording: jest.fn(async () =>
@@ -409,6 +415,55 @@ describe('DebriefReplyService (Ask Ally)', () => {
     expect(done.content).not.toContain('7/10');
   });
 
+  it('replaces a reply over the word cap, like any other failed check', async () => {
+    const long = Array.from({ length: 121 }, (_, i) => `w${i}`).join(' ');
+    const { svc } = build({ reply: { text: long } });
+    const done = (await run(svc, 'Tell me everything.')).find(
+      (e) => e.type === 'done',
+    );
+    expect(done.content).not.toContain('w120');
+  });
+
+  it('fills the reply prompt’s placeholders; the cap is the last line', () => {
+    expect(REPLY_LENGTH_REMINDER).toBe('REPLY LIMIT: 120 words.');
+    const seed = readFileSync(
+      join(__dirname, '../../prompts/debrief/reply_system.txt'),
+      'utf8',
+    );
+    const out = renderReplySystem(seed, {
+      session_language: 'hi',
+      debrief: '{"opening":"x"}',
+      transcript: 'client: hello',
+      organisation: 'none',
+      reply_word_limit: 120,
+    });
+    expect(out.trim().endsWith(REPLY_LENGTH_REMINDER)).toBe(true);
+    expect(out.split('in short paragraphs').length - 1).toBe(1);
+    expect(out.split('client: hello').length - 1).toBe(1);
+    expect(out).not.toContain('{{');
+  });
+
+  it('fails loudly when the live reply prompt lacks a required variable', async () => {
+    expect(() =>
+      renderReplySystem('No placeholders here.', {
+        session_language: 'en',
+        debrief: '{}',
+        transcript: 'x',
+        organisation: 'none',
+        reply_word_limit: 120,
+      }),
+    ).toThrow(
+      /debrief_reply_system is missing required variable\(s\) .*\{\{debrief\}\}/,
+    );
+    const { svc, askAlly, context } = build({ reply: { text: 'Fine.' } });
+    context.promptText.mockImplementation(
+      async () => 'OLD TEXT, NO PLACEHOLDERS',
+    );
+    const events = await run(svc, 'ok');
+    expect(events.map((e) => e.type)).toEqual(['start', 'error']);
+    expect(askAlly.reply).not.toHaveBeenCalled();
+  });
+
   it('replaces a reply that quotes words nobody said', async () => {
     const { svc } = build({
       reply: { text: 'She said "I am going to leave home tonight" there.' },
@@ -504,7 +559,7 @@ describe('DebriefReplyService (Ask Ally)', () => {
   it('sends no Safety reader prompt when none is live, so ally-ai uses its default', async () => {
     const { svc, askAlly, context } = build({ reply: { text: 'Fine.' } });
     context.promptText.mockImplementation(async (code: string) =>
-      code === 'debrief_safety_reader_system' ? (null as any) : 'REPLY PROMPT',
+      code === 'debrief_safety_reader_system' ? (null as any) : REPLY_TEMPLATE,
     );
     await run(svc, 'ok');
     expect(sent(askAlly).safety_system).toBeNull();

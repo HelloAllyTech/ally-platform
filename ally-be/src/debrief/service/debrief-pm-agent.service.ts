@@ -1688,7 +1688,10 @@ export class DebriefPmAgentService
     await this.notifier?.pinnedRuleDeciders({
       title: 'Debriefs: a pinned-rule change needs approval',
       body: `Proposed change to the ${pinnedRuleName(input.promptCode)}: ${why}`,
-      data: { ideaId: rows[0].id, url: `/debriefs/pm-agent?change=${rows[0].id}` },
+      data: {
+        ideaId: rows[0].id,
+        url: `/debriefs/pm-agent?change=${rows[0].id}`,
+      },
       excludeUserId: userId,
     });
     return { id: rows[0].id };
@@ -1758,6 +1761,26 @@ export class DebriefPmAgentService
     const next: DebriefBundle = JSON.parse(JSON.stringify(bundle));
     let releaseId: string | null = null;
     let releaseVersion: number | null = null;
+    // The signed-off version becomes the Skills Store's current version for
+    // every reader: the runner (for rules outside the release), the
+    // independent judge (which reads the store's rubric and definition) and
+    // the PM agent. A release pins it too when the rule is in the bundle.
+    {
+      const [{ currentVersion }] = await this.dataSource.query(
+        `SELECT "currentVersion" FROM prompts WHERE id = $1`,
+        [prompt.id],
+      );
+      await this.prompts.promote(
+        prompt.id,
+        version.version,
+        currentVersion ?? null,
+        {
+          confirmPinnedChange: true,
+          signedOffPinnedRule: true,
+          requireTranslations: false,
+        },
+      );
+    }
     if (code in next.prompts) {
       next.prompts[code] = version.version;
       const draft = await this.releases.createDraft(
@@ -1795,6 +1818,34 @@ export class DebriefPmAgentService
       releaseId,
       note: note ?? null,
     });
+    // The clinical sign-off is the gate for a pinned rule (review
+    // 2026-11-16): at our volume a learner try-out would never finish, so
+    // the signed-off version goes live for everyone at once and is watched
+    // (A5) with automatic undo, like any change that went live.
+    if (releaseId) {
+      const before = await this.releases.getGa(DEBRIEF_AGENT_KEY);
+      const released = await this.releases.makeGa(
+        releaseId,
+        userId,
+        AgentReleaseAuditAction.PROMOTED,
+        note,
+        actorOf(userId),
+      );
+      releaseVersion =
+        (released as { version?: number })?.version ?? releaseVersion;
+      await this.dataSource.query(
+        `UPDATE agent_lessons SET status = 'active', "updatedAt" = now() WHERE id = $1`,
+        [ideaId],
+      );
+      await this.writeEvidence(ideaId, 'canary', {
+        status: 'skipped',
+        reason: 'signed off: a pinned rule goes live on its sign-off',
+        releaseId,
+        version: releaseVersion,
+        promotedAt: new Date().toISOString(),
+      });
+      await this.startWatch(ideaId, releaseId, before?.id ?? null);
+    }
     return {
       releaseId: releaseId as string,
       version: releaseVersion as number,

@@ -27,6 +27,7 @@ import { SettingsSection } from "../consoleRoutes";
 import { TruncatedTitle } from "../consoleRows";
 import { BackLink, ConsoleTag, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
+import { ClinicalListsSection } from "./ClinicalListsSection";
 import { OrganisationsSection } from "./OrganisationsSection";
 import { PinnedRulesSection } from "./PinnedRulesSection";
 import { SchedulesSection } from "./SchedulesSection";
@@ -47,10 +48,11 @@ const TABS: SettingsSection[] = [
   "autonomy",
   "weights",
   "pinned",
+  "clinical",
   "progress",
 ];
 /** The tabs that move into More below lg (1056px), last first, so the tab row never wraps. */
-const NARROW_MORE: SettingsSection[] = ["weights", "pinned", "progress"];
+const NARROW_MORE: SettingsSection[] = ["weights", "pinned", "clinical", "progress"];
 
 const Section: React.FC<{
   id: SettingsSection;
@@ -340,6 +342,11 @@ export const DebriefSettingsPage: React.FC = () => {
         {current === "pinned" && (
           <Section id="pinned" title={s.nav.pinned} help={s.pinnedHelp}>
             <PinnedRulesSection canAsk={access.approvePinnedRule} />
+          </Section>
+        )}
+        {current === "clinical" && (
+          <Section id="clinical" title={s.nav.clinical} help={s.clinicalHelp}>
+            <ClinicalListsSection canEdit={access.clinicalLists} />
           </Section>
         )}
         {current === "progress" && (

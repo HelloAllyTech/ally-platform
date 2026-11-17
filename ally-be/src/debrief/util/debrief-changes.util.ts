@@ -118,10 +118,14 @@ export function isChange(idea: IdeaRow): boolean {
 
 const STEP_NAMES: Record<string, string> = {
   [DEBRIEF_PROMPT_CODES.safetyReader]: 'Safety reader',
+  [DEBRIEF_PROMPT_CODES.riskCueDefinition]: 'Risk cue definition',
   [DEBRIEF_PROMPT_CODES.analyst]: 'Analyst',
   [DEBRIEF_PROMPT_CODES.writer]: 'Writer',
   [DEBRIEF_PROMPT_CODES.reviser]: 'Reviser',
   [DEBRIEF_PROMPT_CODES.rubric]: 'Rubric',
+  [DEBRIEF_PROMPT_CODES.evaluator]: 'Evaluator',
+  [DEBRIEF_PROMPT_CODES.evaluatorFix]: 'Evaluator',
+  [DEBRIEF_PROMPT_CODES.plannerAgents]: 'Planner',
   [DEBRIEF_PROMPT_CODES.reply]: 'Ask Ally',
   [DEBRIEF_PROMPT_CODES.planner]: 'Planner',
   [DEBRIEF_PROMPT_CODES.protocolCheck]: 'Protocol check',
@@ -144,7 +148,9 @@ const words = (s: string) => {
 const stepName = (code: string) => STEP_NAMES[code] ?? words(code);
 const PINNED = new Set([
   DEBRIEF_PROMPT_CODES.safetyReader,
+  DEBRIEF_PROMPT_CODES.riskCueDefinition,
   DEBRIEF_PROMPT_CODES.rubric,
+  DEBRIEF_PROMPT_CODES.evaluator,
   'debrief_quality_judge_system',
 ]);
 
@@ -213,6 +219,8 @@ const n1 = (x: unknown) =>
 const RULE_PURPOSE: Record<string, string> = {
   [DEBRIEF_PROMPT_CODES.safetyReader]:
     'It decides what counts as a risk cue in a roleplay.',
+  [DEBRIEF_PROMPT_CODES.riskCueDefinition]:
+    'It decides which client words are a clear risk cue that every debrief must cover.',
   [DEBRIEF_PROMPT_CODES.rubric]:
     'It decides what a good debrief must do; every debrief is scored against it.',
   debrief_quality_judge_system:

@@ -31,8 +31,8 @@ describe('deriveStage', () => {
     [BugFindingStatus.PENDING_APPROVAL, RoadmapOpportunityStage.NEW],
     [BugFindingStatus.APPROVED, RoadmapOpportunityStage.PRIORITISED],
     [BugFindingStatus.QUEUED, RoadmapOpportunityStage.PRIORITISED],
-    [BugFindingStatus.FIXING, RoadmapOpportunityStage.UNDER_DEVELOPMENT],
-    [BugFindingStatus.PR_OPENED, RoadmapOpportunityStage.UNDER_DEVELOPMENT],
+    [BugFindingStatus.FIXING, RoadmapOpportunityStage.PRIORITISED],
+    [BugFindingStatus.PR_OPENED, RoadmapOpportunityStage.PRIORITISED],
     [BugFindingStatus.MERGED, RoadmapOpportunityStage.RELEASED],
     [BugFindingStatus.RELEASED, RoadmapOpportunityStage.RELEASED],
     [BugFindingStatus.DISMISSED, RoadmapOpportunityStage.ARCHIVED],
@@ -47,9 +47,9 @@ describe('deriveStage', () => {
    * picked the bug up — putting it back at New would hide an in-flight session
    * among the untriaged.
    */
-  it('keeps a bug waiting on an answer in development, not back at New', () => {
+  it('keeps a bug waiting on an answer at Prioritised, not back at New', () => {
     expect(deriveStage(BugFindingStatus.NEEDS_INPUT)).toBe(
-      RoadmapOpportunityStage.UNDER_DEVELOPMENT,
+      RoadmapOpportunityStage.PRIORITISED,
     );
   });
 
@@ -72,8 +72,19 @@ describe('deriveStage', () => {
 describe('effectiveStage', () => {
   it('derives from status when nothing is pinned', () => {
     expect(effectiveStage(finding({ status: BugFindingStatus.FIXING }))).toBe(
-      RoadmapOpportunityStage.UNDER_DEVELOPMENT,
+      RoadmapOpportunityStage.PRIORITISED,
     );
+  });
+
+  it('reads a pre-retirement under_development override as Prioritised', () => {
+    expect(
+      effectiveStage(
+        finding({
+          status: BugFindingStatus.NEW,
+          stageOverride: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
+        }),
+      ),
+    ).toBe(RoadmapOpportunityStage.PRIORITISED);
   });
 
   /**

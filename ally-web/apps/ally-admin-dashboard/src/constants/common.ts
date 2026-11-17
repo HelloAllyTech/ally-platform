@@ -62,6 +62,7 @@ export const ApiEndpoints = {
     AI_TASKS: "/v1/llm/tasks",
     LLM_MODEL_CATALOG_BY_ID: (id: string) => `/v1/llm/catalog/${id}`,
     PREVIEW_LLM_MODEL: (id: string) => `/v1/llm-preview/model/${id}`,
+    PREVIEW_PROMPT: "/v1/llm-preview/prompt",
     UPDATE_LLM_CONFIG: (id: string) => `/v1/learn/llm-configs/${id}`,
     SCENARIO_LANGUAGES: "/v1/learn/scenario-languages",
     GET_LANGUAGES: "/v1/language",
@@ -410,6 +411,10 @@ export const ApiEndpoints = {
     STRATEGY_GOALS_ORDER: "/v1/product-roadmap/strategy-goals/order",
     STRATEGY_GOALS_ASSESS_MISSING: "/v1/product-roadmap/strategy-goals/assess-missing",
     RANK_WEIGHTS: "/v1/product-roadmap/rank-weights",
+    /** The Prod Director pick (GET/PUT) — a platform admin whose star boosts rank. */
+    PROD_DIRECTOR: "/v1/product-roadmap/prod-director",
+    OPPORTUNITY_DIRECTOR_STAR: (id: string) =>
+      `/v1/product-roadmap/opportunities/${id}/director-star`,
     /** The Vision & strategy page the opportunity copilot reads on every turn. */
     STRATEGY_CONTEXT: "/v1/product-roadmap/strategy-context",
     OPPORTUNITY_GOAL_IMPACT: (id: string) => `/v1/product-roadmap/opportunities/${id}/goal-impact`,
@@ -482,6 +487,7 @@ export const ApiEndpoints = {
     /** Settings › Schedules (engineering only). */
     SCHEDULES: "/v1/debriefs/console/schedules",
     SETTINGS_BASELINE: "/v1/debriefs/console/settings/baseline",
+    CLINICAL_LISTS: "/v1/debriefs/console/settings/clinical-lists",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
     PM_AGENT: "/v1/debriefs/console/pm-agent",
     PM_AGENT_ANALYSE: "/v1/debriefs/console/pm-agent/analyse",

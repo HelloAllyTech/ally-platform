@@ -13,7 +13,6 @@ import { BUG_FINDING_STAGE_LABELS } from "./bugFindingLabels";
 const STAGE_ORDER: BugFindingStage[] = [
   BugFindingStage.NEW,
   BugFindingStage.PRIORITISED,
-  BugFindingStage.UNDER_DEVELOPMENT,
   BugFindingStage.RELEASED,
   BugFindingStage.ARCHIVED,
 ];

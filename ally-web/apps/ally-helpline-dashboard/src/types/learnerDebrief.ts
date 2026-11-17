@@ -65,7 +65,17 @@ export interface DebriefCardsData {
   important_moment?: DebriefImportantMoment | null;
   what_worked: DebriefWhatWorked[];
   work_on_this: DebriefWorkOnThis[];
-  practise_next?: { skill: string; reason: string; scenario_id?: number | null } | null;
+  /**
+   * `try_next`: a session played in a course — "Practise this again" with up
+   * to 3 things to try. `skill` can be missing when a custom competency's
+   * code was removed from an older debrief.
+   */
+  practise_next?: {
+    skill?: string;
+    reason: string;
+    scenario_id?: number | null;
+    try_next?: string[];
+  } | null;
   skill_words: Array<{ skill: string; word: DebriefSkillWord }>;
   reflective_question: string;
   progress_note?: string | null;

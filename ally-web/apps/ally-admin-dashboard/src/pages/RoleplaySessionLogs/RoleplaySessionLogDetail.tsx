@@ -20,6 +20,8 @@ import { useTranscriptDisclaimer } from "@hooks/useTranscriptDisclaimer";
 import { RoleplaySessionWeakMetric } from "@types";
 import { formatDate } from "@utils";
 
+import { SectionNav, SessionPager } from "./DetailNav";
+
 /** Seconds offset -> "m:ss" for transcript turn timestamps. */
 const formatOffset = (seconds: number | null): string => {
   if (seconds === null || seconds < 0) return "";
@@ -281,6 +283,7 @@ export const RoleplaySessionLogDetail: FC = () => {
   const { data, isLoading, isError } = useGetRoleplaySessionLogQuery(id, { skip: !id });
   const transcriptDisclaimer = useTranscriptDisclaimer();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
 
   const goBack = () => navigate(ROUTES.ROLEPLAY_SESSION_LOGS);
@@ -329,14 +332,21 @@ export const RoleplaySessionLogDetail: FC = () => {
   const notApplicableGoals = new Set(data.actorEvaluation?.notApplicableGoals ?? []);
 
   return (
-    <div className="h-full font-primary flex flex-col overflow-y-auto custom-scrollbar">
+    <div
+      ref={pageRef}
+      className="h-full font-primary flex flex-col overflow-y-auto custom-scrollbar"
+    >
       <div className="shrink-0">
-        <Button variant={ButtonVariant.TEXT} onClick={goBack} className="h-[36px] px-0">
-          ← Back to logs
-        </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button variant={ButtonVariant.TEXT} onClick={goBack} className="h-[36px] px-0">
+            ← Back to logs
+          </Button>
+          <SessionPager sessionId={id} />
+        </div>
         <h1 className="text-2xl text-typography-900 font-secondary mt-2 break-words">
           {data.scenarioTitle || "Roleplay session"}
         </h1>
+        <SectionNav containerRef={pageRef} watchKey={data} />
       </div>
 
       {/* Summary card */}

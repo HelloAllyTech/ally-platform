@@ -84,7 +84,7 @@ describe("Analytics › Debriefs › Overall score (v2, U5)", () => {
   it("shows the score, its weekly line with change markers, the measures and the two gates", () => {
     h.score.mockReturnValue(ok(VIEW));
     render(<ScoreSection />);
-    expect(h.score).toHaveBeenCalledWith({ days: 56 });
+    expect(h.score).toHaveBeenCalledWith({ days: 84 });
     const s = screen.getByTestId("score-section");
     expect(within(s).getByRole("heading", { level: 2 })).toHaveTextContent(
       "The overall score held at 7.8 this week.",

@@ -18,6 +18,7 @@ import {
   DebriefRunStatus,
 } from '../enum/debrief-run.enum';
 import { DebriefCards, cardsForReader } from '../util/debrief-cards.util';
+import { readableCards } from '../util/debrief-competencies.util';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefSlackService } from './debrief-slack.service';
 import { DebriefPublishService } from './debrief-publish.service';
@@ -126,10 +127,20 @@ export function sectionText(
         : null;
     case 'opening':
       return cards.opening ?? null;
-    case 'practise_next':
-      return cards.practise_next
-        ? `${cards.practise_next.skill}. ${cards.practise_next.reason}`
-        : null;
+    case 'practise_next': {
+      if (!cards.practise_next) return null;
+      // A course session: "Try the following:" is read after the reason.
+      const tryNext = (cards.practise_next.try_next ?? []).filter(
+        (t) => typeof t === 'string' && t.trim(),
+      );
+      return [
+        cards.practise_next.skill ? `${cards.practise_next.skill}.` : '',
+        cards.practise_next.reason,
+        ...tryNext,
+      ]
+        .filter(Boolean)
+        .join(' ');
+    }
     case 'reflective_question':
       return cards.reflective_question ?? null;
     case 'progress_note':
@@ -480,7 +491,11 @@ export class DebriefFeedbackService {
     return {
       state: 'ready',
       readOnly: true,
-      cards: cardsForReader(run.cards, run.recipeKey),
+      // The supervisor reads what the learner reads: no custom codes.
+      cards: await readableCards(
+        this.dataSource,
+        cardsForReader(run.cards, run.recipeKey),
+      ),
       language: run.language,
       corrections: decorated.corrections ?? [],
       flags: learner

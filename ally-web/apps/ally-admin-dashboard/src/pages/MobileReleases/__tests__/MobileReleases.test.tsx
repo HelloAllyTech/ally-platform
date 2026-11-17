@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Control the data/loading state the page renders from.
@@ -41,7 +42,9 @@ vi.mock("@utils", () => ({
 vi.mock("../tabs/AndroidReleasesTab", () => ({ AndroidReleasesTab: () => null }));
 vi.mock("../tabs/IosTestflightTab", () => ({ IosTestflightTab: () => null }));
 vi.mock("../tabs/AppStoreSubmissionsTab", () => ({ AppStoreSubmissionsTab: () => null }));
-vi.mock("../tabs/ReleaseHistoryTab", () => ({ ReleaseHistoryTab: () => null }));
+vi.mock("../tabs/ReleaseHistoryTab", () => ({
+  ReleaseHistoryTab: () => <div data-testid="history-tab" />,
+}));
 
 // Pulls in @icons/@assets dependencies irrelevant to the overview panel this test covers.
 vi.mock("../components/NextCheckPanel", () => ({ NextCheckPanel: () => null }));
@@ -115,7 +118,11 @@ describe("MobileReleases page — Android pipeline panel gating", () => {
 
   it("does not show the 'no successful build' placeholder while the run history is still loading", () => {
     (useMobileReleases as any).mockReturnValue(makeState({ runs: [], isRunsLoading: true }));
-    render(<MobileReleases />);
+    render(
+      <MemoryRouter>
+        <MobileReleases />
+      </MemoryRouter>,
+    );
 
     // The version card above already shows a build exists — the pipeline
     // panel below must not contradict it just because the separate runs
@@ -125,16 +132,35 @@ describe("MobileReleases page — Android pipeline panel gating", () => {
 
   it("does not show the 'no successful build' placeholder when the run history failed to load", () => {
     (useMobileReleases as any).mockReturnValue(makeState({ runs: [], isRunsError: true }));
-    render(<MobileReleases />);
+    render(
+      <MemoryRouter>
+        <MobileReleases />
+      </MemoryRouter>,
+    );
 
     expect(screen.queryByText(/No successful Android build yet/i)).not.toBeInTheDocument();
   });
 
   it("shows the real pipeline once the run history has loaded with a successful build", () => {
     (useMobileReleases as any).mockReturnValue(makeState({ runs: [androidBuildRun] }));
-    render(<MobileReleases />);
+    render(
+      <MemoryRouter>
+        <MobileReleases />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText("Current Android build's pipeline")).toBeInTheDocument();
     expect(screen.queryByText(/No successful Android build yet/i)).not.toBeInTheDocument();
+  });
+
+  it("opens the history tab named in ?tab=", () => {
+    (useMobileReleases as any).mockReturnValue(makeState({ runs: [] }));
+    render(
+      <MemoryRouter initialEntries={["/mobile-releases?tab=history"]}>
+        <MobileReleases />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("history-tab")).toBeInTheDocument();
   });
 });

@@ -225,11 +225,11 @@ describe('a debrief past the month’s budget', () => {
   });
 });
 
-describe('Practise next inside a course', () => {
+describe('Practise this again inside a course (clinical review 2026-11-16)', () => {
   const practice = (rows: unknown[], ownTip: string | null = 'tip-1') => {
     const dataSource = {
       query: jest.fn(async (q: string) => {
-        if (q.includes('WITH cur')) return rows;
+        if (q.includes('track_item_id')) return rows;
         if (q.includes('"trackItemProgressId" AS tip'))
           return [{ tip: ownTip }];
         if (q.includes('competencies')) return [];
@@ -238,7 +238,10 @@ describe('Practise next inside a course', () => {
     };
     const scenarios = {
       getScenariosV2: jest.fn(async () => ({
-        data: [{ id: 99, title: 'Library roleplay' }],
+        data: [
+          { id: 99, title: 'Library roleplay' },
+          { id: 4, title: 'Another roleplay' },
+        ],
       })),
     };
     return {
@@ -246,79 +249,45 @@ describe('Practise next inside a course', () => {
       scenarios,
     };
   };
+  const thisOne = [
+    { id: 3, title: 'This one', course: 'Basics', track_item_id: 'i3' },
+  ];
 
-  it('offers only reached roleplays of the course, not-done first, this one always, never the library', async () => {
-    const { svc, scenarios } = practice([
-      {
-        id: 1,
-        title: 'Done earlier',
-        course: 'Basics',
-        done: true,
-        current: false,
-        track_item_id: 'i1',
-      },
-      {
-        id: 2,
-        title: 'Skipped earlier',
-        course: 'Basics',
-        done: false,
-        current: false,
-        track_item_id: 'i2',
-      },
+  it('offers only this same roleplay, as its course item; never another roleplay', async () => {
+    const { svc, scenarios } = practice(thisOne);
+    expect(await svc.optionsFor(7, 't1', 's1')).toEqual([
       {
         id: 3,
         title: 'This one',
+        skills: [],
         course: 'Basics',
-        done: false,
-        current: true,
-        track_item_id: 'i3',
+        this_roleplay: true,
+        trackItemId: 'i3',
       },
     ]);
-    const options = await svc.optionsFor(7, 't1', 's1');
-    expect(options.map((o) => o.id)).toEqual([2, 3, 1]);
-    expect(options.every((o) => o.course === 'Basics')).toBe(true);
-    expect(options.find((o) => o.id === 3)?.this_roleplay).toBe(true);
     expect(scenarios.getScenariosV2).not.toHaveBeenCalled();
   });
 
-  it('never offers the library to a course session whose course lists nothing', async () => {
+  it('offers nothing when the course cannot be read', async () => {
     const { svc, scenarios } = practice([]);
     expect(await svc.optionsFor(7, 't1', 's1')).toEqual([]);
     expect(await svc.available(7, 't1', [99], 's1')).toEqual([]);
     expect(scenarios.getScenariosV2).not.toHaveBeenCalled();
   });
 
-  it('offers the library outside a course', async () => {
+  it("offers the learner's own list outside a course", async () => {
     const { svc } = practice([], null);
     expect((await svc.optionsFor(7, 't1', 's1')).map((o) => o.id)).toEqual([
-      99,
+      99, 4,
     ]);
   });
 
-  it('shows a practise button only for a roleplay of the course the learner reached', async () => {
-    const { svc } = practice([
-      {
-        id: 3,
-        title: 'This one',
-        course: 'Basics',
-        done: false,
-        current: true,
-        track_item_id: 'i3',
-      },
-    ]);
-    expect(await svc.available(7, 't1', [3, 99], 's1')).toEqual([
+  it('shows a practise button only for this same course item', async () => {
+    const { svc } = practice(thisOne);
+    expect(await svc.available(7, 't1', [3, 4, 99], 's1')).toEqual([
       { id: 3, title: 'This one', trackItemId: 'i3' },
     ]);
-  });
-
-  it('reads only items at or before this one, or completed ones', async () => {
-    const { svc } = practice([]);
-    await svc.course('s1');
-    const q = ((svc as any).dataSource.query as jest.Mock).mock.calls[0][0];
-    expect(q).toMatch(
-      /\(ts\."order", ti\."order"\) <= \(cur\.s_order, cur\.i_order\)/,
-    );
-    expect(q).toMatch(/p\.status = 'COMPLETED'/);
+    expect(await svc.available(7, 't1', [4, 99], 's1')).toEqual([]);
   });
 });
 

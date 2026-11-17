@@ -42,6 +42,7 @@ interface SectionNodeProps {
     title: string,
   ) => void;
   onDeleteSection: (sectionIndex: number) => void;
+  onDuplicateSection: (sectionIndex: number) => void;
   onReorderItems: (sectionIndex: number, from: number, to: number) => void;
 }
 
@@ -54,6 +55,7 @@ export const SectionNode: FC<SectionNodeProps> = ({
   onAddItem,
   onAddItemFromTemplate,
   onDeleteSection,
+  onDuplicateSection,
   onReorderItems,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -112,6 +114,14 @@ export const SectionNode: FC<SectionNodeProps> = ({
           {section.title?.trim() || `Section ${sectionIndex + 1}`}
         </span>
         {sectionHasError && <WarningAlt className="w-3.5 h-3.5 text-destructive-500" />}
+        <button
+          type="button"
+          onClick={() => onDuplicateSection(sectionIndex)}
+          className="text-xs text-typography-600 hover:text-typography-900 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 max-lg:p-2 max-lg:-m-1"
+          aria-label="Duplicate section"
+        >
+          Duplicate
+        </button>
         <button
           type="button"
           onClick={() => onDeleteSection(sectionIndex)}

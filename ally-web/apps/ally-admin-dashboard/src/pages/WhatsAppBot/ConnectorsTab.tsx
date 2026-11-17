@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 import { Select, SelectItem, SkeletonText } from "@ally-ui-mono/ui-shared";
 import { useBindConnectorMutation } from "@api";
-import { Button, EmptyState } from "@components";
+import { Button, EmptyState, useConfirm } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { Chatbot, WaBusinessNumber } from "@types";
@@ -17,9 +17,18 @@ const ch = en.whatsappBot.bots.channels;
 
 const useMoveChannel = () => {
   const [bind, { isLoading }] = useBindConnectorMutation();
+  const { confirm, dialog } = useConfirm();
   const move = async (number: WaBusinessNumber, chatbotId: string | null) => {
     if (!number.connectorId) return;
-    if (!chatbotId && !window.confirm(t.unassignConfirm)) return;
+    if (
+      !chatbotId &&
+      !(await confirm({
+        title: t.unassignTitle,
+        consequence: t.unassignConfirm,
+        confirmLabel: t.unassignAction,
+      }))
+    )
+      return;
     try {
       await bind({ id: number.connectorId, chatbotId }).unwrap();
       toast.success(chatbotId ? t.assigned : t.unassigned);
@@ -27,7 +36,7 @@ const useMoveChannel = () => {
       toast.error(errorMessage(err, t.failed));
     }
   };
-  return { move, isMoving: isLoading };
+  return { move, isMoving: isLoading, dialog };
 };
 
 /**
@@ -40,7 +49,7 @@ export const AllConnectorsTab: React.FC<{ bots: Chatbot[]; onCreateAgent: () => 
 }) => {
   const [connecting, setConnecting] = useState(false);
   const { data: numbers = [], isLoading, isError, refetch } = useWaNumbers();
-  const { move, isMoving } = useMoveChannel();
+  const { move, isMoving, dialog } = useMoveChannel();
 
   // A channel with no agent behind it answers nobody, so with no agents yet the first step is an
   // agent, not a number. (Numbers that already exist are still listed, so they can be managed.)
@@ -61,6 +70,7 @@ export const AllConnectorsTab: React.FC<{ bots: Chatbot[]; onCreateAgent: () => 
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl">
+      {dialog}
       <Card
         title={t.allTitle}
         subtitle={t.allIntro}

@@ -73,6 +73,8 @@ export const RoleplaySessionLogs: FC = () => {
     isLoading,
     isFetching,
     isError,
+    scenarioId,
+    clearScenario,
     searchInput,
     setSearchInput,
     status,
@@ -196,6 +198,22 @@ export const RoleplaySessionLogs: FC = () => {
             className="rounded border border-border-light px-3 py-2 bg-white text-sm outline-none focus:border-primary-500"
           />
         </div>
+        {scenarioId ? (
+          <span
+            className="inline-flex h-[40px] items-center gap-2 rounded-full border border-border-light bg-white px-3 text-sm"
+            data-testid="scenario-filter-chip"
+          >
+            Scenario {scenarioId}
+            <button
+              type="button"
+              aria-label="Remove scenario filter"
+              onClick={clearScenario}
+              className="text-typography-600 hover:text-typography-900"
+            >
+              ×
+            </button>
+          </span>
+        ) : null}
         {hasActiveFilters && (
           <Button variant={ButtonVariant.TEXT} onClick={clearFilters} className="h-[40px] px-4">
             Clear filters

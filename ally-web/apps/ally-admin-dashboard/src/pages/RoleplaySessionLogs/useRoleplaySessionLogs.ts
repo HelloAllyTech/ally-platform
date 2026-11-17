@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { useSearchParams } from "react-router-dom";
+
 import { useGetRoleplaySessionLogsQuery } from "@api";
 import { RoleplaySessionLogsParams, RoleplaySessionStatus } from "@types";
 
@@ -14,6 +16,21 @@ export const ROLEPLAY_LOGS_PAGE_SIZE = 25;
 type SessionTypeFilter = "all" | "test" | "real";
 
 export function useRoleplaySessionLogs() {
+  // `?scenarioId=` lets other screens (Analytics' worst-scenarios table) open
+  // this list already narrowed to one scenario. The free-text search cannot do
+  // that: it matches user and scenario TITLE, never an id.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const rawScenarioId = Number(urlParams.get("scenarioId"));
+  const scenarioId = Number.isInteger(rawScenarioId) && rawScenarioId > 0 ? rawScenarioId : null;
+  const clearScenario = () =>
+    setUrlParams(
+      current => {
+        const next = new URLSearchParams(current);
+        next.delete("scenarioId");
+        return next;
+      },
+      { replace: true },
+    );
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<RoleplaySessionStatus | "">("");
@@ -37,6 +54,7 @@ export function useRoleplaySessionLogs() {
       limit: ROLEPLAY_LOGS_PAGE_SIZE,
       offset,
     };
+    if (scenarioId) next.scenarioId = scenarioId;
     if (search) next.search = search;
     if (status) next.status = status;
     if (sessionType === "test") next.isV2VTest = true;
@@ -46,7 +64,7 @@ export function useRoleplaySessionLogs() {
     // Treat the picked end date as inclusive (end of that day, UTC).
     if (dateTo) next.dateTo = `${dateTo}T23:59:59.999Z`;
     return next;
-  }, [search, status, sessionType, language, dateFrom, dateTo, offset]);
+  }, [scenarioId, search, status, sessionType, language, dateFrom, dateTo, offset]);
 
   const { data, isLoading, isFetching, isError, refetch } = useGetRoleplaySessionLogsQuery(params);
 
@@ -75,9 +93,10 @@ export function useRoleplaySessionLogs() {
   };
 
   const hasActiveFilters = Boolean(
-    search || status || sessionType !== "all" || language || dateFrom || dateTo,
+    scenarioId || search || status || sessionType !== "all" || language || dateFrom || dateTo,
   );
   const clearFilters = () => {
+    clearScenario();
     setSearchInput("");
     setSearch("");
     setStatus("");
@@ -105,6 +124,8 @@ export function useRoleplaySessionLogs() {
     isError,
     refetch,
     // filters
+    scenarioId,
+    clearScenario,
     searchInput,
     setSearchInput,
     status,

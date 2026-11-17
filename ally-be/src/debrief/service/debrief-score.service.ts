@@ -5,9 +5,16 @@ import {
   DEBRIEF_AGENT_KEY,
   DEBRIEF_SESSION_BUDGET_DEFAULT,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_QUALITY_DIMENSIONS } from '../../analytics/constants/debrief-quality.constants';
 import { debriefOutcome } from '../util/debrief-outcome.util';
 import {
   GateRun,
+  mondays,
+  QualityBreakdown,
+  qualityBreakdown,
+  RollingPoint,
+  rollingSeries,
+  ROLLING_WEEKS,
   SCORE_MEASURE_LABELS,
   SCORE_MEASURES,
   ScoreFacts,
@@ -62,6 +69,10 @@ export interface DebriefScoreView {
     display: string;
   }>;
   byLanguage: Array<{ language: string; score: number | null; n: number }>;
+  /** The improvement chart: one point a week, each over the four weeks ending then. */
+  rolling: RollingPoint[];
+  /** The quality score in detail over the last four weeks, against the four before. */
+  quality: QualityBreakdown;
 }
 
 const DAY_MS = 86_400_000;
@@ -71,6 +82,9 @@ const DAY_MS = 86_400_000;
  * (week × language × recipe × release), the two gates, and the Analytics
  * view. Reads only; no model call.
  */
+/** The fewest debriefs each week needs before the two weeks are compared. */
+export const SCORE_COMPARE_MIN_DEBRIEFS = 20;
+
 @Injectable()
 export class DebriefScoreService {
   constructor(
@@ -111,6 +125,7 @@ export class DebriefScoreService {
               r."checkFailures" AS check_failures,
               (r.workspace ? 'judge') AS judged,
               (r.workspace->'judge'->>'overall')::float AS quality,
+              r.workspace->'judge'->'dimensions' AS dims,
               COALESCE(r.workspace->'judge'->'hardFails', '[]'::jsonb) AS hard_fails,
               (r.status IN ('published','below_bar')
                 AND r.workspace->'decision'->>'reviewReason' = 'missed_risk_cue') AS missed_clear,
@@ -143,7 +158,20 @@ export class DebriefScoreService {
   async view(days = 56, now = new Date()): Promise<DebriefScoreView> {
     const d = Math.max(14, Math.min(365, Math.round(days)));
     const w = await this.weights();
-    const runs = await this.runs(new Date(now.getTime() - d * DAY_MS));
+    const from = new Date(now.getTime() - d * DAY_MS);
+    // The chart's first point reads the three weeks before the range too.
+    const lead = (ROLLING_WEEKS - 1) * 7 + 7;
+    const allRuns = await this.runs(new Date(from.getTime() - lead * DAY_MS));
+    const runs = allRuns.filter((r) => r.createdAt >= from);
+    const window = ROLLING_WEEKS * 7 * DAY_MS;
+    const lastWindow = allRuns.filter(
+      (r) => r.createdAt.getTime() >= now.getTime() - window,
+    );
+    const windowBefore = allRuns.filter(
+      (r) =>
+        r.createdAt.getTime() >= now.getTime() - 2 * window &&
+        r.createdAt.getTime() < now.getTime() - window,
+    );
     const weekAgo = now.getTime() - 7 * DAY_MS;
     const twoWeeksAgo = now.getTime() - 14 * DAY_MS;
     const thisWeek = runs.filter((r) => r.createdAt.getTime() >= weekAgo);
@@ -162,7 +190,13 @@ export class DebriefScoreService {
     const gates = await this.gates(thisWeek, lastWeek);
     return {
       current: sliceScore(thisWeek, w),
-      previous: sliceScore(lastWeek, w),
+      // A week of a handful of debriefs is not a comparison (prod 2026-11-16:
+      // 2 debriefs last week against 56 this week read as "fell 1.0").
+      previous:
+        lastWeek.length >= SCORE_COMPARE_MIN_DEBRIEFS &&
+        thisWeek.length >= SCORE_COMPARE_MIN_DEBRIEFS
+          ? sliceScore(lastWeek, w)
+          : null,
       debriefs: thisWeek.length,
       byWeek: [...weeks.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
@@ -183,6 +217,13 @@ export class DebriefScoreService {
           n: rs.length,
         }))
         .sort((a, b) => b.n - a.n),
+      rolling: rollingSeries(allRuns, mondays(weekOf(from), weekOf(now)), w),
+      quality: qualityBreakdown(
+        lastWindow,
+        windowBefore,
+        DEBRIEF_QUALITY_DIMENSIONS,
+        SCORE_COMPARE_MIN_DEBRIEFS,
+      ),
     };
   }
 
@@ -248,9 +289,23 @@ export function toScoredRun(r: Record<string, any>): ScoredRun {
     pass: outcome.pass,
     helpful: r.up ? true : r.down ? false : null,
     flagged: !!r.flagged,
+    dims: dimsOf(r.dims),
     missedClearRiskCue: !!r.missed_clear,
     sessionCostUsd: Number.isFinite(cost as number) ? cost : null,
   };
+}
+
+/** The judge's `[{dimension, score}]` as a map; null when not judged. */
+export function dimsOf(v: unknown): Record<string, number> | null {
+  if (!Array.isArray(v)) return null;
+  const out: Record<string, number> = {};
+  for (const x of v as Array<{ dimension?: unknown; score?: unknown }>) {
+    const n = Number(x?.score);
+    if (typeof x?.dimension === 'string' && Number.isFinite(n)) {
+      out[x.dimension] = n;
+    }
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /** Monday of the date's week (UTC, as Postgres' date_trunc('week') gives it). */

@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Protocol
 
 from pydantic import TypeAdapter
 
+from app.core.debrief.render import PromptVariableMissing
 from app.core.config import settings
 from app.core.debrief import steps
 from app.core.debrief.safety_reader import (
@@ -84,6 +85,12 @@ class InProcessSteps:
             answer = await handler(body, model, session_id)
         except StepError:
             raise
+        except PromptVariableMissing as exc:
+            # The live prompt lacks a variable the code requires (step 5): loud,
+            # naming the code and the variable; the retry and the fallback to
+            # today's debrief handle the run.
+            logger.error("[debrief-%s] %s", path, exc)
+            raise StepError(500, str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - the endpoint's 500
             logger.exception("[debrief-%s] failed", path)
             raise StepError(500, f"{label} failed") from exc
@@ -98,6 +105,7 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             scenario_session_id=session_id,
             model=model,
+            risk_cue_definition=body.get("risk_cue_definition"),
         )
         if reading is None:
             return None
@@ -114,6 +122,9 @@ class InProcessSteps:
             model or settings.DEBRIEF.ANALYST_MODEL,
             scenario=body.get("scenario") or {},
             expected_behaviours=body.get("expected_behaviours") or [],
+            helpful_behaviours=body.get("helpful_behaviours") or [],
+            unhelpful_behaviours=body.get("unhelpful_behaviours") or [],
+            competencies=body.get("competencies") or [],
             learner_level=body.get("learner_level"),
             system=body.get("system_prompt"),
             scenario_session_id=session_id,
@@ -181,6 +192,7 @@ class InProcessSteps:
             assessment=bool(body.get("assessment")),
             cohort=body.get("cohort"),
             findings=body.get("findings"),
+            risk_cue_definition=body.get("risk_cue_definition"),
         )
         if out is None:
             return None
@@ -201,6 +213,10 @@ class InProcessSteps:
             guidance=body.get("guidance"),
             scenario_session_id=session_id,
             history=body.get("history"),
+            risk_cue_definition=body.get("risk_cue_definition"),
+            system=body.get("system_prompt"),
+            fix_system=body.get("fix_prompt"),
+            pass_score=body.get("pass_score") or 8,
         )
         if out is None:
             return None
@@ -221,6 +237,8 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             scenario_session_id=session_id,
             findings=body.get("findings"),
+            risk_cue_definition=body.get("risk_cue_definition"),
+            safety=body.get("safety") or {},
         )
         if out is None:
             return None

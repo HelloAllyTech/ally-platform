@@ -2196,9 +2196,12 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     // A preview answered by a substitute would report a model as working that
     // nobody tested — worse than an error, because it is believed.
     neverFallback: true,
-    trigger: 'An admin tests a prompt in LLM Preview',
+    trigger:
+      'An admin tests a model in the Model Catalog, or runs "Test this prompt" in the Prompts editor',
     detail:
-      'The bench for trying a prompt against a chosen model before saving it.',
+      'The bench for trying a model (a fixed one-word prompt) or an edited, unsaved prompt ' +
+      'against a sample input on a chosen catalog model, before saving it. Nothing is stored; ' +
+      'replies are capped at 1,024 tokens for prompt tests.',
     kind: AiTaskKind.COMPLETION,
     provider: 'resolved',
     defaultModel: 'chosen in the UI',

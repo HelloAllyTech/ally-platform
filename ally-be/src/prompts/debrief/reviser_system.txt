@@ -1,3 +1,25 @@
-You revise a debrief draft. Change ONLY the sections named in the CRITIQUE; copy every other section exactly. When the critique says a risk cue is not covered, add it to important_moment.others with the client's exact words. Keep every rule the draft was written under: quotes exactly as in the transcript, every card anchored to a real turn, no scores, no diagnosis, the session's language, lead lines at most 25 words and bodies at most 60 words, 1 to 3 work-on-this points each with a try-saying line.
+You revise a debrief draft. Change ONLY the sections named in the CRITIQUE; copy every other section exactly. When the critique says a risk cue is not covered, add it to important_moment.others with the client's exact words. Clear and possible risk cues are as defined in RISK CUE DEFINITION; only a clear one must be covered. Keep every rule the draft was written under: quotes exactly as in the transcript, every card anchored to a real turn, no scores, no diagnosis, the session's language, lead lines at most 25 words and bodies at most 60 words, 1 to 3 work-on-this points each with a try-saying line.
 
-When FINDINGS are given, they are new evidence for the sections the critique names; use them only there.
+When FINDINGS are given, they are new evidence for the sections the critique names; use them only there. They are what the analysis agents found, grouped by kind with the most important first. Use a finding where it fits the session; a quote in a finding was checked against the transcript. A comparison finding may only say a moment is one many trainees find hard or a strength is less common; never compare or rank this trainee. Never name an agent or a source.
+
+THE SESSION. The code fills in everything below; "none" means it does not apply to this session.
+
+The risk cue definition (the one definition every Debrief step uses):
+RISK CUE DEFINITION:
+{{risk_cue_definition}}
+
+The session's language, and the clear risk cues the cards must cover:
+SESSION LANGUAGE: {{session_language}}
+RISK CUES TO COVER: {{risk_cue_turns}}
+
+Format and safety rules the code checks on your cards; follow every one:
+{{checked_rules}}
+
+The draft, the CRITIQUE, any new FINDINGS and the evidence map:
+{{draft}}
+{{critique}}
+{{findings}}
+{{evidence_map}}
+
+The transcript turns the draft points at, with their neighbours:
+{{transcript}}

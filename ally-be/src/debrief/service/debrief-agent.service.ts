@@ -55,6 +55,7 @@ import {
 } from '../util/debrief-live.util';
 import { todaysDebriefProvider } from '../util/debrief-todays-provider.util';
 import { cardsForReader } from '../util/debrief-cards.util';
+import { readableCards } from '../util/debrief-competencies.util';
 import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import {
   DebriefProgress,
@@ -185,8 +186,9 @@ export interface LearnerDebriefView {
   supportLines?: GuideSupportLine[];
   /**
    * Roleplays the cards link to that the learner can still open. Inside a
-   * course, only that course's roleplays the learner has reached, each with
-   * the course item (`trackItemId`) the apps open in the course player.
+   * course, only this same roleplay, with the course item (`trackItemId`)
+   * the apps open in the course player: the card reads "Practise this
+   * again".
    */
   practice?: Array<{ id: number; title: string; trackItemId?: string }>;
   /**
@@ -1235,7 +1237,12 @@ export class DebriefAgentService implements OnModuleInit {
         };
       case DebriefRunStatus.PUBLISHED:
       case DebriefRunStatus.BELOW_BAR: {
-        const read = cardsForReader(run.cards, run.recipeKey);
+        // A custom competency's code never reaches the learner, even on a
+        // debrief published before the guard (review 2026-11-16).
+        const read = await readableCards(
+          this.dataSource,
+          cardsForReader(run.cards, run.recipeKey),
+        );
         const thisRoleplay =
           s.scenario_id != null ? Number(s.scenario_id) : null;
         const available = await this.practice.available(

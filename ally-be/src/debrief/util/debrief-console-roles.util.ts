@@ -45,6 +45,8 @@ export const DEBRIEF_ACTIONS = {
   agentLogs: [TEAM, OWNER],
   /** Budgets, test thresholds, accepting proposed values, autonomy unlocks, steering weights. */
   ownerSettings: [OWNER],
+  /** Settings › Clinical lists: the words behind the score, diagnosis and jargon checks. */
+  clinicalLists: [ADVISOR, OWNER],
 } as const satisfies Record<string, readonly string[]>;
 
 export type DebriefAction = keyof typeof DEBRIEF_ACTIONS;

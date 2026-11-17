@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { TextArea } from "@ally-ui-mono/ui-shared";
@@ -9,6 +9,7 @@ import {
   useGetDebriefModelsQuery,
   useGetDebriefSessionQuery,
   useResolveDebriefFlagMutation,
+  useLazyGetDebriefSessionsQuery,
 } from "@api";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
@@ -21,12 +22,14 @@ import { TruncatedTitle } from "../consoleRows";
 import { BackLink } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { selectionToAnchor } from "../expertReviewSelection";
-import { FILTER_KEYS } from "../queue";
+import { FILTER_KEYS, HOME_CATEGORIES, HomeCategory, sessionsQuery } from "../queue";
 import { cardDomId, Correcting, DebriefColumn, DebriefTab } from "./DebriefColumn";
 import { ReviewPanel } from "./ReviewPanel";
 import { RoleplayColumn, turnDomId } from "./RoleplayColumn";
 import { Decision, JumpTarget, WaitingBar } from "./WaitingBar";
 import { scenarioTitle } from "../home/SessionCard";
+
+import type { HomeFilters } from "../queue";
 
 /** How long a "Read first" jump keeps its highlight. */
 const HIGHLIGHT_MS = 2500;
@@ -115,8 +118,47 @@ export const DebriefSessionPage: React.FC = () => {
       const v = params.get(k);
       if (v) out.set(k, v);
     }
+    const cat = params.get("cat");
+    if (cat) out.set("cat", cat);
     return out.toString();
   }, [params]);
+
+  // Auto-advance: after the viewer's decision clears everything waiting on them here, open the
+  // next item in the queue they came from (`?cat=`), so a review run is one decision after
+  // another instead of back-to-the-list each time.
+  const navigate = useNavigate();
+  const [fetchQueue] = useLazyGetDebriefSessionsQuery();
+  const advanceArmed = useRef(false);
+  const advance = useCallback(async () => {
+    const cat = params.get("cat") as HomeCategory | null;
+    if (!cat || !HOME_CATEGORIES.includes(cat)) return;
+    const filters: HomeFilters = {};
+    for (const k of FILTER_KEYS) {
+      const v = params.get(k);
+      if (v) (filters as Record<string, string>)[k] = v;
+    }
+    try {
+      const page = await fetchQueue({ ...sessionsQuery(cat, filters), limit: 20 }).unwrap();
+      const next = page.items.find(item => item.runId !== runId);
+      if (next) {
+        toast.success(en.debriefs.session.nextUp);
+        const q = new URLSearchParams(params);
+        navigate(`${ROUTES.DEBRIEF_SESSION(next.runId)}?${q.toString()}`, { replace: true });
+      } else {
+        toast.success(en.debriefs.session.queueClear);
+        navigate(`${ROUTES.DEBRIEFS}?${new URLSearchParams(params).toString()}`);
+      }
+    } catch {
+      /* stay on the page: the decision itself already succeeded */
+    }
+  }, [params, runId, fetchQueue, navigate]);
+  const remainingForViewer = view ? reviewActions(view).length : -1;
+  useEffect(() => {
+    if (advanceArmed.current && !q.isFetching && remainingForViewer === 0) {
+      advanceArmed.current = false;
+      void advance();
+    }
+  }, [remainingForViewer, q.isFetching, advance]);
 
   const [paneOpen, setPaneOpen] = useState(false);
   const [tab, setTab] = useState<DebriefTab>("debrief");
@@ -241,6 +283,7 @@ export const DebriefSessionPage: React.FC = () => {
       );
       setAsking(null);
       setPaneOpen(false);
+      advanceArmed.current = true;
     } catch (e) {
       toast.error(getErrorMessage(e, en.debriefs.review.failed));
     }

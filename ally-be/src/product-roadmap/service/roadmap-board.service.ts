@@ -84,7 +84,7 @@ export class RoadmapBoardService {
 
     // ONE mapping pass over every row, then bucket the mapped DTOs. Mapping per lane would
     // resolve the same creators once per lane instead of once per board.
-    const mapped = await this.opportunityService.toResponseList(rows);
+    const mapped = await this.opportunityService.toResponseList(rows, userId);
     const byLane = this.bucketByLane(rows, mapped);
 
     return {

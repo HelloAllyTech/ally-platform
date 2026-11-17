@@ -110,8 +110,30 @@ describe("ListToolbar", () => {
       const searchInput = screen.getByPlaceholderText("Search...");
       await user.type(searchInput, "a");
 
-      expect(mockOnSearchChange).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(mockOnSearchChange).toHaveBeenCalledTimes(1));
       expect(mockOnSearchChange).toHaveBeenCalledWith("a");
+    });
+
+    it("debounces: a burst of keystrokes produces one onSearchChange with the final text", async () => {
+      const user = userEvent.setup();
+      const mockOnSearchChange = vi.fn();
+      render(<ListToolbar {...defaultProps} onSearchChange={mockOnSearchChange} />);
+
+      await user.type(screen.getByPlaceholderText("Search..."), "abcd");
+      expect(mockOnSearchChange).not.toHaveBeenCalled();
+
+      await waitFor(() => expect(mockOnSearchChange).toHaveBeenCalledTimes(1));
+      expect(mockOnSearchChange).toHaveBeenCalledWith("abcd");
+    });
+
+    it("fires every keystroke when searchDebounceMs is 0", async () => {
+      const user = userEvent.setup();
+      const mockOnSearchChange = vi.fn();
+      render(
+        <ListToolbar {...defaultProps} onSearchChange={mockOnSearchChange} searchDebounceMs={0} />,
+      );
+      await user.type(screen.getByPlaceholderText("Search..."), "ab");
+      expect(mockOnSearchChange).toHaveBeenCalledTimes(2);
     });
 
     it("shows clear button when search value is not empty", () => {
@@ -195,7 +217,7 @@ describe("ListToolbar", () => {
       const searchInput = screen.getByPlaceholderText("Search...");
       await user.type(searchInput, "a");
 
-      expect(mockOnSearchChange).toHaveBeenCalledWith("a");
+      await waitFor(() => expect(mockOnSearchChange).toHaveBeenCalledWith("a"));
       expect(screen.getByTestId("access-filter")).toBeInTheDocument();
     });
   });
@@ -762,7 +784,7 @@ describe("ListToolbar", () => {
       const searchInput = screen.getByPlaceholderText("Search...");
       await user.type(searchInput, "!@#$%^&*()");
 
-      expect(mockOnSearchChange).toHaveBeenCalled();
+      await waitFor(() => expect(mockOnSearchChange).toHaveBeenCalledWith("!@#$%^&*()"));
     });
   });
 

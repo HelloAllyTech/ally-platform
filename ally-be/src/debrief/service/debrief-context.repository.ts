@@ -22,6 +22,14 @@ import {
   ProgressVoiceRow,
   ProgressWindowRow,
 } from '../util/debrief-progress.util';
+import {
+  buildExpectations,
+  CompetencyBehaviourRow,
+  DebriefCompetency,
+  resolveCustomCodes,
+  RoleplayExpectations,
+  ScenarioBehaviourRow,
+} from '../util/debrief-competencies.util';
 import { FHS_RUBRIC_VERSION } from '../../foundational-skills/constants/helping-skills-rubric.constants';
 
 export interface DebriefSessionContext {
@@ -35,7 +43,19 @@ export interface DebriefSessionContext {
   /** Null for a session whose scenario row is gone. */
   scenarioId: number | null;
   scenario: { title: string | null; description: string | null };
+  /**
+   * The roleplay's named competencies, for cohort stats and other name
+   * readers: never a custom competency's generated code.
+   */
   expectedBehaviours: string[];
+  /**
+   * What the roleplay expects (`buildExpectations`): its own SHOULD_DO /
+   * SHOULD_NOT_DO behaviours plus custom competencies' behaviours, and the
+   * named competencies as labels with their own behaviours when they have any.
+   */
+  helpfulBehaviours: string[];
+  unhelpfulBehaviours: string[];
+  competencies: DebriefCompetency[];
   /** Played for a course roleplay item in assessment mode: a graded attempt. */
   assessment: boolean;
   /** Played as one session of a case: earlier sessions are the client's memory. */
@@ -110,12 +130,10 @@ export class DebriefContextRepository {
     const ids: string[] = Array.isArray(r.competency_ids)
       ? r.competency_ids
       : [];
-    const competencies = ids.length
-      ? await this.dataSource.query(
-          `SELECT name FROM competencies WHERE id = ANY($1::uuid[]) ORDER BY name`,
-          [ids],
-        )
-      : [];
+    const expects = await this.expectationsOf(
+      ids,
+      r.scenario_id == null ? null : Number(r.scenario_id),
+    );
     return {
       id: r.id,
       tenantId: r.tenant_id ?? null,
@@ -126,12 +144,67 @@ export class DebriefContextRepository {
       learnerTurns: Number(r.learner_turns ?? 0),
       scenarioId: r.scenario_id == null ? null : Number(r.scenario_id),
       scenario: { title: r.title ?? null, description: r.description ?? null },
-      expectedBehaviours: competencies.map((c: { name: string }) => c.name),
+      expectedBehaviours: expects.competencies.map((c) => c.name),
+      helpfulBehaviours: expects.helpful,
+      unhelpfulBehaviours: expects.unhelpful,
+      competencies: expects.competencies,
       assessment: r.assessment === true,
       inCase: r.in_case === true,
       languageRecorded: r.language_recorded === true,
       debriefTabOff: r.debrief_tab_off === true,
     };
+  }
+
+  /**
+   * What the roleplay expects: its own SHOULD_DO / SHOULD_NOT_DO behaviours
+   * (what today's debrief reads,
+   * `ScenarioSharedService.getBehaviorInstructionsByScenarioId`), and its
+   * competencies with their HELPFUL / UNHELPFUL behaviours. Unreadable
+   * instructions never stop a debrief: it runs on what could be read.
+   */
+  async expectationsOf(
+    competencyIds: string[],
+    scenarioId: number | null,
+  ): Promise<RoleplayExpectations> {
+    const rows: CompetencyBehaviourRow[] = competencyIds.length
+      ? await this.dataSource.query(
+          `SELECT c.id, c.name, c."isCustom" AS is_custom,
+                  b.name AS behaviour, cb.type
+             FROM competencies c
+             LEFT JOIN competency_behaviors cb ON cb."competencyId" = c.id
+             LEFT JOIN behaviors b ON b.id = cb."behaviorId"
+            WHERE c.id = ANY($1::uuid[])
+            ORDER BY c.name, cb.type, b.name`,
+          [competencyIds],
+        )
+      : [];
+    let own: ScenarioBehaviourRow[] = [];
+    if (scenarioId != null) {
+      try {
+        own = await this.dataSource.query(
+          `SELECT i.category, b.name AS behaviour
+             FROM scenario_behavior_instructions i
+             JOIN scenario_behavior_instruction_behaviors ib
+               ON ib."scenarioBehaviorInstructionId" = i.id
+             JOIN behaviors b ON b.id = ib."behaviorId"
+            WHERE i."scenarioId" = $1 AND i."deletedAt" IS NULL
+            ORDER BY i.category, b.name`,
+          [scenarioId],
+        );
+      } catch {
+        own = [];
+      }
+    }
+    return buildExpectations(rows ?? [], own ?? []);
+  }
+
+  /**
+   * Each custom competency code to its first HELPFUL behaviour (null when it
+   * has none, or cannot be read), so a card that names a code can name what
+   * it means instead. Never throws: a code that cannot be resolved is dropped.
+   */
+  resolveCustomCodes(codes: string[]): Promise<Map<string, string | null>> {
+    return resolveCustomCodes(this.dataSource, codes);
   }
 
   /**
@@ -233,7 +306,7 @@ export class DebriefContextRepository {
             AND s."counselorId" IS NOT NULL
             AND s."counselorId" IS DISTINCT FROM $3
             AND r."scenarioSessionId" <> $4
-            AND r.mode IN ('shadow','live')
+            AND r.mode = 'live'
             AND r.status IN ('published','below_bar')
             AND r."createdAt" > now() - interval '90 days'
           ORDER BY s."counselorId", r."createdAt" DESC
@@ -328,11 +401,11 @@ export class DebriefContextRepository {
             JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
            WHERE s."counselorId" = $2 AND s.tenant_id IS NOT DISTINCT FROM $1::text
              AND r."scenarioSessionId" <> $3
-             AND r.mode IN ('shadow','live') AND r.status IN ('published','below_bar')) AS past_debriefs,
+             AND r.mode = 'live' AND r.status IN ('published','below_bar')) AS past_debriefs,
          (SELECT count(DISTINCT s."counselorId")::int FROM debrief_runs r
             JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
            WHERE s.tenant_id = $1::text AND s."counselorId" IS DISTINCT FROM $2
-             AND r.mode IN ('shadow','live') AND r.status IN ('published','below_bar')
+             AND r.mode = 'live' AND r.status IN ('published','below_bar')
              AND r."createdAt" > now() - interval '90 days') AS peers,
          (SELECT ti."trackId" IS NOT NULL FROM scenario_sessions s
             LEFT JOIN track_item_progress tip ON tip.id = s."trackItemProgressId"
@@ -413,7 +486,7 @@ export class DebriefContextRepository {
         WHERE s."counselorId" = $1
           AND s.tenant_id IS NOT DISTINCT FROM $2
           AND r."scenarioSessionId" <> $3
-          AND r.mode IN ('shadow','live')
+          AND r.mode = 'live'
           AND r.status IN ('published','below_bar')
         ORDER BY r."createdAt" DESC
         LIMIT $4`,
@@ -455,7 +528,7 @@ export class DebriefContextRepository {
         WHERE s."counselorId" = $1
           AND s.tenant_id IS NOT DISTINCT FROM $2
           AND r."scenarioSessionId" <> $3
-          AND r.mode IN ('shadow','live')
+          AND r.mode = 'live'
           AND r.status IN ('published','below_bar')
         ORDER BY r."createdAt" DESC
         LIMIT $4`,
@@ -510,7 +583,7 @@ export class DebriefContextRepository {
               AND s.tenant_id IS NOT DISTINCT FROM $2
               AND r."scenarioSessionId" <> $3
               AND s."createdAt" <= (SELECT at FROM this)
-              AND r.mode IN ('shadow','live')
+              AND r.mode = 'live'
               AND r.status IN ('published','below_bar')
             ORDER BY r."scenarioSessionId", (r.mode = 'live') DESC, r."createdAt" DESC
          ),
@@ -548,7 +621,7 @@ export class DebriefContextRepository {
                            AND s2."scenarioId" = pn.id AND s2.id <> $3
                            AND s2."createdAt" > w."createdAt"
                            AND s2."createdAt" <= (SELECT at FROM this)
-                           AND r2.mode IN ('shadow','live')
+                           AND r2.mode = 'live'
                            AND r2.status IN ('published','below_bar')) AS pn_published
            FROM win w
            LEFT JOIN scenarios sc ON sc.id = w."scenarioId"
@@ -605,7 +678,7 @@ export class DebriefContextRepository {
              JOIN debrief_runs r ON r.id = p.run_id
             WHERE p.counselor_id = $1 AND p.tenant_id IS NOT DISTINCT FROM $2
               AND p.scenario_session_id <> $3
-              AND r.mode IN ('shadow','live')
+              AND r.mode = 'live'
               AND r.status IN ('published','below_bar')
             ORDER BY p.created_at DESC LIMIT 1`,
           [counselorId, tenantId, beforeSessionId],

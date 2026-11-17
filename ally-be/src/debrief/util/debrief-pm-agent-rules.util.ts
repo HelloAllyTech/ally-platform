@@ -55,6 +55,10 @@ const NEVER_PROMPTS: Record<string, NeverListArea> = {
   [DEBRIEF_PROMPT_CODES.rubric]: 'judge',
   debrief_quality_judge_system: 'judge',
   [DEBRIEF_PROMPT_CODES.safetyReader]: 'safety',
+  [DEBRIEF_PROMPT_CODES.riskCueDefinition]: 'safety',
+  [DEBRIEF_PROMPT_CODES.evaluator]: 'judge',
+  // What a safe change is, and what waits for a person.
+  [DEBRIEF_PROMPT_CODES.pmReviewer]: 'approval_list',
   // Its own instructions say what it may do and what needs a person.
   [DEBRIEF_PROMPT_CODES.pmAgent]: 'approval_list',
 };

@@ -195,13 +195,18 @@ class DebriefWorkOnThis {
 }
 
 class DebriefPractiseNext {
-  const DebriefPractiseNext({required this.skill, required this.reason, this.scenarioId});
+  const DebriefPractiseNext({required this.skill, required this.reason, this.scenarioId, this.tryNext = const []});
 
+  /// Empty when a custom competency's code was removed from an older debrief.
   final String skill;
   final String reason;
 
   /// As [DebriefWorkOnThis.scenarioId], for "Practise this next".
   final int? scenarioId;
+
+  /// A session played in a course: "Try the following:", up to 3 short
+  /// things to try when practising this roleplay again, most important first.
+  final List<String> tryNext;
 }
 
 class DebriefSkillWordEntry {
@@ -307,6 +312,10 @@ class DebriefCardsData {
               skill: _str(practise['skill']),
               reason: _str(practise['reason']),
               scenarioId: _optInt(practise['scenario_id']),
+              tryNext: [
+                for (final t in (practise['try_next'] is List ? practise['try_next'] as List : const []))
+                  if (t is String && t.trim().isNotEmpty) t.trim(),
+              ].take(3).toList(),
             )
           : null,
       skillWords: [

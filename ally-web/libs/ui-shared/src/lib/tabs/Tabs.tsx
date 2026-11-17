@@ -61,7 +61,7 @@ export const Tabs: React.FC<TabsProps> = ({
               }`}
               style={tabStyles}
             >
-              {item.label} {showCount ? item.count || "0" : ""}
+              {item.label} {showCount && item.count !== undefined ? item.count : ""}
               {isActive && (
                 <span
                   aria-hidden

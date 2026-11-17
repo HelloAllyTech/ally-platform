@@ -396,7 +396,10 @@ describe("TooltipManagement", () => {
       renderComponent();
       await waitFor(() => fireEvent.click(screen.getByTestId("toggle-active-0")));
       await waitFor(() =>
-        expect(mockToast.success).toHaveBeenCalledWith("Tooltip updated successfully"),
+        expect(mockToast.success).toHaveBeenCalledWith(
+          "Tooltip updated successfully",
+          expect.objectContaining({ action: expect.objectContaining({ label: "Undo" }) }),
+        ),
       );
     });
 

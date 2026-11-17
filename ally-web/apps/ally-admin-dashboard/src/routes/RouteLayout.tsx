@@ -75,7 +75,9 @@ import {
 
 // By path, not through `@pages`: onboarding (chunk 20a) needs nothing the barrel provides.
 
+import { AdminShell } from "./AdminShell";
 import { DefaultRedirect } from "./DefaultRedirect";
+import { NotFound } from "./NotFound";
 import { PrivateLayout } from "./PrivateLayout";
 import { PublicRoute } from "./PublicRoute";
 import { AssistantHome } from "../pages/AssistantHome";
@@ -118,7 +120,7 @@ const ChatbotDetailRoute: React.FC = () => (
   </PrivateLayout>
 );
 
-// Lazy-loaded so IBM Carbon + Carbon Charts (+ d3) and the scoped Carbon
+// Lazy-loaded (the shell's Suspense shows the loading state) so IBM Carbon + Carbon Charts (+ d3) and the scoped Carbon
 // stylesheet ship as their own chunk, loaded only when the Analytics tab opens.
 const Analytics = lazy(() =>
   import("../pages/Analytics/Analytics").then(module => ({ default: module.Analytics })),
@@ -231,54 +233,7 @@ export const RouteLayout: React.FC = () => {
         <Route path={ROUTES.EVALUATE_RECORDS} element={<EvaluateRecords />} />
         <Route path={ROUTES.EVALUATE_RECORD(":assignmentId")} element={<EvaluateRecordDetail />} />
 
-        {/* Private Routes */}
-        <Route
-          path={ROUTES.SIMULATION_STUDIO}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.VIEW_ADMIN_SCENARIO]}
-              requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
-            >
-              <SimulationStudio />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.USER_MANAGEMENT}
-          element={
-            // Any-of: Admin User Management keeps the page, since its Ally admins
-            // list is where every toggle — the Users one included — is edited.
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_USER, Permissions.VIEW_USERS]}
-              requiredFeature={[FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT]}
-            >
-              <UserManagement />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.ORGANIZATION_DETAIL(":id")}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_USER, Permissions.VIEW_USERS]}
-              requiredFeature={FeatureToggleKey.USERS}
-            >
-              <OrganizationDetail />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.CREATE_SIMULATION}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_SCENARIO]}
-              requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
-              alsoRequiredFeatures={[FeatureToggleKey.CREATE_ROLEPLAYS]}
-            >
-              <CreateSimulation />
-            </PrivateLayout>
-          }
-        />
+        {/* Bare preview: no shell to preserve. */}
         <Route
           path={ROUTES.SIMULATION_PREVIEW(":id")}
           element={
@@ -287,585 +242,638 @@ export const RouteLayout: React.FC = () => {
             </PrivateLayout>
           }
         />
-        <Route
-          path={ROUTES.EDIT_SIMULATION(":id")}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_SCENARIO]}
-              requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
-              // Read-only admins open roleplays through VIEW_SIMULATION instead.
-              alsoRequiredFeatures={[FeatureToggleKey.CREATE_ROLEPLAYS]}
-            >
-              <CreateSimulation />
-            </PrivateLayout>
-          }
-        />
-        {/* Read-only View Details: same editor surface, but nothing is ever
+        {/* Private Routes: one shared layout route, so the sidebar, palette and scroll area stay
+            mounted across navigation. Each page's PrivateLayout only gates access. */}
+        <Route element={<AdminShell />}>
+          <Route
+            path={ROUTES.SIMULATION_STUDIO}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_ADMIN_SCENARIO]}
+                requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+              >
+                <SimulationStudio />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.USER_MANAGEMENT}
+            element={
+              // Any-of: Admin User Management keeps the page, since its Ally admins
+              // list is where every toggle — the Users one included — is edited.
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_USER, Permissions.VIEW_USERS]}
+                requiredFeature={[FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT]}
+              >
+                <UserManagement />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.ORGANIZATION_DETAIL(":id")}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_USER, Permissions.VIEW_USERS]}
+                requiredFeature={FeatureToggleKey.USERS}
+              >
+                <OrganizationDetail />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.CREATE_SIMULATION}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_SCENARIO]}
+                requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+                alsoRequiredFeatures={[FeatureToggleKey.CREATE_ROLEPLAYS]}
+              >
+                <CreateSimulation />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.EDIT_SIMULATION(":id")}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_SCENARIO]}
+                requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+                // Read-only admins open roleplays through VIEW_SIMULATION instead.
+                alsoRequiredFeatures={[FeatureToggleKey.CREATE_ROLEPLAYS]}
+              >
+                <CreateSimulation />
+              </PrivateLayout>
+            }
+          />
+          {/* Read-only View Details: same editor surface, but nothing is ever
             saved, so a published simulation stays published. View permission
             only — no edit:scenario required. */}
-        <Route
-          path={ROUTES.VIEW_SIMULATION(":id")}
-          element={
-            <PrivateLayout requiredPermissions={[Permissions.VIEW_ADMIN_SCENARIO]}>
-              <CreateSimulation viewMode />
-            </PrivateLayout>
-          }
-        />
+          <Route
+            path={ROUTES.VIEW_SIMULATION(":id")}
+            element={
+              <PrivateLayout requiredPermissions={[Permissions.VIEW_ADMIN_SCENARIO]}>
+                <CreateSimulation viewMode />
+              </PrivateLayout>
+            }
+          />
 
-        <Route
-          path={ROUTES.MANAGE_EVENTS}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_EVENT]}
-              requiredFeature={FeatureToggleKey.EVENTS}
-            >
-              <EventManagement />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.USER_BADGES}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.USER_BADGES}>
-              <UserBadges />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.CHARACTER_LIBRARY}
-          element={
-            /* Platform admins get here on the feature-toggle path. A
+          <Route
+            path={ROUTES.MANAGE_EVENTS}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_EVENT]}
+                requiredFeature={FeatureToggleKey.EVENTS}
+              >
+                <EventManagement />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.USER_BADGES}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.USER_BADGES}>
+                <UserBadges />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.CHARACTER_LIBRARY}
+            element={
+              /* Platform admins get here on the feature-toggle path. A
                tenant's own ADMINs get here on the org-toggle path, and see
                only the characters their org created. */
-            <PrivateLayout
-              requiredPermissions={[Permissions.VIEW_CHARACTER_LIBRARY]}
-              requiredFeature={FeatureToggleKey.CHARACTER_LIBRARY}
-              requiredOrgToggle={OrgToggle.CHARACTER_LIBRARY}
-            >
-              <CharacterLibrary />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.CHARACTER_LIBRARY_INTERVIEW}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.CREATE_CHARACTER_LIBRARY]}
-              requiredFeature={FeatureToggleKey.CHARACTER_LIBRARY}
-              requiredOrgToggle={OrgToggle.CHARACTER_LIBRARY}
-            >
-              <CharacterInterview />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.MANAGE_SCENARIO_VOICES}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_SCENARIO]}
-              requiredFeature={FeatureToggleKey.SCENARIO_VOICES}
-            >
-              <ScenarioVoices />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.MANAGE_STT_CONFIGS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_STT_CONFIGS}>
-              <SttConfigs />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.MANAGE_LLM_MODEL_CATALOG}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG}>
-              <LlmModelCatalog />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.AI_TASKS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.AI_TASKS}>
-              <AiTasks />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.MANAGE_SCENARIO_LANGUAGES}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_SCENARIO_LANGUAGES}>
-              <ScenarioLanguages />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          // Reached from the Languages list, so it matches that tab's gate —
-          // narrowing it here would dead-end a plain super-admin.
-          path={ROUTES.MANAGE_LANGUAGE_GLOSSARY(":id")}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_SCENARIO_LANGUAGES}>
-              <LanguageGlossary />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.MANAGE_PROMPTS}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_PROMPT]}
-              requiredFeature={FeatureToggleKey.PROMPTS}
-            >
-              <SystemSkillsPage />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.CREATE_PATH}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_EVENT]}
-              requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
-            >
-              <CreatePath />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.EDIT_PATH(":id")}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_EVENT]}
-              requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
-            >
-              <CreatePath />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.CREATE_TRACK}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_EVENT]}
-              requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
-              alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
-            >
-              <CreateTrack />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.EDIT_TRACK(":id")}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_EVENT]}
-              requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
-            >
-              <CreateTrack />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.COMPONENT_LIBRARY}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.VIEW_ADMIN_TRACK]}
-              requiredFeature={FeatureToggleKey.COMPONENT_LIBRARY}
-            >
-              <ComponentLibrary />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.CREATE_CASE}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_EVENT]}
-              requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
-              alsoRequiredFeatures={[FeatureToggleKey.CREATE_CASES]}
-            >
-              <CreateCase />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.EDIT_CASE(":id")}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_EVENT]}
-              requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
-            >
-              <CreateCase />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.MANAGE_GUARDRAILS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_GUARDRAILS}>
-              <GuardrailsManagement />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.MANAGE_TRANSLATIONS}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.VIEW_I18N_TRANSLATIONS]}
-              requiredFeature={FeatureToggleKey.TRANSLATIONS}
-            >
-              <TranslationManagement />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.MANAGE_TOOLTIPS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_TOOLTIPS}>
-              <TooltipManagement />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.BLOG}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.VIEW_BLOGS]}
-              requiredFeature={FeatureToggleKey.BLOG}
-            >
-              <BlogManagement />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.PRODUCT_UPDATES}
-          element={
-            <PrivateLayout
-              requiredPermissions={[Permissions.EDIT_BLOG]}
-              requiredFeature={FeatureToggleKey.PRODUCT_UPDATES}
-            >
-              <ProductUpdates />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.PRODUCT_ROADMAP}
-          element={
-            // Permission-gated, not role-gated: SUPER_ADMIN can view and vote, while the
-            // manage surface inside the page is gated on EDIT_PRODUCT_ROADMAP.
-            <PrivateLayout
-              requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
-              requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
-            >
-              <ProductRoadmap />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.AI_LAB}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.AI_LAB}>
-              <AILab />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.ANALYTICS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.ANALYTICS}>
-              <Suspense fallback={null}>
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_CHARACTER_LIBRARY]}
+                requiredFeature={FeatureToggleKey.CHARACTER_LIBRARY}
+                requiredOrgToggle={OrgToggle.CHARACTER_LIBRARY}
+              >
+                <CharacterLibrary />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.CHARACTER_LIBRARY_INTERVIEW}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.CREATE_CHARACTER_LIBRARY]}
+                requiredFeature={FeatureToggleKey.CHARACTER_LIBRARY}
+                requiredOrgToggle={OrgToggle.CHARACTER_LIBRARY}
+              >
+                <CharacterInterview />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MANAGE_SCENARIO_VOICES}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_SCENARIO]}
+                requiredFeature={FeatureToggleKey.SCENARIO_VOICES}
+              >
+                <ScenarioVoices />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MANAGE_STT_CONFIGS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_STT_CONFIGS}>
+                <SttConfigs />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MANAGE_LLM_MODEL_CATALOG}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG}>
+                <LlmModelCatalog />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.AI_TASKS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.AI_TASKS}>
+                <AiTasks />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MANAGE_SCENARIO_LANGUAGES}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_SCENARIO_LANGUAGES}>
+                <ScenarioLanguages />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            // Reached from the Languages list, so it matches that tab's gate —
+            // narrowing it here would dead-end a plain super-admin.
+            path={ROUTES.MANAGE_LANGUAGE_GLOSSARY(":id")}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_SCENARIO_LANGUAGES}>
+                <LanguageGlossary />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MANAGE_PROMPTS}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_PROMPT]}
+                requiredFeature={FeatureToggleKey.PROMPTS}
+              >
+                <SystemSkillsPage />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.CREATE_PATH}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_EVENT]}
+                requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+              >
+                <CreatePath />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.EDIT_PATH(":id")}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_EVENT]}
+                requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+              >
+                <CreatePath />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.CREATE_TRACK}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_EVENT]}
+                requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+                alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
+              >
+                <CreateTrack />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.EDIT_TRACK(":id")}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_EVENT]}
+                requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+              >
+                <CreateTrack />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.COMPONENT_LIBRARY}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_ADMIN_TRACK]}
+                requiredFeature={FeatureToggleKey.COMPONENT_LIBRARY}
+              >
+                <ComponentLibrary />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.CREATE_CASE}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_EVENT]}
+                requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+                alsoRequiredFeatures={[FeatureToggleKey.CREATE_CASES]}
+              >
+                <CreateCase />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.EDIT_CASE(":id")}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_EVENT]}
+                requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+              >
+                <CreateCase />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MANAGE_GUARDRAILS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_GUARDRAILS}>
+                <GuardrailsManagement />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MANAGE_TRANSLATIONS}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_I18N_TRANSLATIONS]}
+                requiredFeature={FeatureToggleKey.TRANSLATIONS}
+              >
+                <TranslationManagement />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MANAGE_TOOLTIPS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_TOOLTIPS}>
+                <TooltipManagement />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BLOG}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_BLOGS]}
+                requiredFeature={FeatureToggleKey.BLOG}
+              >
+                <BlogManagement />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.PRODUCT_UPDATES}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.EDIT_BLOG]}
+                requiredFeature={FeatureToggleKey.PRODUCT_UPDATES}
+              >
+                <ProductUpdates />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.PRODUCT_ROADMAP}
+            element={
+              // Permission-gated, not role-gated: SUPER_ADMIN can view and vote, while the
+              // manage surface inside the page is gated on EDIT_PRODUCT_ROADMAP.
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+              >
+                <ProductRoadmap />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.AI_LAB}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.AI_LAB}>
+                <AILab />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.ANALYTICS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.ANALYTICS}>
                 <Analytics />
-              </Suspense>
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.SETTINGS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.SETTINGS}>
-              <Settings />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.CONTEXT_LIBRARY}
-          element={
-            // Platform admins, or an organisation's admins (the Ally organisation-settings
-            // toggle), who see only their organisation's entries.
-            <PrivateLayout
-              requiredFeature={[FeatureToggleKey.CONTEXT_LIBRARY, FeatureToggleKey.ALLY_GUIDE_ORG]}
-            >
-              <Suspense fallback={null}>
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.SETTINGS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.SETTINGS}>
+                <Settings />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.CONTEXT_LIBRARY}
+            element={
+              // Platform admins, or an organisation's admins (the Ally organisation-settings
+              // toggle), who see only their organisation's entries.
+              <PrivateLayout
+                requiredFeature={[
+                  FeatureToggleKey.CONTEXT_LIBRARY,
+                  FeatureToggleKey.ALLY_GUIDE_ORG,
+                ]}
+              >
                 <ContextLibrary />
-              </Suspense>
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.BUG_HUNTER}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER}>
-              <BugHunter />
-            </PrivateLayout>
-          }
-        />
-        {/* The Builder tab: Now · Rules · History. Mission control's full list moved to
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUG_HUNTER}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER}>
+                <BugHunter />
+              </PrivateLayout>
+            }
+          />
+          {/* The Builder tab: Now · Rules · History. Mission control's full list moved to
             /builder/sessions, and /builder/decisions (linked from Slack) lands here. */}
-        <Route
-          path={ROUTES.BUILDER}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-              <BuilderRoom />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.BUILDER_ALL_SESSIONS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-              <Builder />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.BUILDER_SESSION(":sessionId")}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-              <BuilderSession />
-            </PrivateLayout>
-          }
-        />
-        <Route path={ROUTES.BUILDER_DECISIONS} element={<Navigate to={ROUTES.BUILDER} replace />} />
-        <Route
-          path={ROUTES.BUILDER_SETTINGS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-              <BuilderSettings />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.BUILDER_PIPELINE}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-              <BuilderPipeline />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.BUILDER_SCOREBOARD}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-              <BuilderScoreboard />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.BUILDER_KNOWLEDGE}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-              <BuilderKnowledge />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.BUILDER_EVAL}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
-              <BuilderEval />
-            </PrivateLayout>
-          }
-        />
-        {/* Gated on the toggle AND the edit grant (one gate — a view-only session list is
+          <Route
+            path={ROUTES.BUILDER}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+                <BuilderRoom />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUILDER_ALL_SESSIONS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+                <Builder />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUILDER_SESSION(":sessionId")}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+                <BuilderSession />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUILDER_DECISIONS}
+            element={<Navigate to={ROUTES.BUILDER} replace />}
+          />
+          <Route
+            path={ROUTES.BUILDER_SETTINGS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+                <BuilderSettings />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUILDER_PIPELINE}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+                <BuilderPipeline />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUILDER_SCOREBOARD}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+                <BuilderScoreboard />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUILDER_KNOWLEDGE}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+                <BuilderKnowledge />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUILDER_EVAL}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+                <BuilderEval />
+              </PrivateLayout>
+            }
+          />
+          {/* Gated on the toggle AND the edit grant (one gate — a view-only session list is
             pointless without the chat). `new` is registered before `:sessionId`: React Router
             ranks static segments above params, but the order keeps that obvious to a reader. */}
-        <Route
-          path={ROUTES.COURSE_COPILOT}
-          element={
-            <PrivateLayout
-              requiredFeature={FeatureToggleKey.COURSE_COPILOT}
-              requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
-              alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
-            >
-              <CourseCopilotSessions />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.COURSE_COPILOT_NEW}
-          element={
-            <PrivateLayout
-              requiredFeature={FeatureToggleKey.COURSE_COPILOT}
-              requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
-              alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
-            >
-              <CourseCopilotNew />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.COURSE_COPILOT_SESSION(":sessionId")}
-          element={
-            <PrivateLayout
-              requiredFeature={FeatureToggleKey.COURSE_COPILOT}
-              requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
-              alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
-            >
-              <CourseCopilotSession />
-            </PrivateLayout>
-          }
-        />
-        {/* The toggle AND the view grant, as ally-be checks them; every edit control inside the page
+          <Route
+            path={ROUTES.COURSE_COPILOT}
+            element={
+              <PrivateLayout
+                requiredFeature={FeatureToggleKey.COURSE_COPILOT}
+                requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
+                alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
+              >
+                <CourseCopilotSessions />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.COURSE_COPILOT_NEW}
+            element={
+              <PrivateLayout
+                requiredFeature={FeatureToggleKey.COURSE_COPILOT}
+                requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
+                alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
+              >
+                <CourseCopilotNew />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.COURSE_COPILOT_SESSION(":sessionId")}
+            element={
+              <PrivateLayout
+                requiredFeature={FeatureToggleKey.COURSE_COPILOT}
+                requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
+                alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
+              >
+                <CourseCopilotSession />
+              </PrivateLayout>
+            }
+          />
+          {/* The toggle AND the view grant, as ally-be checks them; every edit control inside the page
             narrows further on EDIT_ALLY_GUIDE. */}
-        <Route
-          path={ROUTES.ALLY_CONSOLE}
-          element={
-            <PrivateLayout
-              requiredFeature={FeatureToggleKey.ALLY_GUIDE}
-              requiredPermissions={[Permissions.VIEW_ALLY_GUIDE]}
-            >
-              <AllyConsole />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.LOGS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.LOGS}>
-              <Logs />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.MOBILE_RELEASES}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.MOBILE_RELEASES}>
-              <MobileReleases />
-            </PrivateLayout>
-          }
-        />
-        <Route path={ROUTES.INBOX} element={<InboxRedirect />} />
-        <Route
-          path={ROUTES.WHATSAPP_BOT}
-          element={
-            // Full bleed, as the assistant home: the page draws its own background to the edges.
-            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
-              <WhatsAppBot />
-            </PrivateLayout>
-          }
-        />
-        {/* Onboarding (chunk 20a), before `:botId` so `new` is never read as a bot id. */}
-        <Route
-          path={ROUTES.CHATBOT_NEW}
-          element={
-            <PrivateLayout
-              requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
-              requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
-              fullBleed
-            >
-              <OnboardingStart />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.CHATBOT_NEW_SESSION(":draftId")}
-          element={
-            <PrivateLayout
-              requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
-              requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
-              fullBleed
-            >
-              <OnboardingSession />
-            </PrivateLayout>
-          }
-        />
-        <Route path={ROUTES.CHATBOT_DETAIL} element={<ChatbotDetailRoute />} />
-        <Route
-          path={ROUTES.WHATSAPP_BOT_LEGACY}
-          element={<Navigate to={ROUTES.WHATSAPP_BOT} replace />}
-        />
-        <Route path={ROUTES.CHATBOTS_LEGACY} element={<ChatbotsLegacyRedirect />} />
-        <Route path={`${ROUTES.CHATBOTS_LEGACY}/*`} element={<ChatbotsLegacyRedirect />} />
-        <Route
-          path={ROUTES.DEBRIEFS}
-          element={
-            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
-              <DebriefConsole />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.DEBRIEF_SESSION(":runId")}
-          element={
-            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
-              <DebriefSessionPage />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.DEBRIEF_SESSION_LOGS(":runId")}
-          element={
-            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
-              <AgentLogsPage />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.DEBRIEFS_PM_AGENT}
-          element={
-            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
-              <PmAgentPage />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.DEBRIEFS_SETTINGS}
-          element={
-            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
-              <DebriefSettingsPage />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.AGENT_TEST_CASES}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.AGENT_TEST_CASES}>
-              <AgentTestCases />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.COMPETENCIES}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.COMPETENCIES}>
-              <Competencies />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.ROLEPLAY_SESSION_LOGS}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.ROLEPLAY_SESSION_LOGS}>
-              <RoleplaySessionLogs />
-            </PrivateLayout>
-          }
-        />
-        <Route
-          path={ROUTES.ROLEPLAY_SESSION_LOG_DETAIL(":id")}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.ROLEPLAY_SESSION_LOGS}>
-              <RoleplaySessionLogDetail />
-            </PrivateLayout>
-          }
-        />
+          <Route
+            path={ROUTES.ALLY_CONSOLE}
+            element={
+              <PrivateLayout
+                requiredFeature={FeatureToggleKey.ALLY_GUIDE}
+                requiredPermissions={[Permissions.VIEW_ALLY_GUIDE]}
+              >
+                <AllyConsole />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.LOGS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.LOGS}>
+                <Logs />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MOBILE_RELEASES}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MOBILE_RELEASES}>
+                <MobileReleases />
+              </PrivateLayout>
+            }
+          />
+          <Route path={ROUTES.INBOX} element={<InboxRedirect />} />
+          <Route
+            path={ROUTES.WHATSAPP_BOT}
+            element={
+              // Full bleed, as the assistant home: the page draws its own background to the edges.
+              <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
+                <WhatsAppBot />
+              </PrivateLayout>
+            }
+          />
+          {/* Onboarding (chunk 20a), before `:botId` so `new` is never read as a bot id. */}
+          <Route
+            path={ROUTES.CHATBOT_NEW}
+            element={
+              <PrivateLayout
+                requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
+                requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
+                fullBleed
+              >
+                <OnboardingStart />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.CHATBOT_NEW_SESSION(":draftId")}
+            element={
+              <PrivateLayout
+                requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
+                requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
+                fullBleed
+              >
+                <OnboardingSession />
+              </PrivateLayout>
+            }
+          />
+          <Route path={ROUTES.CHATBOT_DETAIL} element={<ChatbotDetailRoute />} />
+          <Route
+            path={ROUTES.WHATSAPP_BOT_LEGACY}
+            element={<Navigate to={ROUTES.WHATSAPP_BOT} replace />}
+          />
+          <Route path={ROUTES.CHATBOTS_LEGACY} element={<ChatbotsLegacyRedirect />} />
+          <Route path={`${ROUTES.CHATBOTS_LEGACY}/*`} element={<ChatbotsLegacyRedirect />} />
+          <Route
+            path={ROUTES.DEBRIEFS}
+            element={
+              <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+                <DebriefConsole />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.DEBRIEF_SESSION(":runId")}
+            element={
+              <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+                <DebriefSessionPage />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.DEBRIEF_SESSION_LOGS(":runId")}
+            element={
+              <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+                <AgentLogsPage />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.DEBRIEFS_PM_AGENT}
+            element={
+              <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+                <PmAgentPage />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.DEBRIEFS_SETTINGS}
+            element={
+              <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
+                <DebriefSettingsPage />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.AGENT_TEST_CASES}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.AGENT_TEST_CASES}>
+                <AgentTestCases />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.COMPETENCIES}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.COMPETENCIES}>
+                <Competencies />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.ROLEPLAY_SESSION_LOGS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.ROLEPLAY_SESSION_LOGS}>
+                <RoleplaySessionLogs />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.ROLEPLAY_SESSION_LOG_DETAIL(":id")}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.ROLEPLAY_SESSION_LOGS}>
+                <RoleplaySessionLogDetail />
+              </PrivateLayout>
+            }
+          />
+          {/* Anything else under the shell is a real 404 with a way home, not a silent redirect. */}
+          <Route path="*" element={<NotFound />} />
+        </Route>
         <Route path="/" element={<DefaultRedirect />} />
         {/* No sign-up (A1): accounts are made by Ally admin or an owner's invite. */}
         <Route path={ROUTES.SIGN_UP} element={<Navigate to={ROUTES.LOGIN} replace />} />
         <Route path={ROUTES.SIGN_UP_ALT} element={<Navigate to={ROUTES.LOGIN} replace />} />
-
-        <Route path="*" element={<Navigate to={ROUTES.SIMULATION_STUDIO} replace />} />
       </Routes>
     </BrowserRouter>
   );

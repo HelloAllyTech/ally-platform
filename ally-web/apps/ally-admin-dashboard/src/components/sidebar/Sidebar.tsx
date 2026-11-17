@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   DndContext,
@@ -34,7 +34,7 @@ import {
   Terminal,
   Tools,
 } from "@icons";
-import { LibraryBig } from "lucide-react";
+import { ChevronDown, ChevronRight, LibraryBig, TrendingUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -65,13 +65,17 @@ import { UserModal } from "@components";
 // neighbour and several suites mock it wholesale.
 import { AgentAvatar } from "@components/agent-avatar";
 import { ColorModeToggle } from "@components/color-mode-toggle/ColorModeToggle";
+import { useCommandPalette } from "@components/command-palette/CommandPaletteContext";
 import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
 import { NotificationBell } from "@components/notification-bell/NotificationBell";
+import type { NavigationItem } from "@components/types";
 import { SIDEBAR_ITEMS, ROUTES, en, profileSettings, USER_MODAL_FIELDS_IDS } from "@constants";
 import { useClickOutside, useUser } from "@hooks";
+import { groupNavigationItems, isNavItemActive } from "@utils/navigation";
 
 import { BuilderNavBadge } from "./BuilderNavBadge";
 import { SortableNavItem } from "./SortableNavItem";
+import { useCollapsedSections } from "./useCollapsedSections";
 import { FeatureToggleKey } from "../../constants/featureToggles";
 
 const EXPANDED_WIDTH = 1200;
@@ -156,12 +160,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const ids = filteredNavigationItems.map(item => item.id);
+    // Tabs reorder inside their own section; a drop onto another section's tab is ignored.
+    const section = sections.find(sec => sec.items.some(item => item.id === String(active.id)));
+    if (!section) return;
+    const ids = section.items.map(item => item.id);
     const oldIndex = ids.indexOf(String(active.id));
     const newIndex = ids.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
 
-    reorderSidebar(arrayMove(ids, oldIndex, newIndex));
+    // The saved order is one flat list: the sections as displayed, with this one rearranged.
+    const nextSection = arrayMove(ids, oldIndex, newIndex);
+    reorderSidebar(
+      sections.flatMap(sec =>
+        sec.id === section.id ? nextSection : sec.items.map(item => item.id),
+      ),
+    );
   };
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -181,6 +194,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     (isHoverExpandEnabled ? (isPinned && !isRouteForceCollapsed) || isHovered : isExpanded);
   const [openSettings, setOpenSettings] = useState(false);
   const [navSearch, setNavSearch] = useState("");
+  const { collapsed, toggle: toggleSection } = useCollapsedSections();
+  const palette = useCommandPalette();
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -221,11 +236,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  const handleNavigation = (path: string) => {
-    navigate(path);
-    onMobileClose?.();
-  };
 
   const handleUserMenuToggle = () => {
     setIsUserMenuOpen(!isUserMenuOpen);
@@ -313,6 +323,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <BarChart3 size={20} />;
       case SIDEBAR_ITEMS.DEBRIEFS:
         return <Report size={20} />;
+      // Drift is a measure over time, so a trend line — not Analytics' bars.
+      case SIDEBAR_ITEMS.CONVERSATION_DRIFT:
+        return <TrendingUp size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.AGENT_TEST_CASES:
         return <Flag size={20} />;
       case SIDEBAR_ITEMS.COMPETENCIES:
@@ -382,85 +395,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     }
   };
 
-  const isTabItemActive = (path: string) => {
-    switch (path) {
-      case ROUTES.SIMULATION_STUDIO:
-        return (
-          location.pathname.includes(ROUTES.SIMULATION_STUDIO) ||
-          location.pathname.includes(ROUTES.CREATE_SIMULATION)
-        );
-      case ROUTES.USER_MANAGEMENT:
-        return location.pathname.includes(ROUTES.USER_MANAGEMENT);
-      case ROUTES.MANAGE_EVENTS:
-        return location.pathname.includes(ROUTES.MANAGE_EVENTS);
-      case ROUTES.CHARACTER_LIBRARY:
-        return location.pathname.includes(ROUTES.CHARACTER_LIBRARY);
-      case ROUTES.COMPONENT_LIBRARY:
-        return location.pathname.includes(ROUTES.COMPONENT_LIBRARY);
-      case ROUTES.MANAGE_SCENARIO_LANGUAGES:
-        return location.pathname.includes(ROUTES.MANAGE_SCENARIO_LANGUAGES);
-      case ROUTES.MANAGE_SCENARIO_VOICES:
-        return location.pathname.includes(ROUTES.MANAGE_SCENARIO_VOICES);
-      case ROUTES.MANAGE_STT_CONFIGS:
-        return location.pathname.includes(ROUTES.MANAGE_STT_CONFIGS);
-      case ROUTES.MANAGE_LLM_MODEL_CATALOG:
-        return location.pathname.includes(ROUTES.MANAGE_LLM_MODEL_CATALOG);
-      case ROUTES.AI_TASKS:
-        return location.pathname.includes(ROUTES.AI_TASKS);
-      case ROUTES.DEBRIEFS:
-        return location.pathname.includes(ROUTES.DEBRIEFS);
-      case ROUTES.MANAGE_PROMPTS:
-        return location.pathname.includes(ROUTES.MANAGE_PROMPTS);
-      case ROUTES.MANAGE_GUARDRAILS:
-        return location.pathname.includes(ROUTES.MANAGE_GUARDRAILS);
-      case ROUTES.USER_BADGES:
-        return location.pathname.includes(ROUTES.USER_BADGES);
-      case ROUTES.MANAGE_TRANSLATIONS:
-        return location.pathname.includes(ROUTES.MANAGE_TRANSLATIONS);
-      case ROUTES.MANAGE_TOOLTIPS:
-        return location.pathname.includes(ROUTES.MANAGE_TOOLTIPS);
-      case ROUTES.BLOG:
-        return location.pathname.includes(ROUTES.BLOG);
-      case ROUTES.PRODUCT_UPDATES:
-        return location.pathname.includes(ROUTES.PRODUCT_UPDATES);
-      case ROUTES.ANALYTICS:
-        return location.pathname.includes(ROUTES.ANALYTICS);
-      case ROUTES.ROLEPLAY_SESSION_LOGS:
-        return location.pathname.includes(ROUTES.ROLEPLAY_SESSION_LOGS);
-      case ROUTES.AI_LAB:
-        return location.pathname.includes(ROUTES.AI_LAB);
-      // Matches the session detail route too, so the tab stays highlighted
-      // while you are inside a build rather than only on the list.
-      case ROUTES.BUILDER:
-        return location.pathname.includes(ROUTES.BUILDER);
-      // Matches the session and /new routes too, so the tab stays lit inside a session.
-      case ROUTES.COURSE_COPILOT:
-        return location.pathname.includes(ROUTES.COURSE_COPILOT);
-      case ROUTES.ALLY_CONSOLE:
-        return (
-          location.pathname === ROUTES.ALLY_CONSOLE ||
-          location.pathname.startsWith(`${ROUTES.ALLY_CONSOLE}/`)
-        );
-      case ROUTES.PRODUCT_ROADMAP:
-        return location.pathname.includes(ROUTES.PRODUCT_ROADMAP);
-      case ROUTES.SETTINGS:
-        return location.pathname.includes(ROUTES.SETTINGS);
-      // The list, each assistant and onboarding (`/assistants/new`).
-      case ROUTES.WHATSAPP_BOT:
-        return (
-          location.pathname === ROUTES.WHATSAPP_BOT ||
-          location.pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`)
-        );
-      default:
-        return false;
-    }
-  };
-
   const query = navSearch.trim().toLowerCase();
   const isSearching = query.length > 0;
   const displayedNavItems = isSearching
     ? filteredNavigationItems.filter(item => item.label.toLowerCase().includes(query))
     : filteredNavigationItems;
+
+  // Sections come from the full visible list; a search then narrows each section's tabs.
+  const sections = useMemo(
+    () => groupNavigationItems(filteredNavigationItems),
+    [filteredNavigationItems],
+  );
+  const visibleSections = useMemo(
+    () =>
+      sections
+        .map(section => ({
+          ...section,
+          items: isSearching
+            ? section.items.filter(item => item.label.toLowerCase().includes(query))
+            : section.items,
+        }))
+        .filter(section => section.items.length > 0),
+    [sections, isSearching, query],
+  );
+  const isActive = (item: NavigationItem) =>
+    isNavItemActive(item, location.pathname, location.search);
 
   const sidebarItems = (
     <div className="flex-1 min-h-0 flex flex-col pt-4">
@@ -490,42 +449,85 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
           )}
         </div>
       )}
-      <nav className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
+      <nav aria-label={en.nav.mainNavLabel} className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext
-            items={displayedNavItems.map(item => item.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <ul className="space-y-1">
-              {displayedNavItems.map(item => (
-                <SortableNavItem
-                  key={item.id}
-                  item={item}
-                  icon={renderIcon(item.id)}
-                  isActive={isTabItemActive(item.path)}
-                  isExpanded={showExpanded}
-                  canReorder={canReorder && !isSearching}
-                  onNavigate={handleNavigation}
-                  badge={renderBadge(item.id)}
-                />
-              ))}
-            </ul>
-            {/* Signed in, permissions known, and no page to open: say so, not a blank sidebar. */}
-            {showExpanded &&
-              !isSearching &&
-              filteredNavigationItems.length === 0 &&
-              Boolean(permissions?.length) && (
-                <p
-                  data-testid="sidebar-no-access"
-                  className="px-3 py-2 text-sm text-typography-600"
+          {visibleSections.map((section, sectionIndex) => {
+            // A collapsed section still shows the page you are on, so the highlight is never lost.
+            const isCollapsed = showExpanded && !isSearching && collapsed.has(section.id);
+            const shownItems = isCollapsed
+              ? section.items.filter(item => isActive(item))
+              : section.items;
+            const headingId = `sidebar-section-${section.id}`;
+            return (
+              <section
+                key={section.id}
+                aria-labelledby={showExpanded ? headingId : undefined}
+                data-testid={`sidebar-section-${section.id}`}
+                className={
+                  showExpanded
+                    ? "mb-2"
+                    : sectionIndex > 0
+                      ? "mt-2 border-t border-border-light pt-2"
+                      : ""
+                }
+              >
+                {showExpanded && (
+                  <h2 id={headingId} className="m-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(section.id)}
+                      aria-expanded={!isCollapsed}
+                      aria-label={
+                        isCollapsed
+                          ? en.nav.expandSection(section.label)
+                          : en.nav.collapseSection(section.label)
+                      }
+                      disabled={isSearching}
+                      className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-typography-600 hover:text-typography-900 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-default disabled:hover:text-typography-600"
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight size={14} aria-hidden />
+                      ) : (
+                        <ChevronDown size={14} aria-hidden />
+                      )}
+                      <span>{section.label}</span>
+                    </button>
+                  </h2>
+                )}
+                <SortableContext
+                  items={shownItems.map(item => item.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  {en.common.noMenuAccess}
-                </p>
-              )}
-            {showExpanded && isSearching && displayedNavItems.length === 0 && (
-              <p className="px-3 py-2 text-sm text-typography-600">{en.common.noMenuResults}</p>
+                  <ul>
+                    {shownItems.map(item => (
+                      <SortableNavItem
+                        key={item.id}
+                        item={item}
+                        icon={renderIcon(item.id)}
+                        isActive={isActive(item)}
+                        isExpanded={showExpanded}
+                        canReorder={canReorder && !isSearching && !isCollapsed}
+                        onNavigate={onMobileClose}
+                        badge={renderBadge(item.id)}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </section>
+            );
+          })}
+          {/* Signed in, permissions known, and no page to open: say so, not a blank sidebar. */}
+          {showExpanded &&
+            !isSearching &&
+            filteredNavigationItems.length === 0 &&
+            Boolean(permissions?.length) && (
+              <p data-testid="sidebar-no-access" className="px-3 py-2 text-sm text-typography-600">
+                {en.common.noMenuAccess}
+              </p>
             )}
-          </SortableContext>
+          {showExpanded && isSearching && displayedNavItems.length === 0 && (
+            <p className="px-3 py-2 text-sm text-typography-600">{en.common.noMenuResults}</p>
+          )}
         </DndContext>
       </nav>
     </div>
@@ -543,6 +545,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         showExpanded ? "flex-row px-2" : "flex-col"
       }`}
     >
+      <button
+        type="button"
+        onClick={palette.open}
+        aria-label={en.nav.palette.open}
+        title={en.nav.palette.open}
+        data-testid="sidebar-palette-button"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-md text-typography-700 hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+      >
+        <Search size={20} aria-hidden />
+      </button>
       <NotificationBell placement="above" />
       <IdeaCaptureLauncher />
       <ColorModeToggle />

@@ -62,6 +62,14 @@ class RiskCue(BaseModel):
     addressed_by_debrief: bool = Field(
         description="Does the debrief name this moment and how the trainee responded?"
     )
+    clear: bool = Field(
+        default=True,
+        description=(
+            "True when this is a clear risk cue as defined in RISK CUE "
+            "DEFINITION (also when you cannot tell); false when it is a "
+            "possible one."
+        ),
+    )
 
 
 class DebriefQualityOutput(BaseModel):

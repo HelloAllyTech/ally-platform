@@ -165,6 +165,11 @@ export const ANALYTICS_EVENTS = {
 
   // Admin
   SIDEBAR_INTERACTION: "sidebar_interaction",
+  // Admin usage tracking (which screens/actions the internal team actually uses). No PII:
+  // route is the route PATTERN (ids stripped), never free text.
+  ADMIN_PAGE_VIEWED: "admin_page_viewed",
+  ADMIN_ACTION: "admin_action",
+  ADMIN_SEARCH_USED: "admin_search_used",
   // Admin idea capture (the header mic-and-bulb). Save rate = draft_saved / session_started,
   // split by capture_mode. Never send the idea's text.
   IDEA_CAPTURE_SESSION_STARTED: "idea_capture_session_started",
@@ -317,6 +322,10 @@ export const ANALYTICS_PROPS = {
   SEARCH_QUERY: "search_query",
   QUERY_LENGTH: "query_length",
   RESULT_COUNT: "result_count",
+
+  // Admin usage tracking (screen / action reuse HELPLINE_SCREEN / ACTION)
+  ROUTE: "route",
+  TENANT_TIER: "tenant_tier",
 
   // Upgrade / paywall context
   ORG_ID: "org_id",

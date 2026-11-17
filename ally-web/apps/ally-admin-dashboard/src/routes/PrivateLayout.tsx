@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 
 import { Menu } from "@icons";
 import { useDispatch } from "react-redux";
@@ -25,6 +25,8 @@ import {
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
 import { setUser, setPermissions, setFeatures } from "@reducer";
 import { hasPermissions, hasFeature, loginPathWithNext } from "@utils";
+
+import { ShellContext } from "./ShellContext";
 
 interface PrivateLayoutProps {
   children: React.ReactNode;
@@ -103,6 +105,10 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
     useGetCharacterLibraryEnabledQuery(undefined, {
       skip: requiredOrgToggle !== OrgToggle.CHARACTER_LIBRARY,
     });
+
+  // Under AdminShell this layout only gates: the sidebar, scroll area and error barrier are the
+  // shell's, and stay mounted across navigation.
+  const inShell = useContext(ShellContext);
 
   const dispatch = useDispatch();
   // Only used to reset the crash barrier below: React Router reuses this
@@ -239,43 +245,39 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
     void refetchFeatures();
   };
 
-  // The page itself, or what stands in for it while access is checked or refused.
-  const content = (
-    <ErrorBoundary resetKey={pathname}>
-      {entitlementsLoading ? (
-        <div
-          className="flex h-full min-h-[500px] items-center justify-center"
-          data-testid="entitlements-loading"
+  const gateContent = entitlementsLoading ? (
+    <div
+      className="flex h-full min-h-[500px] items-center justify-center"
+      data-testid="entitlements-loading"
+    >
+      <InlineLoading description={en.accessCheck.checking} />
+    </div>
+  ) : entitlementsFailed ? (
+    <div data-testid="entitlements-failed">
+      <AccessDenied
+        title={en.accessCheck.failedTitle}
+        message={en.accessCheck.failedMessage}
+        nextStep={en.accessCheck.failedNextStep}
+        showBackButton={false}
+      />
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={retryEntitlements}
+          data-testid="entitlements-retry"
+          className="inline-flex items-center rounded-lg bg-primary-500 px-6 py-3 text-base font-medium text-white shadow-sm transition-colors hover:bg-primary-600"
         >
-          <InlineLoading description={en.accessCheck.checking} />
-        </div>
-      ) : entitlementsFailed ? (
-        <div data-testid="entitlements-failed">
-          <AccessDenied
-            title={en.accessCheck.failedTitle}
-            message={en.accessCheck.failedMessage}
-            nextStep={en.accessCheck.failedNextStep}
-            showBackButton={false}
-          />
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={retryEntitlements}
-              data-testid="entitlements-retry"
-              className="inline-flex items-center rounded-lg bg-primary-500 px-6 py-3 text-base font-medium text-white shadow-sm transition-colors hover:bg-primary-600"
-            >
-              {en.accessCheck.retry}
-            </button>
-          </div>
-        </div>
-      ) : hasAccess ? (
-        children
-      ) : (
-        <AccessDenied reason={accessDeniedReason} nextStep={en.accessDenied.nextStepContactAdmin} />
-      )}
-    </ErrorBoundary>
+          {en.accessCheck.retry}
+        </button>
+      </div>
+    </div>
+  ) : hasAccess ? (
+    children
+  ) : (
+    <AccessDenied reason={accessDeniedReason} nextStep={en.accessDenied.nextStepContactAdmin} />
   );
 
+  if (inShell) return <>{gateContent}</>;
   // The preview routes render bare, with no shell to preserve — but a crash
   // there used to blank the page just the same, so they get the barrier too.
   if (hasAccess && isPreview) return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
@@ -321,7 +323,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
           <div
             className={`relative min-h-0 flex-1 overflow-y-auto ${fullBleed ? "" : "p-4 lg:p-6"}`}
           >
-            {content}
+            <ErrorBoundary resetKey={pathname}>{gateContent}</ErrorBoundary>
           </div>
         </main>
         <ReportUploadProgressDialog />

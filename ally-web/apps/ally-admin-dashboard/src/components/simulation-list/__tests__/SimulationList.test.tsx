@@ -207,6 +207,23 @@ describe("SimulationList", () => {
     vi.clearAllMocks();
   });
 
+  describe("Default row action", () => {
+    it("opens a draft for editing when its title is clicked", () => {
+      // The test double only forwards title clicks for preview-enabled rows.
+      const draft = { ...mockSimulations[1], isPreviewEnabled: true };
+      renderWithStore(<SimulationList simulations={[draft]} {...mockCallbacks} />);
+      fireEvent.click(screen.getByText("Test Simulation 2"));
+      expect(mockCallbacks.onEdit).toHaveBeenCalledWith(draft);
+    });
+
+    it("opens a published simulation read-only, never starting an edit", () => {
+      renderWithStore(<SimulationList simulations={mockSimulations} {...mockCallbacks} />);
+      fireEvent.click(screen.getByText("Test Simulation 1"));
+      expect(mockCallbacks.onView).toHaveBeenCalledWith(mockSimulations[0]);
+      expect(mockCallbacks.onEdit).not.toHaveBeenCalled();
+    });
+  });
+
   describe("Rendering", () => {
     it("renders table header correctly", () => {
       renderWithStore(<SimulationList simulations={mockSimulations} {...mockCallbacks} />);

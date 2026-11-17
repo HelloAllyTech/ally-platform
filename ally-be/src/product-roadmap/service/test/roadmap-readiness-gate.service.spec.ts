@@ -84,6 +84,7 @@ describe('RoadmapOpportunityService — readiness gate', () => {
           provide: RoadmapStrategyGoalService,
           useValue: {
             countGoals: jest.fn().mockResolvedValue(0),
+            isProdDirector: jest.fn().mockResolvedValue(false),
             getRankContext: jest.fn().mockResolvedValue({
               weights: {
                 votesWeight: 1,

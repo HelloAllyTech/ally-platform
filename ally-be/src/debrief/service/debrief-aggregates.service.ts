@@ -102,7 +102,7 @@ export class DebriefAggregatesService {
     const base = `tenant_id = ${lit(scope.tenantId)}
          AND learner_key <> ${me}
          AND opportunity
-         AND mode IN ('shadow','live') AND status IN ('published','below_bar')
+         AND mode = 'live' AND status IN ('published','below_bar')
          AND created_at > now() - interval '90 days'`;
     const latest = (where: string) => `WITH latest AS (
        SELECT DISTINCT ON (learner_key, skill) learner_key, skill, observation
