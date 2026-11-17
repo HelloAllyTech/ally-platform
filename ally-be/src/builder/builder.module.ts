@@ -29,6 +29,9 @@ import { BuilderSettings } from './entity/builder-settings.entity';
 import { BuilderNotification } from './entity/builder-notification.entity';
 import { BuilderRepoCatalog } from './entity/builder-repo-catalog.entity';
 import { BuilderEvidence } from './entity/builder-evidence.entity';
+import { BuilderPlanReadGuard } from './guard/builder-plan-read.guard';
+import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+import { FeatureToggleGuard } from 'src/auth/guards/feature-toggle.guard';
 import { BuilderController } from './controller/builder.controller';
 import { BuilderPrinciplesController } from './controller/builder-principles.controller';
 import { BuilderPipelineController } from './controller/builder-pipeline.controller';
@@ -198,6 +201,10 @@ import { BuilderPlanConversationService } from './service/builder-plan-conversat
     BuilderPlanConversationController,
   ],
   providers: [
+    // Roadmap v2 D2: read-only way into a shared plan session for Idea people.
+    BuilderPlanReadGuard,
+    PermissionsGuard,
+    FeatureToggleGuard,
     BuilderPrinciplesService,
     BuilderPlanConversationService,
     BuilderSlackService,

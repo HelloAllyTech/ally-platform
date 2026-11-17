@@ -12,6 +12,7 @@ import {
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
 import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { RoadmapInboxService } from 'src/product-planning/service/roadmap-inbox.service';
+import { RoadmapNotificationService } from 'src/product-roadmap/service/roadmap-notification.service';
 import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.service';
 import {
   roleAtLeast,
@@ -79,6 +80,7 @@ export class BuilderPlanConversationService {
     private readonly roles: RoadmapRoleService,
     private readonly inbox: RoadmapInboxService,
     private readonly events: PlanEventService,
+    private readonly broadcast: RoadmapNotificationService,
   ) {}
 
   async list(
@@ -137,15 +139,21 @@ export class BuilderPlanConversationService {
     if (!text) throw new UnprocessableEntityException('Write an answer first.');
 
     const by = await this.author(plan, userId, role);
-    const { post } = await this.post(sessionId, userId, input.idempotencyKey, {
-      content: text,
-      meta: {
-        kind: 'answer',
-        questionId: input.questionId,
-        ...(optionIds.length ? { optionIds } : {}),
-        by,
+    const { post, created } = await this.post(
+      sessionId,
+      userId,
+      input.idempotencyKey,
+      {
+        content: text,
+        meta: {
+          kind: 'answer',
+          questionId: input.questionId,
+          ...(optionIds.length ? { optionIds } : {}),
+          by,
+        },
       },
-    });
+    );
+    if (created) this.changed(plan, 'answers', userId);
     const after = await this.messages.listBySession(sessionId);
     const states = await this.questions(plan, after);
     const state = states.find(
@@ -200,6 +208,7 @@ export class BuilderPlanConversationService {
       },
     );
     // A retried offline send is the same comment: nobody is told twice.
+    if (created) this.changed(plan, 'comments', userId);
     if (mentions.length && created) {
       await this.inbox.deliver({
         kind: RoadmapNotificationKind.MENTION,
@@ -265,6 +274,7 @@ export class BuilderPlanConversationService {
       actorUserId: userId,
       detail: { questionId: chosen.questionId, postId: chosen.id },
     });
+    this.changed(plan, 'answers', userId);
     const states = await this.questions(
       plan,
       await this.messages.listBySession(sessionId),
@@ -278,6 +288,24 @@ export class BuilderPlanConversationService {
   }
 
   // ── Internals ──────────────────────────────────────────────────────────────
+
+  /**
+   * Tells open queues and idea pages (`roadmap:item-changed`) so they refetch
+   * instead of polling. Names the field only, never its text.
+   */
+  private changed(
+    plan: PlanFacts,
+    field: 'answers' | 'comments',
+    actorId: number,
+  ): void {
+    if (!plan.code) return;
+    this.broadcast.emit({
+      kind: 'ITEM_CHANGED',
+      actorId,
+      code: plan.code,
+      fields: [field],
+    });
+  }
 
   private async plan(sessionId: string): Promise<PlanFacts> {
     const [row] = await this.dataSource.query(

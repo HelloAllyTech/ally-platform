@@ -87,6 +87,7 @@ function build(
     },
     inbox: { deliver: jest.fn() },
     events: { record: jest.fn() },
+    broadcast: { emit: jest.fn() },
   };
   const service = new BuilderPlanConversationService(
     ...(Object.values(deps) as unknown as ConstructorParameters<
@@ -113,6 +114,14 @@ describe('BuilderPlanConversationService', () => {
     });
     expect(again.post.id).toBe(first.post.id);
     expect(deps.messages.appendMessage).toHaveBeenCalledTimes(1);
+    // One live update for the one stored answer, not one per retry.
+    expect(deps.broadcast.emit).toHaveBeenCalledTimes(1);
+    expect(deps.broadcast.emit).toHaveBeenCalledWith({
+      kind: 'ITEM_CHANGED',
+      actorId: OTHER,
+      code: 'OPP-0100',
+      fields: ['answers'],
+    });
     expect(first.post).toMatchObject({
       kind: 'answer',
       text: 'Learners; mostly week one',
@@ -188,6 +197,9 @@ describe('BuilderPlanConversationService', () => {
     expect(deps.events.record).toHaveBeenCalledWith(
       expect.objectContaining({ kind: PlanEventKind.ANSWER_SETTLED }),
     );
+    expect(deps.broadcast.emit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ fields: ['answers'], actorId: AUTHOR }),
+    );
   });
 
   it('once there is a lead, the author no longer settles', async () => {
@@ -217,6 +229,10 @@ describe('BuilderPlanConversationService', () => {
       mentionUserIds: [AUTHOR],
       idempotencyKey: 'key-00000008',
     });
+    expect(deps.broadcast.emit).toHaveBeenCalledTimes(1);
+    expect(deps.broadcast.emit).toHaveBeenCalledWith(
+      expect.objectContaining({ fields: ['comments'], code: 'OPP-0100' }),
+    );
     expect(deps.inbox.deliver).toHaveBeenCalledTimes(1);
     expect(deps.inbox.deliver).toHaveBeenCalledWith(
       expect.objectContaining({

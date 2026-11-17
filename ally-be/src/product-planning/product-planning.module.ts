@@ -12,6 +12,7 @@ import { PlanEventService } from './service/plan-event.service';
 import { PlanSpendService } from './service/plan-spend.service';
 import { PlanNotificationService } from './service/plan-notification.service';
 import { PlanSettingsService } from './service/plan-settings.service';
+import { RoadmapNotificationService } from 'src/product-roadmap/service/roadmap-notification.service';
 import { RoadmapRoleService } from './service/roadmap-role.service';
 import { PlanCeilingService } from './service/plan-ceiling.service';
 import { RoadmapInboxService } from './service/roadmap-inbox.service';
@@ -56,6 +57,9 @@ const ENTITIES = TypeOrmModule.forFeature([
     RoadmapRoleService,
     PlanCeilingService,
     RoadmapInboxService,
+    // The roadmap's listener registry (the gateway registers on it). Provided here, a leaf both
+    // Builder and the roadmap import, so there is exactly one instance.
+    RoadmapNotificationService,
   ],
   exports: [
     // Re-exported so the plan flow injects these repositories without registering them twice.
@@ -68,6 +72,7 @@ const ENTITIES = TypeOrmModule.forFeature([
     RoadmapRoleService,
     PlanCeilingService,
     RoadmapInboxService,
+    RoadmapNotificationService,
   ],
 })
 export class ProductPlanningModule {}

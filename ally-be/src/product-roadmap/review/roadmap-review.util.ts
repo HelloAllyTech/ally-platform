@@ -91,6 +91,12 @@ export interface ReviewUndoPayload {
 
 /** The client offers undo for 8 s; the server allows for the trip home. */
 export const REVIEW_UNDO_TTL_MS = 30_000;
+
+/**
+ * Accepted / declined notices wait this long (the client's 8 s undo window plus
+ * the trip home) so an undone decision never tells anyone anything.
+ */
+export const REVIEW_NOTICE_DELAY_MS = 10_000;
 const KEY_LABEL = 'ally:roadmap-v2:review-undo:v1';
 
 /** A key of its own, derived from the app secret under a label (like the readiness token). */

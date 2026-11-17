@@ -9,6 +9,7 @@ import {
   RoadmapNotificationKind,
 } from 'src/product-planning/enum/product-planning.enum';
 import { RoadmapReviewService } from '../roadmap-review.service';
+import { REVIEW_NOTICE_DELAY_MS } from '../roadmap-review.util';
 
 const OWNER = 1;
 const BUILDER = 2;
@@ -38,14 +39,20 @@ function build(
       return [];
     }),
   };
+  // What a re-read of the item finds when a held notice fires.
+  const db: { state: string } = { state: 'pending' };
   const deps = {
     dataSource: {
-      query: jest.fn(
-        async (sql: string): Promise<any> =>
+      query: jest.fn(async (sql: string): Promise<any> => {
+        if (
+          sql.includes('"createdBy"') &&
           sql.includes('FROM "roadmap_opportunities"')
-            ? [{ reviewState: 'pending', createdBy: AUTHOR }]
-            : [],
-      ),
+        )
+          return [{ reviewState: 'pending', createdBy: AUTHOR }];
+        if (sql.startsWith('SELECT "reviewState"'))
+          return [{ reviewState: db.state }];
+        return [];
+      }),
       transaction: jest.fn(async (fn: any) => fn(manager)),
     },
     config: { jwt: { accessToken: { secret: 'secret' } } },
@@ -90,10 +97,13 @@ function build(
       typeof RoadmapReviewService
     >),
   );
-  return { service, deps, txQueries, manager };
+  return { service, deps, txQueries, manager, db };
 }
 
 describe('RoadmapReviewService', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
   it('only an Owner reviews', async () => {
     const { service } = build({ roles: { [OWNER]: 'builder' } });
     await expect(
@@ -102,7 +112,8 @@ describe('RoadmapReviewService', () => {
   });
 
   it('decline needs a one-line reason, kept out of the event and given to the inbox as author-only', async () => {
-    const { service, deps } = build();
+    const { service, deps, db } = build();
+    db.state = 'declined';
     await expect(
       service.review(OWNER, { code: 'OPP-0001', decision: 'decline' }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -118,6 +129,9 @@ describe('RoadmapReviewService', () => {
         detail: { decision: 'decline' },
       }),
     );
+    // Held while the undo window is open.
+    expect(deps.inbox.deliver).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(REVIEW_NOTICE_DELAY_MS);
     expect(deps.inbox.deliver).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: RoadmapNotificationKind.DECLINED,
@@ -126,6 +140,46 @@ describe('RoadmapReviewService', () => {
         }),
       }),
     );
+  });
+
+  describe('accepted and declined notices wait out the undo window', () => {
+    const noticeKinds = (deps: any) =>
+      deps.inbox.deliver.mock.calls.map(([e]: any[]) => e.kind);
+
+    it('sends one accepted notice after the window, and only then', async () => {
+      const { service, deps, db } = build();
+      db.state = 'accepted';
+      await service.review(OWNER, { code: 'OPP-0001', decision: 'accept' });
+      await jest.advanceTimersByTimeAsync(REVIEW_NOTICE_DELAY_MS - 1);
+      expect(noticeKinds(deps)).not.toContain(RoadmapNotificationKind.ACCEPTED);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(noticeKinds(deps)).toEqual([RoadmapNotificationKind.ACCEPTED]);
+    });
+
+    it('sends nothing when the decision is undone inside the window', async () => {
+      const { service, deps, manager } = build();
+      const { undoToken } = await service.review(OWNER, {
+        code: 'OPP-0001',
+        decision: 'accept',
+      });
+      manager.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('SELECT "reviewState"'))
+          return [{ reviewState: 'accepted' }];
+        if (sql.includes('SELECT "leadUserId"')) return [{ leadUserId: null }];
+        return [];
+      });
+      await service.undo(OWNER, undoToken);
+      await jest.advanceTimersByTimeAsync(REVIEW_NOTICE_DELAY_MS * 2);
+      expect(deps.inbox.deliver).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing when the idea is no longer in the decided state', async () => {
+      const { service, deps, db } = build();
+      db.state = 'pending'; // undone elsewhere
+      await service.review(OWNER, { code: 'OPP-0001', decision: 'accept' });
+      await jest.advanceTimersByTimeAsync(REVIEW_NOTICE_DELAY_MS);
+      expect(deps.inbox.deliver).not.toHaveBeenCalled();
+    });
   });
 
   it('accept with a lead assigns in the same transaction and tells the lead', async () => {

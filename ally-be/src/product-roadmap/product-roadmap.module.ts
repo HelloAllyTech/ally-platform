@@ -56,7 +56,6 @@ import { RoadmapAllocationService } from './service/roadmap-allocation.service';
 import { RoadmapMultiplierService } from './service/roadmap-multiplier.service';
 import { RoadmapCommentService } from './service/roadmap-comment.service';
 import { RoadmapInterviewNoteService } from './service/roadmap-content.service';
-import { RoadmapNotificationService } from './service/roadmap-notification.service';
 import { RoadmapImportService } from './service/roadmap-import.service';
 import { RoadmapOpportunityService } from './service/roadmap-opportunity.service';
 import { RoadmapSavedViewService } from './service/roadmap-saved-view.service';
@@ -277,8 +276,7 @@ import { RoadmapReviewService } from './review/roadmap-review.service';
     RoadmapInterviewNoteRepository,
     RoadmapSavedViewRepository,
     RoadmapUserTabOrderRepository,
-    // services
-    RoadmapNotificationService,
+    // services (RoadmapNotificationService now comes from ProductPlanningModule)
     RoadmapAccessService,
     // Signs the readiness verdict on the way out of ai/readiness and verifies it on the way
     // into POST /opportunities — the readiness gate's server-side half.

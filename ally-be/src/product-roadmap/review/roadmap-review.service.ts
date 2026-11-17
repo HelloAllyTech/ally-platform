@@ -4,8 +4,10 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  OnModuleDestroy,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { LoggerService } from 'src/logger/logger.service';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppConfigService } from 'src/config/config.service';
 import {
@@ -35,6 +37,7 @@ import {
 import { REVIEW_REASON_MAX } from '../draft/roadmap-draft.dto';
 import {
   readReviewUndo,
+  REVIEW_NOTICE_DELAY_MS,
   REVIEW_UNDO_TTL_MS,
   ReviewUndoItem,
   reviewUndoKey,
@@ -79,7 +82,14 @@ const coded = (status: HttpStatus, code: string, message: string, extra = {}) =>
  * answered 404 while `roadmap_v2` is off.
  */
 @Injectable()
-export class RoadmapReviewService {
+export class RoadmapReviewService implements OnModuleDestroy {
+  private readonly logger = LoggerService.getInstance(
+    RoadmapReviewService.name,
+  );
+
+  /** Accepted / declined notices waiting out the undo window, by item id. */
+  private readonly heldNotices = new Map<string, NodeJS.Timeout>();
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly config: AppConfigService,
@@ -161,6 +171,9 @@ export class RoadmapReviewService {
       throw new ForbiddenException('Only the Owner who reviewed can undo it.');
     }
     await this.assertOwner(userId);
+
+    // An undone decision tells nobody anything: drop its held notices.
+    for (const item of payload.items) this.cancelDecisionNotice(item.id);
 
     await this.dataSource.transaction(async (manager) => {
       const conflicts: string[] = [];
@@ -587,14 +600,8 @@ export class RoadmapReviewService {
             ? RoadmapNotificationKind.DECLINED
             : null;
       if (kind) {
-        await this.inbox.deliver({
-          kind,
-          itemId: p.id,
-          sessionId: p.sessionId,
-          actorUserId: userId,
-          // `reason` is an author-only key: the inbox strips it for everyone else.
-          payload: { code: p.code, ...(p.reason ? { reason: p.reason } : {}) },
-        });
+        // Held until the undo window has passed (see scheduleDecisionNotice).
+        this.scheduleDecisionNotice(userId, p, kind);
       }
       if (p.sessionId && p.undo.next.leadUserId !== p.undo.prev.leadUserId) {
         await this.afterLeadAssigned(
@@ -667,6 +674,68 @@ export class RoadmapReviewService {
         [p.sessionId, p.undo.next.leadUserId, userId],
       );
     }
+  }
+
+  /**
+   * The accepted / declined notice (author and voters) is sent only once the
+   * undo window has passed, and only if the decision still stands then. The
+   * timer is in-process: a restart inside the window drops that notice, which
+   * is the safe direction (a missed note, never one about an undone decision).
+   * A newer decision on the same idea replaces the held one.
+   */
+  private scheduleDecisionNotice(
+    actorUserId: number,
+    p: PlannedReview,
+    kind: RoadmapNotificationKind,
+  ): void {
+    this.cancelDecisionNotice(p.id);
+    const timer = setTimeout(() => {
+      this.heldNotices.delete(p.id);
+      void this.sendDecisionNotice(actorUserId, p, kind);
+    }, REVIEW_NOTICE_DELAY_MS);
+    timer.unref?.();
+    this.heldNotices.set(p.id, timer);
+  }
+
+  private cancelDecisionNotice(itemId: string): void {
+    const held = this.heldNotices.get(itemId);
+    if (held) clearTimeout(held);
+    this.heldNotices.delete(itemId);
+  }
+
+  private async sendDecisionNotice(
+    actorUserId: number,
+    p: PlannedReview,
+    kind: RoadmapNotificationKind,
+  ): Promise<void> {
+    try {
+      const [row] = await this.dataSource.query(
+        `SELECT "reviewState" FROM "roadmap_opportunities"
+          WHERE id = $1 AND "deletedAt" IS NULL`,
+        [p.id],
+      );
+      // Undone (here or on another instance) or changed since: say nothing.
+      if (row?.reviewState !== p.undo.next.reviewState) return;
+      await this.inbox.deliver({
+        kind,
+        itemId: p.id,
+        sessionId: p.sessionId,
+        actorUserId,
+        // `reason` is an author-only key: the inbox strips it for everyone else.
+        payload: { code: p.code, ...(p.reason ? { reason: p.reason } : {}) },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Could not send the ${kind} notice for ${p.code}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  onModuleDestroy(): void {
+    for (const timer of this.heldNotices.values()) clearTimeout(timer);
+    this.heldNotices.clear();
   }
 
   private async afterLeadAssigned(
