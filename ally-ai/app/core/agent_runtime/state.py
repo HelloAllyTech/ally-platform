@@ -97,6 +97,9 @@ class RunWorking(TypedDict, total=False):
     fallback_result: Optional[Dict[str, Any]]
     # What the run asked to remember (chunk 8a): returned, never stored here.
     memory_writes: List[Dict[str, Any]]
+    #: What the run did, step by step, as the bot page shows it (chunk 6b,
+    #: activity.py): each with `ok`, and a write's record id.
+    activity: List[Dict[str, Any]]
 
     # --- output: the `/knowledge-agent/answer` response, field for field
     result: Optional[Dict[str, Any]]

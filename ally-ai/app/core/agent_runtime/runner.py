@@ -18,6 +18,7 @@ from uuid import uuid4
 
 from langgraph.graph.state import CompiledStateGraph
 
+from app.core.agent_runtime import activity
 from app.core.agent_runtime.budget import RUN_DEADLINE
 from app.core.agent_runtime.gateway import AgentGatewayClient
 from app.core.agent_runtime.graph import OnEvent, run_agent
@@ -78,6 +79,7 @@ def build_response(state: AgentState, run_id: str) -> AgentRunResponse:
         run_id=run_id,
         trace=state.get("trace") or [],
         memory_writes=state.get("memory_writes") or [],
+        activity=activity.done(state.get("activity") or []),
     )
 
 

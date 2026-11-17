@@ -111,6 +111,14 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             "already logged the same message."
         ),
     )
+    activity: bool = Field(
+        False,
+        description=(
+            "Emit `activity` events and return `activity` (chunk 6b), for the bot "
+            "page's and Try it's live steps. Off for WhatsApp and every other caller, "
+            "whose events and response are unchanged."
+        ),
+    )
     knowledge_topics: List[str] = Field(
         default_factory=list,
         max_length=50,
@@ -189,6 +197,8 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             "knowledge_topics": list(self.knowledge_topics),
             "decline_text": self.decline_text,
         }
+        if self.activity:
+            bot["activity"] = True
         if self.gateway:
             bot["gateway_tools"] = list(self.gateway.tools)
             # Only when there are some, so a run without list tools is today's.
@@ -293,6 +303,17 @@ class AgentRunResponse(KnowledgeAnswerResponse):
         ),
     )
 
+    activity: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            'What the run did, for the bot page\'s "what I did" line and its '
+            "confirmation card (chunk 6b): each step that succeeded, as a kind "
+            "(search, find, create, update, cancel, hand_over), the list's name and a "
+            "record's title; a write also carries the record's id, which ally-be uses "
+            "to read the stored record and never shows. Sent only when there are some."
+        ),
+    )
+
     @model_serializer(mode="wrap")
     def _handover_only_when_set(
         self, handler: SerializerFunctionWrapHandler
@@ -302,6 +323,8 @@ class AgentRunResponse(KnowledgeAnswerResponse):
         data = handler(self)
         if not data.get("handover"):
             data.pop("handover", None)
+        if not data.get("activity"):
+            data.pop("activity", None)
         if not data.get("memory_writes"):
             data.pop("memory_writes", None)
         else:

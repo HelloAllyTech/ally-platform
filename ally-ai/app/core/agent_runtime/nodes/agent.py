@@ -7,7 +7,7 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, Literal, Tuple, Union
 
-from app.core.agent_runtime import conversation, memory
+from app.core.agent_runtime import activity, conversation, memory
 from app.core.agent_runtime.budget import (
     MAX_REVISIONS,
     MAX_TOOL_STEPS,
@@ -54,6 +54,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
                 "limits": service.resolve_limits(**bot.get("limits", {})),
                 "passages": [],
                 "tool_calls": [],
+                "activity": [],
                 "revisions": 0,
                 "started_at": time.time(),
             }
@@ -141,6 +142,8 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
                 state.get("memory_writes") or [], step, memory.remember_mode(bot)
             )
         )
+        if (step.get("action") or REPLY_ACTION) == REPLY_ACTION:
+            activity.writing(bot)  # the live step "Writing a reply…" (chunk 6b)
         added = writes[len(state.get("memory_writes") or []) :]
         if added:
             start["trace"] = [
