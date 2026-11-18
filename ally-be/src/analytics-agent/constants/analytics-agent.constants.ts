@@ -320,6 +320,23 @@ export const FORBIDDEN_SQL_FRAGMENTS: readonly string[] = Object.freeze([
  * a chart and a scrollable table can hold hundreds of rows usefully, while a
  * narration prompt cannot, and every row sent is a row leaving this service.
  */
+/**
+ * The OpenAI chat model behind the Analytics Agent, its audit and the weekly
+ * automation. `OPENAI_CHAT_MODEL` overrides it. Read when a client is built, not
+ * at import, so suites that load this file never need the env.
+ */
+export const ANALYTICS_CHAT_MODEL = Object.freeze({
+  ENV_VAR: 'OPENAI_CHAT_MODEL',
+  DEFAULT: 'gpt-5.6-luna',
+});
+
+export function resolveAnalyticsChatModel(): string {
+  return (
+    process.env[ANALYTICS_CHAT_MODEL.ENV_VAR]?.trim() ||
+    ANALYTICS_CHAT_MODEL.DEFAULT
+  );
+}
+
 export const AGENT_LIMITS = Object.freeze({
   ROW_LIMIT: 500,
   NARRATION_ROW_LIMIT: 100,

@@ -2445,7 +2445,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'Agent model; prompt is AUDIT_AGENT_SYSTEM_PROMPT in code, not a Skills Store prompt.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
-    defaultModel: 'whatever OPENAI_CHAT_MODEL names (no default in code)',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
     configuredBy: 'OPENAI_CHAT_MODEL',
   },
   {
@@ -2458,7 +2458,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'One LangChain agent run with read-only GitHub tools: decides whether code added since the last run needs new PostHog events and proposes them as exact-text edits. The agent holds three GitHub MCP write tools (create branch, push files, open pull request), each wrapped by a guard that refuses, in code, any write outside the platform repo, an automation/ branch and the allowed folders; reported events are then checked for personal-data property names. Prompt is POSTHOG_EVENTS_SYSTEM_PROMPT in code.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
-    defaultModel: 'whatever OPENAI_CHAT_MODEL names (no default in code)',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
     configuredBy: 'OPENAI_CHAT_MODEL',
   },
   {
@@ -2471,7 +2471,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'Two separate LangChain agent runs. Analysis (read-only GitHub tools, no approval needed, edits nothing): what changed in the platform (migrations, entities, metric definitions: the "Metrics / Definition changes" section) and a plan of the dbt changes, with the items that exist only because of the PostHog events marked. Changes (after approval): applies the part of the plan the PostHog pull request outcome allows (all of it if merged, without the PostHog-dependent items if closed) by editing the dbt repo and opening a pull request through guarded GitHub MCP write tools (confined in code to the dbt repo, an automation/ branch and models/seeds/tests). Prompts are DBT_ANALYSIS_SYSTEM_PROMPT and DBT_CHANGES_SYSTEM_PROMPT in code.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
-    defaultModel: 'whatever OPENAI_CHAT_MODEL names (no default in code)',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
     configuredBy: 'OPENAI_CHAT_MODEL',
   },
   {
@@ -2484,7 +2484,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       "One LangChain agent run per fix attempt. The server polls the pull request's checks on GitHub; when one fails, the agent reads the failed job logs (read-only GitHub tools, including the Actions toolset) and pushes a fix to the same branch through the guarded push_files tool (confined in code to the dbt repo, the automation/ branch and models/seeds/tests; it cannot open, approve or merge a pull request). It is told not to weaken tests to get a pass and to push nothing when the failure is not caused by the branch. Prompt is DBT_CI_FIX_SYSTEM_PROMPT in code.",
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
-    defaultModel: 'whatever OPENAI_CHAT_MODEL names (no default in code)',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
     configuredBy: 'OPENAI_CHAT_MODEL',
   },
   {
@@ -2497,7 +2497,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'One LangChain agent run with read-only GitHub tools, independent of the agent that wrote the pull request: reads the diff, judges it against a checklist (including no personal or health data in events) and posts a verdict as a PR comment. Never approves or merges. Prompt is PR_REVIEW_SYSTEM_PROMPT in code.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
-    defaultModel: 'whatever OPENAI_CHAT_MODEL names (no default in code)',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
     configuredBy: 'OPENAI_CHAT_MODEL',
   },
 ];

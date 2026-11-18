@@ -17,6 +17,7 @@ import z from 'zod';
 import {
   AGENT_LIMITS,
   AGENT_SYSTEM_PROMPT,
+  resolveAnalyticsChatModel,
 } from '../constants/analytics-agent.constants';
 import {
   AnalyticalAgentTraceHandler,
@@ -30,7 +31,7 @@ import { createDatalyzeTaskTokenMiddleware } from '../util/datalyze-task-token.u
 const logger = new Logger('AnalyticalAgent');
 
 export const LLM = new ChatOpenAI({
-  model: process.env.OPENAI_CHAT_MODEL,
+  model: resolveAnalyticsChatModel(),
   apiKey: process.env.OPENAI_API_KEY,
   supportsStrictToolCalling: false,
   useResponsesApi: true,

@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
 import { createAgent, HumanMessage, toolStrategy } from 'langchain';
 import type { z } from 'zod';
+import { resolveAnalyticsChatModel } from '../constants/analytics-agent.constants';
 import { AUTOMATION_LIMITS } from '../constants/analytics-automation.constants';
 import type { AnalyticsAutomationCommitShas } from '../entity/analytics-automation-run.entity';
 import type { RepoRef } from './analytics-automation-github.service';
@@ -26,7 +27,7 @@ let llm: ChatOpenAI | undefined;
  */
 export function automationLlm(): ChatOpenAI {
   llm ??= new ChatOpenAI({
-    model: process.env.OPENAI_CHAT_MODEL,
+    model: resolveAnalyticsChatModel(),
     apiKey: process.env.OPENAI_API_KEY,
     supportsStrictToolCalling: false,
     useResponsesApi: true,
