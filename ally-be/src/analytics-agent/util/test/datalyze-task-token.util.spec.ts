@@ -5,8 +5,9 @@ import {
   TASK_TOKEN_PLACEHOLDER,
 } from '../datalyze-task-token.util';
 
-const TOKEN_1 = 'eyJ3IjoicHVsbCJ9.c2lnMQ';
-const TOKEN_2 = 'eyJ3IjoicHVsbCIsInMiOjF9.c2lnMg';
+// Placeholders, not real tokens: anything without whitespace or backticks will do.
+const TOKEN_1 = 'fake-task-token-one.fake-signature-one';
+const TOKEN_2 = 'fake-task-token-two.fake-signature-two';
 
 const result = (text: string) =>
   new ToolMessage({ content: text, tool_call_id: 'x' });

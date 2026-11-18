@@ -110,6 +110,10 @@ describe('AppModule', () => {
 
   beforeAll(() => {
     Object.assign(process.env, stubEnvFromSchema());
+    // Not in the env schema, but the Analytics Agent builds its GitHub App auth at import.
+    process.env.GITHUB_APP_ID ??= '1';
+    process.env.GITHUB_APP_INSTALLATION_ID ??= '1';
+    process.env.GITHUB_APP_PRIVATE_KEY ??= 'placeholder';
     // 'test' is in the schema's allowed NODE_ENV values and keeps any
     // environment-sensitive module on its least surprising branch.
     process.env.NODE_ENV = 'test';

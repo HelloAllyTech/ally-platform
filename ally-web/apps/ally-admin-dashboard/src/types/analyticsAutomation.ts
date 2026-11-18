@@ -125,4 +125,3 @@ export interface AnalyticsAutomationRunDetail extends AnalyticsAutomationRunSumm
   };
   agentRuns: AnalyticsAutomationAgentRun[];
 }
-

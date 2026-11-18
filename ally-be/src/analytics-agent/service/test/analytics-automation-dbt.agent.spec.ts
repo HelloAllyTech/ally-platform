@@ -251,12 +251,10 @@ describe('AnalyticsAutomationDbtAgent dbt-build label', () => {
     const github = {
       readTools: jest.fn().mockResolvedValue([]),
       guardedWriteTools: jest.fn(),
-      openPullRequest: jest
-        .fn()
-        .mockResolvedValue({
-          number: 9,
-          url: 'https://github.com/O/dbt/pull/9',
-        }),
+      openPullRequest: jest.fn().mockResolvedValue({
+        number: 9,
+        url: 'https://github.com/O/dbt/pull/9',
+      }),
       addPullRequestLabel: jest.fn().mockResolvedValue(undefined),
       getCheckRuns: jest.fn().mockResolvedValue(green),
       commentOnPullRequest: jest.fn().mockResolvedValue(undefined),

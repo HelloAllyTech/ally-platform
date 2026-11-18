@@ -25,7 +25,11 @@ module.exports = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
-  transformIgnorePatterns: ['node_modules/(?!(uuid)/)'],
+  // ESM-only packages ts-jest has to transform. `@octokit/auth-app` (the Analytics Agent's
+  // GitHub App auth) and the ESM-only packages it pulls in.
+  transformIgnorePatterns: [
+    'node_modules/(?!(uuid|@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|toad-cache|fast-content-type-parse|json-with-bigint|content-type)/)',
+  ],
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
