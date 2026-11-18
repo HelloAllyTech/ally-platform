@@ -73,8 +73,7 @@ class PmConversationRequest(BaseModel):
     #: ally-be's id for this turn (the person's message id): the agent token's
     #: run id, so every action the turn takes is tied to the person's words.
     turn_id: str
-    #: The checkpoint thread: one per console thread (`debrief-pm-conversation`,
-    #: and `debrief-pm-conversation:pinned-rules` for the clinical advisor).
+    #: The checkpoint thread: one per console thread (`debrief-pm-conversation`).
     thread_id: str = Field(
         "debrief-pm-conversation",
         pattern=r"^debrief-pm-conversation(:[a-z0-9-]{1,40})?$",

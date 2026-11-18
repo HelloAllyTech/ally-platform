@@ -10,6 +10,7 @@ Welcome to the **Ally Developer Wiki** catalog. This catalog is parsed by the LL
 - [Platform Overview](platform/overview.md) — What Ally is, its mission, and the ecosystem
 - [Architecture & Data Flow](platform/architecture.md) — Services, integrations, queues, storage, HIPAA
 - [Tech Stack](platform/tech-stack.md) — The polyglot stack across all layers
+- [Core Concepts](platform/concepts.md) — **Start here in an unfamiliar area.** Every core concept as a card: what it is, what it's made of, its code, whether it's live and what gates it; plus overloaded terms. CI keeps it complete
 - [Cross-Repo Agent Guide](platform/agent-guide.md) — Conventions, common tasks, and gotchas for agents
 - [Debrief Agent](platform/debrief-agent.md) — The post-roleplay debrief family (graph, Ask Ally, expert review, orchestrator, PM agent): pieces, releases, measurement, evals
 - [Language-Quality Evaluation & RCA](platform/language-quality-eval.md) — Evaluating and fixing voice-agent language quality via LLM-judge error annotation + single-variable RCA

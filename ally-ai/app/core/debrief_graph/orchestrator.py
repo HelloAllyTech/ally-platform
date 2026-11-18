@@ -38,7 +38,7 @@ from app.core.debrief_graph.constants import FallbackRung, Recipe, Step
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
 from app.core.debrief_graph.findings import count as count_findings
 from app.core.debrief_graph.gateway import GATEWAY_RETRY
-from app.core.debrief_graph.model_step import ModelStep
+from app.core.debrief_graph.model_step_node import ModelStep
 from app.core.debrief_graph.narration import n
 from app.core.debrief_graph.records import iso, js_len
 from app.core.debrief_graph.registry import (  # noqa: F401 - registers them

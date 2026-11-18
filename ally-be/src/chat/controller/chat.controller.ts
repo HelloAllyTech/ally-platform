@@ -66,6 +66,8 @@ import { GenerateNoteFromAudioResponseDto } from '../dto/voice-note.dto';
 import { SetNoteTranscriptDto } from '../dto/set-note-transcript.dto';
 import { TranscriptRequestDto } from '../dto/transcript.dto';
 import { ApiAuthGuard } from 'src/auth/guards/api-auth.guard';
+import { NoteDraftCallbackDto } from '../dto/note-draft.dto';
+import { ScribeNoteHarnessService } from '../service/scribe-note-harness.service';
 import { ToggleArchiveStatusDto } from '../dto/toggle-archive-status.dto';
 
 @ApiTags('Chats')
@@ -80,6 +82,7 @@ export class ChatController {
     private readonly chatTranscriptService: ChatTranscriptService,
     private readonly audioUploadService: AudioUploadService,
     private readonly voiceNoteService: VoiceNoteService,
+    private readonly scribeNoteHarnessService: ScribeNoteHarnessService,
   ) {}
 
   @Post('note')
@@ -858,5 +861,16 @@ export class ChatController {
     return this.chatTranscriptService.processTranscribeResult(
       chatTranscriptDto,
     );
+  }
+
+  @Post('note-drafts')
+  @UseGuards(ApiAuthGuard)
+  @ApiSecurity('api-key')
+  @ApiOperation({
+    summary: 'Store a Scribe v2 note-harness draft (ally-ai callback)',
+  })
+  @ApiResponse({ status: 201, description: 'Draft stored' })
+  async recordNoteDraft(@Body() dto: NoteDraftCallbackDto): Promise<void> {
+    return this.scribeNoteHarnessService.recordDraft(dto);
   }
 }

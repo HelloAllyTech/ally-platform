@@ -5,7 +5,7 @@ planner reads a summary of its evidence map, and it is never offered to the
 planner. Its evidence map stays the Writer's and the checks' input and is also
 summarised into findings."""
 
-from app.core.debrief_graph import model_steps
+from app.core.debrief_graph import model_step_inputs
 from app.core.debrief_graph.constants import Step
 from app.core.debrief_graph.findings import evidence_findings
 from app.core.debrief_graph.registry.agents._common import registry_step
@@ -47,7 +47,7 @@ MANIFEST = register(
         floor=True,
         step=registry_step(
             "analyst",
-            model_steps.ANALYST,
+            model_step_inputs.ANALYST,
             Step.ANALYST,
             on_success=_evidence,
             findings=lambda s, c, r: evidence_findings(r.get("evidence") or {}),

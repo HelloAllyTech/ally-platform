@@ -3,7 +3,10 @@ import { DebriefAgentsConfigController } from '../controller/debrief-agents-conf
 import { DEBRIEF_SEED_BUNDLE } from '../constants/debrief-release.constants';
 import { DebriefAgentsConfigService } from '../service/debrief-agents-config.service';
 import {
+  agentsView,
   applyAgentsConfigChanges,
+  firstSentence,
+  parsePlannerAgentDescriptions,
   recipeUsedWhen,
   releaseAuthor,
 } from '../util/debrief-agents-config.util';
@@ -33,9 +36,11 @@ describe('agents config changes', () => {
           value: { writer: ['guidance_index'] },
         },
         { kind: 'orchestrator_agent', id: 'guidance_agent', enabled: false },
+        { kind: 'setting', key: 'roleplayFields', value: ['stages'] },
       ],
       APPROVED,
     );
+    expect(out.bundle.settings.roleplayFields).toEqual(['stages']);
     const w = out.bundle.recipes.standard.steps.find(
       (s: any) => s.step === 'writer',
     );
@@ -176,7 +181,7 @@ if (DEBRIEF_SEED_BUNDLE.orchestrator?.plannerModel)
   seedModels.add(DEBRIEF_SEED_BUNDLE.orchestrator.plannerModel);
 const live = { id: 'ga1', version: 7, status: 'ga', bundle: bundle() };
 
-function make(opts: { ask?: any; rows?: any[] } = {}) {
+function make(opts: { ask?: any; rows?: any[]; wording?: string } = {}) {
   const created: any[] = [];
   const repo = {
     findOne: jest.fn(async ({ where }: any) =>
@@ -185,7 +190,10 @@ function make(opts: { ask?: any; rows?: any[] } = {}) {
   };
   const dataSource: any = {
     getRepository: () => repo,
-    query: jest.fn(async (sql: string) => {
+    query: jest.fn(async (sql: string, params?: unknown[]) => {
+      if (params?.[0] === 'debrief_planner_agents') {
+        return opts.wording ? [{ prompt: opts.wording }] : [];
+      }
       if (sql.includes("r.status = 'draft'"))
         return [
           {
@@ -306,6 +314,35 @@ describe('Agents config service', () => {
       reviser: [],
     });
     expect(v.limits.guidanceAgentMaxCalls).toEqual({ min: 0, max: 5 });
+    // The optional roleplay fields on (a release naming none uses the defaults), and the declared
+    // data access the Agents page draws its matrix from.
+    expect(v.settings.roleplayFields).toEqual([]);
+    expect(v.dataAccess.agents.map((a: any) => a.key)).toEqual([
+      'safety_reader',
+      'analyst',
+      'progress_agent',
+      'progress_reader',
+      'writer',
+      'evaluator',
+      'reviser',
+    ]);
+    expect(
+      v.dataAccess.roleplayFields.map((f: any) => [f.key, f.enabled]),
+    ).toContainEqual(['difficulty', false]);
+    expect(
+      v.dataAccess.roleplayFields.find((f: any) => f.key === 'title'),
+    ).toMatchObject({ alwaysOn: true, enabled: true });
+    const analyst = v.dataAccess.agents.find((a: any) => a.key === 'analyst');
+    expect(analyst.reads.map((r: any) => r.data)).toContain('roleplay_brief');
+    const safety = v.dataAccess.agents.find(
+      (a: any) => a.key === 'safety_reader',
+    );
+    expect(
+      safety.reads.find((r: any) => r.data === 'roleplay_brief').when,
+    ).toMatch(/only when/);
+    expect(
+      safety.reads.find((r: any) => r.data === 'transcript').when,
+    ).toBeNull();
     expect(v.models.map((m: any) => m.id).sort()).toEqual([...APPROVED].sort());
     expect(
       v.orchestratorAgents.find((a: any) => a.id === 'guidance_agent'),
@@ -442,5 +479,116 @@ describe('recipe descriptions', () => {
       );
       expect(r.usedWhen.length).toBeGreaterThan(10);
     }
+  });
+});
+
+describe('every agent in the Debrief system', () => {
+  const none = () => ({ what: null, when: null });
+
+  it('lists the steps in run order, then the planner, then the agents only the planner chooses', () => {
+    const agents = agentsView(bundle(), none);
+    expect(agents.map((a) => a.id)).toEqual([
+      'safety_reader',
+      'analyst',
+      'progress_reader',
+      'guidance_lookup',
+      'guidance_agent',
+      'writer',
+      'checks',
+      'evaluator',
+      'reviser',
+      'planner',
+      'case_memory',
+      'assessment_anchoring',
+      'protocol_check',
+      'history_deep',
+      'language_specialist',
+      'cohort_comparison',
+      'course_patterns',
+    ]);
+    expect(agents.map((a) => a.kind)).toEqual([
+      ...Array(9).fill('step'),
+      'planner',
+      ...Array(7).fill('data'),
+    ]);
+  });
+
+  it('says which recipes use each step, from the recipes themselves', () => {
+    const agents = agentsView(bundle(), none);
+    const by = (id: string) => agents.find((a) => a.id === id)!;
+    expect(by('writer')).toMatchObject({
+      runs: 'always',
+      recipes: ['standard', 'short', 'case', 'assessment'],
+    });
+    // The short recipe has no Progress reader or lookup: the data says so.
+    expect(by('progress_reader').recipes).not.toContain('short');
+    expect(by('progress_reader').recipes).toContain('standard');
+    expect(by('progress_reader').runs).toBe('optional');
+    expect(by('checks')).toMatchObject({ promptCode: null, runs: 'always' });
+    expect(by('writer').promptCode).toBe('debrief_writer_system');
+  });
+
+  it('marks planner agents on or off from the release, and the planner off when the orchestrator is', () => {
+    const b = bundle();
+    b.orchestrator.agents = b.orchestrator.agents.filter(
+      (a: any) => a.id !== 'cohort_comparison',
+    );
+    let agents = agentsView(b, none);
+    const by = (id: string) => agents.find((a) => a.id === id)!;
+    expect(by('case_memory')).toMatchObject({
+      runs: 'planner',
+      plannerChoice: { enabled: true },
+    });
+    expect(by('cohort_comparison')).toMatchObject({
+      runs: 'off',
+      plannerChoice: { enabled: false },
+    });
+    // A step that is also a registry agent carries the planner switch too.
+    expect(by('analyst').plannerChoice).toEqual({ enabled: true });
+    expect(by('planner')).toMatchObject({
+      runs: 'always',
+      model: b.orchestrator.plannerModel,
+    });
+    b.orchestrator.enabled = false;
+    agents = agentsView(b, none);
+    expect(agents.find((a) => a.id === 'planner')!.runs).toBe('off');
+    expect(agents.find((a) => a.id === 'case_memory')!.runs).toBe('off');
+  });
+
+  it('reads the planner’s wording and cuts a description to its first sentence', () => {
+    const text = [
+      'How the planner sees each agent.',
+      '## cohort_comparison',
+      'description: Shows how others did. Never a rank.',
+      'use_when: ahead of peers',
+      '## course_patterns',
+      'description: Skills learners miss most.',
+    ].join('\n');
+    expect(parsePlannerAgentDescriptions(text)).toEqual({
+      cohort_comparison: 'Shows how others did. Never a rank.',
+      course_patterns: 'Skills learners miss most.',
+    });
+    expect(parsePlannerAgentDescriptions(null)).toEqual({});
+    expect(firstSentence('Writes the cards. Never sees the rubric.')).toBe(
+      'Writes the cards.',
+    );
+    expect(firstSentence('')).toBeNull();
+  });
+
+  it('the view carries them with a description from the planner’s wording, else the AI Tasks page, else none', async () => {
+    const { svc } = make({
+      wording: '## cohort_comparison\ndescription: Shows how others did.',
+    });
+    const v: any = await svc.view(1, true);
+    const by = (id: string) => v.agents.find((a: any) => a.id === id);
+    expect(v.agents).toHaveLength(17);
+    expect(by('cohort_comparison').what).toBe('Shows how others did.');
+    expect(by('writer').what).toMatch(/debrief cards/);
+    expect(by('writer').when).toBe('Every debrief run');
+    // Nothing in the system describes the code checks: no invented text.
+    expect(by('checks').what).toBeNull();
+    // The existing shape is untouched.
+    expect(v.recipes).toHaveLength(4);
+    expect(v.orchestratorAgents.length).toBeGreaterThan(0);
   });
 });

@@ -4,7 +4,7 @@ import {
   LIVE_START_DELAY_MS,
   learnerProgress,
 } from '../service/debrief-agent.service';
-import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../util/debrief-live.util';
+import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../../common/util/debrief-live.util';
 
 function build(opts: {
   owner?: number;
@@ -355,6 +355,70 @@ describe('DebriefAgentService.learnerView', () => {
       runs: [run({ workspace: {} })],
     }).learnerView('s', 7);
     expect(legacy).toMatchObject({ riskCue: true });
+  });
+
+  describe('the follow-up notice (a clear risk cue the debrief still leaves out)', () => {
+    const run = (extra: Record<string, unknown>) => ({
+      mode: 'live',
+      status: 'below_bar',
+      cards: { opening: 'x' },
+      language: 'en',
+      steps: [],
+      hasRiskCue: true,
+      ...extra,
+    });
+    const view = (r: Record<string, unknown>) =>
+      build({ runs: [run(r)] }).learnerView('s', 7) as Promise<any>;
+
+    it('is true when the best draft left a clear cue uncovered', async () => {
+      expect(
+        await view({ checkFailures: [{ code: 'risk_cue_uncovered' }] }),
+      ).toMatchObject({ state: 'ready', followUp: true });
+    });
+
+    it('is true when the Evaluator found a missed clear cue, or the decision says so', async () => {
+      expect(
+        await view({ evaluatorHardFails: [{ code: 'missed_risk_cue' }] }),
+      ).toMatchObject({ followUp: true });
+      expect(
+        await view({
+          workspace: { decision: { reviewReason: 'missed_risk_cue' } },
+        }),
+      ).toMatchObject({ followUp: true });
+    });
+
+    it('is absent when the clear cue was covered, with or without other failed checks', async () => {
+      const covered = await view({
+        status: 'published',
+        checkFailures: [],
+        evaluatorHardFails: [],
+      });
+      expect(covered).not.toHaveProperty('followUp');
+      expect(
+        await view({ checkFailures: [{ code: 'quote_mismatch' }] }),
+      ).not.toHaveProperty('followUp');
+    });
+
+    it('is absent with no risk cue at all, and for a possible cue that raised nothing', async () => {
+      expect(
+        await view({
+          hasRiskCue: false,
+          checkFailures: [{ code: 'risk_cue_uncovered' }],
+        }),
+      ).not.toHaveProperty('followUp');
+      // A possible-only cue never fails the coverage check or raises the hard fail.
+      expect(await view({})).not.toHaveProperty('followUp');
+    });
+
+    it('never changes what the learner reads: the cards and the support lines are the same', async () => {
+      const plain = await view({});
+      const flagged = await view({
+        checkFailures: [{ code: 'risk_cue_uncovered' }],
+      });
+      const { followUp, ...rest } = flagged;
+      expect(followUp).toBe(true);
+      expect(rest).toEqual(plain);
+    });
   });
 
   it('gives Tele-MANAS when the organisation set no support lines', async () => {

@@ -55,6 +55,8 @@ class TestEndpoint:
         data = res.json()
         assert data["status"] == "published"
         assert data["error"] is None
+        # The version is always sent, so ally-be can tell what it is talking to.
+        assert data["contract_version"] == 1
         writer = [c for c in steps.calls if c["path"] == "writer"][0]
         assert writer["body"]["system_prompt"] is None
 

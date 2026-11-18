@@ -13,6 +13,7 @@ import { defaultsConfirmation } from "./purposes";
 import {
   BuildingScreen,
   DesignScreen,
+  InterviewScreen,
   LearnedScreen,
   LiveScreen,
   QuestionScreen,
@@ -95,6 +96,17 @@ export const OnboardingView: React.FC<{
 
   const body = (() => {
     switch (screen) {
+      case "interview":
+        return (
+          <InterviewScreen
+            view={view}
+            busy={s.sending}
+            working={s.working}
+            streaming={s.streaming}
+            onSend={s.say}
+            onDone={() => s.pass("interview")}
+          />
+        );
       case "reading":
         return <ReadingScreen view={view} reading={s.reading} onDone={() => s.pass("reading")} />;
       case "learned":

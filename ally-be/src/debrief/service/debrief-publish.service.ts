@@ -155,6 +155,14 @@ export class DebriefPublishService {
             ],
           );
         }
+        // The session's debrief is now written: stamp it so a run that crashed before this point
+        // can be found and published again (`DebriefAgentService.republishUnapplied`).
+        await em.query(
+          `UPDATE debrief_runs
+              SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{appliedAt}', to_jsonb(now()::text))
+            WHERE id = $1`,
+          [run.id],
+        );
         if (row) {
           await em.query(
             `UPDATE scenario_session_details
@@ -186,6 +194,10 @@ export class DebriefPublishService {
           );
         }
       });
+      run.workspace = {
+        ...run.workspace,
+        appliedAt: new Date().toISOString(),
+      };
       if (opts.announce) await this.announce(run, cards);
       return true;
     } catch (e) {

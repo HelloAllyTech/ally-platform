@@ -9,6 +9,11 @@ summary: A chronological log tracking all wiki updates and modifications.
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
 
+## [2026-11-18] create | `platform/concepts.md`: Core Concepts — the vocabulary map, kept complete by CI.
+
+- New `platform/concepts.md`: one card per core concept (Is / Also called / Composed of / Status + gate / Code / Deep doc) across learning product, counselling & public product, AI platform, internal agent tooling and delivery & ops, plus an Overloaded terms table and a Plumbing list. Status is judged from code on `master`.
+- Kept current by `scripts/concepts_lint.py` (the `concepts` job in `docs.yml`: every module/package/page/feature directory and every `FeatureToggleKey` must be on a card), the `concepts-gates` rule in `.docs-map.yml`, and a rule in the root `AGENTS.md`/`CLAUDE.md`. Linked from `index.md` and `platform/agent-guide.md`.
+
 ## [2026-11-11] create | `platform/debrief-agent.md`: an overview page for the Debrief agent family.
 
 - New `platform/debrief-agent.md`: the pieces (graph, orchestrator, Ask Ally, expert review, PM agent, system of record), releases and the seed auto-promote trap, where people see it (Debrief Console, Analytics → Debriefs), the one pass definition with intervals and filters, clinical calibration, and the eval tools (test sets, paired runner, gates). Linked from `index.md` and `repos/ally-web.md`.

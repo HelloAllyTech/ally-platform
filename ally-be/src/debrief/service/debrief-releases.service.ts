@@ -12,7 +12,6 @@ import { AgentReleaseService } from '../../llm-agent/harness/release/agent-relea
 import { AgentReleaseAuditAction } from '../../llm-agent/harness/enum/harness.enum';
 import { canonicalHash } from '../../llm-agent/harness/release/canonical-hash.util';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_MODELS,
   DEBRIEF_REGISTRY_AGENTS,
   DEBRIEF_REPLY_DEFAULT,
@@ -22,7 +21,11 @@ import {
   DebriefStep,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
-import { PINNED_RULE_PROMPTS } from '../util/debrief-console-view.util';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
+import {
+  PINNED_RULE_CODES,
+  PINNED_RULE_PROMPTS,
+} from '../util/debrief-console-view.util';
 import {
   applyStepEdits,
   BUDGET_SETTING_KEYS,
@@ -550,8 +553,8 @@ export class DebriefReleasesService implements OnModuleInit {
     }
     for (const rc of diff.recipes) {
       changes.push({
-        area: `Recipe: ${rc.recipe}`,
-        what: what ?? 'Recipe changed',
+        area: `Debrief flow: ${rc.recipe}`,
+        what: what ?? 'Debrief flow changed',
         why,
         before: JSON.stringify(rc.before),
         after: JSON.stringify(rc.after),
@@ -901,11 +904,10 @@ export class DebriefReleasesService implements OnModuleInit {
    * A debrief prompt published in the Skills Store (dashboard, `prompts` CLI,
    * revert, experiment) becomes a release with that version: live at once,
    * unless it would undo a promoted PM-agent or person-proposed change.
-   * Pinned rules are not affected (their own sign-off route), nor prompts the
-   * live release does not use.
+   * A pinned rule goes the same way: only the pinned editors named in the Skills
+   * Store can publish one, and prompts the live release does not use are ignored.
    */
   async fromPublish(e: PromptPublishedEvent) {
-    if (PINNED_RULE_PROMPTS.some((p) => p.code === e.promptCode)) return null;
     const run = () => this.fromPublishNow(e);
     const next = this.sourceQueue.then(run, run);
     this.sourceQueue = next.catch(() => undefined);
@@ -1448,9 +1450,11 @@ export class DebriefReleasesService implements OnModuleInit {
           `${code} is not a prompt of this release`,
         );
       }
-      if (PINNED_RULE_PROMPTS.some((p) => p.code === code)) {
+      if (PINNED_RULE_CODES.has(code)) {
+        // Never from a release change a person or the PM agent proposes here: a pinned rule
+        // is published in the Skills Store by a pinned editor, and the release follows it.
         throw new BadRequestException(
-          `${code} is a pinned rule: propose it as a pinned-rule change`,
+          `${code} is a pinned rule: it is changed in the Skills Store by a pinned editor`,
         );
       }
       const [row] = await this.dataSource.query(

@@ -267,3 +267,18 @@ rules:
         - ally-mobile/docs/RELEASE.md
     why: >
       Version and build-number handling is the step people get wrong at release time.
+
+  # ── Cross-service: the Core Concepts map ───────────────────────────────
+  # scripts/concepts_lint.py (the `concepts` job) already fails on a new, moved or removed
+  # directory or toggle key. This rule covers what it cannot see: a gate whose *default* or
+  # meaning changed, which flips a concept between Live and Dark without touching a path.
+  - id: concepts-gates
+    watch:
+      - "ally-be/src/authorization/constants/admin-feature-toggle.constants.ts"
+      - "ally-be/src/*/entity/*settings*.entity.ts"
+    requires: helloallytech.github.io/wiki/platform/concepts.md
+    why: >
+      Feature toggles and settings flags decide whether a concept is Live, Dark or Partial,
+      and the Core Concepts page states that status per concept. Re-check the Status line of
+      the concept this gate belongs to; a change that moves no status (a description, a
+      reordering) can take the `docs:skip` label.

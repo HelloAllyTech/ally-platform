@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
-import {
-  DEBRIEF_AGENT_KEY,
-  DEBRIEF_SESSION_BUDGET_DEFAULT,
-} from '../constants/debrief-release.constants';
+import { DEBRIEF_SESSION_BUDGET_DEFAULT } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DEBRIEF_QUALITY_DIMENSIONS } from '../../analytics/constants/debrief-quality.constants';
 import { debriefOutcome } from '../util/debrief-outcome.util';
 import {
@@ -129,7 +127,7 @@ export class DebriefScoreService {
               COALESCE(r.workspace->'judge'->'hardFails', '[]'::jsonb) AS hard_fails,
               (r.status IN ('published','below_bar')) AS shown,
               r.workspace->'safety'->'risk_cues' AS risk_cues,
-              r.workspace->'riskCueOption'->>'handling' AS risk_handling,
+              COALESCE(r."riskCueHandling", r.workspace->'riskCueOption'->>'handling') AS risk_handling,
               r.cards->'important_moment' AS important_moment,
               COALESCE(r."actualCostUsd", r."estimatedCostUsd")::float
                 + COALESCE((r.workspace->>'askAllySpentUsd')::float, 0) AS session_cost,

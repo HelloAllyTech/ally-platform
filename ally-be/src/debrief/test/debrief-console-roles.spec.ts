@@ -2,7 +2,12 @@ import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
-import { DebriefConsoleController } from '../controller/debrief-console.controller';
+import {
+  CONSOLE_CONTROLLERS,
+  consoleControllerOf,
+} from './support/console-controllers';
+import { DebriefConsolePmAgentController } from '../controller/debrief-console-pm-agent.controller';
+import { DebriefConsoleTenantsController } from '../controller/debrief-console-tenants.controller';
 import { DebriefReviewController } from '../controller/debrief-review.controller';
 import {
   canDecideFlag,
@@ -26,7 +31,11 @@ function guardFor(perms: string[]) {
   } as any);
 }
 
+/** Stands for 'the Console controller that serves this handler' (the API is split by area). */
+const ANY_CONSOLE = {} as any;
+
 function ctx(controller: any, handler: string): ExecutionContext {
+  if (controller === ANY_CONSOLE) controller = consoleControllerOf(handler);
   return {
     getHandler: () => controller.prototype[handler],
     getClass: () => controller,
@@ -47,7 +56,7 @@ async function allowed(perms: string[], controller: any, handler: string) {
 
 describe('Debrief console role gating', () => {
   it('comments: review rights (Ally team, clinical advisor, owner) only; anyone else gets 403', async () => {
-    const C = DebriefConsoleController;
+    const C = ANY_CONSOLE;
     expect(await allowed(TEAM, C, 'addComment')).toBe(true);
     expect(await allowed(ADVISOR, C, 'addComment')).toBe(true);
     expect(await allowed(OWNER, C, 'addComment')).toBe(true);
@@ -68,7 +77,7 @@ describe('Debrief console role gating', () => {
   });
 
   it('held debriefs, escalation and the Debrief PM agent: Ally team or owner, never the advisor alone', async () => {
-    const C = DebriefConsoleController;
+    const C = ANY_CONSOLE;
     for (const h of [
       'publishRun',
       'escalateFlag',
@@ -84,7 +93,7 @@ describe('Debrief console role gating', () => {
   });
 
   it('owner settings, budgets and autonomy: the owner only', async () => {
-    const C = DebriefConsoleController;
+    const C = ANY_CONSOLE;
     for (const h of [
       'updateSettings',
       'acceptBaseline',
@@ -98,32 +107,27 @@ describe('Debrief console role gating', () => {
     }
   });
 
-  it('verdicts: the clinical advisor; pinned-rule sign-off: advisor or owner', async () => {
+  it('verdicts: the clinical advisor; pinned rules have no console routes any more', async () => {
     expect(await allowed(ADVISOR, DebriefReviewController, 'verdict')).toBe(
       true,
     );
     expect(await allowed(TEAM, DebriefReviewController, 'verdict')).toBe(false);
-    const C = DebriefConsoleController;
-    expect(await allowed(ADVISOR, C, 'approvePinnedRule')).toBe(true);
-    expect(await allowed(OWNER, C, 'approvePinnedRule')).toBe(true);
-    expect(await allowed(TEAM, C, 'approvePinnedRule')).toBe(false);
-  });
-
-  it('pinned rules: propose, withdraw and reject follow approval (advisor or owner)', async () => {
-    const C = DebriefConsoleController;
+    const protos = CONSOLE_CONTROLLERS.map(
+      (c) => c.prototype as unknown as Record<string, unknown>,
+    );
+    // Pinned rules are Skills Store prompts for the named pinned editors: nothing to approve here.
     for (const h of [
-      'proposePinnedRule',
+      'approvePinnedRule',
       'withdrawPinnedRule',
       'rejectPinnedRule',
+      'proposePinnedRule',
     ]) {
-      expect(await allowed(ADVISOR, C, h)).toBe(true);
-      expect(await allowed(OWNER, C, h)).toBe(true);
-      expect(await allowed(TEAM, C, h)).toBe(false);
+      for (const proto of protos) expect(proto[h]).toBeUndefined();
     }
   });
 
   it('the clinical advisor needs only review:admin:debriefs, never system:access (PE-06, RA-15)', async () => {
-    const C = DebriefConsoleController;
+    const C = ANY_CONSOLE;
     // Verdict, comments, Score by hand (item + save), escalated flags,
     // pinned-rule sign-off.
     expect(await allowed(ADVISOR, DebriefReviewController, 'verdict')).toBe(
@@ -134,14 +138,15 @@ describe('Debrief console role gating', () => {
       'editComment',
       'resolveComment',
       'resolveFlag',
-      'approvePinnedRule',
     ]) {
       expect(await allowed(ADVISOR, C, h)).toBe(true);
     }
     // Score by hand is gone (2026-11-12): no route left for anyone.
-    expect(
-      (C.prototype as unknown as Record<string, unknown>).score,
-    ).toBeUndefined();
+    for (const c of CONSOLE_CONTROLLERS) {
+      expect(
+        (c.prototype as unknown as Record<string, unknown>).score,
+      ).toBeUndefined();
+    }
     // The team's own actions stay on system:access.
     for (const h of ['publishRun', 'escalateFlag', 'proposeChange']) {
       expect(await allowed(ADVISOR, C, h)).toBe(false);
@@ -150,9 +155,7 @@ describe('Debrief console role gating', () => {
   });
 
   it('flag decisions: the advisor reaches the route but decides only escalated flags', async () => {
-    expect(
-      await allowed(ADVISOR, DebriefConsoleController, 'resolveFlag'),
-    ).toBe(true);
+    expect(await allowed(ADVISOR, ANY_CONSOLE, 'resolveFlag')).toBe(true);
     const advisor = { roles: debriefRoles(ADVISOR, true) };
     const team = { roles: debriefRoles(TEAM) };
     expect(canDecideFlag(advisor, 'open')).toBe(false);
@@ -165,7 +168,7 @@ describe('Debrief console role gating', () => {
       viewer: jest.fn(async () => ({ can: debriefCan(TEAM) })),
     };
     const agent = { setLive: jest.fn() };
-    const controller = Object.create(DebriefConsoleController.prototype);
+    const controller = Object.create(DebriefConsoleTenantsController.prototype);
     Object.assign(controller, { view, agent });
     await expect(
       controller.setLive('t1', { live: true }, { user: { id: 1 } }),
@@ -180,7 +183,6 @@ describe('Debrief console role gating', () => {
       comment: true,
       heldDebrief: true,
       verdict: false,
-      approvePinnedRule: false,
       switchOrgOn: false,
       ownerSettings: false,
       emergencyStop: true,
@@ -190,8 +192,9 @@ describe('Debrief console role gating', () => {
       flagDecision: true,
       heldDebrief: false,
       verdict: true,
-      approvePinnedRule: true,
       pmAgent: false,
+      releases: false,
+      ownerSettings: false,
     });
     // A team member granted review:admin:debriefs by hand: escalations are
     // addressed only to the named advisor.
@@ -203,7 +206,7 @@ describe('Debrief console role gating', () => {
   });
 
   it('proposals and releases: Ally team or owner; release settings and budget promotions: the owner', async () => {
-    const C = DebriefConsoleController;
+    const C = ANY_CONSOLE;
     for (const h of [
       'proposeChange',
       'editDraft',
@@ -221,7 +224,7 @@ describe('Debrief console role gating', () => {
       })),
       approve: jest.fn(),
     };
-    const controller = Object.create(DebriefConsoleController.prototype);
+    const controller = Object.create(DebriefConsolePmAgentController.prototype);
     Object.assign(controller, { view, releaseHistory, pmAgent });
     await expect(
       controller.proposeChange(

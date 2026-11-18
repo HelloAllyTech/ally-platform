@@ -74,7 +74,7 @@ const useIsBelowMd = () => {
   return matches;
 };
 
-const UserLogsTable: FC<LogsTableProps> = ({ refreshKey, sessionType, className }) => {
+const UserLogsTable: FC<LogsTableProps> = ({ refreshKey, sessionType, className, openChatId }) => {
   const dispatch = useDispatch();
   const location = useLocation();
   const { t, i18n } = useTranslation();
@@ -210,6 +210,21 @@ const UserLogsTable: FC<LogsTableProps> = ({ refreshKey, sessionType, className 
       }
     }
   }, [location, refreshKey, isCall, isSimulation, refetchCallLogs, refetchSimulationLogs]);
+
+  // Open a just-created note (from the New note drawer) in the sidebar: refetch
+  // so it is in the list, then select its row. A new note is the newest
+  // session, so it is on the first page.
+  useEffect(() => {
+    if (!openChatId || !isCall || !refetchCallLogs) return undefined;
+    let cancelled = false;
+    void refetchCallLogs().then(response => {
+      const row = response.data?.data?.find(log => log.id === openChatId);
+      if (!cancelled && row) setSummary(row);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [openChatId, isCall, refetchCallLogs]);
 
   const handleLoadMore = () => {
     if (!isLoading && !isLoadingMore && hasMore) {

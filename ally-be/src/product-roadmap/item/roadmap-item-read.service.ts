@@ -1296,6 +1296,7 @@ export class RoadmapItemReadService {
         ...(c.leadId ? { lead: person(c.leadId, 'lead') } : {}),
         votes: c.votes,
         ...(c.queueRank != null ? { rank: c.queueRank } : {}),
+        queueRank: c.queueRank,
         votedByMe: c.votedByMe,
         starred: c.starred,
         ...(c.starred && c.opp.starredById

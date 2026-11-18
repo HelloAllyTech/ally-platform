@@ -971,6 +971,44 @@ export class SettingsService {
     return { success: true };
   }
 
+  /** Scribe v2: whether the note harness runs in shadow for this org. */
+  async getScribeNoteHarnessShadowEnabled(tenantId?: string): Promise<boolean> {
+    const resolvedTenantId = await this.resolveReadableTenantId(tenantId);
+    const preference = await this.preferenceService.getPreference(
+      PreferenceName.SCRIBE_NOTE_HARNESS_SHADOW_ENABLED,
+      resolvedTenantId,
+      PreferenceRelatedEntity.ORGANIZATION,
+    );
+    if (!preference?.value) return false;
+    return (
+      (preference.value as CustomFieldsEnabledPreferenceValue).enabled ?? false
+    );
+  }
+
+  async updateScribeNoteHarnessShadowEnabled(
+    tenantId: string,
+    enabled: boolean,
+  ): Promise<{ success: boolean }> {
+    const resolvedId = await this.resolveWritableTenantId(tenantId);
+    const existing = await this.preferenceService.getPreference(
+      PreferenceName.SCRIBE_NOTE_HARNESS_SHADOW_ENABLED,
+      resolvedId,
+      PreferenceRelatedEntity.ORGANIZATION,
+    );
+    if (existing) {
+      await this.preferenceService.updatePreference(existing.id, { enabled });
+    } else {
+      await this.preferenceService.createPreference({
+        name: PreferenceName.SCRIBE_NOTE_HARNESS_SHADOW_ENABLED,
+        relatedId: resolvedId,
+        relatedEntity: PreferenceRelatedEntity.ORGANIZATION,
+        value: { enabled },
+        tenantId: ExecutionManager.getTenantId(),
+      });
+    }
+    return { success: true };
+  }
+
   async updateEnabledCustomFieldTypes(
     tenantId: string,
     enabledTypes: string[],

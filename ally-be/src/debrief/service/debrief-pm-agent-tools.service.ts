@@ -2,11 +2,12 @@ import { HttpException, Injectable, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { DataSource } from 'typeorm';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
   DEBRIEF_PROMPT_CODES,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
+import { ROLEPLAY_FIELDS_KEY } from '../constants/debrief-roleplay-fields.constants';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { parseMetricsFilter } from '../util/debrief-metrics-filter.util';
@@ -541,12 +542,17 @@ export class DebriefPmAgentToolsService {
         replace: b.replace,
       };
     } else if (kind === 'setting') {
-      const r = settingRefusal(b.setting_key, b.setting_value);
+      // roleplayFields is a list: it travels in setting_fields (setting_value is a number).
+      const value =
+        b.setting_key === ROLEPLAY_FIELDS_KEY
+          ? b.setting_fields
+          : b.setting_value;
+      const r = settingRefusal(b.setting_key, value);
       if (r) throw new Refused(r);
       change = {
         ideaKind: 'setting',
         settingKey: b.setting_key,
-        settingValue: settingValueText(b.setting_key, b.setting_value),
+        settingValue: settingValueText(b.setting_key, value),
       };
       lessonKind = 'policy';
     } else if (kind === 'registry_agent') {

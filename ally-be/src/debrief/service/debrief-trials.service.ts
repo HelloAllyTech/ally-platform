@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { judgeOverallSql } from '../util/debrief-run-columns.util';
 import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -19,7 +20,7 @@ import {
   trialVerdict,
 } from '../util/debrief-ladder.util';
 import { runWithConcurrency } from '../../analytics/util/judge-concurrency.util';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   AgentReleaseAuthorKind,
   AgentReleaseAuditAction,
@@ -304,8 +305,8 @@ export class DebriefTrialsService implements OnModuleInit {
       }> = await this.dataSource.query(
         `SELECT CASE WHEN "experimentId" = $1 THEN 'canary' ELSE 'control' END AS arm,
                 count(*)::int AS runs,
-                array_agg((workspace->'judge'->>'overall')::float)
-                  FILTER (WHERE workspace->'judge'->>'overall' IS NOT NULL) AS scores,
+                array_agg(${judgeOverallSql()})
+                  FILTER (WHERE ${judgeOverallSql()} IS NOT NULL) AS scores,
                 avg(CASE WHEN jsonb_array_length(COALESCE(workspace->'judge'->'hardFails','[]'::jsonb)) > 0
                          THEN 1 ELSE 0 END) FILTER (WHERE workspace ? 'judge') AS hard_fail_share,
                 count(*) FILTER (WHERE workspace->'judge'->'hardFails' @> '[{"code":"missed_risk_cue"}]')::int AS missed_risk

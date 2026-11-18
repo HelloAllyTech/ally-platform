@@ -14,6 +14,7 @@ import {
   useSetRoadmapWatchMutation,
 } from "@api";
 import { ROUTES, en } from "@constants";
+import { useClaimCommandPaletteShortcut } from "@components/command-palette/CommandPaletteContext";
 import { useUser } from "@hooks";
 import type { RoadmapQueueSort, RoadmapSavedView } from "@types";
 
@@ -77,6 +78,8 @@ export const RoadmapQueuePage: React.FC = () => {
   const { can } = useRoadmapRole();
   const { user } = useUser();
   const breakpoint = useRoadmapBreakpoint();
+  // ⌘K here is the Queue's own quick open, not the global page palette.
+  useClaimCommandPaletteShortcut();
   const touch = breakpoint === "phone" || breakpoint === "tablet";
   const isPhone = breakpoint === "phone";
   const withPane = hasReadingPane(breakpoint);

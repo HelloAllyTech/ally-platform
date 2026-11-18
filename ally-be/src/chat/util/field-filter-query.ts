@@ -37,6 +37,20 @@ const asArray = (value: string | string[]): string[] =>
 const firstString = (value: string | string[]): string =>
   (Array.isArray(value) ? value[0] : value) ?? '';
 
+/**
+ * Selected option ids plus each option's label, so a filter also matches
+ * values stored as labels (mobile builds before 2026-11).
+ */
+export const withOptionLabels = (
+  def: CustomFieldDefinition,
+  values: string[],
+): string[] => {
+  const labels = values
+    .map((v) => def.options?.find((o) => o.id === v)?.label)
+    .filter((l): l is string => !!l);
+  return [...new Set([...values, ...labels])];
+};
+
 /** A parseable, finite number — guards NUMBER casts from NaN/garbage input. */
 const isFiniteNumber = (v: string | undefined): boolean =>
   v != null && v.trim() !== '' && Number.isFinite(Number(v));
@@ -132,20 +146,33 @@ function applyPersistedFieldFilter(
           params: { [p('v')]: `%${firstString(values)}%` },
         };
 
-      case CustomFieldType.SINGLE_SELECT:
       case CustomFieldType.BOOLEAN:
         return {
           sql: `${cfv}.value = ANY(:${p('v')})`,
           params: { [p('v')]: values },
         };
 
-      case CustomFieldType.MULTI_SELECT:
-        // Stored as a JSON array of option ids; match if it contains any of
-        // the selected ids. `jsonb_exists_any` is the function form of the
-        // `?|` operator (avoids `?` being treated as a param placeholder).
+      case CustomFieldType.SINGLE_SELECT:
+        // The filter sends option ids; mobile builds before 2026-11 stored
+        // the option's label instead, so match either.
         return {
-          sql: `jsonb_exists_any(${cfv}.value::jsonb, ARRAY[:...${p('v')}])`,
-          params: { [p('v')]: values },
+          sql: `${cfv}.value = ANY(:${p('v')})`,
+          params: { [p('v')]: withOptionLabels(def, values) },
+        };
+
+      case CustomFieldType.MULTI_SELECT:
+        // Stored as a JSON array of option ids (or labels, from older mobile
+        // builds); match if it contains any of the selected options.
+        // `jsonb_exists_any` is the function form of the `?|` operator
+        // (avoids `?` being treated as a param placeholder). A stored value
+        // that isn't a JSON array (a bare legacy value) is compared as text
+        // rather than cast, since one bad cast would fail the whole query.
+        return {
+          sql:
+            `(CASE WHEN ${cfv}.value LIKE '[%' ` +
+            `THEN jsonb_exists_any(${cfv}.value::jsonb, ARRAY[:...${p('v')}]) ` +
+            `ELSE ${cfv}.value = ANY(ARRAY[:...${p('v')}]) END)`,
+          params: { [p('v')]: withOptionLabels(def, values) },
         };
 
       case CustomFieldType.NUMBER: {

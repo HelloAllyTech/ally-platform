@@ -20,7 +20,7 @@ import { languageLabel } from "../consoleLabels";
 import { analyticsDebriefsPath } from "../consoleRoutes";
 import { DebriefAccess } from "../debriefAccess";
 import { one, scoreTrend } from "../scoreText";
-import { Wording, WholeRule } from "./ChangeText";
+import { Wording } from "./ChangeText";
 import { DecisionButtons } from "./DecisionButtons";
 import { PmConversation } from "./PmConversation";
 
@@ -79,20 +79,9 @@ const STATE_TAG: Record<ChangeGroup, string> = {
   undone: "bg-neutral-100 text-neutral-900",
 };
 
-/**
- * Whether this change is one the clinical advisor takes part in: a pinned-rule change that waits
- * for a person. ally-be names the kind in words ("Pinned rule · Safety reader").
- */
-export const isPinnedRuleChange = (c: DebriefChange) =>
-  c.state === "waits" && /^pinned rule/i.test(c.kind);
-
-/**
- * The changes this viewer sees: everything for the Ally team and the owner; only pinned-rule
- * changes that wait for a person for the clinical advisor (who approves pinned rules but does not
- * run the PM agent).
- */
+/** The changes this viewer sees: everything for the Ally team and the owner, nothing for others. */
 export const visibleChanges = (all: DebriefChange[], access: DebriefAccess): DebriefChange[] =>
-  access.pmAgent ? all : access.approvePinnedRule ? all.filter(isPinnedRuleChange) : [];
+  access.pmAgent ? all : [];
 
 const TONE_FG: Record<string, string> = {
   up: "text-success-600",
@@ -159,7 +148,6 @@ const Detail: React.FC<{ change: DebriefChange; canAct: boolean; access: Debrief
         </p>
       )}
       {change.wording && <Wording before={change.wording.before} after={change.wording.after} />}
-      {change.rule && <WholeRule rule={change.rule} changed={!!change.wording} />}
       <DecisionButtons change={change} access={access} />
       {/* The title already leads a waiting change; a reason shows only when someone gave one. */}
       {(change.state !== "waits" || change.why) && (
@@ -269,7 +257,7 @@ export const ChangesView: React.FC<{
   // The list's row is shown at once; the detail endpoint's answer replaces it when it lands.
   const detail = useGetDebriefChangeQuery(current?.id ?? "", { skip: !current });
   const shown = detail.data && detail.data.id === current?.id ? detail.data : current;
-  const canTalk = access.pmAgent || access.approvePinnedRule;
+  const canTalk = access.pmAgent;
   const count = (g: ChangeGroup) => groups.find(x => x.id === g)?.items.length ?? 0;
   const headline = c.headline(
     home.data?.thisWeek.wentLive ?? count("live"),

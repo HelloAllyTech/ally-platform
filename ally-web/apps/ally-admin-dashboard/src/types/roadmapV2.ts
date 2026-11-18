@@ -167,6 +167,8 @@ export interface RoadmapItemRow {
   votes: number;
   /** Queue position, 1-based, for every idea not yet released. Absent once released or closed. */
   rank?: number;
+  /** Position in the composite-score queue (1 = first); null when the idea is not ranked. */
+  queueRank?: number | null;
   votedByMe: boolean;
   starred: boolean;
   starredBy?: RoadmapPersonRef;

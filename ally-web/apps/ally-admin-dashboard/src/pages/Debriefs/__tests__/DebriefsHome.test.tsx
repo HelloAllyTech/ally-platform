@@ -55,7 +55,6 @@ const CAN = (on: boolean) =>
       "verdict",
       "score",
       "pmAgent",
-      "approvePinnedRule",
       "testSets",
       "releases",
       "switchOrgOn",
@@ -69,7 +68,7 @@ const TEAM = {
 };
 const ADVISOR = {
   roles: { allyTeam: false, clinicalAdvisor: true, owner: false, receivesEscalations: true },
-  can: { ...CAN(false), comment: true, verdict: true, approvePinnedRule: true },
+  can: { ...CAN(false), comment: true, verdict: true },
 };
 
 const item = (over: Record<string, unknown> = {}) => ({
@@ -293,18 +292,18 @@ describe("Needs you: listed on Home, decided on the Debrief PM agent page", () =
   it("a row opens that change on the Debrief PM agent page", () => {
     renderAt();
     fireEvent.click(screen.getByTestId("home-needs-item"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/changes?change=c-safety");
   });
 
   it("the headline's 'needs you' links to the Debrief PM agent", () => {
     renderAt();
     fireEvent.click(screen.getByTestId("home-needs-link"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/changes");
   });
 
   it("an old Home link to a change opens it on the Debrief PM agent page", () => {
     renderAt("/debriefs?change=c-safety");
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/changes?change=c-safety");
   });
 });
 
@@ -313,22 +312,22 @@ describe("the clinical advisor's home", () => {
     h.sessions.mockReturnValue(page(ITEMS, ADVISOR));
   });
 
-  it("leads with their decision; no Changes, Analytics, Settings, This week or Debrief PM agent", () => {
+  it("is the review list: no headline, Needs you, Changes, Analytics, Settings, This week or Debrief PM agent", () => {
     renderAt();
-    expect(screen.getByTestId("home-headline")).toHaveTextContent("1 change needs your decision.");
-    expect(screen.getByTestId("home-needs-you")).toHaveTextContent(
-      "Needs you: a change only you or the owner can approve",
-    );
+    expect(screen.queryByTestId("home-headline")).toBeNull();
+    expect(screen.queryByTestId("home-needs-you")).toBeNull();
     expect(screen.queryByTestId("changes-button")).toBeNull();
     expect(screen.queryByTestId("analytics-button")).toBeNull();
     expect(screen.queryByTestId("home-more")).toBeNull();
     expect(screen.queryByTestId("home-this-week")).toBeNull();
     expect(screen.queryByTestId("home-pm-accordion")).toBeNull();
+    expect(screen.getAllByTestId("session-card").length).toBeGreaterThan(0);
   });
 
-  it("a deep link opens their change on the Debrief PM agent page", () => {
+  it("an old link to a change goes nowhere for them: they have no changes", () => {
     renderAt("/debriefs?change=c-safety");
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
+    // They stay on Home: the PM agent page (which shows where it is) never opens.
+    expect(screen.queryByTestId("where")).toBeNull();
   });
 });
 
@@ -424,8 +423,8 @@ describe("old links", () => {
   it.each([
     ["runs", "/debriefs"],
     ["review", "/debriefs"],
-    ["pm-agent", "/debriefs/pm-agent"],
-    ["releases", "/debriefs/pm-agent"],
+    ["pm-agent", "/debriefs/changes"],
+    ["releases", "/debriefs/changes"],
     ["organisations", "/debriefs/settings#orgs"],
     ["settings", "/debriefs/settings"],
     ["knowledge", "/debriefs/settings#guidance"],
@@ -443,7 +442,7 @@ describe("old links", () => {
 
   it("follows the redirect when the page opens", () => {
     renderAt("/debriefs?tab=releases");
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/changes");
   });
 
   it("tells a reader without console access why (PE-02)", () => {

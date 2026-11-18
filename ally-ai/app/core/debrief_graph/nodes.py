@@ -1,7 +1,7 @@
 """The graph's deciding nodes: recipe and budget, the gates in front of each
 paid step, guidance, the rule checks, scoring, the decision and the ending.
 
-The model steps themselves are built in `model_steps.py`; every node here
+The model steps themselves are built in `model_step_inputs.py`; every node here
 routes with a typed `Command` or follows its static edge.
 """
 
@@ -25,6 +25,8 @@ from app.core.debrief_graph.agent_logs import code_log, origin_of
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
 from app.core.debrief_graph.constants import (
     DEFAULT_ADVISORY_CHECKS,
+    DEFAULT_DEADLINE_MS,
+    DEFAULT_PASS_SCORE,
     PROMPT_CODES,
     FallbackRung,
     Recipe,
@@ -452,7 +454,7 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
             if not (m or {}).get("summary"):
                 continue
             if ctx.time_left_ms(state.get("has_risk_cue", False)) < (
-                ctx.setting("deadlineMs", 150_000) / 2
+                ctx.setting("deadlineMs", DEFAULT_DEADLINE_MS) / 2
             ):
                 update["rung"] = int(FallbackRung.ONE_GUIDANCE_LOOKUP)
                 stopped = "Stopped early to keep time for writing."
@@ -700,6 +702,14 @@ async def checks(
     debrief = (await ctx.gateway.call("render_cards", {"cards": cur["cards"]}))["text"]
     rubric = ctx.prompt(PROMPT_CODES["rubric"])
     evaluator_step = ctx.step_of(state["recipe_key"], Step.EVALUATOR)
+    # No model step starts past the run's deadline: ally-be treats a run that outlives it (plus its
+    # margin) as dead and starts it again, so a step begun now would be paid for twice. The draft
+    # stands and goes to `decide` unevaluated (below the bar, sent to review).
+    if evaluator_step and ctx.time_left_ms(state.get("has_risk_cue", False)) <= 0:
+        steps.append(skipped(ctx, estimated, evaluator_step, "deadline"))
+        return Command(
+            update={**update, "steps": steps, "current": current}, goto="score_draft"
+        )
     est = _reserve(
         ctx,
         estimated,
@@ -783,9 +793,9 @@ async def score_draft(
         "hardFails": [h["code"] for h in evaluation["hardFails"]] if evaluation else [],
         "checks": [c["code"] for c in draft["checks"]],
     }
-    again = not meets_bar(best, advisory, ctx.setting("passScore", 8)) and state.get(
-        "round", 0
-    ) < _max_rounds(state, ctx)
+    again = not meets_bar(
+        best, advisory, ctx.setting("passScore", DEFAULT_PASS_SCORE)
+    ) and state.get("round", 0) < _max_rounds(state, ctx)
     goto = "revise_gate" if again else "decide"
     if (
         again
@@ -795,7 +805,7 @@ async def score_draft(
     ):
         # D3: the first failed evaluation gets one evidence top-up first.
         goto = "top_up"
-    pass_score = ctx.setting("passScore", 8)
+    pass_score = ctx.setting("passScore", DEFAULT_PASS_SCORE)
     log = code_log(
         ctx,
         "score_draft",
@@ -873,7 +883,7 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
     ctx = runtime.context
     best = state["best"]
     advisory = set(state.get("advisory") or [])
-    pass_score = ctx.setting("passScore", 8)
+    pass_score = ctx.setting("passScore", DEFAULT_PASS_SCORE)
     rnd = state.get("round", 0)
     ev = best.get("evaluation")
     options = body.practice_options(ctx)

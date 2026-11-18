@@ -573,9 +573,10 @@ export class ScenarioSessionRepository extends Repository<ScenarioSessions> {
    * The agent's `totalScore` is `ScoreKeeper.get_total_score()`: every event it
    * sent us (persisted per detection into `scenario_session_events.score`) plus
    * every behaviour instruction it detected (persisted into
-   * `scenario_session_behavior_instructions`, whose score is a constant per
-   * category — see `formatBehaviorInstructionsForLivekitMetadata`, which is
-   * where the agent read it from). So this is the same arithmetic over the same
+   * `scenario_session_behavior_instructions`, whose `score` is the value the
+   * agent applied, frozen at detection; rows from before that column existed
+   * are NULL and fall back to the per-category constant — see
+   * `formatBehaviorInstructionsForLivekitMetadata`, where the agent read it). So this is the same arithmetic over the same
    * rows, and it lands close.
    *
    * BUT IT IS NOT THE SAME NUMBER, and must never be written into
@@ -618,7 +619,7 @@ export class ScenarioSessionRepository extends Repository<ScenarioSessions> {
                     -- The ::int casts are required, not decorative: an
                     -- untyped bound parameter arrives as text, and SUM(text)
                     -- is not a function that exists.
-                    SUM(CASE WHEN bi.category = $2 THEN $3::int ELSE $4::int END)
+                    SUM(COALESCE(sb.score, CASE WHEN bi.category = $2 THEN $3::int ELSE $4::int END))
                       AS points
                FROM scenario_session_behavior_instructions sb
                JOIN scenario_behavior_instructions bi

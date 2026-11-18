@@ -8764,6 +8764,16 @@ export const en = {
       digestOff: "Weekly email turned off.",
       digestFailed: "Couldn't change your email setting.",
     },
+    concepts: {
+      button: "Core concepts",
+      tooltip: "Core concepts: what each part of Ally is, its code, and whether it's live",
+      title: "Core concepts",
+      source: "View only. The latest version of the Developer Wiki page.",
+      openOnWiki: "Open on the wiki",
+      loading: "Loading core concepts",
+      failed: "Couldn't load the core concepts page.",
+      retry: "Try again",
+    },
     agent: {
       title: "Agent",
       intro: "What the Builder agent costs, how well it does, and the rules it follows.",
@@ -11116,67 +11126,20 @@ export const en = {
     loading: "Loading…",
     error: "Couldn't load notifications.",
   },
-  /** Simulation editor › Debrief choices for one roleplay, and the risk-cue option dialog. */
+  /** Simulation editor › the Debrief's risk-cue question for one roleplay. */
   debriefRoleplayOptions: {
     frameworkLabel: "Debrief skill framework",
     frameworkTip:
       "The skills the debrief assesses beyond this roleplay's own competencies. Pick None to assess only the roleplay's own competencies.",
     defaultSuffix: " (default)",
     none: "None",
-    riskCueLabel: "Risk cues in this roleplay",
+    riskCueLabel: "Is handling a risk conversation the skill practised here?",
     riskCueTip:
-      "What counts as a risk cue when the debrief reads this roleplay, and what the debrief does with one. Standard suits most roleplays.",
-    loading: "Loading…",
-    loadFailed: "Couldn't load the choices. The saved choice is kept.",
-    status: {
-      draft: "Draft, only you can see it",
-      awaiting_approval: "Waiting for a clinical advisor",
-      retired: "Retired",
-    } as Record<string, string>,
-    handlingAlarm: "Every kind of risk cue is an alarm: an important moment and the support lines.",
-    handlingAssessed:
-      "The reader decides, cue by cue, which risk cues are the skill being practised. Those are assessed in the coaching cards; any other cue is still an alarm.",
-    createLink: "Create a risk-cue option",
-    editLink: "Edit",
-    dialog: {
-      titleNew: "Create a risk-cue option",
-      titleEdit: "Edit risk-cue option",
-      name: "Name",
-      wording: "What counts as a risk cue here",
-      wordingMin: "Write at least 60 characters.",
-      handling: "How a risk cue is handled",
-      alarm: "Alarm: every risk cue gets an important moment in the debrief",
-      assessed:
-        "Part of the practice: the reader decides which cues are the skill being practised; those are assessed in the coaching cards, and any other cue still raises the alarm",
-      wordListRaises: "Let the safety word list mark cues as clear",
-      supportLines: "Show the support lines after the character's risk cue",
-      cues: "Lines that ARE a risk cue here",
-      nonCues: "Lines that are NOT a risk cue here",
-      examplesHint: "One example per line.",
-      cuesMin: "Add at least one example.",
-      examplesMax: "Use at most 12 lines.",
-      nameRequired: "Give it a name.",
-      saveDraft: "Save draft",
-      save: "Save changes",
-      saved: "Saved as a draft.",
-      saveFailed: "Couldn't save. Try again.",
-      testIt: "Test it",
-      testing: "Testing… this can take up to a minute.",
-      testFailed: "The test couldn't run. Try again.",
-      testPassed: "Passed. The debrief tells these examples apart correctly.",
-      testNotPassed: "Not passed.",
-      missed: (line: string) => `Missed a risk cue: "${line}"`,
-      wrong: (line: string) => `Flagged as a risk cue by mistake: "${line}"`,
-      run: (n: number) => `Run ${n}`,
-      staleTest: "You changed it since the last test. Test it again.",
-      send: "Send for approval",
-      sent: "Sent. A clinical advisor will review it.",
-      sendFailed: "Couldn't send it for approval.",
-      needsTest: "Pass a test first.",
-      saveFirst: "Save your changes first.",
-      turnedDown: (note: string) => `A clinical advisor turned it down: ${note}`,
-      close: "Close",
-    },
+      "Choose Yes for a roleplay about assessing or responding to risk, such as thoughts of suicide. The debrief then coaches how the learner assessed and responded, instead of treating the cue as an emergency. Any other risk cue the client voices still raises the alarm.",
+    riskCueNo:
+      "No. A risk cue the client voices is a safety moment: the debrief shows it as an important moment with the support lines.",
+    riskCueYes:
+      "Yes. The debrief coaches how the learner assessed and responded. Any other risk cue still raises the alarm.",
   },
   debriefs: {
     /** A Debriefs console page the reader may not see (a 403 from ally-be). */
@@ -11211,21 +11174,7 @@ export const en = {
         expand: (title: string) => `Open ${title}`,
         before: "Before",
         after: "After",
-        wholeRule: (name: string) => `The whole ${name}`,
-        wholeRuleChanged: (name: string) =>
-          `The whole ${name} after the change (the change is marked)`,
-        ruleStale:
-          "The rule has changed since this was proposed, so the passage no longer matches. Ask the Debrief PM agent to redo it.",
         evidence: "Evidence",
-        /** The clinical advisor's home: their pending decisions only. */
-        advisorHeadline: (n: number) =>
-          n === 0
-            ? "Nothing needs your decision."
-            : `${n} ${n === 1 ? "change needs" : "changes need"} your decision.`,
-        advisorNeedsHeading: (n: number) =>
-          n === 1
-            ? "Needs you: a change only you or the owner can approve"
-            : `Needs you: ${n} changes only you or the owner can approve`,
         thisWeek: (score: string | null, trend: string | null, live: number, undone: number) =>
           [
             score === null
@@ -11290,14 +11239,11 @@ export const en = {
       },
       decision: {
         approve: "Approve",
-        signOff: "Sign it off",
         turnDown: "Turn it down",
         confirmTurnDown: "Turn it down",
         reasonLabel: "Why (the Debrief PM agent reads this)",
         reasonPlaceholder: "One line is enough",
         approved: "Approved. It goes through its tests and tries next.",
-        approvedLive: "Approved. It is live for everyone now.",
-        signedOff: "Signed off.",
         turnedDown: "Turned down. The Debrief PM agent has your reason.",
         failed: "That didn't go through. Try again.",
       },
@@ -11451,12 +11397,7 @@ export const en = {
         alwaysAsks: "Always asks a person",
         lockedHelp: "Always on: this can't be switched off.",
         locked: [
-          { name: "Safety reader text", why: "What counts as a risk cue" },
           { name: "Crisis lines and support copy", why: "What a learner in distress reads" },
-          {
-            name: "Pinned rules: rubric, judge and Evaluator instructions",
-            why: "The clinical advisor or owner signs these",
-          },
           { name: "Budget increases", why: "Lower budgets go ahead on their own" },
         ],
         askLowConfidence: {
@@ -11479,7 +11420,7 @@ export const en = {
           watchDays: "Watched after going live (days)",
         } as Record<string, string>,
         rolloutNote:
-          "A new missed risk cue, or cost above the session budget, undoes a change at once whatever the score. Drops are compared within the same language and recipe.",
+          "A new missed risk cue, or cost above the session budget, undoes a change at once whatever the score. Drops are compared within the same language and debrief flow.",
         perOrg: "Per organisation",
         perOrgHelp:
           "An organisation can keep changes from being tried on its learners. It then gets a change only once it is live for everyone else.",
@@ -11643,8 +11584,8 @@ export const en = {
         heading: "Your verdict",
         good: "Good",
         needsWork: "Needs work",
-        hardFails: "Hard fails",
-        hardFailsHelp: "Tick any that apply. A debrief with a hard fail needs work.",
+        hardFails: "Serious problems",
+        hardFailsHelp: "Tick any that apply. A debrief with a serious problem needs work.",
         save: "Save verdict",
         update: "Update verdict",
         saved: "Verdict saved",
@@ -11679,7 +11620,7 @@ export const en = {
           fromTurn: (turn: number) => `From your comment on turn ${turn}`,
           fromSection: (section: string) => `From your comment on ${section}`,
           fromDebrief: "From your comment on the debrief",
-          fromHardFail: "From the hard fail you ticked",
+          fromHardFail: "From the serious problem you ticked",
         },
       },
       flags: {
@@ -11727,7 +11668,7 @@ export const en = {
         quickTestMinLift: "Lift needed to pass (points)",
         gateCases: "Sessions in the pass test",
         gateRotationShare: "Share of the test sessions replaced each month",
-        gateNoNewHardFails: "No new hard fails",
+        gateNoNewHardFails: "No new serious problems",
         gateJudgeMedianNotLower: "Judge's median not lower",
         gateMaxCostIncreasePct: "Most extra cost allowed (%)",
         sealedCases: "Sealed sessions",
@@ -11763,6 +11704,7 @@ export const en = {
         scoreWeightFlags: "Overall score: weight of cards flagged",
         undoMargin: "Undo when the score drops by more than",
         watchDays: "Days a change is watched after going live",
+        agentLogRetentionDays: "Days an Agent log keeps its messages before they are cleared",
         askLowConfidence: "Changes the Debrief PM agent is not confident about ask a person",
         askModels: "New models or providers ask a person",
         slackChannel: "Slack channel for drops and undos",
@@ -11885,7 +11827,7 @@ export const en = {
           fail: "Gave no draft",
         },
         reviser: {
-          name: "Reviser",
+          name: "Reviser (fixes drafts)",
           fix: "Fixed a first draft that failed a check",
           regression: "Revisions that broke a check the draft before passed",
           deadline: "Ran out of time for another revision",
@@ -11921,11 +11863,11 @@ export const en = {
           held: "Still standing 14 days after going live",
         },
         planner: {
-          name: "Planner",
+          name: "Planner (picks extra agents)",
           runs: "Debriefs it planned",
-          fallback: "Fell back to the standard plan (planner failed, timed out or could not run)",
-          timeout: "Fell back because the planner took too long",
-          reasons: "Why it fell back",
+          fallback: "Used the usual steps because the planner failed, timed out or could not run",
+          timeout: "Used the usual steps because the planner took too long",
+          reasons: "Why it used the usual steps",
           time: "Time, median / slowest 10%",
           chosen: "Agents chosen per debrief, mean / median",
           budget: "Plans that lost an agent: not enough budget",
@@ -11938,10 +11880,10 @@ export const en = {
           chosenMissedAgent: (agent: string) => `Ran ${agent}, and its miss showed up anyway`,
         },
         topUp: {
-          name: "Top-up",
-          reached: "First draft fell below the bar and reached the top-up",
-          added: "Top-up added at least one agent",
-          passAfter: "Debriefs that passed after a top-up added agents",
+          name: "Extra evidence round",
+          reached: "First draft fell below the bar and went to an extra evidence round",
+          added: "The extra round added at least one agent",
+          passAfter: "Debriefs that passed after the extra round added agents",
         },
         registry: {
           floor: "Always runs (not chosen by the planner)",
@@ -11951,8 +11893,8 @@ export const en = {
           findings: "Findings per run, mean",
           droppedQuotes: "Quotes dropped because no turn held them",
           used: "Findings the Writer used in a card",
-          hardFail: "Judged debriefs it worked on that still had a hard fail",
-          topHardFails: "Most common hard fails",
+          hardFail: "Judged debriefs it worked on that still had a serious problem",
+          topHardFails: "Most common serious problems",
           names: {
             analyst: "Analyst (agent)",
             progress_reader: "Progress reader (agent)",
@@ -12005,9 +11947,9 @@ export const en = {
           reply_too_long: "Ask Ally reply over its word limit",
         } as Record<string, string>,
         plannerFallback: {
-          planner_failed: "Planner failed or returned a bad plan",
-          no_model: "No planner model set in the release",
-          no_price: "Planner model has no known price",
+          planner_failed: "The planner failed or gave an answer that could not be used",
+          no_model: "No model is set for the planner in this release",
+          no_price: "The planner's model has no known price",
           no_budget: "Not enough run budget left",
           no_time: "Not enough time left",
           nothing_left: "Every agent had already run",
@@ -12016,7 +11958,7 @@ export const en = {
       },
       filters: {
         heading: "Filters",
-        help: "Every number on this page follows these filters, except the baselines, uptake lift and the Debrief PM agent, which always read across everything. The evals use the same filters.",
+        help: "Every number on this page follows these filters, except the reference values, uptake lift and the Debrief PM agent, which always read across everything. The evals use the same filters.",
         all: "All",
         organisation: "Organisation",
         language: "Language",
@@ -12045,7 +11987,7 @@ export const en = {
           case: "Case",
           assessment: "Assessment",
         } as Record<string, string>,
-        unfilteredNote: "Not filtered: baselines, uptake lift and the Debrief PM agent.",
+        unfilteredNote: "Not filtered: reference values, uptake lift and the Debrief PM agent.",
       },
       quality: {
         heading: "Pass rate",
@@ -12143,7 +12085,7 @@ export const en = {
           `95% range ${lo}–${hi}. ${n} of ${of} scored debriefs passed.`,
         hardFail: "Hard-fail rate",
         hardFailHelp: (n: number, of: number) =>
-          `${n} of ${of} scored debriefs had a hard fail from the independent judge.`,
+          `${n} of ${of} scored debriefs had a serious problem found by the independent judge.`,
         judge: "Judge score, mean",
         judgeHelp: (n: number) => `Out of 10, over ${n} judged debriefs.`,
         debriefs: "Debriefs",
@@ -12180,7 +12122,7 @@ export const en = {
       sections: {
         noLive: "No live debriefs in this window",
         noLiveHelp:
-          "These charts fill in once an organisation has the Debrief agent switched on (Debrief console → Organisations). Shadow runs are not counted here.",
+          "These charts fill in once an organisation has the Debrief agent switched on (Debrief console → Organisations). Background (shadow) runs are not counted here.",
         noLiveFiltered: "No live debriefs match these filters. Clear them to see the whole window.",
         loadFailedTitle: "Couldn't load the debrief metrics",
         loadFailedSubtitle: "There was a problem fetching the numbers.",
@@ -12202,7 +12144,8 @@ export const en = {
           "Lift with its 95% range per month. Coloured only when the range excludes zero.",
         uptakeEmptyLabel: "insufficient data, needs 150 pairs",
         uptakeEmpty: "No month has paired sessions yet.",
-        groupExtra: (hardFail: string, judge: string) => `Hard fail ${hardFail} · judge ${judge}`,
+        groupExtra: (hardFail: string, judge: string) =>
+          `Serious problem ${hardFail} · judge ${judge}`,
         pairs: (n: number) => `${n} pairs`,
         thisWeek: (v: string) => `This week ${v}`,
         window: (v: string) => `Whole window ${v}`,
@@ -12214,14 +12157,14 @@ export const en = {
         time: "Time per step",
         timeCaption: "Slowest first.",
         readers: "Analyst and progress reader",
-        planner: "Planner",
-        plannerReasons: "Why it fell back",
+        planner: "Planner (picks extra agents)",
+        plannerReasons: "Why it used the usual steps",
         plannerChosen: "Most chosen agents",
         skipped: "Skipped, then the miss showed up",
         skippedOverall: "Any skipped agent",
         whenSkipped: "When skipped",
         whenRan: "When it ran",
-        topUp: "Top-up",
+        topUp: "Extra evidence round",
         writerFailures: "Most common first-draft failures",
         judgeVersions: (v: string) => `Judge versions: ${v}`,
         outcome: "What happened to the changes",
@@ -12231,7 +12174,7 @@ export const en = {
           rejected: "Turned down",
           pending: "Waiting",
         },
-        registryHeading: "Agents the planner chooses",
+        registryHeading: "Optional agents (added when needed)",
         allNumbers: "Show every agent's numbers as a table",
         empty: "No agent has run in this window.",
       },
@@ -12294,7 +12237,7 @@ export const en = {
       filters: {
         org: { label: "Organisation", all: "All organisations" },
         language: { label: "Language", all: "All languages" },
-        recipe: { label: "Recipe", all: "All recipes" },
+        recipe: { label: "Debrief flow", all: "All debrief flows" },
         fallback: {
           label: "Fallback step",
           all: "Any fallback step",
@@ -12425,7 +12368,7 @@ export const en = {
       origin: {
         fixed: "Fixed",
         planned: "Planned",
-        top_up: "Top-up",
+        top_up: "Extra evidence round",
         unknown: "Source unknown",
       } as Record<string, string>,
       originHelp: {
@@ -12475,9 +12418,9 @@ export const en = {
       names: {
         plan: "Plan",
         profile: "Session profile",
-        planner: "Planner",
+        planner: "Planner (picks extra agents)",
         dispatch: "Dispatch",
-        top_up: "Top-up",
+        top_up: "Extra evidence round",
         score_draft: "Scoring",
         decide: "Decision",
         evaluator: "Draft score",
@@ -12524,7 +12467,7 @@ export const en = {
       facts: {
         session: "Session",
         organisation: "Organisation",
-        recipe: "Recipe",
+        recipe: "Debrief flow",
         language: "Language",
         judge: "Quality score",
         evaluator: "Draft score",
@@ -12773,11 +12716,11 @@ export const en = {
         decidedFlags: "Flags already decided",
       },
     },
-    // The PM agent page (redesign 2026-11-12): Ideas, Releases and Test sets.
+    // The PM agent page (redesign 2026-11-12): Changes, Releases and Test sets.
     pmPage: {
       title: "Debrief PM agent",
       tabs: {
-        ideas: "Ideas",
+        ideas: "Changes",
         releases: "Releases",
         reports: "Reports",
         "test-sets": "Test sets",
@@ -12812,7 +12755,7 @@ export const en = {
       propose: {
         button: "Propose a change",
         title: "Propose a change",
-        help: "Your change becomes an idea with its own draft release, copied from the live one. It climbs the same tests as the Debrief PM agent's ideas before it reaches learners; the live release is never edited. Budget changes the owner proposes go live directly.",
+        help: "Your change gets its own draft release, copied from the live one. It climbs the same tests as the Debrief PM agent's changes before it reaches learners; the live release is never edited. Budget changes the owner proposes go live directly.",
         titleLabel: "What it is, in a few words",
         whyLabel: "Why (optional)",
         cols: {
@@ -12832,9 +12775,9 @@ export const en = {
           monthlyCapUsd: "Monthly cap ($)",
           passScore: "Evaluator bar",
         },
-        afterwards: "It appears under Ideas › Being tested.",
+        afterwards: "It appears under Changes › Being tested.",
         submit: "Propose it",
-        done: (v: number) => `Proposed as draft release v${v}. It's under Ideas.`,
+        done: (v: number) => `Proposed as draft release v${v}. It's under Changes.`,
         doneBudget: (v: number) =>
           `Proposed as release v${v}. A budgets-only change waits for the owner.`,
       },
@@ -12870,7 +12813,6 @@ export const en = {
       autonomyKinds: {
         settings: "Settings",
         prompts: "Prompts and agents",
-        pinned_rules: "Pinned rules",
       } as Record<string, string>,
       autonomyStates: {
         alone: "on its own",
@@ -12887,9 +12829,6 @@ export const en = {
         rejected: "Rejected or withdrawn",
         expired: "Expired (no decision)",
         reverted: "Reverted",
-      } as Record<string, string>,
-      kinds: {
-        pinned_rule: "Pinned rule",
       } as Record<string, string>,
       expired: "No decision",
       expiredNoDecision: "Expired · no decision in 14 days",
@@ -12987,93 +12926,27 @@ export const en = {
       approveCanary: "Approve and try it on some learners",
       recommended: (pct: number) =>
         `Recommended · up to ${pct}% of new debriefs; everyone only after a person puts it live`,
-      approvePinned: "Approve",
-      pinned: {
-        title: "Approve this pinned-rule change?",
-        body: "Your name and today's date are recorded as its approval. The change becomes a draft release, and the Ally team puts it live.",
-        firstTitle: "Approve the rule as it reads now?",
-        firstBody:
-          "Your name and today's date are recorded as its approval. Nothing changes in what runs.",
-        confirm: "Approve",
-        done: "Approved. The Ally team will put it live.",
-        firstDone: "Approved",
-      },
-      pinnedRule: {
-        readWhole: "Read the whole rule",
-        asItReads: (name: string, v: number | null) =>
-          v == null ? `${name} as it reads now` : `${name} v${v}, as it reads now`,
-        afterChange: "As it would read after this change. The new wording is highlighted.",
-        firstVersionIntro:
-          "Written by the Ally engineering team and not yet reviewed by a clinician. Read it, then approve it or ask for a change.",
-        stale:
-          "The rule has changed since this was proposed, and the passage is no longer in it. It can't be approved as it is.",
-        otherOpen: (n: number) =>
-          n === 1
-            ? "Another change to this rule is waiting for approval."
-            : `${n} other changes to this rule are waiting for approval.`,
-        proposedByYou: "You proposed this change.",
-        why: "Why",
-        approved: "Approved. The Ally team will put it live.",
-        approvedFirst: "Approved.",
-        approvedStatus: "Approved",
-        withdrawnStatus: "Withdrawn",
-        withdraw: "Withdraw",
-        askForChange: "Ask for a change",
-        withdrawTitle: "Withdraw your proposal?",
-        withdrawBody: "It closes as withdrawn. You can propose a change to the rule again later.",
-        withdrawDone: "Withdrawn",
-        rejectTitle: "Reject this change?",
-        rejectBody:
-          "The Debrief PM agent reads your reason before it proposes anything like this again.",
-        reasonLabel: "Why are you rejecting it?",
-        reasonRequired: "Say why you are rejecting it.",
-        rejectDone: "Rejected",
-        form: {
-          title: (name: string) => `Ask for a change to the ${name}`,
-          help: "Select the passage to change in the rule, or paste it. Then write the new wording and why.",
-          ruleLabel: "The rule as it reads now",
-          passage: "Passage to change",
-          passageHelp: "Your selection lands here. It must appear exactly once in the rule.",
-          replace: "Replace it with",
-          why: "Why",
-          whyHelp: "The person who approves it reads this.",
-          submit: "Send for approval",
-          cancel: "Cancel",
-          sent: "Sent. It waits in Debrief PM agent › Ideas for the clinical advisor or the owner.",
-          empty: "Select the passage to change in the rule, or paste it.",
-          notFound:
-            "That passage is not in the current rule. Select it in the text, or paste it exactly as it reads.",
-          notUnique:
-            "That passage appears more than once in the rule. Select a longer passage, so it is found only once.",
-          same: "The replacement is the same as the passage. Write the new wording.",
-          noWhy: "Say why the rule should change.",
-          otherOpen: (n: number) =>
-            n === 1
-              ? "Another change to this rule is already waiting. You can still send this one."
-              : `${n} other changes to this rule are already waiting. You can still send this one.`,
-        },
-      },
       basedOn: (what: string) => `Based on: ${what}.`,
       ofNeedYou: (i: number, n: number) => `${i} of ${n} that need you`,
       previous: "Previous",
       next: "Next",
       setHelp: {
-        debrief_open: "The Debrief PM agent tries ideas here",
+        debrief_open: "The Debrief PM agent tries changes here",
         debrief_gate: "Decides whether a change may go further",
         debrief_sealed: "Never shown to the Debrief PM agent",
       } as Record<string, string>,
       releases: {
         explainer:
-          "A release is the exact set of prompt and recipe versions, models and settings learners get. Code deploys and Skills Store edits become releases by themselves and go live, unless they would undo a change a person put live. Only what has been live is listed here. Changes on their way (drafts being tested or tried on learners) live under Ideas until a person puts them live for everyone. Rolling back restores everything in a release together.",
+          "A release is the exact set of prompt versions, debrief flows, models and settings learners get. Code deploys and Skills Store edits become releases by themselves and go live, unless they would undo a change a person put live. Only what has been live is listed here. Changes on their way (drafts being tested or tried on learners) live under Changes until a person puts them live for everyone. Rolling back restores everything in a release together.",
         onTheWay: (n: number) =>
-          `${n} ${n === 1 ? "change" : "changes"} on ${n === 1 ? "its" : "their"} way · see Ideas`,
+          `${n} ${n === 1 ? "change" : "changes"} on ${n === 1 ? "its" : "their"} way · see Changes`,
         listLabel: "Releases",
         rolledBack: "Rolled back",
         retiredTag: "Retired",
         since: (when: string) => `live since ${when}`,
         liveFromTo: (from: string, to: string) => `live ${from} – ${to}`,
         origin: {
-          agentIdea: (t: string) => `From the Debrief PM agent's idea “${t}”`,
+          agentIdea: (t: string) => `From the Debrief PM agent's change “${t}”`,
           personIdea: (t: string) => `From a person's proposal “${t}”`,
           code: "A code release",
           codeTag: (tag: string) => `Code · ${tag}`,
@@ -13108,7 +12981,7 @@ export const en = {
         confirmLabel: "Confirm roll back",
         confirmTitle: (v: string) => `Roll back to ${v}?`,
         confirmBody:
-          "Every prompt, recipe, model and setting goes back to this release for all switched-on organisations. Debriefs already written don't change.",
+          "Every prompt, debrief flow, model and setting goes back to this release for all switched-on organisations. Debriefs already written don't change.",
         whatChanged: (v: string) => `What changed from ${v}`,
         whatChangedFirst: "What's in the first release",
         noNotes: "No note written.",
@@ -13136,17 +13009,17 @@ export const en = {
         stats: {
           debriefs: "Debriefs",
           judge: "Judge median",
-          hardFails: "Hard fails",
+          hardFails: "Serious problems",
           cost: "Cost a debrief",
           time: "Time to a debrief",
         },
         everything: "Everything in this release",
-        promptsHeading: "Prompts and recipes · Skills Store versions",
-        recipe: (name: string) => `Recipe: ${name} (revision rounds)`,
+        promptsHeading: "Prompts and debrief flows · Skills Store versions",
+        recipe: (name: string) => `Debrief flow: ${name} (revision rounds)`,
         current: "current",
         changed: "changed",
         unchanged: "unchanged",
-        pinnedLock: "Pinned",
+        pinnedLock: "Locked",
         releaseOnly: "Release-only",
         cols: {
           step: "Step",
@@ -13161,7 +13034,7 @@ export const en = {
         stepStatus: { on: "On", off: "Off", fixed: "Fixed" } as Record<string, string>,
         settingsHeading: "Settings in this release",
         changeInSettings: "Change in Settings (makes a new release)",
-        pinnedHeading: "Pinned rules",
+        pinnedHeading: "Locked prompts",
         locked: "locked",
       },
       steps: {
@@ -13194,12 +13067,11 @@ export const en = {
         tests: "Tests",
         autonomy: "Autonomy",
         weights: "Score",
-        pinned: "Pinned rules",
+        pinned: "Locked prompts",
         clinical: "Clinical lists",
         progress: "Progress",
         schedules: "Schedules",
         guidance: "Guidance",
-        "risk-cues": "Risk-cue options",
         agents: "Agents",
       } as Record<string, string>,
       agentsHelp:
@@ -13225,8 +13097,79 @@ export const en = {
           case: "Case",
           assessment: "Assessment",
         } as Record<string, string>,
-        revisionRounds: (n: number) => `Up to ${n} revision ${n === 1 ? "round" : "rounds"}`,
-        columns: { step: "Step", prompt: "Prompt", model: "Model", backup: "Backup model" },
+        allAgents: {
+          title: "All agents",
+          help: "Every agent the Debrief uses. A model change applies to every debrief flow that uses the agent.",
+          none: "No agents to show.",
+          columns: {
+            agent: "Agent",
+            runs: "When it runs",
+            model: "Model",
+            backup: "Backup model",
+            instructions: "Instructions",
+            planner: "Planner may choose",
+          },
+          runs: {
+            always: "Every debrief",
+            some_recipes: "Some debrief flows",
+            optional: "Optional",
+            planner: "When the planner picks it",
+            off: "Off",
+          } as Record<string, string>,
+          noModel: "No model (code)",
+          noWhat: "Nothing describes it yet.",
+          buildDefault: "Build default",
+        },
+        byRecipe: {
+          title: "Which agents each debrief flow uses",
+          help: "A tick means the debrief flow runs that agent.",
+          agent: "Agent",
+          used: "Used",
+          notUsed: "Not used",
+          rounds: "Revision rounds",
+          plannerNote:
+            "The planner chooses its own agents for each session, so they are not listed per debrief flow.",
+        },
+        dataAccess: {
+          title: "What each agent can read",
+          help: "A tick means the agent is sent that data. This list is checked against what each agent is really sent, so it cannot drift.",
+          data: "Data",
+          control: "Who can change it",
+          controls: {
+            fixed: "Always on",
+            setting: "Can be switched",
+            owner: "Owner only",
+          } as Record<string, string>,
+          personal: "personal",
+          reads: "Reads it",
+          doesNotRead: "Does not read it",
+          onlyWhenNote: "* Only in some runs; hover the star to see when.",
+          onlyWhen: (when: string) => `Only ${when.replace(/^only /i, "")}`,
+          groups: {
+            "this session": "This session",
+            "the roleplay": "The roleplay",
+            "the learner": "The learner",
+            "other learners": "Other learners",
+            "the library": "The library",
+            "other agents": "Other agents",
+          } as Record<string, string>,
+          undeclared: (names: string) =>
+            `Not listed here yet, because what they are sent is not declared: ${names}.`,
+          roleplay: {
+            title: "Roleplay information the debrief reads",
+            note: "Only the Analyst reads the roleplay brief today, and the Safety reader when handling a risk conversation is the skill practised. Ticking a field adds a change to the draft release at the bottom of the page; nothing goes live at once.",
+            always: "Always read",
+            alwaysOn: "always on",
+            defaultOn: "on unless a release says otherwise",
+            toggle: (label: string) => `Read the roleplay's ${label.toLowerCase()}`,
+          },
+          pm: {
+            title: "Debrief PM agent",
+            canRead: "It can read",
+            canDo: "It can do",
+            note: "It can switch optional roleplay fields on through a proposal, but it can never change learner, case or cohort data, and it cannot edit locked prompts.",
+          },
+        },
         optional: "optional",
         noModel: "—",
         noBackup: "No backup",
@@ -13253,10 +13196,6 @@ export const en = {
           toggleLabel: (step: string, tool: string) => `${step}: ${tool}`,
         },
         planner: {
-          title: "Agents the planner may choose",
-          help: "The planner picks from the agents that are turned on here.",
-          none: "No planner agents.",
-          version: (n: number) => `v${n}`,
           toggleLabel: (id: string) => `Planner may choose ${id}`,
         },
         bar: {
@@ -13270,6 +13209,8 @@ export const en = {
             `${recipe} › ${step}: ${model}${backup ? `, backup ${backup}` : ", no backup"}`,
           limit: (n: number) => `Guidance call limit: ${n}`,
           tools: "Guidance tools",
+          roleplayFields: (n: number) =>
+            `Roleplay information the debrief reads: ${n} optional ${n === 1 ? "field" : "fields"}`,
           planner: (id: string, on: boolean) => `Planner agent ${id}: ${on ? "on" : "off"}`,
         },
         success: (version: number) => `Draft release v${version} created`,
@@ -13278,55 +13219,6 @@ export const en = {
         refused: "Some changes were refused. Fix or discard them and try again.",
         forbidden: "You don't have permission to change the agents.",
         failed: "Couldn't create the draft release. Try again.",
-      },
-      riskCuesHelp: "Risk-cue options written for roleplays. Test, then approve or turn down.",
-      riskCues: {
-        loading: "Loading options…",
-        loadFailed: "Couldn't load the options. Reload to try again.",
-        none: "No options yet.",
-        pick: "Select an option to see its details.",
-        list: "Options",
-        version: (n: number) => `v${n}`,
-        status: {
-          draft: "Draft",
-          awaiting_approval: "Waiting for review",
-          approved: "Approved",
-          retired: "Retired",
-        } as Record<string, string>,
-        handling: { alarm: "Alarm", assessed: "Part of the practice" } as Record<string, string>,
-        standardWording: "The standard definition",
-        wording: "What counts as a risk cue",
-        behaviour: "What it does",
-        wordListOn: "The safety word list can mark cues as clear.",
-        wordListOff: "The safety word list does not mark cues as clear.",
-        supportOn: "The support lines show after the character's risk cue.",
-        supportOff: "The support lines do not show after the character's risk cue.",
-        cues: "Lines that are a risk cue",
-        nonCues: "Lines that are not a risk cue",
-        lastTest: "Last test",
-        noTest: "Not tested yet.",
-        testPassed: (n: number) => `Passed on version ${n}.`,
-        testNotPassed: (n: number) => `Not passed on version ${n}.`,
-        testOld: (n: number) => `That test was on version ${n}, not this one.`,
-        runTest: "Run test",
-        testing: "Testing… this can take up to a minute.",
-        testFailed: "The test couldn't run. Try again.",
-        approve: "Approve",
-        approved: "Approved. It can now be picked in roleplays.",
-        approveFailed: "Couldn't approve it.",
-        turnDown: "Turn down",
-        turnedDown: "Turned down. The writer sees your note.",
-        turnDownFailed: "Couldn't turn it down.",
-        noteLabel: "Note to the writer",
-        noteRequired: "Say why, so the writer can fix it.",
-        retire: "Retire",
-        retireTitle: "Retire this option?",
-        retireBody:
-          "Roleplays that use it keep working, but nobody can pick it for another roleplay.",
-        retired: "Retired.",
-        retireFailed: "Couldn't retire it.",
-        cancel: "Cancel",
-        more: "More",
       },
       clinicalHelp:
         "Words the checks look for in every debrief and Ask Ally reply. English applies to every language.",
@@ -13404,6 +13296,10 @@ export const en = {
             name: "Remove deleted sessions' audio",
             what: "Deletes the read-aloud audio of sessions that no longer exist",
           },
+          "debrief-run-log-retention": {
+            name: "Clear old agent-log text",
+            what: "Clears the exact messages and replies in Agent logs older than the retention days (it keeps cost, timing and step names). Off until an owner turns it on",
+          },
           "debrief-autonomy-relock": {
             name: "Re-lock autonomy",
             what: "Takes back “on its own” after reverts or a failed baseline",
@@ -13416,17 +13312,21 @@ export const en = {
             name: "Nightly check",
             what: "Measures yesterday’s debriefs against the days before and sends some to a person",
           },
+          "debrief-roleplay-field-drift": {
+            name: "Roleplay field check",
+            what: "Looks for a roleplay field that newly saved roleplays stopped filling in, and tells the Ally team",
+          },
           "debrief-judge-anchor": {
             name: "Judge drift",
             what: "Scores a fixed set of debriefs again for the quality score, to catch drift (learning budget)",
           },
           "debrief-pm-agent-forecasts": {
             name: "Check forecasts",
-            what: "Reads whether ideas put live moved the metric they named",
+            what: "Reads whether changes put live moved the metric they named",
           },
           "debrief-pm-agent": {
             name: "Debrief PM agent analysis",
-            what: "Reads the week’s signals and proposes ideas (learning budget)",
+            what: "Reads the week’s signals and proposes changes (learning budget)",
           },
           "debrief-pm-agent-review": {
             name: "Debrief PM agent monthly review",
@@ -13508,13 +13408,13 @@ export const en = {
         "Which organisations' learners read the new debrief. Once an organisation is live, switching it off is an emergency stop: its learners see “not available”, not today's debrief.",
       budgetHelp:
         "Every change asks you to confirm. The Debrief PM agent may propose a lower budget; a higher one always waits for you. Spend and burn rate are in Analytics › Debriefs.",
-      testsHelp: "How much an idea must prove at each step before it reaches learners.",
+      testsHelp: "How much a change must prove at each step before it reaches learners.",
       progressHelp:
         "How the Debrief agent reads a learner's progress across their recent sessions, and what learners are shown.",
       weightsHelp:
         "How the weekly steering score weighs each signal, and how soon a learner's flag should be reviewed.",
       pinnedHelp:
-        "Apply to every organisation and change rarely. A change arrives as a proposal in the Debrief PM agent's “Needs you” list, and only the clinical advisor or the owner can approve it.",
+        "These prompts decide what counts as safe, and they apply to every organisation. A few named people edit them in the Skills Store. The Debrief PM agent can read them but never change them.",
       orgs: {
         change: "change",
         supportLine: (line: string) => `Support line: ${line}`,
@@ -13557,7 +13457,6 @@ export const en = {
         kinds: {
           settings: "Settings (not budgets)",
           prompts: "Prompts, agents and default plans",
-          pinned_rules: "Pinned rules",
         } as Record<string, string>,
         cells: { auto: "On its own", ask: "Asks first", off: "Off" } as Record<string, string>,
         never: "Never",
@@ -13595,7 +13494,7 @@ export const en = {
           },
           {
             lead: "Pinned rules",
-            text: "(safety rules, rubric, judge’s instructions) aren’t in this table: the clinical advisor or owner always approves them, and the Debrief PM agent can only suggest a change. Their status is under",
+            text: "(safety rules, rubric, judge’s instructions) aren’t in this table: the Debrief PM agent can never change them. A few named people edit them in the Skills Store. Their versions are under",
             link: "Pinned rules",
           },
         ],
@@ -13658,15 +13557,11 @@ export const en = {
         },
       },
       pinned: {
-        notYet: "The pinned rules' versions show here once ally-be records who approved them.",
-        signed: (who: string, when: string) => `Approved by ${who}, ${when}`,
-        unsigned: "Not approved yet",
-        askForChange: "Ask for a change",
+        notYet: "The pinned rules show here once they are loaded.",
+        updated: (who: string, when: string) => `Last changed by ${who}, ${when}`,
+        writtenByEngineering: "Written by engineering",
+        open: "Open in Skills Store",
         someone: "someone",
-        roles: { clinical_advisor: "the clinical advisor", owner: "the owner" } as Record<
-          string,
-          string
-        >,
       },
     },
     // Analytics › Debriefs additions (redesign 2026-11-12): the console's tiles and spend.
@@ -13742,7 +13637,7 @@ export const en = {
       checks: "Checks",
       round: (n: number) => (n === 0 ? "First draft" : `Revision ${n}`),
       judge: "Independent judge",
-      hardFails: "Hard fails",
+      hardFails: "Serious problems",
       cards: "The debrief",
       noCards: "No debrief was written.",
       opening: "Opening",
@@ -14301,7 +14196,7 @@ export const en = {
       slice: "Show",
       all: "All debriefs",
       language: (code: string) => `Language: ${code}`,
-      recipe: (key: string) => `Recipe: ${key}`,
+      recipe: (key: string) => `Debrief flow: ${key}`,
       alertsHeading: "What happened with the findings of the last 2 weeks",
       noAlerts: "Nothing outside the normal range in the last 2 weeks.",
       routedTo: (to: string) => `→ ${to}`,

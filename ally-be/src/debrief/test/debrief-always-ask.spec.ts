@@ -8,38 +8,7 @@ import { lastChangesOf } from '../service/debrief-settings.service';
 const on = { askLowConfidence: true, askModels: false };
 
 describe('"Always asks a person" (v2 A1)', () => {
-  it('locked on: the Safety reader, crisis and support copy, pinned rules, budget increases', () => {
-    expect(
-      alwaysAsk(
-        {
-          change: {
-            ideaKind: 'prompt_edit',
-            promptCode: 'debrief_safety_reader_system',
-          },
-        },
-        on,
-      ),
-    ).toMatchObject({ kind: 'safety_reader', locked: true });
-    expect(
-      alwaysAsk(
-        {
-          change: { ideaKind: 'release' },
-          evidence: { diff: { prompts: [{ code: 'debrief_quality_rubric' }] } },
-        },
-        on,
-      ),
-    ).toMatchObject({ kind: 'pinned_rule', locked: true });
-    expect(
-      alwaysAsk(
-        {
-          change: {
-            ideaKind: 'pinned_rule',
-            promptCode: 'debrief_quality_judge_system',
-          },
-        },
-        on,
-      )?.kind,
-    ).toBe('pinned_rule');
+  it('locked on: crisis and support copy, budget increases', () => {
     expect(
       alwaysAsk(
         { change: { ideaKind: 'release', touches: 'crisis_lines' } },

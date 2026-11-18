@@ -22,7 +22,7 @@ const nav = vi.hoisted(() => ({
 vi.mock("@hooks", () => ({ useUser: () => ({ filteredNavigationItems: nav.items }) }));
 
 import { CommandPaletteProvider } from "../CommandPaletteProvider";
-import { useCommandPalette } from "../CommandPaletteContext";
+import { useClaimCommandPaletteShortcut, useCommandPalette } from "../CommandPaletteContext";
 
 const Where: React.FC = () => {
   const location = useLocation();
@@ -63,6 +63,34 @@ describe("CommandPalette", () => {
     openWithShortcut({ key: "k", ctrlKey: true });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     openWithShortcut({ key: "K", ctrlKey: true });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("leaves Cmd+K to a page that claims it, and takes it back when that page goes", () => {
+    const Claimer: React.FC = () => {
+      useClaimCommandPaletteShortcut();
+      return null;
+    };
+    const tree = (claimed: boolean) => (
+      <MemoryRouter initialEntries={["/simulation-studio"]}>
+        <CommandPaletteProvider>
+          <Opener />
+          {claimed && <Claimer />}
+        </CommandPaletteProvider>
+      </MemoryRouter>
+    );
+    const { rerender } = render(tree(true));
+    openWithShortcut();
+    openWithShortcut({ key: "k", ctrlKey: true });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // The sidebar's search button still opens it while a page holds the chord.
+    fireEvent.click(screen.getByText("open palette"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+
+    rerender(tree(false));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    openWithShortcut();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 

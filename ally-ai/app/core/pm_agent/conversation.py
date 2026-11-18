@@ -48,8 +48,7 @@ logger = get_logger(__name__)
 
 #: The instructions' Skills Store prompt (`ally_ai_debrief_pm_conversation_system`).
 PROMPT_PATH = "debrief/pm_conversation_system"
-#: The console's one shared thread; the clinical advisor's turns have their own
-#: (`…:pinned-rules`) so they never see the rest of the thread (C4).
+#: The console's one shared thread.
 THREAD_PREFIX = "debrief-pm-conversation"
 #: A turn is short: model passes and tool calls together before the loop is cut.
 RECURSION_LIMIT = 80
