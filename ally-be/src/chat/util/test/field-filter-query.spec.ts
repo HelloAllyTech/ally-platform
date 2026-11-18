@@ -155,6 +155,41 @@ describe('applyFieldFilters', () => {
     expect(captured[0].sql).toContain('jsonb_exists_any');
   });
 
+  it('also matches select values stored as labels (older mobile builds)', () => {
+    const options = [
+      { id: 'uuid-run', label: 'Running away', order: 0 },
+      { id: 'uuid-harm', label: 'Self harm', order: 1 },
+    ];
+    for (const fieldType of [
+      CustomFieldType.SINGLE_SELECT,
+      CustomFieldType.MULTI_SELECT,
+    ]) {
+      const { qb, captured } = makeQueryMock();
+      applyFieldFilters(
+        qb,
+        [{ fieldDefinitionId: 'def-1', value: ['uuid-run', 'gone'] }],
+        new Map([['def-1', def({ fieldType, options })]]),
+        TENANT,
+      );
+      expect(Object.values(captured[0].params)).toContainEqual([
+        'uuid-run',
+        'gone',
+        'Running away',
+      ]);
+    }
+  });
+
+  it('never casts a bare (non-JSON) multi-select value', () => {
+    const { qb, captured } = makeQueryMock();
+    applyFieldFilters(
+      qb,
+      [{ fieldDefinitionId: 'def-1', value: ['x'] }],
+      new Map([['def-1', def({ fieldType: CustomFieldType.MULTI_SELECT })]]),
+      TENANT,
+    );
+    expect(captured[0].sql).toMatch(/CASE WHEN \S+\.value LIKE '\[%' THEN/);
+  });
+
   it('builds a numeric range for NUMBER fields', () => {
     const { qb, captured } = makeQueryMock();
     const map = new Map([

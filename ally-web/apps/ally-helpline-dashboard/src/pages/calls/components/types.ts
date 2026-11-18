@@ -44,6 +44,8 @@ export interface LogsTableProps {
   refreshKey?: number;
   sessionType: SessionType;
   className?: string;
+  /** A note to open in the summary sidebar once the logs have refetched. */
+  openChatId?: number | null;
 }
 
 export interface ArchivesLogsTableProps {
