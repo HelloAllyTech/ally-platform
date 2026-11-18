@@ -141,6 +141,8 @@ export interface RoadmapItemRow {
   author: RoadmapPersonRef;
   lead?: RoadmapPersonRef;
   votes: number;
+  /** Queue position, 1-based, for every idea not yet released. Absent once released or closed. */
+  rank?: number;
   votedByMe: boolean;
   starred: boolean;
   starredBy?: RoadmapPersonRef;

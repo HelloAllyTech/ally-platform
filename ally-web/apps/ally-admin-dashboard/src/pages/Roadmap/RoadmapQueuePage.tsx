@@ -34,15 +34,10 @@ import { QuickOpen } from "./components/QuickOpen";
 import { RoadmapHelpMenu, RoadmapRoleTabs } from "./components/RoadmapAreaNav";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
-import {
-  LayoutSwitch,
-  SaveViewControls,
-  SearchButton,
-  SortSelect,
-  ViewChips,
-} from "./components/ViewBar";
+import { SaveViewControls, SearchButton, SortSelect, ViewChips } from "./components/ViewBar";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useQueueSavedViews } from "./hooks/useQueueSavedViews";
+import { useQueueTabOrder } from "./hooks/useQueueTabOrder";
 import { hasReadingPane, useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
 import { isRoadmapEntry, useRoadmapJobTimer } from "./hooks/useRoadmapJobTimer";
 import { useRoadmapRealtime } from "./hooks/useRoadmapRealtime";
@@ -55,7 +50,6 @@ import {
   QueueFilters,
   QueueLayout,
   QueueState,
-  canUseBoard,
   decodeQueueState,
   encodeQueueState,
   hasActiveFilters,
@@ -91,8 +85,9 @@ export const RoadmapQueuePage: React.FC = () => {
       }),
     [searchParams, role],
   );
-  // The Board isn't offered below laptop width (§4.17); the list covers it.
-  const layout: QueueLayout = state.layout === "board" && withPane ? "board" : "list";
+  // The List / Board switch is retired: the Queue is always the list. The Board code below stays
+  // so it can come back, but nothing selects it — not the switch, a saved pref or `?layout=board`.
+  const layout = "list" as QueueLayout;
 
   const setState = useCallback(
     (next: QueueState, replace = true) => setSearchParams(encodeQueueState(next), { replace }),
@@ -286,12 +281,11 @@ export const RoadmapQueuePage: React.FC = () => {
       .catch(() => toast.error(copy.actions.copyFailed));
   };
 
-  const views = viewsForRole(role);
+  const { views, canReorder, reorder } = useQueueTabOrder(viewsForRole(role));
   const setView = (view: RoadmapQueueView) =>
     setState({ view, filters: {}, layout: state.layout, open: state.open }, false);
   const setFilters = (filters: QueueFilters) => setState({ ...state, filters });
   const setSort = (sort: RoadmapQueueSort) => setState({ ...state, sort });
-  const setLayout = (next: QueueLayout) => setState({ ...state, layout: next });
   const selectSaved = (view: RoadmapSavedView) =>
     setState({
       ...stateFromSavedView(view.state.queue ?? {}, role, state.layout, view.id),
@@ -319,13 +313,13 @@ export const RoadmapQueuePage: React.FC = () => {
           triageCount={triageCount}
           onSelectView={setView}
           onSelectSaved={selectSaved}
+          onReorder={canReorder ? reorder : undefined}
           scroll={touch}
         />
         {!touch && (
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <FilterButton filters={state.filters} options={filterOptions} onChange={setFilters} />
             {sortControl}
-            {canUseBoard(role) && withPane && <LayoutSwitch layout={layout} onChange={setLayout} />}
             <SearchButton onClick={() => setQuickOpen(true)} />
           </div>
         )}

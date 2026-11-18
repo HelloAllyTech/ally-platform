@@ -1,5 +1,21 @@
 import React, { useState } from "react";
 
+import {
+  DndContext,
+  DragEndEvent,
+  MouseSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Pin, Search } from "@icons";
 import { motion } from "framer-motion";
 
@@ -34,9 +50,42 @@ interface ViewChipsProps {
   triageCount?: number;
   onSelectView: (view: RoadmapQueueView) => void;
   onSelectSaved: (view: RoadmapSavedView) => void;
+  /** Present when the person may reorder the built-in tabs: drag one, or Alt+← / Alt+→ on it. */
+  onReorder?: (views: RoadmapQueueView[]) => void;
   /** Phone: chips scroll sideways with faded edges instead of wrapping. */
   scroll: boolean;
 }
+
+/** A built-in tab that can be dragged to a new place; a click below the drag distance still selects. */
+const SortableChip: React.FC<{
+  id: string;
+  disabled: boolean;
+  children: React.ReactNode;
+}> = ({ id, disabled, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled,
+  });
+  // dnd-kit's role/tabIndex would turn the <li> into a second button around the real one.
+  const dragAttributes: Partial<typeof attributes> = { ...attributes };
+  delete dragAttributes.role;
+  delete dragAttributes.tabIndex;
+  return (
+    <li
+      ref={setNodeRef}
+      className="relative shrink-0"
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+        zIndex: isDragging ? 1 : undefined,
+      }}
+      {...(disabled ? {} : { ...dragAttributes, ...listeners })}
+    >
+      {children}
+    </li>
+  );
+};
 
 /**
  * Built-in views for the role, then saved views (at most 5 as chips, the rest under More). The
@@ -52,10 +101,28 @@ export const ViewChips: React.FC<ViewChipsProps> = ({
   triageCount,
   onSelectView,
   onSelectSaved,
+  onReorder,
   scroll,
 }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
+  // A press-and-move past 8px drags; a plain click still selects. Touch needs a press-and-hold, so
+  // a finger swiping the scrolling chips scrolls them instead.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  );
+  const moveView = (from: number, to: number) => {
+    if (!onReorder || to < 0 || to >= views.length) return;
+    onReorder(arrayMove(views, from, to));
+  };
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    moveView(
+      views.indexOf(active.id as RoadmapQueueView),
+      views.indexOf(over.id as RoadmapQueueView),
+    );
+  };
   const chip = (
     key: string,
     label: string,
@@ -63,12 +130,25 @@ export const ViewChips: React.FC<ViewChipsProps> = ({
     onClick: () => void,
     badge?: number,
     pinned?: boolean,
-  ) => (
-    <li key={key} className="relative shrink-0">
+    builtIn = false,
+  ) => {
+    const index = builtIn ? views.indexOf(key as RoadmapQueueView) : -1;
+    const body = (
       <button
         type="button"
         aria-pressed={selected}
         onClick={onClick}
+        onKeyDown={
+          builtIn && onReorder
+            ? event => {
+                if (!event.altKey) return;
+                if (event.key === "ArrowLeft") moveView(index, index - 1);
+                else if (event.key === "ArrowRight") moveView(index, index + 1);
+                else return;
+                event.preventDefault();
+              }
+            : undefined
+        }
         className={`relative inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-sm ${
           selected ? "text-white" : "text-typography-primary hover:bg-neutral-100"
         }`}
@@ -95,7 +175,31 @@ export const ViewChips: React.FC<ViewChipsProps> = ({
           ) : null}
         </span>
       </button>
-    </li>
+    );
+    if (builtIn && onReorder) {
+      return (
+        <SortableChip key={key} id={key} disabled={false}>
+          {body}
+        </SortableChip>
+      );
+    }
+    return (
+      <li key={key} className="relative shrink-0">
+        {body}
+      </li>
+    );
+  };
+
+  const builtInChips = views.map(view =>
+    chip(
+      view,
+      copy.views[view],
+      !activeSavedViewId && active === view,
+      () => onSelectView(view),
+      view === "for-you" ? forYouCount : view === "to-triage" ? triageCount : undefined,
+      undefined,
+      true,
+    ),
   );
 
   return (
@@ -108,14 +212,14 @@ export const ViewChips: React.FC<ViewChipsProps> = ({
             : "flex-wrap"
         }`}
       >
-        {views.map(view =>
-          chip(
-            view,
-            copy.views[view],
-            !activeSavedViewId && active === view,
-            () => onSelectView(view),
-            view === "for-you" ? forYouCount : view === "to-triage" ? triageCount : undefined,
-          ),
+        {onReorder ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={views} strategy={horizontalListSortingStrategy}>
+              {builtInChips}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          builtInChips
         )}
         {savedChips.map(saved =>
           chip(

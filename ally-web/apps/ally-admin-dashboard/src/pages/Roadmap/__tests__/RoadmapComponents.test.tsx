@@ -248,6 +248,15 @@ describe("QueueRow", () => {
     expect(screen.getByText("Plan agent asks: which learners first?")).toBeInTheDocument();
   });
 
+  it("shows the queue rank when the idea has one, and nothing once it is released", () => {
+    const { unmount } = renderRow({ row: row({ rank: 7 }) });
+    const rank = screen.getByText("#7");
+    expect(rank.closest("[title]")).toHaveAttribute("title", en.roadmapV2.row.rankHelp(7));
+    unmount();
+    renderRow({ row: row({ shownStage: "shipped" }) });
+    expect(screen.queryByText(/^#\d+$/)).toBeNull();
+  });
+
   it("loads a row's vote record only when the reader reaches for it, then shows VoteButton", () => {
     mockOpportunity.mockClear();
     renderRow();

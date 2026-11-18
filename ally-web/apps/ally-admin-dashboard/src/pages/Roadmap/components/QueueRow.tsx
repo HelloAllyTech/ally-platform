@@ -245,6 +245,15 @@ export const QueueRow: React.FC<QueueRowProps> = ({
           className="relative min-w-0 flex-1 py-3 pr-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
         >
           <span className="flex min-w-0 items-baseline gap-2">
+            {row.rank != null && (
+              <span
+                className="min-w-[2.25rem] shrink-0 text-right text-xs font-semibold tabular-nums text-primary-700"
+                title={copy.row.rankHelp(row.rank)}
+              >
+                <span aria-hidden>{copy.row.rank(row.rank)}</span>
+                <span className="sr-only">{copy.row.rankLabel(row.rank)}</span>
+              </span>
+            )}
             <span className="shrink-0 text-xs tabular-nums text-typography-secondary">
               {row.code}
             </span>

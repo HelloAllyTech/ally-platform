@@ -9146,6 +9146,10 @@ export const en = {
       open: (code: string, title: string) => `Open ${code}: ${title}`,
       openUnread: (code: string, title: string) => `Open ${code}: ${title}. Unread`,
       actions: (code: string) => `Actions for ${code}`,
+      rank: (n: number) => `#${n}`,
+      rankLabel: (n: number) => `Rank ${n}`,
+      rankHelp: (n: number) =>
+        `Rank ${n} of every idea that isn't released yet. The order is votes, voters, effort, goals helped and a director's star.`,
       votes: (count: number) => (count === 1 ? "1 vote" : `${count} votes`),
       votedByMe: "You voted",
       starred: "Starred",

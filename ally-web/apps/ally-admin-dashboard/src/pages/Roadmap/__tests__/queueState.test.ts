@@ -13,17 +13,45 @@ import {
   savedViewPayload,
   stateFromSavedView,
   toItemsQuery,
+  orderViews,
   viewsForRole,
 } from "../utils/queueState";
 
 describe("viewsForRole", () => {
-  it("gives Idea people For you and All ideas only", () => {
-    expect(viewsForRole("idea")).toEqual(["for-you", "all"]);
-    expect(viewsForRole("viewer")).toEqual(["for-you", "all"]);
+  it("gives Idea people All ideas and For you only", () => {
+    expect(viewsForRole("idea")).toEqual(["all", "for-you"]);
+    expect(viewsForRole("viewer")).toEqual(["all", "for-you"]);
   });
-  it("adds Leading for Builders and To triage for Owners", () => {
-    expect(viewsForRole("builder")).toEqual(["for-you", "leading", "all"]);
-    expect(viewsForRole("owner")).toEqual(["for-you", "leading", "to-triage", "all"]);
+  it("adds Leading for Builders and To triage for Owners, triage first", () => {
+    expect(viewsForRole("builder")).toEqual(["all", "leading", "for-you"]);
+    expect(viewsForRole("owner")).toEqual(["to-triage", "all", "leading", "for-you"]);
+  });
+  it("opens on the first tab when nothing is remembered", () => {
+    const state = decodeQueueState(new URLSearchParams(), "owner");
+    expect(state.view).toBe("to-triage");
+  });
+  it("applies a saved order, drops views the role lost and appends new ones in default order", () => {
+    const owner = viewsForRole("owner");
+    expect(orderViews(owner, ["for-you", "all", "leading", "to-triage"])).toEqual([
+      "for-you",
+      "all",
+      "leading",
+      "to-triage",
+    ]);
+    // A Builder who was once an Owner: To triage is gone.
+    expect(orderViews(viewsForRole("builder"), ["to-triage", "for-you", "all"])).toEqual([
+      "for-you",
+      "all",
+      "leading",
+    ]);
+    // Only one view saved: the rest follow in the default order; duplicates and junk are ignored.
+    expect(orderViews(owner, ["leading", "leading", "nope"])).toEqual([
+      "leading",
+      "to-triage",
+      "all",
+      "for-you",
+    ]);
+    expect(orderViews(owner, undefined)).toEqual(owner);
   });
   it("offers the Board only to Builders and Owners", () => {
     expect(canUseBoard("idea")).toBe(false);
@@ -74,13 +102,13 @@ describe("filter encoding", () => {
 });
 
 describe("URL state", () => {
-  it("opens on For you with nothing in the URL", () => {
+  it("opens on the first tab with nothing in the URL", () => {
     const state = decodeQueueState(new URLSearchParams(), "idea");
-    expect(state).toEqual({ view: "for-you", filters: {}, layout: "list" });
+    expect(state).toEqual({ view: "all", filters: {}, layout: "list" });
   });
 
-  it("falls back to For you for a view the role can't see", () => {
-    expect(decodeQueueState(new URLSearchParams("view=to-triage"), "builder").view).toBe("for-you");
+  it("falls back to the first tab for a view the role can't see", () => {
+    expect(decodeQueueState(new URLSearchParams("view=to-triage"), "builder").view).toBe("all");
     expect(decodeQueueState(new URLSearchParams("view=to-triage"), "owner").view).toBe("to-triage");
   });
 

@@ -65,6 +65,9 @@ export interface UserPreferencesData {
   default_language_id?: number;
   // Ordered list of sidebar item ids (SIDEBAR_ITEMS values) for the left nav.
   admin_sidebar_order?: string[];
+  // Ordered Roadmap Queue tab ids ("to-triage" | "all" | "leading" | "for-you"), saved per person
+  // so the order follows them across devices. Absent = the default order.
+  roadmap_queue_tab_order?: string[];
 }
 
 export interface UserState {

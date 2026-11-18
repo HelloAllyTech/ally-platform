@@ -61,16 +61,36 @@ export const PAGE_KEYS = { open: "open", layout: "layout", savedView: "sv" } as 
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-/** Which built-in views a role sees (§4.3, [FP-1023]): Idea gets two, Builder adds Leading, Owner adds To triage. */
+/** The order everyone starts with: triage first, then the whole queue, then your own. */
+export const DEFAULT_VIEW_ORDER: RoadmapQueueView[] = ["to-triage", "all", "leading", "for-you"];
+
+/**
+ * Which built-in views a role sees (§4.3, [FP-1023]): Idea gets two, Builder adds Leading, Owner
+ * adds To triage — in the default order. A person's saved order is applied on top (`orderViews`).
+ */
 export const viewsForRole = (role: RoadmapRole | undefined): RoadmapQueueView[] => {
-  switch (role) {
-    case "owner":
-      return ["for-you", "leading", "to-triage", "all"];
-    case "builder":
-      return ["for-you", "leading", "all"];
-    default:
-      return ["for-you", "all"];
-  }
+  const seen: RoadmapQueueView[] =
+    role === "owner"
+      ? ["for-you", "leading", "to-triage", "all"]
+      : role === "builder"
+        ? ["for-you", "leading", "all"]
+        : ["for-you", "all"];
+  return DEFAULT_VIEW_ORDER.filter(view => seen.includes(view));
+};
+
+/**
+ * Apply a person's saved tab order to the views their role sees. Ids they no longer have are
+ * dropped; views the saved list doesn't mention (a role gained since) follow in default order.
+ */
+export const orderViews = (
+  allowed: RoadmapQueueView[],
+  saved: readonly string[] | undefined,
+): RoadmapQueueView[] => {
+  const picked = (saved ?? []).filter(
+    (id, i, all): id is RoadmapQueueView =>
+      allowed.includes(id as RoadmapQueueView) && all.indexOf(id) === i,
+  );
+  return [...picked, ...allowed.filter(view => !picked.includes(view))];
 };
 
 /** The List | Board switch is for Builders and Owners (§4.3). */
@@ -162,7 +182,7 @@ export const paramsToFilters = (
 };
 
 /**
- * Read the Queue's state from the URL. A view the role can't see falls back to For you, so a
+ * Read the Queue's state from the URL. A view the role can't see falls back to the first tab, so a
  * shared To triage link opens something useful for an Idea person instead of a 403.
  */
 export const decodeQueueState = (
@@ -173,7 +193,7 @@ export const decodeQueueState = (
   const allowed = viewsForRole(role);
   const rawView = search.get("view") as RoadmapQueueView | null;
   const fallbackView =
-    remembered?.view && allowed.includes(remembered.view) ? remembered.view : "for-you";
+    remembered?.view && allowed.includes(remembered.view) ? remembered.view : allowed[0];
   const view = rawView && allowed.includes(rawView) ? rawView : fallbackView;
 
   const rawSort = search.get("sort") as RoadmapQueueSort | null;

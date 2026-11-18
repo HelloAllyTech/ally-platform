@@ -45,4 +45,13 @@ export class UpdateUserPreferencesDto {
   @IsString({ each: true })
   @ArrayUnique()
   org_metrics_layout?: string[];
+
+  // Per-user order of the Roadmap Queue's built-in tabs (admin-dashboard Roadmap → Queue), as view
+  // ids: 'to-triage' | 'all' | 'leading' | 'for-you'. Loose like the other keys: the frontend drops
+  // an id the person's role no longer offers and appends any it doesn't find, in the default order.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayUnique()
+  roadmap_queue_tab_order?: string[];
 }
