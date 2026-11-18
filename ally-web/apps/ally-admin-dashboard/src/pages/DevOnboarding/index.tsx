@@ -46,6 +46,7 @@ function stageState(stage: Stage): {
   const view = baseView();
   const index = STAGES.indexOf(stage);
   const passed: PassedScreens = {
+    interview: true,
     reading: index >= STAGES.indexOf("learned"),
     safety: index >= STAGES.indexOf("question-1"),
     built: index >= STAGES.indexOf("make"),

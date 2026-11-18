@@ -100,7 +100,8 @@ lines), every other cue keeps the alarm path. The Writer, Reviser and Evaluator'
 `POST /gateway/checks` carries `risk_handling` and each cue's `part_of_practice`. The response's `has_alarm_risk_cue` says
 whether any cue stayed on the alarm path. The Evaluator also judges progress claims against `PROGRESS` (an unsupported
 "consistent strength" is a hard fail; no keyword list). The
-option's wording still arrives through `prompts["debrief_risk_cue_definition"]`. The run records
+definition of a risk cue always arrives through `prompts["debrief_risk_cue_definition"]` (one pinned definition; a roleplay no longer carries its own wording).
+A roleplay's choice is one yes/no (Studio: "Is handling a risk conversation the skill practised here?", saved as `scenarios.metadata.debriefRiskCueOption` = `part_of_practice` or unset). `word_list_raises` is always true. The run records
 `workspace.frameworkUsed` (id, ids, name, area names) and `workspace.riskCueOption` (key, version, handling, support-lines flag, wording); the graph adds its own `workspace.framework`, `risk_cue` and `speaker_labels`.
 
 **Language (v9 FR-39; moved into the graph 2026-11-11, spec §D1).** ally-be sends what it knows: the session's

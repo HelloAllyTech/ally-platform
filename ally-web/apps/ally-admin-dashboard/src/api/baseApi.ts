@@ -97,6 +97,15 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
         );
 
         if (!refreshResult.data) {
+          // Only a refusal of the refresh token means the session is over. A network error or
+          // 5xx is ally-be restarting (every deploy) — logging out then threw away a good
+          // session. Hand back that error instead so the caller can retry once the API is up.
+          const refreshStatus = refreshResult.error?.status;
+          const isSessionRejected =
+            typeof refreshStatus === "number" && refreshStatus >= 400 && refreshStatus < 500;
+          if (refreshResult.error && !isSessionRejected) {
+            return { error: refreshResult.error };
+          }
           handleLogout();
           throw new Error(en.error.noRefreshDataReceived);
         }

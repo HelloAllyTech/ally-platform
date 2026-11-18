@@ -32,6 +32,11 @@ import {
 } from '../util/debrief-competencies.util';
 import { FHS_RUBRIC_VERSION } from '../../foundational-skills/constants/helping-skills-rubric.constants';
 import { DebriefSkillFramework } from '../constants/debrief-framework.constants';
+import {
+  readRoleplayFields,
+  roleplayFieldSelect,
+  RoleplayFieldValues,
+} from '../util/debrief-roleplay-brief.util';
 
 export interface DebriefSessionContext {
   id: string;
@@ -44,6 +49,11 @@ export interface DebriefSessionContext {
   /** Null for a session whose scenario row is gone. */
   scenarioId: number | null;
   scenario: { title: string | null; description: string | null };
+  /**
+   * Every field of the roleplay's brief the registry names (`ROLEPLAY_FIELDS`), raw. The runner
+   * sends the always-on ones and the ones the release has on (`roleplayBrief`).
+   */
+  roleplayFields?: RoleplayFieldValues;
   /**
    * The roleplay's named competencies, for cohort stats and other name
    * readers: never a custom competency's generated code.
@@ -111,6 +121,7 @@ export class DebriefContextRepository {
               u.metadata AS user_metadata,
               s."scenarioId" AS scenario_id,
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
+              ${roleplayFieldSelect('sc')},
               s."caseSessionItemId" IS NOT NULL AS in_case,
               COALESCE(sc.metadata->'feedbackTabs'->>'debrief', '') = 'false' AS debrief_tab_off,
               NULLIF(sc.metadata->>'debriefRiskCueOption', '') AS risk_cue_option,
@@ -148,6 +159,7 @@ export class DebriefContextRepository {
       learnerTurns: Number(r.learner_turns ?? 0),
       scenarioId: r.scenario_id == null ? null : Number(r.scenario_id),
       scenario: { title: r.title ?? null, description: r.description ?? null },
+      roleplayFields: readRoleplayFields(r),
       expectedBehaviours: expects.competencies.map((c) => c.name),
       helpfulBehaviours: expects.helpful,
       unhelpfulBehaviours: expects.unhelpful,

@@ -170,7 +170,7 @@ vi.mock("../TemplatesTab", () => ({ TemplatesTab: stub("replies") }));
 vi.mock("../../Onboarding/OnboardingStart", () => ({
   OnboardingStart: ({ onLeave }: { onLeave?: () => void }) => (
     <button type="button" onClick={onLeave}>
-      onboarding-start
+      Close
     </button>
   ),
 }));
@@ -315,7 +315,7 @@ describe("Chatbots home", () => {
 
     it("opens the first step of building an assistant full screen", async () => {
       renderAt("/chatbots");
-      expect(await screen.findByText("onboarding-start")).toBeTruthy();
+      expect(await screen.findByRole("button", { name: "Close" })).toBeTruthy();
       expect(screen.getByTestId("first-assistant-overlay").getAttribute("aria-modal")).toBe("true");
     });
 
@@ -331,7 +331,7 @@ describe("Chatbots home", () => {
 
     it("closes on Escape", async () => {
       renderAt("/chatbots");
-      await screen.findByText("onboarding-start");
+      await screen.findByRole("button", { name: "Close" });
       fireEvent.keyDown(document, { key: "Escape" });
       expect(screen.queryByTestId("first-assistant-overlay")).toBeNull();
     });

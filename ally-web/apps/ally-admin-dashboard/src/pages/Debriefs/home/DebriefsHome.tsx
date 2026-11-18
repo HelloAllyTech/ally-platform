@@ -189,8 +189,7 @@ export const DebriefsHome: React.FC = () => {
   );
   const page = sessions.data;
   const access = useDebriefAccess(page?.viewer);
-  // The Ally team and the owner run the PM agent; the clinical advisor only answers pinned-rule
-  // changes (ally-be sends them only those), reached from Needs you, so gets no PM agent button.
+  // The Ally team and the owner run the PM agent; the clinical advisor gets no PM agent button.
   const team = access.pmAgent;
   const openChange = params.get("change");
   // Older links to a change on Home (`/debriefs?change=`) open it on the PM agent page.

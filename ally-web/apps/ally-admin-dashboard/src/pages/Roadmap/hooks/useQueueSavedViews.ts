@@ -60,7 +60,7 @@ export const useQueueSavedViews = (state: QueueState, currentUserId: number | un
   const currentSignature = queueSignature(state.filters, state.sort);
   const activeSignature = active
     ? (() => {
-        const saved = stateFromSavedView(active.state.queue ?? {}, "owner", "list", active.id);
+        const saved = stateFromSavedView(active.state.queue ?? {}, "owner", active.id);
         return queueSignature(saved.filters, saved.sort);
       })()
     : null;

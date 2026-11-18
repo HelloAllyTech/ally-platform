@@ -70,15 +70,7 @@ export interface DebriefChange {
     stale: boolean;
   } | null;
   /** What kind of thing changes (pinned rules are the clinical advisor's or the owner's). */
-  kindKey?:
-    | "pinned_rule"
-    | "prompt"
-    | "setting"
-    | "budget"
-    | "model"
-    | "code"
-    | "agents"
-    | "change";
+  kindKey?: "prompt" | "setting" | "budget" | "model" | "code" | "agents" | "change";
   /** Live: Undo now. */
   canUndo: boolean;
   /** Trying / testing: Stop now. */

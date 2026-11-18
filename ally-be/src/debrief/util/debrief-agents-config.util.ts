@@ -15,6 +15,7 @@ import {
   settingRefusal,
   settingValueOf,
 } from './debrief-pm-agent-rules.util';
+import { ROLEPLAY_FIELDS_KEY } from '../constants/debrief-roleplay-fields.constants';
 import {
   BundleDiff,
   OPTIONAL_STEPS,
@@ -43,6 +44,7 @@ export type AgentsConfigChange =
 export const AGENTS_CONFIG_SETTING_KEYS = [
   'guidanceAgentMaxCalls',
   GUIDANCE_TOOLS_KEY,
+  ROLEPLAY_FIELDS_KEY,
 ] as const;
 
 /** Steps with no model slot: code runs them. */
@@ -214,7 +216,13 @@ export function diffSummary(diff: BundleDiff): string[] {
   for (const p of diff.prompts) out.push(`Prompt · ${promptLabel(p.code)}`);
   for (const s of diff.settings) {
     out.push(
-      `Setting · ${s.key === GUIDANCE_TOOLS_KEY ? 'Guidance tools' : humanise(s.key)}`,
+      `Setting · ${
+        s.key === GUIDANCE_TOOLS_KEY
+          ? 'Guidance tools'
+          : s.key === ROLEPLAY_FIELDS_KEY
+            ? 'Roleplay information'
+            : humanise(s.key)
+      }`,
     );
   }
   for (const s of diff.steps) {
@@ -247,4 +255,184 @@ export function recipeUsedWhen(key: string, minLearnerTurns: number): string {
     default:
       return '';
   }
+}
+
+// --- Every agent in the Debrief system, and which recipe uses which (Settings › Agents) ----------
+
+/** Plain names for every agent: the code-owned steps, the planner and the planner's own agents. */
+export const AGENT_NAMES: Record<string, string> = {
+  safety_reader: 'Safety reader',
+  analyst: 'Analyst',
+  progress_reader: 'Progress reader',
+  guidance_lookup: 'Guidance lookup',
+  guidance_agent: 'Guidance agent',
+  writer: 'Writer',
+  checks: 'Checks',
+  evaluator: 'Evaluator',
+  reviser: 'Reviser',
+  planner: 'Planner',
+  case_memory: 'Case memory',
+  assessment_anchoring: 'Assessment anchoring',
+  protocol_check: 'Protocol check',
+  history_deep: 'Learner history',
+  language_specialist: 'Language specialist',
+  cohort_comparison: 'Organisation comparison',
+  course_patterns: 'Course patterns',
+};
+
+/** The AI Tasks page entry that already describes each agent (`AI_TASK_REGISTRY` ids). */
+export const AGENT_TASK_IDS: Record<string, string> = {
+  safety_reader: 'debrief-safety-reader',
+  analyst: 'debrief-analyst',
+  progress_reader: 'debrief-progress-reader',
+  guidance_agent: 'debrief-guidance-agent',
+  writer: 'debrief-writer',
+  evaluator: 'debrief-evaluator',
+  reviser: 'debrief-reviser',
+  planner: 'debrief-planner',
+  protocol_check: 'debrief-protocol-check',
+  history_deep: 'debrief-history-deep',
+  language_specialist: 'debrief-language-specialist',
+};
+
+/** The part of an agent's text a person reads at a glance: up to the first full stop. */
+export function firstSentence(text: string | null | undefined): string | null {
+  const t = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  const m = /^(.+?[.!?])(\s|$)/.exec(t);
+  const out = (m ? m[1] : t).trim();
+  return out.length > 220 ? `${out.slice(0, 217)}…` : out;
+}
+
+/**
+ * The planner's wording for its agents (the Skills Store prompt `debrief_planner_agents`): one
+ * `## <agent id>` section each with a `description:` line. Anything else in the text is ignored.
+ */
+export function parsePlannerAgentDescriptions(
+  text: string | null | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  let id: string | null = null;
+  for (const raw of (text ?? '').split('\n')) {
+    const line = raw.trim();
+    const head = /^##\s+([a-z0-9_]+)\s*$/.exec(line);
+    if (head) {
+      id = head[1];
+      continue;
+    }
+    const d = /^description:\s*(.+)$/i.exec(line);
+    if (id && d && !out[id]) out[id] = d[1].trim();
+  }
+  return out;
+}
+
+/** How an agent takes part in the live release. */
+export type AgentRuns =
+  /** A step of every recipe. */
+  | 'always'
+  /** A step of some recipes only. */
+  | 'some_recipes'
+  /** A step a draft may turn off. */
+  | 'optional'
+  /** The planner may choose it for a session. */
+  | 'planner'
+  /** Not in the live release (or the planner is off). */
+  | 'off';
+
+export interface AgentView {
+  id: string;
+  name: string;
+  /** `step`: part of recipes; `planner`: the planner itself; `data`: only the planner chooses it. */
+  kind: 'step' | 'planner' | 'data';
+  /** One line on what it does; null when nothing in the system describes it. */
+  what: string | null;
+  /** When it runs, where the system says so. */
+  when: string | null;
+  runs: AgentRuns;
+  /** The Skills Store prompt it runs; null for code. */
+  promptCode: string | null;
+  /** Recipe keys whose steps include it (steps only). */
+  recipes: string[];
+  /** A registry agent the planner may choose, with whether the live release has it on. */
+  plannerChoice: { enabled: boolean } | null;
+  /** Planner and registry agents: the release's own model (steps: read from `recipes`). */
+  model: string | null;
+  backupModel: string | null;
+}
+
+/** Order of the steps in the list (the order a debrief runs them). */
+const STEP_ORDER = Object.values(DebriefStep) as string[];
+
+/**
+ * Every agent the Debrief system has, from the live bundle: the steps in the order a run takes
+ * them, the planner, then the agents only the planner chooses. `describe` finds the one-line
+ * description and the "when" of an agent id (planner wording, then the AI Tasks page).
+ */
+export function agentsView(
+  bundle: DebriefBundle,
+  describe: (id: string) => { what: string | null; when: string | null },
+): AgentView[] {
+  const recipes = Object.values(bundle.recipes).filter(Boolean);
+  const orch = bundle.orchestrator;
+  const inBundle = new Map(
+    (orch?.agents ?? []).map((a) => [a.id as string, a]),
+  );
+  const plannerChoice = (id: string) =>
+    id in DEBRIEF_REGISTRY_AGENTS
+      ? { enabled: !!orch?.enabled && inBundle.has(id as never) }
+      : null;
+  const stepIds = STEP_ORDER.filter((id) =>
+    recipes.some((r) => r!.steps.some((st) => st.step === id)),
+  );
+  const out: AgentView[] = stepIds.map((id) => {
+    const using = recipes.filter((r) => r!.steps.some((st) => st.step === id));
+    const optional = (OPTIONAL_STEPS as readonly string[]).includes(id);
+    const runs: AgentRuns = optional
+      ? 'optional'
+      : using.length === recipes.length
+        ? 'always'
+        : 'some_recipes';
+    return {
+      id,
+      name: AGENT_NAMES[id] ?? id,
+      kind: 'step' as const,
+      ...describe(id),
+      runs,
+      promptCode: STEP_PROMPT_CODES[id] ?? null,
+      recipes: using.map((r) => r!.key),
+      plannerChoice: plannerChoice(id),
+      model: null,
+      backupModel: null,
+    };
+  });
+  out.push({
+    id: 'planner',
+    name: AGENT_NAMES.planner,
+    kind: 'planner',
+    ...describe('planner'),
+    runs: orch?.enabled ? 'always' : 'off',
+    promptCode: DEBRIEF_PROMPT_CODES.planner ?? null,
+    recipes: [],
+    plannerChoice: null,
+    model: orch?.plannerModel ?? null,
+    backupModel: orch?.plannerBackupModel ?? null,
+  });
+  for (const id of Object.keys(DEBRIEF_REGISTRY_AGENTS)) {
+    if (stepIds.includes(id)) continue;
+    const choice = plannerChoice(id);
+    const own = inBundle.get(id as never);
+    out.push({
+      id,
+      name: AGENT_NAMES[id] ?? id,
+      kind: 'data',
+      ...describe(id),
+      runs: choice?.enabled ? 'planner' : 'off',
+      promptCode: null,
+      recipes: [],
+      plannerChoice: choice,
+      model: own?.model ?? null,
+      backupModel: own?.backupModel ?? null,
+    });
+  }
+  return out;
 }

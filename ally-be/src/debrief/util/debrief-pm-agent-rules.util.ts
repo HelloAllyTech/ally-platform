@@ -6,6 +6,11 @@ import {
   PM_AGENT_SETTINGS,
 } from '../constants/debrief-release.constants';
 import { OWNER_SETTINGS_SPEC } from '../constants/debrief-owner-settings.constants';
+import { ROLEPLAY_FIELDS_KEY } from '../constants/debrief-roleplay-fields.constants';
+import {
+  parseRoleplayFields,
+  roleplayFieldsCatalogue,
+} from './debrief-roleplay-brief.util';
 import {
   ASK_ALLY_GATEWAY_TOOLS,
   DEBRIEF_ORCHESTRATOR_TOOLS,
@@ -156,11 +161,16 @@ export function parseGuidanceTools(
  * per-step object. Ideas store it as text (numbers as `String(n)`, the object as JSON).
  */
 export function settingValueOf(key: string, raw: unknown): unknown {
+  if (key === ROLEPLAY_FIELDS_KEY) return parseRoleplayFields(raw);
   return key === GUIDANCE_TOOLS_KEY ? parseGuidanceTools(raw) : Number(raw);
 }
 
 /** A setting value as an idea stores it. */
 export function settingValueText(key: string, value: unknown): string {
+  if (key === ROLEPLAY_FIELDS_KEY) {
+    const r = parseRoleplayFields(value);
+    return r ? JSON.stringify(r) : '[]';
+  }
   const g = key === GUIDANCE_TOOLS_KEY ? parseGuidanceTools(value) : null;
   return g ? JSON.stringify(g) : String(Number(value));
 }
@@ -191,12 +201,20 @@ export function settingRefusal(
           reason: `guidanceTools must be an object whose keys are steps (${GUIDANCE_TOOL_STEPS.join(', ')}) and whose values are lists of ${GUIDANCE_TOOL_NAMES.join(', ')}`,
         };
   }
+  if (key === ROLEPLAY_FIELDS_KEY) {
+    return parseRoleplayFields(value)
+      ? null
+      : {
+          reason: `roleplayFields must be a list of roleplay fields. ${roleplayFieldsCatalogue()}`,
+        };
+  }
   const range = PM_AGENT_SETTINGS[key];
   if (!range) {
     return {
       reason: `${key} is not a setting the PM agent may change; it may change: ${[
         ...Object.keys(PM_AGENT_SETTINGS),
         GUIDANCE_TOOLS_KEY,
+        ROLEPLAY_FIELDS_KEY,
       ].join(', ')}`,
     };
   }

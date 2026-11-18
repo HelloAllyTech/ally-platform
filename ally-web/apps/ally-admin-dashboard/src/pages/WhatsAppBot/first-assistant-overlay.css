@@ -6,24 +6,3 @@
   background: var(--ally-bg, #fff);
   overflow: hidden;
 }
-.ally-first-assistant__close {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  z-index: 20;
-  width: 40px !important;
-  height: 40px !important;
-  padding: 0;
-  border-radius: 999px;
-  color: var(--ally-ink, #1a1a1a);
-  font-size: 28px;
-  line-height: 1;
-  cursor: pointer;
-}
-.ally-first-assistant__close:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-.ally-first-assistant__close:focus-visible {
-  outline: 2px solid var(--ally-ink, #1a1a1a);
-  outline-offset: 2px;
-}

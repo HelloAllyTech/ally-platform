@@ -13,6 +13,7 @@
  */
 
 import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants';
+import { ROLEPLAY_OPTIONAL_KEYS } from './debrief-roleplay-fields.constants';
 
 export const DEBRIEF_AGENT_KEY = 'debrief';
 
@@ -159,6 +160,11 @@ export interface DebriefSettings {
    * is not enabled for. The PM agent may later switch a tool off for a step.
    */
   guidanceTools?: GuidanceToolsSetting;
+  /**
+   * The optional roleplay fields the debrief reads (keys from `ROLEPLAY_OPTIONAL_KEYS`); the
+   * always-on ones (title, description) are never listed. Absent: `ROLEPLAY_FIELDS_DEFAULT`.
+   */
+  roleplayFields?: string[];
   /**
    * Everything one session may spend: its debrief run and every Ask Ally
    * reply after it (Sandeep, 2026-11-16). Absent in releases made before it:
@@ -817,6 +823,15 @@ export function validateDebriefBundle(
           `settings: guidanceAgentMaxCalls must be a whole number ${r.min}–${r.max}`,
         );
       }
+    }
+    if (
+      s.roleplayFields != null &&
+      (!Array.isArray(s.roleplayFields) ||
+        s.roleplayFields.some((k) => !ROLEPLAY_OPTIONAL_KEYS.includes(k)))
+    ) {
+      problems.push(
+        `settings: roleplayFields must list only ${ROLEPLAY_OPTIONAL_KEYS.join(', ')}`,
+      );
     }
     if (s.guidanceTools != null) {
       const g = s.guidanceTools as unknown;

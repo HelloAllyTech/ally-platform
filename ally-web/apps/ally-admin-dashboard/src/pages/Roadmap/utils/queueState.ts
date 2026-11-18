@@ -42,14 +42,11 @@ export interface QueueFilters {
   month?: string;
 }
 
-export type QueueLayout = "list" | "board";
-
 export interface QueueState {
   view: RoadmapQueueView;
   filters: QueueFilters;
   /** Absent = the view's own default sort. */
   sort?: RoadmapQueueSort;
-  layout: QueueLayout;
   /** The saved view this state started from, if any. */
   savedViewId?: string;
   /** The idea open in the reading pane. */
@@ -57,7 +54,7 @@ export interface QueueState {
 }
 
 /** URL keys the page owns; the API never sees these. */
-export const PAGE_KEYS = { open: "open", layout: "layout", savedView: "sv" } as const;
+export const PAGE_KEYS = { open: "open", savedView: "sv" } as const;
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -72,10 +69,6 @@ export const viewsForRole = (role: RoadmapRole | undefined): RoadmapQueueView[] 
       return ["for-you", "all"];
   }
 };
-
-/** The List | Board switch is for Builders and Owners (§4.3). */
-export const canUseBoard = (role: RoadmapRole | undefined): boolean =>
-  role === "builder" || role === "owner";
 
 /** Each view's default sort (§4.3 table). */
 export const defaultSortFor = (view: RoadmapQueueView): RoadmapQueueSort => {
@@ -168,7 +161,7 @@ export const paramsToFilters = (
 export const decodeQueueState = (
   search: URLSearchParams,
   role: RoadmapRole | undefined,
-  remembered?: Partial<Pick<QueueState, "view" | "layout">>,
+  remembered?: Partial<Pick<QueueState, "view">>,
 ): QueueState => {
   const allowed = viewsForRole(role);
   const rawView = search.get("view") as RoadmapQueueView | null;
@@ -179,11 +172,7 @@ export const decodeQueueState = (
   const rawSort = search.get("sort") as RoadmapQueueSort | null;
   const sort = rawSort && QUEUE_SORTS.includes(rawSort) ? rawSort : undefined;
 
-  const rawLayout = search.get(PAGE_KEYS.layout);
-  const wantsBoard = rawLayout ? rawLayout === "board" : remembered?.layout === "board";
-  const layout: QueueLayout = wantsBoard && canUseBoard(role) ? "board" : "list";
-
-  const state: QueueState = { view, filters: paramsToFilters(search), layout };
+  const state: QueueState = { view, filters: paramsToFilters(search) };
   if (sort) state.sort = sort;
   const savedViewId = search.get(PAGE_KEYS.savedView);
   if (savedViewId) state.savedViewId = savedViewId;
@@ -198,7 +187,6 @@ export const encodeQueueState = (state: QueueState): URLSearchParams => {
   params.set("view", state.view);
   for (const [key, value] of Object.entries(filtersToParams(state.filters))) params.set(key, value);
   if (state.sort && state.sort !== defaultSortFor(state.view)) params.set("sort", state.sort);
-  if (state.layout === "board") params.set(PAGE_KEYS.layout, "board");
   if (state.savedViewId) params.set(PAGE_KEYS.savedView, state.savedViewId);
   if (state.open) params.set(PAGE_KEYS.open, state.open);
   return params;
@@ -273,9 +261,8 @@ export const savedViewPayload = (state: QueueState): Record<string, string> => {
 export const stateFromSavedView = (
   payload: Record<string, string>,
   role: RoadmapRole | undefined,
-  layout: QueueLayout,
   savedViewId: string,
 ): QueueState => {
   const decoded = decodeQueueState(new URLSearchParams(payload), role);
-  return { ...decoded, layout, savedViewId, open: undefined };
+  return { ...decoded, savedViewId, open: undefined };
 };

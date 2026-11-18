@@ -222,6 +222,43 @@ const ENTRIES: AgentLogEntry[] = [
     origin: null,
     output: { vetoed: ["skill_a"], count: 1 },
   }),
+  base({
+    seq: 14,
+    step: "profile",
+    input: { answered: {}, budgetLeftUsd: 0.3554, timeLeftMs: 126670 },
+    output: {
+      profile: {
+        indic: false,
+        turns: 39,
+        course: false,
+        scripts: { Latin: 1 },
+        language: "en-IN",
+        risk_cues: 2,
+        assessment: false,
+        code_mixed: false,
+        case_memory: false,
+        cohort_data: false,
+        has_learner: true,
+        session_type: "standard",
+        time_left_ms: 126672,
+        learner_turns: 16,
+        org_protocols: 0,
+        past_debriefs: 20,
+        risk_cue_turns: [18, 39],
+        budget_left_usd: 0.3554,
+        live_detections: 12,
+        script_mismatch: false,
+        transcript_gaps: 0,
+        learner_distress: false,
+        past_work_on_this_points: 8,
+      },
+      offered: ["learner_history", "progress_reader"],
+      floorReserveUsd: 0.044158,
+      plannerModel: "gemini-2.5-flash",
+      plannerEstimateUsd: 0.004854,
+      next: "planner",
+    },
+  }),
 ];
 
 const LOGS = {
@@ -423,6 +460,118 @@ describe("per-step renderers", () => {
     expect(kv).toHaveTextContent("Vetoed");
     expect(kv).toHaveTextContent("Skill a");
     expect(kv.textContent).not.toMatch(/[{}"]/);
+  });
+});
+
+describe("session profile and the generic card: plain by default, raw behind Show details", () => {
+  it("the profile card is one sentence and the facts worth reading", () => {
+    renderFound("profile");
+    expect(screen.getByTestId("found-profile-sentence")).toHaveTextContent(
+      "Looked over the session, then asked the planner to choose from: Learner history, Progress reader.",
+    );
+    const facts = screen.getByTestId("found-profile-facts");
+    expect(
+      within(facts)
+        .getAllByRole("listitem")
+        .map(li => li.textContent),
+    ).toEqual([
+      "2 risk cues, at turns 18 and 39",
+      "16 learner turns of 39",
+      "English (India)",
+      "20 past debriefs, 8 earlier points to work on",
+      "12 moments flagged live",
+    ]);
+    // Nothing for no, zero or false, and nothing mechanical.
+    const card = screen.getByTestId("found-profile");
+    expect(card.textContent).not.toMatch(
+      /Indic|Code mixed|Case memory|Cohort|Time left|Budget|\$|ms\b/,
+    );
+    expect(screen.queryByTestId("log-details-rows")).toBeNull();
+  });
+
+  it("Show details holds the raw fields in plain labels and clean units", () => {
+    renderFound("profile");
+    fireEvent.click(screen.getByRole("button", { name: /Show details/ }));
+    const rows = screen.getByTestId("log-details-rows");
+    expect(rows).toHaveTextContent("Time left");
+    expect(rows).toHaveTextContent("126.7 s");
+    expect(rows).toHaveTextContent("Budget left");
+    expect(rows).toHaveTextContent("$0.3554");
+    expect(rows).toHaveTextContent("Held back for the safe path");
+    expect(rows).toHaveTextContent("$0.0442");
+    expect(rows).toHaveTextContent("Planner cost estimate");
+    expect(rows).toHaveTextContent("$0.0049");
+    expect(rows).toHaveTextContent("Earlier points to work on");
+    expect(rows).toHaveTextContent("Learner history, Progress reader");
+    expect(rows.textContent).not.toMatch(/Floor reserve|Past work on this points|_usd|_ms/);
+  });
+
+  it("a planner that was skipped says why, in a sentence", () => {
+    render(
+      <Found
+        entry={base({
+          step: "profile",
+          output: {
+            profile: {},
+            offered: [],
+            next: "dispatch",
+            fallback: "The release names no planner model",
+          },
+        })}
+        entries={ENTRIES}
+        expandAll={false}
+      />,
+    );
+    expect(screen.getByTestId("found-profile-sentence")).toHaveTextContent(
+      "Used the default plan without asking the planner: the release names no planner model.",
+    );
+  });
+
+  it("the generic card shows only what is worth reading and keeps the rest under Show details", () => {
+    render(
+      <Found
+        entry={base({
+          step: "some_new_step",
+          output: { vetoed: ["skill_a"], count: 0, flagged: false, costUsd: 0.5, waitedMs: 2500 },
+        })}
+        entries={ENTRIES}
+        expandAll={false}
+      />,
+    );
+    const kv = screen.getByTestId("found-kv");
+    expect(kv).toHaveTextContent("Vetoed");
+    expect(kv).toHaveTextContent("Skill a");
+    expect(kv.textContent).not.toMatch(/Count|Flagged|Cost|Waited|\$|ms\b/);
+    fireEvent.click(screen.getByRole("button", { name: /Show details/ }));
+    const rows = screen.getByTestId("log-details-rows");
+    expect(rows).toHaveTextContent("Count");
+    expect(rows).toHaveTextContent("Flagged");
+    expect(rows).toHaveTextContent("$0.50");
+    expect(rows).toHaveTextContent("2.50 s");
+  });
+
+  it("a card with nothing worth reading says so, and offers the details", () => {
+    render(
+      <Found
+        entry={base({ step: "some_new_step", output: { count: 0, flagged: false } })}
+        entries={ENTRIES}
+        expandAll={false}
+      />,
+    );
+    expect(screen.getByTestId("found-kv")).toHaveTextContent("Nothing notable.");
+    expect(screen.getByRole("button", { name: /Show details/ })).toBeInTheDocument();
+  });
+
+  it("'What it was given' on a code step keeps time and money out of sight until Show details", () => {
+    renderPage();
+    const card = screen
+      .getAllByTestId("log-entry")
+      .find(c => c.textContent?.includes("Session profile"))!;
+    const given = within(card).getByTestId("log-given");
+    expect(given.textContent).not.toMatch(/Time left|Budget left|\(ms\)|\(USD\)/);
+    expect(given).toHaveTextContent("Steps that answered");
+    fireEvent.click(within(given).getByRole("button", { name: /Show details/ }));
+    expect(within(given).getByTestId("log-details-rows")).toHaveTextContent("126.7 s");
   });
 });
 

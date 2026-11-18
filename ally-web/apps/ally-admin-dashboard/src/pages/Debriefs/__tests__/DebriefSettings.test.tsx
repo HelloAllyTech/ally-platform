@@ -50,11 +50,6 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefAutonomyQuery: () => h.autonomy(),
   useSetDebriefOrgAutonomyMutation: () => [h.setOrg, { isLoading: false }],
   useGetDebriefPinnedRulesQuery: () => ({ data: { rules: [] } }),
-  useGetRiskCueOptionsForReviewQuery: () => ({ isLoading: false, data: [] }),
-  useReviewTestRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
-  useApproveRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
-  useRejectRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
-  useRetireRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
 }));
 vi.mock("react-redux", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -276,15 +271,6 @@ const AUTONOMY = {
       relockedAt: null,
       relockReason: null,
     },
-    {
-      kind: "pinned_rules",
-      configurable: false,
-      cells: cells("off"),
-      eligible: false,
-      reason: "",
-      relockedAt: null,
-      relockReason: null,
-    },
   ],
   orgs: [
     {
@@ -400,20 +386,12 @@ describe("Debrief settings page: who can change what", () => {
     expect(shown()).toEqual([`settings-section-${id}`]);
   });
 
-  it("Risk-cue options open for someone who can approve pinned rules, by hash or a banner's category", () => {
+  it("the old risk-cue options tab and banner links open Organisations", () => {
     h.permissions = ["review:admin:debriefs"];
     renderPage("#risk-cues");
-    expect(shown()).toEqual(["settings-section-risk-cues"]);
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Risk-cue options");
-  });
-
-  it("opens Risk-cue options from ?category=risk_cue_options, and not for someone who can't review", () => {
-    h.permissions = ["review:admin:debriefs"];
-    renderPage("?category=risk_cue_options");
-    expect(shown()).toEqual(["settings-section-risk-cues"]);
+    expect(shown()).toEqual(["settings-section-orgs"]);
     cleanup();
-    h.permissions = [];
-    renderPage("#risk-cues");
+    renderPage("?category=risk_cue_options");
     expect(shown()).toEqual(["settings-section-orgs"]);
   });
 
@@ -721,7 +699,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
       </MemoryRouter>,
     );
 
-  it("Always asks a person: four locked kinds, then low confidence (on) and new models (off)", () => {
+  it("Always asks a person: three locked kinds, then low confidence (on) and new models (off)", () => {
     h.permissions = ["manage:admin:debrief-settings"];
     renderPage("#autonomy");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
@@ -732,12 +710,11 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     expect(rows.map(r => r.querySelector("span span")?.textContent)).toEqual([
       "Safety reader text",
       "Crisis lines and support copy",
-      "Pinned rules: rubric, judge and Evaluator instructions",
       "Budget increases",
       "Anything the Debrief PM agent is not confident about",
       "New models or providers",
     ]);
-    for (const r of rows.slice(0, 4)) {
+    for (const r of rows.slice(0, 3)) {
       expect(r).toHaveAttribute("data-locked", "true");
       expect(within(r).getByRole("checkbox")).toBeChecked();
       expect(within(r).getByRole("checkbox")).toBeDisabled();
@@ -747,7 +724,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     expect(low).not.toBeDisabled();
     const models = screen.getByLabelText(a.askModels.name);
     expect(models).not.toBeChecked();
-    expect(rows[5]).toHaveTextContent("Off: model changes go through the same tests as prompts");
+    expect(rows[4]).toHaveTextContent("Off: model changes go through the same tests as prompts");
     // The old matrix and the judge-agreement block are gone.
     expect(screen.queryByTestId("autonomy-matrix")).toBeNull();
     expect(screen.queryByTestId("autonomy-agreement")).toBeNull();

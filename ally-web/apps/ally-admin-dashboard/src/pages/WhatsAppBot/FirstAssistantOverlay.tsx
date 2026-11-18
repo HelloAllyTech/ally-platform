@@ -2,9 +2,6 @@ import React, { lazy, Suspense, useCallback, useEffect, useState } from "react";
 
 import { createPortal } from "react-dom";
 
-import { Button } from "@components/button";
-import { ButtonVariant } from "@components/types";
-
 import { COPY } from "../Onboarding/copy";
 
 import "./first-assistant-overlay.css";
@@ -14,7 +11,6 @@ const OnboardingStart = lazy(() =>
   import("../Onboarding/OnboardingStart").then(m => ({ default: m.OnboardingStart })),
 );
 
-const CLOSE_LABEL = "Close";
 const DISMISSED_KEY = "ally.firstAssistantOverlay.dismissed";
 
 const wasDismissed = (): boolean => {
@@ -62,15 +58,6 @@ export const FirstAssistantOverlay: React.FC = () => {
       aria-label={COPY.header}
       data-testid="first-assistant-overlay"
     >
-      <Button
-        variant={ButtonVariant.ICON}
-        type="button"
-        className="ally-first-assistant__close"
-        aria-label={CLOSE_LABEL}
-        onClick={close}
-      >
-        <span aria-hidden="true">×</span>
-      </Button>
       <Suspense fallback={null}>
         <OnboardingStart onLeave={close} />
       </Suspense>
