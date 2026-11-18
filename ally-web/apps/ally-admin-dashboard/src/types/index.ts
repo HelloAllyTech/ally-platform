@@ -57,7 +57,6 @@ export * from "./allyGuideLearning";
 export * from "./allyGuidePipeline";
 export * from "./allyGuideAnalytics";
 export * from "./contextLibrary";
-export * from "./debriefRoleplayOptions";
 export * from "./roadmapV2";
 export * from "./debriefAgents";
 export * from "./roadmapV2Cutover";

@@ -30,6 +30,12 @@ export interface DataItem {
   control: 'fixed' | 'setting' | 'owner';
   /** Personal data about a learner or learners. */
   personal?: boolean;
+  /**
+   * The `request.context` keys a provider loads this item under (`debrief-data-providers.ts`); a
+   * spec ties each to a provider. Absent: it is not loaded by a provider (the transcript, the
+   * session, the roleplay's own fields, prompts, the library or another agent's output).
+   */
+  contextKeys?: string[];
 }
 
 export const DATA_ITEMS: readonly DataItem[] = [
@@ -55,6 +61,7 @@ export const DATA_ITEMS: readonly DataItem[] = [
       'The events the live detector watched for during the roleplay.',
     group: 'this session',
     control: 'fixed',
+    contextKeys: ['live_detections'],
   },
   {
     key: 'roleplay_brief',
@@ -109,6 +116,7 @@ export const DATA_ITEMS: readonly DataItem[] = [
       'The roleplays and course items the learner could practise next.',
     group: 'the library',
     control: 'fixed',
+    contextKeys: ['practice_options'],
   },
   {
     key: 'learner_level',
@@ -126,6 +134,7 @@ export const DATA_ITEMS: readonly DataItem[] = [
     group: 'the learner',
     control: 'owner',
     personal: true,
+    contextKeys: ['past_work_on_this', 'progress_profile'],
   },
   {
     key: 'case_memory',
@@ -135,6 +144,7 @@ export const DATA_ITEMS: readonly DataItem[] = [
     group: 'the learner',
     control: 'owner',
     personal: true,
+    contextKeys: ['case_memory'],
   },
   {
     key: 'cohort',
@@ -144,6 +154,7 @@ export const DATA_ITEMS: readonly DataItem[] = [
     group: 'other learners',
     control: 'owner',
     personal: true,
+    contextKeys: ['cohort'],
   },
   {
     key: 'earlier_findings',

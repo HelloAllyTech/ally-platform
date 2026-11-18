@@ -124,8 +124,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
       // The Guide's approved crisis copy, for a learner in crisis in Ask Ally.
       GuideCrisisResponse,
       GuideSignal,
-      // Risk-cue options (what a roleplay's Debrief counts as a risk cue), and the Context
-      // Library entries that hold skill frameworks.
+      // The Context Library entries that hold skill frameworks.
       ClChunk,
     ]),
     AiChatModule,
@@ -146,7 +145,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
   ],
   controllers: [
     DebriefConsoleController,
-    // Simulation Studio's Debrief choices and the clinical advisor's review of risk-cue options.
+    // Simulation Studio: whether the new Debrief is on for a roleplay (its risk-cue question shows only then).
     DebriefRoleplayOptionsController,
     // Debrief v2: Home, Changes (Undo now, Stop now) and the cumulative score.
     DebriefChangesController,
@@ -164,7 +163,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
   providers: [
     DebriefAdvisorsService,
     DebriefAgentsConfigService,
-    // Spec DEBRIEF_ACROSS_ROLEPLAYS: the skill framework and risk-cue option a roleplay chose.
+    // Spec DEBRIEF_ACROSS_ROLEPLAYS: the skill framework a learner's organisation can read.
     DebriefFrameworkService,
     DebriefGuidanceIndexService,
     // Debrief v2: the cumulative score, Changes and the watch, Slack posts.

@@ -20,7 +20,10 @@
       "label": "Live detections",
       "description": "The events the live detector watched for during the roleplay.",
       "group": "this session",
-      "control": "fixed"
+      "control": "fixed",
+      "contextKeys": [
+        "live_detections"
+      ]
     },
     {
       "key": "roleplay_brief",
@@ -69,7 +72,10 @@
       "label": "What to practise next",
       "description": "The roleplays and course items the learner could practise next.",
       "group": "the library",
-      "control": "fixed"
+      "control": "fixed",
+      "contextKeys": [
+        "practice_options"
+      ]
     },
     {
       "key": "learner_level",
@@ -85,7 +91,11 @@
       "description": "The learner’s earlier debriefs and the points they were working on.",
       "group": "the learner",
       "control": "owner",
-      "personal": true
+      "personal": true,
+      "contextKeys": [
+        "past_work_on_this",
+        "progress_profile"
+      ]
     },
     {
       "key": "case_memory",
@@ -93,7 +103,10 @@
       "description": "What the client remembers from the learner’s earlier sessions in the same case.",
       "group": "the learner",
       "control": "owner",
-      "personal": true
+      "personal": true,
+      "contextKeys": [
+        "case_memory"
+      ]
     },
     {
       "key": "cohort",
@@ -101,7 +114,10 @@
       "description": "How other trainees did on this roleplay, in words, never a number.",
       "group": "other learners",
       "control": "owner",
-      "personal": true
+      "personal": true,
+      "contextKeys": [
+        "cohort"
+      ]
     },
     {
       "key": "earlier_findings",

@@ -54,6 +54,11 @@ import {
 import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefFrameworkService } from './debrief-framework.service';
 import { resolveRiskCue } from '../util/debrief-risk-cue.util';
+import {
+  DataProvider,
+  debriefDataProviders,
+  loadDebriefData,
+} from './debrief-data-providers';
 import { roleplayBrief } from '../util/debrief-roleplay-brief.util';
 import { emptyFramework } from '../constants/debrief-framework.constants';
 import {
@@ -193,6 +198,9 @@ export class DebriefRunnerService {
     DebriefRunnerService.name,
   );
 
+  /** Where each piece of context data comes from (one provider each). */
+  private readonly dataProviders: DataProvider[];
+
   constructor(
     @InjectRepository(DebriefRun)
     private readonly runs: Repository<DebriefRun>,
@@ -201,7 +209,7 @@ export class DebriefRunnerService {
     private readonly tokens: DebriefRunTokenService,
     private readonly config: AppConfigService,
     private readonly releases: AgentReleaseService,
-    private readonly practice: DebriefPracticeService,
+    practice: DebriefPracticeService,
     private readonly llmModels: LlmModelService,
     private readonly agentLogs: DebriefRunLogsService,
     @Optional() private readonly ownerSettings?: DebriefSettingsService,
@@ -212,7 +220,9 @@ export class DebriefRunnerService {
     @Optional() private readonly holds?: DebriefChangeHoldsService,
     /** The organisation's skill frameworks (Context Library). Absent in unit tests: none. */
     @Optional() private readonly frameworks?: DebriefFrameworkService,
-  ) {}
+  ) {
+    this.dataProviders = debriefDataProviders({ context, practice });
+  }
 
   /**
    * The LLM catalog as the release check reads it. Its service falls back to
@@ -593,60 +603,36 @@ export class DebriefRunnerService {
       : emptyFramework();
     const riskCue = resolveRiskCue(session.riskCueOption);
     const competencyNames = (session.competencies ?? []).map((c) => c.name);
-    const [
-      liveDetections,
-      caseMemory,
-      pastWorkOnThis,
-      cohort,
-      practiceOptions,
-      { texts: prompts, versions: promptVersions },
-      availability,
-      progressProfile,
-    ] = await Promise.all([
-      orFallback(
-        () => this.context.liveDetections(sessionId, session.scenarioId),
-        [],
-      ),
-      recipe.key === DebriefRecipeKey.CASE
-        ? orFallback(() => this.context.caseMemory(session.id), null)
-        : Promise.resolve(null),
-      session.counselorId
-        ? orFallback(
-            () =>
-              this.context.pastWorkOnThis(
-                session.counselorId!,
-                session.tenantId,
-                sessionId,
-              ),
-            [],
-          )
-        : Promise.resolve([]),
-      orFallback(() => this.context.cohortStats(session), null),
-      this.practice.optionsFor(
-        session.counselorId,
-        session.tenantId,
-        sessionId,
-      ),
-      this.prompts(bundle, opts.promptOverrides),
-      // What the orchestrator's planner may build on (spec A5: presence of
-      // org protocols, past debriefs, cohort and course data), cheap counts.
-      isOrchestrated(bundle)
-        ? orFallback(() => this.context.availability(session), null)
-        : Promise.resolve(null),
-      owner.progressOn && session.counselorId
-        ? orFallback(
-            () =>
-              this.context.progressProfile(
-                session.counselorId!,
-                session.tenantId,
-                sessionId,
-                progressSettings(owner),
-                { framework, competencies: competencyNames },
-              ),
-            null,
-          )
-        : Promise.resolve(null),
-    ]);
+    const [{ texts: prompts, versions: promptVersions }, loaded] =
+      await Promise.all([
+        this.prompts(bundle, opts.promptOverrides),
+        // Every piece of context data, each from its one provider (debrief-data-providers.ts).
+        loadDebriefData(this.dataProviders, {
+          session,
+          sessionId,
+          recipeKey: recipe.key,
+          orchestrated: isOrchestrated(bundle),
+          progressOn: owner.progressOn,
+          progressProfile: () =>
+            this.context.progressProfile(
+              session.counselorId!,
+              session.tenantId,
+              sessionId,
+              progressSettings(owner),
+              { framework, competencies: competencyNames },
+            ),
+        }),
+      ]);
+    const liveDetections = (loaded.context.live_detections ?? []) as unknown[];
+    const caseMemory = loaded.context.case_memory;
+    const cohort = loaded.context.cohort;
+    if (loaded.problems.length) {
+      // A run that read less than it should says so; the Agent logs can show it.
+      this.logger.warn(
+        `[debrief] ${sessionId}: ${loaded.problems.map((p) => `${p.contextKey} (${p.why})`).join('; ')}`,
+      );
+      run.workspace = { ...run.workspace, dataNotes: loaded.problems };
+    }
     run.workspace = {
       ...run.workspace,
       // What this run used, kept so a later edit never changes how a past debrief reads.
@@ -714,15 +700,7 @@ export class DebriefRunnerService {
             : 'legacy',
         },
         transcript,
-        context: {
-          live_detections: liveDetections,
-          past_work_on_this: pastWorkOnThis,
-          cohort,
-          case_memory: caseMemory,
-          practice_options: practiceOptions,
-          ...(availability ? { availability } : {}),
-          progress_profile: progressProfile,
-        },
+        context: loaded.context as DebriefGraphRequest['context'],
       },
       promptVersions,
       counselorId: session.counselorId,

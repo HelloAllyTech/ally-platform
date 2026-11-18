@@ -672,6 +672,29 @@ describe('DebriefRunnerService', () => {
       );
       expect(request().context.live_detections).toEqual([]);
     });
+
+    it('says what it could not read: the run keeps a note of each failed read', async () => {
+      const { svc, saved } = build({
+        inCase: true,
+        live: new Error('db down'),
+      });
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      const ws = saved[saved.length - 1]?.workspace ?? {};
+      expect(ws.dataNotes).toEqual([
+        {
+          contextKey: 'live_detections',
+          item: 'live_detections',
+          why: 'db down',
+        },
+      ]);
+    });
+
+    it('keeps no note when every read worked', async () => {
+      const { svc, saved } = build();
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      const ws = saved[saved.length - 1]?.workspace ?? {};
+      expect(ws).not.toHaveProperty('dataNotes');
+    });
   });
 
   describe('apply', () => {

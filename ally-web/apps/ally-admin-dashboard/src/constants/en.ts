@@ -10977,7 +10977,7 @@ export const en = {
     loading: "Loading…",
     error: "Couldn't load notifications.",
   },
-  /** Simulation editor › Debrief choices for one roleplay, and the risk-cue option dialog. */
+  /** Simulation editor › the Debrief's risk-cue question for one roleplay. */
   debriefRoleplayOptions: {
     frameworkLabel: "Debrief skill framework",
     frameworkTip:
