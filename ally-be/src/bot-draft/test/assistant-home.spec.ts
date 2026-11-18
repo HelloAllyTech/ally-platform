@@ -36,7 +36,7 @@ import {
 } from '../home/home-fields';
 import { changeOwnRules, safetyView } from '../home/own-rules';
 import { SafetyLockedError } from '../safety-pack/safety-lock';
-import { SAFETY_PACKS } from '../safety-pack/safety-packs';
+import { GENERAL_CRISIS_TEXT, SAFETY_PACKS } from '../safety-pack/safety-packs';
 import { memoryDrafts } from './memory-drafts';
 
 jest.mock('src/common/execution/execution-manager', () => ({
@@ -960,7 +960,12 @@ describe('Your instructions, checked like the builder checks (chunk 20d-2)', () 
     };
     const { service } = harness({ settings });
     const home = await service.get('bot-1');
-    expect(home.safety.atRiskReply).toBe('Please call 14416 now.');
+    // Exactly what's sent (Q3-fast, gaps item 10): the real numbers, then the bot's helplines;
+    // never the platform's old "your local crisis line" template.
+    expect(home.safety.atRiskReply).toBe(
+      `${GENERAL_CRISIS_TEXT} You can also call: 14416.`,
+    );
+    expect(home.safety.atRiskReply).not.toMatch(/your local crisis line/i);
     // Without the settings service the box just has no default.
     const bare = await harness().service.get('bot-1');
     expect(bare.safety.atRiskReply).toBeNull();

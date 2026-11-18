@@ -776,6 +776,24 @@ class TestFallbackContact:
         assert "98765" not in result["answer"]
         assert result["answer"].endswith("Please call +91 20 0000 4400.")
 
+    def test_a_reply_that_already_gives_other_numbers_gets_no_second_line(self):
+        # Q3-fast, gaps item 7: "Please call 95949 04015." after a reply that had
+        # already given the hospital's numbers.
+        text = (
+            "I don't have the parking details. You can call the hospital on "
+            "+91 44 4227 1500 or email care@hospital.example."
+        )
+        contact = passage(
+            CHUNK_A,
+            0.7,
+            "Call the hospital on +91 44 4227 1500, email care@hospital.example.",
+        )
+        result, _ = review(
+            "decline", text, decline_text=self.WORDING, passages=[contact]
+        )
+        assert result["answer"] == text
+        assert "4400" not in result["answer"]
+
     def test_no_contact_in_the_wording_adds_nothing(self):
         text = "I don't have that information."
         result, _ = review("decline", text, decline_text="Please ask our front desk.")

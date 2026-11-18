@@ -131,6 +131,17 @@ const LEAD_INTERESTS = ['A demo', 'Pricing', 'Something else'];
  */
 const EARLIER_EXAMPLES: string[][] = [
   ['Consultation', 'Follow-up', 'Check-up'],
+  // Q3d's `generic` set, before Q3-fast made it neutral.
+  ['Consultation', 'Visit', 'Call back'],
+];
+/**
+ * Appointments' neutral examples (Q3-fast, gaps item 6): what the catalogue shows and what any
+ * business we can't place gets. Never therapy services, which only a mental-health assistant gets.
+ */
+export const NEUTRAL_APPOINTMENT_SERVICES = [
+  'Consultation',
+  'Follow-up',
+  'Something else',
 ];
 /** Appointments' examples: the seed's, which 5a and 6's specs book with. */
 const APPOINTMENT_SERVICES = [
@@ -162,7 +173,7 @@ export const APPOINTMENT_EXAMPLES: Record<BusinessKind, string[]> = {
   salon: ['Haircut', 'Hair colour', 'Facial'],
   coworking: ['Space tour', 'Meeting room', 'Day pass'],
   education: ['Counselling session', 'Campus visit', 'Demo class'],
-  generic: ['Consultation', 'Visit', 'Call back'],
+  generic: NEUTRAL_APPOINTMENT_SERVICES,
 };
 
 /** Setup's industry → kind. The industries not here have no booking examples of their own. */
@@ -254,7 +265,7 @@ export const READY_MADE: ReadyMadeItem[] = [
         fields: [
           relation('slot', 'Slot', 'slots', { ...required, ...agent }),
           relation('client', 'Client', 'contact', required),
-          examples('service', 'Service', APPOINTMENT_SERVICES, agent),
+          examples('service', 'Service', NEUTRAL_APPOINTMENT_SERVICES, agent),
           status(
             ['booked', 'confirmed', 'completed', 'cancelled', 'no_show'],
             agent,

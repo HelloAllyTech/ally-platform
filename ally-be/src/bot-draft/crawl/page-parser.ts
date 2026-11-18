@@ -112,12 +112,45 @@ export function parsePage(html: string): ParsedPage {
   } as sanitizeHtml.IOptions);
 
   page.title = decodeEntities(title).replace(/\s+/g, ' ').trim() || null;
-  const extracted = htmlToExtractedDocument(mainContent(html));
+  const extracted = htmlToExtractedDocument(
+    withoutHiddenEmails(mainContent(revealCloudflareEmails(html))),
+  );
   page.text = extracted.text;
   page.headings = extracted.sections
     .map((s) => s.path.split(' > ').pop() ?? s.path)
     .slice(0, 30);
   return page;
+}
+
+/**
+ * Cloudflare's email protection (Q3-fast, gaps item 6): it serves every address on a page as
+ * "[email protected]", with the real one encoded in `data-cfemail` (or after
+ * `/cdn-cgi/l/email-protection#`): the first byte is a key, XOR'd with the rest. The address is put
+ * back, so "[email protected]" never becomes knowledge or a fact.
+ */
+export function decodeCfEmail(hex: string): string | null {
+  if (!/^[0-9a-f]{4,}$/i.test(hex) || hex.length % 2) return null;
+  const key = parseInt(hex.slice(0, 2), 16);
+  let out = '';
+  for (let i = 2; i < hex.length; i += 2) {
+    out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ key);
+  }
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(out) ? out : null;
+}
+
+export function revealCloudflareEmails(html: string): string {
+  return html
+    .replace(
+      /<(a|span)\b[^>]*?(?:data-cfemail=["']([0-9a-f]+)["']|email-protection#([0-9a-f]+))[^>]*>[\s\S]*?<\/\1>/gi,
+      (whole, _tag: string, data?: string, href?: string) =>
+        decodeCfEmail(data ?? href ?? '') ?? ' ',
+    )
+    .replace(/<script\b[^>]*email-decode[^>]*>[\s\S]*?<\/script>/gi, ' ');
+}
+
+/** Any placeholder that couldn't be decoded is dropped, never read as text. */
+function withoutHiddenEmails(html: string): string {
+  return html.replace(/\[email(?:\s|&#160;|&nbsp;|\u00a0)*protected\]/gi, ' ');
 }
 
 /** The main region's HTML, or the body without its navigation, header, footer and asides. */

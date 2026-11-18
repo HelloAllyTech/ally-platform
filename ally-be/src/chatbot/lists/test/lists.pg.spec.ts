@@ -501,8 +501,8 @@ describePg('Lists (Postgres)', () => {
   describe('rules', () => {
     it('refuses a rule existing records break, and lists them', async () => {
       const second = await contact('Second');
-      const a = await book(slots[0].id, person, { service: 'Couples therapy' });
-      const b = await book(slots[1].id, second, { service: 'Couples therapy' });
+      const a = await book(slots[0].id, person, { service: 'Consultation' });
+      const b = await book(slots[1].id, second, { service: 'Consultation' });
       const r = await refusal(
         definitions.addRule(bot, 'appointments', {
           kind: ListConstraintKind.UNIQUE,
@@ -657,7 +657,7 @@ describePg('Lists (Postgres)', () => {
         'appointments',
         OWNER,
         record.id,
-        { service: 'Couples therapy' },
+        { service: 'Consultation' },
         1,
       );
       expect(

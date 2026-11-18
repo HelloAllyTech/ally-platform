@@ -1,4 +1,5 @@
 import {
+  NEUTRAL_APPOINTMENT_SERVICES,
   APPOINTMENT_EXAMPLES,
   READY_MADE,
   businessKind,
@@ -80,10 +81,15 @@ describe('ready-made example choices', () => {
         'LASIK consultation',
         'Cataract consultation',
       ]);
-      // Without a kind (the seed, older specs) the catalogue's stay.
+      // Without a kind the catalogue's are neutral, never therapy services (Q3-fast).
       expect(exampleOptions(item)[0].examples).toEqual(
-        APPOINTMENT_EXAMPLES.therapy,
+        NEUTRAL_APPOINTMENT_SERVICES,
       );
+      expect(APPOINTMENT_EXAMPLES.generic).toEqual([
+        'Consultation',
+        'Follow-up',
+        'Something else',
+      ]);
       const list = item.lists.find((l) => l.key === 'appointments')!;
       const { fields = [] } = listInputFor(list, {
         options: { service: APPOINTMENT_EXAMPLES.salon },

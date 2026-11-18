@@ -1,6 +1,11 @@
 import { readable, toHex, commonColour, detectBrand } from '../crawl/brand';
 import { looksLikeErrorPage } from '../crawl/error-page';
-import { decodeEntities, mainContent, parsePage } from '../crawl/page-parser';
+import {
+  decodeCfEmail,
+  decodeEntities,
+  mainContent,
+  parsePage,
+} from '../crawl/page-parser';
 import { parseRobots } from '../crawl/robots';
 import { parseSitemap } from '../crawl/sitemap';
 import {
@@ -300,5 +305,24 @@ describe('looksLikeErrorPage (Q3-fast Part 3, B16)', () => {
     ).toBe(false);
     const long = `Our forms are protected by a captcha. ${'We treat anxiety. '.repeat(100)}`;
     expect(looksLikeErrorPage('Services', long)).toBe(false);
+  });
+});
+
+describe('Cloudflare-hidden emails (Q3-fast, gaps item 6)', () => {
+  const HEX = '3a595554545f594e7a4e525f49554f565f5e494e55485f14595557';
+
+  it('puts the real address back, and never keeps "[email protected]"', () => {
+    expect(decodeCfEmail(HEX)).toBe('connect@thesouledstore.com');
+    expect(decodeCfEmail('zz')).toBeNull();
+    const html = `<html><head><title>Contact</title></head><body><main>
+      <p>Write to <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="${HEX}">[email&#160;protected]</a> any time.</p>
+      <p>Or <a href="/cdn-cgi/l/email-protection#${HEX}"><span>[email&#160;protected]</span></a>.</p>
+      <p>Grievances: [email&#160;protected] (we can't read this one).</p>
+      ${'<p>We sell t-shirts, hoodies and sneakers across India.</p>'.repeat(3)}
+    </main></body></html>`;
+    const { text } = parsePage(html);
+    expect(text).toContain('Write to connect@thesouledstore.com any time.');
+    expect(text.match(/connect@thesouledstore\.com/g)).toHaveLength(2);
+    expect(text).not.toMatch(/email\s*protected/i);
   });
 });

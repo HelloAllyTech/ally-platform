@@ -194,7 +194,11 @@ describePg('Lists, the owner’s section (Postgres)', () => {
       ]);
 
       await ds.query(`DELETE FROM bot_drafts WHERE chatbot_id = $1`, [bot]);
-      expect(await services()).toEqual(['Consultation', 'Visit', 'Call back']);
+      expect(await services()).toEqual([
+        'Consultation',
+        'Follow-up',
+        'Something else',
+      ]);
 
       // The owner's own choices still win.
       const { lists } = await owner.install(await chatbot(), 'appointments', {
@@ -219,11 +223,8 @@ describePg('Lists, the owner’s section (Postgres)', () => {
             list: 'appointments',
             field: 'service',
             label: 'Service',
-            examples: [
-              'Individual therapy',
-              'Couples therapy',
-              'Family therapy',
-            ],
+            // Neutral in the catalogue, never therapy services (Q3-fast).
+            examples: ['Consultation', 'Follow-up', 'Something else'],
           },
         ],
       });

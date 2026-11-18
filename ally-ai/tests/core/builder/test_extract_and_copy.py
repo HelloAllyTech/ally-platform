@@ -72,6 +72,7 @@ class TestLenient:
             "The page shows a captcha security check.",
             "404 - Page not found.",
             "Please enable JavaScript and cookies to continue.",
+            "Email customer care at [email protected] for returns.",
         ]
         kept = [
             "Open 24 hours; call 040 2345 6789.",

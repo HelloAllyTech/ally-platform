@@ -15,7 +15,6 @@ from app.core.agent_runtime.check.text import (
     in_a_persons_words,
     looks_factual,
     mentions_sources,
-    normalise_detail,
     repeated_crisis_wording,
     unsupported_details,
     without_details,
@@ -135,9 +134,9 @@ def add_fallback_contact(verdict: Verdict, ctx: CheckContext) -> None:
     contact = decline_contact(ctx)
     if not contact:
         return
-    wanted = {normalise_detail(d) for d in contact_details(contact)}
-    present = {normalise_detail(d) for d in contact_details(verdict.answer)}
-    if wanted & present:
+    # Once only (Q3-fast, gaps item 7: "Please call 95949 04015." after a reply that
+    # had already given numbers): a reply that gives any phone or email is left as is.
+    if contact_details(verdict.answer):
         return
     verdict.answer = f"{verdict.answer.rstrip()} {contact}"
 

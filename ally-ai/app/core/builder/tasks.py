@@ -118,7 +118,9 @@ _ERROR_FACT = re.compile(
     r"server error|bad gateway|unavailable)\b|\baccess (?:is |was )?denied\b|"
     r"\b(?:captcha|security check)\b|"
     r"\b(?:website|site|page|server) (?:returned|responded with|showed) "
-    r"(?:an? )?(?:error|'?\d{3})|\benable (?:javascript and )?cookies\b",
+    r"(?:an? )?(?:error|'?\d{3})|\benable (?:javascript and )?cookies\b|"
+    # Cloudflare's hidden address (gaps item 6): the placeholder, never the email.
+    r"\[email(?:\s|&#160;|&nbsp;)*protected\]",
     re.IGNORECASE,
 )
 SECTIONS = {section.value for section in LearnedSection}

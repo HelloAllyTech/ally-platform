@@ -19,7 +19,7 @@ import { ChatbotService } from '../../chatbot/service/chatbot.service';
 import { LoggerService } from '../../logger/logger.service';
 import { ChatbotPage } from '../../chatbot/entity/chatbot-page.entity';
 import { Chatbot, type PackChange } from '../../chatbot/entity/chatbot.entity';
-import { packFor } from '../safety-pack/safety-packs';
+import { crisisReply, packFor } from '../safety-pack/safety-packs';
 import { BotPageAccess, BotPageStatus } from '../../chatbot/enum/bot-page.enum';
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
@@ -189,19 +189,18 @@ export class AssistantHomeService {
    * rules is saved with a note that it can't. If the check can't be reached, nothing is saved.
    */
   /**
-   * The reply someone who may be at risk gets when the owner hasn't written their own: the
-   * platform's text with this bot's helpline numbers, as the engine sends it (chunk 20d-2).
+   * The reply someone who may be at risk gets when the owner hasn't written their own, exactly as
+   * the engine sends it (`crisisReply`): the real numbers (112, Tele-MANAS) and this bot's
+   * helplines. Q3-fast (gaps item 10): it showed the platform's old template, "your local crisis
+   * line", while customers got the numbers.
    */
   private async atRiskReply(chatbot: Chatbot): Promise<string | null> {
     if (!this.settings) return null;
-    const [defaults, effective] = await Promise.all([
-      this.settings.get(),
-      this.settings.getForChatbot(chatbot),
-    ]);
-    return this.settings.renderPlaceholders(
-      defaults.crisisEscalationText,
-      effective,
-    );
+    const effective = await this.settings.getForChatbot(chatbot);
+    return crisisReply({
+      pack: chatbot.safetyPack,
+      helplineNumbers: effective.helplineNumbers,
+    });
   }
 
   private async checkInstructions(value: unknown): Promise<string | null> {

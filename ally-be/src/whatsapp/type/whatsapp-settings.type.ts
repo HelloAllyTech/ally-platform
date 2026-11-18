@@ -214,7 +214,7 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
     topK: 8,
     minSimilarity: 0.35,
     declineSimilarity: 0.42,
-    maxPassages: 5,
+    maxPassages: 8,
     maxContextTokens: 3000,
     similarityBand: 0.08,
     translateQuery: true,
