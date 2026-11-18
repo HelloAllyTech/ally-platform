@@ -411,7 +411,7 @@ export class DebriefAgentService implements OnModuleInit {
           ),
         );
       void this.trials?.onPublished(run);
-      void this.slack?.missedRiskCue(run).catch(() => false);
+      this.postMissedRiskCue(run);
       return run;
     }
     if (run.mode !== DebriefRunMode.LIVE) return run;
@@ -654,6 +654,20 @@ export class DebriefAgentService implements OnModuleInit {
     });
     void this.slack?.post(`:money_with_wings: ${body}`).catch(() => false);
     return true;
+  }
+
+  /**
+   * The Slack post for a missed risk cue. The urgent review itself does not depend on it: the run
+   * carries `decision.reviewReason = 'missed_risk_cue'`, which the Console lists first and the
+   * overdue notice follows; and a post that failed here is made again by the safety sweep. So a
+   * failure is logged at error and never stops the run.
+   */
+  private postMissedRiskCue(run: DebriefRun): void {
+    void Promise.resolve(this.slack?.missedRiskCue(run)).catch((e: Error) =>
+      this.logger.error(
+        `[debrief] the Slack post for run ${run.id} (a missed risk cue) failed, the safety sweep will try again: ${e.message}`,
+      ),
+    );
   }
 
   /**
@@ -1193,7 +1207,7 @@ export class DebriefAgentService implements OnModuleInit {
         if (!run) continue;
         await this.publisher?.applyToSession(run);
         await this.notifier.ready(run);
-        void this.slack?.missedRiskCue(run).catch(() => false);
+        this.postMissedRiskCue(run);
       } catch (e) {
         this.logger.warn(
           `[debrief] could not show held draft ${id}: ${(e as Error).message}`,
