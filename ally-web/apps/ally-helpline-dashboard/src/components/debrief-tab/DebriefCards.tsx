@@ -394,6 +394,23 @@ const ReadyCards: FC<{
 
   return (
     <div className="flex flex-col gap-4">
+      {view.followUp && !supervisor && (
+        <section
+          data-testid="debrief-follow-up"
+          aria-labelledby="debrief-follow-up-title"
+          className="flex flex-col gap-2 rounded-lg border border-primary-200 bg-primary-50 p-4"
+        >
+          <h3
+            id="debrief-follow-up-title"
+            className="flex items-center gap-2 font-primary text-base font-semibold text-typography-900"
+          >
+            <HeartHandshake aria-hidden="true" className="h-5 w-5 text-primary-600" />
+            {t("postSim.debriefCards.followUp.title")}
+          </h3>
+          <Body>{t("postSim.debriefCards.followUp.body")}</Body>
+          {!!view.supportLines?.length && <Body>{t("postSim.debriefCards.followUp.support")}</Body>}
+        </section>
+      )}
       {moment && (
         <ul className="flex flex-col gap-4">
           <Card

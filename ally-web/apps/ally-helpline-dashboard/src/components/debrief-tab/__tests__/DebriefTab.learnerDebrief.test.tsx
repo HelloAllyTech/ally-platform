@@ -819,6 +819,52 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       expect(screen.queryByTestId("debrief-card-support")).not.toBeInTheDocument();
     });
 
+    it("adds a kind follow-up notice, next to the lines, when a clear risk cue is still left out, and changes nothing else", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: CARDS,
+          language: "en",
+          riskCue: true,
+          followUp: true,
+          supportLines: [TELE_MANAS],
+        },
+      });
+      renderTab();
+
+      const notice = screen.getByTestId("debrief-follow-up");
+      expect(within(notice).getByText("postSim.debriefCards.followUp.title")).toBeInTheDocument();
+      expect(within(notice).getByText("postSim.debriefCards.followUp.body")).toBeInTheDocument();
+      expect(within(notice).getByText("postSim.debriefCards.followUp.support")).toBeInTheDocument();
+      // The debrief is shown exactly as before: the cards are still there.
+      expect(screen.getByTestId("debrief-card-important-moment")).toBeInTheDocument();
+    });
+
+    it("says nothing about a follow-up when there is none, and does not promise the lines when there are none", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: CARDS,
+          language: "en",
+          riskCue: true,
+          supportLines: [TELE_MANAS],
+        },
+      });
+      const { unmount } = renderTab();
+      expect(screen.queryByTestId("debrief-follow-up")).not.toBeInTheDocument();
+      unmount();
+
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en", followUp: true },
+      });
+      renderTab();
+      const notice = screen.getByTestId("debrief-follow-up");
+      expect(within(notice).getByText("postSim.debriefCards.followUp.body")).toBeInTheDocument();
+      expect(
+        within(notice).queryByText("postSim.debriefCards.followUp.support"),
+      ).not.toBeInTheDocument();
+    });
+
     it("puts care first when the learner was in distress, and the debrief opens on request", () => {
       mockLearnerDebriefQuery.mockReturnValue({
         data: {

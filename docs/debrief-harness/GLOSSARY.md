@@ -37,6 +37,7 @@ Other screen words: **serious problem** (code: hard fail) is a flaw that fails a
 - **cards** and **sections** are the same thing: the parts of the debrief note (what worked, what to work on, the important moment, and so on). The code and mobile locale files say `cards` (`postSim.debriefCards`); the data and API say sections or points.
 - **important moment**: the card about a risk cue the client voiced and how the learner responded.
 - **risk cue**: something the client says about dying, self-harm, harming others or being in danger (clear), or low mood, stress and the like (possible). The one pinned definition decides.
+- **follow-up notice** (`followUp`): when a clear risk cue is still left out of a debrief, the debrief is shown as it is and the learner also sees a notice that someone from the team is checking it more closely (owner decision 2026-11-18: publish with a notice, never withhold). It promises no contact.
 
 ## Locked prompts (code: pinned rules)
 

@@ -115,6 +115,17 @@ void main() {
       expect(plain.practice, isEmpty);
     });
 
+    test('followUp: true only when the server sends true; an older server never sends it', () {
+      expect(LearnerDebriefView.fromJson(readyDebriefJson()).followUp, isFalse);
+      expect(LearnerDebriefView.fromJson({...readyDebriefJson(), 'followUp': true}).followUp, isTrue);
+      expect(LearnerDebriefView.fromJson({...readyDebriefJson(), 'followUp': 'yes'}).followUp, isFalse);
+      // A copy made when the learner flags a card keeps it.
+      expect(
+        LearnerDebriefView.fromJson({...readyDebriefJson(), 'followUp': true}).copyWith(helpful: true).followUp,
+        isTrue,
+      );
+    });
+
     test('state mapping, and which answers replace today\'s debrief', () {
       LearnerDebriefView of(Map<String, dynamic> json) => LearnerDebriefView.fromJson(json);
       expect(of({'state': 'working', 'steps': ['a', 'b']}).steps, ['a', 'b']);

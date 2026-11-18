@@ -169,6 +169,13 @@ export interface LearnerDebriefView {
    * did, with or without an important-moment card.
    */
   riskCue?: boolean;
+  /**
+   * `ready` only, present (true) only when a clear risk cue is still left uncovered by the debrief
+   * the learner reads (the best draft failed the risk-cue coverage check, or the Evaluator found a
+   * missed clear cue). The debrief is shown as it is; the apps add a kind notice that a coach is
+   * following up (risk-cue policy option C, 2026-11-18). Absent otherwise, so older apps ignore it.
+   */
+  followUp?: boolean;
   /** The organisation's support lines (the Guide's), crisis lines first. */
   supportLines?: GuideSupportLine[];
   /**
@@ -303,6 +310,27 @@ export function cueBringsSupportLines(run: {
   if (!facts.assessed) return true;
   if (!facts.practisedCues.length) return true;
   return facts.practisedCues.some((practised) => !practised);
+}
+
+/**
+ * A clear risk cue the debrief the learner reads still leaves uncovered: the best draft failed the
+ * coverage check (`risk_cue_uncovered`), the Evaluator raised the `missed_risk_cue` hard fail, or the
+ * decision recorded it as the review reason. Both signals are only ever raised for CLEAR cues (a
+ * possible cue never fails the check or raises the hard fail), and a cue the roleplay practises is
+ * coached in the cards, so it never counts. False without a recorded risk cue.
+ */
+export function needsFollowUp(run: {
+  hasRiskCue?: boolean | null;
+  checkFailures?: Array<{ code?: string }> | null;
+  evaluatorHardFails?: Array<{ code?: string }> | null;
+  workspace?: Record<string, any> | null;
+}): boolean {
+  if (run.hasRiskCue !== true) return false;
+  return (
+    (run.checkFailures ?? []).some((c) => c?.code === 'risk_cue_uncovered') ||
+    (run.evaluatorHardFails ?? []).some((h) => h?.code === 'missed_risk_cue') ||
+    run.workspace?.decision?.reviewReason === 'missed_risk_cue'
+  );
 }
 
 /** The roleplays a debrief's cards link to, once each. */
@@ -1406,6 +1434,9 @@ export class DebriefAgentService implements OnModuleInit {
           // Whether a character's cue brings the support lines follows the roleplay's risk-cue
           // option (recorded on the run); the learner's own distress always does.
           riskCue: cueBringsSupportLines(run),
+          // A clear cue the debrief still leaves out: the apps add a kind "a coach will follow up"
+          // notice next to the support lines. The debrief itself is shown exactly as before.
+          ...(needsFollowUp(run) ? { followUp: true } : {}),
           supportLines: await this.supportLines(s.tenant_id, run.language),
           practice: available.filter((p) => linked.has(p.id)),
           askAlly: askAllyState(run),

@@ -643,6 +643,7 @@ class LearnerDebriefView {
     this.flags = const [],
     this.distress = false,
     this.riskCue = false,
+    this.followUp = false,
     this.supportLines = const [],
     this.practice = const [],
     this.supervisor,
@@ -692,6 +693,7 @@ class LearnerDebriefView {
           : const [],
       distress: json['distress'] == true,
       riskCue: json['riskCue'] == true,
+      followUp: json['followUp'] == true,
       supportLines: _maps(json['supportLines'])
           .map(DebriefSupportLine.fromJson)
           .where((l) => l.phone.isNotEmpty)
@@ -733,6 +735,10 @@ class LearnerDebriefView {
   /// The safety reading found a risk cue: the [supportLines] show even when
   /// the debrief has no important-moment card.
   final bool riskCue;
+
+  /// A clear risk cue is still left out of this debrief: it is shown as it is, with a kind notice that
+  /// someone from the team is checking it more closely. Older servers never send it.
+  final bool followUp;
   final List<DebriefSupportLine> supportLines;
 
   /// The roleplays a card may link to; anything else gets no button.
@@ -806,6 +812,7 @@ class LearnerDebriefView {
     flags: flags ?? this.flags,
     distress: distress,
     riskCue: riskCue,
+    followUp: followUp,
     supportLines: supportLines,
     practice: practice,
     supervisor: supervisor,

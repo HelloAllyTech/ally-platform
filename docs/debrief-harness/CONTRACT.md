@@ -106,6 +106,8 @@ definition of a risk cue always arrives through `prompts["debrief_risk_cue_defin
 A roleplay's choice is one yes/no (Studio: "Is handling a risk conversation the skill practised here?", saved as `scenarios.metadata.debriefRiskCueOption` = `part_of_practice` or unset). `word_list_raises` is always true. The run records
 `workspace.frameworkUsed` (id, ids, name, area names) and `workspace.riskCueOption` (key, version, handling, support-lines flag, wording); the graph adds its own `workspace.framework`, `risk_cue` and `speaker_labels`.
 
+**Learner view `followUp` (2026-11-18).** `GET /debriefs/sessions/:id` answers `followUp: true` (absent otherwise, so older apps ignore it) when a clear risk cue is still left out of the debrief the learner reads: the run has `hasRiskCue` and its best draft failed the `risk_cue_uncovered` check, the Evaluator raised the `missed_risk_cue` hard fail, or `workspace.decision.reviewReason` is `missed_risk_cue` (`needsFollowUp` in debrief-agent.service.ts; only ever raised for clear cues). The debrief is shown exactly as before ("no debrief is held", 2026-11-16); the apps add a kind notice next to the support lines (`postSim.debriefCards.followUp.*`).
+
 **Language (v9 FR-39; moved into the graph 2026-11-11, spec §D1).** ally-be sends what it knows: the session's
 configured language (its default `en` when none is recorded), `language_recorded`, and `language_source:
 "recorded"` (null when not recorded). Before any step, the graph settles the language
