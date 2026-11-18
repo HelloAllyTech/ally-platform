@@ -8,6 +8,7 @@ import {
   SafetyPackId,
 } from '../enum/bot-draft.enum';
 import { SAFETY_PACKS } from '../safety-pack/safety-packs';
+import { LEARNED_FACTS_CHANGED } from '../service/learned-facts-document';
 import {
   BotDraftService,
   MAX_DRAFT_EVENTS,
@@ -36,11 +37,13 @@ function harness() {
     execute: async () => ({ affected: stale ? 0 : 1 }),
   };
   const events = { publish: jest.fn() };
+  const emitter = { emit: jest.fn() };
   const service = new BotDraftService(
     { createQueryBuilder: () => builder, findOne: jest.fn() } as never,
     {} as never,
     { isPlatformAdmin: async () => false } as never,
     events as never,
+    emitter as never,
   );
   const draft = (): BotDraftEntity =>
     ({
@@ -72,6 +75,7 @@ function harness() {
     service,
     draft,
     events,
+    emitter,
     writes,
     setStale: (v: boolean) => (stale = v),
   };
@@ -91,6 +95,36 @@ async function refusal(promise: Promise<unknown>): Promise<string | undefined> {
 }
 
 describe('BotDraftService', () => {
+  it('tells the learned-facts document to follow a save, once it exists (Q3-fast Part 2)', async () => {
+    const h = harness();
+    // Before the facts are a document (during setup), nothing is sent.
+    await h.service.update({ ...h.draft(), chatbotId: 'bot-1' } as never, {});
+    expect(h.emitter.emit).not.toHaveBeenCalled();
+
+    const withDoc = {
+      ...h.draft(),
+      chatbotId: 'bot-1',
+      tenantId: 'tenant-1',
+      source: { learnedFactsDocumentId: 'learned-1' },
+    } as never;
+    await h.service.update(withDoc, {});
+    expect(h.emitter.emit).toHaveBeenCalledWith(
+      LEARNED_FACTS_CHANGED,
+      expect.objectContaining({
+        chatbotId: 'bot-1',
+        documentId: 'learned-1',
+        ownerUserId: 7,
+        facts: [expect.objectContaining({ text: 'Mon–Sat 9–7' })],
+      }),
+    );
+
+    // A stale save writes nothing, so it tells nothing.
+    h.emitter.emit.mockClear();
+    h.setStale(true);
+    await expect(h.service.update(withDoc, {})).rejects.toThrow();
+    expect(h.emitter.emit).not.toHaveBeenCalled();
+  });
+
   it('applies an owner edit, logs it with its inverse, bumps the version and tells the canvas', async () => {
     const h = harness();
     const { draft: saved, event } = await h.service.applyPatch(

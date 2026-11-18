@@ -841,7 +841,11 @@ export class KnowledgeBaseService {
     if (dto.text !== undefined) {
       const text = dto.text.trim();
       const hash = KbIngestService.hash(text);
-      if (hash !== document.contentHash) {
+      // The same text never re-indexes. Compared as text too: a pasted document's hash is only
+      // stored by its first ingest, so an update in that window would otherwise queue a second,
+      // concurrent re-index of the same text (Q3-fast: the learned facts are written at publish
+      // and again by the save that records them).
+      if (hash !== document.contentHash && text !== document.rawText?.trim()) {
         Object.assign(patch, {
           rawText: text,
           contentHash: hash,

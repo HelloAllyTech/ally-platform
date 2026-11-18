@@ -4,7 +4,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
@@ -33,6 +35,10 @@ import {
   SafetyLockedError,
 } from '../safety-pack/safety-lock';
 import { packFor } from '../safety-pack/safety-packs';
+import {
+  LEARNED_FACTS_CHANGED,
+  type LearnedFactsChanged,
+} from './learned-facts-document';
 import type {
   BotDraft,
   DraftEvent,
@@ -127,6 +133,7 @@ export class BotDraftService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly access: ChatbotAccessService,
     private readonly events: BotDraftEventsService,
+    @Optional() private readonly emitter?: EventEmitter2,
   ) {}
 
   static defaultDraft(name: string): BotDraft {
@@ -681,6 +688,17 @@ export class BotDraftService {
         message:
           'Something changed while you were editing. Your view has been refreshed.',
       });
+    }
+    // Q3-fast Part 2: once the facts are a document, it follows every save (an unchanged text is
+    // a no-op there), so a removed page, a correction or a re-read reaches what the assistant knows.
+    if (next.chatbotId && next.source?.learnedFactsDocumentId) {
+      this.emitter?.emit(LEARNED_FACTS_CHANGED, {
+        chatbotId: next.chatbotId,
+        documentId: next.source.learnedFactsDocumentId,
+        facts: (next.learned?.facts ?? []) as LearnedFact[],
+        ownerUserId: next.ownerUserId,
+        tenantId: next.tenantId ?? null,
+      } satisfies LearnedFactsChanged);
     }
     return next;
   }
