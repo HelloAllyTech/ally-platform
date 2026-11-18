@@ -1,18 +1,19 @@
 """The data-access matrix is a mirror of the real wiring, never a second source.
 
 `docs/debrief-harness/data-access.json` (written from ally-be's
-`debrief-data-access.constants.ts`) declares what each Debrief agent can read. This test builds
-every step body in `inputs.py` with every optional input present and fails when a body carries a
-key the declaration does not name, or the declaration names a key the body no longer has: adding
-an input to a step without declaring it (or removing one) is caught here. The PM agent's tools
-are checked the same way.
+`debrief-data-access.constants.ts`) declares what each Debrief agent can read.
+This test builds every step body in `inputs.py` with every optional input
+present and fails when a body carries a key the declaration does not name, or
+the declaration names a key the body no longer has: adding an input to a step
+without declaring it (or removing one) is caught here. The PM agent's tools are
+checked the same way.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pytest
 
@@ -21,7 +22,10 @@ from app.core.pm_agent.tools import make_tools
 
 DECLARED = json.loads(
     (
-        Path(__file__).resolve().parents[4] / "docs" / "debrief-harness" / "data-access.json"
+        Path(__file__).resolve().parents[4]
+        / "docs"
+        / "debrief-harness"
+        / "data-access.json"
     ).read_text()
 )
 AGENTS = {a["key"]: a for a in DECLARED["agents"]}
@@ -121,8 +125,8 @@ def test_a_step_body_carries_exactly_the_declared_inputs(agent: str):
         "it is in ally-be debrief-data-access.constants.ts (then UPDATE_DATA_ACCESS=1)"
     )
     assert set(declared) - set(body) == set(), (
-        f"{agent} no longer carries {sorted(set(declared) - set(body))}: remove it from "
-        "the declaration"
+        f"{agent} no longer carries {sorted(set(declared) - set(body))}: "
+        "remove it from the declaration"
     )
     for item in declared.values():
         assert item is None or item in DATA_KEYS
