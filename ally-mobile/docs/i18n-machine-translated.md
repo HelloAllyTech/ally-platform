@@ -161,3 +161,7 @@ Added 2026-11-16 for the learner Debrief fixes (back to the course, Ally's flag 
 | `postSim.debriefCards.flag.answer.label` | Ally's answer: | Ally का जवाब: | ಆಲಿಯ ಉತ್ತರ: | अ‍ॅलीचे उत्तर: | ஆலியின் பதில்: |
 | `postSim.debriefCards.flag.answer.kept` | Ally looked at this again and kept it. | Ally ने इसे फिर से देखा और इसे वैसा ही रखा। | ಆಲಿ ಇದನ್ನು ಮತ್ತೆ ನೋಡಿ ಹಾಗೆಯೇ ಉಳಿಸಿದೆ. | अ‍ॅलीने हे पुन्हा पाहिले आणि तसेच ठेवले. | ஆலி இதை மீண்டும் பார்த்து அப்படியே வைத்தது. |
 | `postSim.debriefCards.flag.answer.corrected` | Ally looked at this again and changed it. | Ally ने इसे फिर से देखा और इसे बदल दिया। | ಆಲಿ ಇದನ್ನು ಮತ್ತೆ ನೋಡಿ ಬದಲಾಯಿಸಿದೆ. | अ‍ॅलीने हे पुन्हा पाहिले आणि बदलले. | ஆலி இதை மீண்டும் பார்த்து மாற்றியது. |
+
+## Debrief: collapsing, retitles, breathing, Reminders (2026-11-18)
+
+Written for this app (no RN source). Needs a native speaker's read. Keys: `postSim.debriefCards.workOnThis` (retitled "What to strengthen"), `postSim.debriefCards.practiseNext` and `postSim.debriefCards.practise.next` (retitled "Try this in your next practice"), `postSim.debriefCards.working.breatheStart`, `.breatheStop`, `.breatheCalm`, and `simulationPage.fromLastDebrief`.

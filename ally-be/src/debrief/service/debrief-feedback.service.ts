@@ -359,6 +359,66 @@ export class DebriefFeedbackService {
   }
 
   /**
+   * What the learner's most recent debrief for this roleplay asked of them:
+   * the "What to strengthen" lines they could try saying, and the
+   * "Try this in your next practice" nudge. Shown under Reminders on the
+   * roleplay call screen so the points stay in mind on the next attempt.
+   * Only the learner's own live debrief, read as they read it; points a
+   * reviewer removed are left out; nothing when there is no debrief yet.
+   */
+  async latestPoints(
+    scenarioId: number,
+    userId: number,
+  ): Promise<{
+    runId: string | null;
+    workOnThis: Array<{ lead: string; trySaying: string }>;
+    practiseNext: { skill: string; reason: string } | null;
+  }> {
+    const none = { runId: null, workOnThis: [], practiseNext: null };
+    const rows: Array<{
+      id: string;
+      cards: Record<string, any> | null;
+      recipe_key: string | null;
+    }> = await this.dataSource.query(
+      `SELECT r.id, r.cards, r."recipeKey" AS recipe_key
+           FROM debrief_runs r
+           JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+          WHERE s."counselorId" = $1 AND s."scenarioId" = $2
+            AND r.mode = 'live' AND r.status IN ('published','below_bar')
+            AND r.cards IS NOT NULL
+          ORDER BY COALESCE(s."endedAt", s."updatedAt") DESC
+          LIMIT 1`,
+      [userId, scenarioId],
+    );
+    const run = rows?.[0];
+    if (!run?.cards) return none;
+    const removed = new Set(
+      (
+        await this.feedback.find({
+          where: { runId: run.id, status: DebriefFeedbackStatus.REMOVED },
+        })
+      ).map((r) => r.section),
+    );
+    const cards = cardsForReader(
+      run.cards,
+      run.recipe_key,
+    ) as Partial<DebriefCards>;
+    const workOnThis = (cards.work_on_this ?? [])
+      .map((c, i) => ({ c, i }))
+      .filter(({ c, i }) => !removed.has(`work_on_this[${i}]`) && c.lead)
+      .map(({ c }) => ({ lead: c.lead, trySaying: c.try_saying ?? '' }));
+    const next = cards.practise_next;
+    return {
+      runId: run.id,
+      workOnThis,
+      practiseNext:
+        next && !removed.has('practise_next') && next.skill
+          ? { skill: next.skill, reason: next.reason ?? '' }
+          : null,
+    };
+  }
+
+  /**
    * The learner's view with their own feedback and the review outcomes. Cards
    * stay as stored: the apps hide a removed card by its stored index (the
    * same index its flag names) and show the outcome, so nothing shifts.

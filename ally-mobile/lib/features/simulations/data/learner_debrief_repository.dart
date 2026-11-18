@@ -906,11 +906,52 @@ class LearnerDebriefRepository {
   /// `Platform`, so it also answers under tests.
   static String get platform => defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
+  /// The points from the learner's latest debrief for this roleplay. Never
+  /// throws: no points is the same as no debrief yet.
+  Future<LatestDebriefPoints?> getLatestPoints(int scenarioId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/debriefs/scenarios/$scenarioId/latest-points');
+      final points = LatestDebriefPoints.fromJson(response.data ?? const {});
+      return points.isEmpty ? null : points;
+    } on Object {
+      return null;
+    }
+  }
+
   /// Ask Ally: the debrief chat's thread, answered by the Debrief agent.
   /// Same SSE events as the scenario-session chat stream; the history is shared.
   static String replyStreamPath(String sessionId) => '/debriefs/sessions/$sessionId/reply/stream';
 }
 
+/// What the learner's latest debrief for a roleplay asked of them, shown
+/// under Reminders on the call screen (`GET /debriefs/scenarios/:id/latest-points`).
+class LatestDebriefPoints {
+  const LatestDebriefPoints({required this.workOnThis, this.practiseNext});
+
+  factory LatestDebriefPoints.fromJson(Map<String, dynamic> json) {
+    final next = json['practiseNext'];
+    final nextSkill = next is Map<String, dynamic> ? _optStr(next['skill']) : null;
+    return LatestDebriefPoints(
+      workOnThis: [
+        for (final m in _maps(json['workOnThis']))
+          if (_optStr(m['lead']) != null) (lead: _str(m['lead']), trySaying: _str(m['trySaying'])),
+      ],
+      practiseNext: nextSkill == null
+          ? null
+          : (skill: nextSkill, reason: _str((next as Map<String, dynamic>)['reason'])),
+    );
+  }
+
+  final List<({String lead, String trySaying})> workOnThis;
+  final ({String skill, String reason})? practiseNext;
+
+  bool get isEmpty => workOnThis.isEmpty && practiseNext == null;
+}
+
 final learnerDebriefRepositoryProvider = Provider<LearnerDebriefRepository>((ref) {
   return LearnerDebriefRepository(ref.watch(apiClientProvider));
+});
+/// The learner's latest debrief points for a roleplay (null when none).
+final latestDebriefPointsProvider = FutureProvider.autoDispose.family<LatestDebriefPoints?, int>((ref, scenarioId) {
+  return ref.watch(learnerDebriefRepositoryProvider).getLatestPoints(scenarioId);
 });
