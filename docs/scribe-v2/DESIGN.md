@@ -1,6 +1,6 @@
 # Scribe v2: end-to-end redesign
 
-Status: **proposal, for review**. Nothing here is built yet.
+Status: **proposal, partly built.** Phase 3 — the note harness in shadow mode, behind the org preference `SCRIBE_NOTE_HARNESS_SHADOW_ENABLED` — is on `master` (`ally-ai/app/core/note_harness/`); what it does and what it does not touch is in [PHASE-3-NOTES.md](PHASE-3-NOTES.md). Treat the rest of the phases in §11 as unbuilt unless their code says otherwise.
 Scope: everything from the moment a counsellor presses Record (or Dictate) to the moment a
 saved, correct note is on screen. Web and mobile.
 

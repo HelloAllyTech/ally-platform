@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { judgeOverallSql } from '../util/debrief-run-columns.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { LoggerService } from '../../logger/logger.service';
@@ -127,7 +128,7 @@ export class DebriefNightlyService implements OnModuleInit {
     const rows: Array<Record<string, any>> = await this.dataSource.query(
       `SELECT r.id, s."counselorId" AS learner, r.language, r."recipeKey" AS recipe,
               r.status, r.cards, r."evaluatorOverall"::float AS ev,
-              (r.workspace->'judge'->>'overall')::float AS judge,
+              ${judgeOverallSql('r')} AS judge,
               (SELECT (d->>'score')::float
                  FROM jsonb_array_elements(coalesce(r.workspace->'judge'->'dimensions', '[]'::jsonb)) d
                 WHERE d->>'dimension' = 'evidence_specificity' LIMIT 1) AS spec
@@ -278,9 +279,9 @@ export class DebriefNightlyService implements OnModuleInit {
          JOIN debrief_runs r ON r.id = v."runId"
         WHERE v."updatedAt" >= $1 AND v."updatedAt" < $2 AND r.mode = 'live'
           AND r.workspace ? 'judge'
-          AND ((v.verdict = 'good' AND ((r.workspace->'judge'->>'overall')::float < $3
+          AND ((v.verdict = 'good' AND (${judgeOverallSql('r')} < $3
                  OR jsonb_array_length(coalesce(r.workspace->'judge'->'hardFails','[]'::jsonb)) > 0))
-            OR (v.verdict = 'needs_work' AND (r.workspace->'judge'->>'overall')::float >= $3
+            OR (v.verdict = 'needs_work' AND ${judgeOverallSql('r')} >= $3
                  AND jsonb_array_length(coalesce(r.workspace->'judge'->'hardFails','[]'::jsonb)) = 0))`,
       [from, to, DEBRIEF_QUALITY_PASS],
     );
@@ -352,7 +353,7 @@ export class DebriefNightlyService implements OnModuleInit {
     const picked: Array<{ id: string }> = await this.dataSource.query(
       `SELECT id FROM debrief_runs
         WHERE mode = 'live' AND status IN ('published','below_bar')
-          AND (workspace->'judge'->>'overall') IS NOT NULL
+          AND ${judgeOverallSql()} IS NOT NULL
           AND NOT (id = ANY($2::uuid[]))
         ORDER BY "createdAt" DESC LIMIT $1`,
       [size - kept.length, kept],

@@ -378,7 +378,8 @@ describe('debrief agreement: canary eligibility reads it', () => {
       {} as any,
       {} as any,
       {} as any,
-      { get: jest.fn(() => agreement) } as any,
+      agreement as any,
+      { owner: jest.fn(async () => 1) } as any,
     );
     return { service, agreement };
   };

@@ -76,7 +76,9 @@ export class PlanStageService {
 
     let prdReady = false;
     let designApproved = false;
-    if (!isPrivate && plan.leadUserId) {
+    // The PRD and design are assessed once planning is under way: an Owner
+    // plans before anyone is assigned to build it (lifecycle 2026-11-18).
+    if (!isPrivate && (plan.leadUserId || record.planningStarted === true)) {
       const detail =
         preloaded ??
         (await this.builderSessions.getSessionDetail(plan.id, plan.createdBy));
@@ -105,6 +107,7 @@ export class PlanStageService {
       launched: !!record.launch?.launchedAt,
       reviewsDue: record.reviews?.dueDates.length ?? 0,
       reviewsDone: record.reviews?.done ?? 0,
+      planningStarted: record.planningStarted === true,
     };
   }
 

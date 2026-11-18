@@ -2,12 +2,12 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_PROMPT_CODES,
   DEBRIEF_REGISTRY_AGENTS,
   DebriefBundle,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   AI_TASK_REGISTRY,
   AiTaskEntry,

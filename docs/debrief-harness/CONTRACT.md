@@ -1,5 +1,7 @@
 # Debrief harness: the ally-be ↔ ally-ai contract
 
+Words used here (change, release, bundle, recipe, plan, step, agent) are defined in [GLOSSARY.md](GLOSSARY.md).
+
 Status: being built (2026-11-10); Ask Ally (§5) moved 2026-11-11. Design: `~/projects/Ally/ally-debrief-orchestrator-spec.md` (Parts A, D, E; Ask Ally §A10, §D2 step 4).
 
 The Debrief agent moves from ally-be's `DebriefRunnerService` to a LangGraph graph in ally-ai. **The graph
@@ -104,6 +106,8 @@ definition of a risk cue always arrives through `prompts["debrief_risk_cue_defin
 A roleplay's choice is one yes/no (Studio: "Is handling a risk conversation the skill practised here?", saved as `scenarios.metadata.debriefRiskCueOption` = `part_of_practice` or unset). `word_list_raises` is always true. The run records
 `workspace.frameworkUsed` (id, ids, name, area names) and `workspace.riskCueOption` (key, version, handling, support-lines flag, wording); the graph adds its own `workspace.framework`, `risk_cue` and `speaker_labels`.
 
+**Learner view `followUp` (2026-11-18).** `GET /debriefs/sessions/:id` answers `followUp: true` (absent otherwise, so older apps ignore it) when a clear risk cue is still left out of the debrief the learner reads: the run has `hasRiskCue` and its best draft failed the `risk_cue_uncovered` check, the Evaluator raised the `missed_risk_cue` hard fail, or `workspace.decision.reviewReason` is `missed_risk_cue` (`needsFollowUp` in debrief-agent.service.ts; only ever raised for clear cues). The debrief is shown exactly as before ("no debrief is held", 2026-11-16); the apps add a kind notice next to the support lines (`postSim.debriefCards.followUp.*`).
+
 **Language (v9 FR-39; moved into the graph 2026-11-11, spec §D1).** ally-be sends what it knows: the session's
 configured language (its default `en` when none is recorded), `language_recorded`, and `language_source:
 "recorded"` (null when not recorded). Before any step, the graph settles the language
@@ -118,6 +122,29 @@ language; the response's `language` and `workspace.languageSource` carry it, and
 
 Field meanings and values are exactly today's `DebriefRun` columns and workspace keys, so ally-be's apply step,
 the Console, the metrics and the PM agent's reporting views read them unchanged.
+
+### Versioning and tolerance (2026-11-19)
+
+Both sides carry `contract_version` (an integer, now **1**) on `POST /debrief/runs`: ally-be sends it in
+the request, ally-ai answers with it. A missing value means 1, so an older side still works during a
+deploy. Bump it only for a change the other side cannot tolerate; adding an optional field is not one.
+
+- **Unknown fields pass through.** ally-ai's response models allow extras (`extra='allow'`, never
+  `forbid`) and the route sends `exclude_unset`, so a card, step or hard fail has exactly the keys the
+  graph built. ally-be keeps unknown fields too.
+- **Typed on the ally-ai side:** `cards` (`lead`, `what_worked`, `work_on_this`, `important_moment`,
+  `practise_next`), `steps[]` (`step`, `label`, `status`, `startedAt`, `ms`), `evaluator_hard_fails[]` and
+  `check_failures[]` (a `code` is required). `workspace`, `bundle`, `session` and `context` stay plain
+  objects on purpose: ally-be owns their keys.
+- **ally-be reads the response through `normaliseGraphResponse`** (`debrief-graph-contract.util.ts`): a
+  wrongly shaped optional field is dropped with a warning that names its path; a response with no
+  `status`, or non-object `cards` for a debrief that is shown, is a **contract error**: the graph client
+  throws a graph error with status 422, so the run ends as failed (and is retried or falls back) instead
+  of being left for the sweeper or half-applied. A `contract_version` above the one ally-be reads logs a
+  warning.
+- **One fixture, two tests.** `contract-fixture-response.json` in this folder is read by ally-ai's
+  `tests/core/debrief_graph/test_contract_fixture.py` and ally-be's `debrief-graph-contract.spec.ts`. If
+  one side changes what it sends or can read, a test fails; change the fixture and both tests together.
 
 ## 2. Gateway tools — `POST {gateway_url}/tools/:name` (ally-be)
 

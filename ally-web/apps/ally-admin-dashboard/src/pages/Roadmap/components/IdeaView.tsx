@@ -27,6 +27,7 @@ import type { RoadmapItemDetail } from "@types";
 
 import { BottomSheet } from "./BottomSheet";
 import { Conversation } from "./Conversation";
+import { IdeaBannerControls } from "./IdeaBannerControls";
 import {
   CopyLinkButton,
   IdeaStar,
@@ -36,7 +37,9 @@ import {
   PrimaryAction,
 } from "./IdeaControls";
 import { IdeaPanelContent } from "./IdeaPanels";
+import { BANNER_TONE, HeaderTracker, OpportunityHeader } from "./OpportunityHeader";
 import { PeopleChips } from "./PeopleChips";
+import { RoadmapIconButton } from "./RoadmapIconButton";
 import { ShippedCard } from "./ShippedCard";
 import { Tracker } from "./Tracker";
 import { motionTransition, paneVariants, useReducedMotionPreference } from "../../../motion";
@@ -205,6 +208,9 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
     clampPanelWidth(readPref(ROADMAP_PREF_KEYS.panelWidth, PANEL_WIDTH.default)),
   );
   const [phoneTab, setPhoneTab] = useState<"conversation" | "details">("conversation");
+  // The reading pane holds the whole idea: its conversation, and its details (Summary, Design,
+  // Build ...) behind a switch, so nothing needs a second page. Null until chosen.
+  const [paneView, setPaneView] = useState<"conversation" | IdeaPanelTab | null>(null);
 
   const setPanel = (open: boolean) => {
     setPanelOpen(open);
@@ -215,12 +221,13 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   const openDetails = useCallback(
     (next?: IdeaPanelTab) => {
       if (next) setTab(next);
-      if (panelMode === "inline") setPanel(true);
+      if (mode === "pane") setPaneView(next ?? tab);
+      else if (panelMode === "inline") setPanel(true);
       else if (panelMode === "tabs") setPhoneTab("details");
       else setOverlayOpen(true);
     },
 
-    [panelMode],
+    [panelMode, mode],
   );
 
   const keyboardInset = useKeyboardInset();
@@ -345,58 +352,36 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   const header = isPhone ? (
     <PhoneHeader item={item} collapsed={collapsed} headingRef={headingRef} status={status} />
   ) : (
-    <header className="flex flex-col gap-2 border-b border-border-light px-4 py-3">
-      <div className="flex flex-wrap items-start gap-2">
-        <span className="pt-1 text-xs tabular-nums text-typography-secondary">{item.code}</span>
-        <IdeaTitle
-          item={item}
-          as={mode === "page" ? "h1" : "h2"}
-          headingRef={headingRef}
-          className="min-w-0 flex-1 text-lg font-semibold text-typography-primary"
-        />
-        <div className="flex shrink-0 items-center gap-1">
+    <OpportunityHeader
+      item={item}
+      as={mode === "page" ? "h1" : "h2"}
+      headingRef={headingRef}
+      controls={<IdeaBannerControls item={item} />}
+      actions={
+        <>
           <IdeaVotes item={item} />
           <IdeaStar item={item} />
           <IdeaWatch item={item} />
           <CopyLinkButton code={item.code} />
           {mode === "pane" && onOpenFull && (
-            <button
-              type="button"
-              onClick={onOpenFull}
-              aria-label={copy.openFullPage}
-              className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-neutral-100"
-            >
+            <RoadmapIconButton label={copy.openFullPage} onClick={onOpenFull}>
               <Maximize size={16} aria-hidden />
-            </button>
+            </RoadmapIconButton>
           )}
           {mode === "pane" && onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={copy.closePane}
-              className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-neutral-100"
-            >
+            <RoadmapIconButton label={copy.closePane} onClick={onClose}>
               <Close size={16} aria-hidden />
-            </button>
+            </RoadmapIconButton>
           )}
           {mode === "page" && panelMode === "inline" && !panelOpen && (
-            <button
-              type="button"
-              onClick={() => setPanel(true)}
-              aria-label={copy.idea.panelExpand}
-              className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-neutral-100"
-            >
+            <RoadmapIconButton label={copy.idea.panelExpand} onClick={() => setPanel(true)}>
               <DockToRight size={16} aria-hidden />
-            </button>
+            </RoadmapIconButton>
           )}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <Tracker stage={item.shownStage} />
-        <p className="m-0 text-sm text-typography-secondary" aria-live="polite">
-          {status}
-        </p>
-      </div>
+        </>
+      }
+    >
+      <HeaderTracker item={item} status={status} />
       <FirstSubmitNote code={item.code} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col">
@@ -412,11 +397,14 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
           )}
         </div>
       </div>
-    </header>
+    </OpportunityHeader>
   );
 
   // ── reading pane ────────────────────────────────────────────────────────────────────────────
   if (mode === "pane") {
+    // One row of tabs: Conversation, then the idea's own sections. An idea with no conversation yet
+    // (a Backlog idea) opens on its Summary, the useful side.
+    const shown = paneView ?? (item.sessionId ? "conversation" : tab);
     return (
       <motion.div
         key={item.code}
@@ -425,7 +413,41 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
         transition={motionTransition("moderate", "productive", reduced)}
       >
         {header}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{conversation}</div>
+        <div
+          role="tablist"
+          aria-label={copy.idea.panel}
+          className="flex shrink-0 overflow-x-auto border-b border-border-light px-2"
+        >
+          {(["conversation", ...IDEA_PANEL_TABS] as const).map(key => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={shown === key}
+              onClick={() => {
+                setPaneView(key);
+                if (key !== "conversation") setTab(key);
+              }}
+              className={`relative min-h-10 shrink-0 px-4 text-sm ${
+                shown === key
+                  ? "font-semibold text-typography-primary"
+                  : "text-typography-secondary hover:bg-neutral-100 hover:text-typography-primary"
+              }`}
+            >
+              {key === "conversation" ? copy.idea.conversation : copy.idea.tabs[key]}
+              {shown === key && (
+                <span className="absolute inset-x-0 bottom-0 h-0.5 bg-primary-500" aria-hidden />
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          {shown === "conversation" ? (
+            conversation
+          ) : (
+            <IdeaPanelContent tab={shown} item={item} session={session} />
+          )}
+        </div>
       </motion.div>
     );
   }
@@ -551,14 +573,12 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
                   className="absolute inset-y-0 -left-1 z-[1] w-2 cursor-col-resize focus-visible:bg-primary-200"
                 />
                 <div className="flex items-center justify-end px-2 pt-1">
-                  <button
-                    type="button"
+                  <RoadmapIconButton
+                    label={copy.idea.panelCollapse}
                     onClick={() => setPanel(false)}
-                    aria-label={copy.idea.panelCollapse}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-neutral-100"
                   >
                     <Close size={16} aria-hidden />
-                  </button>
+                  </RoadmapIconButton>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">{tabbedPanel}</div>
               </motion.aside>
@@ -604,25 +624,42 @@ const PhoneHeader: React.FC<{
 }> = ({ item, collapsed, status, headingRef }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
+  const [barOpen, setBarOpen] = useState(false);
+  useEffect(() => setBarOpen(false), [item.code]);
   return (
     <header className="flex flex-col">
-      <div className="sticky top-0 z-[3] flex h-12 items-center gap-1 border-b border-border-light bg-white px-1">
+      <div
+        className={`sticky top-0 z-[3] flex min-h-12 items-start gap-1 border-b px-1 ${
+          BANNER_TONE[item.stage ?? "draft"] ?? BANNER_TONE.draft
+        }`}
+      >
         <Link
           to={ROUTES.ROADMAP}
-          className="inline-flex h-11 items-center px-2 text-sm text-primary-700"
+          className="inline-flex h-12 shrink-0 items-center px-2 text-sm text-primary-700"
           aria-label={copy.actions.back}
         >
           ‹ {copy.backToQueue}
         </Link>
-        <motion.span
-          className="min-w-0 flex-1 truncate text-base font-semibold text-typography-primary"
-          animate={{ opacity: collapsed ? 1 : 0 }}
-          transition={motionTransition("fast", "productive", reduced)}
-          aria-hidden={!collapsed}
+        {/* The grounding strip: code, stage and title are on screen at every scroll position and in
+            every tab. The title is one line until tapped, then the whole text. */}
+        <button
+          type="button"
+          onClick={() => setBarOpen(open => !open)}
+          aria-expanded={barOpen}
+          aria-label={`${item.code}. ${item.title}. ${barOpen ? copy.idea.titleHide : copy.idea.titleShow}`}
+          className="flex min-h-12 min-w-0 flex-1 flex-col justify-center bg-transparent py-1 text-left"
         >
-          {item.title}
-        </motion.span>
-        <IdeaVotes item={item} />
+          <span className="text-xs tabular-nums leading-tight text-typography-secondary">
+            {item.code} · {copy.stages[item.stage ?? item.shownStage]}
+          </span>
+          <span
+            className={`text-sm font-semibold leading-snug text-typography-primary ${
+              barOpen ? "" : "truncate"
+            }`}
+          >
+            {item.title}
+          </span>
+        </button>
         <IdeaStar item={item} compact />
         <CopyLinkButton code={item.code} compact />
       </div>
@@ -640,11 +677,15 @@ const PhoneHeader: React.FC<{
             className="text-xl font-semibold text-typography-primary"
           />
         </motion.div>
-        <Tracker stage={item.shownStage} compact />
+        <Tracker stage={item.stage ?? item.shownStage} compact />
         <p className="m-0 text-sm text-typography-secondary">
-          {copy.stages[item.shownStage]} · {status}
+          {copy.stages[item.stage ?? item.shownStage]} · {status}
         </p>
-        <IdeaWatch item={item} />
+        <IdeaBannerControls item={item} />
+        <div className="flex items-center gap-2">
+          <IdeaVotes item={item} />
+          <IdeaWatch item={item} />
+        </div>
       </div>
     </header>
   );
@@ -655,7 +696,9 @@ const PhoneCommentButton: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => 
   const copy = en.roadmapV2.session;
   const session = useSessionAnswers(item);
   const [open, setOpen] = useState(false);
-  if (!item.can?.comment || !session.enabled) return null;
+  if (!item.can?.comment) return null;
+  // An older idea with no conversation yet: the sheet's box offers to open one.
+  if (!session.enabled && item.sessionId) return null;
   return (
     <>
       <button

@@ -21,13 +21,13 @@ import {
 import { PromptVersioningService } from '../../prompt/service/prompt-versioning.service';
 import { PromptVersionSource } from '../../prompt/entity/prompt-version.entity';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_PROMPT_CODES,
   DebriefBundle,
   DebriefRecipeKey,
   DebriefStep,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { PM_HOLD_DAYS } from '../util/debrief-outcome.util';
 import {
   changeEvidenceRefusal,
@@ -705,19 +705,65 @@ export class DebriefPmAgentService implements OnModuleInit {
   }
 
   /** After going live for everyone: watched for `watchDays` against the release before (A5). */
-  private async startWatch(
-    ideaId: string,
-    releaseId: string,
-    previousReleaseId: string | null,
-  ): Promise<void> {
+  private async watchOf(releaseId: string, previousReleaseId: string | null) {
     const { watchDays } = await this.ownerSettings.get();
     const at = new Date();
-    await this.writeEvidence(ideaId, 'watch', {
+    return {
       status: 'watching',
       releaseId,
       previousReleaseId,
       liveAt: at.toISOString(),
       until: new Date(at.getTime() + watchDays * 86_400_000).toISOString(),
+    };
+  }
+
+  /**
+   * The release that was live before `releaseId` became live. When an earlier attempt already made
+   * it live and died before recording that, the audit of the promotion remembers what it replaced
+   * (reading the live release would answer with the release itself, and the watch would then
+   * compare it with itself and undo to the wrong release).
+   */
+  private async releaseBefore(releaseId: string): Promise<string | null> {
+    const ga = await this.releases.getGa(DEBRIEF_AGENT_KEY);
+    if (!ga) return null;
+    if (ga.id !== releaseId) return ga.id;
+    const [row] = await this.dataSource.query(
+      `SELECT detail->>'fromReleaseId' AS previous FROM agent_release_audit
+        WHERE "releaseId" = $1 AND action = $2
+        ORDER BY "createdAt" DESC LIMIT 1`,
+      [releaseId, AgentReleaseAuditAction.PROMOTED],
+    );
+    return row?.previous ?? null;
+  }
+
+  /**
+   * An idea went live: its status, its canary result and the watch after it, written together
+   * under a lock on the idea's row. A crash between the release going live and this leaves the idea
+   * 'proposed' with its release already live; running the promotion again finds the release live
+   * (`makeGa` does nothing for it), recovers the previous release (`releaseBefore`) and lands here.
+   */
+  private async recordLive(
+    ideaId: string,
+    releaseId: string,
+    previousReleaseId: string | null,
+    canary: Record<string, unknown>,
+  ): Promise<void> {
+    const watch = await this.watchOf(releaseId, previousReleaseId);
+    await this.dataSource.transaction(async (em) => {
+      await em.query(
+        `SELECT id FROM agent_lessons WHERE id = $1::uuid FOR UPDATE`,
+        [ideaId],
+      );
+      await em.query(
+        `UPDATE agent_lessons
+            SET status = 'active', "releaseId" = $2,
+                evidence = evidence
+                  || jsonb_build_object('canary'::text, $3::jsonb)
+                  || jsonb_build_object('watch'::text, $4::jsonb),
+                "updatedAt" = now()
+          WHERE id = $1`,
+        [ideaId, releaseId, JSON.stringify(canary), JSON.stringify(watch)],
+      );
     });
   }
 
@@ -851,7 +897,7 @@ export class DebriefPmAgentService implements OnModuleInit {
         true,
       );
       if (scoped) return scoped;
-      const before = await this.releases.getGa(DEBRIEF_AGENT_KEY);
+      const previousId = await this.releaseBefore(canary.releaseId);
       const released = await this.releases.makeGa(
         canary.releaseId,
         userId,
@@ -859,16 +905,11 @@ export class DebriefPmAgentService implements OnModuleInit {
         note,
         actorOf(userId),
       );
-      await this.dataSource.query(
-        `UPDATE agent_lessons SET status = 'active', "releaseId" = $2, "updatedAt" = now() WHERE id = $1`,
-        [ideaId, canary.releaseId],
-      );
-      await this.writeEvidence(ideaId, 'canary', {
+      await this.recordLive(ideaId, canary.releaseId, previousId, {
         ...canary,
         status: 'promoted',
         promotedAt: new Date().toISOString(),
       });
-      await this.startWatch(ideaId, canary.releaseId, before?.id ?? null);
       await this.audit('activated', ideaId, userId, {
         releaseId: canary.releaseId,
         note: note ?? null,
@@ -988,7 +1029,7 @@ export class DebriefPmAgentService implements OnModuleInit {
     const scoped = await this.liveForLanguagesOnly(idea, draft, userId, note);
     if (scoped) return scoped;
     const ideaId = idea.id as string;
-    const before = await this.releases.getGa(DEBRIEF_AGENT_KEY);
+    const previousId = await this.releaseBefore(draft.id);
     const released = await this.releases.makeGa(
       draft.id,
       userId,
@@ -998,18 +1039,13 @@ export class DebriefPmAgentService implements OnModuleInit {
     );
     const version =
       (released as { version?: number })?.version ?? draft.version;
-    await this.dataSource.query(
-      `UPDATE agent_lessons SET status = 'active', "releaseId" = $2, "updatedAt" = now() WHERE id = $1`,
-      [ideaId, draft.id],
-    );
-    await this.writeEvidence(ideaId, 'canary', {
+    await this.recordLive(ideaId, draft.id, previousId, {
       status: 'skipped',
       reason: 'not learner-visible',
       releaseId: draft.id,
       version,
       promotedAt: new Date().toISOString(),
     });
-    await this.startWatch(ideaId, draft.id, before?.id ?? null);
     await this.audit('activated', ideaId, userId, {
       releaseId: draft.id,
       canary: 'skipped: not learner-visible',

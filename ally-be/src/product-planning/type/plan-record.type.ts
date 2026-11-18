@@ -93,9 +93,35 @@ export interface PlanRecord {
    */
   externalBuild?: PlanExternalBuild | null;
 
+  /**
+   * The Owner closed the plan: planning is finished and the idea can take a
+   * builder (Roadmap lifecycle 2026-11-18). Not the same as `closed`, which
+   * is "not pursuing". Cleared by reopening the plan, which only works while
+   * nobody leads the idea.
+   */
+  planClosed?: PlanActorStamp | null;
+
+  /**
+   * How the assigned builder builds it: with the Builder agent here, or
+   * outside it (Claude Code, by hand). The builder can switch at any time;
+   * every switch is a `build_mode_set` event.
+   */
+  buildMode?: (PlanActorStamp & { mode: PlanBuildMode }) | null;
+
   /** Last stage written, with when — mirrors the planStage column. */
   lastStage?: PlanStage;
 }
+
+/** Who did something to a plan, and when. */
+export interface PlanActorStamp {
+  byUserId: number;
+  at: string;
+}
+
+/** `builder_agent`: Builder builds it here. `outside`: built outside the Builder agent. */
+export type PlanBuildMode = 'builder_agent' | 'outside';
+
+export const PLAN_BUILD_MODES: PlanBuildMode[] = ['builder_agent', 'outside'];
 
 export interface PlanExternalBuild {
   tool: 'claude_code';

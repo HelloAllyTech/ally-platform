@@ -12,8 +12,9 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from app.core.debrief import framework
+from app.core.debrief_graph.constants import DEFAULT_DEADLINE_MS, HARD_MARGIN_MS
 from app.core.debrief_graph.gateway import Gateway
-from app.core.debrief_graph.step_functions import StepRunner
+from app.core.debrief_graph.step_wire import StepRunner
 
 
 def now_ms() -> float:
@@ -129,8 +130,18 @@ class DebriefRunContext:
 
     def deadline_ms(self, has_risk_cue: bool) -> float:
         return float(
-            self.setting("riskDeadlineMs" if has_risk_cue else "deadlineMs", 150_000)
+            self.setting(
+                "riskDeadlineMs" if has_risk_cue else "deadlineMs", DEFAULT_DEADLINE_MS
+            )
         )
+
+    def hard_left_s(self, has_risk_cue: bool) -> float:
+        """Seconds until ally-be gives up on the run (deadline + margin); may be < 0."""
+        return (
+            self.deadline_ms(has_risk_cue)
+            + HARD_MARGIN_MS
+            - (self.clock() - self.started_at)
+        ) / 1000.0
 
     def time_left_ms(self, has_risk_cue: bool) -> float:
         return self.deadline_ms(has_risk_cue) - (self.clock() - self.started_at)

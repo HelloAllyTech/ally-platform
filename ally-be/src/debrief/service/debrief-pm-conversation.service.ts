@@ -14,10 +14,8 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
 import { AgentReleaseAuditAction } from '../../llm-agent/harness/enum/harness.enum';
-import {
-  DEBRIEF_AGENT_KEY,
-  DEBRIEF_MODELS,
-} from '../constants/debrief-release.constants';
+import { DEBRIEF_MODELS } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   DebriefPmMessage,
   PmAbout,

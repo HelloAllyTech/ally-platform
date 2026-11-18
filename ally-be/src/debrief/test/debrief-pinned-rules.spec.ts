@@ -85,7 +85,6 @@ describe('Settings › Pinned rules (read-only)', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
     );
     return { svc, dataSource };
   }

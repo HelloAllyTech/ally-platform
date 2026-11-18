@@ -292,8 +292,10 @@ export class RoadmapReviewService implements OnModuleDestroy {
       if (!item.can.pickLead) {
         throw new ForbiddenException(
           (await this.roles.roleOf(userId)) === 'owner'
-            ? 'This idea is not at a stage that takes a lead.'
-            : 'Only an Owner can pick the lead.',
+            ? item.shownStage === 'shipped' || !item.can.decline
+              ? 'This idea is released or closed; it takes no builder.'
+              : 'Close the plan before assigning a builder.'
+            : 'Only an Owner assigns the builder.',
         );
       }
       const to = Number(input.leadUserId);
@@ -360,44 +362,46 @@ export class RoadmapReviewService implements OnModuleDestroy {
   }
 
   /**
-   * Start planning (§2.1a, P3b): the plan interview begins in the idea's one
-   * session. The lead on their own idea, or any Owner on any idea; an Owner
-   * starting an idea nobody leads takes the lead, because the plan
-   * interview is the lead's conversation. Idempotent.
+   * Start planning: an Owner expands the idea into a plan, in its one
+   * session (lifecycle 2026-11-18). Only an Owner, and nobody is assigned to
+   * build it by doing so: the Owner plans, closes the plan, and only then
+   * assigns a builder. Starting to plan an idea still waiting for review
+   * accepts it. Idempotent.
    */
   async startPlanning(userId: number, code: string): Promise<ItemDetail> {
     const item = await this.reader.detail(userId, code);
     const ref = await this.lookup.get(code);
-    if (!ref.builderSessionId && !item.can.startPlanning) {
-      throw new ForbiddenException(
-        item.shownStage === 'accepted'
-          ? 'Only the lead or an Owner can start planning.'
-          : 'Planning starts once an idea is accepted.',
+    const refusal = () =>
+      new ForbiddenException(
+        item.shownStage === 'submitted' || item.shownStage === 'accepted'
+          ? 'Only an Owner expands an idea into a plan.'
+          : 'This idea is past planning.',
       );
-    }
+    if (!ref.builderSessionId && !item.can.startPlanning) throw refusal();
     const session = await this.ensurePlanSession(userId, ref);
     if (session.plan?.planningStarted === true) return item;
-    if (!item.can.startPlanning) {
-      throw new ForbiddenException(
-        item.shownStage === 'accepted'
-          ? 'Only the lead or an Owner can start planning.'
-          : 'Planning starts once an idea is accepted.',
+    if (!item.can.startPlanning) throw refusal();
+
+    if (item.shownStage === 'submitted') {
+      // Expanding it into a plan is the Owner taking it on: it is accepted.
+      const accepted = await this.dataSource.query(
+        `UPDATE "roadmap_opportunities"
+            SET "reviewState" = 'accepted', "reviewedBy" = $2, "reviewedAt" = now(),
+                "updatedBy" = $2, "updatedAt" = now()
+          WHERE id = $1 AND "reviewState" = 'pending'
+          RETURNING id`,
+        [ref.id, userId],
       );
-    }
-    const lead = session.leadUserId == null ? null : Number(session.leadUserId);
-    if (lead === null) {
-      await this.store.update(session.id, {
-        leadUserId: userId,
-        updatedBy: userId,
-      });
-      await this.afterLeadAssigned(
-        userId,
-        ref.id,
-        ref.code,
-        session.id,
-        null,
-        userId,
-      );
+      const rows = Array.isArray(accepted?.[0]) ? accepted[0] : accepted;
+      if (rows?.length) {
+        this.cancelDecisionNotice(ref.id);
+        await this.events.record({
+          sessionId: session.id,
+          kind: PlanEventKind.REVIEWED,
+          actorUserId: userId,
+          detail: { decision: 'accept', via: 'start_planning' },
+        });
+      }
     }
     await this.store.patchPlan(session.id, {
       planningStarted: true,
@@ -416,6 +420,70 @@ export class RoadmapReviewService implements OnModuleDestroy {
       code: ref.code,
       fields: ['stage'],
     });
+    return this.reader.detail(userId, code);
+  }
+
+  /**
+   * Close the plan (an Owner): planning is done, and the idea can now take a
+   * builder. Reopen undoes it while nobody is assigned to build it yet.
+   * Neither touches the PRD or design; they only open and shut the gate to
+   * assigning a builder.
+   */
+  async setPlanClosed(
+    userId: number,
+    code: string,
+    closed: boolean,
+  ): Promise<ItemDetail> {
+    const item = await this.reader.detail(userId, code);
+    const allowed = closed ? item.can.closePlan : item.can.reopenPlan;
+    if (!allowed) {
+      if ((await this.roles.roleOf(userId)) !== 'owner') {
+        throw new ForbiddenException('Only an Owner closes or reopens a plan.');
+      }
+      throw new ConflictException(
+        closed
+          ? 'Only a plan that is being planned, with no builder yet, can be closed.'
+          : 'Only a closed plan with no builder yet can be reopened.',
+      );
+    }
+    const ref = await this.lookup.get(code);
+    const session = await this.planSession(ref.builderSessionId);
+    await this.store.patchPlan(session.id, {
+      planClosed: closed
+        ? { byUserId: userId, at: new Date().toISOString() }
+        : null,
+    });
+    await this.events.record({
+      sessionId: session.id,
+      kind: closed ? PlanEventKind.PLAN_CLOSED : PlanEventKind.PLAN_REOPENED,
+      actorUserId: userId,
+    });
+    this.broadcast.emit({
+      kind: 'ITEM_CHANGED',
+      actorId: userId,
+      code: ref.code,
+      fields: ['stage'],
+    });
+    return this.reader.detail(userId, code);
+  }
+
+  /**
+   * Open the conversation on an idea filed before ideas had one (an older or
+   * quick-added idea), so anyone who can comment on it can. Makes the idea's
+   * session if it has none; changes nothing else (no lead, no planning, no
+   * stage). Idempotent.
+   */
+  async openConversation(userId: number, code: string): Promise<ItemDetail> {
+    const item = await this.reader.detail(userId, code);
+    if (!item.can.comment) {
+      throw new ForbiddenException(
+        "This idea can't take comments: it is a draft, declined or closed.",
+      );
+    }
+    const ref = await this.lookup.get(code);
+    if (!ref.builderSessionId) {
+      await this.ensurePlanSession(userId, ref, 'conversation');
+    }
     return this.reader.detail(userId, code);
   }
 
@@ -518,6 +586,12 @@ export class RoadmapReviewService implements OnModuleDestroy {
       if (item.shownStage !== 'declined') {
         throw new ConflictException(`${ref.code} is not declined.`);
       }
+    } else if (request.decision === 'decline') {
+      if (!item.can.decline) {
+        throw new ConflictException(
+          `${ref.code} can't be declined: it is released, or already closed.`,
+        );
+      }
     } else if (!item.can.review) {
       throw new ConflictException(`${ref.code} is not waiting for review.`);
     }
@@ -548,18 +622,12 @@ export class RoadmapReviewService implements OnModuleDestroy {
     const prevLead =
       session?.leadUserId == null ? null : Number(session.leadUserId);
 
-    let nextLead = prevLead;
-    if (request.decision === 'accept' && request.leadUserId != null) {
-      if (!session) {
-        throw new ConflictException(
-          `${ref.code} has no plan yet, so it has no lead to set.`,
-        );
-      }
-      await this.assertCanLead(Number(request.leadUserId));
-      nextLead = Number(request.leadUserId);
-    } else if (request.leadUserId != null) {
+    const nextLead = prevLead;
+    if (request.leadUserId != null) {
+      // A builder is assigned only once the Owner has planned the idea and
+      // closed the plan (lifecycle 2026-11-18), never straight from review.
       throw new UnprocessableEntityException(
-        'A lead can only be picked when accepting.',
+        'Expand the idea into a plan and close the plan before assigning a builder.',
       );
     }
 
@@ -814,6 +882,7 @@ export class RoadmapReviewService implements OnModuleDestroy {
       createdBy: number;
       builderSessionId: string | null;
     },
+    by: 'lead_assignment' | 'conversation' = 'lead_assignment',
   ): Promise<PlanSession> {
     if (ref.builderSessionId) return this.planSession(ref.builderSessionId);
 
@@ -870,7 +939,7 @@ export class RoadmapReviewService implements OnModuleDestroy {
       sessionId: created.id,
       kind: PlanEventKind.FILED,
       actorUserId: userId,
-      detail: { by: 'lead_assignment' },
+      detail: { by },
     });
     return this.planSession(created.id);
   }

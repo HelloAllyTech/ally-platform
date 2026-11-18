@@ -150,6 +150,15 @@ export const DEBRIEF_SCHEDULE_JOBS: readonly DebriefScheduleJob[] = [
     learningBudget: false,
   },
   {
+    // Clears the exact input and reply of agent-log rows older than the owner setting
+    // `agentLogRetentionDays`. It deletes data, so it ships OFF: an owner switches it on.
+    key: 'debrief-run-log-retention',
+    options: DAY,
+    defaults: { ...daily, enabled: false },
+    locked: false,
+    learningBudget: false,
+  },
+  {
     key: 'debrief-autonomy-relock',
     options: DAY,
     defaults: daily,

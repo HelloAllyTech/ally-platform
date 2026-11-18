@@ -254,7 +254,7 @@ const AskAllyCost: React.FC<{ askAlly: DebriefAgentMetrics["askAlly"] }> = ({ as
   );
 };
 
-export const AgentsSection: React.FC<{ agents: DebriefMetricsAgents }> = ({ agents }) => {
+export const AgentsMetricsSection: React.FC<{ agents: DebriefMetricsAgents }> = ({ agents }) => {
   const s = en.debriefs.metrics.agents;
   const c = en.debriefs.metrics.agentCharts;
   if (!agents) return null;

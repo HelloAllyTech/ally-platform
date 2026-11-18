@@ -93,10 +93,15 @@ export class RoadmapAllocationService {
         // merge can redistribute votes on opportunities that have already moved on. The
         // source needed a transaction-local GUC (app.bypass_stage_check) to defeat its
         // trigger; nothing here needs defeating.
-        if (opportunity.stage !== RoadmapOpportunityStage.NEW) {
+        //
+        // Voting follows the idea's stage as people see it, not the legacy board stage: it is open
+        // only in the Backlog (nobody leads it, not declined, not released). Anything else is
+        // locked, and the votes already cast stay.
+        const locked = await this.lockedReason(manager, opportunity);
+        if (locked) {
           throw new ConflictException(
-            `Votes can only be added to opportunities in the "new" stage; ` +
-              `this one is "${opportunity.stage}". Existing votes are kept.`,
+            `Votes can only be added while an idea is in the Backlog; this one is ${locked}. ` +
+              `Existing votes are kept.`,
           );
         }
 
@@ -235,5 +240,30 @@ export class RoadmapAllocationService {
     return new ConflictException(
       'Not enough votes available. Refresh to see your current balance.',
     );
+  }
+
+  /**
+   * Why an idea is no longer in the Backlog, in words, or null while it still is. Declined, released
+   * and archived ideas, ideas whose plan is closed, and ideas a lead holds are all past it.
+   */
+  private async lockedReason(
+    manager: import('typeorm').EntityManager,
+    opportunity: RoadmapOpportunity,
+  ): Promise<string | null> {
+    if (opportunity.reviewState === 'declined') return 'declined';
+    if (opportunity.stage === RoadmapOpportunityStage.RELEASED)
+      return 'released';
+    if (opportunity.stage === RoadmapOpportunityStage.ARCHIVED) return 'closed';
+    if (opportunity.builderSessionId) {
+      const [session] = await manager.query(
+        `SELECT "leadUserId", plan->'closed' AS closed
+           FROM "builder_sessions" WHERE id = $1`,
+        [opportunity.builderSessionId],
+      );
+      if (session?.closed && !session.closed.pendingConfirmation)
+        return 'closed';
+      if (session?.leadUserId != null) return 'being built';
+    }
+    return null;
   }
 }

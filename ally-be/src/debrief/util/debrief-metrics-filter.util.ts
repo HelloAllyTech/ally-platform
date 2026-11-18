@@ -1,4 +1,8 @@
 import { DebriefRecipeKey } from '../constants/debrief-release.constants';
+import {
+  judgeModelSql,
+  judgePromptVersionSql,
+} from './debrief-run-columns.util';
 import { DEBRIEF_GUIDELINE_LEVELS } from '../../context-library/profiles/debrief-guidance.profile';
 
 /**
@@ -149,7 +153,7 @@ export function metricsFilterSql(
     parts.push(`${r}."releaseVersion" = ${f.releaseVersion}`);
   if (f.judgeVersion) {
     parts.push(
-      `(${r}.workspace->'judge'->>'model') || '/' || COALESCE(${r}.workspace->'judge'->>'promptVersion', '?') = ${lit(f.judgeVersion)}`,
+      `${judgeModelSql(r)} || '/' || COALESCE(${judgePromptVersionSql(r)}, '?') = ${lit(f.judgeVersion)}`,
     );
   }
   if (f.skill) {

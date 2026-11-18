@@ -444,7 +444,7 @@ describe("per-step renderers", () => {
     renderFound("judge");
     const box = screen.getByTestId("found-quality");
     expect(box).toHaveTextContent("9.5");
-    expect(box).toHaveTextContent("No hard fails. Lowest: Personalisation 9.");
+    expect(box).toHaveTextContent("No serious problems. Lowest: Personalisation 9.");
   });
 
   it("findings agents: one line per finding", () => {

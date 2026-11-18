@@ -12,7 +12,6 @@ import { AgentReleaseService } from '../../llm-agent/harness/release/agent-relea
 import { AgentReleaseAuditAction } from '../../llm-agent/harness/enum/harness.enum';
 import { canonicalHash } from '../../llm-agent/harness/release/canonical-hash.util';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_MODELS,
   DEBRIEF_REGISTRY_AGENTS,
   DEBRIEF_REPLY_DEFAULT,
@@ -22,6 +21,7 @@ import {
   DebriefStep,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   PINNED_RULE_CODES,
   PINNED_RULE_PROMPTS,
@@ -553,8 +553,8 @@ export class DebriefReleasesService implements OnModuleInit {
     }
     for (const rc of diff.recipes) {
       changes.push({
-        area: `Recipe: ${rc.recipe}`,
-        what: what ?? 'Recipe changed',
+        area: `Debrief flow: ${rc.recipe}`,
+        what: what ?? 'Debrief flow changed',
         why,
         before: JSON.stringify(rc.before),
         after: JSON.stringify(rc.after),

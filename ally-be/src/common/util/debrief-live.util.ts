@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../constants/debrief-agent.constants';
 
 /**
  * Asked by the Debrief agent when a learner in a switched-on organisation

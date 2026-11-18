@@ -10,7 +10,7 @@ import { en } from "@constants";
 import type { RoadmapItemRow } from "@types";
 
 import { SimilarLine, SummaryFacts } from "./TriageSummary";
-import { swipeDecision, workingDaysSince } from "./triageUtils";
+import { swipeDecision, todoNextStep, workingDaysSince } from "./triageUtils";
 import {
   haptic,
   motionTransition,
@@ -25,34 +25,34 @@ const MAX_TILT_DEG = 4;
 interface TriageReviewModeProps {
   open: boolean;
   rows: RoadmapItemRow[];
-  sectionOf: (code: string) => string | undefined;
+  /** True while the idea still awaits review, so it can be declined as well as given a lead. */
+  needsReview: (code: string) => boolean;
   onClose: () => void;
-  onAccept: (row: RoadmapItemRow) => Promise<boolean>;
   /** Opens the reason sheet, with the suggested reason pre-selected. */
   onDecline: (row: RoadmapItemRow) => void;
+  /** Opens the lead picker. Picking the lead is what accepts an unreviewed idea. */
   onPickLead: (row: RoadmapItemRow) => void;
 }
 
 /**
  * Triage review mode (Owner, phone and tablet; §4.17): one card at a time, the next peeking behind.
- * A swipe past 40% of the width commits — right accepts, left opens the decline reason sheet —
- * and short of that the card springs back. Each commit gives a light haptic and an Undo toast.
+ * A swipe past 40% of the width commits — right opens the lead picker, left opens the decline
+ * reason sheet — and short of that the card springs back. Each commit gives a light haptic and an Undo toast.
  * Every swipe has a button below. Under reduced motion there's no drag or tilt: the buttons decide
  * and the next card crossfades in.
  */
 export const TriageReviewMode: React.FC<TriageReviewModeProps> = ({
   open,
   rows,
-  sectionOf,
+  needsReview,
   onClose,
-  onAccept,
   onDecline,
   onPickLead,
 }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.triage;
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
-  const [fly, setFly] = useState<"accept" | "decline" | null>(null);
+  const [fly, setFly] = useState<"decline" | null>(null);
   const totalRef = useRef(0);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -71,7 +71,7 @@ export const TriageReviewMode: React.FC<TriageReviewModeProps> = ({
   // P8: the card in front starts "triage one" for it (§4.16); the decision ends it.
   const jobs = useRoadmapJobTimer();
   const currentCode = open ? current?.code : undefined;
-  const currentAwaiting = !!currentCode && sectionOf(currentCode) === "awaitingReview";
+  const currentAwaiting = !!currentCode && needsReview(currentCode);
   useEffect(() => {
     if (currentCode && currentAwaiting) {
       jobs.start("triage_one", { itemId: currentCode, restart: true });
@@ -82,23 +82,6 @@ export const TriageReviewMode: React.FC<TriageReviewModeProps> = ({
   const next = queue[1];
   const total = Math.max(totalRef.current, rows.length);
   const index = Math.min(total, total - queue.length + 1);
-
-  const accept = async (row: RoadmapItemRow) => {
-    if (sectionOf(row.code) !== "awaitingReview") {
-      onPickLead(row);
-      return;
-    }
-    setFly("accept");
-    setDecided(prev => new Set(prev).add(row.code));
-    const ok = await onAccept(row);
-    if (!ok) {
-      setDecided(prev => {
-        const n = new Set(prev);
-        n.delete(row.code);
-        return n;
-      });
-    }
-  };
 
   useEffect(() => {
     if (!open) return undefined;
@@ -156,16 +139,16 @@ export const TriageReviewMode: React.FC<TriageReviewModeProps> = ({
                 transition={motionTransition("moderate", "productive", reduced)}
                 aria-hidden
               >
-                <CardBody row={next} section={sectionOf(next.code)} />
+                <CardBody row={next} awaitingReview={needsReview(next.code)} />
               </motion.div>
             )}
             <AnimatePresence initial={false} custom={fly}>
               <SwipeCard
                 key={current.code}
                 row={current}
-                section={sectionOf(current.code)}
+                awaitingReview={needsReview(current.code)}
                 fly={fly}
-                onAccept={() => void accept(current)}
+                onPickLead={() => onPickLead(current)}
                 onDecline={() => {
                   setFly("decline");
                   onDecline(current);
@@ -181,12 +164,12 @@ export const TriageReviewMode: React.FC<TriageReviewModeProps> = ({
           <p className="m-0 pb-2 text-center text-xs text-typography-secondary" aria-hidden>
             {copy.swipeHint}
           </p>
-          <footer className="grid grid-cols-3 gap-2 border-t border-border-light bg-white px-4 py-3">
+          <footer className="grid grid-cols-2 gap-2 border-t border-border-light bg-white px-4 py-3">
             <Button
               kind="secondary"
               size="lg"
               className="max-w-none"
-              disabled={sectionOf(current.code) !== "awaitingReview"}
+              disabled={!needsReview(current.code)}
               onClick={() => {
                 setFly("decline");
                 onDecline(current);
@@ -195,20 +178,12 @@ export const TriageReviewMode: React.FC<TriageReviewModeProps> = ({
               {en.roadmapV2.review.decline}
             </Button>
             <Button
-              kind="tertiary"
+              kind="primary"
               size="lg"
               className="max-w-none"
               onClick={() => onPickLead(current)}
             >
-              {en.roadmapV2.review.pickLead}
-            </Button>
-            <Button
-              kind="primary"
-              size="lg"
-              className="max-w-none"
-              onClick={() => void accept(current)}
-            >
-              {en.roadmapV2.review.accept}
+              {en.roadmapV2.triage.nextStep[todoNextStep(current)]}
             </Button>
           </footer>
         </>
@@ -220,11 +195,11 @@ export const TriageReviewMode: React.FC<TriageReviewModeProps> = ({
 
 const SwipeCard: React.FC<{
   row: RoadmapItemRow;
-  section?: string;
-  fly: "accept" | "decline" | null;
-  onAccept: () => void;
+  awaitingReview: boolean;
+  fly: "decline" | null;
+  onPickLead: () => void;
   onDecline: () => void;
-}> = ({ row, section, fly, onAccept, onDecline }) => {
+}> = ({ row, awaitingReview, fly, onPickLead, onDecline }) => {
   const reduced = useReducedMotionPreference();
   const ref = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
@@ -236,14 +211,14 @@ const SwipeCard: React.FC<{
 
   const onDragEnd = (_event: unknown, info: PanInfo) => {
     const decision = swipeDecision(info.offset.x, width());
-    if (decision === "accept") {
+    if (decision === "pickLead") {
       haptic(10);
-      onAccept();
+      onPickLead();
     } else if (decision === "decline") {
       haptic([15, 60, 15]);
       onDecline();
     }
-    // Short of the threshold (or a decline waiting for its reason) the card springs back.
+    // Short of the threshold (or a lead or decline waiting for its sheet) the card springs back.
   };
 
   return (
@@ -261,8 +236,8 @@ const SwipeCard: React.FC<{
       variants={{
         enter: reduced ? { opacity: 0 } : { scale: 0.96, opacity: 0 },
         shown: { scale: 1, opacity: 1 },
-        // Flies off the way it was decided: right for accept, left for decline.
-        gone: (dir: "accept" | "decline" | null) =>
+        // Flies off the way it was decided: right once it has a lead, left for decline.
+        gone: (dir: "decline" | null) =>
           reduced
             ? { opacity: 0 }
             : dir === "decline"
@@ -276,25 +251,28 @@ const SwipeCard: React.FC<{
       data-testid="roadmap-triage-card"
       data-code={row.code}
     >
-      <CardBody row={row} section={section} />
+      <CardBody row={row} awaitingReview={awaitingReview} />
     </motion.div>
   );
 };
 
-const CardBody: React.FC<{ row: RoadmapItemRow; section?: string }> = ({ row, section }) => {
+const CardBody: React.FC<{ row: RoadmapItemRow; awaitingReview: boolean }> = ({
+  row,
+  awaitingReview,
+}) => {
   const copy = en.roadmapV2;
   const { data: item } = useGetRoadmapItemQuery(row.code);
   const days = workingDaysSince(
     row.whyHere && "since" in row.whyHere ? row.whyHere.since : row.stageSince,
   );
   return (
-    <article className="flex h-full flex-col gap-3 overflow-y-auto rounded-2xl border border-border-light bg-white p-5 shadow-lg">
+    <article className="flex h-full flex-col gap-3 overflow-y-auto border border-border-light bg-white p-5">
       <header className="flex items-baseline justify-between gap-2">
         <h3 className="m-0 text-lg font-semibold text-typography-primary">
           <span className="mr-2 text-xs tabular-nums text-typography-secondary">{row.code}</span>
           {row.title}
         </h3>
-        {section === "awaitingReview" && (
+        {awaitingReview && (
           <span className="shrink-0 text-xs tabular-nums text-typography-secondary">
             {copy.triage.waiting(days)}
           </span>

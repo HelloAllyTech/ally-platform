@@ -13,7 +13,6 @@ import {
 import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefReleasesService } from './debrief-releases.service';
-import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { PermissionsService } from '../../authorization/service/permissions.service';
@@ -93,7 +92,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
     private readonly autonomy: DebriefAutonomyService,
     private readonly agreement: DebriefAgreementService,
     private readonly config: AppConfigService,
-    private readonly moduleRef: ModuleRef,
     @Optional() private readonly notifier?: DebriefNotifier,
     @Optional() private readonly releasesView?: DebriefReleasesService,
   ) {}

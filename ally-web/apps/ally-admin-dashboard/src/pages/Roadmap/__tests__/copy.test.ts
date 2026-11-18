@@ -7,7 +7,10 @@ import {
   panelTabForStage,
   personLabel,
   quietLine,
+  simpleStageOfShown,
   statusLine,
+  timelineAnchors,
+  timelineLabel,
   trackerModel,
   whyHereLine,
 } from "../utils/copy";
@@ -20,6 +23,7 @@ const row = (overrides: Partial<RoadmapItemRow>): RoadmapItemRow => ({
   code: "OPP-1",
   title: "Streak",
   shownStage: "submitted",
+  stage: "backlog",
   statusParts: { stage: "submitted", since: "2026-11-03T10:00:00Z", votes: 6 },
   author: ravi,
   votes: 6,
@@ -45,7 +49,7 @@ describe("statusLine", () => {
           lead: priya,
         }),
       ),
-    ).toBe("Priya leads · planning not started");
+    ).toBe("Priya builds it · planning not started");
     expect(
       statusLine(
         row({
@@ -53,7 +57,7 @@ describe("statusLine", () => {
           statusParts: { stage: "accepted", leadUserId: null, needsLead: true, votes: 1 },
         }),
       ),
-    ).toBe("Needs a lead");
+    ).toBe("Needs planning");
   });
 
   it("covers planning's three steps", () => {
@@ -134,7 +138,7 @@ describe("statusLine", () => {
   });
 
   it("falls back to the stage word for status parts it doesn't know", () => {
-    expect(statusLine(row({ shownStage: "shipped", statusParts: { odd: true } }))).toBe("Shipped");
+    expect(statusLine(row({ shownStage: "shipped", statusParts: { odd: true } }))).toBe("Released");
   });
 });
 
@@ -161,25 +165,32 @@ describe("whyHereLine", () => {
 });
 
 describe("trackerModel", () => {
-  it("marks steps before the current one done", () => {
-    const model = trackerModel("planning");
+  it("has three steps in the lifecycle's words: To do, Building, Released", () => {
+    const model = trackerModel("being_built");
     expect(model.kind).toBe("steps");
     if (model.kind !== "steps") return;
-    expect(model.steps.map(s => s.state)).toEqual(["done", "done", "current", "todo", "todo"]);
-    expect(model.steps.map(s => s.label)).toEqual([
-      "Submitted",
-      "Accepted",
-      "Planning",
-      "Building",
-      "Shipped",
-    ]);
+    expect(model.steps.map(s => s.state)).toEqual(["done", "current", "todo"]);
+    expect(model.steps.map(s => s.label)).toEqual(["To do", "Building", "Released"]);
   });
-  it("replaces the tracker for Declined and Closed", () => {
+  it("reads the finer stages as the stage they fall in: To do until a builder is assigned", () => {
+    const building = trackerModel("building");
+    expect(building.kind === "steps" && building.currentIndex).toBe(1);
+    for (const shown of ["submitted", "accepted", "planning"] as const) {
+      const model = trackerModel(shown);
+      expect(model.kind === "steps" && model.currentIndex).toBe(0);
+    }
+    expect(simpleStageOfShown("planning", true)).toBe("being_built");
+    expect(simpleStageOfShown("accepted", true)).toBe("being_built");
+    expect(simpleStageOfShown("closed")).toBe("declined");
+  });
+  it("replaces the tracker for Declined, Closed and Draft", () => {
     expect(trackerModel("declined")).toEqual({
       kind: "terminal",
       stage: "declined",
       label: "Declined",
     });
+    expect(trackerModel("closed")).toMatchObject({ kind: "terminal", stage: "declined" });
+    expect(trackerModel("draft")).toMatchObject({ kind: "terminal", stage: "draft" });
   });
 });
 
@@ -190,13 +201,135 @@ describe("people and quiet line", () => {
   });
   it("says who decides instead of greying out a button", () => {
     expect(quietLine({ shownStage: "planning", lead: priya })).toBe(
-      "Priya leads this idea and decides what happens next.",
+      "Priya builds this idea and marks it released when it ships.",
     );
-    expect(quietLine({ shownStage: "submitted" })).toMatch(/Owner reviews/);
+    expect(quietLine({ shownStage: "submitted" })).toMatch(/Owner expands/);
+    expect(quietLine({ shownStage: "planning" })).toMatch(/An Owner is planning/);
+    expect(
+      quietLine({
+        shownStage: "planning",
+        statusParts: {
+          stage: "planning",
+          step: "prd",
+          leadUserId: null,
+          prdPercent: 40,
+          openQuestions: 0,
+          designAwaitingApproval: false,
+          planClosed: { byUserId: 1, at: "2026-11-18T10:00:00Z" },
+        },
+      }),
+    ).toMatch(/assigns a builder next/);
   });
   it("opens the side panel on the tab matching the stage", () => {
     expect(panelTabForStage("submitted")).toBe("summary");
     expect(panelTabForStage("building")).toBe("build");
     expect(panelTabForStage("shipped")).toBe("ship");
+  });
+});
+
+describe("lifecycle 2026-11-18: status line and timeline", () => {
+  const planning = (over: Record<string, unknown>) =>
+    row({
+      shownStage: "planning",
+      statusParts: {
+        stage: "planning",
+        step: "prd",
+        leadUserId: null,
+        prdPercent: 40,
+        openQuestions: 0,
+        designAwaitingApproval: false,
+        ...over,
+      },
+    });
+
+  it("says an Owner is planning it, then that it needs a builder once the plan is closed", () => {
+    expect(statusLine(planning({}))).toBe("Being planned · PRD 40%");
+    expect(statusLine(planning({ planClosed: { byUserId: 1, at: "x" } }))).toBe(
+      "Plan closed · needs a builder",
+    );
+  });
+
+  it("names the builder and how it is built once one is assigned", () => {
+    expect(statusLine({ ...planning({ leadUserId: 2, buildMode: "outside" }), lead: priya })).toBe(
+      "Priya builds it · Outside Builder · PRD 40%",
+    );
+  });
+
+  it("prompts, never claims, Released when the work is live", () => {
+    expect(
+      statusLine(
+        row({
+          shownStage: "building",
+          statusParts: {
+            stage: "building",
+            where: "here",
+            leadUserId: 2,
+            externalBuild: null,
+            repos: [],
+            openPrs: [],
+            mergedPrs: 1,
+            waitingForPr: false,
+            releasing: false,
+            heldReason: null,
+            workLive: true,
+          },
+        }),
+      ),
+    ).toBe("Live in production · waiting to be marked released");
+  });
+
+  it("words every milestone, and skips a kind it doesn't know", () => {
+    const owner = { id: 1, name: "Sandeep", role: "owner" as const };
+    expect(
+      timelineLabel({
+        at: "x",
+        kind: "lead_assigned",
+        actor: owner,
+        detail: { from: null, to: priya },
+      }),
+    ).toBe("Sandeep assigned Priya to build it");
+    expect(
+      timelineLabel({
+        at: "x",
+        kind: "lead_assigned",
+        actor: owner,
+        detail: { from: ravi, to: priya },
+      }),
+    ).toBe("Sandeep handed it from Ravi to Priya");
+    expect(timelineLabel({ at: "x", kind: "plan_closed", actor: owner })).toBe(
+      "Sandeep closed the plan",
+    );
+    expect(
+      timelineLabel({
+        at: "x",
+        kind: "build_mode_set",
+        actor: priya,
+        detail: { from: null, to: "builder_agent" },
+      }),
+    ).toBe("Priya: built with Builder agent");
+    expect(timelineLabel({ at: "x", kind: "marked_released", actor: priya })).toBe(
+      "Priya marked it released",
+    );
+    expect(timelineLabel({ at: "x", kind: "unheard_of" as never, actor: priya })).toBeNull();
+  });
+
+  it("places each milestone before the first message at or after it, the rest at the end", () => {
+    const feed = [{ id: "m1" }, { id: "m2" }];
+    const at: Record<string, string> = {
+      m1: "2026-11-02T00:00:00Z",
+      m2: "2026-11-05T00:00:00Z",
+    };
+    const anchors = timelineAnchors(
+      [
+        { at: "2026-11-01T00:00:00Z", kind: "submitted", actor: null },
+        { at: "2026-11-03T00:00:00Z", kind: "plan_closed", actor: null },
+        { at: "2026-11-09T00:00:00Z", kind: "marked_released", actor: null },
+      ],
+      feed,
+      id => at[id],
+    );
+    expect(anchors.get("m1")?.map(e => e.kind)).toEqual(["submitted"]);
+    expect(anchors.get("m2")?.map(e => e.kind)).toEqual(["plan_closed"]);
+    expect(anchors.get(null)?.map(e => e.kind)).toEqual(["marked_released"]);
   });
 });

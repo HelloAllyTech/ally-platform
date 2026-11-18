@@ -20,6 +20,7 @@ import {
   profileFacts,
   profileSentence,
 } from "./agentLogReadable";
+import { Disclosure } from "../consoleUi";
 import { entryName, plainText } from "./agentLogText";
 
 /**
@@ -352,7 +353,7 @@ const QualityFound: React.FC<{ output: Obj }> = ({ output }) => {
     <div className="flex items-center gap-4" data-testid="found-quality">
       <span className="font-secondary text-[32px] leading-none">{overall ?? "—"}</span>
       <p className="m-0 text-[13px] text-neutral-800">
-        {fails.length ? `Hard fails: ${fails.join(", ")}.` : "No hard fails."}
+        {fails.length ? `Serious problems: ${fails.join(", ")}.` : "No serious problems."}
         {lowest ? ` Lowest: ${lowest.name} ${lowest.score}.` : ""}
         {str(output.note) ? ` ${output.note}` : ""} Scored by a separate AI reviewer that never sees
         how the debrief was written.
@@ -382,34 +383,29 @@ const FindingsFound: React.FC<{ output: Obj }> = ({ output }) => (
  * Closed by default; the card itself shows only what a person would act on.
  */
 export const Details: React.FC<{ rows: DetailRow[] }> = ({ rows }) => {
-  const [open, setOpen] = useState(false);
   if (!rows.length) return null;
   return (
-    <div className="flex flex-col gap-1.5" data-testid="log-details">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(o => !o)}
-        className="self-start border-0 bg-transparent p-0 text-xs text-primary-500 hover:underline"
+    <Disclosure
+      label="Show details ▾"
+      openLabel="Hide details ▴"
+      className="flex flex-col gap-1.5"
+      testId="log-details"
+      buttonClassName="self-start border-0 bg-transparent p-0 text-xs text-primary-500 hover:underline"
+    >
+      <dl
+        className="m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-xs text-neutral-700"
+        data-testid="log-details-rows"
       >
-        {open ? "Hide details ▴" : "Show details ▾"}
-      </button>
-      {open && (
-        <dl
-          className="m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-xs text-neutral-700"
-          data-testid="log-details-rows"
-        >
-          {rows.map((r, i) => (
-            <React.Fragment key={`${r.label}-${i}`}>
-              <dt className="text-neutral-600">{r.label}</dt>
-              <dd className="m-0 min-w-0 truncate" title={r.value}>
-                {r.value}
-              </dd>
-            </React.Fragment>
-          ))}
-        </dl>
-      )}
-    </div>
+        {rows.map((r, i) => (
+          <React.Fragment key={`${r.label}-${i}`}>
+            <dt className="text-neutral-600">{r.label}</dt>
+            <dd className="m-0 min-w-0 truncate" title={r.value}>
+              {r.value}
+            </dd>
+          </React.Fragment>
+        ))}
+      </dl>
+    </Disclosure>
   );
 };
 

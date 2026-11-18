@@ -12,6 +12,7 @@ import {
   Put,
   Query,
   UseGuards,
+  GoneException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -65,6 +66,7 @@ import { RoadmapSplitMergeService } from '../service/roadmap-split-merge.service
 import { RoadmapBuilderService } from '../service/roadmap-builder.service';
 import { RoadmapBoardService } from '../service/roadmap-board.service';
 import { RoadmapAccessService } from '../service/roadmap-access.service';
+import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 
 /**
@@ -89,6 +91,7 @@ export class RoadmapOpportunityController {
     private readonly access: RoadmapAccessService,
     private readonly multiplierService: RoadmapMultiplierService,
     private readonly planAccess: PlanAccessService,
+    private readonly planSettings: PlanSettingsService,
   ) {}
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
@@ -288,6 +291,14 @@ export class RoadmapOpportunityController {
     // Filing is the Idea role's (rev 5.2 §B.12); an org-restricted admin is
     // a Viewer at most, so it is withheld from them.
     await this.planAccess.assertIdeas(user.id);
+    // With the Roadmap on, ideas are filed only through a draft and its
+    // interview (lifecycle 2026-11-18): this older door skipped the readiness
+    // check and left the idea unreviewed. Bug reports have their own route.
+    if ((await this.planSettings.getRoadmapV2()).enabled) {
+      throw new GoneException(
+        'Ideas are filed from a draft now: start one with New idea, finish it in the interview, then submit it.',
+      );
+    }
     return this.opportunityService.create(user.id, dto, {
       canManage: await this.access.canManage(user.id),
       enforceReadiness: true,

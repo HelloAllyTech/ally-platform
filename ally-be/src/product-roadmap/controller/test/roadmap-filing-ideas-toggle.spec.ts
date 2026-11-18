@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, GoneException } from '@nestjs/common';
 import { RoadmapOpportunityController } from '../roadmap-opportunity.controller';
 import { RoadmapAdminController } from '../roadmap-admin.controller';
 import { RoadmapIdeaDraftController } from '../roadmap-idea-draft.controller';
@@ -26,6 +26,9 @@ describe('Filing doors require a Roadmap role', () => {
   };
   const transcription = { transcribe: jest.fn() };
   const access = { canManage: jest.fn(async () => false) };
+  const planSettings = {
+    getRoadmapV2: jest.fn(async () => ({ enabled: false })),
+  };
 
   const opportunity = new RoadmapOpportunityController(
     opportunityService as never,
@@ -36,6 +39,7 @@ describe('Filing doors require a Roadmap role', () => {
     access as never,
     {} as never,
     planAccess as never,
+    planSettings as never,
   );
   const admin = new RoadmapAdminController(
     {} as never,
@@ -98,5 +102,14 @@ describe('Filing doors require a Roadmap role', () => {
     await ideaDrafts.list(user);
     await ideaDrafts.remove(user, 'id');
     expect(planAccess.assertIdeas).not.toHaveBeenCalled();
+  });
+
+  it('refuses to file an idea through the old door while the Roadmap is on: ideas come from drafts', async () => {
+    planAccess.assertIdeas.mockResolvedValueOnce(undefined as never);
+    planSettings.getRoadmapV2.mockResolvedValueOnce({ enabled: true });
+    await expect(opportunity.create(user, {} as never)).rejects.toBeInstanceOf(
+      GoneException,
+    );
+    expect(opportunityService.create).not.toHaveBeenCalled();
   });
 });

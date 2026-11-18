@@ -2,7 +2,7 @@
 title: Architecture & Data Flow
 tags: [platform, architecture, integration, queues, storage]
 summary: How Ally's services connect — data flow, integration points, message queues, storage, and authentication across the platform.
-last_reconciled: 2026-10-21
+last_reconciled: 2026-11-18
 ---
 
 # Architecture & Data Flow
@@ -92,12 +92,12 @@ The client surfaces — the helpline and admin dashboards in [ally-web](../repos
 
 ## Deployment
 
-- **CI/CD** — GitHub Actions; each service's production release is a manually dispatched workflow that builds and tags an image.
+- **CI/CD** — GitHub Actions in `ally-platform`. Each deployable has one manually dispatched `production-release-*.yaml` workflow that validates a per-service tag (`be-v*`, `ai-v*`, `learn-v*`, `frontend-v*`), tests, builds and deploys. See [Release Process](../contributing/release-process.md).
 - **Container registry** — AWS ECR.
-- **Production** — ally-be, ally-ai and ally-ai-learn run as AWS ECS services. A release builds the image, runs ally-be's database migrations as a one-off ECS task, then updates the service. These deploys come from each code repo's own workflow, not from `infra`.
-- **Dashboards** — the helpline and admin apps are static builds synced to S3 and served through CloudFront.
+- **Production** — since the 2026-11-07 cutover, ally-be, ally-ai, ally-ai-learn and both dashboards run in Incus containers on Hetzner baremetal managed by [infra](../repos/infra.md). A release deploys through the `deploy-metal01` composite action, which runs that service's Ansible playbook from the private infra repo. **Database migrations run inside the playbook**; there is no separate migration job. The workflow then checks the service's health endpoint.
+- **Dashboards** — the helpline and admin apps are built once per `frontend-v*` release and served as static sites from the same stack (admin under `/admin/`), deployed by their own playbooks. The manual `deploy-*.yml` workflows predate the cutover: they still deploy to AWS ECS (services) and S3 + CloudFront (dashboards), so their `prd` option no longer reaches production.
 - **Mobile** — ally-mobile builds and store releases run from GitHub Actions workflows.
-- **infra** — Ansible and Terraform provision Hetzner baremetal split into Incus containers (see [infra](../repos/infra.md)); that fleet hosts the self-hosted tools (PostHog and Metabase analytics, the locale service, CI), not the core services.
+- **Self-hosted tools** — the same infra fleet hosts PostHog, Metabase, the locale service and CI.
 - **DNS / TLS** — Caddy with automatic HTTPS on the infra-managed hosts.
 
 ## Shared Environment Variables

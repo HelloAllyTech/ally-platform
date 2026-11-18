@@ -96,6 +96,8 @@ function build(
     roles?: Record<number, string>;
     decisions?: Record<string, unknown>[];
     reads?: { itemId: string }[];
+    events?: Record<string, unknown>[];
+    origin?: Record<string, unknown>;
   } = {},
 ) {
   const roleOf = jest.fn(
@@ -110,6 +112,10 @@ function build(
         return [1, 2, 3, 9, ME].map((id) => ({ id, name: `Person ${id}` }));
       }
       if (sql.includes('FROM "roadmap_item_reads"')) return opts.reads ?? [];
+      if (sql.includes('FROM "plan_events"')) return opts.events ?? [];
+      if (sql.includes(`plan->>'draftText'`)) {
+        return opts.origin ? [opts.origin] : [];
+      }
       if (sql.includes('AS shipped')) return [{ userId: 1, shipped: '3' }];
       if (sql.includes('SELECT "createdBy" FROM "builder_sessions"')) {
         return [{ createdBy: 1 }];
@@ -282,7 +288,7 @@ describe('RoadmapItemReadService.list', () => {
     });
   });
 
-  it('builds To triage for an Owner: review, a lead to pick, idle leads', async () => {
+  it('builds To triage for an Owner: one Backlog list, never an idea someone leads', async () => {
     const pending = item(1, {}, { reviewState: 'pending' });
     const noLead = item(2, { builderSessionId: 's2' }, planSession('s2'));
     const idle = item(
@@ -312,15 +318,56 @@ describe('RoadmapItemReadService.list', () => {
     )) as unknown as {
       sections: Record<string, { code: string; whyHere?: any }[]>;
     };
-    expect(result.sections.awaitingReview.map((r) => r.code)).toEqual([
+    // One Backlog list: the unreviewed idea and the accepted one with no lead. The led ideas
+    // (idle or busy) are Being built: Leading shows them, To triage does not.
+    expect(Object.keys(result.sections)).toEqual(['backlog']);
+    expect(result.sections.backlog.map((r) => r.code).sort()).toEqual([
       'OPP-0001',
+      'OPP-0002',
     ]);
-    expect(result.sections.needsLead.map((r) => r.code)).toEqual(['OPP-0002']);
-    expect(result.sections.reassign.map((r) => r.code)).toEqual(['OPP-0003']);
-    expect(result.sections.reassign[0].whyHere).toEqual({
-      kind: 'reassign',
-      idleDays: 9,
+    const why = Object.fromEntries(
+      result.sections.backlog.map((r) => [r.code, r.whyHere?.kind]),
+    );
+    expect(why).toEqual({
+      'OPP-0001': 'awaitingReview',
+      'OPP-0002': 'needsLead',
     });
+  });
+
+  it('filters to the ideas the person leads, wrote, or that wait on them', async () => {
+    const mineAuthored = item(1, { createdBy: ME });
+    const ledByMe = item(
+      2,
+      { builderSessionId: 's2' },
+      planSession('s2', { leadUserId: ME, sessionPlanStage: 'prd' }),
+    );
+    const other = item(3);
+    const waiting = item(
+      4,
+      { builderSessionId: 's4' },
+      planSession('s4', { leadUserId: ME, sessionPlanStage: 'prd' }),
+    );
+    const { service } = build([mineAuthored, ledByMe, other, waiting], {
+      decisions: [
+        {
+          sessionId: 's4',
+          kind: 'question',
+          waitingSince: ago(1),
+          prompt: 'Which learners first?',
+        },
+      ],
+    });
+    const codes = async (q: Record<string, string>) =>
+      (
+        (await service.list(ME, parseItemQuery({ view: 'all', ...q }))) as {
+          rows: { code: string }[];
+        }
+      ).rows
+        .map((r) => r.code)
+        .sort();
+    expect(await codes({ wroteByMe: '1' })).toEqual(['OPP-0001']);
+    expect(await codes({ ledByMe: '1' })).toEqual(['OPP-0002', 'OPP-0004']);
+    expect(await codes({ needsYou: '1' })).toEqual(['OPP-0004']);
   });
 
   it('marks a row unread only when something happened since it was opened', async () => {
@@ -400,7 +447,8 @@ describe('RoadmapItemReadService.detail', () => {
       watchLevel: 'none',
     });
     expect(detail.can).toMatchObject({
-      vote: true,
+      // It has a builder, so its votes are locked (they lock once it leaves To do).
+      vote: false,
       answer: true,
       approveDesign: false,
       editTitle: false,
@@ -413,7 +461,7 @@ describe('RoadmapItemReadService.detail', () => {
     ]);
   });
 
-  it('gives the lead the design approval and the inline edits', async () => {
+  it('gives the assigned builder the design approval, but no edits: only an Owner edits a submitted idea', async () => {
     const { service } = build([planned()], { roles: { [ME]: 'builder' } });
     const fixtures = [
       item(
@@ -426,12 +474,73 @@ describe('RoadmapItemReadService.detail', () => {
     const detail = await lead.service.detail(ME, 'OPP-0001');
     expect(detail.can).toMatchObject({
       approveDesign: true,
-      editTitle: true,
-      editSummary: true,
+      editTitle: false,
+      editSummary: false,
       editLead: false,
       editMonth: false,
     });
     expect((await service.detail(ME, 'OPP-0001')).can.editTitle).toBe(false);
+  });
+
+  it('gives one history: where it started and every milestone, oldest first', async () => {
+    const fixtures = [
+      item(
+        1,
+        { builderSessionId: 's1' },
+        planSession('s1', { leadUserId: 9, sessionPlanStage: 'building' }),
+      ),
+    ];
+    const { service } = build(fixtures, {
+      origin: {
+        createdAt: '2026-11-01T09:00:00Z',
+        createdBy: 1,
+        captureMode: 'voice',
+        draftText: 'Learners lose their place after a break',
+      },
+      events: [
+        {
+          kind: 'lead_assigned',
+          actorUserId: 2,
+          detail: { from: 3, to: 9 },
+          at: '2026-11-05T10:00:00Z',
+        },
+        {
+          kind: 'filed',
+          actorUserId: 1,
+          detail: null,
+          at: '2026-11-02T09:00:00Z',
+        },
+        // A session made later for comments: not the submission, so not shown.
+        {
+          kind: 'filed',
+          actorUserId: 9,
+          detail: { by: 'conversation' },
+          at: '2026-11-03T09:00:00Z',
+        },
+        {
+          kind: 'plan_closed',
+          actorUserId: 2,
+          detail: null,
+          at: '2026-11-04T09:00:00Z',
+        },
+      ],
+    });
+    const detail = await service.detail(ME, 'OPP-0001');
+    expect(detail.origin).toMatchObject({
+      startedAt: '2026-11-01T09:00:00.000Z',
+      startedBy: { id: 1 },
+      captureMode: 'voice',
+      roughIdea: 'Learners lose their place after a break',
+    });
+    expect(detail.timeline.map((e) => e.kind)).toEqual([
+      'submitted',
+      'plan_closed',
+      'lead_assigned',
+    ]);
+    expect(detail.timeline[2]).toMatchObject({
+      actor: { id: 2 },
+      detail: { from: { id: 3 }, to: { id: 9 } },
+    });
   });
 
   it('shows a Viewer the board facts only (D2)', async () => {

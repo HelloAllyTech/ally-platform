@@ -232,7 +232,7 @@ export function diffSummary(diff: BundleDiff): string[] {
         : `Model · ${s.step}${s.field === 'backupModel' ? ' (backup)' : ''}`,
     );
   }
-  for (const r of diff.recipes) out.push(`Recipe · ${r.recipe}`);
+  for (const r of diff.recipes) out.push(`Debrief flow · ${r.recipe}`);
   if (diff.reply) out.push('Model · Ask Ally');
   if (diff.orchestrator) out.push('Orchestrator');
   return [...new Set(out)];

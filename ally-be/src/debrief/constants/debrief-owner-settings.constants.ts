@@ -171,6 +171,16 @@ export const OWNER_SETTINGS_SPEC = {
     budget: true,
     group: 'agent',
   },
+  // Agent logs keep each model call's exact input and reply, which hold learner quotes. The
+  // retention job (Settings › Schedules, shipped OFF) clears those two fields on rows older than
+  // this many days and keeps the tokens, cost, timing and step name.
+  agentLogRetentionDays: {
+    default: 90,
+    kind: 'int',
+    min: 7,
+    max: 3650,
+    group: 'agent',
+  },
   // Learner progress in debriefs. On by default: only
   // organisations switched on for the Debrief agent run it anyway. The card
   // ("Your last n sessions") shows every `progressCardEvery`th eligible

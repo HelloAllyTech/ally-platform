@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { Refresh } from "@icons";
 import { MotionConfig, motion } from "framer-motion";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button } from "@ally-ui-mono/ui-shared";
@@ -13,9 +13,10 @@ import {
   useRoadmapV2Prefetch,
   useSetRoadmapWatchMutation,
 } from "@api";
+import { useClaimCommandPaletteShortcut } from "@components/command-palette/CommandPaletteContext";
 import { ROUTES, en } from "@constants";
 import { useUser } from "@hooks";
-import type { RoadmapQueueSort, RoadmapQueueView, RoadmapSavedView } from "@types";
+import type { RoadmapQueueSort, RoadmapSavedView } from "@types";
 
 import { useReducedMotionPreference } from "../../motion";
 import { BottomSheet } from "./components/BottomSheet";
@@ -25,17 +26,21 @@ import {
   FilterSheet,
   useFilterOptions,
 } from "./components/FilterControls";
-import { ideaUrl } from "./components/IdeaControls";
 import { IdeaView } from "./components/IdeaView";
-import { NewIdeaButton } from "./components/NewIdeaButton";
 import { QueueList } from "./components/QueueList";
+import { QueueSortSelect } from "./components/QueueSortSelect";
+import { QueueTab, QueueTabs } from "./components/QueueTabs";
 import { QuickOpen } from "./components/QuickOpen";
-import { RoadmapHelpMenu, RoadmapRoleTabs } from "./components/RoadmapAreaNav";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
+import { RoadmapIconButton } from "./components/RoadmapIconButton";
+import { RoadmapTopNav } from "./components/RoadmapTopNav";
+import { SavedViewControls } from "./components/SavedViewControls";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
-import { SaveViewControls, SearchButton, SortSelect, ViewChips } from "./components/ViewBar";
+import { SearchButton } from "./components/ViewBar";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useQueueSavedViews } from "./hooks/useQueueSavedViews";
+import { useQueueTabOrder } from "./hooks/useQueueTabOrder";
+import { useQueueViewSorts } from "./hooks/useQueueViewSorts";
 import { hasReadingPane, useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
 import { isRoadmapEntry, useRoadmapJobTimer } from "./hooks/useRoadmapJobTimer";
 import { useRoadmapRealtime } from "./hooks/useRoadmapRealtime";
@@ -45,15 +50,18 @@ import { TriageView } from "./triage/TriageView";
 import { queueKeyAction, stepSelection } from "./utils/keyboard";
 import { ROADMAP_PREF_KEYS, readPref, writePref } from "./utils/prefs";
 import {
+  DEFAULT_VIEWS,
+  DEFAULT_VIEW_IDS,
+  DefaultViewId,
   QueueFilters,
   QueueState,
   decodeQueueState,
+  defaultSortFor,
   encodeQueueState,
   hasActiveFilters,
   removeChip,
   stateFromSavedView,
   toItemsQuery,
-  viewsForRole,
 } from "./utils/queueState";
 
 /**
@@ -65,7 +73,7 @@ import {
 export const RoadmapQueuePage: React.FC = () => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
-  const { role, can } = useRoadmapRole();
+  const { can } = useRoadmapRole();
   const { user } = useUser();
   const breakpoint = useRoadmapBreakpoint();
   const touch = breakpoint === "phone" || breakpoint === "tablet";
@@ -76,12 +84,11 @@ export const RoadmapQueuePage: React.FC = () => {
 
   const state = useMemo(
     () =>
-      decodeQueueState(searchParams, role, {
-        view: readPref<RoadmapQueueView | undefined>(ROADMAP_PREF_KEYS.lastView, undefined),
+      decodeQueueState(searchParams, {
+        view: readPref<string | undefined>(ROADMAP_PREF_KEYS.lastView, undefined),
       }),
-    [searchParams, role],
+    [searchParams],
   );
-
   const setState = useCallback(
     (next: QueueState, replace = true) => setSearchParams(encodeQueueState(next), { replace }),
     [setSearchParams],
@@ -92,29 +99,33 @@ export const RoadmapQueuePage: React.FC = () => {
   }, [state.view]);
 
   // ── data ────────────────────────────────────────────────────────────────────────────────────
+  // The sort in force: the URL's, else (on a default view) the one this person chose for it, else
+  // the view's own. A saved view keeps its sort in the view.
+  const sortPrefs = useQueueViewSorts();
+  const chosenSort = state.sort ?? (state.savedViewId ? undefined : sortPrefs.sortFor(state.view));
+  const currentSort: RoadmapQueueSort =
+    chosenSort ?? defaultSortFor(state.savedViewId ? "saved" : state.view);
+  const queryState = useMemo(() => ({ ...state, sort: chosenSort }), [state, chosenSort]);
+  // To do is where an Owner triages: its own list and tools, on a default view only.
+  const triageMode = state.view === "todo" && !state.savedViewId && !!can.review;
+
   const [cursor, setCursor] = useState<string | undefined>();
-  const baseQuery = useMemo(() => toItemsQuery(state), [state]);
+  // To do shows the whole Backlog (the triage list has no pages), the rest a page at a time.
+  const baseQuery = useMemo(
+    () => ({ ...toItemsQuery(queryState), ...(triageMode ? { limit: "200" } : {}) }),
+    [queryState, triageMode],
+  );
   const baseKey = JSON.stringify(baseQuery);
   useEffect(() => setCursor(undefined), [baseKey]);
   const query = useMemo(() => (cursor ? { ...baseQuery, cursor } : baseQuery), [baseQuery, cursor]);
   const { data, isLoading, isFetching, isError, refetch } = useGetRoadmapItemsQuery(query);
 
-  // The For you badge (Needs you) and the To triage count. Same cache entry as an unfiltered view.
-  const { data: forYou } = useGetRoadmapItemsQuery({ view: "for-you" });
-  const forYouCount =
-    forYou &&
-    "sections" in forYou &&
-    Array.isArray((forYou.sections as { needsYou?: unknown }).needsYou)
-      ? (forYou.sections as { needsYou: unknown[] }).needsYou.length
-      : undefined;
-  const { data: triage } = useGetRoadmapItemsQuery(
-    { view: "to-triage" },
-    { skip: role !== "owner" },
-  );
-  const triageCount = triage ? rowsOfItemsResponse(triage).length : undefined;
+  // The To do count on its tab: how many ideas are in the Backlog.
+  const { data: backlog } = useGetRoadmapItemsQuery({ view: "all", stage: "backlog" });
+  const todoCount = backlog && "total" in backlog ? backlog.total : undefined;
 
   const rows = useMemo(() => rowsOfItemsResponse(data), [data]);
-  const filterOptions = useFilterOptions(rows);
+  const filterOptions = useFilterOptions(rows, state.view !== "all" && !state.savedViewId);
   const saved = useQueueSavedViews(state, user?.id);
   const { presence } = useRoadmapRealtime({
     enabled: true,
@@ -154,7 +165,7 @@ export const RoadmapQueuePage: React.FC = () => {
 
   const openIdea = useCallback(
     (code: string) => {
-      const row = state.view === "for-you" ? rows.find(r => r.code === code) : undefined;
+      const row = state.filters.needsYou ? rows.find(r => r.code === code) : undefined;
       if (row?.whyHere?.kind === "agentQuestion") {
         jobs.start("answer_from_notification", { itemId: code, restart: true });
       }
@@ -176,6 +187,8 @@ export const RoadmapQueuePage: React.FC = () => {
   }, [setState, state]);
 
   // ── keyboard (§4.10) ────────────────────────────────────────────────────────────────────────
+  // ⌘K here is the Queue's own quick open, not the global page palette.
+  useClaimCommandPaletteShortcut();
   const [quickOpen, setQuickOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -184,7 +197,6 @@ export const RoadmapQueuePage: React.FC = () => {
   const overlayOpen =
     quickOpen || shortcutsOpen || filterSheetOpen || !!actionSheetFor || triageOverlay;
   // To triage, for an Owner, is the triage screen (§4.6): its own rows, keys and Summary pane.
-  const triageMode = state.view === "to-triage" && !!can.review;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -264,45 +276,65 @@ export const RoadmapQueuePage: React.FC = () => {
       .then(() => toast.success(copy.actions.watchLevel(copy.actions.watchLevels.all)))
       .catch(() => toast.error(copy.actions.watchFailed));
   };
-  const onCopyLink = (code: string) => {
-    navigator.clipboard
-      .writeText(ideaUrl(code))
-      .then(() => toast.success(copy.actions.copied))
-      .catch(() => toast.error(copy.actions.copyFailed));
-  };
 
-  const views = viewsForRole(role);
-  const setView = (view: RoadmapQueueView) =>
-    setState({ view, filters: {}, open: state.open }, false);
+  const setView = (view: DefaultViewId) => setState({ view, filters: {}, open: state.open }, false);
   const setFilters = (filters: QueueFilters) => setState({ ...state, filters });
-  const setSort = (sort: RoadmapQueueSort) => setState({ ...state, sort });
+  const setSort = (sort: RoadmapQueueSort) => {
+    if (state.savedViewId) {
+      setState({ ...state, sort });
+    } else {
+      // A default view remembers its sort for you; the URL stays plain.
+      void sortPrefs.setSortFor(state.view, sort);
+      if (state.sort) setState({ ...state, sort: undefined });
+    }
+  };
   const selectSaved = (view: RoadmapSavedView) =>
     setState({
-      ...stateFromSavedView(view.state.queue ?? {}, role, view.id),
+      ...stateFromSavedView(view.state.queue ?? {}, view.id),
       open: state.open,
     });
 
+  // Tabs: the five default views, then the person's own, in the order they keep.
+  const tabLookup = useMemo(() => {
+    const map = new Map<string, QueueTab>();
+    DEFAULT_VIEW_IDS.forEach(id =>
+      map.set(id, {
+        id,
+        label: copy.views[id],
+        help: copy.viewsHelp[id],
+        badge: id === "todo" ? todoCount : undefined,
+      }),
+    );
+    saved.views.forEach(view => map.set(view.id, { id: view.id, label: view.name }));
+    return map;
+  }, [copy.views, copy.viewsHelp, saved.views, todoCount]);
+  const { views: tabIds, canReorder, reorder } = useQueueTabOrder([...tabLookup.keys()]);
+  const tabs = tabIds.map(id => tabLookup.get(id)!).filter(Boolean);
+  const onSelectTab = (id: string) => {
+    const view = saved.views.find(v => v.id === id);
+    if (view) selectSaved(view);
+    else setView(id as DefaultViewId);
+  };
+
   const filtered = hasActiveFilters(state.filters);
-  const showSave = filtered || !!state.sort || saved.isDirty;
+  // Something to save as a new view: filters, or a sort that isn't the view's own. On a saved view
+  // the controls offer Update instead once it has changed.
+  const canSaveAsView =
+    !state.savedViewId && (filtered || currentSort !== DEFAULT_VIEWS[state.view].sort);
 
   const sortControl = (
-    <SortSelect id="roadmap-queue-sort" view={state.view} sort={state.sort} onChange={setSort} />
+    <QueueSortSelect id="roadmap-queue-sort" sort={currentSort} onChange={setSort} />
   );
 
   // ── render ──────────────────────────────────────────────────────────────────────────────────
   const viewBar = (
     <div className="flex flex-col gap-2 border-b border-border-light px-4 py-2">
       <div className="flex items-center gap-2">
-        <ViewChips
-          views={views}
-          active={state.view}
-          activeSavedViewId={state.savedViewId}
-          savedChips={saved.chips}
-          savedOverflow={saved.overflow}
-          forYouCount={forYouCount}
-          triageCount={triageCount}
-          onSelectView={setView}
-          onSelectSaved={selectSaved}
+        <QueueTabs
+          tabs={tabs}
+          active={state.savedViewId ?? state.view}
+          onSelect={onSelectTab}
+          onReorder={canReorder ? reorder : undefined}
           scroll={touch}
         />
         {!touch && (
@@ -322,17 +354,12 @@ export const RoadmapQueuePage: React.FC = () => {
           >
             {copy.mobile.filterSort}
           </button>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            aria-label={copy.refresh}
-            className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded hover:bg-neutral-100"
-          >
+          <RoadmapIconButton label={copy.refresh} onClick={() => void refresh()} large>
             <Refresh size={18} aria-hidden />
-          </button>
+          </RoadmapIconButton>
         </div>
       )}
-      {(filtered || showSave || saved.active) && (
+      {(filtered || canSaveAsView || saved.active) && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <FilterChips
             filters={state.filters}
@@ -340,19 +367,22 @@ export const RoadmapQueuePage: React.FC = () => {
             onRemove={chip => setFilters(removeChip(state.filters, chip))}
             onClear={() => setFilters({})}
           />
-          <SaveViewControls
-            visible={showSave}
-            activeName={saved.active?.name}
-            canUpdate={saved.canUpdate && saved.isDirty}
-            canPin={!!can.pinView}
-            activePinned={saved.active?.pinned}
+          <SavedViewControls
+            canSaveAsView={canSaveAsView}
+            active={saved.active}
+            isDirty={saved.isDirty}
             isSaving={saved.isSaving}
             onSave={async name => {
               const created = await saved.save(name);
               if (created) setState({ ...state, savedViewId: created.id });
             }}
             onUpdate={() => void saved.update()}
-            onTogglePin={() => saved.active && void saved.togglePin(saved.active)}
+            onRename={saved.rename}
+            onDelete={async view => {
+              const ok = await saved.remove(view);
+              if (ok && state.savedViewId === view.id) setView("all");
+              return ok;
+            }}
           />
         </div>
       )}
@@ -390,7 +420,7 @@ export const RoadmapQueuePage: React.FC = () => {
         </div>
       )}
       <QueueList
-        view={state.view}
+        view="all"
         data={data}
         isLoading={isLoading}
         isFetching={isFetching}
@@ -411,7 +441,6 @@ export const RoadmapQueuePage: React.FC = () => {
         onOpen={openIdea}
         onMarkRead={onMarkRead}
         onWatch={onWatch}
-        onCopyLink={onCopyLink}
         onLongPress={code => setActionSheetFor(code)}
         onPrefetch={code => prefetch(code)}
       />
@@ -422,34 +451,12 @@ export const RoadmapQueuePage: React.FC = () => {
   return (
     <MotionConfig reducedMotion={reduced ? "always" : "user"}>
       <div className="flex h-full min-h-0 flex-col bg-white">
-        <header className="flex items-center justify-between gap-2 px-4 pb-1 pt-3">
-          <div className="flex min-w-0 items-baseline gap-4">
-            <h1 className="text-xl font-semibold text-typography-primary">{copy.title}</h1>
-            {!isPhone && (
-              <nav aria-label={copy.title} className="flex items-center gap-3 text-sm">
-                <span className="font-semibold text-typography-primary" aria-current="page">
-                  {copy.mobile.queue}
-                </span>
-                <Link
-                  to={ROUTES.ROADMAP_DRAFTS}
-                  className="text-typography-secondary hover:underline"
-                >
-                  {copy.mobile.drafts}
-                </Link>
-                <Link
-                  to={ROUTES.ROADMAP_BUGS}
-                  className="text-typography-secondary hover:underline"
-                >
-                  {copy.mobile.bugs}
-                </Link>
-                <RoadmapRoleTabs role={role} />
-                <RoadmapHelpMenu />
-              </nav>
-            )}
-          </div>
-          {!isPhone && <NewIdeaButton />}
-          {isPhone && <SearchButton compact onClick={() => setQuickOpen(true)} />}
-        </header>
+        {isPhone && (
+          <RoadmapTopNav
+            phone
+            phoneTrailing={<SearchButton compact onClick={() => setQuickOpen(true)} />}
+          />
+        )}
 
         {viewBar}
 
@@ -465,6 +472,11 @@ export const RoadmapQueuePage: React.FC = () => {
             onOpen={openIdea}
             onVisibleCodes={onVisibleCodes}
             onOverlay={setTriageOverlay}
+            onLoadMore={
+              data && "rows" in data && data.nextCursor
+                ? () => setCursor((data as { nextCursor?: string }).nextCursor)
+                : undefined
+            }
           />
         ) : withPane ? (
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,2fr)_3fr]">
@@ -479,7 +491,6 @@ export const RoadmapQueuePage: React.FC = () => {
                   presence={presence}
                   headingRef={paneHeadingRef}
                   onClose={closePane}
-                  onOpenFull={() => navigate(ROUTES.ROADMAP_IDEA(state.open!))}
                 />
               ) : (
                 <p className="p-6 text-sm text-typography-secondary">{copy.readingPaneEmpty}</p>
@@ -490,16 +501,14 @@ export const RoadmapQueuePage: React.FC = () => {
           list
         )}
 
-        {isPhone && (
-          <RoadmapBottomBar hidden={barHidden || keyboardInset > 0} forYouCount={forYouCount} />
-        )}
+        {isPhone && <RoadmapBottomBar hidden={barHidden || keyboardInset > 0} />}
 
         <QuickOpen
           open={quickOpen}
           onClose={() => setQuickOpen(false)}
           onOpenIdea={openIdea}
-          onOpenView={setView}
-          views={views}
+          onOpenView={id => setView(id as DefaultViewId)}
+          views={DEFAULT_VIEW_IDS}
           fullScreen={isPhone}
         />
         <ShortcutsDialog
@@ -528,7 +537,6 @@ export const RoadmapQueuePage: React.FC = () => {
               {[
                 { label: copy.row.openRow, run: () => openIdea(actionSheetFor) },
                 { label: copy.row.watch, run: () => onWatch(actionSheetFor) },
-                { label: copy.row.copyLink, run: () => onCopyLink(actionSheetFor) },
               ].map(action => (
                 <Button
                   key={action.label}

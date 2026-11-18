@@ -1,8 +1,9 @@
 import React, { useMemo, useRef, useState } from "react";
 
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
-import { Button, Tooltip } from "@ally-ui-mono/ui-shared";
+import { Button, TextArea, Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon } from "@assets";
 import { en } from "@constants";
 import type { RoadmapItemDetail, RoadmapPersonRef } from "@types";
@@ -10,6 +11,7 @@ import type { RoadmapItemDetail, RoadmapPersonRef } from "@types";
 import { useRoadmapPresence, useTypingIn } from "./presenceContext";
 import { PendingAnswers } from "./QuestionCard";
 import { SessionAnswers } from "./useSessionAnswers";
+import { useOpenRoadmapConversationMutation } from "../../../api/roadmapV2Flow";
 import { fadeUpVariants, motionTransition, useReducedMotionPreference } from "../../../motion";
 import { CodeText } from "../components/CodeChip";
 import { DictationButton } from "../components/DictationButton";
@@ -17,6 +19,39 @@ import { typeInText } from "../hooks/useDictation";
 import { personLabel } from "../utils/copy";
 
 import type { RoadmapConversationPost } from "../../../types/roadmapV2Flow";
+
+/** Opens the conversation on an older idea that has none (it was filed before ideas had one). */
+export const OpenConversationButton: React.FC<{ code: string }> = ({ code }) => {
+  const copy = en.roadmapV2.session;
+  const [open, { isLoading }] = useOpenRoadmapConversationMutation();
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Button
+        kind="tertiary"
+        size="sm"
+        disabled={isLoading}
+        onClick={async () => {
+          try {
+            await open(code).unwrap();
+          } catch {
+            toast.error(copy.openConversationFailed);
+          }
+        }}
+      >
+        {copy.openConversation}
+      </Button>
+      <Tooltip label={copy.openConversationHelp} align="top">
+        <button
+          type="button"
+          className="inline-flex cursor-pointer items-center"
+          aria-label={copy.openConversationHelp}
+        >
+          <TooltipIcon />
+        </button>
+      </Tooltip>
+    </span>
+  );
+};
 
 /** The @word being typed at the caret, if any: "@pri" → { query: "pri", start }. */
 export const mentionAt = (text: string, caret: number): { query: string; start: number } | null => {
@@ -88,6 +123,10 @@ export const CommentBox: React.FC<CommentBoxProps> = ({
         : [],
     [mention, people],
   );
+  // An older idea with no conversation yet: offer to open one, so it can take comments too.
+  if (item.can?.comment && !item.sessionId && item.shownStage !== "draft") {
+    return <OpenConversationButton code={item.code} />;
+  }
   const canComment = !!item.can?.comment && session.enabled;
   if (!canComment) return null;
 
@@ -118,12 +157,11 @@ export const CommentBox: React.FC<CommentBoxProps> = ({
   return (
     <div className="flex flex-col gap-1">
       <PendingAnswers pending={pending} onRetry={session.retry} />
-      <div className="relative flex items-end gap-2 rounded border border-border-light p-2 focus-within:border-primary-600">
-        <label className="sr-only" htmlFor={`roadmap-comment-${item.code}`}>
-          {copy.commentLabel}
-        </label>
-        <textarea
+      <div className="relative flex flex-col gap-2">
+        <TextArea
           id={`roadmap-comment-${item.code}`}
+          labelText={copy.commentLabel}
+          hideLabel
           ref={ref}
           rows={large ? 4 : 1}
           value={text}
@@ -160,17 +198,18 @@ export const CommentBox: React.FC<CommentBoxProps> = ({
               send();
             }
           }}
-          className="min-h-10 flex-1 resize-none bg-transparent px-1 text-base outline-none"
         />
-        <DictationButton
-          code={item.code}
-          large={large}
-          boxLabel={copy.commentLabel}
-          onText={words => typeInText(text, words, setText, reduced)}
-        />
-        <Button kind="primary" size={large ? "lg" : "sm"} onClick={send} disabled={!text.trim()}>
-          {copy.commentSend}
-        </Button>
+        <div className="flex items-center justify-end gap-2">
+          <DictationButton
+            code={item.code}
+            large={large}
+            boxLabel={copy.commentLabel}
+            onText={words => typeInText(text, words, setText, reduced)}
+          />
+          <Button kind="primary" size={large ? "lg" : "sm"} onClick={send} disabled={!text.trim()}>
+            {copy.commentSend}
+          </Button>
+        </div>
         {matches.length > 0 && (
           <ul
             id={listId}

@@ -9,7 +9,6 @@ import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
 import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import { withPinnedPrompts } from '../util/debrief-releases.util';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_PROMPT_CODES,
   DEBRIEF_SEED_BUNDLE,
@@ -24,6 +23,7 @@ import {
   orchestratorModels,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   DebriefRunArm,
@@ -54,6 +54,10 @@ import {
 import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefFrameworkService } from './debrief-framework.service';
 import { resolveRiskCue } from '../util/debrief-risk-cue.util';
+import { checkTransition } from '../util/debrief-run-status.util';
+import { Degraded } from '../util/debrief-degraded.util';
+import { canonicalHash } from '../../llm-agent/harness/release/canonical-hash.util';
+import { DEBRIEF_CONTRACT_VERSION } from '../util/debrief-graph-contract.util';
 import {
   DataProvider,
   debriefDataProviders,
@@ -243,6 +247,7 @@ export class DebriefRunnerService {
   /** The GA bundle, or the seed when GA is missing or does not validate. */
   async resolveRelease(
     release?: AgentRelease | null,
+    degraded?: Degraded,
   ): Promise<{ release: AgentRelease | null; bundle: DebriefBundle }> {
     const r = release ?? (await this.releases.getGa(DEBRIEF_AGENT_KEY));
     const problems = r
@@ -253,9 +258,10 @@ export class DebriefRunnerService {
       // write the release runs with what it has recorded so far.
       const pins = r.id
         ? await this.pinPrompts(r).catch((e) => {
-            this.logger.warn(
+            this.logger.error(
               `[debrief] could not record prompt versions for release v${r.version}: ${(e as Error).message}`,
             );
+            degraded?.note('prompt_pins', null, e);
             return (
               (r.changeSet as Record<string, any> | null)?.pinnedPrompts ?? null
             );
@@ -320,13 +326,17 @@ export class DebriefRunnerService {
     const now = opts.now ?? Date.now;
     // V2_AUTONOMY A9: a production session whose language is pinned (a change
     // held or undone for it, or live only for it) runs on the pinned release.
-    // A pin that cannot be read never fails the run: the release in force runs.
+    // A pin that cannot be read fails the attempt (nothing is claimed, the drain
+    // starts it again) rather than running a pinned language on the release in force.
     const pinned =
       !opts.release && opts.mode !== DebriefRunMode.REPLAY
-        ? await this.holds?.releaseForSession(sessionId).catch(() => null)
+        ? await this.holds?.releaseForSession(sessionId)
         : null;
+    // Every read that falls back to a default for this run: noted on the run once it exists.
+    const degraded = new Degraded(this.logger);
     const { release, bundle: released } = await this.resolveRelease(
       opts.release ?? pinned,
+      degraded,
     );
     const bundle: DebriefBundle = {
       ...released,
@@ -348,9 +358,11 @@ export class DebriefRunnerService {
       const prepared = await this.prepare(run, sessionId, opts, release, {
         bundle,
         now,
+        degraded,
       });
       if ('ended' in prepared) return prepared.ended;
-      const retries = Number(run.workspace?.retries ?? 0) || 0;
+      const retries =
+        Number(run.retries ?? 0) || Number(run.workspace?.retries ?? 0) || 0;
       const res = await this.graph.run(
         {
           ...prepared.request,
@@ -423,12 +435,16 @@ export class DebriefRunnerService {
     sessionId: string,
     opts: RunOptions,
     release: AgentRelease | null,
-    { bundle: released, now }: { bundle: DebriefBundle; now: () => number },
+    {
+      bundle: released,
+      now,
+      degraded,
+    }: { bundle: DebriefBundle; now: () => number; degraded: Degraded },
   ): Promise<Prepared> {
     let bundle = released;
     const settings = bundle.settings;
     const resumed = !!opts.resume;
-    const session = await this.context.loadSession(sessionId);
+    const session = await this.context.loadSession(sessionId, degraded);
     if (!session) {
       return {
         ended: await this.finish(run, DebriefRunStatus.SKIPPED, {
@@ -481,6 +497,7 @@ export class DebriefRunnerService {
     // and `language_recorded: false`; the graph reads the language from what
     // the learner wrote and answers it with `language` and
     // `workspace.languageSource` (the Console counts these per organisation).
+    if (session.languageRecorded) run.languageSource = 'recorded';
     run.workspace = {
       ...run.workspace,
       ...(session.languageRecorded ? { languageSource: 'recorded' } : {}),
@@ -592,7 +609,9 @@ export class DebriefRunnerService {
 
     // Learner progress: the owner settings' switch, then the learner's
     // profile. Never blocks a debrief: unreadable means no profile.
-    const owner = await orFallback(
+    const owner = await degraded.or(
+      'owner_settings',
+      null,
       async () => (await this.ownerSettings?.get()) ?? defaultOwnerSettings(),
       defaultOwnerSettings(),
     );
@@ -608,7 +627,7 @@ export class DebriefRunnerService {
     const competencyNames = (session.competencies ?? []).map((c) => c.name);
     const [{ texts: prompts, versions: promptVersions }, loaded] =
       await Promise.all([
-        this.prompts(bundle, opts.promptOverrides),
+        this.prompts(bundle, opts.promptOverrides, degraded),
         // Every piece of context data, each from its one provider (debrief-data-providers.ts).
         loadDebriefData(this.dataProviders, {
           session,
@@ -623,6 +642,7 @@ export class DebriefRunnerService {
               sessionId,
               progressSettings(owner),
               { framework, competencies: competencyNames },
+              degraded,
             ),
         }),
       ]);
@@ -640,6 +660,8 @@ export class DebriefRunnerService {
         why: `${p.label}: ${p.why}`,
       });
     }
+    // Reads that fell back (this method's, the pins', the session's) join the providers' notes.
+    loaded.problems.push(...degraded.notes);
     if (loaded.problems.length) {
       // A run that read less than it should says so; the Agent logs can show it.
       this.logger.warn(
@@ -647,6 +669,15 @@ export class DebriefRunnerService {
       );
       run.workspace = { ...run.workspace, dataNotes: loaded.problems };
     }
+    run.riskCueHandling = riskCue.handling;
+    // What this run ran, so it can be reproduced without a join.
+    run.bundleHash = canonicalHash(bundle);
+    run.promptVersions = Object.fromEntries(
+      Object.entries(promptVersions).map(([code, v]) => [
+        code,
+        v && typeof v === 'object' ? 'override' : v,
+      ]),
+    );
     run.workspace = {
       ...run.workspace,
       // What this run used, kept so a later edit never changes how a past debrief reads.
@@ -683,6 +714,7 @@ export class DebriefRunnerService {
 
     return {
       request: {
+        contract_version: DEBRIEF_CONTRACT_VERSION,
         run_id: run.id,
         scenario_session_id: sessionId,
         mode: opts.mode,
@@ -729,6 +761,7 @@ export class DebriefRunnerService {
   private async prompts(
     bundle: DebriefBundle,
     overrides: Record<string, string> = {},
+    degraded?: Degraded,
   ): Promise<{
     texts: Record<string, string | null>;
     versions: PromptVersions;
@@ -748,13 +781,18 @@ export class DebriefRunnerService {
           (await this.context.promptText(code, bundle.prompts?.[code] ?? null)),
       ),
     );
-    const current = await orFallback(
-      () =>
-        this.context.currentPromptVersions(
-          codes.filter((c) => bundle.prompts?.[c] == null && !overrides[c]),
-        ),
-      {} as Record<string, number>,
-    );
+    const readCurrent = () =>
+      this.context.currentPromptVersions(
+        codes.filter((c) => bundle.prompts?.[c] == null && !overrides[c]),
+      );
+    const current = degraded
+      ? await degraded.or(
+          'prompt_versions',
+          null,
+          readCurrent,
+          {} as Record<string, number>,
+        )
+      : await orFallback(readCurrent, {} as Record<string, number>);
     const versions: PromptVersions = Object.fromEntries(
       codes.map((code, i) => [
         code,
@@ -785,6 +823,10 @@ export class DebriefRunnerService {
     }
     const status = res.status as DebriefRunStatus;
     run.workspace = { ...run.workspace, ...(res.workspace ?? {}) };
+    const source = run.workspace.languageSource;
+    if (typeof source === 'string' && source) {
+      run.languageSource = source.slice(0, 40);
+    }
     if (status === DebriefRunStatus.FAILED && !run.workspace.decision) {
       run.workspace = {
         ...run.workspace,
@@ -795,13 +837,18 @@ export class DebriefRunnerService {
         },
       };
     }
+    checkTransition(run.status, status, this.logger, 'the graph answer');
     Object.assign(run, {
       status,
       skipReason: res.skip_reason ?? null,
       recipeKey: res.recipe_key ?? run.recipeKey ?? null,
       cards: res.cards ?? null,
       steps: res.steps ?? [],
-      estimatedCostUsd: Number(res.estimated_cost_usd ?? 0).toFixed(4),
+      // This attempt plus what earlier attempts of a retried run spent.
+      estimatedCostUsd: (
+        Number(res.estimated_cost_usd ?? 0) +
+        Number(run.workspace?.priorEstimatedUsd ?? 0)
+      ).toFixed(4),
       fallbackRung: Math.max(run.fallbackRung ?? 0, res.fallback_rung ?? 0),
       // The graph's language: the recorded one, or the one it read from the
       // learner's turns.
@@ -899,6 +946,7 @@ export class DebriefRunnerService {
         },
       };
     }
+    checkTransition(run.status, status, this.logger, 'the runner');
     Object.assign(run, patch, {
       status,
       steps: [],

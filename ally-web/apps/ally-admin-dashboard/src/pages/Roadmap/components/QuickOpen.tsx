@@ -1,14 +1,16 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { Close, Search } from "@icons";
+import { Close } from "@icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 
+import { Search } from "@ally-ui-mono/ui-shared";
 import { useSearchRoadmapQuery } from "@api";
 import { ROUTES, en } from "@constants";
-import type { RoadmapItemRow, RoadmapQueueView } from "@types";
+import type { RoadmapItemRow } from "@types";
 
+import { RoadmapIconButton } from "./RoadmapIconButton";
 import { dialogVariants, motionTransition, useReducedMotionPreference } from "../../../motion";
 import { useDebouncedValue } from "../../ProductRoadmap/useDebouncedValue";
 import { stageWord } from "../utils/copy";
@@ -16,14 +18,14 @@ import { stageWord } from "../utils/copy";
 type Entry =
   | { kind: "newIdea"; label: string }
   | { kind: "idea"; row: RoadmapItemRow }
-  | { kind: "view"; view: RoadmapQueueView; label: string };
+  | { kind: "view"; view: string; label: string };
 
 interface QuickOpenProps {
   open: boolean;
   onClose: () => void;
   onOpenIdea: (code: string) => void;
-  onOpenView: (view: RoadmapQueueView) => void;
-  views: RoadmapQueueView[];
+  onOpenView: (view: string) => void;
+  views: string[];
   /** Phone: full screen (§4.17 "Search opens full screen"). */
   fullScreen: boolean;
 }
@@ -139,29 +141,27 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
             }
             style={fullScreen ? { paddingTop: "env(safe-area-inset-top)" } : undefined}
           >
-            <div className="flex items-center gap-2 border-b border-border-light px-3">
-              <Search size={18} className="text-typography-secondary" aria-hidden />
-              <input
-                ref={inputRef}
-                type="search"
-                role="combobox"
-                aria-expanded="true"
-                aria-controls={listId}
-                aria-activedescendant={entries.length ? optionId(highlight) : undefined}
-                aria-label={copy.placeholder}
-                placeholder={copy.placeholder}
-                value={query}
-                onChange={event => setQuery(event.target.value)}
-                className="h-12 min-w-0 flex-1 bg-transparent text-base outline-none"
-              />
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label={copy.close}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-neutral-100"
-              >
+            <div className="flex items-center gap-2 border-b border-border-light">
+              <div className="min-w-0 flex-1">
+                <Search
+                  ref={inputRef}
+                  size="lg"
+                  role="combobox"
+                  aria-expanded="true"
+                  aria-controls={listId}
+                  aria-activedescendant={entries.length ? optionId(highlight) : undefined}
+                  labelText={copy.placeholder}
+                  placeholder={copy.placeholder}
+                  value={query}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    setQuery(event.target.value)
+                  }
+                  onClear={() => setQuery("")}
+                />
+              </div>
+              <RoadmapIconButton label={copy.close} onClick={onClose} large>
                 <Close size={18} aria-hidden />
-              </button>
+              </RoadmapIconButton>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto py-2">
               <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-typography-secondary">
@@ -206,7 +206,7 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
                           </span>
                           <span className="min-w-0 flex-1 truncate">{entry.row.title}</span>
                           <span className="shrink-0 text-xs text-typography-secondary">
-                            {stageWord(entry.row.shownStage)}
+                            {stageWord(entry.row.stage ?? entry.row.shownStage)}
                           </span>
                         </span>
                       ) : entry.kind === "view" ? (

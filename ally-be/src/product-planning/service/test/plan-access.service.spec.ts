@@ -85,15 +85,17 @@ describe('PlanAccessService', () => {
       ).toBe(false);
     });
 
-    it('shows a shared plan to Builders and Owners only', async () => {
+    it('shows a shared plan to everyone with the Idea role or above', async () => {
       const access = build({
         [LEAD]: 'builder',
         [OTHER]: 'idea',
         4: 'owner',
+        5: 'viewer',
       });
       expect(await access.canRead(sharedPlan, LEAD)).toBe(true);
       expect(await access.canRead(sharedPlan, 4)).toBe(true);
-      expect(await access.canRead(sharedPlan, OTHER)).toBe(false);
+      expect(await access.canRead(sharedPlan, OTHER)).toBe(true);
+      expect(await access.canRead(sharedPlan, 5)).toBe(false);
     });
   });
 
@@ -137,12 +139,15 @@ describe('PlanAccessService', () => {
       expect(await build({ [LEAD]: 'idea' }).canEdit(plan, LEAD)).toBe(false);
     });
 
-    it('lets nobody edit a shared plan nobody has taken on', async () => {
+    it('lets an Owner, and only an Owner, edit a shared plan nobody builds yet', async () => {
       const plan = {
         createdBy: AUTHOR,
         visibility: BuilderSessionVisibility.SHARED,
       };
       expect(await build({ [AUTHOR]: 'owner' }).canEdit(plan, AUTHOR)).toBe(
+        true,
+      );
+      expect(await build({ [AUTHOR]: 'builder' }).canEdit(plan, AUTHOR)).toBe(
         false,
       );
     });

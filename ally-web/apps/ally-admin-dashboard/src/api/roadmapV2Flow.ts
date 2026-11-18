@@ -2,7 +2,7 @@ import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 
 import { baseAPI } from "./baseApi";
 
-import type { RoadmapItemDetail, RoadmapItemRow } from "../types/roadmapV2";
+import type { RoadmapBuildMode, RoadmapItemDetail, RoadmapItemRow } from "../types/roadmapV2";
 import type {
   RoadmapAddToResult,
   RoadmapAnswerRequest,
@@ -271,6 +271,48 @@ export const roadmapV2FlowAPI = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, code) => [itemTag(code), listTag],
     }),
 
+    /** Opens the conversation on an older idea that has none, so it can take comments. */
+    openRoadmapConversation: builder.mutation<RoadmapItemDetail, string>({
+      query: code => ({
+        url: ApiEndpoints.ROADMAP_V2_FLOW.OPEN_CONVERSATION(code),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, code) => [itemTag(code)],
+    }),
+
+    /** An Owner closes (`closed: true`) or reopens the plan. A builder is assigned only once it is closed. */
+    setRoadmapPlanClosed: builder.mutation<RoadmapItemDetail, { code: string; closed: boolean }>({
+      query: ({ code, closed }) => ({
+        url: closed
+          ? ApiEndpoints.ROADMAP_V2_FLOW.CLOSE_PLAN(code)
+          : ApiEndpoints.ROADMAP_V2_FLOW.REOPEN_PLAN(code),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, { code }) => [itemTag(code), listTag],
+    }),
+
+    /** The assigned builder: build with the Builder agent here, or outside it. Switchable. */
+    setRoadmapBuildMode: builder.mutation<
+      RoadmapItemDetail,
+      { code: string; mode: RoadmapBuildMode }
+    >({
+      query: ({ code, mode }) => ({
+        url: ApiEndpoints.ROADMAP_V2_FLOW.BUILD_MODE(code),
+        method: HttpMethod.POST,
+        body: { mode },
+      }),
+      invalidatesTags: (_r, _e, { code }) => [itemTag(code), listTag],
+    }),
+
+    /** The assigned builder (or an Owner) marks it Released. Nothing marks it automatically. */
+    markRoadmapReleased: builder.mutation<RoadmapItemDetail, string>({
+      query: code => ({
+        url: ApiEndpoints.ROADMAP_V2_FLOW.MARK_RELEASED(code),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, code) => [itemTag(code), listTag],
+    }),
+
     // ── P3b: answers, comments, settling ────────────────────────────────────────────────────────
     getRoadmapSessionAnswers: builder.query<RoadmapSessionAnswers, string>({
       query: sessionId => ({
@@ -397,6 +439,10 @@ export const {
   useGetRoadmapLeadSuggestionsQuery,
   useGetRoadmapItemSimilarQuery,
   useStartRoadmapPlanningMutation,
+  useSetRoadmapPlanClosedMutation,
+  useOpenRoadmapConversationMutation,
+  useSetRoadmapBuildModeMutation,
+  useMarkRoadmapReleasedMutation,
   useGetRoadmapSessionAnswersQuery,
   usePostRoadmapAnswerMutation,
   usePostRoadmapCommentMutation,

@@ -46,7 +46,11 @@ from typing_extensions import TypedDict
 from app.core.debrief.render import NONE, render
 from app.core.debrief.steps import DEFAULT_GUIDANCE_AGENT_SYSTEM, GUIDANCE_AGENT_CODE
 from app.core.debrief_graph.budget import cost_usd, estimate_step_cost_usd
-from app.core.debrief_graph.constants import STEP_TIMEOUT_S, Step
+from app.core.debrief_graph.constants import (
+    DEFAULT_DEADLINE_MS,
+    STEP_TIMEOUT_S,
+    Step,
+)
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
 from app.utils.logger import get_logger
 
@@ -571,7 +575,7 @@ async def run_phase(
     if not model_name:
         return result("skipped", NO_MODEL)
     if ctx.time_left_ms(state.get("has_risk_cue", False)) < (
-        ctx.setting("deadlineMs", 150_000) / 2
+        ctx.setting("deadlineMs", DEFAULT_DEADLINE_MS) / 2
     ):
         return result("skipped", "deadline")
 
@@ -631,7 +635,7 @@ async def run_phase(
     def keep_going(spent: float) -> bool:
         return (
             ctx.time_left_ms(state.get("has_risk_cue", False))
-            >= ctx.setting("deadlineMs", 150_000) / 4
+            >= ctx.setting("deadlineMs", DEFAULT_DEADLINE_MS) / 4
             and spent <= est
         )
 

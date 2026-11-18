@@ -5,7 +5,7 @@ import { DebriefCards } from '../util/debrief-cards.util';
 import {
   hasLegacyFeedback,
   isDebriefAgentLiveForSession,
-} from '../util/debrief-live.util';
+} from '../../common/util/debrief-live.util';
 import {
   areasOfGrowthFromCards,
   claimsFromCards,
@@ -336,6 +336,31 @@ describe('DebriefPublishService', () => {
       expect(queries).toHaveLength(0);
       expect(events.emit).not.toHaveBeenCalled();
     }
+  });
+
+  it('stamps appliedAt in the same transaction as the write, and on the run it hands back', async () => {
+    const { svc, queries } = build({ feedback: {} });
+    const r = run();
+    expect(await svc.applyToSession(r)).toBe(true);
+    const stamp = queries.find((q) => q.sql.includes('{appliedAt}'))!;
+    expect(stamp.params).toEqual(['run-1']);
+    // Stamped before the summary is written, inside the same transaction.
+    expect(queries.indexOf(stamp)).toBeLessThan(
+      queries.findIndex((q) =>
+        q.sql.includes('UPDATE scenario_session_details'),
+      ),
+    );
+    expect(typeof r.workspace.appliedAt).toBe('string');
+  });
+
+  it('leaves no stamp when the write fails, so the sweep can publish it again', async () => {
+    const { svc, runs } = build({ feedback: {} });
+    runs.manager.transaction = async () => {
+      throw new Error('db down');
+    };
+    const r = run();
+    expect(await svc.applyToSession(r)).toBe(false);
+    expect(r.workspace.appliedAt).toBeUndefined();
   });
 
   it('never throws when the write fails', async () => {

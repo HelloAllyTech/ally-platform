@@ -8,7 +8,7 @@ import {
   OwnerSettingsBaseline,
   TEST_SETTING_KEYS,
 } from '../constants/debrief-owner-settings.constants';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   BaselineFacts,

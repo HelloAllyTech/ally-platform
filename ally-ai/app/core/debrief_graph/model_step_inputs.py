@@ -1,5 +1,17 @@
 """The six model steps: what each is sent, how the run view explains it, and
 where the run goes when it succeeds or fails (ally-be's runner, step by step).
+
+How the step files relate (read in this order):
+- `app/core/debrief/steps.py`, `safety_reader.py`: what each AI step says and returns
+  (the prompts and the structured call). One function per step.
+- `debrief_graph/step_wire.py`: runs those functions in-process and answers in the wire
+  shape the step records and ally-be read (`InProcessSteps`, `StepError`).
+- `debrief_graph/model_step_inputs.py`: for each of the six steps, what it is sent, how
+  the run view explains it and where the run goes next.
+- `debrief_graph/model_step_node.py`: one such step as a graph node (retry, timeout,
+  backup model).
+- `debrief_graph/inputs.py`: builds each step's body from the run's state (declared data
+  access).
 """
 
 from __future__ import annotations
@@ -10,10 +22,16 @@ from app.core.debrief.cue_strength import effective_hard_fails
 from app.core.debrief_graph import inputs as body
 from app.core.debrief_graph import progress
 from app.core.debrief_graph.agent_logs import code_log
-from app.core.debrief_graph.constants import PROMPT_CODES, FallbackRung, Status, Step
+from app.core.debrief_graph.constants import (
+    DEFAULT_PASS_SCORE,
+    PROMPT_CODES,
+    FallbackRung,
+    Status,
+    Step,
+)
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
 from app.core.debrief_graph.findings import evidence_findings
-from app.core.debrief_graph.model_step import ModelStep
+from app.core.debrief_graph.model_step_node import ModelStep
 from app.core.debrief_graph.narration import (
     cards_summary,
     evaluator_summary,
@@ -105,7 +123,7 @@ ANALYST = ModelStep(
     on_success=_stay,
     on_failure=_stay,
     config=_analyst_config,
-    # Kept on the run as findings in orchestrated runs only (model_step.py).
+    # Kept on the run as findings in orchestrated runs only (model_step_node.py).
     findings=lambda s, c, r: evidence_findings(r.get("evidence") or {}),
 )
 
@@ -372,7 +390,9 @@ REVISER = ModelStep(
     body=body.reviser_body,
     round_of=lambda s: s["round"],
     why=lambda s, c: revision_why(
-        s["best"], c.setting("passScore", 8), set(s.get("advisory") or [])
+        s["best"],
+        c.setting("passScore", DEFAULT_PASS_SCORE),
+        set(s.get("advisory") or []),
     ),
     inputs=lambda s, c: [
         f"the best draft so far (round {s['best']['round']})",

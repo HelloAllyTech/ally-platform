@@ -176,7 +176,7 @@ describe("Debrief owner settings (v9 FR-60)", () => {
 
   it("toggles a yes/no setting with a Carbon toggle and saves it", async () => {
     render(<SettingsTab />);
-    const toggle = screen.getByLabelText("No new hard fails");
+    const toggle = screen.getByLabelText("No new serious problems");
     expect(toggle).toHaveAttribute("role", "switch");
     fireEvent.click(toggle);
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -343,7 +343,7 @@ describe("Debrief settings page: who can change what", () => {
       "Tests",
       "Autonomy",
       "Score",
-      "Pinned rules",
+      "Locked prompts",
       "Clinical lists",
       "Progress",
     ]);
@@ -418,7 +418,7 @@ describe("Debrief settings page: who can change what", () => {
     expect(note).toHaveAttribute("title", "Only the owner can change these.");
     expect(note).toHaveClass("truncate");
     expect(screen.getByTestId("settings-tabs")).toHaveClass("flex-nowrap");
-    // Score, Pinned rules and Progress are tabs at lg and up, More items below it.
+    // Score, Locked prompts and Progress are tabs at lg and up, More items below it.
     for (const id of ["weights", "pinned", "clinical", "progress"])
       expect(tab(id)).toHaveClass("hidden", "min-[1056px]:inline");
     expect(tab("orgs")).not.toHaveClass("hidden");
@@ -741,7 +741,9 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     renderPage("#autonomy");
     const rules = screen.getByTestId("rollout-rules");
     expect(rules).toHaveTextContent("How a change goes live and comes back");
-    expect(rules).toHaveTextContent("Drops are compared within the same language and recipe.");
+    expect(rules).toHaveTextContent(
+      "Drops are compared within the same language and debrief flow.",
+    );
     fireEvent.change(within(rules).getByLabelText("Share of learners while it is tried (%)"), {
       target: { value: "20" },
     });
@@ -802,7 +804,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     expect(row).toHaveTextContent("Was 30: 4 changes passed here and then failed the next test");
     expect(within(row).getByRole("link", { name: "See change" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent?change=c-tests",
+      "/debriefs/changes?change=c-tests",
     );
     expect(screen.queryByText("Proposed")).toBeNull();
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();

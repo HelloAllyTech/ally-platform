@@ -104,7 +104,7 @@ import {
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import { SkillExperimentRouterService } from '../../skill-experiment/service/skill-experiment-router.service';
 import { ExecutionManager } from '../../common/execution/execution-manager';
-import { DEBRIEF_AGENT_KEY } from '../../debrief/constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   ALLY_AI_PROMPT_PREFIX,
   ALLY_AI_LEARN_PROMPT_PREFIX,

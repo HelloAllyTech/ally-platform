@@ -4,7 +4,7 @@ import { DataSource, IsNull, Repository } from 'typeorm';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
 import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
 import { DebriefChangeHold } from '../entity/debrief-change-hold.entity';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 
 /** Kinds of change a person can pause (C2): prompts, settings, and Builder / Bug Hunter hand-offs. */
 export const PAUSABLE_KINDS = ['prompts', 'settings', 'code'] as const;
@@ -74,9 +74,8 @@ export class DebriefChangeHoldsService {
     if (!language) return null;
     const pin = await this.activePin(language);
     if (!pin?.releaseId) return null;
-    const release = await this.releases
-      .getById(pin.releaseId)
-      .catch(() => null);
+    // A pinned release that cannot be read throws: the caller must not fall back to another one.
+    const release = await this.releases.getById(pin.releaseId);
     return release && release.agentKey === DEBRIEF_AGENT_KEY ? release : null;
   }
 

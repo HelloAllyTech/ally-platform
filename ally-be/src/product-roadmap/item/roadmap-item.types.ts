@@ -1,6 +1,7 @@
 import type {
   ItemStatusParts,
   ShownStage,
+  SimpleStage,
 } from 'src/product-planning/util/plan-stage.util';
 import type {
   RoadmapCapabilities,
@@ -61,6 +62,8 @@ export interface ItemRow {
   code: string;
   title: string;
   shownStage: ShownStage;
+  /** The stage in five words (Draft, Backlog, Being built, Shipped, Declined): what rows, filters and the tracker say. */
+  stage: SimpleStage;
   statusParts: ItemStatusParts;
   author: PersonRef;
   lead?: PersonRef;
@@ -73,6 +76,8 @@ export interface ItemRow {
   unread: boolean;
   whyHere?: WhyHere;
   goal?: { id: string; name: string };
+  /** 'YYYY-MM' the Owner planned it for, or null when unscheduled. */
+  plannedMonth: string | null;
   updatedAt: string;
   stageSince: string;
 }
@@ -118,6 +123,57 @@ export interface ItemDetail extends ItemRow {
   reviewState?: 'pending' | 'accepted' | 'declined';
   /** Present only for the author and Owners (D10, [FP-0992]). */
   declineReason?: string;
+  /**
+   * Where it started: who, when, how, and the rough idea as it was written
+   * before the interview. Absent for an idea filed with no draft session.
+   */
+  origin?: ItemOrigin;
+  /**
+   * Everything that happened to it after the first word, oldest first, one
+   * entry per milestone: submitted, planned, plan closed, builder assigned or
+   * changed, build mode, releases going live, marked released, declined.
+   * The conversation itself is the session transcript beside it.
+   */
+  timeline: ItemTimelineEntry[];
+}
+
+export interface ItemOrigin {
+  startedAt: string;
+  startedBy: PersonRef | null;
+  captureMode: 'typed' | 'voice' | null;
+  /** The idea as its author wrote it on the draft page. */
+  roughIdea: string | null;
+}
+
+export type ItemTimelineKind =
+  | 'submitted'
+  | 'reviewed'
+  | 'planning_started'
+  | 'plan_closed'
+  | 'plan_reopened'
+  | 'lead_assigned'
+  | 'lead_handed_back'
+  | 'design_approved'
+  | 'build_sent'
+  | 'external_build'
+  | 'build_mode_set'
+  | 'release_live'
+  | 'marked_released'
+  | 'closed'
+  | 'reopened'
+  | 'item_edited'
+  | 'answer_settled';
+
+export interface ItemTimelineEntry {
+  at: string;
+  kind: ItemTimelineKind;
+  actor: PersonRef | null;
+  /**
+   * Kind-specific facts, ids and values only (the UI writes the words):
+   * lead_assigned { from, to } as PersonRefs; build_mode_set { from, to };
+   * reviewed { decision }; item_edited { field }; release_live { service, tag }.
+   */
+  detail?: Record<string, unknown>;
 }
 
 export interface ForYouSections {
@@ -127,10 +183,12 @@ export interface ForYouSections {
   recentlyShipped: ItemRow[];
 }
 
+/**
+ * To triage is the Backlog: every idea nobody leads yet, in one list. Ideas that already have a
+ * lead are Being built and live under Leading, not here.
+ */
 export interface ToTriageSections {
-  awaitingReview: ItemRow[];
-  needsLead: ItemRow[];
-  reassign: ItemRow[];
+  backlog: ItemRow[];
 }
 
 export type ItemListResponse =

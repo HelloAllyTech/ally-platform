@@ -272,7 +272,6 @@ describe('RoadmapAllocationService', () => {
 
   describe('the stage rule', () => {
     it.each([
-      RoadmapOpportunityStage.PRIORITISED,
       RoadmapOpportunityStage.RELEASED,
       RoadmapOpportunityStage.ARCHIVED,
     ])('rejects a vote on a %s opportunity with 409', async (stage) => {
@@ -284,7 +283,53 @@ describe('RoadmapAllocationService', () => {
       expect(manager.save).not.toHaveBeenCalled();
     });
 
-    it('allows a vote on a new opportunity', async () => {
+    it("follows the idea's stage, not the legacy board stage: a prioritised idea nobody leads still takes votes", async () => {
+      givenExistingAllocation(null, RoadmapOpportunityStage.PRIORITISED);
+      await expect(service.setVotes(USER, OPP_ID, 5)).resolves.toMatchObject({
+        votes: 5,
+      });
+    });
+
+    it('locks a declined idea', async () => {
+      manager.findOne.mockImplementation(async (entity: unknown) =>
+        entity === RoadmapOpportunity
+          ? {
+              id: OPP_ID,
+              stage: RoadmapOpportunityStage.NEW,
+              type: RoadmapOpportunityType.IDEA,
+              reviewState: 'declined',
+            }
+          : null,
+      );
+      await expect(service.setVotes(USER, OPP_ID, 5)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('locks an idea once a lead holds it, and one whose plan is closed', async () => {
+      manager.findOne.mockImplementation(async (entity: unknown) =>
+        entity === RoadmapOpportunity
+          ? {
+              id: OPP_ID,
+              stage: RoadmapOpportunityStage.NEW,
+              type: RoadmapOpportunityType.IDEA,
+              builderSessionId: 's1',
+            }
+          : null,
+      );
+      manager.query.mockResolvedValueOnce([{ leadUserId: 7, closed: null }]);
+      await expect(service.setVotes(USER, OPP_ID, 5)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      manager.query.mockResolvedValueOnce([
+        { leadUserId: null, closed: { at: 'x' } },
+      ]);
+      await expect(service.setVotes(USER, OPP_ID, 5)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('takes votes on a new idea nobody leads', async () => {
       givenExistingAllocation(null, RoadmapOpportunityStage.NEW);
       await expect(service.setVotes(USER, OPP_ID, 5)).resolves.toMatchObject({
         votes: 5,

@@ -11,8 +11,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Data only. down() puts back 5 where this set 8.
  */
-export class KeepEightPassages1984400000000 implements MigrationInterface {
-  name = 'KeepEightPassages1984400000000';
+export class KeepEightPassages1984600000000 implements MigrationInterface {
+  name = 'KeepEightPassages1984600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

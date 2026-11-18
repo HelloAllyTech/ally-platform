@@ -159,6 +159,11 @@ export interface LearnerDebriefView {
    */
   riskCue?: boolean;
   /**
+   * A clear risk cue is still left out of this debrief (present, true, only then). The debrief is
+   * shown as it is, with a kind notice that someone from the team is checking it more closely.
+   */
+  followUp?: boolean;
+  /**
    * Roleplays the cards link to that the learner can still open. Inside a
    * course only that course's roleplays, each with its course item.
    */

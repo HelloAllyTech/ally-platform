@@ -9,6 +9,7 @@ import { BuilderSessionService } from 'src/builder/service/builder-session.servi
 import type { BuilderDecision } from 'src/builder/type/builder-decision.type';
 import { LoggerService } from 'src/logger/logger.service';
 import {
+  PlanEventKind,
   RoadmapNotificationKind,
   RoadmapWatchLevel,
 } from 'src/product-planning/enum/product-planning.enum';
@@ -17,6 +18,7 @@ import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.se
 import {
   deriveItemStage,
   ItemStage,
+  simpleStageOf,
 } from 'src/product-planning/util/plan-stage.util';
 import {
   capabilitiesFor,
@@ -30,7 +32,6 @@ import {
 } from '../repository/roadmap-opportunity.repository';
 import { RoadmapStrategyGoalService } from '../service/roadmap-strategy-goal.service';
 import { currentPeriodKey } from '../util/roadmap-period.util';
-import { NUDGE_AFTER_DAYS } from '../plan/plan-lead.service';
 import { PlanSessionStore } from '../plan/plan-session.store';
 import {
   PlanSessionDetail,
@@ -65,8 +66,11 @@ import {
   ItemDesignState,
   ItemDetail,
   ItemListResponse,
+  ItemOrigin,
   ItemRelation,
   ItemRow,
+  ItemTimelineEntry,
+  ItemTimelineKind,
   ItemSearchResponse,
   PersonRef,
   ToTriageSections,
@@ -79,6 +83,8 @@ const DAY_MS = 86_400_000;
 const RECENTLY_SHIPPED_DAYS = 14;
 /** One section of For you or To triage never returns more than this. */
 const SECTION_MAX = 50;
+/** To triage is the whole Backlog, so it is not cut at the small per-section limit the other views use. */
+const TRIAGE_SECTION_MAX = 500;
 /** Quick open (§4.11). */
 const SEARCH_MAX = 20;
 const RECENT_MAX = 5;
@@ -98,6 +104,26 @@ const DECISION_WHY: Partial<Record<string, WhyHereDecision>> = {
   build_failed: 'unblock',
 };
 const QUESTION_KINDS = ['question', 'brief'];
+
+/** The plan events an idea's timeline shows: milestones, not housekeeping. */
+const TIMELINE_EVENT_KINDS: string[] = [
+  PlanEventKind.FILED,
+  PlanEventKind.REVIEWED,
+  PlanEventKind.PLANNING_STARTED,
+  PlanEventKind.PLAN_CLOSED,
+  PlanEventKind.PLAN_REOPENED,
+  PlanEventKind.LEAD_ASSIGNED,
+  PlanEventKind.LEAD_HANDED_BACK,
+  PlanEventKind.DESIGN_APPROVED,
+  PlanEventKind.BUILD_SENT,
+  PlanEventKind.EXTERNAL_BUILD,
+  PlanEventKind.BUILD_MODE_SET,
+  PlanEventKind.MARKED_RELEASED,
+  PlanEventKind.CLOSED,
+  PlanEventKind.REOPENED,
+  PlanEventKind.ITEM_EDITED,
+  PlanEventKind.ANSWER_SETTLED,
+];
 
 interface Notice {
   kind: string;
@@ -216,9 +242,17 @@ export class RoadmapItemReadService {
       throw new ForbiddenException('To triage is for Owners.');
     }
     const loaded = await this.loadAll(userId, role);
-    const visible = loaded.cores.filter((c) =>
-      matchesFilters(c, query.filters),
-    );
+    let visible = loaded.cores.filter((c) => matchesFilters(c, query.filters));
+    // Filters about the person asking: ideas they lead, wrote, or that wait on them.
+    const f = query.filters;
+    if (f.ledByMe) visible = visible.filter((c) => c.leadId === userId);
+    if (f.wroteByMe) visible = visible.filter((c) => c.authorId === userId);
+    if (f.needsYou) {
+      visible = visible
+        .filter((c) => c.shownStage !== 'declined' && c.shownStage !== 'closed')
+        .map((c) => ({ ...c, whyHere: this.needsYouWhy(loaded, c) }))
+        .filter((c) => !!c.whyHere);
+    }
     const order = compareRows(query.sort);
 
     if (query.view === 'for-you') {
@@ -239,7 +273,7 @@ export class RoadmapItemReadService {
       for (const key of Object.keys(sections) as (keyof ToTriageSections)[]) {
         out[key] = await this.toRows(
           loaded,
-          sections[key].sort(order).slice(0, SECTION_MAX),
+          sections[key].sort(order).slice(0, TRIAGE_SECTION_MAX),
         );
       }
       return { sections: out };
@@ -362,6 +396,7 @@ export class RoadmapItemReadService {
           hasPlan: session?.kind === 'plan',
           planningStarted:
             core.shownStage !== 'submitted' && core.shownStage !== 'accepted',
+          planClosed: !!session?.planClosed?.at,
           designAwaitingApproval:
             design === 'awaitingApproval' ||
             core.decisions.some((d) => d.kind === 'design_review'),
@@ -373,16 +408,20 @@ export class RoadmapItemReadService {
           answersConflict: (session?.openConflicts ?? 0) > 0,
         },
       ),
-      ...editCapabilitiesFor(role, { isAuthor, isLead }, core.shownStage),
+      ...editCapabilitiesFor(role, { isAuthor, isLead }, core.shownStage, {
+        planClosed: !!session?.planClosed?.at,
+        hasLead: core.leadId !== null,
+      }),
     };
 
-    const [runs, spend, outcome, people] = await Promise.all([
+    const [runs, spend, outcome, people, history] = await Promise.all([
       session && !viewer ? this.runs(session.id) : Promise.resolve([]),
       session && !viewer ? this.spend(session) : Promise.resolve(undefined),
       session && !viewer
         ? this.outcome(session.id)
         : Promise.resolve(undefined),
       this.people(core),
+      this.history(core, session?.id ?? null),
     ]);
 
     const brief = asJson<{
@@ -458,8 +497,129 @@ export class RoadmapItemReadService {
       (isAuthor || role === 'owner')
         ? { declineReason: core.opp.declineReason }
         : {}),
+      ...(history.origin ? { origin: history.origin } : {}),
+      timeline: history.timeline,
     };
     return detail;
+  }
+
+  /**
+   * The idea's one history (lifecycle 2026-11-18): where it started and every
+   * milestone since, from the plan events, the filing and the release rows.
+   * Read-only, and open to everyone who can read the idea.
+   */
+  private async history(
+    core: ItemCore,
+    sessionId: string | null,
+  ): Promise<{ origin: ItemOrigin | null; timeline: ItemTimelineEntry[] }> {
+    const [sessionRows, eventRows] = sessionId
+      ? await Promise.all([
+          this.dataSource.query(
+            `SELECT "createdAt", "createdBy", plan->>'captureMode' AS "captureMode",
+                    plan->>'draftText' AS "draftText"
+               FROM "builder_sessions" WHERE id = $1`,
+            [sessionId],
+          ) as Promise<Record<string, unknown>[]>,
+          this.dataSource.query(
+            `SELECT kind, "actorUserId", detail, "at" FROM "plan_events"
+              WHERE "sessionId" = $1 AND kind = ANY($2::varchar[])
+              ORDER BY "at" ASC, id ASC`,
+            [sessionId, TIMELINE_EVENT_KINDS],
+          ) as Promise<Record<string, unknown>[]>,
+        ])
+      : [[], []];
+    const origin = sessionRows[0] ?? null;
+    const events = eventRows.map((e) => ({
+      at: toIso(e.at) ?? '',
+      kind: String(e.kind),
+      actorId: e.actorUserId == null ? null : Number(e.actorUserId),
+      detail: asJson<Record<string, unknown>>(e.detail) ?? undefined,
+    }));
+
+    const ids: number[] = [core.authorId];
+    if (origin?.createdBy != null) ids.push(Number(origin.createdBy));
+    for (const e of events) {
+      if (e.actorId) ids.push(e.actorId);
+      if (e.kind === 'lead_assigned') {
+        for (const key of ['from', 'to']) {
+          const id = e.detail?.[key];
+          if (typeof id === 'number' || typeof id === 'string') {
+            ids.push(Number(id));
+          }
+        }
+      }
+    }
+    const people = await this.resolvePeople(ids);
+    const person = (id: number | null | undefined) =>
+      id == null ? null : (people.get(Number(id)) ?? null);
+
+    const timeline: ItemTimelineEntry[] = [];
+    // Filing is recorded as a `filed` event by the guided flow. A session made
+    // later for an older idea (to pick a builder, or to comment) also records
+    // `filed`, with `detail.by`, at that later time and by that person: it is
+    // not the submission, so the row's createdAt and author stand in for it.
+    const isSubmission = (e: {
+      kind: string;
+      detail?: Record<string, unknown>;
+    }) => e.kind === 'filed' && !e.detail?.by;
+    const shown = events.filter((e) => e.kind !== 'filed' || isSubmission(e));
+    if (!shown.some(isSubmission)) {
+      const filedAt = toIso(core.opp.createdAt);
+      if (filedAt) {
+        timeline.push({
+          at: filedAt,
+          kind: 'submitted',
+          actor: person(core.authorId),
+        });
+      }
+    }
+    for (const e of shown) {
+      const kind: ItemTimelineKind =
+        e.kind === 'filed' ? 'submitted' : (e.kind as ItemTimelineKind);
+      const detail =
+        e.kind === 'lead_assigned'
+          ? {
+              from: person(e.detail?.from as number | null),
+              to: person(e.detail?.to as number | null),
+            }
+          : e.detail;
+      timeline.push({
+        at: e.at,
+        kind,
+        actor: person(e.actorId),
+        ...(detail && Object.keys(detail).length ? { detail } : {}),
+      });
+    }
+    for (const r of core.releases) {
+      if (r.state !== 'live' || !r.releasedAt) continue;
+      timeline.push({
+        at: r.releasedAt,
+        kind: 'release_live',
+        actor: null,
+        detail: { service: r.service, ...(r.tag ? { tag: r.tag } : {}) },
+      });
+    }
+    timeline.sort((a, b) => a.at.localeCompare(b.at));
+
+    return {
+      origin: origin
+        ? {
+            startedAt: toIso(origin.createdAt) ?? '',
+            startedBy: person(
+              origin.createdBy == null ? null : Number(origin.createdBy),
+            ),
+            captureMode:
+              origin.captureMode === 'voice' || origin.captureMode === 'typed'
+                ? origin.captureMode
+                : null,
+            roughIdea:
+              typeof origin.draftText === 'string' && origin.draftText.trim()
+                ? origin.draftText
+                : null,
+          }
+        : null,
+      timeline,
+    };
   }
 
   // ── Sections ───────────────────────────────────────────────────────────────
@@ -585,38 +745,29 @@ export class RoadmapItemReadService {
     return undefined;
   }
 
-  /** To triage (§4.3, §4.6): review, a lead to pick, and idle leads. */
+  /**
+   * To do (§4.3, §4.6): every idea with no builder yet, as one list. The Owner's next move is the
+   * idea's next step: Start planning (which accepts an unreviewed idea), Close plan, or assign a
+   * builder once the plan is closed; or decline it. Ideas with a builder are Being built.
+   */
   private toTriage(cores: ItemCore[]): CoreSections<ToTriageSections> {
-    const now = Date.now();
-    const awaitingReview = cores
-      .filter((c) => c.shownStage === 'submitted')
-      .map((c) => ({
-        ...c,
-        whyHere: { kind: 'awaitingReview' as const, since: c.stageSince },
-      }));
-    const needsLead = cores
-      .filter((c) => c.shownStage === 'accepted' && c.leadId === null)
-      .map((c) => ({
-        ...c,
-        whyHere: { kind: 'needsLead' as const, since: c.stageSince },
-      }));
-    const reassign = cores
+    const backlog = cores
       .filter(
         (c) =>
-          c.leadId !== null &&
-          (c.shownStage === 'accepted' ||
-            c.shownStage === 'planning' ||
-            c.shownStage === 'building'),
+          c.shownStage === 'submitted' ||
+          // Lifecycle 2026-11-18: accepted and being planned stay To do until an
+          // Owner assigns a builder, which only happens once the plan is closed.
+          ((c.shownStage === 'accepted' || c.shownStage === 'planning') &&
+            c.leadId === null),
       )
-      .map((c) => {
-        const quiet = Date.parse(c.session?.updatedAt ?? c.opp.updatedAt ?? '');
-        const idleDays = Number.isFinite(quiet)
-          ? Math.floor((now - quiet) / DAY_MS)
-          : 0;
-        return { ...c, whyHere: { kind: 'reassign' as const, idleDays } };
-      })
-      .filter((c) => c.whyHere.idleDays >= NUDGE_AFTER_DAYS);
-    return { awaitingReview, needsLead, reassign };
+      .map((c) => ({
+        ...c,
+        whyHere:
+          c.shownStage === 'submitted'
+            ? { kind: 'awaitingReview' as const, since: c.stageSince }
+            : { kind: 'needsLead' as const, since: c.stageSince },
+      }));
+    return { backlog };
   }
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -690,6 +841,8 @@ export class RoadmapItemReadService {
               s.plan->'reviews' AS "planReviews",
               s.plan->'externalBuild' AS "externalBuild",
               s.plan->'planningStarted' AS "planningStarted",
+              s.plan->'planClosed' AS "planClosedStamp",
+              s.plan->'buildMode' AS "buildMode",
               s.plan->>'openConflicts' AS "openConflicts",
               w.level AS "watchLevel",
               r."lastSeenAt",
@@ -816,6 +969,8 @@ export class RoadmapItemReadService {
               typeof asJson(f.planningStarted) === 'boolean'
                 ? (asJson(f.planningStarted) as boolean)
                 : null,
+            planClosed: asJson(f.planClosedStamp),
+            buildMode: asJson(f.buildMode),
             openConflicts: num(f.openConflicts),
             totalCostUsd: num(f.totalCostUsd),
             budgetUsd: f.budgetUsd == null ? null : num(f.budgetUsd),
@@ -1135,6 +1290,7 @@ export class RoadmapItemReadService {
         code: c.code,
         title: c.title,
         shownStage: c.shownStage,
+        stage: simpleStageOf(c.shownStage, c.leadId),
         statusParts: c.stage.statusParts,
         author: person(c.authorId, 'author'),
         ...(c.leadId ? { lead: person(c.leadId, 'lead') } : {}),
@@ -1150,6 +1306,7 @@ export class RoadmapItemReadService {
         ...(c.goalId && c.goalName
           ? { goal: { id: c.goalId, name: c.goalName } }
           : {}),
+        plannedMonth: c.plannedMonth,
         updatedAt: c.lastActivityAt,
         stageSince: c.stageSince,
       };

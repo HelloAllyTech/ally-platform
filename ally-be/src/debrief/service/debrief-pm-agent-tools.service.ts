@@ -2,10 +2,10 @@ import { HttpException, Injectable, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { DataSource } from 'typeorm';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
   DEBRIEF_PROMPT_CODES,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
 import { ROLEPLAY_FIELDS_KEY } from '../constants/debrief-roleplay-fields.constants';
 import { DebriefAutonomyService } from './debrief-autonomy.service';

@@ -1,4 +1,6 @@
 import { DebriefSlackService } from './debrief-slack.service';
+import { retriesSql } from '../util/debrief-run-columns.util';
+import { runRiskCueFacts } from '../util/debrief-risk-cue.util';
 import {
   BadRequestException,
   ForbiddenException,
@@ -20,15 +22,16 @@ import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants'
 import { settledEndedSessionPredicate } from '../../analytics/util/session-eligibility.util';
 import { runWithConcurrency } from '../../analytics/util/judge-concurrency.util';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_SEED_BUNDLE,
   DebriefProvider,
   DebriefStep,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   PROVIDER_ALLOWED_KEY,
+  ALLOWLIST_WHEN_UNREADABLE,
   allowlistFromValues,
 } from '../util/debrief-provider-allowlist.util';
 import { GuideSupportLine } from '../../guide/entity/guide-org-profile.entity';
@@ -52,39 +55,25 @@ import {
   DEBRIEF_FALLBACK_TO_TODAY_EVENT,
   DebriefFallbackToTodayEventParams,
   hasLegacyFeedback,
-} from '../util/debrief-live.util';
+} from '../../common/util/debrief-live.util';
 import { todaysDebriefProvider } from '../util/debrief-todays-provider.util';
+import { RUN_STATUS_WRITERS } from '../util/debrief-run-status.util';
 import { cardsForReader } from '../util/debrief-cards.util';
 import { readableCards } from '../util/debrief-competencies.util';
+import { DEBRIEF_TIMING } from '../constants/debrief-timing.constants';
 import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import {
   DebriefProgress,
   DebriefRunnerService,
 } from './debrief-runner.service';
 
-/** Sessions per 5-minute tick; at today's volume the backlog clears in one or two ticks. */
-const DRAIN_BATCH = 8;
-const DRAIN_CONCURRENCY = 2;
-/**
- * How long after a live session ends its debrief starts: long enough for the
- * last turns to land, short enough that the learner is still on the page.
- * The drain is the backstop if this instance restarts in between.
- */
-export const LIVE_START_DELAY_MS = 45_000;
-/** Only recent sessions: a debrief days late is not what a learner waits for. */
-const DRAIN_WINDOW_HOURS = 48;
-/** Well past the longest deadline (risk cue: 3 min) plus a slow drain. */
-const STUCK_AFTER_MINUTES = 10;
-/**
- * A session no run has started for this long after it ended is not going to
- * get one soon: the learner gets today's debrief instead of "working".
- */
-export const NO_RUN_GIVE_UP_MINUTES = 30;
-/**
- * A live run that ended without a draft is run again from the start this
- * many times (Gopi, 2026-11-16) before the learner gets today's debrief.
- */
-export const MAX_RETRIES = 1;
+const DRAIN_BATCH = DEBRIEF_TIMING.drainBatch;
+const DRAIN_CONCURRENCY = DEBRIEF_TIMING.drainConcurrency;
+export const LIVE_START_DELAY_MS = DEBRIEF_TIMING.liveStartDelayMs;
+const DRAIN_WINDOW_HOURS = DEBRIEF_TIMING.drainWindowHours;
+export const STUCK_AFTER_MINUTES = DEBRIEF_TIMING.stuckAfterMinutes;
+export const NO_RUN_GIVE_UP_MINUTES = DEBRIEF_TIMING.noRunGiveUpMinutes;
+export const MAX_RETRIES = DEBRIEF_TIMING.maxRetries;
 /**
  * Why a live run may end without a draft and be worth running again: a
  * model step failed, it was stuck, or the budget stopped it (before live
@@ -103,12 +92,10 @@ const NO_FALLBACK_SKIPS: ReadonlySet<string> = new Set([
   'no_transcript',
   'no_session',
 ]);
-/**
- * v9 FR-3: a run still "running" this long is past every deadline (150 s,
- * 180 s with a risk cue), so its worker is gone: resume it, once.
- */
-const RESUME_AFTER_MINUTES = 5;
-const MAX_RESUMES = 1;
+export const REPUBLISH_AFTER_MINUTES = DEBRIEF_TIMING.republishAfterMinutes;
+const REPUBLISH_BATCH = DEBRIEF_TIMING.republishBatch;
+export const RESUME_AFTER_MINUTES = DEBRIEF_TIMING.resumeAfterMinutes;
+const MAX_RESUMES = DEBRIEF_TIMING.maxResumes;
 
 /** The tenant switch: the only per-org setting the Debrief agent has in v1. */
 export const DEBRIEF_POLICY: PolicySchema = {
@@ -182,6 +169,13 @@ export interface LearnerDebriefView {
    * did, with or without an important-moment card.
    */
   riskCue?: boolean;
+  /**
+   * `ready` only, present (true) only when a clear risk cue is still left uncovered by the debrief
+   * the learner reads (the best draft failed the risk-cue coverage check, or the Evaluator found a
+   * missed clear cue). The debrief is shown as it is; the apps add a kind notice that a coach is
+   * following up (risk-cue policy option C, 2026-11-18). Absent otherwise, so older apps ignore it.
+   */
+  followUp?: boolean;
   /** The organisation's support lines (the Guide's), crisis lines first. */
   supportLines?: GuideSupportLine[];
   /**
@@ -306,17 +300,36 @@ export function withoutPractice<
  */
 export function cueBringsSupportLines(run: {
   hasRiskCue?: boolean | null;
+  riskCueHandling?: string | null;
   workspace?: Record<string, any> | null;
 }): boolean {
   if (run.hasRiskCue !== true) return false;
-  const option = run.workspace?.riskCueOption;
-  if (!option) return true;
-  if (option.supportLinesOnCue === false) return false;
-  if (option.handling !== 'assessed') return true;
-  const cues = run.workspace?.safety?.risk_cues;
-  if (!Array.isArray(cues) || !cues.length) return true;
-  return cues.some(
-    (c: { part_of_practice?: unknown }) => c?.part_of_practice !== true,
+  const facts = runRiskCueFacts(run);
+  if (!facts.known) return true;
+  if (!facts.supportLinesOnCue) return false;
+  if (!facts.assessed) return true;
+  if (!facts.practisedCues.length) return true;
+  return facts.practisedCues.some((practised) => !practised);
+}
+
+/**
+ * A clear risk cue the debrief the learner reads still leaves uncovered: the best draft failed the
+ * coverage check (`risk_cue_uncovered`), the Evaluator raised the `missed_risk_cue` hard fail, or the
+ * decision recorded it as the review reason. Both signals are only ever raised for CLEAR cues (a
+ * possible cue never fails the check or raises the hard fail), and a cue the roleplay practises is
+ * coached in the cards, so it never counts. False without a recorded risk cue.
+ */
+export function needsFollowUp(run: {
+  hasRiskCue?: boolean | null;
+  checkFailures?: Array<{ code?: string }> | null;
+  evaluatorHardFails?: Array<{ code?: string }> | null;
+  workspace?: Record<string, any> | null;
+}): boolean {
+  if (run.hasRiskCue !== true) return false;
+  return (
+    (run.checkFailures ?? []).some((c) => c?.code === 'risk_cue_uncovered') ||
+    (run.evaluatorHardFails ?? []).some((h) => h?.code === 'missed_risk_cue') ||
+    run.workspace?.decision?.reviewReason === 'missed_risk_cue'
   );
 }
 
@@ -426,7 +439,7 @@ export class DebriefAgentService implements OnModuleInit {
           ),
         );
       void this.trials?.onPublished(run);
-      void this.slack?.missedRiskCue(run).catch(() => false);
+      this.postMissedRiskCue(run);
       return run;
     }
     if (run.mode !== DebriefRunMode.LIVE) return run;
@@ -454,22 +467,32 @@ export class DebriefAgentService implements OnModuleInit {
    */
   async retryRun(run: DebriefRun): Promise<DebriefRun | null> {
     const res = await this.dataSource.query(
+      // A retry starts a fresh attempt, but what the first one spent and when it began are kept
+      // (`firstStartedAt`, `priorEstimatedUsd`), so the month's spend and the cost reconcile count it.
       `UPDATE debrief_runs
-          SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{retries}',
-                to_jsonb(COALESCE((workspace->>'retries')::int, 0) + 1)),
+          SET workspace = jsonb_set(
+                jsonb_set(
+                  jsonb_set(coalesce(workspace, '{}'::jsonb), '{retries}',
+                    to_jsonb(${retriesSql()} + 1)),
+                  '{firstStartedAt}',
+                  to_jsonb(COALESCE(workspace->>'firstStartedAt',
+                                    COALESCE("startedAt", "createdAt")::text))),
+                '{priorEstimatedUsd}',
+                to_jsonb(COALESCE((workspace->>'priorEstimatedUsd')::numeric, 0)
+                         + COALESCE("estimatedCostUsd", 0))),
+              "retries" = ${retriesSql()} + 1,
               status = $2,
               "startedAt" = now(),
               "finishedAt" = NULL,
               "updatedAt" = now()
         WHERE id = $1 AND mode = 'live' AND cards IS NULL
           AND status IN ($3, $4)
-          AND COALESCE((workspace->>'retries')::int, 0) < $5
+          AND ${retriesSql()} < $5
         RETURNING id`,
       [
         run.id,
-        DebriefRunStatus.RUNNING,
-        DebriefRunStatus.NEEDS_PERSON,
-        DebriefRunStatus.FAILED,
+        ...RUN_STATUS_WRITERS.retry.to,
+        ...RUN_STATUS_WRITERS.retry.from,
         MAX_RETRIES,
       ],
     );
@@ -501,7 +524,7 @@ export class DebriefAgentService implements OnModuleInit {
       `SELECT id FROM debrief_runs
         WHERE mode = 'live' AND cards IS NULL
           AND (status = $1 OR (status = $2 AND "skipReason" = ANY($3::text[])))
-          AND COALESCE((workspace->>'retries')::int, 0) < $4
+          AND ${retriesSql()} < $4
           AND "createdAt" >= now() - make_interval(hours => $5)
         ORDER BY "createdAt" LIMIT $6`,
       [
@@ -537,7 +560,7 @@ export class DebriefAgentService implements OnModuleInit {
           AND status IN ($1, $2, $3)
           AND NOT (coalesce("skipReason", '') = ANY($4::text[]))
           AND NOT (coalesce(workspace, '{}'::jsonb) ? 'fallbackToToday')
-          AND (status = $3 OR COALESCE((workspace->>'retries')::int, 0) >= $5
+          AND (status = $3 OR ${retriesSql()} >= $5
                OR NOT (coalesce("skipReason", '') = ANY($6::text[])))
           AND "createdAt" >= now() - make_interval(hours => $7)
         ORDER BY "createdAt" LIMIT $8`,
@@ -564,9 +587,12 @@ export class DebriefAgentService implements OnModuleInit {
    * Whether today's debrief may be written for this organisation: its model
    * runs on a provider the organisation allows (plan §8.9, FR-57: a
    * learner's data never goes to a provider the organisation does not
-   * allow). A failed read allows it, as every provider is allowed by default.
+   * allow). Null when the allowlist could not be read: callers fail closed
+   * (nothing is written) but must not record a verdict from a blip.
    */
-  async todaysDebriefAllowed(tenantId: string | null): Promise<boolean> {
+  private async readTodaysAllowance(
+    tenantId: string | null,
+  ): Promise<boolean | null> {
     const provider = todaysDebriefProvider();
     if (!provider || !tenantId) return true;
     try {
@@ -577,8 +603,20 @@ export class DebriefAgentService implements OnModuleInit {
       );
       return allowlistFromValues(row?.values).includes(provider);
     } catch {
-      return true;
+      return null;
     }
+  }
+
+  /**
+   * Whether today's debrief may be written. A failed read allows nothing
+   * (fail closed, as the context repository's allowlist does): the learner
+   * then sees the defined "not available" state, never a stuck one.
+   */
+  async todaysDebriefAllowed(tenantId: string | null): Promise<boolean> {
+    const read = await this.readTodaysAllowance(tenantId);
+    if (read !== null) return read;
+    const provider = todaysDebriefProvider();
+    return !!provider && ALLOWLIST_WHEN_UNREADABLE.includes(provider);
   }
 
   /**
@@ -589,7 +627,16 @@ export class DebriefAgentService implements OnModuleInit {
    * on the run once (`workspace.fallbackToToday`). True when this call did it.
    */
   async fallBackToToday(run: DebriefRun): Promise<boolean> {
-    const allowed = await this.todaysDebriefAllowed(run.tenantId ?? null);
+    const read = await this.readTodaysAllowance(run.tenantId ?? null);
+    if (read === null) {
+      // The allowlist could not be read: write nothing and record no verdict, so the next sweep
+      // decides once it can be read (a blip must not mark a learner "not available" for good).
+      this.logger.warn(
+        `[debrief] run ${run.id}: the provider allowlist could not be read; deciding at the next sweep`,
+      );
+      return false;
+    }
+    const allowed = read;
     const outcome = allowed ? 'today' : 'not_available';
     const res = await this.dataSource.query(
       `UPDATE debrief_runs
@@ -662,13 +709,28 @@ export class DebriefAgentService implements OnModuleInit {
   }
 
   /**
+   * The Slack post for a missed risk cue. The urgent review itself does not depend on it: the run
+   * carries `decision.reviewReason = 'missed_risk_cue'`, which the Console lists first and the
+   * overdue notice follows; and a post that failed here is made again by the safety sweep. So a
+   * failure is logged at error and never stops the run.
+   */
+  private postMissedRiskCue(run: DebriefRun): void {
+    void Promise.resolve(this.slack?.missedRiskCue(run)).catch((e: Error) =>
+      this.logger.error(
+        `[debrief] the Slack post for run ${run.id} (a missed risk cue) failed, the safety sweep will try again: ${e.message}`,
+      ),
+    );
+  }
+
+  /**
    * v9 FR-28: tell the learner their debrief is ready — only for a live run
    * this call just finished (the runner hands back an existing run too).
    */
   private async announceReady(run: DebriefRun): Promise<void> {
     const justFinished =
       run.finishedAt &&
-      Date.now() - new Date(run.finishedAt).getTime() < 2 * 60 * 1000;
+      Date.now() - new Date(run.finishedAt).getTime() <
+        DEBRIEF_TIMING.announceWithinMs;
     if (
       run.mode === DebriefRunMode.LIVE &&
       justFinished &&
@@ -676,6 +738,9 @@ export class DebriefAgentService implements OnModuleInit {
         run.status,
       )
     ) {
+      // The learner reads the debrief from the run's own cards, so "your debrief is ready" does not
+      // wait on writing the supervisor note, memory and ready event into the session. If that write
+      // fails the run carries no `appliedAt`, and the stuck sweep (`republishUnapplied`) does it again.
       await this.publisher?.applyToSession(run);
       await this.notifier.ready(run);
     }
@@ -700,9 +765,10 @@ export class DebriefAgentService implements OnModuleInit {
         const shown = await this.showHeldDrafts();
         const retried = await this.retryFailedRuns();
         const fellBack = await this.fallBackSweep();
-        return resumed + handed + shown + retried + fellBack === 0
+        const republished = await this.republishUnapplied();
+        return resumed + handed + shown + retried + fellBack + republished === 0
           ? 'none stuck'
-          : `${resumed} resumed, ${handed} handed to a person, ${shown} held draft(s) shown, ${retried} retried, ${fellBack} sent to today's debrief`;
+          : `${resumed} resumed, ${handed} handed to a person, ${shown} held draft(s) shown, ${retried} retried, ${fellBack} sent to today's debrief, ${republished} published again`;
       },
     );
     scheduledTaskRegistry.registerConfigurable('debrief-judge', async () => {
@@ -964,17 +1030,25 @@ export class DebriefAgentService implements OnModuleInit {
     let done = 0;
     await runWithConcurrency(pending, DRAIN_CONCURRENCY, async (s) => {
       const mode = DebriefRunMode.LIVE;
-      // The independent judge scores every debrief, published or not, blind.
-      const run = await this.afterRun(
-        await this.runner.run(s.id, {
-          mode,
-          ...(await this.canaryOptions(s.id, mode)),
-        }),
-      );
-      done++;
-      this.logger.info(
-        `[debrief] ${mode} run ${run.id} session=${s.id} status=${run.status} rung=${run.fallbackRung}`,
-      );
+      try {
+        // The independent judge scores every debrief, published or not, blind.
+        const run = await this.afterRun(
+          await this.runner.run(s.id, {
+            mode,
+            ...(await this.canaryOptions(s.id, mode)),
+          }),
+        );
+        done++;
+        this.logger.info(
+          `[debrief] ${mode} run ${run.id} session=${s.id} status=${run.status} rung=${run.fallbackRung}`,
+        );
+      } catch (e) {
+        // A run that could not start (a pinned release that cannot be read) leaves no run row:
+        // the next drain starts it again, and the others in this batch carry on.
+        this.logger.error(
+          `[debrief] ${mode} run for session ${s.id} could not start, will be retried: ${(e as Error).message}`,
+        );
+      }
     });
     this.logger.info(`[debrief] drain finished ${done}/${pending.length}`);
     return `${done} started`;
@@ -1110,6 +1184,43 @@ export class DebriefAgentService implements OnModuleInit {
   }
 
   /**
+   * A readable live run whose debrief was never written into its session (a crash between the
+   * run being saved and the publish, or a publish that failed): publish it again. Every publish
+   * write is idempotent. `workspace.appliedAt` is stamped by the publish itself, and a migration
+   * stamped every run that already had one, so only runs finished since are ever picked up.
+   */
+  async republishUnapplied(): Promise<number> {
+    const rows: Array<{ id: string }> = await this.dataSource.query(
+      `SELECT id FROM debrief_runs
+        WHERE mode = 'live' AND status IN ('published', 'below_bar')
+          AND cards IS NOT NULL AND tenant_id IS NOT NULL
+          AND "finishedAt" < now() - make_interval(mins => $1)
+          AND "finishedAt" >= now() - make_interval(hours => $2)
+          AND NOT (coalesce(workspace, '{}'::jsonb) ? 'appliedAt')
+        ORDER BY "finishedAt"
+        LIMIT $3`,
+      [REPUBLISH_AFTER_MINUTES, DRAIN_WINDOW_HOURS, REPUBLISH_BATCH],
+    );
+    let n = 0;
+    for (const { id } of rows ?? []) {
+      try {
+        const run = await this.runs.findOne({ where: { id } });
+        if (run && (await this.publisher?.applyToSession(run))) n++;
+      } catch (e) {
+        this.logger.error(
+          `[debrief] could not publish run ${id} again: ${(e as Error).message}`,
+        );
+      }
+    }
+    if (rows?.length) {
+      this.logger.warn(
+        `[debrief] ${rows.length} run(s) were never written into their session; published ${n} again`,
+      );
+    }
+    return n;
+  }
+
+  /**
    * No debrief is held (Gopi, 2026-11-16): a live run waiting for a person
    * that already has a draft is shown as it is — below the bar, still in the
    * review queue — and the learner is told it is ready. Runs held before the
@@ -1134,7 +1245,10 @@ export class DebriefAgentService implements OnModuleInit {
           AND NOT (coalesce(workspace, '{}'::jsonb) ? 'review')
           AND coalesce(workspace, '{}'::jsonb) ? 'decision'
         RETURNING id`,
-      [DebriefRunStatus.BELOW_BAR, DebriefRunStatus.NEEDS_PERSON],
+      [
+        ...RUN_STATUS_WRITERS.showHeldDraft.to,
+        ...RUN_STATUS_WRITERS.showHeldDraft.from,
+      ],
     );
     const rows: Array<{ id: string }> = Array.isArray(res?.[0])
       ? res[0]
@@ -1145,7 +1259,7 @@ export class DebriefAgentService implements OnModuleInit {
         if (!run) continue;
         await this.publisher?.applyToSession(run);
         await this.notifier.ready(run);
-        void this.slack?.missedRiskCue(run).catch(() => false);
+        this.postMissedRiskCue(run);
       } catch (e) {
         this.logger.warn(
           `[debrief] could not show held draft ${id}: ${(e as Error).message}`,
@@ -1169,9 +1283,8 @@ export class DebriefAgentService implements OnModuleInit {
           AND COALESCE("startedAt", "createdAt") < now() - interval '${STUCK_AFTER_MINUTES} minutes'
         RETURNING id, mode`,
       [
-        DebriefRunStatus.NEEDS_PERSON,
-        DebriefRunStatus.FAILED,
-        DebriefRunStatus.RUNNING,
+        ...RUN_STATUS_WRITERS.sweepStuck.to,
+        ...RUN_STATUS_WRITERS.sweepStuck.from,
       ],
     );
     const rows = Array.isArray(res?.[0]) ? res[0] : (res ?? []);
@@ -1321,6 +1434,9 @@ export class DebriefAgentService implements OnModuleInit {
           // Whether a character's cue brings the support lines follows the roleplay's risk-cue
           // option (recorded on the run); the learner's own distress always does.
           riskCue: cueBringsSupportLines(run),
+          // A clear cue the debrief still leaves out: the apps add a kind "a coach will follow up"
+          // notice next to the support lines. The debrief itself is shown exactly as before.
+          ...(needsFollowUp(run) ? { followUp: true } : {}),
           supportLines: await this.supportLines(s.tenant_id, run.language),
           practice: available.filter((p) => linked.has(p.id)),
           askAlly: askAllyState(run),
@@ -1411,7 +1527,8 @@ export class DebriefAgentService implements OnModuleInit {
       startedAt: Date;
       finishedAt: Date;
     }> = await this.dataSource.query(
-      `SELECT id, "scenarioSessionId", "startedAt", "finishedAt"
+      `SELECT id, "scenarioSessionId", "finishedAt",
+              COALESCE((workspace->>'firstStartedAt')::timestamp, "startedAt") AS "startedAt"
          FROM debrief_runs
         WHERE "actualCostUsd" IS NULL AND "finishedAt" IS NOT NULL
           AND "finishedAt" < now() - interval '1 hour'

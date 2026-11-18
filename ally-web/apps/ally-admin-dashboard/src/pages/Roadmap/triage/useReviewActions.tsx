@@ -9,6 +9,7 @@ import {
   useReviewRoadmapBatchMutation,
   useReviewRoadmapItemMutation,
   useSetRoadmapLeadMutation,
+  useStartRoadmapPlanningMutation,
   useUndoRoadmapReviewMutation,
 } from "../../../api/roadmapV2Flow";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
@@ -30,7 +31,7 @@ export const UndoToast: React.FC<{
   const copy = en.roadmapV2.review;
   return (
     <div
-      className="relative flex w-[356px] max-w-[calc(100vw-2rem)] items-center gap-3 overflow-hidden rounded-md bg-neutral-800 px-4 py-3 text-sm text-white shadow-lg"
+      className="relative flex w-[356px] max-w-[calc(100vw-2rem)] items-center gap-3 overflow-hidden bg-neutral-800 px-4 py-3 text-sm text-white shadow-lg"
       role="status"
       data-testid="roadmap-undo-toast"
     >
@@ -69,17 +70,20 @@ export const undoLastReview = (): boolean => {
 };
 
 /**
- * The Owner's review calls, each with the 8-second undo (§4.6) and haptics (10 ms on accept,
- * 2 × 15 ms on decline; §4.18). One undo token reverses a whole batch.
+ * The Owner's review calls, each with the 8-second undo (§4.6) and haptics (10 ms on a lead,
+ * 2 × 15 ms on decline; §4.18). One undo token reverses a whole batch. There is no plain Accept:
+ * Start planning accepts an idea still waiting (lifecycle 2026-11-18). A builder is assigned
+ * (`pickLead`) only once the Owner has closed the plan.
  */
 export const useReviewActions = () => {
   const [review] = useReviewRoadmapItemMutation();
   const [batch] = useReviewRoadmapBatchMutation();
   const [undo] = useUndoRoadmapReviewMutation();
   const [setLead] = useSetRoadmapLeadMutation();
+  const [start] = useStartRoadmapPlanningMutation();
   const copy = en.roadmapV2.review;
-  // P8: Accept (with or without a lead) or Decline (with a reason) ends "triage one" (§4.16) when
-  // the row's focus started it. Bulk reviews are not timed per idea.
+  // P8: picking a lead or Decline (with a reason) ends "triage one" (§4.16) when the row's focus
+  // started it. Bulk reviews are not timed per idea.
   const { complete: completeJob } = useRoadmapJobTimer();
 
   const offerUndo = useCallback(
@@ -118,28 +122,21 @@ export const useReviewActions = () => {
     [undo, copy],
   );
 
-  const accept = useCallback(
-    async (code: string, lead?: { id: number; name: string }, onUndone?: () => void) => {
+  /** Start planning: an Owner expands the idea into a plan (accepting it if it was waiting). */
+  const startPlanning = useCallback(
+    async (code: string) => {
       try {
-        const result = await review({
-          code,
-          decision: "accept",
-          ...(lead ? { leadUserId: lead.id } : {}),
-        }).unwrap();
+        await start(code).unwrap();
         haptic(10);
         completeJob("triage_one", { itemId: code });
-        offerUndo(
-          lead ? copy.acceptedWithLead(code, lead.name) : copy.accepted(code),
-          result.undoToken,
-          onUndone,
-        );
+        toast.success(en.roadmapV2.session.planningStarted);
         return true;
-      } catch {
-        toast.error(copy.failed);
+      } catch (error) {
+        toast.error(errorMessage(error) ?? en.roadmapV2.session.startPlanningFailed);
         return false;
       }
     },
-    [review, offerUndo, copy, completeJob],
+    [start, completeJob],
   );
 
   const decline = useCallback(
@@ -229,13 +226,13 @@ export const useReviewActions = () => {
     [setLead, copy],
   );
 
-  return { accept, decline, reopen, reviewMany, pickLead, handBack };
+  return { startPlanning, decline, reopen, reviewMany, pickLead, handBack };
 };
 
-/** Motion values for the desktop triage row (§4.18): accept slides right, decline left. */
-export const triageExit = (decision: "accept" | "decline" | null, reduced: boolean) => {
+/** Motion values for the desktop triage row (§4.18): a lead slides right, decline left. */
+export const triageExit = (decision: "assign" | "decline" | null, reduced: boolean) => {
   if (!decision || reduced) return { opacity: 0 };
-  return { x: decision === "accept" ? 24 : -24, opacity: 0 };
+  return { x: decision === "assign" ? 24 : -24, opacity: 0 };
 };
 
 export const triageTransition = (reduced: boolean) =>

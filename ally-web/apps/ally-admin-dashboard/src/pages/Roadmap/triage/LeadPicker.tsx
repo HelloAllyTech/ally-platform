@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import { SkeletonText, Tag } from "@ally-ui-mono/ui-shared";
+import { RadioButton, RadioButtonGroup, SkeletonText, Tag } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 
 import { useGetRoadmapLeadSuggestionsQuery } from "../../../api/roadmapV2Flow";
@@ -33,8 +33,6 @@ interface LeadPickerProps {
   /** The idea the suggestion is scored for (the first, in a bulk pick). */
   code: string;
   count?: number;
-  /** Accept + lead says so on its button. */
-  accepting?: boolean;
   onClose: () => void;
   onPick: (lead: { id: number; name: string }) => Promise<boolean>;
   sheet: boolean;
@@ -48,7 +46,6 @@ export const LeadPicker: React.FC<LeadPickerProps> = ({
   open,
   code,
   count = 1,
-  accepting,
   onClose,
   onPick,
   sheet,
@@ -82,7 +79,7 @@ export const LeadPicker: React.FC<LeadPickerProps> = ({
       open={open}
       onClose={onClose}
       title={count > 1 ? copy.leadTitleMany(count) : copy.leadTitle(code)}
-      primaryText={accepting ? copy.leadAcceptConfirm : copy.leadConfirm}
+      primaryText={copy.leadConfirm}
       onPrimary={() => void confirm()}
       primaryDisabled={!person || sending}
       secondaryText={copy.cancel}
@@ -96,24 +93,20 @@ export const LeadPicker: React.FC<LeadPickerProps> = ({
         {!isLoading && !isError && candidates.length === 0 && (
           <p className="m-0 text-sm text-typography-secondary">{copy.leadNone}</p>
         )}
-        <div role="radiogroup" aria-label={copy.pickLead} className="flex flex-col gap-1">
-          {candidates.map(c => {
-            const selected = chosen === c.user.id;
-            return (
-              <label
-                key={c.user.id}
-                className={`flex min-h-12 cursor-pointer items-center gap-3 rounded border px-3 py-2 ${
-                  selected ? "border-primary-600 bg-primary-50" : "border-border-light"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={`roadmap-lead-${code}`}
-                  checked={selected}
-                  onChange={() => setChosen(c.user.id)}
-                  className="h-4 w-4"
-                />
-                <span className="flex min-w-0 flex-1 flex-col">
+        <RadioButtonGroup
+          legendText={copy.pickLead}
+          name={`roadmap-lead-${code}`}
+          orientation="vertical"
+          valueSelected={chosen === null ? undefined : String(chosen)}
+          onChange={(value: string | number | undefined) => setChosen(Number(value))}
+        >
+          {candidates.map(c => (
+            <RadioButton
+              key={c.user.id}
+              id={`roadmap-lead-${code}-${c.user.id}`}
+              value={String(c.user.id)}
+              labelText={
+                <span className="flex min-w-0 flex-col">
                   <span className="flex items-center gap-2 text-sm text-typography-primary">
                     {c.user.name}
                     {c.user.id === data?.suggestedUserId && (
@@ -126,10 +119,10 @@ export const LeadPicker: React.FC<LeadPickerProps> = ({
                     {c.freeSlots > 0 ? leadWhy(c) : copy.leadFull}
                   </span>
                 </span>
-              </label>
-            );
-          })}
-        </div>
+              }
+            />
+          ))}
+        </RadioButtonGroup>
       </div>
     </RoadmapDialog>
   );

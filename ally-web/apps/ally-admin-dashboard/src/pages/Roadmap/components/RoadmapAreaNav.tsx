@@ -1,7 +1,7 @@
 import React from "react";
 
-import { HelpIcon } from "@icons";
-import { NavLink } from "react-router-dom";
+import { ThreeDot } from "@icons";
+import { NavLink, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { CarbonToggle, OverflowMenu, OverflowMenuItem } from "@ally-ui-mono/ui-shared";
@@ -10,9 +10,10 @@ import { ROUTES, en } from "@constants";
 import type { RoadmapRole } from "@types";
 
 import { requestShortcuts, useRoadmapFrame } from "../RoadmapFrame";
+import { ConceptsButton } from "./ConceptsDrawer";
 import { canSeeAgent, canSeeMeasures, canSeeSettings } from "../utils/redirects";
 
-type RoleTabKey = "agent" | "settings" | "measures";
+export type RoleTabKey = "agent" | "settings" | "measures";
 
 /** The tabs past Queue · My drafts · Bugs, for the roles that have them (§4.1, §4.15; P8). */
 export const roleTabsFor = (role: RoadmapRole): { key: RoleTabKey; to: string }[] => [
@@ -22,7 +23,7 @@ export const roleTabsFor = (role: RoadmapRole): { key: RoleTabKey; to: string }[
 ];
 
 /** A tab's label. Measures' copy lives in its own block (P8). */
-const tabLabel = (key: RoleTabKey): string =>
+export const tabLabel = (key: RoleTabKey): string =>
   key === "measures" ? en.roadmapV2Measures.tab : en.roadmapV2Tools.tabs[key];
 
 /** Agent (Builders, Owners), Settings and Measures (Owners), as links in the Roadmap's tab row. */
@@ -75,24 +76,40 @@ export const DigestToggle: React.FC<{ id?: string }> = ({ id = "roadmap-weekly-d
   );
 };
 
-/** ? : Keyboard shortcuts · What moved · the weekly email (§4.15). */
-export const RoadmapHelpMenu: React.FC<{ showShortcuts?: boolean }> = ({
-  showShortcuts = true,
-}) => {
+/**
+ * The Roadmap's one "more" menu, the last item of the top tabs: Agent, Settings and Measures
+ * (whichever the role has) as sub-options, then Keyboard shortcuts (on the Queue, where they apply),
+ * What moved, and the weekly email (§4.15). One icon, so the tab row is the same on every page.
+ */
+export const RoadmapMoreMenu: React.FC<{
+  role: RoadmapRole;
+  /** The role tab the page is on, if any, to tick it. */
+  active?: RoleTabKey;
+  showShortcuts?: boolean;
+}> = ({ role, active, showShortcuts = false }) => {
   const copy = en.roadmapV2Tools.help;
+  const navigate = useNavigate();
   const { openWhatMoved } = useRoadmapFrame();
   const { data } = useGetRoadmapPreferencesQuery();
   const [save] = useSetRoadmapPreferencesMutation();
   const on = !!data?.weeklyDigest;
+  const label = en.roadmapV2Tools.tabs.moreTitle;
   return (
     <OverflowMenu
-      aria-label={en.roadmapV2Tools.tabs.help}
-      iconDescription={en.roadmapV2Tools.tabs.help}
+      aria-label={label}
+      iconDescription={label}
       flipped
       menuOptionsClass="!z-[9100] !w-72 [&_.cds--overflow-menu-options\_\_btn]:!max-w-none"
-      renderIcon={() => <HelpIcon size={16} aria-hidden />}
+      renderIcon={() => <ThreeDot size={16} aria-hidden />}
       className="!h-8 !w-8"
     >
+      {roleTabsFor(role).map(tab => (
+        <OverflowMenuItem
+          key={tab.key}
+          itemText={`${active === tab.key ? "✓ " : ""}${tabLabel(tab.key)}`}
+          onClick={() => navigate(tab.to)}
+        />
+      ))}
       {showShortcuts && <OverflowMenuItem itemText={copy.shortcuts} onClick={requestShortcuts} />}
       <OverflowMenuItem itemText={copy.whatMoved} onClick={openWhatMoved} />
       {data && (
@@ -110,13 +127,19 @@ export const RoadmapHelpMenu: React.FC<{ showShortcuts?: boolean }> = ({
   );
 };
 
+/** The book icon beside ? in the Roadmap header: the Core Concepts page, for every role. */
+export const RoadmapConceptsButton: React.FC = () => {
+  const { openConcepts } = useRoadmapFrame();
+  return <ConceptsButton onOpen={openConcepts} />;
+};
+
 /** Agent and Settings on a phone: the bottom bar's ⋯ opens these (§4.17). */
 export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => void }> = ({
   role,
   onNavigate,
 }) => {
   const copy = en.roadmapV2Tools;
-  const { openWhatMoved } = useRoadmapFrame();
+  const { openWhatMoved, openConcepts } = useRoadmapFrame();
   const tabs = roleTabsFor(role);
   return (
     <div className="flex flex-col gap-4">
@@ -144,6 +167,16 @@ export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => v
         className="flex min-h-12 items-center text-left text-base text-primary-700"
       >
         {copy.help.whatMoved}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate();
+          openConcepts();
+        }}
+        className="flex min-h-12 items-center text-left text-base text-primary-700"
+      >
+        {copy.concepts.button}
       </button>
     </div>
   );

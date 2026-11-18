@@ -52,6 +52,8 @@ function build(
     },
     access: {
       assertLead: jest.fn(),
+      assertOwner: jest.fn(),
+      isOwner: jest.fn(async () => true),
       canLead: jest.fn(async () => true),
       canRead: jest.fn(async () => true),
     },
@@ -111,7 +113,7 @@ describe('PlanLeadService', () => {
     );
   });
 
-  it('closes directly under the vote threshold', async () => {
+  it('closes directly as not pursuing (an Owner)', async () => {
     const { service, deps, plan } = build({ leadUserId: 4 });
     await service.close(
       'p1',
@@ -130,7 +132,7 @@ describe('PlanLeadService', () => {
     );
   });
 
-  it('needs a second Lead above the threshold, and never the same one', async () => {
+  it('closes above the vote threshold with no second person: only an Owner closes now', async () => {
     const { service, deps, plan } = build(
       { leadUserId: 4 },
       {
@@ -144,20 +146,27 @@ describe('PlanLeadService', () => {
       4,
       'Overlaps with the re-entry work already planned.',
     );
-    expect(plan().plan.closed.pendingConfirmation).toBe(true);
-    expect(deps.events.record).not.toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'closed' }),
-    );
-    await expect(service.confirmClose('p1', 4)).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
-    await service.confirmClose('p1', 5);
-    expect(plan().plan.closed).toMatchObject({
-      pendingConfirmation: false,
-      confirmedBy: 5,
-    });
+    expect(plan().plan.closed.pendingConfirmation).toBe(false);
     expect(deps.events.record).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'closed' }),
+    );
+  });
+
+  it('refuses take-on, close and reopen to anyone but an Owner', async () => {
+    const { service, deps } = build({ leadUserId: null });
+    deps.access.assertOwner.mockRejectedValue(new ForbiddenException('no'));
+    await expect(service.takeOn('p1', 4)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(
+      service.close(
+        'p1',
+        4,
+        'Overlaps with the re-entry work already planned.',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.reopen('p1', 4)).rejects.toBeInstanceOf(
+      ForbiddenException,
     );
   });
 

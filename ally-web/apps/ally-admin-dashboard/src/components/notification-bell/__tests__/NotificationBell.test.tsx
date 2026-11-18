@@ -89,11 +89,11 @@ describe("NotificationBell", () => {
   it("links debrief alerts to the session, the change on the Debrief PM agent page, or the Debrief PM agent", () => {
     expect(notificationHref(N() as never)).toBe("/debriefs/sessions/run-7");
     expect(notificationHref(N({ data: { screen: "DebriefConsole", ideaId: "i9" } }) as never)).toBe(
-      "/debriefs/pm-agent?change=i9",
+      "/debriefs/changes?change=i9",
     );
     expect(
       notificationHref(N({ data: { screen: "DebriefConsole", releaseId: "r3" } }) as never),
-    ).toBe("/debriefs/pm-agent");
+    ).toBe("/debriefs/changes");
     expect(notificationHref(N({ data: { screen: "Simulations" } }) as never)).toBeNull();
     expect(
       notificationHref(

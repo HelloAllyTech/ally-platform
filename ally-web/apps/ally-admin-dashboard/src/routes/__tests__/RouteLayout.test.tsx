@@ -91,6 +91,7 @@ vi.mock("@pages", () => ({
   ProductRoadmap: () => <div>ProductRoadmapPage</div>,
   RoadmapGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   RoadmapQueuePage: () => <div>RoadmapQueuePage</div>,
+  RoadmapProductUpdatesPage: () => <div>ProductUpdatesPage</div>,
   RoadmapIdeaPage: () => <div>RoadmapIdeaPage</div>,
   RoadmapDraftsPage: () => <div>RoadmapDraftsPage</div>,
   RoadmapNewIdeaPage: () => <div>RoadmapNewIdeaPage</div>,

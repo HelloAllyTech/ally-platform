@@ -45,6 +45,7 @@ export interface DebriefRunStepRecord {
  */
 @Entity('debrief_runs')
 @Index('debrief_runs_created_at_idx', ['createdAt'])
+@Index('debrief_runs_status_created_at_idx', ['status', 'createdAt'])
 export class DebriefRun extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -110,6 +111,44 @@ export class DebriefRun extends BaseWithoutTenantEntity {
 
   @Column({ type: 'numeric', precision: 4, scale: 2, nullable: true })
   evaluatorOverall?: string | null;
+
+  /**
+   * The independent judge's score, model and prompt version (migration 1984420000000): real
+   * columns for what SQL filters and averages. `workspace.judge` keeps the whole judgment (the
+   * dimensions and hard fails) and the copy of these three for older readers.
+   */
+  @Column({ type: 'numeric', precision: 4, scale: 2, nullable: true })
+  judgeOverall?: string | null;
+
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  judgeModel?: string | null;
+
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  judgePromptVersion?: string | null;
+
+  /**
+   * How the run treated risk cues: `alarm` (a cue is a safety moment) or `assessed` (handling it
+   * is the skill practised). Set when the run starts; null on a run from before the column, which
+   * `workspace.riskCueOption` still describes.
+   */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  riskCueHandling?: 'alarm' | 'assessed' | null;
+
+  /** sha256 of the release bundle this run ran (equal hashes = equal release behaviour). */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  bundleHash?: string | null;
+
+  /** The Skills Store version each prompt used, by prompt code; `'override'` for a replay's own text. */
+  @Column({ type: 'jsonb', nullable: true })
+  promptVersions?: Record<string, number | string | null> | null;
+
+  /** How the session's language was found: recorded, detected or detected_low_confidence. */
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  languageSource?: string | null;
+
+  /** Times the run was started again from scratch; changed only by the atomic UPDATEs in the drain (never by a save). */
+  @Column({ type: 'smallint', default: 0, update: false })
+  retries!: number;
 
   @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
   evaluatorHardFails!: Array<{ code: string; evidence: string }>;

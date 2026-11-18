@@ -67,7 +67,7 @@ Branch `feat/agents-v2-q3-fast` → `master`. All three apps.
 | 0 One path | `d37247aea` | v1 fallback removed; `run-failed-reply.ts`; `agentRuntimeAllowed` ignored |
 | 0b Booking | `565c2935e` | `takenOf`, refusals relayed, `said_yes`, hand-over respects its switch, table in the title |
 | 1 Safety | `48969ffad` | four crisis levels, `crisisReply` / `emergencyReply`, the level wait, pack correction, Medical v3 and Legal v2, young people with no pre-chat |
-| 2 Answers | `18d88b01b`, `f0d42a807`, `893fa52e6` | honest voice and contact; the "What we learned" document; 8 passages (migration `1984400000000`); contact once |
+| 2 Answers | `18d88b01b`, `f0d42a807`, `893fa52e6` | honest voice and contact; the "What we learned" document; 8 passages (migration `1984600000000`); contact once |
 | 2b Playbooks | `059837791`, `610fa2c81` | `playbooks.py`, four approved playbooks, owner's line per list |
 | 3 Trust in setup | `408e60615`, `995c7310a`, `893fa52e6`, `610fa2c81` | error pages, Cloudflare emails, the publish gate, uploads show reading, one pack per assistant |
 | Q3d | `aeba62123` (merge) | gap answers saved, thumbs-down reason reaches the owner, Appointments examples per business, Overview counts, share link base path |
@@ -106,7 +106,7 @@ These are in `LAUNCH-CHECKLIST.md`, Q3-fast section.
    - `ally_ai_knowledge_crisis_classify` (gpt-6-luna, temperature 0);
    - `ally_ai_builder_system` (rule 3).
 2. **Deploy.**
-   - Migration `1984400000000-KeepEightPassages` runs with ally-be. It's data only.
+   - Migration `1984600000000-KeepEightPassages` runs with ally-be. It's data only.
    - The sync creates the new prompts from their approved seeds:
      - the four `ally_ai_agent_playbook_*` prompts;
      - `ally_ai_agent_upset` and `ally_ai_agent_upset_support`.
@@ -152,10 +152,16 @@ Three Postgres tests fail on master too:
 - **One conflict:** `ally-be/DATA_SCHEMA.md`, the `bot_drafts` row. This branch added
   `source.learnedFactsDocumentId` and `source.readingDocuments`; master added
   `source.interview`. Resolved by keeping all three.
-- **One migration timestamp clashed.** master added `1984300000000-DropDebriefRiskCueOptions`,
-  and this branch's `KeepEightPassages` had the same timestamp. Ours was renumbered to
-  `1984400000000`. It's idempotent (it acts only where the value is still 5), so an environment
-  that already ran it under the old number is unaffected.
+- **The migration timestamp clashed twice.** master added `1984300000000-DropDebriefRiskCueOptions`
+  and later `1984400000000-AddBehaviorInstructionScore`, each with the timestamp this branch's
+  `KeepEightPassages` had at the time. Ours is now `1984600000000`, after every master migration.
+  It's idempotent (it acts only where the value is still 5), so an environment that already ran
+  it under an old number is unaffected.
+- **Second merge (19 Nov, master at `56531062f`):** one conflict,
+  `ally-web/.../Roadmap/components/ViewBar.tsx`. This branch had only moved an import (from the
+  first merge's lint fix); master rewrote the file. Took master's version. master's changes are in
+  debrief, roadmap, learn and mobile, nothing in the agent runtime, crisis check, packs or prompts,
+  so safety wasn't re-run.
 - **master's changes in these areas:** only new Scribe prompts and their contracts. Nothing in
   the agent runtime, crisis check, packs or engine. Even so, the safety suite was re-run once on
   the merged code, with the same results as before:

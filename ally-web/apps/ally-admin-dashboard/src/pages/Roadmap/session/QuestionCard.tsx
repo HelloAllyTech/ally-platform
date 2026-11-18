@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 
-import { Button } from "@ally-ui-mono/ui-shared";
+import { Button, TextArea } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 import { useUser } from "@hooks";
 import type { BuilderQuestionEvent, RoadmapItemDetail, RoadmapPersonRef } from "@types";
@@ -160,12 +160,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   };
 
   const freeBox = (large: boolean) => (
-    <div className="flex items-end gap-2 rounded border border-border-light p-2 focus-within:border-primary-600">
-      <label className="sr-only" htmlFor={`roadmap-q-${question.id}`}>
-        {copy.answerLabel(question.prompt)}
-      </label>
-      <textarea
+    <div className="flex flex-col gap-2">
+      <TextArea
         id={`roadmap-q-${question.id}`}
+        labelText={copy.answerLabel(question.prompt)}
+        hideLabel
         rows={large ? 4 : 1}
         value={freeText}
         placeholder={copy.answerPlaceholder}
@@ -179,22 +178,23 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             sendText();
           }
         }}
-        className="min-h-10 flex-1 resize-none bg-transparent px-1 text-base outline-none"
       />
-      <DictationButton
-        code={item.code}
-        large={large}
-        boxLabel={copy.answerLabel(question.prompt)}
-        onText={words => typeInText(freeText, words, setFreeText, reduced)}
-      />
-      <Button
-        kind="primary"
-        size={large ? "lg" : "sm"}
-        onClick={sendText}
-        disabled={!freeText.trim()}
-      >
-        {copy.send}
-      </Button>
+      <div className="flex items-center justify-end gap-2">
+        <DictationButton
+          code={item.code}
+          large={large}
+          boxLabel={copy.answerLabel(question.prompt)}
+          onText={words => typeInText(freeText, words, setFreeText, reduced)}
+        />
+        <Button
+          kind="primary"
+          size={large ? "lg" : "sm"}
+          onClick={sendText}
+          disabled={!freeText.trim()}
+        >
+          {copy.send}
+        </Button>
+      </div>
     </div>
   );
 
@@ -204,7 +204,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     <li ref={cardRef} className="py-2" data-question={question.id}>
       <motion.div
         layout={reduced ? false : "size"}
-        className="flex flex-col gap-2 rounded-lg border border-border-light bg-white p-3"
+        className="flex flex-col gap-2 border border-border-light bg-white p-3"
         transition={motionTransition("moderate", "productive", reduced)}
       >
         <span className="text-xs font-semibold text-typography-secondary">{agentName}</span>

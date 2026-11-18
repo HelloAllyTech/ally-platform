@@ -103,18 +103,16 @@ describe("deriveNavigationItems", () => {
     expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.PRODUCT_ROADMAP);
   });
 
-  it("shows Product updates right after Blog for a holder of EDIT_BLOG", () => {
+  it("no longer lists Product updates in the sidebar: it is a tab of the Roadmap's top menu", () => {
     const result = deriveNavigationItems({
       permissions: [Permissions.EDIT_BLOG, Permissions.VIEW_BLOGS],
       features: DEFAULT_TAB_KEYS,
       savedOrder: undefined,
     });
-    const ids = result.map(i => i.id);
-    expect(ids).toEqual([SIDEBAR_ITEMS.BLOG, SIDEBAR_ITEMS.PRODUCT_UPDATES]);
-    expect(result[1].path).toBe(ROUTES.PRODUCT_UPDATES);
+    expect(result.map(i => i.id)).toEqual([SIDEBAR_ITEMS.BLOG]);
   });
 
-  it("hides Product updates without EDIT_BLOG, even with VIEW_BLOGS or every feature toggle", () => {
+  it("keeps Product updates out of the sidebar whatever the permissions or toggles", () => {
     expect(
       deriveNavigationItems({
         permissions: [Permissions.VIEW_BLOGS],
@@ -493,7 +491,6 @@ describe("deriveNavigationItems", () => {
         FeatureToggleKey.TRANSLATIONS,
       ],
       [SIDEBAR_ITEMS.BLOG, Permissions.VIEW_BLOGS, FeatureToggleKey.BLOG],
-      [SIDEBAR_ITEMS.PRODUCT_UPDATES, Permissions.EDIT_BLOG, FeatureToggleKey.PRODUCT_UPDATES],
       [
         SIDEBAR_ITEMS.PRODUCT_ROADMAP,
         Permissions.VIEW_PRODUCT_ROADMAP,
@@ -552,7 +549,7 @@ describe("sections", () => {
         .find(s => s.id === id)!
         .items.map(i => i.label);
     expect(labelsOf("create")).toEqual(
-      expect.arrayContaining(["Roleplays", "Events", "Characters", "Blog", "Product Updates"]),
+      expect.arrayContaining(["Roleplays", "Events", "Characters", "Blog"]),
     );
     expect(labelsOf("people")).toEqual(["Users", "Badges", "Debriefs", "Roleplay Logs"]);
     expect(labelsOf("insights")).toEqual(["Analytics", "Conversation Drift"]);

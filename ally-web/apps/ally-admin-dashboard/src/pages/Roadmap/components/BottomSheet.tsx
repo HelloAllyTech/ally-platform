@@ -4,6 +4,7 @@ import { Close } from "@icons";
 import { AnimatePresence, PanInfo, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 
+import { RoadmapIconButton } from "./RoadmapIconButton";
 import { motionTransition, springTransition, useReducedMotionPreference } from "../../../motion";
 
 interface BottomSheetProps {
@@ -108,7 +109,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
             aria-modal="true"
             aria-labelledby={titleId}
             tabIndex={-1}
-            className={`absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-white shadow-lg outline-none ${
+            className={`absolute inset-x-0 bottom-0 flex flex-col bg-white shadow-lg outline-none ${
               full ? "h-[92dvh]" : "max-h-[85dvh]"
             }`}
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -128,14 +129,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
               <h2 id={titleId} className="text-base font-semibold text-typography-primary">
                 {title}
               </h2>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label={closeLabel}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-neutral-100"
-              >
+              <RoadmapIconButton label={closeLabel} onClick={onClose} large>
                 <Close size={20} aria-hidden />
-              </button>
+              </RoadmapIconButton>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 text-base">
               {children}

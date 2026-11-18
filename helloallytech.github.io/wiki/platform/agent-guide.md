@@ -16,6 +16,9 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 > [!NOTE]
 > The in-wiki **Product Management Best Practices** section ([hub](../product/best-practices.md), [UI](../product/ui.md), [Gamification](../product/gamification.md), [Data Visualisation](../product/data-visualisation.md), [Prioritisation](../product/prioritisation.md), [User Personas](../product/user-personas.md), [AI-Product Patterns](../product/ai-product-patterns.md)) was **deprecated on 2026-08-07** and replaced by what is now the Context Library. Nothing in it is a gate any more. It is kept readable because platform pages cite its principles by number, and because it records what this team decided up to August 2026 — useful context, not a checklist.
 
+> [!TIP]
+> **Don't know what a word means here?** [Core Concepts](concepts.md) has a card per concept — what it is, what it's made of, its code, whether it's live and what gates it — and a table of the terms that mean more than one thing ("Skill", "Track", "Chat", "Builder"…). Adding, retiring, renaming or re-gating a concept updates its card in the same PR; CI (`scripts/concepts_lint.py`) fails a PR that adds a module, page or `FeatureToggleKey` the page doesn't map.
+
 ## Repo Quick Reference
 
 ### [ally-be](../repos/ally-be.md) — Core Backend

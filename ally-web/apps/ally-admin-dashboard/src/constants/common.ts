@@ -470,6 +470,12 @@ export const ApiEndpoints = {
     ITEM_SIMILAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/similar`,
     START_PLANNING: (code: string) =>
       `/v1/roadmap/items/${encodeURIComponent(code)}/start-planning`,
+    OPEN_CONVERSATION: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/conversation`,
+    CLOSE_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/close-plan`,
+    REOPEN_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/reopen-plan`,
+    BUILD_MODE: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/build-mode`,
+    MARK_RELEASED: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/mark-released`,
     SESSION_ANSWERS: (sessionId: string) =>
       `/v1/builder/sessions/${encodeURIComponent(sessionId)}/answers`,
     SESSION_COMMENTS: (sessionId: string) =>
@@ -1278,6 +1284,9 @@ export const ROUTES = {
   DEBRIEFS: "/debriefs",
   DEBRIEF_SESSION: (runId: string) => `/debriefs/sessions/${runId}`,
   DEBRIEF_SESSION_LOGS: (runId: string) => `/debriefs/sessions/${runId}/logs`,
+  /** The Changes page (the Debrief PM agent's changes, releases, reports and test sets). */
+  DEBRIEFS_CHANGES: "/debriefs/changes",
+  /** The page's old address (links, emails and notifications sent before 2026-11-18): redirects to Changes. */
   DEBRIEFS_PM_AGENT: "/debriefs/pm-agent",
   DEBRIEFS_SETTINGS: "/debriefs/settings",
   MANAGE_SCENARIO_LANGUAGES: "/manage-scenario-languages",

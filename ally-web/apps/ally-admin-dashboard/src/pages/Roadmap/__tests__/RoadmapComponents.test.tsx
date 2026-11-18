@@ -77,6 +77,7 @@ const row = (overrides: Partial<RoadmapItemRow> = {}): RoadmapItemRow => ({
   code: "OPP-388",
   title: "Streak on start screen",
   shownStage: "planning",
+  stage: "being_built",
   statusParts: {
     stage: "planning",
     step: "design",
@@ -129,7 +130,7 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
     expect(screen.getByRole("heading", { name: "Streak on start screen" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: en.roadmapV2.actions.approveDesign })).toBeNull();
     // The quiet line stands where the action would be.
-    expect(screen.getByText(/Priya leads this idea/)).toBeInTheDocument();
+    expect(screen.getByText(/Priya builds this idea/)).toBeInTheDocument();
   });
 
   it("an Owner gets the star, the title editor and Approve design", () => {
@@ -155,9 +156,16 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("locks voting once the idea leaves the Backlog: the count stays, the control goes", () => {
+    wrap(<IdeaVotes item={detail({ vote: true }, { stage: "being_built" })} />);
+    expect(screen.queryByRole("button", { name: "vote-button" })).toBeNull();
+    expect(screen.getByText(en.roadmapV2.row.votes(23))).toBeInTheDocument();
+    expect(screen.getByTitle(en.roadmapV2.row.votesLocked)).toBeInTheDocument();
+  });
+
   it("gives the idea page the real VoteButton, keyed by the opportunity id", () => {
     mockOpportunity.mockClear();
-    wrap(<IdeaVotes item={detail({ vote: true })} />);
+    wrap(<IdeaVotes item={detail({ vote: true }, { stage: "backlog" })} />);
     expect(screen.getByRole("button", { name: "vote-button" })).toBeInTheDocument();
     expect(mockOpportunity).toHaveBeenCalledWith("opp-uuid-388", { skip: false });
   });
@@ -184,13 +192,53 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
 });
 
 describe("primaryActionFor", () => {
-  it("picks one action by stage and can{}", () => {
-    expect(primaryActionFor(detail({ review: true }, { shownStage: "submitted" }))).toBe("accept");
+  it("picks one action by stage and can{}, in the lifecycle's order", () => {
+    // An Owner plans first: Start planning accepts an idea still waiting.
     expect(
-      primaryActionFor(detail({ pickLead: true }, { shownStage: "accepted", lead: undefined })),
+      primaryActionFor(detail({ review: true, startPlanning: true }, { shownStage: "submitted" })),
+    ).toBe("startPlanning");
+    // A builder is never picked straight from review.
+    expect(
+      primaryActionFor(detail({ review: true, pickLead: true }, { shownStage: "submitted" })),
+    ).toBeNull();
+    const unled = { shownStage: "planning" as const, lead: undefined };
+    expect(primaryActionFor(detail({ closePlan: true, pickLead: false }, unled))).toBe("closePlan");
+    const closedParts = {
+      stage: "planning" as const,
+      step: "prd" as const,
+      leadUserId: null,
+      prdPercent: 50,
+      openQuestions: 0,
+      designAwaitingApproval: false,
+      planClosed: { byUserId: 1, at: "2026-11-18T10:00:00Z" },
+    };
+    expect(
+      primaryActionFor(detail({ pickLead: true }, { ...unled, statusParts: closedParts })),
     ).toBe("pickLead");
     expect(primaryActionFor(detail({ approveDesign: true }))).toBe("approveDesign");
     expect(primaryActionFor(detail({}))).toBeNull();
+  });
+
+  it("gives the builder Mark released once building, and never Released on its own", () => {
+    const building = {
+      shownStage: "building" as const,
+      statusParts: {
+        stage: "building" as const,
+        where: "here" as const,
+        leadUserId: 2,
+        externalBuild: null,
+        repos: [],
+        openPrs: [],
+        mergedPrs: 1,
+        waitingForPr: false,
+        releasing: false,
+        heldReason: null,
+        workLive: true,
+      },
+    };
+    expect(primaryActionFor(detail({ markReleased: true }, building))).toBe("markReleased");
+    expect(primaryActionFor(detail({ merge: true, markReleased: true }, building))).toBe("merge");
+    expect(primaryActionFor(detail({}, building))).toBeNull();
   });
 
   it("renders nothing for the actions later phases build", () => {
@@ -256,13 +304,10 @@ describe("QueueRow", () => {
     expect(screen.queryByTestId("queue-rank")).toBeNull();
   });
 
-  it("loads a row's vote record only when the reader reaches for it, then shows VoteButton", () => {
-    mockOpportunity.mockClear();
+  it("shows no votes and no menu in the row: it is read, then opened", () => {
     renderRow();
     expect(screen.queryByRole("button", { name: "vote-button" })).toBeNull();
-    expect(mockOpportunity).toHaveBeenLastCalledWith("opp-uuid-388", { skip: true });
-    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${en.roadmapV2.row.vote}:`) }));
-    expect(screen.getByRole("button", { name: "vote-button" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.roadmapV2.row.actions("OPP-388") })).toBeNull();
   });
 
   it("prefetches after a 150 ms mouse hover, but not for a touch", () => {
@@ -279,14 +324,9 @@ describe("QueueRow", () => {
     vi.useRealTimers();
   });
 
-  it("on touch, the swipe actions also exist as visible buttons in the row's ⋯ menu", () => {
+  it("on touch, the swipe actions are there, revealed by a swipe", () => {
     renderRow({ touch: true });
-    // Revealed by swipes (hidden from AT until revealed) …
     expect(screen.getAllByText(en.roadmapV2.row.markRead).length).toBeGreaterThan(0);
-    // … and the ⋯ menu is always there.
-    expect(
-      screen.getByRole("button", { name: en.roadmapV2.row.actions("OPP-388") }),
-    ).toBeInTheDocument();
   });
 });
 
@@ -325,7 +365,7 @@ describe("reduced motion lands on the same final state", () => {
     setReduceMotionSwitch(true);
     const still = snapshot();
     expect(still).toEqual(moving);
-    expect(still.text).toContain("Planning");
+    expect(still.text).toContain("Building");
   });
 });
 
@@ -400,12 +440,18 @@ describe("QueueList", () => {
     expect(screen.getByRole("button", { name: en.roadmapV2.updatedPill })).toBeInTheDocument();
   });
 
-  it("groups Leading by stage", () => {
+  it("groups Leading by the five stages: anything with a builder is Building", () => {
     const sections = sectionsFor("leading", {
-      rows: [row({ code: "OPP-1" }), row({ code: "OPP-2", shownStage: "building" })],
-      total: 2,
+      rows: [
+        row({ code: "OPP-1", stage: "being_built" }),
+        row({ code: "OPP-2", shownStage: "building", stage: "being_built" }),
+        row({ code: "OPP-3", shownStage: "shipped", stage: "shipped" }),
+      ],
+      total: 3,
     });
-    expect(sections.map(s => s.key)).toEqual(["planning", "building"]);
+    expect(sections.map(s => s.key)).toEqual(["being_built", "shipped"]);
+    expect(sections[0].rows.map(r => r.code)).toEqual(["OPP-1", "OPP-2"]);
+    expect(sections[0].label).toBe("Building");
   });
 });
 
