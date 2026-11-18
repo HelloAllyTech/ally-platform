@@ -480,6 +480,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Comparison:** vs {value} last week
 - **Unanswered list title:** Questions it didn't know
 - **Unanswered action:** Answer it
+- **Booking steps, apart from it** *(added in Q3d)*: Couldn't complete a booking · From the last 7 days. These were part of a booking, not questions to answer.
 - **Thumbs-down list title:** Answers people weren't happy with
 - **Thumbs-down actions:** Correct this · It was fine
 - **Checkup card:** Last checkup: {passed} of {total} answered well · View checkup
@@ -1001,7 +1002,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - Example
 - Add
 - Add a {detail}
-- Keep at least one.
+- Add at least one of your own.
 - Add the times people can book
 - Pick the days and hours. You can change or remove any of them later.
 - What can your assistant do with {list}?

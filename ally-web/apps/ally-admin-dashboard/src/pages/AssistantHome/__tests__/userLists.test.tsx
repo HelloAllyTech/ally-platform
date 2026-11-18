@@ -236,6 +236,47 @@ describe("no lists yet", () => {
     expect(screen.getByRole("heading", { name: t.setup.timesTitle })).toBeTruthy();
     expect(screen.getByRole("button", { name: t.setup.skipForNow })).toBeTruthy();
   });
+
+  it("every example can be removed, the last one too, and Next waits for one of their own", async () => {
+    // Prod, 18 Nov: the last example couldn't be removed, stayed, and the assistant offered it.
+    h.results.install = () => {
+      h.lists.current = [SLOTS, APPOINTMENTS];
+      return Promise.resolve({ lists: [SLOTS, APPOINTMENTS] });
+    };
+    const view = render(
+      <ListsSection bot={BOT} home={{} as never} canEdit canManage go={vi.fn()} tryIt={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.empty.readyMade) }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: `${t.setup.use}: Appointments` }));
+    });
+    view.rerender(
+      <ListsSection bot={BOT} home={{} as never} canEdit canManage go={vi.fn()} tryIt={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Follow-up" }));
+    const last = screen.getByRole("button", { name: "Remove Consultation" }) as HTMLButtonElement;
+    expect(last.disabled).toBe(false);
+    fireEvent.click(last);
+    expect(screen.queryByText(t.setup.example)).toBeNull();
+    expect(screen.getByText(t.setup.needOne)).toBeTruthy();
+    const next = screen.getByRole("button", { name: t.setup.next }) as HTMLButtonElement;
+    expect(next.disabled).toBe(true);
+
+    fireEvent.change(screen.getByPlaceholderText("Add a service"), {
+      target: { value: "Eye check-up" },
+    });
+    expect(next.disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(next);
+    });
+    expect(h.calls.updateField).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: "service",
+        change: { options: { values: ["Eye check-up"] } },
+      }),
+    );
+  });
 });
 
 describe("a choice typed but not added", () => {

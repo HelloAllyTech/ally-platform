@@ -28,7 +28,10 @@ import {
 } from './list-store';
 import type { ListActor } from './list-types';
 import {
+  type BusinessKind,
+  businessKind,
   exampleOptions,
+  examplesFor,
   HEALTH_PACKS,
   listInputFor,
   READY_MADE,
@@ -344,8 +347,39 @@ export class ListOwnerService {
 
   // ---- ready-made lists ------------------------------------------------------------------------
 
-  /** The catalogue as the picker shows it, grouped as `READY-MADE-LISTS.md` groups it. */
-  catalogue() {
+  /**
+   * The kind of business an assistant serves (Q3d), for examples that fit it: from its setup
+   * draft's industry, name and "about" facts, else its name and safety pack.
+   */
+  async businessKindOf(
+    chatbot: Pick<Chatbot, 'id'> &
+      Partial<Pick<Chatbot, 'name' | 'safetyPack'>>,
+  ): Promise<BusinessKind> {
+    const [draft] = (await this.dataSource.query(
+      `SELECT industry, draft_config->>'name' AS name, learned FROM bot_drafts
+        WHERE chatbot_id = $1 ORDER BY "updatedAt" DESC LIMIT 1`,
+      [chatbot.id],
+    )) as {
+      industry: string | null;
+      name: string | null;
+      learned: { facts?: { section?: string; text?: string }[] } | null;
+    }[];
+    const about = (draft?.learned?.facts ?? [])
+      .filter((f) => f.section === 'about')
+      .slice(0, 5)
+      .map((f) => f.text ?? '');
+    return businessKind({
+      industry: draft?.industry,
+      safetyPack: chatbot.safetyPack,
+      text: [chatbot.name, draft?.name, ...about].filter(Boolean).join('\n'),
+    });
+  }
+
+  /**
+   * The catalogue as the picker shows it, grouped as `READY-MADE-LISTS.md` groups it, with the
+   * examples that fit the business when its kind is given.
+   */
+  catalogue(kind?: BusinessKind) {
     return {
       groups: READY_MADE_GROUPS.map((group) => ({
         name: group,
@@ -365,7 +399,7 @@ export class ListOwnerService {
                 required: !!f.required,
               })),
             })),
-            needs_options: exampleOptions(item),
+            needs_options: exampleOptions(item, kind),
           }),
         ),
       })),
@@ -379,7 +413,7 @@ export class ListOwnerService {
    */
   async install(
     chatbot: Pick<Chatbot, 'id' | 'settings'> &
-      Partial<Pick<Chatbot, 'safetyPack'>>,
+      Partial<Pick<Chatbot, 'safetyPack' | 'name'>>,
     name: string,
     options?: Record<string, Record<string, string[]>>,
   ): Promise<{ lists: OwnerListView[] }> {
@@ -392,6 +426,8 @@ export class ListOwnerService {
       );
     }
     const health = HEALTH_PACKS.has(chatbot.safetyPack ?? '');
+    // Examples that fit the business; the owner's own choices win (Q3d).
+    const fitting = examplesFor(await this.businessKindOf(chatbot));
     const { views, settings } = await this.dataSource.transaction(async (m) => {
       for (const list of item.lists) {
         if (await loadList(m, chatbot.id, list.key)) {
@@ -406,7 +442,7 @@ export class ListOwnerService {
       for (const list of item.lists) {
         const { rules, ...input } = listInputFor(list, {
           health,
-          options: options?.[list.key],
+          options: { ...fitting[list.key], ...options?.[list.key] },
         });
         await this.definitions.createList(chatbot.id, input, { manager: m });
         let view: ListDefinitionView | undefined;

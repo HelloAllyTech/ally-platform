@@ -256,6 +256,17 @@ export const Scorecard: React.FC<{
       )}
 
       <UnansweredList botId={botId} canEdit={canEdit} />
+      {!!data.bookingProblems?.length && (
+        <Group title={t.bookingTitle} hint={t.bookingHint} testId="overview-booking-problems">
+          <ul className="ally-score__list">
+            {data.bookingProblems.map(q => (
+              <li key={q.id}>
+                <p className="ally-body">“{q.question}”</p>
+              </li>
+            ))}
+          </ul>
+        </Group>
+      )}
 
       <Group title={t.thumbsDownTitle} testId="overview-thumbs-down">
         {data.thumbsDown.length === 0 ? (

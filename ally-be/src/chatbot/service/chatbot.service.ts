@@ -247,11 +247,13 @@ export class ChatbotService {
   }
 
   /**
-   * One bot's numbers over the last 7 or 30 days, counted as the list counts its 30 (chunk 20d-2:
-   * the home's 7 days / 30 days switch). Access is checked by the caller.
+   * One bot's numbers over the last 7 or 30 days (chunk 20d-2: the home's 7 days / 30 days
+   * switch). Always from the shared store (`chatbot_*`), the one the Overview's "This week" counts,
+   * so the two never disagree (Q3d; prod 18 Nov: "7 conversations" beside "People 0, Messages 0",
+   * because the bot page's chats are only in `chatbot_*`). Access is checked by the caller.
    */
   async statsFor(id: string, days: 7 | 30): Promise<ChatbotStats> {
-    const stats = await this.stats([id], days);
+    const stats = await this.stats([id], days, true);
     return stats.get(id) ?? { ...EMPTY_STATS };
   }
 
@@ -359,13 +361,16 @@ export class ChatbotService {
   /**
    * Last-30-day activity per bot, from the conversations stamped with it. From `wa_*`, or, while
    * the dashboard reads the shared store (chunk 12b), from `chatbot_*`: every channel, the bot page
-   * included. The two have the same shape, so one query serves both.
+   * included. The two have the same shape, so one query serves both. `fromSharedStore` reads
+   * `chatbot_*` whatever the dashboard setting.
    */
   private async stats(
     ids: string[],
     days = STATS_DAYS,
+    fromSharedStore = false,
   ): Promise<Map<string, ChatbotStats>> {
-    const shared = dashboardReadsShared(await this.settingsService.get());
+    const shared =
+      fromSharedStore || dashboardReadsShared(await this.settingsService.get());
     const messages = shared ? 'chatbot_messages' : 'wa_messages';
     const conversations = shared ? 'chatbot_conversations' : 'wa_conversations';
     const rows = await this.chatbotRepository.manager.query<
