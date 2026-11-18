@@ -21,6 +21,8 @@ function build(
     stage?: string;
     can?: Record<string, boolean>;
     lead?: number | null;
+    /** The idea has no plan session yet (filed outside the guided interview). */
+    noSession?: boolean;
   } = {},
 ) {
   const roles = opts.roles ?? { [OWNER]: 'owner', [BUILDER]: 'builder' };
@@ -49,6 +51,10 @@ function build(
           sql.includes('FROM "roadmap_opportunities"')
         )
           return [{ reviewState: 'pending', createdBy: AUTHOR }];
+        if (sql.startsWith('UPDATE "roadmap_opportunities"'))
+          return [[{ id: 'id' }], 1];
+        if (sql.includes('SELECT description'))
+          return [{ description: 'Tell me why I am blocked.\nMore.' }];
         if (sql.startsWith('SELECT "reviewState"'))
           return [{ reviewState: db.state }];
         return [];
@@ -67,7 +73,7 @@ function build(
         id: `id-${code}`,
         code,
         createdBy: AUTHOR,
-        builderSessionId: `s-${code}`,
+        builderSessionId: opts.noSession ? null : `s-${code}`,
       })),
     },
     reader: {
@@ -85,12 +91,16 @@ function build(
       })),
       update: jest.fn(),
       patchPlan: jest.fn(),
+      repository: { update: jest.fn() },
     },
     stage: { sync: jest.fn() },
     events: { record: jest.fn() },
     inbox: { deliver: jest.fn() },
     broadcast: { emit: jest.fn() },
     strategyGoals: { invalidate: jest.fn() },
+    builderSessions: {
+      createSession: jest.fn(async () => ({ id: 'new-session' })),
+    },
   };
   const service = new RoadmapReviewService(
     ...(Object.values(deps) as unknown as ConstructorParameters<
@@ -205,6 +215,77 @@ describe('RoadmapReviewService', () => {
         directRecipientIds: [BUILDER],
       }),
     );
+  });
+
+  describe('picking a lead on an idea with no plan session', () => {
+    it('creates the session, links it to the idea and assigns the lead', async () => {
+      const { service, deps } = build({ noSession: true, stage: 'accepted' });
+      await service.lead(OWNER, 'OPP-0001', {
+        action: 'assign',
+        leadUserId: BUILDER,
+      });
+      // Owned by the author, titled from the idea's first line.
+      expect(deps.builderSessions.createSession).toHaveBeenCalledWith(AUTHOR, {
+        title: 'Tell me why I am blocked.',
+      });
+      expect(deps.store.repository.update).toHaveBeenCalledWith(
+        { id: 'new-session' },
+        expect.objectContaining({ kind: 'plan', visibility: 'shared' }),
+      );
+      expect(deps.dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('"builderSessionId" IS NULL'),
+        ['id-OPP-0001', 'new-session', OWNER],
+      );
+      expect(deps.store.update).toHaveBeenCalledWith(
+        'new-session',
+        expect.objectContaining({ leadUserId: BUILDER }),
+      );
+      expect(deps.events.record).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: PlanEventKind.LEAD_ASSIGNED }),
+      );
+    });
+
+    it('keeps the winner and archives its own session when another Owner got there first', async () => {
+      const { service, deps } = build({ noSession: true, stage: 'accepted' });
+      deps.dataSource.query.mockImplementation(async (sql: string) => {
+        if (sql.startsWith('UPDATE "roadmap_opportunities"')) return [[], 0];
+        if (sql.includes('SELECT description')) return [{ description: 'x' }];
+        return [];
+      });
+      deps.lookup.get
+        .mockResolvedValueOnce({
+          id: 'id-1',
+          code: 'OPP-0001',
+          createdBy: AUTHOR,
+          builderSessionId: null,
+        })
+        .mockResolvedValue({
+          id: 'id-1',
+          code: 'OPP-0001',
+          createdBy: AUTHOR,
+          builderSessionId: 'winner',
+        });
+      await service.lead(OWNER, 'OPP-0001', {
+        action: 'assign',
+        leadUserId: BUILDER,
+      });
+      expect(deps.store.update).toHaveBeenCalledWith(
+        'new-session',
+        expect.objectContaining({ archivedAt: expect.any(Date) }),
+      );
+      expect(deps.store.update).toHaveBeenCalledWith(
+        'winner',
+        expect.objectContaining({ leadUserId: BUILDER }),
+      );
+    });
+
+    it('does not create a session just to hand an idea back', async () => {
+      const { service, deps } = build({ noSession: true, stage: 'accepted' });
+      await expect(
+        service.lead(BUILDER, 'OPP-0001', { action: 'handBack' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(deps.builderSessions.createSession).not.toHaveBeenCalled();
+    });
   });
 
   it('refuses a lead who is not a Builder or Owner', async () => {

@@ -12,7 +12,7 @@ import {
   useUndoRoadmapReviewMutation,
 } from "../../../api/roadmapV2Flow";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
-import { errorCode, errorStatus } from "../drafts/draftUtils";
+import { errorCode, errorMessage, errorStatus } from "../drafts/draftUtils";
 import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
 
 import type { RoadmapBatchReviewItem } from "../../../types/roadmapV2Flow";
@@ -207,8 +207,8 @@ export const useReviewActions = () => {
         haptic(10);
         toast.success(copy.leadPicked(lead.name));
         return true;
-      } catch {
-        toast.error(copy.failed);
+      } catch (error) {
+        toast.error(errorMessage(error) ?? copy.failed);
         return false;
       }
     },
@@ -221,8 +221,8 @@ export const useReviewActions = () => {
         await setLead({ code, action: "handBack" }).unwrap();
         toast.success(copy.handedBack);
         return true;
-      } catch {
-        toast.error(copy.failed);
+      } catch (error) {
+        toast.error(errorMessage(error) ?? copy.failed);
         return false;
       }
     },

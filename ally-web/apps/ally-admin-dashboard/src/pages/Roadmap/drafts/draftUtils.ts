@@ -28,6 +28,17 @@ export const newlyMet = (
 export const errorCode = (error: unknown): string | undefined =>
   (error as RoadmapFlowError)?.data?.code;
 
+/**
+ * The server's own sentence for a refusal (4xx only: its 403/409/422 messages are written to be
+ * read), or undefined so the caller shows its generic line. A 5xx message is never shown.
+ */
+export const errorMessage = (error: unknown): string | undefined => {
+  const status = errorStatus(error);
+  if (status === undefined || status < 400 || status >= 500) return undefined;
+  const message = (error as { data?: { message?: unknown } })?.data?.message;
+  return typeof message === "string" && message.trim() ? message : undefined;
+};
+
 export const errorStatus = (error: unknown): number | undefined => {
   const status = (error as RoadmapFlowError)?.status;
   return typeof status === "number" ? status : undefined;
