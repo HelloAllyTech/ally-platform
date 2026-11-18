@@ -58,11 +58,13 @@ describe('ChatRepository', () => {
 
     entityManager = {
       getRepository: jest.fn().mockReturnValue(chatRepo),
+      query: jest.fn().mockResolvedValue([[{ id: 1 }], 1]),
     } as any;
 
     dataSource = {
       createEntityManager: jest.fn().mockReturnValue(entityManager),
       getRepository: jest.fn().mockReturnValue(chatRepo),
+      query: jest.fn().mockResolvedValue([[{ id: 1 }], 1]),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -90,97 +92,75 @@ describe('ChatRepository', () => {
   });
 
   describe('updateChat', () => {
-    // it('should return false when no updates are provided', async () => {
-    //   const emptyInput: UpdateChatInput = {};
-    //   mockQueryBuilder.execute.mockResolvedValue({ affected: 0 });
+    const ok = { affected: 1, raw: [], generatedMaps: [] };
 
-    //   const result = await repository.updateChat(1, emptyInput);
+    it('merges metadata into what is stored instead of replacing it', async () => {
+      chatRepo.update.mockResolvedValue(ok);
 
-    //   expect(result).toBe(false);
-    //   expect(chatRepo.createQueryBuilder).toHaveBeenCalledWith('chat');
-    //   expect(mockQueryBuilder.set).not.toHaveBeenCalled();
-    //   expect(mockQueryBuilder.where).toHaveBeenCalledWith('id = :chatId', {
-    //     chatId: 1,
-    //   });
-    // });
+      const result = await repository.updateChat(1, mockUpdateChatInput);
 
-    it('should return false when update affects 0 rows', async () => {
+      expect(result).toBe(true);
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining(`COALESCE(metadata, '{}'::jsonb) || $2::jsonb`),
+        [1, JSON.stringify({ key: 'value' })],
+      );
+      // The other columns still go through the ordinary update, without metadata.
+      expect(chatRepo.update).toHaveBeenCalledWith(1, {
+        summaryStatus: ChatSummaryStatus.SUCCESS,
+      });
+    });
+
+    it('returns false when no row matched', async () => {
+      dataSource.query.mockResolvedValue([[], 0]);
       chatRepo.update.mockResolvedValue({
         affected: 0,
         raw: [],
         generatedMaps: [],
       });
 
-      const result = await repository.updateChat(1, mockUpdateChatInput);
-
-      expect(result).toBe(false);
-      expect(chatRepo.update).toHaveBeenCalledWith(1, mockUpdateChatInput);
+      await expect(repository.updateChat(1, mockUpdateChatInput)).resolves.toBe(
+        false,
+      );
     });
 
-    it('should return true when update affects rows', async () => {
-      chatRepo.update.mockResolvedValue({
-        affected: 1,
-        raw: [],
-        generatedMaps: [],
+    it('updates columns alone when no metadata is given', async () => {
+      chatRepo.update.mockResolvedValue(ok);
+
+      await repository.updateChat(1, {
+        summaryStatus: ChatSummaryStatus.FAILED,
       });
 
-      const result = await repository.updateChat(1, mockUpdateChatInput);
-
-      expect(result).toBe(true);
-      expect(chatRepo.update).toHaveBeenCalledWith(1, mockUpdateChatInput);
+      expect(dataSource.query).not.toHaveBeenCalled();
+      expect(chatRepo.update).toHaveBeenCalledWith(1, {
+        summaryStatus: ChatSummaryStatus.FAILED,
+      });
     });
 
-    it('should set metadata as function that returns correct SQL', async () => {
-      const inputWithMetadata: UpdateChatInput = {
-        metadata: { key: 'value' },
-      };
-      chatRepo.update.mockResolvedValue({
-        affected: 1,
-        raw: [],
-        generatedMaps: [],
-      });
-
-      await repository.updateChat(1, inputWithMetadata);
-
-      expect(chatRepo.update).toHaveBeenCalledWith(1, inputWithMetadata);
+    it('merges metadata alone without an empty column update', async () => {
+      await expect(
+        repository.updateChat(1, { metadata: { a: 1 } }),
+      ).resolves.toBe(true);
+      expect(chatRepo.update).not.toHaveBeenCalled();
     });
 
     it('should use EntityManager when provided', async () => {
-      chatRepo.update.mockResolvedValue({
-        affected: 1,
-        raw: [],
-        generatedMaps: [],
-      });
+      chatRepo.update.mockResolvedValue(ok);
 
       await repository.updateChat(1, mockUpdateChatInput, entityManager);
 
       expect(entityManager.getRepository).toHaveBeenCalledWith(Chat);
+      expect(entityManager.query).toHaveBeenCalled();
       expect(dataSource.getRepository).not.toHaveBeenCalled();
+      expect(dataSource.query).not.toHaveBeenCalled();
     });
 
     it('should use DataSource when EntityManager not provided', async () => {
-      chatRepo.update.mockResolvedValue({
-        affected: 1,
-        raw: [],
-        generatedMaps: [],
-      });
+      chatRepo.update.mockResolvedValue(ok);
 
       await repository.updateChat(1, mockUpdateChatInput);
 
       expect(dataSource.getRepository).toHaveBeenCalledWith(Chat);
       expect(entityManager.getRepository).not.toHaveBeenCalled();
-    });
-
-    it('should handle both summaryStatus and metadata updates', async () => {
-      chatRepo.update.mockResolvedValue({
-        affected: 1,
-        raw: [],
-        generatedMaps: [],
-      });
-
-      await repository.updateChat(1, mockUpdateChatInput);
-
-      expect(chatRepo.update).toHaveBeenCalledWith(1, mockUpdateChatInput);
     });
   });
 

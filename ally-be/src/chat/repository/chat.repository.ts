@@ -491,17 +491,38 @@ export class ChatRepository extends Repository<Chat> {
       ? em.getRepository(Chat)
       : this.dataSource.getRepository(Chat);
 
-    const updateData = Object.fromEntries(
+    const updateData: Record<string, any> = Object.fromEntries(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       Object.entries(input).filter(([key, value]) => value !== undefined),
     );
 
+    // metadata is MERGED into what is stored, never replaced. Replacing it let
+    // any writer that passed a partial object erase every other key: the
+    // transcription hand-off's { correlationId } erased the incomplete-
+    // recording flag set a moment before, so a cut-off recording's summary
+    // never said audio was missing. `||` in one statement, so two writers
+    // can't lose each other's keys either.
+    const metadata = updateData.metadata;
+    delete updateData.metadata;
+    let affected = false;
+    if (metadata && typeof metadata === 'object') {
+      const runner = em ?? this.dataSource;
+      const merged: unknown = await runner.query(
+        `UPDATE chats SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb WHERE id = $1 RETURNING id`,
+        [chatId, JSON.stringify(metadata)],
+      );
+      // postgres returns [rows, count] for UPDATE … RETURNING.
+      const rows =
+        Array.isArray(merged) && Array.isArray(merged[0]) ? merged[0] : merged;
+      affected = Array.isArray(rows) && rows.length > 0;
+    }
+
     if (Object.keys(updateData).length === 0) {
-      return false;
+      return affected;
     }
 
     const result = await chatRepo.update(chatId, updateData);
-    return result.affected !== 0;
+    return result.affected !== 0 || affected;
   }
 
   async deleteChat(
