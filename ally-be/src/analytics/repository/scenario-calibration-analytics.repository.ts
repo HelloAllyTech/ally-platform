@@ -188,7 +188,8 @@ export class ScenarioCalibrationAnalyticsRepository {
    *  - every live PASSIVE base event (the worker is sent them for every
    *    scenario): the scenario's own mapping score/cap when it has one, else
    *    the base score, uncapped;
-   *  - live behaviour instructions: SHOULD_DO +10, SHOULD_NOT_DO −10, uncapped.
+   *  - live behaviour instructions: the authored score, else SHOULD_DO +10 /
+   *    SHOULD_NOT_DO −10, uncapped.
    *
    * Contributors with no score come back too; the range derivation skips them.
    */
@@ -226,9 +227,10 @@ export class ScenarioCalibrationAnalyticsRepository {
       UNION ALL
       SELECT bi."scenarioId" AS scenario_id,
              'behaviour' AS kind,
-             (CASE WHEN bi.category = '${BehaviorInstructionCategory.SHOULD_DO}'
-                   THEN ${BEHAVIOR_INSTRUCTION_SHOULD_DO_SCORE}
-                   ELSE ${BEHAVIOR_INSTRUCTION_SHOULD_NOT_DO_SCORE} END)::float AS score,
+             COALESCE(bi.score,
+                      CASE WHEN bi.category = '${BehaviorInstructionCategory.SHOULD_DO}'
+                           THEN ${BEHAVIOR_INSTRUCTION_SHOULD_DO_SCORE}
+                           ELSE ${BEHAVIOR_INSTRUCTION_SHOULD_NOT_DO_SCORE} END)::float AS score,
              NULL::float AS max_occurrences
         FROM scenario_behavior_instructions bi
        WHERE bi."scenarioId" = ANY($1::int[])
