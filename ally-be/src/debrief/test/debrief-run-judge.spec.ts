@@ -283,7 +283,7 @@ describe('judging a run is exclusive', () => {
     // runs cannot keep older ones from being judged.
     const where = (svc as any).runs.find.mock.calls[0][0].where;
     const sql: string = where.workspace.getSql('w');
-    expect(sql).toContain("(w->>'judgeFailedAt' IS NULL");
+    expect(sql).toContain("(w ->> 'judgeFailedAt' IS NULL");
     expect(sql).toContain('power(2,');
     expect(sql).toContain("NOT (coalesce(w, '{}'::jsonb) ? 'judge')");
     void snapshot;
@@ -354,5 +354,16 @@ describe('the judge drain reaches older unscored runs', () => {
     expect(where.workspace.getSql('w')).toMatch(
       /^NOT \(coalesce\(w, '\{\}'::jsonb\) \? 'judge'\)/,
     );
+  });
+});
+
+describe('the judge drain’s pending-runs filter', () => {
+  it('leaves a space, comma or parenthesis after every use of the column, so TypeORM quotes it', async () => {
+    const { judgePendingSql } =
+      await import('../service/debrief-run-judge.service');
+    const sql = judgePendingSql('__COLUMN__');
+    expect(sql.match(/__COLUMN__/g)?.length).toBeGreaterThan(0);
+    // TypeORM only rewrites the column name when whitespace, a comma or ")" follows it.
+    expect(sql).not.toMatch(/__COLUMN__(?![\s,)])/);
   });
 });

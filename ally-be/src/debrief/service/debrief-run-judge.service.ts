@@ -61,6 +61,19 @@ export interface RunJudgment {
  * the run (`workspace.judge`), because `debrief_quality_judgment` is keyed one
  * row per session per judge and today's debrief already holds that slot.
  */
+/**
+ * The WHERE for runs the judge still has to score. TypeORM hands `Raw` the column as `w` and only
+ * quotes it when a space, comma or parenthesis follows it: `${w}->>'x'` is left unquoted and Postgres
+ * fails with "missing FROM-clause entry", so every `->>` here has a space before it.
+ */
+export const judgePendingSql = (w: string): string =>
+  `NOT (coalesce(${w}, '{}'::jsonb) ? 'judge')
+            AND (${w} ->> 'judgeFailedAt' IS NULL
+                 OR (${w} ->> 'judgeFailedAt')::timestamptz
+                      < now() - make_interval(mins => LEAST(${JUDGE_RETRY_MAX_MINUTES},
+                          ${JUDGE_RETRY_BASE_MINUTES}
+                          * power(2, LEAST(COALESCE((${w} ->> 'judgeFailures')::int, 1), 8) - 1))::int))`;
+
 @Injectable()
 export class DebriefRunJudgeService {
   private readonly logger = LoggerService.getInstance(
@@ -321,14 +334,7 @@ export class DebriefRunJudgeService {
         // And not one that failed lately: a run the judge cannot score would otherwise sit among
         // the newest and, with enough of them, keep every older run from being reached. A failure
         // waits 15 min, then 30, 60 … up to a day before it is tried again.
-        workspace: Raw(
-          (w) => `NOT (coalesce(${w}, '{}'::jsonb) ? 'judge')
-            AND (${w}->>'judgeFailedAt' IS NULL
-                 OR (${w}->>'judgeFailedAt')::timestamptz
-                      < now() - make_interval(mins => LEAST(${JUDGE_RETRY_MAX_MINUTES},
-                          ${JUDGE_RETRY_BASE_MINUTES}
-                          * power(2, LEAST(COALESCE((${w}->>'judgeFailures')::int, 1), 8) - 1))::int))`,
-        ),
+        workspace: Raw(judgePendingSql),
       },
       order: { createdAt: 'DESC' },
       take: limit * 3,
