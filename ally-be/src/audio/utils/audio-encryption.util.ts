@@ -13,13 +13,27 @@ export class AudioEncryptionUtil {
   /**
    * Create a cipher stream and write directly to encrypted file.
    */
-  static createEncryptionStream(outputPath: string) {
+  static createEncryptionStream(
+    outputPath: string,
+    onError?: (error: Error) => void,
+  ) {
     const key = crypto.randomBytes(32); // 256-bit key
     const iv = crypto.randomBytes(16);
 
     const cipher = crypto.createCipheriv(this.ALGORITHM, key, iv);
 
     const writeStream = fs.createWriteStream(outputPath);
+    // Without a listener, a stream 'error' (a full disk, a missing directory)
+    // is an unhandled event that crashes the whole process, ending every
+    // recording on it. Report it once instead; the caller fails this one.
+    let reported = false;
+    const report = (error: Error) => {
+      if (reported) return;
+      reported = true;
+      onError?.(error);
+    };
+    writeStream.on('error', report);
+    cipher.on('error', report);
     cipher.pipe(writeStream);
 
     return {
@@ -40,6 +54,17 @@ export class AudioEncryptionUtil {
     writeStream: fs.WriteStream,
   ): Promise<EncryptionMetadata> {
     return new Promise((resolve, reject) => {
+      // A stream that already failed never emits 'finish': waiting for it
+      // would hang the end of the recording forever.
+      if (
+        writeStream.errored ||
+        (writeStream.destroyed && !writeStream.writableFinished)
+      ) {
+        reject(
+          writeStream.errored ?? new Error('Recording file stream was closed'),
+        );
+        return;
+      }
       cipher.end();
       writeStream.on('finish', () => {
         const authTag = cipher.getAuthTag();
