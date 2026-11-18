@@ -37,8 +37,15 @@ PIPELINE_PROMPT_CODES = [
     "ally_ai_summary_dictation_summary",
     "ally_ai_summary_condense_chunk",
     "ally_ai_analysis_counselor_analysis",
-    # Scribe v2 note harness (shadow runs). Sent on every message so a tenant
-    # switched on mid-flight never runs the minimal local defaults.
+]
+
+# The prompts the v1 pipeline cannot run without. The cached-prompts fallback
+# needs all of these; the optional ones below are used when present.
+_REQUIRED_PIPELINE_PROMPT_CODES = list(PIPELINE_PROMPT_CODES)
+
+PIPELINE_PROMPT_CODES += [
+    # Scribe v2 note harness (shadow runs). Optional: a store that doesn't
+    # have them yet must not stop the cached fallback for v1.
     "ally_ai_scribe_note_generate",
     "ally_ai_scribe_note_map_segment",
     "ally_ai_scribe_note_repair",
@@ -746,7 +753,10 @@ class TranscriptionRequestHandler:
                 PIPELINE_PROMPT_CODES
             )
         except Exception as e:  # noqa: BLE001 - any failure means requeue
-            if all(c in _last_good_pipeline_prompts for c in PIPELINE_PROMPT_CODES):
+            if all(
+                c in _last_good_pipeline_prompts
+                for c in _REQUIRED_PIPELINE_PROMPT_CODES
+            ):
                 logger.warning(
                     f"[PROMPT_DELIVERY] Could not fetch the pipeline prompts for "
                     f"chat_id={chat_id} correlation_id={correlation_id}; using "
@@ -765,7 +775,7 @@ class TranscriptionRequestHandler:
             for code, text in (texts or {}).items()
             if isinstance(text, str) and text.strip()
         }
-        missing = [c for c in PIPELINE_PROMPT_CODES if c not in prompts]
+        missing = [c for c in _REQUIRED_PIPELINE_PROMPT_CODES if c not in prompts]
         if missing:
             logger.error(
                 f"[PROMPT_DELIVERY] ally-be has no live text for {missing}; "

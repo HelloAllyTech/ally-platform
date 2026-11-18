@@ -95,3 +95,26 @@ async def test_shadow_failures_are_reported_not_raised():
         correlation_id=None,
     )
     text_gen.generate_note_draft.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cached_fallback_does_not_need_the_v2_prompts():
+    """A store without the new harness prompts must not stop the v1 fallback."""
+    from app.core.queue.transcription_request_handler import (
+        _REQUIRED_PIPELINE_PROMPT_CODES,
+        PIPELINE_PROMPT_CODES,
+    )
+
+    assert "ally_ai_scribe_note_generate" in PIPELINE_PROMPT_CODES
+    assert "ally_ai_scribe_note_generate" not in _REQUIRED_PIPELINE_PROMPT_CODES
+
+    handler, ally_core, _ = _handler()
+    ally_core.get_prompts_by_codes.side_effect = RuntimeError("be down")
+    handler_module._last_good_pipeline_prompts.clear()
+    for code in _REQUIRED_PIPELINE_PROMPT_CODES:
+        handler_module._last_good_pipeline_prompts[code] = {"prompt": "t"}
+    try:
+        prompts = await handler._fetch_pipeline_prompts(7, None)
+    finally:
+        handler_module._last_good_pipeline_prompts.clear()
+    assert set(prompts) == set(_REQUIRED_PIPELINE_PROMPT_CODES)
