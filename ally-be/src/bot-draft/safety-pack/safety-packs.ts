@@ -334,8 +334,15 @@ export function packRequest(
   return asked.strength > current.strength ? 'apply' : 'keep';
 }
 
-/** "Medical safety" → "Medical", for "the Medical safety rules". */
-const rulesName = (name: string) => name.replace(/\s+safety$/i, '');
+/** Each pack's short name in setup's sentence ("the Medical safety rules", "Young-people rules"). */
+const RULES_NAME: Record<SafetyPackId, string> = {
+  [SafetyPackId.MEDICAL]: 'Medical',
+  [SafetyPackId.PHARMACY]: 'Pharmacy',
+  [SafetyPackId.MENTAL_HEALTH]: 'Mental health',
+  [SafetyPackId.MINORS]: 'Young-people',
+  [SafetyPackId.LEGAL_FINANCIAL]: 'Legal and financial',
+  [SafetyPackId.STANDARD]: 'Facts only',
+};
 
 /** What setup says when the asked-for pack can't be added (approved 18 Nov). */
 export function cantCombinePacksText(
@@ -344,7 +351,7 @@ export function cantCombinePacksText(
 ): string {
   const current = packFor(currentId)!;
   const asked = packFor(requestedId)!;
-  return `Your assistant uses the ${rulesName(current.name)} safety rules. ${rulesName(asked.name)} rules can't be added on top yet; tell Ally if you need both.`;
+  return `Your assistant uses the ${RULES_NAME[current.id]} safety rules. ${RULES_NAME[asked.id]} rules can't be added on top yet; tell Ally if you need both.`;
 }
 
 export function packFor(

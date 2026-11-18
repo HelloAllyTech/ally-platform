@@ -269,7 +269,7 @@ describe('BotDraftSessionService.turn', () => {
     expect(h.store.row().draftConfig.safetyPackId).toBe(SafetyPackId.MEDICAL);
     expect(h.store.row().transcript.slice(-1)[0]).toMatchObject({
       role: 'builder',
-      text: "Your assistant uses the Medical safety rules. Care for young people rules can't be added on top yet; tell Ally if you need both.",
+      text: "Your assistant uses the Medical safety rules. Young-people rules can't be added on top yet; tell Ally if you need both.",
     });
   });
 
