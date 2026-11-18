@@ -3,22 +3,33 @@ import { DataSource } from 'typeorm';
 import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
 import {
   DEBRIEF_AGENT_KEY,
+  DEBRIEF_PROMPT_CODES,
   DEBRIEF_REGISTRY_AGENTS,
   DebriefBundle,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
 import {
+  AI_TASK_REGISTRY,
+  AiTaskEntry,
+} from '../../llm/constants/ai-task-registry.constants';
+import {
+  AGENT_TASK_IDS,
   AGENTS_CONFIG_LIMITS,
   AgentsConfigChange,
+  agentsView,
   applyAgentsConfigChanges,
   changeSource,
   diffSummary,
+  firstSentence,
   guidanceToolsView,
+  parsePlannerAgentDescriptions,
   ReleaseAuthor,
   releaseAuthor,
   STEP_PROMPT_CODES,
   recipeUsedWhen,
 } from '../util/debrief-agents-config.util';
+import { dataAccessView } from '../util/debrief-data-access.util';
+import { enabledRoleplayKeys } from '../util/debrief-roleplay-brief.util';
 import { alwaysAsk } from '../util/debrief-always-ask.util';
 import {
   OPTIONAL_STEPS,
@@ -109,6 +120,27 @@ export class DebriefAgentsConfigService {
     };
   }
 
+  /**
+   * The planner's wording for each agent (the live text of `debrief_planner_agents`), by agent id.
+   * Unreadable means none: the page then falls back to the AI Tasks page's description.
+   */
+  private async plannerDescriptions(): Promise<Record<string, string>> {
+    try {
+      const rows: Array<{ prompt: string | null }> =
+        await this.dataSource.query(
+          `SELECT pv.prompt
+           FROM prompts p
+           JOIN prompts_versions pv ON pv."promptId" = p.id
+          WHERE p."promptCode" = $1 AND pv.version = p."currentVersion"
+          LIMIT 1`,
+          [DEBRIEF_PROMPT_CODES.plannerAgents],
+        );
+      return parsePlannerAgentDescriptions(rows?.[0]?.prompt);
+    } catch {
+      return {};
+    }
+  }
+
   async view(userId: number | null, canEdit: boolean) {
     const repo = this.dataSource.getRepository(AgentRelease);
     // Fresh reads: never the runner's cached GA or canary.
@@ -129,6 +161,10 @@ export class DebriefAgentsConfigService {
       [DEBRIEF_AGENT_KEY],
     );
     const s = bundle.settings;
+    const wording = await this.plannerDescriptions();
+    const tasks = new Map<string, AiTaskEntry>(
+      AI_TASK_REGISTRY.map((t) => [t.id, t]),
+    );
     const inBundle = new Map(
       (bundle.orchestrator?.agents ?? []).map((a) => [a.id as string, a]),
     );
@@ -165,8 +201,19 @@ export class DebriefAgentsConfigService {
       settings: {
         guidanceAgentMaxCalls: s.guidanceAgentMaxCalls ?? 3,
         guidanceTools: guidanceToolsView(s.guidanceTools),
+        roleplayFields: enabledRoleplayKeys(s.roleplayFields),
       },
+      // What each agent can read, and the optional roleplay fields the release has on.
+      dataAccess: dataAccessView(s.roleplayFields),
       limits: AGENTS_CONFIG_LIMITS,
+      // Every agent in the Debrief system: the steps, the planner and the planner's own agents.
+      agents: agentsView(bundle, (id) => {
+        const task = tasks.get(AGENT_TASK_IDS[id] ?? '');
+        return {
+          what: wording[id] ?? firstSentence(task?.detail),
+          when: task?.trigger ?? null,
+        };
+      }),
       orchestratorAgents: Object.entries(DEBRIEF_REGISTRY_AGENTS).map(
         ([id, { version }]) => ({
           id,

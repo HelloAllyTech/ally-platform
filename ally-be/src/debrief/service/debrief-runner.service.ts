@@ -54,6 +54,7 @@ import {
 import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefFrameworkService } from './debrief-framework.service';
 import { resolveRiskCue } from '../util/debrief-risk-cue.util';
+import { roleplayBrief } from '../util/debrief-roleplay-brief.util';
 import { emptyFramework } from '../constants/debrief-framework.constants';
 import {
   DEBRIEF_ORCHESTRATOR_TOOLS,
@@ -700,7 +701,7 @@ export class DebriefRunnerService {
           : {}),
         prices: modelPrices(models),
         session: {
-          ...sessionForGraph(session),
+          ...sessionForGraph(session, bundle.settings?.roleplayFields),
           framework,
           risk_cue: {
             key: riskCue.key,
@@ -993,6 +994,7 @@ export class DebriefRunnerService {
 /** The session as the graph reads it (CONTRACT.md §1), in its snake_case. */
 export function sessionForGraph(
   s: DebriefSessionContext,
+  roleplayFields?: unknown,
 ): Record<string, unknown> {
   return {
     id: s.id,
@@ -1008,7 +1010,10 @@ export function sessionForGraph(
     learner_level: s.learnerLevel,
     learner_turns: s.learnerTurns,
     scenario_id: s.scenarioId,
-    scenario: s.scenario,
+    // The roleplay's brief: the always-on fields plus the optional ones this release has on.
+    scenario: s.roleplayFields
+      ? roleplayBrief(s.roleplayFields, roleplayFields)
+      : s.scenario,
     expected_behaviours: s.expectedBehaviours,
     helpful_behaviours: s.helpfulBehaviours ?? [],
     unhelpful_behaviours: s.unhelpfulBehaviours ?? [],
