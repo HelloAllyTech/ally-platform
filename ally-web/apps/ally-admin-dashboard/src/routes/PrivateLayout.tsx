@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 
 import { Menu } from "@icons";
 import { useDispatch } from "react-redux";
-import { Navigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import { InlineLoading } from "@ally-ui-mono/ui-shared";
 import {
@@ -23,8 +23,9 @@ import {
   normalizeEmailForAllowlist,
 } from "@constants";
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
+import { Login } from "@pages/Login/Login";
 import { setUser, setPermissions, setFeatures } from "@reducer";
-import { hasPermissions, hasFeature, loginPathWithNext } from "@utils";
+import { hasPermissions, hasFeature } from "@utils";
 
 import { ShellContext } from "./ShellContext";
 
@@ -114,7 +115,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   // Only used to reset the crash barrier below: React Router reuses this
   // element position across routes, so without a per-route key a page that
   // crashed would keep showing its error panel on the next page you opened.
-  const { pathname, search, hash } = useLocation();
+  const { pathname } = useLocation();
 
   // Phone-only nav drawer (the Sidebar is an in-flow rail from md up). It
   // covers the page, so any navigation and Escape close it.
@@ -138,8 +139,8 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   }, [userData, permissions, features]);
 
   if (!isAuthenticated) {
-    // Back here after logging in (A1): `/login?next=<this page>`.
-    return <Navigate to={loginPathWithNext(pathname, search, hash)} replace />;
+    // The login screen itself, at the URL they asked for: logging in leaves them on this page.
+    return <Login />;
   }
 
   // Check if user has permission to access current route
