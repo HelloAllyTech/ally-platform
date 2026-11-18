@@ -96,6 +96,8 @@ function build(
     roles?: Record<number, string>;
     decisions?: Record<string, unknown>[];
     reads?: { itemId: string }[];
+    events?: Record<string, unknown>[];
+    origin?: Record<string, unknown>;
   } = {},
 ) {
   const roleOf = jest.fn(
@@ -110,6 +112,10 @@ function build(
         return [1, 2, 3, 9, ME].map((id) => ({ id, name: `Person ${id}` }));
       }
       if (sql.includes('FROM "roadmap_item_reads"')) return opts.reads ?? [];
+      if (sql.includes('FROM "plan_events"')) return opts.events ?? [];
+      if (sql.includes(`plan->>'draftText'`)) {
+        return opts.origin ? [opts.origin] : [];
+      }
       if (sql.includes('AS shipped')) return [{ userId: 1, shipped: '3' }];
       if (sql.includes('SELECT "createdBy" FROM "builder_sessions"')) {
         return [{ createdBy: 1 }];
@@ -441,7 +447,8 @@ describe('RoadmapItemReadService.detail', () => {
       watchLevel: 'none',
     });
     expect(detail.can).toMatchObject({
-      vote: true,
+      // It has a builder, so its votes are locked (they lock once it leaves To do).
+      vote: false,
       answer: true,
       approveDesign: false,
       editTitle: false,
@@ -454,7 +461,7 @@ describe('RoadmapItemReadService.detail', () => {
     ]);
   });
 
-  it('gives the lead the design approval and the inline edits', async () => {
+  it('gives the assigned builder the design approval, but no edits: only an Owner edits a submitted idea', async () => {
     const { service } = build([planned()], { roles: { [ME]: 'builder' } });
     const fixtures = [
       item(
@@ -467,12 +474,73 @@ describe('RoadmapItemReadService.detail', () => {
     const detail = await lead.service.detail(ME, 'OPP-0001');
     expect(detail.can).toMatchObject({
       approveDesign: true,
-      editTitle: true,
-      editSummary: true,
+      editTitle: false,
+      editSummary: false,
       editLead: false,
       editMonth: false,
     });
     expect((await service.detail(ME, 'OPP-0001')).can.editTitle).toBe(false);
+  });
+
+  it('gives one history: where it started and every milestone, oldest first', async () => {
+    const fixtures = [
+      item(
+        1,
+        { builderSessionId: 's1' },
+        planSession('s1', { leadUserId: 9, sessionPlanStage: 'building' }),
+      ),
+    ];
+    const { service } = build(fixtures, {
+      origin: {
+        createdAt: '2026-11-01T09:00:00Z',
+        createdBy: 1,
+        captureMode: 'voice',
+        draftText: 'Learners lose their place after a break',
+      },
+      events: [
+        {
+          kind: 'lead_assigned',
+          actorUserId: 2,
+          detail: { from: 3, to: 9 },
+          at: '2026-11-05T10:00:00Z',
+        },
+        {
+          kind: 'filed',
+          actorUserId: 1,
+          detail: null,
+          at: '2026-11-02T09:00:00Z',
+        },
+        // A session made later for comments: not the submission, so not shown.
+        {
+          kind: 'filed',
+          actorUserId: 9,
+          detail: { by: 'conversation' },
+          at: '2026-11-03T09:00:00Z',
+        },
+        {
+          kind: 'plan_closed',
+          actorUserId: 2,
+          detail: null,
+          at: '2026-11-04T09:00:00Z',
+        },
+      ],
+    });
+    const detail = await service.detail(ME, 'OPP-0001');
+    expect(detail.origin).toMatchObject({
+      startedAt: '2026-11-01T09:00:00.000Z',
+      startedBy: { id: 1 },
+      captureMode: 'voice',
+      roughIdea: 'Learners lose their place after a break',
+    });
+    expect(detail.timeline.map((e) => e.kind)).toEqual([
+      'submitted',
+      'plan_closed',
+      'lead_assigned',
+    ]);
+    expect(detail.timeline[2]).toMatchObject({
+      actor: { id: 2 },
+      detail: { from: { id: 3 }, to: { id: 9 } },
+    });
   });
 
   it('shows a Viewer the board facts only (D2)', async () => {

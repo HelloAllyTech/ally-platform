@@ -1,6 +1,7 @@
 import {
   ConflictException,
   ForbiddenException,
+  GoneException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -64,8 +65,6 @@ import {
   DRAFT_CHECK_ORDER,
   firstLine,
   QuotableAnswer,
-  SELF_CHECK_AFTER_FAILURES,
-  SELF_CHECK_FIELDS,
   verifiedEvidence,
 } from './roadmap-draft.util';
 
@@ -475,7 +474,7 @@ export class RoadmapDraftService {
         HttpStatus.SERVICE_UNAVAILABLE,
         'assistant_unavailable',
         "Couldn't reach the assistant. Your words are saved; try again.",
-        { failures, selfCheckOffered: failures >= SELF_CHECK_AFTER_FAILURES },
+        { failures, selfCheckOffered: false },
       );
     }
 
@@ -542,29 +541,14 @@ export class RoadmapDraftService {
     return this.render(await this.store.get(draft.id));
   }
 
-  /** "Fill it in yourself" (§4.13): the agent never blocks a person. */
-  async selfCheck(
-    userId: number,
-    code: string,
-    fields: Record<keyof typeof SELF_CHECK_FIELDS, string>,
-  ): Promise<DraftDetail> {
-    const draft = await this.editableDraft(userId, code);
-    const selfCheck: Record<string, string> = {};
-    for (const [field, { check }] of Object.entries(SELF_CHECK_FIELDS)) {
-      const value = (fields[field as keyof typeof SELF_CHECK_FIELDS] ?? '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (!value) {
-        throw new UnprocessableEntityException(`Fill in "${field}" too.`);
-      }
-      selfCheck[check] = value;
-    }
-    const idea: PlanIdeaState = draft.plan.idea ?? {};
-    await this.store.patchPlan(draft.id, {
-      idea: { ...idea, selfCheck, reopened: [] },
-      lastActiveAt: new Date().toISOString(),
-    });
-    return this.render(await this.store.get(draft.id));
+  /**
+   * "Fill it in yourself" (§4.13) is gone (lifecycle 2026-11-18): drafts are finished by the
+   * interview, the same bar for everyone. Answers 410 so an old client says why.
+   */
+  async selfCheck(): Promise<DraftDetail> {
+    throw new GoneException(
+      'Filling the checks in yourself was removed: a draft is ready once the idea agent has interviewed it. Try Check my idea again.',
+    );
   }
 
   // ── Similar ideas and Add my point ─────────────────────────────────────────
@@ -1077,8 +1061,8 @@ export class RoadmapDraftService {
       checksTotal: checks.length,
       canSubmit: !!text.trim() && checksMet === checks.length,
       selfChecked: checks.some((c) => c.source === 'self'),
-      selfCheckOffered:
-        (record.idea?.turnFailures ?? 0) >= SELF_CHECK_AFTER_FAILURES,
+      // "Fill it in yourself" was removed (lifecycle 2026-11-18): never offered.
+      selfCheckOffered: false,
       checkedAt: record.idea?.lastTurnAt ?? null,
       conversation: messages
         .filter((m) => m.content)

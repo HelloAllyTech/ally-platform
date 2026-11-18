@@ -68,6 +68,14 @@ export enum PlanEventKind {
    * The idea's PRs carrying its code then drive release (linkDrivesRelease).
    */
   EXTERNAL_BUILD = 'external_build',
+  /** The Owner closed the plan: the idea can now take a builder. */
+  PLAN_CLOSED = 'plan_closed',
+  /** The Owner reopened a closed plan (only while nobody leads the idea). */
+  PLAN_REOPENED = 'plan_reopened',
+  /** The builder chose or switched how it is built. detail: { from, to }. */
+  BUILD_MODE_SET = 'build_mode_set',
+  /** The builder or an Owner marked the idea Released. detail: { liveAt? }. */
+  MARKED_RELEASED = 'marked_released',
 }
 
 /** What a plan notification says (plan_notifications.kind). */

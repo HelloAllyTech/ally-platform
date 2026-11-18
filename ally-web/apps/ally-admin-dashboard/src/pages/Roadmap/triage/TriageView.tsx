@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Tick } from "@icons";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 
 import { Button, SkeletonText } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
@@ -10,7 +11,7 @@ import type { RoadmapItemRow, RoadmapItemsResponse } from "@types";
 import { DeclineDialog, DeclineTarget } from "./DeclineDialog";
 import { LeadPicker } from "./LeadPicker";
 import { TriageReviewMode } from "./TriageReviewMode";
-import { workingDaysSince } from "./triageUtils";
+import { todoNextStep, workingDaysSince } from "./triageUtils";
 import { triageExit, undoLastReview, useReviewActions } from "./useReviewActions";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
 import { IdeaView } from "../components/IdeaView";
@@ -107,27 +108,41 @@ export const TriageView: React.FC<TriageViewProps> = ({
     return list.map(rowBy).filter(Boolean) as RoadmapItemRow[];
   }, [selected, open, rowBy]);
 
-  /** Give these ideas a lead. An unreviewed one is accepted by it; an accepted one just gets it. */
+  /** Give these ideas a builder: only ideas whose plan the Owner has closed get here. */
   const assignRows = useCallback(
     async (list: RoadmapItemRow[], lead: { id: number; name: string }) => {
-      const review = list.filter(r => needsReview(r.code));
-      const assign = list.filter(r => !needsReview(r.code));
       const codesNow = list.map(r => r.code);
       markLeaving(codesNow, "assign");
       let ok = true;
-      if (review.length === 1 && assign.length === 0) {
-        ok = await actions.assign(review[0].code, lead, () => unmark(codesNow));
-      } else if (review.length) {
-        ok = await actions.reviewMany(
-          review.map(r => ({ code: r.code, decision: "accept" as const, leadUserId: lead.id })),
-          () => unmark(codesNow),
-        );
-      }
-      for (const r of assign) ok = (await actions.pickLead(r.code, lead)) && ok;
+      for (const r of list) ok = (await actions.pickLead(r.code, lead)) && ok;
       if (!ok) unmark(codesNow);
       return ok;
     },
-    [actions, needsReview],
+    [actions],
+  );
+
+  /**
+   * The next step for these ideas (lifecycle 2026-11-18): Start planning for ideas nobody has
+   * planned yet, the builder picker for ideas whose plan is closed, and the idea itself for one
+   * still being planned, since its plan is closed from its page.
+   */
+  const advanceRows = useCallback(
+    async (list: RoadmapItemRow[]) => {
+      const toPlan = list.filter(r => todoNextStep(r) === "plan");
+      const toAssign = list.filter(r => todoNextStep(r) === "pickBuilder");
+      const toClose = list.filter(r => todoNextStep(r) === "closePlan");
+      for (const r of toPlan) {
+        markLeaving([r.code], "assign");
+        if (!(await actions.startPlanning(r.code))) unmark([r.code]);
+      }
+      if (toAssign.length) setLeadFor(toAssign);
+      else if (toClose.length) {
+        if (toPlan.length === 0) onOpen(toClose[0].code);
+        toast.message(copy.triage.closePlanFirst(toClose[0].code));
+      }
+    },
+    // markLeaving/unmark only set state, so they are left out.
+    [actions, onOpen, copy],
   );
 
   const declineRows = useCallback(
@@ -147,8 +162,9 @@ export const TriageView: React.FC<TriageViewProps> = ({
     [actions],
   );
 
+  // An Owner can decline any To do idea, planned or not (lifecycle 2026-11-18).
   const startDecline = (list: RoadmapItemRow[]) => {
-    const declinable = list.filter(r => needsReview(r.code));
+    const declinable = list;
     if (declinable.length)
       setDeclineFor(
         declinable.map(r => ({ code: r.code, title: r.title, goalName: r.goal?.name })),
@@ -171,13 +187,12 @@ export const TriageView: React.FC<TriageViewProps> = ({
       }
       const list = targets();
       if (list.length === 0) return;
-      if (key === "l") setLeadFor(list);
+      if (key === "l") void advanceRows(list);
       if (key === "d") startDecline(list);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [touch, declineFor, leadFor, selected, open, targets, assignRows]);
+  }, [touch, declineFor, leadFor, selected, open, targets, advanceRows]);
 
   // P8: a row awaiting review taking focus (J/K or opened) starts "triage one" for it; picking a
   // lead or Decline ends it (useReviewActions). Moving away and back starts a fresh attempt.
@@ -295,10 +310,10 @@ export const TriageView: React.FC<TriageViewProps> = ({
         <TriageReviewMode
           open={reviewMode}
           rows={rows}
-          needsReview={needsReview}
+          needsReview={() => true}
           onClose={() => setReviewMode(false)}
           onDecline={row => startDecline([row])}
-          onPickLead={row => setLeadFor([row])}
+          onPickLead={row => void advanceRows([row])}
         />
       </>
     );

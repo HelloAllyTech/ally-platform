@@ -13,6 +13,9 @@ import type { RoadmapItemDetail, RoadmapItemRow, RoadmapItemsResponse } from "@t
 const mockReview = vi.fn();
 const mockBatch = vi.fn();
 const mockStart = vi.fn();
+const mockSetLead = vi.fn();
+const mockPlanClosed = vi.fn();
+const mockOpenConversation = vi.fn();
 const unwrapOf = (fn: ReturnType<typeof vi.fn>) =>
   vi.fn((arg: unknown) => ({ unwrap: () => Promise.resolve(fn(arg)) }));
 
@@ -21,7 +24,9 @@ vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
   useReviewRoadmapItemMutation: () => [unwrapOf(mockReview)],
   useReviewRoadmapBatchMutation: () => [unwrapOf(mockBatch)],
   useUndoRoadmapReviewMutation: () => [unwrapOf(vi.fn())],
-  useSetRoadmapLeadMutation: () => [unwrapOf(vi.fn())],
+  useSetRoadmapLeadMutation: () => [unwrapOf(mockSetLead)],
+  useSetRoadmapPlanClosedMutation: () => [unwrapOf(mockPlanClosed), { isLoading: false }],
+  useOpenRoadmapConversationMutation: () => [unwrapOf(mockOpenConversation), { isLoading: false }],
   useStartRoadmapPlanningMutation: () => [unwrapOf(mockStart), { isLoading: false }],
   useGetRoadmapItemSimilarQuery: () => ({
     data: {
@@ -68,6 +73,7 @@ import { toast } from "sonner";
 
 import { setReduceMotionSwitch, __resetReduceMotionForTests } from "../../../motion/roadmapMotion";
 import { PrimaryAction } from "../components/IdeaControls";
+import { CommentBox } from "../session/CommentBox";
 import { DeclineDialog } from "../triage/DeclineDialog";
 import { LeadPicker } from "../triage/LeadPicker";
 import { TriageView } from "../triage/TriageView";
@@ -97,7 +103,7 @@ function detail(code: string, overrides: Partial<RoadmapItemDetail> = {}): Roadm
     prs: [],
     releases: [],
     people: [],
-    can: { review: true, pickLead: true },
+    can: { review: true, startPlanning: true, decline: true },
     watchLevel: "none",
     ...overrides,
   };
@@ -138,7 +144,7 @@ const renderTriage = (props: Partial<React.ComponentProps<typeof TriageView>> = 
   );
 
 describe("To triage (§4.6)", () => {
-  it("the pane is the whole idea in place: its details, Pick a lead and Decline, and no page to go to", async () => {
+  it("the pane is the whole idea in place: its details, Start planning and Decline, and no page to go to", async () => {
     renderTriage();
     // The idea has no conversation yet, so the pane opens on its details (the Summary).
     expect(await screen.findByText("Learners mid-course")).toBeInTheDocument();
@@ -149,8 +155,10 @@ describe("To triage (§4.6)", () => {
     }
     expect(screen.queryByRole("tab", { name: en.roadmapV2.idea.details })).toBeNull();
     expect(screen.getByText("OPP-212")).toBeInTheDocument();
-    const pane = screen.getAllByRole("button", { name: en.roadmapV2.review.pickLead });
+    const pane = screen.getAllByRole("button", { name: en.roadmapV2.session.startPlanning });
     expect(pane.length).toBeGreaterThan(0);
+    // A builder is never picked straight from review (lifecycle 2026-11-18).
+    expect(screen.queryByRole("button", { name: en.roadmapV2.review.pickLead })).toBeNull();
     expect(
       screen.getAllByRole("button", { name: en.roadmapV2.review.decline }).length,
     ).toBeGreaterThan(0);
@@ -179,22 +187,40 @@ describe("To triage (§4.6)", () => {
     expect(mockBatch).not.toHaveBeenCalled();
   });
 
-  it("L opens the lead picker, and picking the lead accepts the idea with that lead", async () => {
+  it("L starts planning an idea nobody has planned (which accepts it); no builder is picked", async () => {
     renderTriage();
+    fireEvent.keyDown(window, { key: "l" });
+    await waitFor(() => expect(mockStart).toHaveBeenCalledWith("OPP-414"));
+    expect(mockReview).not.toHaveBeenCalled();
+    expect(mockSetLead).not.toHaveBeenCalled();
+  });
+
+  it("L on an idea whose plan is closed opens the builder picker and assigns that builder", async () => {
+    const closed = row("OPP-414", {
+      shownStage: "planning",
+      statusParts: {
+        stage: "planning",
+        step: "prd",
+        leadUserId: null,
+        prdPercent: 80,
+        openQuestions: 0,
+        designAwaitingApproval: false,
+        planClosed: { byUserId: 1, at: "2026-11-18T10:00:00Z" },
+      },
+    });
+    renderTriage({ data: { sections: { backlog: [closed] } } });
     fireEvent.keyDown(window, { key: "l" });
     fireEvent.click(
       (await screen.findAllByRole("button", { name: en.roadmapV2.review.leadConfirm })).at(-1)!,
     );
     await waitFor(() =>
-      expect(mockReview).toHaveBeenCalledWith({
+      expect(mockSetLead).toHaveBeenCalledWith({
         code: "OPP-414",
-        decision: "accept",
+        action: "assign",
         leadUserId: 7,
       }),
     );
-    await waitFor(() =>
-      expect(toast.custom).toHaveBeenCalledWith(expect.any(Function), { duration: 8_000 }),
-    );
+    expect(mockStart).not.toHaveBeenCalled();
   });
 
   it("has no bulk select: no checkboxes and no X key", () => {
@@ -269,27 +295,113 @@ describe("the lead picker", () => {
 });
 
 describe("the idea page's primary action (P3 / P3b)", () => {
-  it("an Owner gets Pick a lead and Decline on a submitted idea, and no Accept", () => {
+  it("an Owner gets Start planning and Decline on a submitted idea, and no Accept or builder", () => {
     wrap(<PrimaryAction item={detail("OPP-414")} onApproveDesign={vi.fn()} />);
-    expect(screen.getByRole("button", { name: en.roadmapV2.review.pickLead })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: en.roadmapV2.session.startPlanning }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: en.roadmapV2.review.decline })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Accept/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.roadmapV2.review.pickLead })).toBeNull();
   });
 
-  it("Pick a lead on an accepted idea without one", () => {
+  it("while planning, an Owner closes the plan; once closed, picks a builder or reopens it", async () => {
+    const planning = {
+      shownStage: "planning" as const,
+      statusParts: {
+        stage: "planning" as const,
+        step: "prd" as const,
+        leadUserId: null,
+        prdPercent: 80,
+        openQuestions: 0,
+        designAwaitingApproval: false,
+      },
+    };
+    const open = wrap(
+      <PrimaryAction
+        item={detail("OPP-402", { ...planning, can: { closePlan: true, decline: true } })}
+        onApproveDesign={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: en.roadmapV2.review.pickLead })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.session.closePlan }));
+    await waitFor(() =>
+      expect(mockPlanClosed).toHaveBeenCalledWith({ code: "OPP-402", closed: true }),
+    );
+    open.unmount();
+
     wrap(
       <PrimaryAction
         item={detail("OPP-402", {
-          shownStage: "accepted",
-          statusParts: { stage: "accepted", leadUserId: null, needsLead: true, votes: 1 },
+          ...planning,
+          statusParts: {
+            ...planning.statusParts,
+            planClosed: { byUserId: 1, at: "2026-11-18T10:00:00Z" },
+          },
+          can: { pickLead: true, reopenPlan: true, decline: true },
         })}
         onApproveDesign={vi.fn()}
       />,
     );
     expect(screen.getByRole("button", { name: en.roadmapV2.review.pickLead })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: en.roadmapV2.session.reopenPlan }),
+    ).toBeInTheDocument();
   });
 
-  it("Start planning for the lead", async () => {
+  it("an Owner can still decline an idea that is Building, beside the builder's action", () => {
+    const building = {
+      shownStage: "building" as const,
+      lead: { id: 7, name: "Priya", role: "builder" as const },
+      statusParts: {
+        stage: "building" as const,
+        where: "here" as const,
+        leadUserId: 7,
+        externalBuild: null,
+        repos: [],
+        openPrs: [],
+        mergedPrs: 0,
+        waitingForPr: false,
+        releasing: false,
+        heldReason: null,
+      },
+    };
+    const owner = wrap(
+      <PrimaryAction
+        item={detail("OPP-402", { ...building, can: { decline: true, markReleased: true } })}
+        onApproveDesign={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: en.roadmapV2.review.decline })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: en.roadmapV2.session.markReleased }),
+    ).toBeInTheDocument();
+    owner.unmount();
+    wrap(
+      <PrimaryAction
+        item={detail("OPP-402", { ...building, can: { markReleased: true } })}
+        onApproveDesign={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: en.roadmapV2.review.decline })).toBeNull();
+  });
+
+  it("an older idea with no conversation offers to open one, so it can take comments", async () => {
+    wrap(
+      <CommentBox
+        item={detail("OPP-50", {
+          shownStage: "accepted",
+          sessionId: undefined,
+          can: { comment: true },
+        })}
+        session={{ enabled: false } as never}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.session.openConversation }));
+    await waitFor(() => expect(mockOpenConversation).toHaveBeenCalledWith("OPP-50"));
+  });
+
+  it("Start planning for an Owner", async () => {
     mockStart.mockReturnValue(detail("OPP-402"));
     wrap(
       <PrimaryAction

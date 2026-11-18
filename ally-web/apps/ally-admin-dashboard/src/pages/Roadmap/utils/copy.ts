@@ -6,6 +6,7 @@ import type {
   RoadmapShownStage,
   RoadmapSimpleStage,
   RoadmapStatusParts,
+  RoadmapTimelineEntry,
   RoadmapWhyHere,
 } from "@types";
 
@@ -54,15 +55,20 @@ export type TrackerModel =
   | { kind: "steps"; steps: TrackerStep[]; currentIndex: number }
   | { kind: "terminal"; stage: RoadmapSimpleStage; label: string };
 
-/** A finer stage read as the simple stage it falls in (an idea's own `stage` is better when known). */
+/**
+ * A finer stage read as the simple stage it falls in (an idea's own `stage` is better when known:
+ * an accepted or planning idea is To do until an Owner assigns a builder, Building after).
+ */
 export const simpleStageOfShown = (
   stage: RoadmapShownStage | RoadmapSimpleStage,
+  hasLead = false,
 ): RoadmapSimpleStage => {
   switch (stage) {
     case "submitted":
-    case "accepted":
       return "backlog";
+    case "accepted":
     case "planning":
+      return hasLead ? "being_built" : "backlog";
     case "building":
       return "being_built";
     case "closed":
@@ -137,22 +143,40 @@ export const statusLine = (
       return join(lead ? s.leads(lead) : null, s.planningNotStarted);
     }
     case "planning": {
+      const mode = parts.buildMode ? s.buildMode[parts.buildMode] : null;
       // P4 moves "Brief sent to Claude Code … waiting for a PR" here, before any PR exists.
       if (parts.externalBuild) {
         const by = nameFor(parts.externalBuild.byUserId, people);
         return by ? s.briefSentBy(by) : s.briefSent;
       }
-      if (parts.step === "ready") return s.readyToBuild;
+      // No builder yet: the Owner is planning it, or has closed the plan and assigns one next.
+      if (parts.leadUserId == null) {
+        if (parts.planClosed) return s.planClosed;
+        return join(
+          s.planning,
+          parts.prdPercent != null ? s.prd(Math.round(num(parts.prdPercent))) : null,
+          num(parts.openQuestions) > 0 ? s.questions(num(parts.openQuestions)) : null,
+        );
+      }
+      const lead = nameFor(parts.leadUserId, people, item.lead);
+      if (parts.step === "ready") return join(s.readyToBuild, lead ? s.leads(lead) : null, mode);
       if (parts.step === "design" || parts.designAwaitingApproval) {
-        return parts.designAwaitingApproval ? s.designWaiting : s.designDrafting;
+        return join(
+          parts.designAwaitingApproval ? s.designWaiting : s.designDrafting,
+          lead ? s.leads(lead) : null,
+        );
       }
       return join(
+        lead ? s.leads(lead) : null,
+        mode,
         parts.prdPercent != null ? s.prd(Math.round(num(parts.prdPercent))) : null,
         num(parts.openQuestions) > 0 ? s.questions(num(parts.openQuestions)) : null,
       );
     }
     case "building": {
       if (parts.heldReason) return s.held(parts.heldReason);
+      // Released is a person's click: live work only prompts the builder.
+      if (parts.workLive) return s.workLive;
       if (parts.waitingForPr) {
         const by = parts.externalBuild ? nameFor(parts.externalBuild.byUserId, people) : null;
         return by ? s.briefSentBy(by) : s.briefSent;
@@ -246,11 +270,19 @@ export const personLabel = (person: RoadmapPersonRef): string => {
  * The quiet line that stands where an action would be, when nothing on this idea is yours to do
  * (§4.0 #14, §4.5). Never a greyed-out button.
  */
-export const quietLine = (item: Pick<RoadmapItemRow, "shownStage" | "lead">): string => {
+export const quietLine = (
+  item: Pick<RoadmapItemRow, "shownStage" | "lead"> & Partial<Pick<RoadmapItemRow, "statusParts">>,
+): string => {
   const q = t().quietLine;
   if (item.lead?.name) return q.leadDecides(item.lead.name);
   if (item.shownStage === "submitted") return q.ownerReviews;
   if (item.shownStage === "accepted") return q.ownerPicksLead;
+  if (item.shownStage === "planning") {
+    const parts = item.statusParts;
+    return isParts(parts) && parts.stage === "planning" && parts.planClosed
+      ? q.ownerAssigns
+      : q.ownerPlanning;
+  }
   return q.nothingToDo;
 };
 
@@ -274,4 +306,89 @@ export const panelTabForStage = (
     default:
       return "summary";
   }
+};
+
+/**
+ * One milestone on an idea's timeline, in words (lifecycle 2026-11-18). Null for a kind this
+ * client doesn't know, so a newer server never shows a raw key.
+ */
+export const timelineLabel = (entry: RoadmapTimelineEntry): string | null => {
+  const w = t().idea.timeline;
+  const who = entry.actor?.name || t().idea.unknownPerson;
+  const d = (entry.detail ?? {}) as Record<string, unknown>;
+  const personName = (value: unknown): string | null =>
+    value && typeof value === "object" && typeof (value as { name?: unknown }).name === "string"
+      ? (value as { name: string }).name
+      : null;
+  switch (entry.kind) {
+    case "submitted":
+      return w.submitted(who);
+    case "reviewed":
+      if (d.decision === "decline") return w.declined(who);
+      if (d.decision === "reopen") return w.reopened(who);
+      return w.accepted(who);
+    case "planning_started":
+      return w.planningStarted(who);
+    case "plan_closed":
+      return w.planClosed(who);
+    case "plan_reopened":
+      return w.planReopened(who);
+    case "lead_assigned": {
+      const from = personName(d.from);
+      const to = personName(d.to) ?? t().idea.unknownPerson;
+      return from ? w.builderChanged(who, from, to) : w.builderAssigned(who, to);
+    }
+    case "lead_handed_back":
+      return w.handedBack(who);
+    case "design_approved":
+      return w.designApproved(who);
+    case "build_sent":
+      return w.buildStarted(who);
+    case "external_build":
+      return w.briefSent(who);
+    case "build_mode_set": {
+      const mode = typeof d.to === "string" ? t().status.buildMode[d.to] : undefined;
+      return mode ? w.buildMode(who, mode) : null;
+    }
+    case "release_live":
+      return w.releaseLive(typeof d.service === "string" ? d.service : "");
+    case "marked_released":
+      return w.markedReleased(who);
+    case "closed":
+      return w.closed(who);
+    case "reopened":
+      return w.reopened(who);
+    case "item_edited": {
+      const field = typeof d.field === "string" ? w.fields[d.field] : undefined;
+      return field ? w.edited(who, field) : null;
+    }
+    case "answer_settled":
+      return w.answerSettled(who);
+    default:
+      return null;
+  }
+};
+
+/**
+ * Where each timeline milestone sits in the conversation: before the first message at or after
+ * it (key: that message's id), or at the end (key: null). Pure; the feed is in time order.
+ */
+export const timelineAnchors = (
+  timeline: RoadmapTimelineEntry[] | undefined,
+  feed: { id: string }[],
+  createdAt: (id: string) => string | undefined,
+): Map<string | null, RoadmapTimelineEntry[]> => {
+  const out = new Map<string | null, RoadmapTimelineEntry[]>();
+  for (const entry of Array.isArray(timeline) ? timeline : []) {
+    const at = new Date(entry.at).getTime();
+    const anchor =
+      feed.find(message => {
+        const when = createdAt(message.id);
+        return when ? new Date(when).getTime() >= at : false;
+      })?.id ?? null;
+    const list = out.get(anchor) ?? [];
+    list.push(entry);
+    out.set(anchor, list);
+  }
+  return out;
 };

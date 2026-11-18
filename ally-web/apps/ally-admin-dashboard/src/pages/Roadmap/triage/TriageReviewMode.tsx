@@ -10,7 +10,7 @@ import { en } from "@constants";
 import type { RoadmapItemRow } from "@types";
 
 import { SimilarLine, SummaryFacts } from "./TriageSummary";
-import { swipeDecision, workingDaysSince } from "./triageUtils";
+import { swipeDecision, todoNextStep, workingDaysSince } from "./triageUtils";
 import {
   haptic,
   motionTransition,
@@ -183,7 +183,7 @@ export const TriageReviewMode: React.FC<TriageReviewModeProps> = ({
               className="max-w-none"
               onClick={() => onPickLead(current)}
             >
-              {en.roadmapV2.review.pickLead}
+              {en.roadmapV2.triage.nextStep[todoNextStep(current)]}
             </Button>
           </footer>
         </>

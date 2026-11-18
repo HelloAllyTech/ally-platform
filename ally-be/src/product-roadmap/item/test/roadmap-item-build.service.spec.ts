@@ -6,7 +6,15 @@ const SPEND = 'SENTINEL-SPEND';
 const TRANSCRIPT = 'SENTINEL-TRANSCRIPT';
 const RANK = 'SENTINEL-WHY-RANKS';
 
-function build(opts: { canExport?: boolean; session?: string | null } = {}) {
+function build(
+  opts: {
+    canExport?: boolean;
+    session?: string | null;
+    can?: Record<string, boolean>;
+    releases?: { state: string; releasedAt?: string }[];
+    shownStage?: string;
+  } = {},
+) {
   const detail = {
     code: 'OPP-0388',
     title: 'Streak reminders',
@@ -16,7 +24,9 @@ function build(opts: { canExport?: boolean; session?: string | null } = {}) {
       whyRanks: { rationale: RANK },
     },
     spend: { spentUsd: SPEND, ceilingUsd: 100 },
-    can: { exportBrief: opts.canExport ?? true },
+    can: { exportBrief: opts.canExport ?? true, ...(opts.can ?? {}) },
+    releases: opts.releases ?? [],
+    shownStage: opts.shownStage ?? 'building',
   };
   const reader = { detail: jest.fn(async () => detail) };
   const ref = {
@@ -60,6 +70,8 @@ function build(opts: { canExport?: boolean; session?: string | null } = {}) {
   const events = { record: jest.fn(async () => undefined) };
   const inbox = { markSeen: jest.fn(async () => undefined) };
   const notifications = { emit: jest.fn() };
+  const stage = { sync: jest.fn(async () => null) };
+  const dataSource = { query: jest.fn(async () => [{ id: 'opp-1' }]) };
   const service = new RoadmapItemBuildService(
     reader as never,
     lookup as never,
@@ -68,8 +80,19 @@ function build(opts: { canExport?: boolean; session?: string | null } = {}) {
     events as never,
     inbox as never,
     notifications as never,
+    stage as never,
+    dataSource as never,
   );
-  return { service, reader, planStore, builderSessions, events, notifications };
+  return {
+    service,
+    reader,
+    planStore,
+    builderSessions,
+    events,
+    notifications,
+    stage,
+    dataSource,
+  };
 }
 
 describe('RoadmapItemBuildService', () => {
@@ -146,5 +169,114 @@ describe('RoadmapItemBuildService', () => {
     await expect(
       service.recordExternalBuild(7, 'OPP-0388'),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  describe('build mode', () => {
+    it('lets the assigned builder pick and switch it, with an event each time it changes', async () => {
+      const { service, planStore, events, notifications } = build({
+        can: { setBuildMode: true },
+      });
+      await service.setBuildMode(5, 'OPP-0388', 'builder_agent');
+      expect(planStore.patchPlan).toHaveBeenCalledWith('s-1', {
+        buildMode: expect.objectContaining({
+          mode: 'builder_agent',
+          byUserId: 5,
+        }),
+      });
+      expect(events.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: PlanEventKind.BUILD_MODE_SET,
+          detail: { from: null, to: 'builder_agent' },
+        }),
+      );
+      expect(notifications.emit).toHaveBeenCalled();
+    });
+
+    it('records nothing when the mode is unchanged', async () => {
+      const { service, planStore, events } = build({
+        can: { setBuildMode: true },
+      });
+      planStore.find.mockResolvedValueOnce({
+        id: 's-1',
+        createdBy: 3,
+        plan: { buildMode: { mode: 'outside', byUserId: 5, at: 'x' } },
+      } as never);
+      await service.setBuildMode(5, 'OPP-0388', 'outside');
+      expect(planStore.patchPlan).not.toHaveBeenCalled();
+      expect(events.record).not.toHaveBeenCalled();
+    });
+
+    it('refuses anyone but the assigned builder or an Owner', async () => {
+      const { service } = build({ can: { setBuildMode: false } });
+      await expect(
+        service.setBuildMode(5, 'OPP-0388', 'outside'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('sending the brief to Claude Code makes it built outside', async () => {
+      const { service, events } = build();
+      await service.recordExternalBuild(5, 'OPP-0388');
+      expect(events.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: PlanEventKind.BUILD_MODE_SET,
+          detail: { from: null, to: 'outside' },
+        }),
+      );
+    });
+  });
+
+  describe('mark released', () => {
+    it("is a person's click: moves the stage, stamps when the work went live, records it", async () => {
+      const { service, dataSource, events, stage } = build({
+        can: { markReleased: true },
+        releases: [
+          { state: 'live', releasedAt: '2026-11-10T08:00:00.000Z' },
+          { state: 'live', releasedAt: '2026-11-12T08:00:00.000Z' },
+        ],
+      });
+      await service.markReleased(5, 'OPP-0388');
+      const [sql, params] = dataSource.query.mock.calls[0] as unknown as [
+        string,
+        unknown[],
+      ];
+      expect(sql).toContain(`stage IN ('new', 'prioritised')`);
+      expect(params).toEqual(['o-1', '2026-11-12T08:00:00.000Z', 5]);
+      expect(events.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: PlanEventKind.MARKED_RELEASED,
+          actorUserId: 5,
+        }),
+      );
+      expect(stage.sync).toHaveBeenCalledWith('s-1', 5);
+    });
+
+    it('stamps now when not every release is live', async () => {
+      const { service, dataSource } = build({
+        can: { markReleased: true },
+        releases: [{ state: 'pending' }],
+      });
+      await service.markReleased(5, 'OPP-0388');
+      expect((dataSource.query.mock.calls[0] as unknown[])[1]).toEqual([
+        'o-1',
+        null,
+        5,
+      ]);
+    });
+
+    it('refuses anyone but the assigned builder or an Owner', async () => {
+      const { service, dataSource } = build({ can: { markReleased: false } });
+      await expect(service.markReleased(5, 'OPP-0388')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(dataSource.query).not.toHaveBeenCalled();
+    });
+
+    it('says so when someone else moved it a moment ago', async () => {
+      const { service, dataSource } = build({ can: { markReleased: true } });
+      dataSource.query.mockResolvedValueOnce([] as never);
+      await expect(service.markReleased(5, 'OPP-0388')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
   });
 });

@@ -69,27 +69,38 @@ export class PlanAccessService {
     await this.assertAtLeast(userId, 'builder', LEAD_REQUIRED_MESSAGE);
   }
 
+  /** True for an Owner (the `product_roadmap_manage` grant). */
+  async isOwner(userId: number): Promise<boolean> {
+    return (await this.roles.roleOf(userId)) === 'owner';
+  }
+
+  async assertOwner(userId: number, message: string): Promise<void> {
+    if (!(await this.isOwner(userId))) throw this.refusal(message);
+  }
+
   /**
    * Read a plan: its author always (even if their role was later lowered), and
-   * any Builder or Owner once it is shared. A private draft is its author's alone.
+   * anyone with the Idea role or above once it is shared: every submitted
+   * idea, plan included, is open to everyone (lifecycle 2026-11-18). A private
+   * draft is its author's alone.
    */
   async canRead(plan: PlanAccessFacts, userId: number): Promise<boolean> {
     if (plan.createdBy === userId) return true;
     if (plan.visibility === BuilderSessionVisibility.PRIVATE) return false;
-    return this.canLead(userId);
+    return this.canIdeas(userId);
   }
 
   /**
-   * Change a plan: while private, its author (with the Idea role); once shared,
-   * only its current lead (with the Builder role). A shared plan nobody has
-   * taken on is edited by nobody until someone does — the author answers Ask
-   * the author, which is not an edit.
+   * Change a plan: while private, its author (with the Idea role); once
+   * shared, an Owner (who plans it) or its assigned builder (with the Builder
+   * role). The author answers Ask the author, which is not an edit.
    */
   async canEdit(plan: PlanAccessFacts, userId: number): Promise<boolean> {
     if (plan.visibility === BuilderSessionVisibility.PRIVATE) {
       if (plan.createdBy !== userId) return false;
       return this.canIdeas(userId);
     }
+    if (await this.isOwner(userId)) return true;
     if (!plan.leadUserId || plan.leadUserId !== userId) return false;
     return this.canLead(userId);
   }

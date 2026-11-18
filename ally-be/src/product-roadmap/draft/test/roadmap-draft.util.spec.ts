@@ -67,7 +67,7 @@ describe('roadmap draft checks', () => {
     expect(checks.filter((c) => c.met)).toHaveLength(4);
   });
 
-  it('Not quite overrides the agent; Fill it in yourself overrides both', () => {
+  it('Not quite overrides the agent; a self-filled answer no longer meets a check', () => {
     const reopened = draftChecks(
       { gates: allMet, reopened: ['outcome'] },
       'x',
@@ -88,9 +88,7 @@ describe('roadmap draft checks', () => {
       [],
     );
     expect(self.find((c) => c.id === 'outcome')).toMatchObject({
-      met: true,
-      source: 'self',
-      evidence: { quote: 'Return rate rises' },
+      met: false,
     });
   });
 

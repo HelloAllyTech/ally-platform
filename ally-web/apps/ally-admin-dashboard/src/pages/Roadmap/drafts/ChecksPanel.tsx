@@ -24,8 +24,6 @@ interface ChecksPanelProps {
   onSubmit: () => void;
   /** Phone: Submit lives in the sticky bar instead. */
   hideSubmit?: boolean;
-  onSelfCheck?: () => void;
-  showSelfCheckOffer: boolean;
 }
 
 /**
@@ -45,8 +43,6 @@ export const ChecksPanel: React.FC<ChecksPanelProps> = ({
   onShowEvidence,
   onSubmit,
   hideSubmit,
-  onSelfCheck,
-  showSelfCheckOffer,
 }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.draft;
@@ -105,15 +101,6 @@ export const ChecksPanel: React.FC<ChecksPanelProps> = ({
               <TooltipIcon />
             </button>
           </Tooltip>
-        </div>
-      )}
-
-      {showSelfCheckOffer && onSelfCheck && !readOnly && (
-        <div className="flex flex-col gap-1 rounded bg-neutral-50 p-3">
-          <p className="m-0 text-sm text-typography-primary">{copy.selfCheckOffer}</p>
-          <Button kind="ghost" size="sm" onClick={onSelfCheck} className="self-start">
-            {copy.selfCheckOpen}
-          </Button>
         </div>
       )}
 

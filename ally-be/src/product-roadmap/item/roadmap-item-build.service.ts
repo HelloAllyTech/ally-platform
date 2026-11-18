@@ -4,6 +4,9 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { BuilderSessionService } from 'src/builder/service/builder-session.service';
+import { DataSource } from 'typeorm';
+import type { PlanBuildMode } from 'src/product-planning/type/plan-record.type';
+import { PlanStageService } from '../plan/plan-stage.service';
 import { PlanEventKind } from 'src/product-planning/enum/product-planning.enum';
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
 import { RoadmapInboxService } from 'src/product-planning/service/roadmap-inbox.service';
@@ -44,6 +47,8 @@ export class RoadmapItemBuildService {
     private readonly events: PlanEventService,
     private readonly inbox: RoadmapInboxService,
     private readonly notifications: RoadmapNotificationService,
+    private readonly stage: PlanStageService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -114,6 +119,13 @@ export class RoadmapItemBuildService {
       actorUserId: userId,
       detail: { tool: externalBuild.tool },
     });
+    // Sending the brief out is building it outside the Builder agent.
+    await this.writeBuildMode(
+      plan.id,
+      userId,
+      plan.plan?.buildMode?.mode ?? null,
+      'outside',
+    );
     this.notifications.emit({
       kind: 'ITEM_CHANGED',
       actorId: userId,
@@ -124,6 +136,126 @@ export class RoadmapItemBuildService {
     return this.reader.detail(userId, code);
   }
 
+  /**
+   * How the assigned builder builds it (lifecycle 2026-11-18): with the
+   * Builder agent here, or outside it. Theirs to switch at any time; each
+   * switch is an attributed `build_mode_set` event on the idea's timeline.
+   */
+  async setBuildMode(
+    userId: number,
+    code: string,
+    mode: PlanBuildMode,
+  ): Promise<ItemDetail> {
+    const detail = await this.reader.detail(userId, code);
+    if (!detail.can.setBuildMode) {
+      throw new ForbiddenException(
+        'Only the builder assigned to this idea, or an Owner, says how it is built.',
+      );
+    }
+    const ref = await this.lookup.get(code);
+    const plan = ref.builderSessionId
+      ? await this.planStore.find(ref.builderSessionId)
+      : null;
+    if (!plan) {
+      throw new ConflictException('This idea has no plan to record it on.');
+    }
+    const changed = await this.writeBuildMode(
+      plan.id,
+      userId,
+      plan.plan?.buildMode?.mode ?? null,
+      mode,
+    );
+    if (changed) {
+      this.notifications.emit({
+        kind: 'ITEM_CHANGED',
+        actorId: userId,
+        code: ref.code,
+        fields: ['buildMode'],
+      });
+    }
+    return this.reader.detail(userId, code);
+  }
+
+  /**
+   * Mark it Released: the assigned builder's call, or an Owner's. The only way
+   * an idea reaches Released (lifecycle 2026-11-18); the release watcher only
+   * tells the builder its work is live. Compare-and-set on the stage, so a
+   * second click never re-stamps `releasedAt`. `releasedAt` is when its work
+   * went live where every release row says so, else now.
+   */
+  async markReleased(userId: number, code: string): Promise<ItemDetail> {
+    const detail = await this.reader.detail(userId, code);
+    if (!detail.can.markReleased) {
+      throw new ForbiddenException(
+        detail.shownStage === 'shipped'
+          ? 'This idea is already released.'
+          : 'Only the builder assigned to this idea, or an Owner, marks it released.',
+      );
+    }
+    const ref = await this.lookup.get(code);
+    const live = detail.releases.filter((r) => r.state === 'live');
+    const liveAt =
+      live.length && live.length === detail.releases.length
+        ? (live
+            .map((r) => r.releasedAt)
+            .filter((at): at is string => !!at)
+            .sort()
+            .pop() ?? null)
+        : null;
+    const result = await this.dataSource.query(
+      `UPDATE "roadmap_opportunities"
+          SET stage = 'released',
+              -- releasedAt is timestamp without time zone, read as UTC.
+              "releasedAt" = COALESCE($2::timestamptz, now()) AT TIME ZONE 'UTC',
+              "updatedBy" = $3, "updatedAt" = now()
+        WHERE id = $1 AND stage IN ('new', 'prioritised') AND "deletedAt" IS NULL
+        RETURNING id`,
+      [ref.id, liveAt, userId],
+    );
+    const rows = Array.isArray(result?.[0]) ? result[0] : result;
+    if (!rows?.length) {
+      throw new ConflictException(
+        `${ref.code} was released or closed a moment ago.`,
+      );
+    }
+    if (ref.builderSessionId) {
+      await this.events.record({
+        sessionId: ref.builderSessionId,
+        kind: PlanEventKind.MARKED_RELEASED,
+        actorUserId: userId,
+        detail: liveAt ? { liveAt } : null,
+      });
+      await this.stage.sync(ref.builderSessionId, userId);
+    }
+    this.notifications.emit({
+      kind: 'ITEM_CHANGED',
+      actorId: userId,
+      code: ref.code,
+      fields: ['stage'],
+    });
+    return this.reader.detail(userId, code);
+  }
+
+  /** Write the build mode and its event when it changes. True if it changed. */
+  private async writeBuildMode(
+    sessionId: string,
+    userId: number,
+    from: PlanBuildMode | null,
+    to: PlanBuildMode,
+  ): Promise<boolean> {
+    if (from === to) return false;
+    await this.planStore.patchPlan(sessionId, {
+      buildMode: { mode: to, byUserId: userId, at: new Date().toISOString() },
+    });
+    await this.events.record({
+      sessionId,
+      kind: PlanEventKind.BUILD_MODE_SET,
+      actorUserId: userId,
+      detail: { from, to },
+    });
+    return true;
+  }
+
   private async assertCanSend(
     userId: number,
     code: string,
@@ -131,7 +263,7 @@ export class RoadmapItemBuildService {
     const detail = await this.reader.detail(userId, code);
     if (!detail.can.exportBrief) {
       throw new ForbiddenException(
-        "Only the idea's lead or an Owner can send it to build, once it is ready to build.",
+        'Only the builder assigned to this idea, or an Owner, can send it to build.',
       );
     }
     return detail;

@@ -19,7 +19,7 @@ import { TokenUser } from 'src/auth/type/auth.types';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
-import { RecordExternalBuildDto } from './roadmap-build.dto';
+import { RecordExternalBuildDto, SetBuildModeDto } from './roadmap-build.dto';
 import {
   BuildBriefResponse,
   RoadmapItemBuildService,
@@ -72,5 +72,36 @@ export class RoadmapItemBuildController {
   ): Promise<ItemDetail> {
     await this.settings.assertRoadmapV2();
     return this.build.recordExternalBuild(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/build-mode')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'The assigned builder (or an Owner): build it with the Builder agent or outside it. Switchable.',
+  })
+  async buildMode(
+    @Param('code') code: string,
+    @Body() dto: SetBuildModeDto,
+    @CurrentUser() user: TokenUser,
+  ): Promise<ItemDetail> {
+    await this.settings.assertRoadmapV2();
+    return this.build.setBuildMode(user.id, code, dto.mode);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/mark-released')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'The assigned builder (or an Owner): mark the idea Released. Nothing marks it automatically.',
+  })
+  async markReleased(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ): Promise<ItemDetail> {
+    await this.settings.assertRoadmapV2();
+    return this.build.markReleased(user.id, code);
   }
 }

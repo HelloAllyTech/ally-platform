@@ -56,6 +56,10 @@ export interface SessionFacts {
   reviews: { dueDates?: string[]; done?: number } | null;
   externalBuild: { byUserId?: number; at?: string } | null;
   planningStarted: boolean | null;
+  /** The Owner closed the plan (lifecycle 2026-11-18). */
+  planClosed?: { byUserId?: number; at?: string } | null;
+  /** How the assigned builder builds it. */
+  buildMode?: { mode?: string; byUserId?: number; at?: string } | null;
   /** Questions whose answers conflict and wait for the settler (P3b). */
   openConflicts?: number;
   totalCostUsd: number;
@@ -215,6 +219,18 @@ export function itemStageFacts(input: {
               : {}),
             closedBy: session.closed?.by ?? null,
             closedAt: iso(session.closed?.at),
+            planClosed:
+              session.planClosed?.byUserId && session.planClosed.at
+                ? {
+                    byUserId: Number(session.planClosed.byUserId),
+                    at: String(session.planClosed.at),
+                  }
+                : null,
+            buildMode:
+              session.buildMode?.mode === 'builder_agent' ||
+              session.buildMode?.mode === 'outside'
+                ? session.buildMode.mode
+                : null,
           }
         : null,
     legacySession:
@@ -231,6 +247,13 @@ export function itemStageFacts(input: {
         !released &&
         merged.length > 0 &&
         input.releases.some((r) => r.state === 'pending'),
+      // Every service its merged work touched is in a production release, but
+      // nobody has marked it Released yet: Released is a person's click.
+      workLive:
+        !released &&
+        merged.length > 0 &&
+        input.releases.length > 0 &&
+        input.releases.every((r) => r.state === 'live'),
       heldReason: null,
     },
     shipped: {

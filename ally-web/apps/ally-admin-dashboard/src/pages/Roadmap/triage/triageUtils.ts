@@ -28,3 +28,16 @@ export const swipeDecision = (offsetX: number, width: number): "pickLead" | "dec
   if (offsetX <= -width * SWIPE_COMMIT_FRACTION) return "decline";
   return null;
 };
+
+/**
+ * What a To do idea needs next from an Owner (lifecycle 2026-11-18): planning (Start planning
+ * accepts it too), closing the plan (done on the idea page, where the plan is), or a builder once
+ * the plan is closed.
+ */
+export type TodoStep = "plan" | "closePlan" | "pickBuilder";
+
+export const todoNextStep = (row: { shownStage: string; statusParts?: unknown }): TodoStep => {
+  if (row.shownStage !== "planning") return "plan";
+  const parts = (row.statusParts ?? {}) as { planClosed?: unknown };
+  return parts.planClosed ? "pickBuilder" : "closePlan";
+};
