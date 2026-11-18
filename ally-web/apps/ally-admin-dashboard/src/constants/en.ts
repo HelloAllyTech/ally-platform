@@ -417,7 +417,7 @@ export const en = {
     enterEmailToContinue: "Enter your email address to continue",
     enterEmailPlaceholder: "Enter your email address",
     next: "Next",
-    byTappingNext: "By proceeding, i agree to Ally's",
+    byTappingNext: "By proceeding, I agree to Ally's",
     andAcknowledge: "and acknowledge",
     verifyYourEmail: "Verify your email address",
     enterSecurityCode: "Enter the security code sent to",
@@ -1766,6 +1766,192 @@ export const en = {
     /** Someone who only has their assistant (chunk 6b): the one thing in its frame. */
     logOut: "Log out",
     toYourAssistants: "Go to your assistants",
+    /** The login screen a signed-out visitor sees on any /assistants page (its own wording and layout). */
+    login: {
+      headline: "Build and manage your own custom ",
+      headlineEmphasis: "chatbots.",
+      /** The wordmark at the top left: "Ally" and, in the orange block, "chatbots". */
+      sendCode: "Send code",
+      googleSignIn: "Sign in using Google",
+      capabilities: {
+        heading: "What you can build and control",
+        items: [
+          {
+            id: "knowledge",
+            title: "Teach it from your pages",
+            blurb:
+              "Add documents and website pages. It answers from them and says where each answer came from.",
+          },
+          {
+            id: "voice",
+            title: "Give it a voice",
+            blurb: "Set its tone, add your own instructions and write quick replies.",
+          },
+          {
+            id: "rules",
+            title: "Set the rules",
+            blurb:
+              "Choose topics it politely avoids. Ally's safety rules stay on, and yours are added.",
+          },
+          {
+            id: "handover",
+            title: "Hand over to a person",
+            blurb: "Decide what happens when someone asks to speak to your team.",
+          },
+          {
+            id: "lists",
+            title: "Keep lists",
+            blurb: "Bookings, leads or orders it can look up, add and change.",
+          },
+          {
+            id: "brand",
+            title: "Make it yours",
+            blurb: "Your logo and colours on a public page and a chat bubble on your website.",
+          },
+          {
+            id: "test",
+            title: "Test before you share",
+            blurb: "Try it live, and run a checkup of test questions.",
+          },
+          {
+            id: "access",
+            title: "Choose who gets in",
+            blurb: "Decide who can use it, and connect WhatsApp or your website.",
+          },
+          {
+            id: "learn",
+            title: "Learn from conversations",
+            blurb: "Read every conversation and see the questions it couldn't answer.",
+          },
+        ],
+      },
+      useCasesHeading: "What organisations use it for",
+      previousCases: "Previous use cases",
+      nextCases: "Next use cases",
+      whatItDoes: "What it does",
+      exampleHeading: "Example conversation",
+      exampleNote:
+        "An illustration of the kind of answer an assistant can give from your own pages.",
+      startBuilding: "Log in to build yours",
+      useCases: [
+        {
+          id: "helpline",
+          title: "Helpline and crisis support",
+          blurb: "Share your helpline details and safe next steps, at any hour.",
+          detail: {
+            intro:
+              "People often reach out late at night, or when no one is free to pick up. Your assistant answers calmly and consistently from the guidance you've published, and points people to your team.",
+            points: [
+              "Shares your helpline numbers and opening hours",
+              "Gives clear next steps from your own safety and referral pages",
+              "Never replaces your counsellors; it directs people to them",
+            ],
+            example: {
+              question: "I need to talk to someone tonight.",
+              answer:
+                "I'm glad you reached out. You can call our helpline any time, day or night. If you're in immediate danger, please contact your local emergency services.",
+            },
+          },
+        },
+        {
+          id: "services",
+          title: "Services and eligibility",
+          blurb: "Explain who can apply, what to bring and where to go, in plain words.",
+          detail: {
+            intro:
+              "The same questions arrive every day: am I eligible, what do I bring, where do I go. Your assistant answers them from your own programme pages, so your staff can focus on people who need them most.",
+            points: [
+              "Explains eligibility and the documents to bring",
+              "Gives hours, locations and the steps to apply",
+              "Answers on your website, your page or WhatsApp",
+            ],
+            example: {
+              question: "What do I need to bring to apply for the food programme?",
+              answer:
+                "Please bring a photo ID and proof of address. Distribution runs on Tuesdays and Saturdays, 9 to 1, at the community hall. Would you like directions?",
+            },
+          },
+        },
+        {
+          id: "supporters",
+          title: "Donors and volunteers",
+          blurb: "Handle giving, receipts and sign-ups without tying up your team.",
+          detail: {
+            intro:
+              "Supporters want quick answers about how to give or help. Your assistant handles the everyday questions at any time, so no offer of help waits days for a reply.",
+            points: [
+              "Explains ways to donate and how receipts work",
+              "Describes volunteer roles, shifts and how to sign up",
+              "Passes on the links and contacts you've published",
+            ],
+            example: {
+              question: "How can I volunteer on weekends?",
+              answer:
+                "Weekend shifts are open at the food bank and the youth centre. You can sign up on our volunteer page, and I can tell you what each shift involves.",
+            },
+          },
+        },
+        {
+          id: "training",
+          title: "Staff and volunteer onboarding",
+          blurb: "New teammates get answers from your own policies and guides.",
+          detail: {
+            intro:
+              "New staff and volunteers have a hundred small questions in their first weeks. Your assistant answers from your own handbooks and policies, so they get a consistent answer without waiting for a senior colleague.",
+            points: [
+              "Answers from your policies, guides and checklists",
+              "Keeps everyone working from the same, current information",
+              "Frees experienced staff from repeat questions",
+            ],
+            example: {
+              question: "What do I do if a client tells me something worrying?",
+              answer:
+                "Following the safeguarding policy: make sure the person is safe, note what they said in their own words, and report it to the safeguarding lead the same day. Want the full checklist?",
+            },
+          },
+        },
+        {
+          id: "languages",
+          title: "Reach more communities",
+          blurb: "Meet people in the languages they speak, on the apps they already use.",
+          detail: {
+            intro:
+              "Information is only useful if people can read it. Your assistant can answer in many languages, on channels like WhatsApp that your community already uses, so language is not a barrier to getting help.",
+            points: [
+              "Answers in the language the person writes in",
+              "Works on WhatsApp, your website and your page",
+              "One set of answers to maintain, not one per language",
+            ],
+            example: {
+              question: "क्या आप हिंदी में स्वास्थ्य शिविर के बारे में बता सकते हैं?",
+              answer:
+                "ज़रूर! स्वास्थ्य शिविर शनिवार को सुबह 9 बजे से गाँव के सामुदायिक केंद्र में लगेगा।",
+            },
+          },
+        },
+        {
+          id: "updates",
+          title: "Campaigns and urgent updates",
+          blurb: "Keep your community informed when things change fast.",
+          detail: {
+            intro:
+              "When a camp moves, a deadline shifts or an emergency unfolds, people need the latest answer immediately. Update your pages once and your assistant gives everyone the same current information.",
+            points: [
+              "Answers from your latest published pages",
+              "Handles a surge of questions without extra staff",
+              "Points people to official sources and contacts",
+            ],
+            example: {
+              question: "Is the relief camp still open?",
+              answer:
+                "Yes. The relief camp at the school is open until Friday, with meals at noon and 7 pm. This answer updates as soon as your page does.",
+            },
+          },
+        },
+      ],
+      wordmarkName: "Ally",
+      wordmarkProduct: "chatbots",
+    },
   },
   whatsappBot: {
     navLabel: "Assistants",

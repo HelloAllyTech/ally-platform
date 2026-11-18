@@ -35,9 +35,12 @@ async function mockLogin(page: Page, features: string[]) {
   );
 }
 
+// The standard login's button is "Next"; the assistants login's is "Send code".
+const SEND_CODE = { name: /^(Next|Send code)$/ };
+
 async function logIn(page: Page) {
   await page.getByPlaceholder("Enter your email address").fill("asha@clinic.example");
-  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", SEND_CODE).click();
   const digits = page.locator('input[inputmode="numeric"]');
   await expect(digits.first()).toBeVisible();
   const count = await digits.count();
@@ -56,7 +59,7 @@ test("logged out: a deep link shows the login screen at that URL (no sign-up), a
 
   await page.goto(deepLink);
   // The login screen is drawn at the URL they opened: no redirect to /login.
-  await expect(page.getByRole("button", { name: "Next" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send code" })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/assistants/${BOT_ID}\\?section=lists&tool=memory$`));
   await expect(page.getByText(/sign\s*up/i)).toHaveCount(0);
 
