@@ -798,5 +798,391 @@
         }
       }
     ]
+  },
+  {
+    "id": "ia-nyc-dinner",
+    "kind": "in data: New York dinner hours 5 pm to 10 pm",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What are your dinner hours in New York?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["5(:00)? ?pm", "10(:00)? ?pm"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ia-mum-reserve",
+    "kind": "in data: Mumbai reservations phone or email",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How do I make a reservation in Mumbai?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": [
+            "(\\+?91 ?)?22 ?3525 ?1500|reservations\\.mum@indianaccent\\.com"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ia-nyc-hold",
+    "kind": "in data: New York holds a table 15 minutes",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How long will you hold my table in New York if I'm running late?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["15 min"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ia-private",
+    "kind": "in data: Delhi private dining for 10 to 40",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Do you have private dining in Delhi? For how many people?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["10\\s*(-|–|to)\\s*40|40 (guests|people)"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ho-sizes",
+    "kind": "in data: Aquantis 3 BHK 1,610 to 1,965 sq ft",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What are the 3 BHK sizes at Aquantis?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["1,?610", "1,?965"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ho-vaastu",
+    "kind": "in data (site FAQ): all 3 BHK are 100% Vaastu compliant",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Are your 3 BHK flats Vaastu compliant?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["100 ?%|all (of )?(our |the )?3 ?BHK|fully"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ho-rera",
+    "kind": "in data: Signatis RERA P02200005923",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What's the RERA number for Honer Signatis?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["P02200005923"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ho-possession",
+    "kind": "in data: Signatis phase 1 possession Dec 2026",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "When is possession for Signatis?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["Dec(ember)?\\.? 2026"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ne-spa",
+    "kind": "in data: spa open 8 am to 8 pm",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What time is the spa open at Neemrana?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["8(\\.|:)?(00)? ?am", "8(\\.|:)?(00)? ?pm"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ne-address",
+    "kind": "in data: Neemrana Fort-Palace address",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What's the address of Neemrana Fort-Palace?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["122nd Milestone|301705"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ne-glasshouse",
+    "kind": "in data: Glasshouse on the Ganges check-in 2 PM",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What's the check-in time at the Glasshouse on the Ganges?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["2(:00)? ?PM|14:00"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ne-preshoot",
+    "kind": "in data: pre-wedding shoot at Tijara 80,000",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How much is a pre-wedding shoot at Tijara?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["80,?000"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "mp-helpline",
+    "kind": "in data (B1 false alarm): the 24x7 helpline number, no crisis reply",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Do you have a helpline I can call any time?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["1800[ -]?120[ -]?820050"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "mp-hours",
+    "kind": "in data: Mumbai centre 9 am to 8 pm",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What are the Mumbai centre's opening hours?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["9(:00)? ?am", "8(:00)? ?pm"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "mp-cancel",
+    "kind": "in data: cancel 48 hours ahead",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What's your cancellation policy?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["48 hours"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "mp-book-delhi",
+    "kind": "in data: Delhi booking number",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How do I book an appointment at the Delhi centre?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["86578 ?7471[12]|8657874711"]
+        }
+      }
+    ]
   }
 ]
