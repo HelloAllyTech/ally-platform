@@ -538,8 +538,8 @@ const CallSummary: FC<CallSummaryProps> = ({
         {isFailedSummary ? (
           // Summary generation failed but the transcript was saved: let the
           // user retry generation or fill the fields in manually and save.
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#c4901f] bg-[#f3e6c9] px-4 py-3 mb-2">
-            <span className="text-[#6b4f22] font-primary text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-status-ochreDot bg-status-ochreBg px-4 py-3 mb-2">
+            <span className="text-status-ochreFg font-primary text-sm">
               {t("summary.generationFailedEditable")}
             </span>
             <Button onClick={handleRetrySummary} disabled={isRetrying} className="shrink-0">
@@ -555,19 +555,19 @@ const CallSummary: FC<CallSummaryProps> = ({
               <InfoBanner
                 message={t("summary.incompleteRecording")}
                 icon={() => (
-                  <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+                  <Warning className="border-status-ochreDot border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
                 )}
-                wrapperClassName="border-[#c4901f] bg-[#f3e6c9] mb-2"
-                messageClassName="text-[#6b4f22]"
+                wrapperClassName="border-status-ochreDot bg-status-ochreBg mb-2"
+                messageClassName="text-status-ochreFg"
               />
             )}
             <InfoBanner
               message={t("summary.disclaimer")}
               icon={() => (
-                <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+                <Warning className="border-status-ochreDot border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
               )}
-              wrapperClassName="border-[#c4901f] bg-[#f3e6c9]"
-              messageClassName="text-[#6b4f22]"
+              wrapperClassName="border-status-ochreDot bg-status-ochreBg"
+              messageClassName="text-status-ochreFg"
             />
           </>
         )}
