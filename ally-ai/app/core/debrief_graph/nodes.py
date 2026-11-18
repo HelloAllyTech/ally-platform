@@ -17,6 +17,7 @@ from langgraph.types import Command
 from app.core.debrief.cue_strength import (
     drop_possible_important_moment,
     effective_hard_fails,
+    needs_review,
     with_strength,
 )
 from app.core.debrief_graph import inputs as body
@@ -757,9 +758,14 @@ async def score_draft(
             "hardFails": hard_fails,
             "fixes": ev.get("fixes") or [],
             "dimensions": ev["dimensions"],
+            # Only the ones a person should look at: a possible cue the learner
+            # handled well and the debrief left out needs no review.
             "possibleMissedCues": [
                 {"turn_index": c.get("turn_index"), "quote": c.get("quote")}
-                for c in possible_missed
+                for c in needs_review(
+                    possible_missed,
+                    (state.get("safety") or {}).get("risk_cues") or [],
+                )
             ],
             "riskCues": ev.get("risk_cues") or [],
         }

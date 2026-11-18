@@ -1,7 +1,7 @@
 """The Evaluator's hard fails as the run counts them, and the line the console
 shows for the step (a possible-only missed cue must not read as a hard fail)."""
 
-from app.core.debrief.cue_strength import effective_hard_fails
+from app.core.debrief.cue_strength import effective_hard_fails, needs_review
 from app.core.debrief_graph.narration import evaluator_summary
 
 DIMS = [
@@ -61,3 +61,28 @@ def test_the_step_line_shows_the_counted_hard_fails():
     counted = evaluator_summary(res, [])
     assert "hard fails: missed_risk_cue" in raw
     assert counted.startswith("9.0 overall; no hard fail")
+
+
+def _read(turn, response):
+    return {"turn_index": turn, "strength": "possible", "learner_response": response}
+
+
+def test_a_possible_cue_the_learner_handled_needs_no_review():
+    possible = [_cue(7, False), _cue(17, False)]
+    reads = [_read(7, "explored"), _read(17, "acknowledged")]
+    assert needs_review(possible, reads) == []
+
+
+def test_a_possible_cue_the_learner_missed_or_dismissed_is_reviewed():
+    possible = [_cue(5, False), _cue(9, False), _cue(12, False)]
+    reads = [_read(5, "missed"), _read(9, "harmful"), _read(12, "explored")]
+    assert [c["turn_index"] for c in needs_review(possible, reads)] == [5, 9]
+
+
+def test_a_cue_with_no_reader_entry_is_not_discounted():
+    assert [c["turn_index"] for c in needs_review([_cue(3, False)], [])] == [3]
+
+
+def test_any_missed_reading_on_the_same_turn_counts():
+    reads = [_read(19, "explored"), _read(19, "missed")]
+    assert len(needs_review([_cue(19, False)], reads)) == 1

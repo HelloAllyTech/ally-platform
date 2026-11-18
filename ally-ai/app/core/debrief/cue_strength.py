@@ -264,6 +264,32 @@ def effective_hard_fails(
     return list(hard_fails), clear, possible
 
 
+#: How the learner met a cue (Safety reader) that leaves a possible cue worth a
+#: person's look when the debrief also left it out.
+_LEARNER_FAILED = frozenset({"missed", "harmful"})
+
+
+def needs_review(
+    possible_cues: List[Dict[str, Any]], safety_cues: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """The possible cues the debrief left out that a person should still check.
+
+    A possible cue the learner stayed with or explored needs no review when the
+    debrief does not mention it: the learner handled it. One the learner missed
+    or dismissed does, and so does one the Safety reader has no entry for (no
+    answer to read, so it is not discounted). Clear cues are not affected."""
+    keep: List[Dict[str, Any]] = []
+    for cue in possible_cues or []:
+        reads = [
+            c for c in safety_cues or [] if c.get("turn_index") == cue.get("turn_index")
+        ]
+        if not reads or any(
+            c.get("learner_response") in _LEARNER_FAILED for c in reads
+        ):
+            keep.append(cue)
+    return keep
+
+
 def drop_possible_important_moment(
     cards: Dict[str, Any],
     evaluator_cues: List[Dict[str, Any]],
