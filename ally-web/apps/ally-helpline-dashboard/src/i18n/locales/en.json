@@ -1467,6 +1467,7 @@
     },
     "createNote": {
       "title": "New note",
+      "autoFilled": "Filled in automatically",
       "saving": "Saving…",
       "saved": "Saved",
       "saveError": "Couldn't save note",
