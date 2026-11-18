@@ -7,16 +7,12 @@ import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-togg
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 
 /**
- * The two filing doors, asserted as decorator metadata (the pattern of
+ * The filing door, asserted as decorator metadata (the pattern of
  * bug-hunter.controller.gating.spec.ts: the service specs instantiate things
- * directly, so guards never run there, and the split lives only in decorators).
+ * directly, so guards never run there, and the gate lives only in decorators).
  *
- * `create` is the interview's door and sits on the VOTE tier with no toggle.
- * `quickAdd` skips the readiness gate, so its handler asserts the Owner role
- * (PlanAccessService.assertQuickAdd, covered in
- * roadmap-filing-ideas-toggle.spec.ts) — a quick-add handler that loses that
- * check would let every voter file unchecked, which is the bypass the gate
- * exists to close.
+ * `create` is the interview's door and sits on the VOTE tier with no toggle. It is the only
+ * route that files onto the board: there is no door that skips the readiness gate.
  */
 describe('RoadmapOpportunityController — filing route gating', () => {
   const reflector = new Reflector();
@@ -48,25 +44,7 @@ describe('RoadmapOpportunityController — filing route gating', () => {
     ]);
     // The Product Roadmap tab's own toggle, ON by default for every platform
     // admin — not a filing tier. The interview stays the door for everyone
-    // who has the tab; quick add is the Owner role's, checked in the handler.
+    // who has the tab.
     expect(toggle?.featureKey).toBe(FeatureToggleKey.PRODUCT_ROADMAP);
-  });
-
-  it('quickAdd is VOTE-tier behind the Roadmap tab; the Owner role is checked in the handler', () => {
-    const { path, permissions, toggle } = gateOf('quickAdd');
-    expect(path).toBe('opportunities/quick');
-    expect(permissions?.permissions).toEqual([
-      PERMISSIONS.VOTE_PRODUCT_ROADMAP,
-    ]);
-    expect(toggle?.featureKey).toBe(FeatureToggleKey.PRODUCT_ROADMAP);
-  });
-
-  it('quickAdd does not share the manage toggle', () => {
-    // Quick add is a filing shortcut, not board curation: the manage toggle
-    // was reset to one account on 2026-10-01 precisely because it had been
-    // carrying unrelated grants.
-    expect(gateOf('quickAdd').toggle?.featureKey).not.toBe(
-      FeatureToggleKey.PRODUCT_ROADMAP_MANAGE,
-    );
   });
 });

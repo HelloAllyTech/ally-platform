@@ -769,8 +769,7 @@ two counters a twenty-turn interview's real spend is unknowable. Build-run usage
 
 The roadmap's idea-to-outcome plan (plans/roadmap-owns-planning rev 5.2). A plan **reuses the Builder
 session tables** (see 3.14, plan columns); these two tables sit beside them. **Not multi-tenant.** Who may
-do is the person's Roadmap role (Idea files and works up ideas, Builder leads a plan, Owner does both and
-quick-adds), read through `PlanAccessService` from `RoadmapRoleService`; the former `product_planning_ideas`,
+do is the person's Roadmap role (Idea files and works up ideas, Builder leads a plan, Owner does both), read through `PlanAccessService` from `RoadmapRoleService`; the former `product_planning_ideas`,
 `product_planning_lead` and `product_roadmap_quick_add` toggles were retired by `1984000000000-RetireRoadmapPlanningToggles`.
 
 | Table                  | Base               | Key columns                                                                                                                                                                                                                                                                                                                                          | Notes                                                                                                                                                                                                                                                                                                                                                                            |

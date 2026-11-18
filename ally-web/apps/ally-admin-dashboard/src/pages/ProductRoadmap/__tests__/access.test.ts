@@ -7,7 +7,6 @@ import {
   canLeadRoadmapPlans,
   canManageRoadmap,
   canOpenRoadmapBuilder,
-  canQuickAddRoadmap,
   roadmapRoleFor,
 } from "../utils/access";
 
@@ -114,22 +113,6 @@ describe("canFileIdeas", () => {
 
   it("does NOT file for an org-restricted admin", () => {
     expect(canFileIdeas(IDEA_PERMS, [ROADMAP], true)).toBe(false);
-  });
-});
-
-describe("canQuickAddRoadmap", () => {
-  it("quick-adds as an Owner", () => {
-    expect(canQuickAddRoadmap(OWNER_PERMS, [ROADMAP, BUILDER, TOGGLE])).toBe(true);
-  });
-
-  it("does NOT quick-add as an Idea or a Builder", () => {
-    expect(canQuickAddRoadmap(IDEA_PERMS, [ROADMAP])).toBe(false);
-    expect(canQuickAddRoadmap(BUILDER_PERMS, [ROADMAP, BUILDER])).toBe(false);
-  });
-
-  it("does NOT quick-add when restricted, or when toggles could not be loaded", () => {
-    expect(canQuickAddRoadmap(OWNER_PERMS, [ROADMAP, BUILDER, TOGGLE], true)).toBe(false);
-    expect(canQuickAddRoadmap(OWNER_PERMS, [])).toBe(false);
   });
 });
 

@@ -12,6 +12,7 @@ import { useSpeechCapture } from "@hooks/useSpeechCapture";
 import { IDEA_DRAFT_TEXT_MAX } from "@types";
 
 import { MicBulbIcon } from "./MicBulbIcon";
+import { useCreateRoadmapDraftMutation } from "../../api/roadmapV2Flow";
 import { canFileIdeas } from "../../pages/ProductRoadmap/utils/access";
 
 const UNSENT_KEY = "ally-admin-idea-capture-unsent";
@@ -46,13 +47,16 @@ const clipExtension = (type: string) =>
 const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).length : 0);
 
 /**
- * The global "say your idea" door: a mic-and-bulb button pinned top-right of every admin screen,
- * which opens a full-screen capture surface that grows out of the button itself.
+ * THE ONE WAY TO START AN IDEA. A mic-and-bulb button that opens a full-screen capture surface
+ * growing out of the button itself. The same component is mounted wherever an idea can begin
+ * (the nav, the Roadmap header, the phone's bottom bar), so the icon, the capture and what
+ * happens after Save are identical everywhere. There is deliberately no second door.
  *
  * WHAT IT IS FOR. Getting the raw first version of an idea out before it evaporates. It does NOT
- * file anything: Save puts a private draft in the author's "My drafts" tab on the Product
- * Roadmap, where it is later continued through the normal copilot interview (which is what
- * creates the real, readiness-checked opportunity).
+ * file anything: Save makes a private draft and opens it, to be expanded until it is mature
+ * enough to be submitted to the board (the readiness check is what puts it on the roadmap).
+ * While Roadmap v2 is on the draft opens on its own page (`/roadmap/i/:code`); before cutover it
+ * lands in the author's "My drafts" tab on the Product Roadmap.
  *
  * THE MIC STARTS ITSELF. Opening is the user gesture, so recording starts inside the click
  * handler — no second "start" tap between having the thought and saying it. The orb is the one
@@ -67,8 +71,18 @@ const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).leng
  * Access mirrors filing an opportunity (the VOTE permission and the Roadmap Idea role or
  * above), because the draft endpoints do; anyone else never sees the button.
  */
-export const IdeaCaptureLauncher: React.FC = () => {
-  const { permissions, features, user } = useUser();
+interface IdeaCaptureLauncherProps {
+  /** `lg` is the phone bottom bar's raised 56px target; `md` is every other place. */
+  size?: "md" | "lg";
+  /** Extra classes for the trigger, e.g. to raise it above a bar. The icon never changes. */
+  className?: string;
+}
+
+export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
+  size = "md",
+  className = "",
+}) => {
+  const { permissions, features, user, isRoadmapV2On } = useUser();
   // Parking an idea is filing's first step: the Idea role (or above), as ally-be checks.
   const allowed = canFileIdeas(permissions, features, user?.restrictedTenantIds != null);
 
@@ -101,7 +115,9 @@ export const IdeaCaptureLauncher: React.FC = () => {
   const [finishing, setFinishing] = useState(false);
   const closeTimer = useRef<number | null>(null);
 
-  const [createDraft, { isLoading: isSaving }] = useCreateRoadmapIdeaDraftMutation();
+  const [createLegacyDraft, { isLoading: isSavingLegacy }] = useCreateRoadmapIdeaDraftMutation();
+  const [createV2Draft, { isLoading: isSavingV2 }] = useCreateRoadmapDraftMutation();
+  const isSaving = isSavingLegacy || isSavingV2;
   const [transcribeClip] = useTranscribeRoadmapIdeaMutation();
 
   const transcribe = useCallback(
@@ -224,7 +240,18 @@ export const IdeaCaptureLauncher: React.FC = () => {
     }
     const captureMode = usedVoice.current ? "voice" : "typed";
     try {
-      await createDraft({ rawText, captureMode }).unwrap();
+      // One pipeline, two stores until cutover: both hand back a private draft to open.
+      let destination: string;
+      if (isRoadmapV2On) {
+        const draft = await createV2Draft({
+          text: rawText.slice(0, IDEA_DRAFT_TEXT_MAX),
+          captureMode,
+        }).unwrap();
+        destination = ROUTES.ROADMAP_IDEA(draft.code);
+      } else {
+        await createLegacyDraft({ rawText, captureMode }).unwrap();
+        destination = `${ROUTES.PRODUCT_ROADMAP}?tab=drafts`;
+      }
       track(ANALYTICS_EVENTS.IDEA_CAPTURE_DRAFT_SAVED, {
         [ANALYTICS_PROPS.CAPTURE_MODE]: captureMode,
       });
@@ -233,13 +260,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
       setSaved(true);
       window.setTimeout(() => {
         finishClose();
-        toast.success("Idea saved to My drafts", {
-          description: "It's private and unpublished. Pick it up whenever you're ready.",
-          action: {
-            label: "Open drafts",
-            onClick: () => navigate(`${ROUTES.PRODUCT_ROADMAP}?tab=drafts`),
-          },
-        });
+        navigate(destination);
       }, 1100);
     } catch (error) {
       const message = (error as { data?: { message?: string | string[] } })?.data?.message;
@@ -248,7 +269,17 @@ export const IdeaCaptureLauncher: React.FC = () => {
           "Could not save that idea. Your words are still here — try again.",
       );
     }
-  }, [isSaving, finishing, speech, createDraft, finishClose, navigate, track]);
+  }, [
+    isSaving,
+    finishing,
+    speech,
+    isRoadmapV2On,
+    createV2Draft,
+    createLegacyDraft,
+    finishClose,
+    navigate,
+    track,
+  ]);
 
   // Keyboard: Esc closes (safely), Cmd/Ctrl+Enter saves.
   useEffect(() => {
@@ -473,14 +504,17 @@ export const IdeaCaptureLauncher: React.FC = () => {
 
             {/* save — the orb above is the only mic control */}
             <div className="mt-4 flex items-center justify-end gap-3">
-              <Tooltip label="Saves privately to My drafts. Nothing is published." align="top">
+              <Tooltip
+                label="Saves a private draft and opens it. Nothing is published."
+                align="top"
+              >
                 <button
                   type="button"
                   onClick={() => void save()}
                   disabled={!canSave}
                   className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-full bg-white px-6 text-sm font-medium text-[#1a1250] shadow-lg shadow-black/30 transition hover:scale-[1.03] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
-                  {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save to drafts"}
+                  {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save idea"}
                   <kbd className="hidden rounded bg-black/10 px-1.5 py-0.5 text-[10px] font-normal md:inline">
                     ⌘↵
                   </kbd>
@@ -503,7 +537,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
                       disabled={isSaving || finishing}
                       className="h-11 cursor-pointer rounded-full bg-white text-sm font-medium text-[#1a1250] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save to drafts"}
+                      {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save idea"}
                     </button>
                     <button
                       type="button"
@@ -554,7 +588,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
                     className="idea-check-tick"
                   />
                 </svg>
-                <p className="mt-4 text-xl font-light">Saved to your drafts</p>
+                <p className="mt-4 text-xl font-light">Saved. Opening your draft…</p>
               </div>
             )}
           </div>
@@ -565,16 +599,18 @@ export const IdeaCaptureLauncher: React.FC = () => {
 
   return (
     <>
-      <Tooltip label="Say an idea" align="right">
+      <Tooltip label="New idea" align="right">
         <button
           ref={buttonRef}
           type="button"
           onClick={open}
-          aria-label="Record a new idea by voice"
+          aria-label="New idea"
           data-testid="idea-capture-button"
-          className="text-typography-secondary hover:text-primary-500 inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+          className={`text-typography-secondary hover:text-primary-500 inline-flex ${
+            size === "lg" ? "h-14 w-14" : "h-11 w-11"
+          } cursor-pointer items-center justify-center rounded-full transition hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 ${className}`}
         >
-          <MicBulbIcon size={22} />
+          <MicBulbIcon size={size === "lg" ? 26 : 22} />
         </button>
       </Tooltip>
       {overlay}

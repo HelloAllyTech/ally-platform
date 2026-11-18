@@ -17,7 +17,7 @@ describe('PlanAccessService', () => {
   const bodyOf = (error: unknown) =>
     (error as ForbiddenException).getResponse() as Record<string, unknown>;
 
-  describe('assertIdeas / assertLead / assertQuickAdd', () => {
+  describe('assertIdeas / assertLead', () => {
     it('passes a holder of the role, or a higher one (the roles nest)', async () => {
       await expect(
         build({ [AUTHOR]: 'idea' }).assertIdeas(AUTHOR),
@@ -27,9 +27,6 @@ describe('PlanAccessService', () => {
       ).resolves.toBeUndefined();
       await expect(
         build({ [LEAD]: 'builder' }).assertIdeas(LEAD),
-      ).resolves.toBeUndefined();
-      await expect(
-        build({ [OTHER]: 'owner' }).assertQuickAdd(OTHER),
       ).resolves.toBeUndefined();
       await expect(
         build({ [OTHER]: 'owner' }).assertLead(OTHER),
@@ -45,14 +42,11 @@ describe('PlanAccessService', () => {
       expect(String(bodyOf(error).message)).toContain('Idea role');
     });
 
-    it('needs the Builder role to lead and the Owner role to quick add', async () => {
+    it('needs the Builder role to lead', async () => {
       const idea = build({ [AUTHOR]: 'idea' });
       expect(await idea.canLead(AUTHOR)).toBe(false);
-      expect(await idea.canQuickAdd(AUTHOR)).toBe(false);
-      const builder = build({ [LEAD]: 'builder' });
-      expect(await builder.canQuickAdd(LEAD)).toBe(false);
-      const error = await builder.assertQuickAdd(LEAD).catch((e: unknown) => e);
-      expect(String(bodyOf(error).message)).toContain('Owner role');
+      const error = await idea.assertLead(AUTHOR).catch((e: unknown) => e);
+      expect(String(bodyOf(error).message)).toContain('Builder role');
     });
 
     it('explains an org-restricted refusal as platform-only', async () => {
@@ -61,7 +55,6 @@ describe('PlanAccessService', () => {
       for (const call of [
         access.assertIdeas(AUTHOR),
         access.assertLead(AUTHOR),
-        access.assertQuickAdd(AUTHOR),
       ]) {
         const error = await call.catch((e: unknown) => e);
         expect(bodyOf(error).message).toBe(PLATFORM_WIDE_ONLY_MESSAGE);
