@@ -97,6 +97,8 @@ function build(
     owner?: Record<string, unknown>;
     progressProfile?: unknown;
     progressInsert?: Error;
+    /** The owner settings read fails with this. */
+    ownerFails?: Error;
     /** The language-pin lookup (DebriefChangeHoldsService); absent in most tests. */
     holds?: unknown;
     /** The ally-ai model catalogue; the seed's models by default. */
@@ -179,6 +181,7 @@ function build(
       async (code: string, version: number | null) =>
         `live ${code}@${version ?? 'current'}`,
     ),
+    recordPromptPins: jest.fn(async () => undefined),
     currentPromptVersions: jest.fn(async (codes: string[]) =>
       Object.fromEntries(codes.map((c) => [c, 2])),
     ),
@@ -227,10 +230,13 @@ function build(
   };
   const agentLogs = { record: jest.fn(async () => 0) };
   const ownerSettings = {
-    get: jest.fn(async () => ({
-      ...defaultOwnerSettings(),
-      ...(opts.owner ?? {}),
-    })),
+    get: jest.fn(async () => {
+      if (opts.ownerFails) throw opts.ownerFails;
+      return {
+        ...defaultOwnerSettings(),
+        ...(opts.owner ?? {}),
+      };
+    }),
   };
   const progressResults = {
     insert: jest.fn(async () => {
@@ -347,6 +353,7 @@ describe('DebriefRunnerService', () => {
         's1',
         expect.anything(),
         { framework: custom, competencies: ['open questions'] },
+        expect.anything(),
       );
       // The run records what it used, so a later edit never changes a past debrief.
       const ws = saved[saved.length - 1]?.workspace ?? {};
@@ -456,8 +463,9 @@ describe('DebriefRunnerService', () => {
         expect(prompts).toHaveProperty(code);
       }
       expect(prompts[DEBRIEF_PROMPT_CODES.writer]).toBe('challenger text');
+      // Not named by the release, so pinned to the version current when the release was first used.
       expect(prompts[DEBRIEF_PROMPT_CODES.safetyReader]).toBe(
-        `live ${DEBRIEF_PROMPT_CODES.safetyReader}@current`,
+        `live ${DEBRIEF_PROMPT_CODES.safetyReader}@2`,
       );
     });
 
@@ -723,6 +731,22 @@ describe('DebriefRunnerService', () => {
       ]);
     });
 
+    it('notes the owner settings falling back to their defaults, and still debriefs', async () => {
+      const { svc, saved } = build({
+        ownerFails: new Error('settings table locked'),
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
+      const ws = saved[saved.length - 1]?.workspace ?? {};
+      expect(ws.dataNotes).toEqual([
+        {
+          contextKey: 'owner_settings',
+          item: null,
+          why: 'settings table locked',
+        },
+      ]);
+    });
+
     it('keeps no note when every read worked', async () => {
       const { svc, saved } = build();
       await svc.run('s1', { mode: DebriefRunMode.SHADOW });
@@ -882,6 +906,7 @@ describe('DebriefRunnerService', () => {
           framework: expect.objectContaining({ skills: [] }),
           competencies: expect.any(Array),
         }),
+        expect.anything(),
       );
       expect(request().prompts).toHaveProperty(DEBRIEF_PROMPT_CODES.progress);
     });

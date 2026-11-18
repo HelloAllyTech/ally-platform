@@ -35,6 +35,7 @@ import {
 } from '../util/debrief-competencies.util';
 import { FHS_RUBRIC_VERSION } from '../../foundational-skills/constants/helping-skills-rubric.constants';
 import { DebriefSkillFramework } from '../constants/debrief-framework.constants';
+import { Degraded } from '../util/debrief-degraded.util';
 import {
   readRoleplayFields,
   roleplayFieldSelect,
@@ -116,7 +117,10 @@ export class DebriefContextRepository {
     this.transcripts = new DebriefQualityRepository(dataSource);
   }
 
-  async loadSession(sessionId: string): Promise<DebriefSessionContext | null> {
+  async loadSession(
+    sessionId: string,
+    degraded?: Degraded,
+  ): Promise<DebriefSessionContext | null> {
     const rows = await this.dataSource.query(
       `SELECT s.id, s.tenant_id, s."counselorId" AS counselor_id, s.status,
               COALESCE(l.value, 'en') AS language,
@@ -151,6 +155,7 @@ export class DebriefContextRepository {
     const expects = await this.expectationsOf(
       ids,
       r.scenario_id == null ? null : Number(r.scenario_id),
+      degraded,
     );
     return {
       id: r.id,
@@ -185,6 +190,7 @@ export class DebriefContextRepository {
   async expectationsOf(
     competencyIds: string[],
     scenarioId: number | null,
+    degraded?: Degraded,
   ): Promise<RoleplayExpectations> {
     const rows: CompetencyBehaviourRow[] = competencyIds.length
       ? await this.dataSource.query(
@@ -211,7 +217,9 @@ export class DebriefContextRepository {
             ORDER BY i.category, b.name`,
           [scenarioId],
         );
-      } catch {
+      } catch (e) {
+        // The debrief goes on with the competencies' behaviours only, and says it did.
+        degraded?.note('roleplay_behaviours', 'roleplay_behaviours', e);
         own = [];
       }
     }
@@ -591,6 +599,8 @@ export class DebriefContextRepository {
       framework?: DebriefSkillFramework;
       competencies?: ReadonlyArray<string>;
     },
+    /** Collects the optional reads (flags, comments, report, voice, levels) that fell back. */
+    degraded?: Degraded,
   ): Promise<ProgressProfile | null> {
     const window = progressWindow(settings);
     const rows: Array<ProgressWindowRow & { total: number }> =
@@ -660,13 +670,10 @@ export class DebriefContextRepository {
     if (!rows?.length) return null;
     const runIds = rows.map((r) => r.run_id);
     const sessionIds = rows.map((r) => r.session_id);
-    const optional = async <T>(read: () => Promise<T>, fallback: T) => {
-      try {
-        return await read();
-      } catch {
-        return fallback;
-      }
-    };
+    const optional = <T>(read: () => Promise<T>, fallback: T) =>
+      degraded
+        ? degraded.or('progress_profile', 'learner_history', read, fallback)
+        : read().catch(() => fallback);
     const [flags, comments, lastReport, voice, fhs] = await Promise.all([
       optional(
         () =>
