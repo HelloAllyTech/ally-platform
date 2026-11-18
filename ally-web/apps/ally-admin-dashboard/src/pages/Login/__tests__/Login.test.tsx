@@ -81,6 +81,8 @@ vi.mock("@api", () => ({
   useGenerateOTPMutation: () => mockUseGenerateOTPMutation(),
   useVerifyOTPMutation: () => mockUseVerifyOTPMutation(),
   useGoogleSignInMutation: () => mockGoogleSignInMutation(),
+  useGetTermsQuery: () => ({ data: { html: "<p>Terms body</p>" }, isFetching: false }),
+  useGetPrivacyQuery: () => ({ data: { html: "<p>Privacy body</p>" }, isFetching: false }),
   baseAPI: {
     injectEndpoints: vi.fn(() => ({})),
     reducerPath: "baseAPI",
@@ -179,7 +181,20 @@ vi.mock("@constants", () => ({
   ALLY_TERMS_URL: "https://ally.com/terms",
   ALLY_PRIVACY_POLICY_URL: "https://ally.com/privacy",
   ALLY_URL: "https://ally.com",
+  ROUTES: { WHATSAPP_BOT: "/assistants" },
   en: {
+    assistantsShell: {
+      login: {
+        headline: "Build and manage your own custom ",
+        headlineEmphasis: "chatbots.",
+        sendCode: "Send code",
+        googleSignIn: "Sign in using Google",
+        wordmarkName: "Ally",
+        wordmarkProduct: "chatbots",
+        useCases: [],
+        capabilities: { heading: "", items: [] },
+      },
+    },
     common: {
       or: "OR",
     },
@@ -716,6 +731,74 @@ describe("Login", () => {
         </Provider>,
       );
       expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+    });
+  });
+
+  describe("Assistants login", () => {
+    const renderAt = (path: string) =>
+      render(
+        <Provider store={store}>
+          <MemoryRouter initialEntries={[path]}>
+            <Login />
+          </MemoryRouter>
+        </Provider>,
+      );
+
+    it.each(["/assistants", "/assistants/b1?section=lists", "/assistants/new"])(
+      "shows its own headline and layout at %s",
+      path => {
+        renderAt(path);
+        expect(screen.getByTestId("assistants-login")).toBeInTheDocument();
+        expect(screen.getByText("chatbots.")).toBeInTheDocument();
+        expect(screen.queryByText("Hey,")).toBeNull();
+        // Same sign-in form underneath.
+        expect(screen.getByTestId("text-field-input")).toBeInTheDocument();
+      },
+    );
+
+    it("shows the Ally chatbots wordmark ahead of the headline", () => {
+      renderAt("/assistants");
+      const wordmark = screen.getByTestId("assistants-login-wordmark");
+      expect(wordmark).toHaveTextContent(/Ally\s*chatbots/);
+      const headline = screen.getByRole("heading", { level: 1 });
+      expect(
+        wordmark.compareDocumentPosition(headline) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("has no Remember Me checkbox and remembers the email by default", () => {
+      // Earlier tests leave this mock mid-request; this one needs the idle button.
+      mockUseGenerateOTPMutation.mockReturnValue([
+        mockGenerateOTP,
+        { isLoading: false, isSuccess: false, data: undefined, error: undefined },
+      ] as any);
+      renderAt("/assistants");
+      expect(screen.queryByRole("checkbox")).toBeNull();
+      fireEvent.change(screen.getByTestId("text-field-input"), {
+        target: { value: "a@b.co" },
+      });
+      fireEvent.click(screen.getByText("Send code"));
+      expect(localStorage.getItem("adminRememberedEmail")).toBe("a@b.co");
+    });
+
+    it("opens the Terms and the Privacy Policy as side drawers on the same page", () => {
+      renderAt("/assistants");
+      expect(screen.queryByTestId("legal-drawer")).toBeNull();
+      fireEvent.click(screen.getByText("Terms and Conditions"));
+      expect(screen.getByRole("dialog", { name: "Terms of Service" })).toBeInTheDocument();
+      expect(screen.getByText("Terms body")).toBeInTheDocument();
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByTestId("legal-drawer")).toBeNull();
+      fireEvent.click(screen.getByText("Privacy Policy."));
+      expect(screen.getByText("Privacy body")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("legal-drawer-overlay"));
+      expect(screen.queryByTestId("legal-drawer")).toBeNull();
+    });
+
+    it("keeps the standard login at /login and other pages", () => {
+      renderAt("/assistants-x");
+      expect(screen.queryByTestId("assistants-login")).toBeNull();
+      expect(screen.getByText("Hey,")).toBeInTheDocument();
     });
   });
 });

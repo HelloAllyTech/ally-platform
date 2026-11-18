@@ -43,6 +43,17 @@ export const PageFallback: React.FC = () => (
 export const AdminShell: React.FC = () => {
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
+  if (!isAuthenticated) {
+    // The login screen itself, at the URL they asked for: logging in leaves them on this page.
+    // (`/login` is its own page, so a visit there is not drawn twice.) Kept out of the signed-in
+    // shell below on purpose: its hooks fetch permissions and switches, and a signed-out visitor's
+    // 401 there sends the whole page to `/login?next=…` (baseApi), undoing this.
+    return <Login />;
+  }
+  return <SignedInShell />;
+};
+
+const SignedInShell: React.FC = () => {
   const { pathname, search } = useLocation();
   const meta = resolveRouteMeta(pathname, search);
   // Usage tracking: one `admin_page_viewed` per route change (route pattern only, never ids).
@@ -69,12 +80,6 @@ export const AdminShell: React.FC = () => {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isMobileNavOpen]);
-
-  if (!isAuthenticated) {
-    // The login screen itself, at the URL they asked for: logging in leaves them on this page.
-    // (`/login` is its own page, so a visit there is not drawn twice.)
-    return <Login />;
-  }
 
   // Someone whose only way in is an assistant's team (chunk 6b): their assistant and nothing else.
   if (assistantOnly) {
