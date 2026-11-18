@@ -511,7 +511,7 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     key: FeatureToggleKey.PM_AGENT,
     label: 'PM Agent',
     description:
-      "Review the AI product manager's recommendations and questions, accept them into Builder builds that merge and release automatically, and configure its budget, queue and memory.",
+      "Review the AI product manager's recommendations and questions, file the ones you accept to the Product Roadmap, and configure its budget, queue and memory.",
     // Backfilled ON for platform-tier admins by 1982000000000-CreatePmAgent; inert like
     // every key added after the role-collapse cutover.
     legacyGrants: SUPER_ADMIN_TIER,

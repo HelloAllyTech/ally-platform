@@ -7,7 +7,7 @@ read routes only the old tabs called (`GET review`, `GET runs`, `GET runs/:id`, 
 `GET releases`) and `POST models` were removed; a model change is a `pm-agent/ideas/propose`.
 
 Build notes: debrief-console-redesign-notes.md (outside the repo). Code:
-`ally-be/src/debrief/controller/debrief-console-view.controller.ts` (with its `-review`, `-releases`, `-settings`, `-tenants` and `-pm-agent` siblings),
+`ally-be/src/debrief/controller/debrief-console-*.controller.ts` (view, review, releases, settings, tenants, PM agent),
 `ally-be/src/debrief/service/debrief-console-view.service.ts`,
 `ally-be/src/debrief/service/debrief-autonomy.service.ts`,
 `ally-be/src/debrief/util/debrief-console-roles.util.ts`,

@@ -33,7 +33,7 @@
     {
       "path": "contributing/docs-system.md",
       "title": "Documentation System",
-      "summary": "How Ally's documentation is routed, deduplicated, enforced in CI, and kept current — the contract behind AGENTS.md, .docs-map.yml, ROUTING.md, and the weekly reconciler.",
+      "summary": "How Ally's documentation is routed, deduplicated, enforced in CI, and kept current inside the ally-platform monorepo — the contract behind AGENTS.md, .docs-map.yml, ROUTING.md, the Core Concepts lint and the weekly health sweep.",
       "tags": [
         "contributing",
         "docs",
@@ -41,8 +41,8 @@
         "ci",
         "automation"
       ],
-      "last_reconciled": "2026-08-06",
-      "words": 1413,
+      "last_reconciled": "2026-11-18",
+      "words": 1439,
       "url": "https://tech.helloally.ai/#/wiki/contributing/docs-system.md",
       "skip_reason": ""
     },
@@ -81,7 +81,7 @@
     {
       "path": "contributing/release-process.md",
       "title": "Release Process",
-      "summary": "The shared production-release process for every Ally service — semantic versioning policy, the automated pipeline, release-draft review, and troubleshooting.",
+      "summary": "The shared production-release process for every Ally service in the ally-platform monorepo — per-service tags, semantic versioning, the automated pipeline (Ansible deploy to the production stack), release-draft review, and troubleshooting.",
       "tags": [
         "contributing",
         "release",
@@ -89,8 +89,8 @@
         "ci",
         "deployment"
       ],
-      "last_reconciled": "2026-09-17",
-      "words": 1282,
+      "last_reconciled": "2026-11-18",
+      "words": 1189,
       "url": "https://tech.helloally.ai/#/wiki/contributing/release-process.md",
       "skip_reason": ""
     },
@@ -127,7 +127,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 14064,
+      "words": 14267,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -220,8 +220,8 @@
         "queues",
         "storage"
       ],
-      "last_reconciled": "2026-10-21",
-      "words": 1485,
+      "last_reconciled": "2026-11-18",
+      "words": 1539,
       "url": "https://tech.helloally.ai/#/wiki/platform/architecture.md",
       "skip_reason": ""
     },
@@ -611,8 +611,8 @@
         "nestjs",
         "api"
       ],
-      "last_reconciled": "2026-11-10",
-      "words": 6979,
+      "last_reconciled": "2026-11-18",
+      "words": 7112,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-be.md",
       "skip_reason": ""
     },
