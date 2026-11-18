@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
-import { DebriefConsoleController } from '../controller/debrief-console.controller';
+import { DebriefConsoleViewController } from '../controller/debrief-console-view.controller';
 import { DebriefRunLogKind } from '../enum/debrief-run.enum';
 import {
   DebriefRunLogsService,
@@ -277,8 +277,9 @@ describe('Agent logs: Ally team only', () => {
   }
   const ctx = (handler: string): ExecutionContext =>
     ({
-      getHandler: () => (DebriefConsoleController.prototype as any)[handler],
-      getClass: () => DebriefConsoleController,
+      getHandler: () =>
+        (DebriefConsoleViewController.prototype as any)[handler],
+      getClass: () => DebriefConsoleViewController,
       switchToHttp: () => ({
         getRequest: () => ({ user: { id: 1 }, method: 'GET', url: '/x' }),
       }),

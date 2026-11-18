@@ -1413,7 +1413,7 @@ export const DEBRIEF_QUALITY_JUDGE_SYSTEM = definePrompt(
   {
     name: "Debrief Quality Judge's Instructions",
     description:
-      "What the independent debrief-quality judge is told to do after the rubric, the transcript and the debrief: list the risk cues, score the eight dimensions, list the hard fails. A pinned rule: a change is approved by the clinical advisor or the owner, and bumps ally-ai's DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION. The Evaluator inside a debrief run keeps ally-ai's own copy.",
+      "What the independent debrief-quality judge is told to do after the rubric, the transcript and the debrief: list the risk cues, score the eight dimensions, list the hard fails. A pinned rule: only the named pinned editors can publish a change, which must also bump ally-ai's DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION. The Evaluator inside a debrief run keeps ally-ai's own copy.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1443,7 +1443,7 @@ export const DEBRIEF_RISK_CUE_DEFINITION = definePrompt(
   {
     name: 'Debrief risk cue definition',
     description:
-      'The one definition of a clear and a possible client risk cue, and what each means for a debrief. ally-ai adds it as a RISK CUE DEFINITION block to every Debrief call that judges risk cues: the Safety reader, the Writer, the Reviser, the Evaluator and the independent debrief-quality judge. Pinned: a change is approved by the clinical advisor or the owner.',
+      'The one definition of a clear and a possible client risk cue, and what each means for a debrief. ally-ai adds it as a RISK CUE DEFINITION block to every Debrief call that judges risk cues: the Safety reader, the Writer, the Reviser, the Evaluator and the independent debrief-quality judge. Pinned: only the named pinned editors can publish a change; the Debrief PM agent can read it but never edit it.',
     category: 'evaluation',
   },
 );

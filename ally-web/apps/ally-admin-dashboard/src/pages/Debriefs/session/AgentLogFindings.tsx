@@ -7,12 +7,20 @@ import {
   asObj,
   dimensions,
   humanCode,
-  keyLabel,
   numOr,
   overallOf,
   passScoreFor,
   str,
 } from "./agentLogParts";
+import {
+  detailRows,
+  DetailRow,
+  meaningfulRows,
+  profileDetailRows,
+  profileFacts,
+  profileSentence,
+} from "./agentLogReadable";
+import { Disclosure } from "../consoleUi";
 import { entryName, plainText } from "./agentLogText";
 
 /**
@@ -345,7 +353,7 @@ const QualityFound: React.FC<{ output: Obj }> = ({ output }) => {
     <div className="flex items-center gap-4" data-testid="found-quality">
       <span className="font-secondary text-[32px] leading-none">{overall ?? "—"}</span>
       <p className="m-0 text-[13px] text-neutral-800">
-        {fails.length ? `Hard fails: ${fails.join(", ")}.` : "No hard fails."}
+        {fails.length ? `Serious problems: ${fails.join(", ")}.` : "No serious problems."}
         {lowest ? ` Lowest: ${lowest.name} ${lowest.score}.` : ""}
         {str(output.note) ? ` ${output.note}` : ""} Scored by a separate AI reviewer that never sees
         how the debrief was written.
@@ -370,7 +378,38 @@ const FindingsFound: React.FC<{ output: Obj }> = ({ output }) => (
   </ul>
 );
 
-/** Any other step: its results as a readable key/value list. */
+/**
+ * "Show details": every raw field of a card, in plain labels and clean units, for engineers.
+ * Closed by default; the card itself shows only what a person would act on.
+ */
+export const Details: React.FC<{ rows: DetailRow[] }> = ({ rows }) => {
+  if (!rows.length) return null;
+  return (
+    <Disclosure
+      label="Show details ▾"
+      openLabel="Hide details ▴"
+      className="flex flex-col gap-1.5"
+      testId="log-details"
+      buttonClassName="self-start border-0 bg-transparent p-0 text-xs text-primary-500 hover:underline"
+    >
+      <dl
+        className="m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-xs text-neutral-700"
+        data-testid="log-details-rows"
+      >
+        {rows.map((r, i) => (
+          <React.Fragment key={`${r.label}-${i}`}>
+            <dt className="text-neutral-600">{r.label}</dt>
+            <dd className="m-0 min-w-0 truncate" title={r.value}>
+              {r.value}
+            </dd>
+          </React.Fragment>
+        ))}
+      </dl>
+    </Disclosure>
+  );
+};
+
+/** Any other step: what is worth reading as a key/value list; the rest under "Show details". */
 export const KeyValues: React.FC<{ value: unknown }> = ({ value }) => {
   const o = asObj(value);
   if (!o) {
@@ -380,20 +419,54 @@ export const KeyValues: React.FC<{ value: unknown }> = ({ value }) => {
       </p>
     );
   }
+  const rows = detailRows(o);
+  const shown = meaningfulRows(rows);
   return (
-    <dl
-      className="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-[13px]"
-      data-testid="found-kv"
-    >
-      {Object.entries(o)
-        .filter(([k]) => k !== "reasoning")
-        .map(([k, v]) => (
-          <React.Fragment key={k}>
-            <dt className="text-neutral-600">{keyLabel(k)}</dt>
-            <dd className="m-0 min-w-0 whitespace-pre-wrap break-words">{plainText(v)}</dd>
-          </React.Fragment>
-        ))}
-    </dl>
+    <div className="flex flex-col gap-1.5">
+      {shown.length ? (
+        <dl
+          className="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-[13px]"
+          data-testid="found-kv"
+        >
+          {shown.map(r => (
+            <React.Fragment key={r.label}>
+              <dt className="text-neutral-600">{r.label}</dt>
+              <dd className="m-0 min-w-0 whitespace-pre-wrap break-words">{r.value}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      ) : (
+        <p className="m-0 text-[13px] text-neutral-600" data-testid="found-kv">
+          Nothing notable.
+        </p>
+      )}
+      {shown.length < rows.length && <Details rows={rows} />}
+    </div>
+  );
+};
+
+/** Session profile: one sentence, the facts worth reading, the raw record behind a button. */
+const ProfileFound: React.FC<{ output: Obj }> = ({ output }) => {
+  const facts = profileFacts(output.profile);
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="found-profile">
+      <p className="m-0 text-[13px]" data-testid="found-profile-sentence">
+        {profileSentence(output)}
+      </p>
+      {facts.length > 0 && (
+        <ul
+          className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[13px] text-neutral-800"
+          data-testid="found-profile-facts"
+        >
+          {facts.map(f => (
+            <li key={f} className="min-w-0 truncate" title={f}>
+              {f}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Details rows={profileDetailRows(output)} />
+    </div>
   );
 };
 
@@ -447,6 +520,8 @@ export const Found: React.FC<{
       return <AnalystFound output={o} expandAll={expandAll} />;
     case "planner":
       return <PlannerFound output={o} />;
+    case "profile":
+      return <ProfileFound output={o} />;
     case "guidance_lookup":
       return <GuidanceFound output={o} />;
     case "writer":

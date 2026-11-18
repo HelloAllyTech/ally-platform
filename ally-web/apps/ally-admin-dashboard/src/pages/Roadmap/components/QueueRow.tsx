@@ -258,13 +258,14 @@ export const QueueRow: React.FC<QueueRowProps> = ({
           {/* Line 1: where it stands. Line 2: the title, in full up to two lines. Line 3: what it is
               about and who has it, so a row can be read before it is opened. */}
           <span className="flex min-w-0 items-center gap-2">
-            {row.rank != null && (
+            {typeof row.queueRank === "number" && (
               <span
                 className="shrink-0 text-xs font-semibold tabular-nums text-primary-700"
-                title={copy.row.rankHelp(row.rank)}
+                title={copy.row.rankHelp(row.queueRank)}
+                data-testid="queue-rank"
               >
-                <span aria-hidden>{copy.row.rank(row.rank)}</span>
-                <span className="sr-only">{copy.row.rankLabel(row.rank)}</span>
+                <span aria-hidden>#{row.queueRank}</span>
+                <span className="sr-only">{copy.row.rankLabel(row.queueRank)}</span>
               </span>
             )}
             <span className="shrink-0 text-xs tabular-nums text-typography-secondary">

@@ -1,4 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  judgeOverallSql,
+  languageSourceSql,
+} from '../util/debrief-run-columns.util';
 import { DataSource } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
@@ -6,7 +10,6 @@ import { debriefOverallSql } from '../../analytics/constants/debrief-quality.con
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_MODELS,
   DEBRIEF_REPLY_DEFAULT,
@@ -17,6 +20,7 @@ import {
   providerOfModel,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DebriefRunnerService } from './debrief-runner.service';
 import { DebriefAgentService, DebriefRegion } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';
@@ -117,8 +121,8 @@ export class DebriefConsoleService {
               count(*) FILTER (WHERE status = 'skipped')::int AS skipped,
               count(*) FILTER (WHERE "hasRiskCue")::int AS risk_cues,
               count(*) FILTER (WHERE workspace ? 'judge')::int AS judged,
-              avg((workspace->'judge'->>'overall')::float) AS judge_mean,
-              avg(CASE WHEN (workspace->'judge'->>'overall')::float >= 8
+              avg(${judgeOverallSql()}) AS judge_mean,
+              avg(CASE WHEN ${judgeOverallSql()} >= 8
                         AND jsonb_array_length(workspace->'judge'->'hardFails') = 0 THEN 1 ELSE 0 END)
                 FILTER (WHERE workspace ? 'judge') AS pass_rate,
               percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE("actualCostUsd","estimatedCostUsd"))
@@ -196,14 +200,14 @@ export class DebriefConsoleService {
     const rows = await this.dataSource.query(
       `SELECT r.tenant_id, t.name,
               count(*)::int AS runs,
-              count(*) FILTER (WHERE r.workspace->>'languageSource' LIKE 'detected%')::int AS detected,
-              count(*) FILTER (WHERE r.workspace->>'languageSource' = 'detected_low_confidence')::int AS unsure
+              count(*) FILTER (WHERE ${languageSourceSql('r')} LIKE 'detected%')::int AS detected,
+              count(*) FILTER (WHERE ${languageSourceSql('r')} = 'detected_low_confidence')::int AS unsure
          FROM debrief_runs r
          LEFT JOIN tenants t ON t.id::text = r.tenant_id
         WHERE r.mode = 'live' AND r.status <> 'skipped'
           AND r."createdAt" >= date_trunc('day', now())
         GROUP BY r.tenant_id, t.name
-       HAVING count(*) FILTER (WHERE r.workspace->>'languageSource' LIKE 'detected%')
+       HAVING count(*) FILTER (WHERE ${languageSourceSql('r')} LIKE 'detected%')
               > 0.05 * count(*)`,
     );
     return rows.map((r: any) => ({

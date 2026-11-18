@@ -118,7 +118,6 @@ describe("URL state", () => {
     expect(decodeQueueState(new URLSearchParams())).toEqual({
       view: "all",
       filters: {},
-      layout: "list",
     });
   });
 
@@ -142,32 +141,30 @@ describe("URL state", () => {
     expect(state.filters).toEqual({ ledByMe: true, goal: ["g1"] });
   });
 
-  it("round-trips view, filters, sort, layout, saved view and the open idea", () => {
+  it("round-trips view, filters, sort, saved view and the open idea", () => {
     const state = {
       view: "all" as const,
       filters: { stage: ["shipped"], votedByMe: true },
       sort: "votes" as const,
-      layout: "board" as const,
       savedViewId: "v1",
       open: "OPP-388",
     };
     const encoded = encodeQueueState(state);
     expect(encoded.toString()).toBe(
-      "view=all&stage=shipped&votedByMe=1&sort=votes&layout=board&sv=v1&open=OPP-388",
+      "view=all&stage=shipped&votedByMe=1&sort=votes&sv=v1&open=OPP-388",
     );
     expect(decodeQueueState(encoded)).toEqual(state);
   });
 
   it("omits the view's default sort from the URL", () => {
-    expect(
-      encodeQueueState({ view: "all", filters: {}, sort: "rank", layout: "list" }).toString(),
-    ).toBe("view=all");
+    expect(encodeQueueState({ view: "all", filters: {}, sort: "rank" }).toString()).toBe(
+      "view=all",
+    );
     expect(
       encodeQueueState({
         view: "released",
         filters: {},
         sort: "stageNewest",
-        layout: "list",
       }).toString(),
     ).toBe("view=released");
   });
@@ -175,12 +172,12 @@ describe("URL state", () => {
 
 describe("toItemsQuery", () => {
   it("is always the one list: the view's own filters go in as filters", () => {
-    expect(toItemsQuery({ view: "todo", filters: {}, layout: "list" })).toEqual({
+    expect(toItemsQuery({ view: "todo", filters: {} })).toEqual({
       view: "all",
       stage: "backlog",
       sort: "rank",
     });
-    expect(toItemsQuery({ view: "released", filters: {}, layout: "list" })).toMatchObject({
+    expect(toItemsQuery({ view: "released", filters: {} })).toMatchObject({
       view: "all",
       stage: "shipped",
       sort: "stageNewest",
@@ -188,15 +185,14 @@ describe("toItemsQuery", () => {
   });
 
   it("sends the filters, the sort in force and the cursor", () => {
-    expect(
-      toItemsQuery(
-        { view: "all", filters: { goal: ["g1"], needsYou: true }, layout: "list" },
-        "c2",
-      ),
-    ).toEqual({ view: "all", goal: "g1", needsYou: "1", sort: "rank", cursor: "c2" });
-    expect(
-      toItemsQuery({ view: "building", filters: {}, layout: "list", sort: "votes" }).sort,
-    ).toBe("votes");
+    expect(toItemsQuery({ view: "all", filters: { goal: ["g1"], needsYou: true } }, "c2")).toEqual({
+      view: "all",
+      goal: "g1",
+      needsYou: "1",
+      sort: "rank",
+      cursor: "c2",
+    });
+    expect(toItemsQuery({ view: "building", filters: {}, sort: "votes" }).sort).toBe("votes");
   });
 });
 
@@ -206,14 +202,12 @@ describe("saved views", () => {
       view: "all",
       filters: { stage: ["shipped"] },
       sort: "newest",
-      layout: "list",
     });
     expect(payload).toEqual({ view: "all", stage: "shipped", sort: "newest" });
-    expect(stateFromSavedView(payload, "list", "v9")).toEqual({
+    expect(stateFromSavedView(payload, "v9")).toEqual({
       view: "all",
       filters: { stage: ["shipped"] },
       sort: "newest",
-      layout: "list",
       savedViewId: "v9",
       open: undefined,
     });
@@ -223,16 +217,15 @@ describe("saved views", () => {
     const payload = savedViewPayload({
       view: "todo",
       filters: { goal: ["g1"] },
-      layout: "list",
     });
     expect(payload).toEqual({ view: "all", stage: "backlog", goal: "g1" });
   });
 
   it("reads an old saved view's For you / Leading / To triage as the filters they mean", () => {
-    expect(stateFromSavedView({ view: "to-triage" }, "list", "v1").filters).toEqual({
+    expect(stateFromSavedView({ view: "to-triage" }, "v1").filters).toEqual({
       stage: ["backlog"],
     });
-    expect(stateFromSavedView({ view: "leading" }, "list", "v2").filters).toEqual({
+    expect(stateFromSavedView({ view: "leading" }, "v2").filters).toEqual({
       ledByMe: true,
     });
   });

@@ -372,13 +372,13 @@ const TriageRow: React.FC<{
         >
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="flex items-center gap-2">
-              {row.rank != null && (
+              {typeof row.queueRank === "number" && (
                 <span
                   className="shrink-0 text-xs font-semibold tabular-nums text-primary-700"
-                  title={en.roadmapV2.row.rankHelp(row.rank)}
+                  title={en.roadmapV2.row.rankHelp(row.queueRank)}
                 >
-                  <span aria-hidden>{en.roadmapV2.row.rank(row.rank)}</span>
-                  <span className="sr-only">{en.roadmapV2.row.rankLabel(row.rank)}</span>
+                  <span aria-hidden>#{row.queueRank}</span>
+                  <span className="sr-only">{en.roadmapV2.row.rankLabel(row.queueRank)}</span>
                 </span>
               )}
               <span className="shrink-0 text-xs tabular-nums text-typography-secondary">

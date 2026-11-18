@@ -26,7 +26,7 @@ describe('the Debrief drain runs only for switched-on organisations', () => {
       releases: { syncSeed: jest.fn(), getGa: jest.fn(async () => null) },
       runner: { run },
       judge: { drain: jest.fn(), judge: jest.fn() },
-      logger: { info: jest.fn(), warn: jest.fn() },
+      logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
       announceReady: jest.fn(),
       canaryOptions: jest.fn(async () => ({})),
     });
@@ -53,5 +53,23 @@ describe('the Debrief drain runs only for switched-on organisations', () => {
     expect(call[0]).toMatch(/tenant_id::text = ANY\(\$3::text\[\]\)/);
     expect(call[1]).toEqual([expect.any(Number), expect.any(Number), ['t1']]);
     expect(run).toHaveBeenCalledWith('s1', { mode: DebriefRunMode.LIVE });
+  });
+
+  it('a run that cannot start is logged and left for the next drain; the others in the batch still run', async () => {
+    const { svc, run } = build(
+      ['t1'],
+      [
+        { id: 's1', tenant_id: 't1' },
+        { id: 's2', tenant_id: 't1' },
+      ],
+    );
+    run.mockImplementationOnce(async () => {
+      throw new Error('pin unreadable');
+    });
+    await expect(svc.drain()).resolves.toBe('1 started');
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(svc.logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('session s1 could not start'),
+    );
   });
 });

@@ -797,6 +797,34 @@ void main() {
       expect(find.byKey(const Key('debrief-card-support')), findsNothing);
     });
 
+    testWidgets('a clear risk cue still left out adds a kind follow-up notice, and the debrief is unchanged', (tester) async {
+      stubDebrief({...readyDebriefJson(), 'riskCue': true, 'followUp': true, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('debrief-follow-up')), findsOneWidget);
+      expect(find.text("We're taking a closer look"), findsOneWidget);
+      expect(
+        find.text(
+          'Something important came up in this session, so someone from the Ally team is checking this debrief more closely.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('If you need support right now, the support lines in this debrief are open any time.'),
+        findsOneWidget,
+      );
+      // Nothing else changes: the cards are still there.
+      expect(find.byKey(const Key('debrief-card-important-moment')), findsOneWidget);
+    });
+
+    testWidgets('no follow-up flag: no notice', (tester) async {
+      stubDebrief({...readyDebriefJson(), 'riskCue': true, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('debrief-follow-up')), findsNothing);
+      expect(find.text("We're taking a closer look"), findsNothing);
+    });
+
     testWidgets('a support line is a tel: link', (tester) async {
       final launcher = _FakeUrlLauncherPlatform();
       final previous = UrlLauncherPlatform.instance;

@@ -50,11 +50,6 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefAutonomyQuery: () => h.autonomy(),
   useSetDebriefOrgAutonomyMutation: () => [h.setOrg, { isLoading: false }],
   useGetDebriefPinnedRulesQuery: () => ({ data: { rules: [] } }),
-  useGetRiskCueOptionsForReviewQuery: () => ({ isLoading: false, data: [] }),
-  useReviewTestRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
-  useApproveRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
-  useRejectRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
-  useRetireRiskCueOptionMutation: () => [vi.fn(), { isLoading: false }],
 }));
 vi.mock("react-redux", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -181,7 +176,7 @@ describe("Debrief owner settings (v9 FR-60)", () => {
 
   it("toggles a yes/no setting with a Carbon toggle and saves it", async () => {
     render(<SettingsTab />);
-    const toggle = screen.getByLabelText("No new hard fails");
+    const toggle = screen.getByLabelText("No new serious problems");
     expect(toggle).toHaveAttribute("role", "switch");
     fireEvent.click(toggle);
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -276,15 +271,6 @@ const AUTONOMY = {
       relockedAt: null,
       relockReason: null,
     },
-    {
-      kind: "pinned_rules",
-      configurable: false,
-      cells: cells("off"),
-      eligible: false,
-      reason: "",
-      relockedAt: null,
-      relockReason: null,
-    },
   ],
   orgs: [
     {
@@ -357,7 +343,7 @@ describe("Debrief settings page: who can change what", () => {
       "Tests",
       "Autonomy",
       "Score",
-      "Pinned rules",
+      "Locked prompts",
       "Clinical lists",
       "Progress",
     ]);
@@ -400,20 +386,12 @@ describe("Debrief settings page: who can change what", () => {
     expect(shown()).toEqual([`settings-section-${id}`]);
   });
 
-  it("Risk-cue options open for someone who can approve pinned rules, by hash or a banner's category", () => {
+  it("the old risk-cue options tab and banner links open Organisations", () => {
     h.permissions = ["review:admin:debriefs"];
     renderPage("#risk-cues");
-    expect(shown()).toEqual(["settings-section-risk-cues"]);
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Risk-cue options");
-  });
-
-  it("opens Risk-cue options from ?category=risk_cue_options, and not for someone who can't review", () => {
-    h.permissions = ["review:admin:debriefs"];
-    renderPage("?category=risk_cue_options");
-    expect(shown()).toEqual(["settings-section-risk-cues"]);
+    expect(shown()).toEqual(["settings-section-orgs"]);
     cleanup();
-    h.permissions = [];
-    renderPage("#risk-cues");
+    renderPage("?category=risk_cue_options");
     expect(shown()).toEqual(["settings-section-orgs"]);
   });
 
@@ -440,7 +418,7 @@ describe("Debrief settings page: who can change what", () => {
     expect(note).toHaveAttribute("title", "Only the owner can change these.");
     expect(note).toHaveClass("truncate");
     expect(screen.getByTestId("settings-tabs")).toHaveClass("flex-nowrap");
-    // Score, Pinned rules and Progress are tabs at lg and up, More items below it.
+    // Score, Locked prompts and Progress are tabs at lg and up, More items below it.
     for (const id of ["weights", "pinned", "clinical", "progress"])
       expect(tab(id)).toHaveClass("hidden", "min-[1056px]:inline");
     expect(tab("orgs")).not.toHaveClass("hidden");
@@ -721,7 +699,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
       </MemoryRouter>,
     );
 
-  it("Always asks a person: four locked kinds, then low confidence (on) and new models (off)", () => {
+  it("Always asks a person: two locked kinds, then low confidence (on) and new models (off)", () => {
     h.permissions = ["manage:admin:debrief-settings"];
     renderPage("#autonomy");
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
@@ -730,14 +708,12 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     expect(screen.getByTestId("autonomy-v2")).toHaveTextContent("watched for 14 days");
     const rows = within(screen.getByTestId("always-asks")).getAllByTestId("always-asks-row");
     expect(rows.map(r => r.querySelector("span span")?.textContent)).toEqual([
-      "Safety reader text",
       "Crisis lines and support copy",
-      "Pinned rules: rubric, judge and Evaluator instructions",
       "Budget increases",
       "Anything the Debrief PM agent is not confident about",
       "New models or providers",
     ]);
-    for (const r of rows.slice(0, 4)) {
+    for (const r of rows.slice(0, 2)) {
       expect(r).toHaveAttribute("data-locked", "true");
       expect(within(r).getByRole("checkbox")).toBeChecked();
       expect(within(r).getByRole("checkbox")).toBeDisabled();
@@ -747,7 +723,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     expect(low).not.toBeDisabled();
     const models = screen.getByLabelText(a.askModels.name);
     expect(models).not.toBeChecked();
-    expect(rows[5]).toHaveTextContent("Off: model changes go through the same tests as prompts");
+    expect(rows[3]).toHaveTextContent("Off: model changes go through the same tests as prompts");
     // The old matrix and the judge-agreement block are gone.
     expect(screen.queryByTestId("autonomy-matrix")).toBeNull();
     expect(screen.queryByTestId("autonomy-agreement")).toBeNull();
@@ -765,7 +741,9 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     renderPage("#autonomy");
     const rules = screen.getByTestId("rollout-rules");
     expect(rules).toHaveTextContent("How a change goes live and comes back");
-    expect(rules).toHaveTextContent("Drops are compared within the same language and recipe.");
+    expect(rules).toHaveTextContent(
+      "Drops are compared within the same language and debrief flow.",
+    );
     fireEvent.change(within(rules).getByLabelText("Share of learners while it is tried (%)"), {
       target: { value: "20" },
     });
@@ -826,7 +804,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     expect(row).toHaveTextContent("Was 30: 4 changes passed here and then failed the next test");
     expect(within(row).getByRole("link", { name: "See change" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent?change=c-tests",
+      "/debriefs/changes?change=c-tests",
     );
     expect(screen.queryByText("Proposed")).toBeNull();
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();

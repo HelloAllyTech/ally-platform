@@ -104,7 +104,6 @@ const CAN_ALL = {
   verdict: false,
   score: false,
   pmAgent: true,
-  approvePinnedRule: false,
   testSets: true,
   releases: true,
   switchOrgOn: false,
@@ -130,7 +129,6 @@ const ADVISOR = {
     flagDecision: true,
     verdict: true,
     score: true,
-    approvePinnedRule: true,
   },
   scorer: true,
 };
@@ -767,7 +765,7 @@ describe("Session page", () => {
     // Ticking the missed risk cue makes that answer No, and says why.
     fireEvent.click(screen.getByLabelText(/ignores how the learner responded/));
     const risk = screen.getByTestId("agreement-missed_risk_cue");
-    expect(risk).toHaveTextContent("From the hard fail you ticked");
+    expect(risk).toHaveTextContent("From the serious problem you ticked");
     expect(within(risk).getByRole("button", { name: "No" })).toHaveAttribute(
       "aria-pressed",
       "true",

@@ -743,6 +743,8 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
         ) {
           const entry: any = {
             category: instruction.category,
+            // Explicit null (not omitted) so clearing a score resets it on the backend.
+            score: Number.isInteger(instruction.score) ? instruction.score : null,
             behaviors: uniqueBehaviorIds(instruction.behaviors),
             instructions: normalizeInstructions(instruction.instructions),
             stateInstructions: (instruction.stateInstructions ?? [])

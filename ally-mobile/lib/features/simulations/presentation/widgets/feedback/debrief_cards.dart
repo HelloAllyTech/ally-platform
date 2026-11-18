@@ -899,6 +899,38 @@ class _ReadyCards extends ConsumerWidget {
     final practiseTitle = ref.t(practiseAgain ? '$_k.practiseAgain' : '$_k.practiseNext');
 
     final children = <Widget>[
+      // A clear risk cue the debrief still leaves out: shown as it is, with a kind notice first.
+      if (view.followUp && supervisor == null)
+        Container(
+          key: const Key('debrief-follow-up'),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.blue50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.blue100),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                header: true,
+                child: Row(
+                  children: [
+                    Icon(Icons.volunteer_activism_outlined, size: 20, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(ref.t('$_k.followUp.title'), style: _leadStyle.copyWith(fontSize: 16))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _Body(ref.t('$_k.followUp.body')),
+              if (view.supportLines.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _Body(ref.t('$_k.followUp.support')),
+              ],
+            ],
+          ),
+        ),
       if (moment != null)
         _Card(
           key: const Key('debrief-card-important-moment'),

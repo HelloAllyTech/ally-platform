@@ -59,13 +59,13 @@ from langgraph.graph.state import CompiledStateGraph
 from app.core.agent_runtime import checkpointer as runtime_checkpointer
 from app.core.debrief_graph import (
     guidance_agent,
-    model_steps,
+    model_step_inputs,
     nodes,
     orchestrator,
 )
 from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import GATEWAY_RETRY
-from app.core.debrief_graph.model_step import make_model_step
+from app.core.debrief_graph.model_step_node import make_model_step
 from app.core.debrief_graph.registry.manifest import REGISTRY
 from app.core.debrief_graph.state import DebriefState
 
@@ -75,20 +75,20 @@ __all__ = ["GATEWAY_RETRY", "build_graph", "get_debrief_graph"]
 def build_graph(checkpointer: Optional[BaseCheckpointSaver]) -> CompiledStateGraph:
     g = StateGraph(DebriefState, context_schema=DebriefRunContext)
     g.add_node("plan", nodes.plan)
-    g.add_node("safety_reader", **make_model_step(model_steps.SAFETY_READER))
-    g.add_node("analyst", **make_model_step(model_steps.ANALYST))
+    g.add_node("safety_reader", **make_model_step(model_step_inputs.SAFETY_READER))
+    g.add_node("analyst", **make_model_step(model_step_inputs.ANALYST))
     g.add_node("after_reading", nodes.after_reading)
     # The release's `progress_reader` step now runs the progress agent.
-    g.add_node("progress_reader", **make_model_step(model_steps.PROGRESS_AGENT))
+    g.add_node("progress_reader", **make_model_step(model_step_inputs.PROGRESS_AGENT))
     g.add_node("guidance_lookup", nodes.guidance_lookup)
     g.add_node("guidance_agent", guidance_agent.guidance_agent)
     g.add_node("prepare_writer", nodes.prepare_writer)
-    g.add_node("writer", **make_model_step(model_steps.WRITER))
+    g.add_node("writer", **make_model_step(model_step_inputs.WRITER))
     g.add_node("checks", nodes.checks, retry_policy=GATEWAY_RETRY)
-    g.add_node("evaluator", **make_model_step(model_steps.EVALUATOR))
+    g.add_node("evaluator", **make_model_step(model_step_inputs.EVALUATOR))
     g.add_node("score_draft", nodes.score_draft)
     g.add_node("revise_gate", nodes.revise_gate)
-    g.add_node("reviser", **make_model_step(model_steps.REVISER))
+    g.add_node("reviser", **make_model_step(model_step_inputs.REVISER))
     g.add_node("decide", nodes.decide, retry_policy=GATEWAY_RETRY)
     g.add_node("finish", nodes.finish)
 

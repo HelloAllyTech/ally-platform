@@ -15,8 +15,7 @@ import { changesPath } from "../consoleRoutes";
  */
 export const NeedsYouList: React.FC<{
   items: DebriefHomeV2["needsYou"];
-  advisor: boolean;
-}> = ({ items, advisor }) => {
+}> = ({ items }) => {
   const t = en.debriefs.v2.home;
   if (items.length === 0) return null;
   return (
@@ -26,7 +25,7 @@ export const NeedsYouList: React.FC<{
       data-testid="home-needs-you"
     >
       <h2 id="home-needs" className="m-0 text-base font-semibold">
-        {advisor ? t.advisorNeedsHeading(items.length) : t.needsHeading(items.length)}
+        {t.needsHeading(items.length)}
       </h2>
       {items.map(n => (
         <Link

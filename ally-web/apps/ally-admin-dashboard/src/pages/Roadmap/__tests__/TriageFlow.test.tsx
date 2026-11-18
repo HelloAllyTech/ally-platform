@@ -164,7 +164,9 @@ describe("To triage (§4.6)", () => {
 
   it("shows each idea's queue rank on its row", () => {
     renderTriage({
-      data: { sections: { backlog: [row("OPP-414", { rank: 3 }), row("OPP-416", { rank: 4 })] } },
+      data: {
+        sections: { backlog: [row("OPP-414", { queueRank: 3 }), row("OPP-416", { queueRank: 4 })] },
+      },
     });
     expect(screen.getByText("#3")).toBeInTheDocument();
     expect(screen.getByText("#4")).toBeInTheDocument();

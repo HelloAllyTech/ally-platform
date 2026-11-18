@@ -25,13 +25,16 @@ from app.core.debrief.flag_answer import (
     answer_flag,
 )
 from app.core.debrief.safety_recall import run_recall
-from app.core.debrief.risk_cue_test import run_risk_cue_test
 from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import HttpGateway
 from app.core.debrief_graph.graph import get_debrief_graph
 from app.core.debrief_graph.runner import run_debrief
-from app.core.debrief_graph.schemas import DebriefRunRequest, DebriefRunResponse
-from app.core.debrief_graph.step_functions import InProcessSteps
+from app.core.debrief_graph.schemas import (
+    CONTRACT_VERSION,
+    DebriefRunRequest,
+    DebriefRunResponse,
+)
+from app.core.debrief_graph.step_wire import InProcessSteps
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -50,7 +53,7 @@ def get_graph():
     return get_debrief_graph()
 
 
-@router.post("/runs", response_model=DebriefRunResponse)
+@router.post("/runs", response_model=DebriefRunResponse, response_model_exclude_unset=True)
 async def debrief_run(
     req: DebriefRunRequest, graph=Depends(get_graph)
 ) -> DebriefRunResponse:
@@ -78,7 +81,9 @@ async def debrief_run(
         gateway=HttpGateway(req.gateway_url, req.run_token),
     )
     result = await run_debrief(graph, ctx, resume=req.resume)
-    return DebriefRunResponse(**result)
+    # `exclude_unset` keeps every shape exactly as the graph built it (no null or empty keys added
+    # by the typed models); the version is set explicitly so it is always sent.
+    return DebriefRunResponse(**{**result, "contract_version": CONTRACT_VERSION})
 
 
 # --- The safety-recall gate --------------------------------------------------------
@@ -113,45 +118,3 @@ async def debrief_safety_recall(req: SafetyRecallRequest) -> SafetyRecallRespons
     """Run the seeded safety set `reps` times; `passed` only at 100% every time."""
     result = await run_recall(req.reps, req.model, req.system)
     return SafetyRecallResponse(**result)
-
-
-# --- A risk-cue option's own test ----------------------------------------------------
-
-
-class RiskCueTestRequest(BaseModel):
-    """An option's definition and its own examples.
-
-    Spec DEBRIEF_ACROSS_ROLEPLAYS §5.
-    """
-
-    risk_cue_definition: Optional[str] = None
-    word_list_raises: bool = True
-    cue_examples: List[str] = Field(default_factory=list, max_length=12)
-    non_cue_examples: List[str] = Field(default_factory=list, max_length=12)
-    reps: int = Field(default=3, ge=1, le=5)
-    model: Optional[str] = None
-    language: str = "en"
-
-
-class RiskCueTestResponse(BaseModel):
-    passed: bool
-    reps: List[Dict[str, Any]]
-    cue_examples: int
-    non_cue_examples: int
-    model: Optional[str] = None
-
-
-@router.post("/risk-cue-tests", response_model=RiskCueTestResponse)
-async def debrief_risk_cue_test(req: RiskCueTestRequest) -> RiskCueTestResponse:
-    """Every example cue found and no example non-cue flagged clear, on every run."""
-    return RiskCueTestResponse(
-        **await run_risk_cue_test(
-            req.cue_examples,
-            req.non_cue_examples,
-            risk_cue_definition=req.risk_cue_definition,
-            word_list_raises=req.word_list_raises,
-            reps=req.reps,
-            model=req.model,
-            language=req.language,
-        )
-    )

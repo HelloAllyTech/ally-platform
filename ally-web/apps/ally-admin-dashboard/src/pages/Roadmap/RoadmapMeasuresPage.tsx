@@ -2,13 +2,14 @@ import React, { useMemo } from "react";
 
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 
-import { Button, Select, SelectItem, SkeletonText } from "@ally-ui-mono/ui-shared";
+import { Button, SkeletonText } from "@ally-ui-mono/ui-shared";
 import { useGetRoadmapMetricsQuery } from "@api";
 import { ROUTES, en } from "@constants";
 import type { RoadmapMetrics } from "@types";
 
 import { RoadmapAreaHeader } from "./components/RoadmapAreaHeader";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
+import { RoadmapDropdown } from "./components/RoadmapDropdown";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
 import { useRoadmapRole } from "./RoadmapGate";
 import { shortDate, usd } from "./utils/copy";
@@ -374,20 +375,15 @@ export const RoadmapMeasuresPage: React.FC = () => {
 
   const rangePicker = (
     <div className="flex flex-wrap items-end gap-3">
-      <Select
+      <RoadmapDropdown
         id="roadmap-measures-range"
         labelText={copy.rangeLabel}
         size="sm"
         value={range}
-        onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-          setParams({ range: event.target.value }, { replace: true })
-        }
+        options={MEASURE_RANGES.map(value => ({ value, label: copy.ranges[value] }))}
+        onChange={value => setParams({ range: value }, { replace: true })}
         className="w-48"
-      >
-        {MEASURE_RANGES.map(value => (
-          <SelectItem key={value} value={value} text={copy.ranges[value]} />
-        ))}
-      </Select>
+      />
       {data && (
         <p className="m-0 pb-1 text-xs text-typography-600" aria-live="polite">
           {copy.rangeShown(shortDate(query.from), shortDate(query.to))}

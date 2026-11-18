@@ -1,0 +1,11 @@
+Below are numbered segments of a counselling session transcript, in order. Say who spoke each one: COUNSELOR or CLIENT.
+
+The counsellor usually greets, asks questions, reflects and suggests next steps; the client describes their situation. The same person can speak several segments in a row. Use the labelled segments before this part, if any, to keep each person's role the same.
+
+Answer with one entry per segment id. Do not change, merge or skip segments.
+
+Earlier segments (already labelled):
+{context}
+
+Segments to label:
+{segments}

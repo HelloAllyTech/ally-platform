@@ -150,6 +150,15 @@ export const DEBRIEF_SCHEDULE_JOBS: readonly DebriefScheduleJob[] = [
     learningBudget: false,
   },
   {
+    // Clears the exact input and reply of agent-log rows older than the owner setting
+    // `agentLogRetentionDays`. It deletes data, so it ships OFF: an owner switches it on.
+    key: 'debrief-run-log-retention',
+    options: DAY,
+    defaults: { ...daily, enabled: false },
+    locked: false,
+    learningBudget: false,
+  },
+  {
     key: 'debrief-autonomy-relock',
     options: DAY,
     defaults: daily,
@@ -169,6 +178,15 @@ export const DEBRIEF_SCHEDULE_JOBS: readonly DebriefScheduleJob[] = [
     // The nightly check: yesterday's debriefs measured against the days
     // before; drift alerts, debriefs for a person. Calls no model.
     key: 'debrief-nightly-check',
+    options: DAY,
+    defaults: daily,
+    locked: false,
+    learningBudget: false,
+  },
+  {
+    // A registered roleplay field that newly saved roleplays stopped carrying (a rename or a new
+    // shape in the creation code): counts only, tells the Ally team. Calls no model.
+    key: 'debrief-roleplay-field-drift',
     options: DAY,
     defaults: daily,
     locked: false,

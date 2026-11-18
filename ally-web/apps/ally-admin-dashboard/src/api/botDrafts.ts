@@ -17,7 +17,7 @@ export const botDraftsApi = baseAPI.injectEndpoints({
 
     createBotDraft: builder.mutation<
       BotDraftView,
-      { website?: string; description?: string; upload?: boolean }
+      { website?: string; description?: string; upload?: boolean; interview?: boolean }
     >({
       query: body => ({ url: ApiEndpoints.BOT_DRAFTS.LIST, method: HttpMethod.POST, body }),
       invalidatesTags: [TAG_TYPES.BOT_DRAFT],

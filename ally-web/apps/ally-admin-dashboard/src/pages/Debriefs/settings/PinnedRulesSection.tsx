@@ -1,24 +1,20 @@
-import React, { useState } from "react";
+import React from "react";
 
-import { Button } from "@ally-ui-mono/ui-shared";
+import { Link } from "react-router-dom";
+
 import { useGetDebriefPinnedRulesQuery } from "@api";
-import { en } from "@constants";
-
-import { AskForChange } from "../pm/PinnedRule";
+import { en, ROUTES } from "@constants";
 
 /**
- * Settings › Pinned rules: each rule's version in force and who approved it. The clinical
- * advisor and the owner may ask for a change to a rule here; it then waits in PM agent › Ideas.
+ * Settings › Pinned rules: a read-only list of the prompts that decide what counts as safe, with
+ * the version in force and who last changed it. They are edited in the Skills Store by a few
+ * named people; the Debrief PM agent can read them but never change them.
  */
-export const PinnedRulesSection: React.FC<{ canAsk: boolean }> = ({ canAsk }) => {
+export const PinnedRulesSection: React.FC = () => {
   const s = en.debriefs.settingsPage.pinned;
   const q = useGetDebriefPinnedRulesQuery();
-  const [asking, setAsking] = useState<string | null>(null);
   const rules = q.data?.rules;
   if (!rules?.length) return <p className="text-sm text-neutral-600">{s.notYet}</p>;
-  const waiting = (code: string) =>
-    (q.data?.proposals ?? []).filter(x => x.change?.promptCode === code && !x.change?.firstVersion)
-      .length;
   return (
     <div className="rounded-sm bg-neutral-50" data-testid="pinned-rules">
       {rules.map(r => (
@@ -27,35 +23,29 @@ export const PinnedRulesSection: React.FC<{ canAsk: boolean }> = ({ canAsk }) =>
             <span className="font-medium">{r.label}</span>
             <span>{r.version == null ? "—" : `v${r.version}`}</span>
             <span className="text-[13px] text-neutral-700">
-              {r.signedAt
-                ? s.signed(
-                    r.signedBy?.name ?? s.someone,
-                    new Date(r.signedAt).toLocaleDateString(undefined, {
-                      day: "numeric",
-                      month: "short",
-                    }),
+              {r.updatedBy || r.updatedAt
+                ? s.updated(
+                    r.updatedBy?.name ?? s.someone,
+                    r.updatedAt
+                      ? new Date(r.updatedAt).toLocaleDateString(undefined, {
+                          day: "numeric",
+                          month: "short",
+                        })
+                      : "",
                   )
-                : s.unsigned}
+                : s.writtenByEngineering}
             </span>
             <span>
-              {canAsk && r.text && asking !== r.code && (
-                <Button kind="tertiary" size="sm" onClick={() => setAsking(r.code)}>
-                  {s.askForChange}
-                </Button>
-              )}
+              <Link
+                to={ROUTES.MANAGE_PROMPTS}
+                className="text-primary-500 underline"
+                data-testid={`pinned-rule-open-${r.code}`}
+                title={r.code}
+              >
+                {s.open}
+              </Link>
             </span>
           </div>
-          {asking === r.code && r.text && (
-            <div className="mt-3">
-              <AskForChange
-                code={r.code}
-                name={r.label.split(" (")[0]}
-                text={r.text}
-                otherOpen={waiting(r.code)}
-                onClose={() => setAsking(null)}
-              />
-            </div>
-          )}
         </div>
       ))}
     </div>

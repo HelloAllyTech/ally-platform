@@ -22,9 +22,8 @@ text people read changed. In the admin and in ally-be's reasons, notifications a
 Try on learners / learner try-out, promote → Live for everyone / put live for everyone, the open and
 gate test sets → Practice sessions and Test sessions, κ → Agreement. On the Debriefs list and the
 session review: the judge → Quality score, the Evaluator → draft score, and a run in a
-trial reads "Version vN · In a trial: the current version". A person's pinned-rule proposal is
-titled "<rule name>: <why>" (e.g. "Safety rules: …"); the closed groups are "Rejected or
-withdrawn" and "Live for everyone".
+trial reads "Version vN · In a trial: the current version". The closed groups are
+"Rejected or withdrawn" and "Live for everyone".
 
 ## Roles and who can act
 
@@ -49,8 +48,7 @@ rather than disable it.
 | `heldDebrief` | yes | no | yes | `runs/:id/publish`, `runs/:id/todays-debrief`, `runs/:id/reviewed`, `runs/:id/correct` |
 | `escalate` | yes | no | yes | `flags/:id/escalate`, `runs/:id/escalate` |
 | `verdict` | no | yes | no | expert-review `runs/:id/verdict` |
-| `pmAgent` | yes | no | yes | `pm-agent/analyse`, `ideas/:id/screen`, `approve` (a budgets-only change: owner), `reject` (never a pinned rule), `questions`, `start-step`, `ideas/propose` and `ideas/:id/draft` (with `settings`: owner) |
-| `approvePinnedRule` | no | yes | yes | `pinned-rules/proposals`, `pm-agent/ideas/:id/approve-pinned-rule`, `withdraw-pinned-rule` (own only), `reject-pinned-rule` |
+| `pmAgent` | yes | no | yes | `pm-agent/analyse`, `ideas/:id/screen`, `approve` (a budgets-only change: owner), `reject`, `questions`, `start-step`, `ideas/propose` and `ideas/:id/draft` (with `settings`: owner) |
 | `testSets` | yes | no | yes | `test-sets/build` |
 | `releases` | yes | no | yes | `releases/orchestrator-challenger`, `releases/:id/rollback`, `releases/:id/promote-waiting`, `releases/:id/dismiss-waiting`, `sessions/:sessionId/run` |
 | `switchOrgOn` | no | no | yes | `tenants/:id/live` with `live: true` (403 for the Ally team), `tenants/:id/region` |
@@ -58,10 +56,11 @@ rather than disable it.
 | `agentLogs` | yes | no | no (unless also on the team) | `runs/:runId/logs` (GET: a read, but team-only because it holds the whole transcript and every prompt) |
 | `ownerSettings` | no | no | yes | `settings` (PUT), `settings/accept`, `settings/baseline`, `budgets`, `autonomy/matrix`, `autonomy/orgs/:id` |
 
-The clinical advisor's routes (verdict, comments, escalated flags,
-pinned-rule sign-off) accept `review:admin:debriefs` without `system:access`; the Ally team's
-actions stay on `system:access`. Platform admins no longer hold `review:admin:debriefs` (migration
-1981900780000), so they give no verdicts and sign off no pinned rules unless granted it by hand.
+The clinical advisor's routes (verdict, comments, escalated flags, clinical lists) accept
+`review:admin:debriefs` without `system:access`; the Ally team's actions stay on `system:access`.
+Platform admins no longer hold `review:admin:debriefs` (migration 1981900780000), so they give no
+verdicts unless granted it by hand. The clinical advisor has no PM-agent content: no Changes and
+no conversation.
 
 "Escalated to you" (the bar, the banner and the `escalated` count) goes only to
 `roles.receivesEscalations`. That is an advisor named with the clinical-advisor toggle, or a
@@ -71,7 +70,7 @@ actions stay on `system:access`. Platform admins no longer hold `review:admin:de
 type Viewer = {
   roles: { allyTeam: boolean; clinicalAdvisor: boolean; owner: boolean; receivesEscalations: boolean };
   can: Record<'comment'|'flagDecision'|'heldDebrief'|'escalate'|'verdict'|'pmAgent'|
-              'approvePinnedRule'|'testSets'|'releases'|'switchOrgOn'|'emergencyStop'|'ownerSettings', boolean>;
+              'testSets'|'releases'|'switchOrgOn'|'emergencyStop'|'ownerSettings', boolean>;
 };
 ```
 
@@ -346,25 +345,15 @@ Each `ideas[]` row keeps its old fields and adds these:
   closedWhy: string | null;          // e.g. the canary's revert reason, "did not pass the gate test"
   releaseId: string | null;          // the release a promoted idea became (link to release-history/:id)
   kind: string|null;                 // prompt_edit | setting | registry_agent | needs_code | defect | needs_person | pinned_rule | release
-  changeKind: 'settings'|'prompts'|'pinned_rules'|null;
-  approval: null | { wait: 'pinned_rule'|'handoff'|'start_quick_test'|'promote_budget'|'start_gate'|'start_trial'|'start_canary'|'promote';
-                     since; expiresAt: string|null; expiresInDays: number|null;  // null: never expires (a pinned rule's first version)
+  changeKind: 'settings'|'prompts'|null;
+  approval: null | { wait: 'handoff'|'start_quick_test'|'promote_budget'|'start_gate'|'start_trial'|'start_canary'|'promote';
+                     since; expiresAt: string|null; expiresInDays: number|null;  // null: never expires
                      expired; expiringSoon /* ≤ 3 days */ };
   expired: boolean; notTakenForward: boolean; notTakenForwardReason: 'no_decision'|'rejected'|null;
   questions: Array<{ id; role: 'person'|'agent'; by: number|null; at; text; replyTo?: string; agentRunId?: string }>;
   draftRelease?: null | { id; version; status;            // open ideas only: the draft it carries
                           changedVsLive: BundleDiff; compare: { releaseId } };  // GET releases/:releaseId/compare
-  can: { approve; reject; tryIt; askQuestion; startStep; editDraft;
-         withdraw?; askForChange? };     // pinned rules only
-  pinnedRule?: {                       // pinned-rule ideas only
-    name;                              // "Safety rules" | "Rubric" | "Judge's instructions"
-    firstVersion: boolean; mine: boolean; proposedBy: number|null;
-    liveVersion: number|null;
-    liveText: string|null;             // open items: the text in force, which "Ask for a change" is written against
-    segments: Array<{ text; changed: boolean }>|null;  // open items: the whole rule as it would read, the new wording `changed`
-    stale: boolean;                    // the passage is no longer in the rule
-    otherOpen: number;                 // other open proposals on the same rule
-    approvedNote: string|null } }
+  can: { approve; reject; tryIt; askQuestion; startStep; editDraft } }
 ```
 The top level adds `counts: { open, closed }` and `viewer: { roles, can }`.
 
@@ -401,42 +390,23 @@ A passed canary that was never promoted is stopped. `approve` on an expired item
 - `PUT budgets {runCeilingUsd?, monthlyCapUsd?, passScore?, note?}` (owner) also creates a change with its idea and release. Budgets alone (no `passScore`) go live on that call, because the owner's confirm is the person's confirmation v9 asks for; the response carries `live: true`. A change with `passScore` stays proposed (`live: false`) and climbs the ladder. Changed 2026-11-16.
 - `POST releases/orchestrator-challenger` creates a proposed change instead of a live release, and adds `ideaId` to its response.
 
-### Pinned rules
-The three pinned rules are the Safety rules (`debrief_safety_reader_system`), the Rubric
-(`debrief_quality_rubric`) and the Judge's instructions (`debrief_quality_judge_system`, the
-judge's closing instructions after the rubric, transcript and debrief; ally-be sends its live
-text to ally-ai as `judge_instructions`, and ally-ai falls back to its own copy). Every action
-below is the clinical advisor's or the owner's (`approvePinnedRule`).
+### Pinned rules (read-only here)
+The six pinned rules are the Safety rules (`debrief_safety_reader_system`), the Risk cue definition
+(`debrief_risk_cue_definition`), the Rubric (`debrief_quality_rubric`), the Judge's instructions
+(`debrief_quality_judge_system`), the Debrief PM agent's reviewer (`debrief_pm_reviewer_system`) and the
+Evaluator's instructions (`debrief_evaluator_system`). Since 2026-11-18 they are ordinary Skills Store
+prompts that only the people named in `SKILLS_STORE_PINNED_EDITORS` can publish (a publish becomes a
+release like any other prompt), and the Debrief PM agent can read them but never edit one
+(`PM_AGENT_EDITABLE_PROMPTS` does not list them). There is no proposal, approval, first-version or
+sign-off flow in the console any more, and no `approvePinnedRule` routes: `pinned-rules/proposals`,
+`approve-pinned-rule`, `withdraw-pinned-rule` and `reject-pinned-rule` were removed. Pinned-rule items
+already in the history stay (`kind: 'pinned_rule'`); a migration closed any still waiting.
 
-- **First versions.** Each rule whose version in force (the live release's pin, else the Skills
-  Store's current) has no approval gets one item, `change = {ideaKind: 'pinned_rule', promptCode,
-  firstVersion: true, version}`, titled "Approve the current Safety rules (v1)". ally-be makes them
-  at boot and on `GET pm-agent` and `GET pinned-rules` (at most once a minute per process); a
-  partial unique index (migration 1981900900000) keeps one per rule and version, and none is made
-  once that version is approved. An open one for a version no longer in force is retired. A first
-  version never expires and cannot be rejected or withdrawn.
-- `POST pinned-rules/proposals {promptCode, find, replace, why}` returns `{id}` and notifies the
-  owner. `find` must appear exactly once in the live text; otherwise 400 says the passage is not in
-  the rule, or appears more than once. Another proposal on the same rule may be open.
-- `POST pm-agent/ideas/:id/approve-pinned-rule {reason?}` returns `{releaseId, version, promptVersion}`.
-  The proposer may approve their own. A change creates a new Skills Store version and, when the
-  live release pins that prompt, a **DRAFT** release the Ally team puts live (the Judge's
-  instructions are not in the release: the team publishes the version in the Skills Store). A
-  first version creates nothing and returns `releaseId: null`. Either way the approval is stored as
-  `evidence.signoff = {by, at, promptVersion, releaseId, firstVersion?}`.
-- `POST pm-agent/ideas/:id/withdraw-pinned-rule` withdraws your own proposal (403 for anyone
-  else's): `status = 'retired'`, `evidence.withdrawn = {by, at}`, `closedReason: 'withdrawn'`,
-  audited as `retired` with `{withdrawn: true}`.
-- `POST pm-agent/ideas/:id/reject-pinned-rule {reason}` rejects a proposal from the PM agent or
-  another person; the reason is required. It is kept as `evidence.rejection = {by, at, reason}`
-  (every rejection now keeps one), and the PM agent reads it in `idea_outcomes[].rejected_because`.
-  `POST pm-agent/ideas/:id/reject` returns 403 for a pinned rule.
 - `GET pinned-rules` returns:
 ```ts
-{ rules: Array<{ code; label; version: number|null; pinnedByRelease; inBundle;
-                 signedBy: {id,name}|null; signedAt: string|null; ideaId; writtenBy: {id,name}|null; writtenAt; note;
-                 text: string|null }>;      // the whole rule in force
-  proposals: Idea[] }                        // open pinned-rule items, first versions included
+{ rules: Array<{ code; label; version: number|null;      // the version in force (the live release's pin, else the store's current)
+                 promptId: string|null;
+                 updatedAt: string|null; updatedBy: { id; name: string|null } | null }> }
 ```
 
 ## Releases (like a GitHub Releases page)
@@ -615,23 +585,22 @@ the agent).
 
 - `GET pm-agent/conversation?before=<messageId>&limit=50&about=<changeId>` (read) →
   `{ messages: PmMessage[]; more: boolean }`, the newest page oldest first. `about` narrows it to the
-  messages about that change (Home's expanded Needs you item). The clinical advisor (no `pmAgent`,
-  has `approvePinnedRule`) sees only messages about pinned-rule changes; anyone else 403.
+  messages about that change (Home's expanded Needs you item). Only the Ally team and the owner
+  (`pmAgent`) read it; the clinical advisor and anyone else get 403.
 - `POST pm-agent/conversation { text (≤ 4000), about?: { kind: change|session|page, id?, label } }`
   (`comment` action at the route; the service checks the rest) → `{ messages: [the person's, the
-  agent's reply] }`, 10–30 s. The advisor may post only with `about` a pinned-rule change (403
-  otherwise, "Open the change from Home"). The agent's `action` is the turn's last action as the
+  agent's reply] }`, 10–30 s. Only the Ally team and the owner may post (403 otherwise). The agent's `action` is the turn's last action as the
   gateway recorded it: `awaiting_yes` (the turn is paused for a yes), `done`, or `failed` (a refusal
   or a missing permission). The request and response shapes are unchanged by the 2026-11-16 rebuild.
 - Approve / turn down (and a retry of a change that always asks) never act at once: the agent's turn
   pauses (ally-ai, LangGraph human-in-the-loop; CONTRACT.md §7c) and the reply states the plan and
   asks for "yes". The thread's next message resolves the pause: the same person's explicit yes
   (`isExplicitYes`) within a day carries it out as them; anything else (not a yes, someone else,
-  lapsed) turns it down and the agent answers what they wrote. Pinned rules (and the Safety reader)
-  need `approvePinnedRule`, a budget increase `ownerSettings`, everything else `pmAgent`. Without it
-  the agent does not act, answers "Only the clinical advisor or the owner can approve this; I've
-  asked them." in the same reply and notifies those people in-app (a pinned rule:
-  `DebriefNotifier.pinnedRuleDeciders`, link `/debriefs?change=<id>`; a budget: the owner).
+  lapsed) turns it down and the agent answers what they wrote. A budget increase needs
+  `ownerSettings`, everything else `pmAgent`. Without it the agent does not act, answers "Only the
+  owner can approve this; I've asked them." (or "the Ally team or the owner") in the same reply and
+  notifies the owner in-app (link `/debriefs?change=<id>`). A pinned-rule item from before pinned rules
+  moved to the Skills Store is never decided here.
 - The agent quotes only what its tools returned in the turn: a reply that quotes, or presents as a
   change's wording or a rule's text, anything else is not shown; the message reads "I don't have
   that text, so I can't quote it. Ask me to read the change first." (the withheld reply is in the
@@ -646,8 +615,6 @@ the agent).
   (`step: conversation_<tool>`, `personWords`). Each turn costs at most min(`pmAgentRunCapUsd`,
   $0.25, learning budget left); with the learning budget spent the agent says so without calling
   a model.
-- A pinned-rule proposal now notifies the clinical advisors and the owner (was: the owner only),
-  with the Home link.
 
 Learner flags (V2_AUTONOMY F1): `GET sessions/runs/:runId` → each flag gains
 `answer: { action: 'kept'|'corrected'|'removed'; reply; at } | null`. The learner's
@@ -661,7 +628,7 @@ it. A person may still Change it (`runs/:id/correct`) or decide an escalated fla
 ```ts
 { enabled: boolean;                       // pmAgentEnabled, the master switch
   steps: ['quick_test','gate_test','paired_trial','canary']; promote: 'person';
-  kinds: Array<{ kind: 'settings'|'prompts'|'pinned_rules'; configurable: boolean;
+  kinds: Array<{ kind: 'settings'|'prompts'; configurable: boolean;
                  cells: Record<Step, 'auto'|'ask'|'off'>;  // quick_test, gate_test, paired_trial always 'auto'
                  eligible: boolean; reason: string;      // the canary's (the κ gate's step)
                  overridable: boolean;                   // the owner may confirm an early canary override
@@ -683,11 +650,11 @@ it. A person may still Change it (`runs/:id/correct`) or decide an escalated fla
                gate: { met; failing }; minReviews: 50; kappa: 0.6;
                sample: { size: 5; thisWeek: number; waiting: number } } | null }
 ```
-- **Kinds.** `settings` covers non-budget settings. `prompts` covers prompt edits, registry agents and default plans. `pinned_rules` is always never.
+- **Kinds.** `settings` covers non-budget settings. `prompts` covers prompt edits, registry agents and default plans. Pinned rules are not a kind: the PM agent can never edit one.
 - **Guidance and models are not kinds.** The PM agent never touches Context Library chunks (spec C4), and model trials come in Release 2. Stored cells for them are dropped when the policy is read.
-- `PUT autonomy/matrix {changes: [{kind, step, value}], override?: boolean}` (owner) is all or nothing. `override: true` is the owner's confirmed **canary override**: a canary may be set `auto` before the κ gate is met (never past a re-lock, never for pinned rules). It is recorded in `overrides[kind]` (who, when; audited with `override`), shown in the row as "On its own · owner override, <name>, <date>", and the κ re-lock leaves it be; reverts, a failed baseline and drift still re-lock it (and clear it), and a canary that misses a risk cue still auto-reverts. With the gate met there is no override. It returns 400 when `auto` is set where the kind is not eligible at that step, when `pinned_rules` is changed, or when the step is unknown.
+- `PUT autonomy/matrix {changes: [{kind, step, value}], override?: boolean}` (owner) is all or nothing. `override: true` is the owner's confirmed **canary override**: a canary may be set `auto` before the κ gate is met (never past a re-lock). It is recorded in `overrides[kind]` (who, when; audited with `override`), shown in the row as "On its own · owner override, <name>, <date>", and the κ re-lock leaves it be; reverts, a failed baseline and drift still re-lock it (and clear it), and a canary that misses a risk cue still auto-reverts. With the gate met there is no override. It returns 400 when `auto` is set where the kind is not eligible at that step, when the kind is not `settings` or `prompts`, or when the step is unknown.
 - `PUT autonomy/orgs/:tenantId {changes: {paired_trial?: 'default'|'never'; canary?: 'default'|'ask'|'never'}}` (owner) only tightens: the stricter of the global and org settings applies. The admin calls them, for side-by-side trials, "Allowed" (`default`) / "Not on its sessions" (`never`); for learner try-outs, "Same as the table above" / "Always ask first" / "Never". `paired_trial: 'ask'` is refused (400); a stored one reads as `default` (it behaved as allowed: trials run on their own).
-- `PUT autonomy/matrix` refuses `quick_test`, `gate_test` and `paired_trial` (400): they always run on their own. The admin grid shows only "Try on learners" (canary) and a locked "Live for everyone · Always a person", with the rows `settings` and `prompts` (pinned rules are not in the grid).
+- `PUT autonomy/matrix` refuses `quick_test`, `gate_test` and `paired_trial` (400): they always run on their own. The admin grid shows only "Try on learners" (canary) and a locked "Live for everyone · Always a person", with the rows `settings` and `prompts`.
 
 Plan §4 "Improver autonomy" and §11.1 "Experiment: free" (decided 2026-11-12): **quick check,
 pass test and side-by-side trial** (`quick_test`, `gate_test`, `paired_trial`) never reach a

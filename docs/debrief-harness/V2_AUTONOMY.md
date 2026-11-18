@@ -91,7 +91,7 @@ must be built, tested and ticked before release.
 - [x] C5 (revised 2026-11-16: "Needs you as a notification icon… take it to the right place only")
       Nothing is decided on Home. Home lists Needs you one line per change (title and why it
       waits); each row opens the change on the PM agent page. This week (score, trend, went
-      live, undone) sits under the PM agent page's headline; Home has no PM agent conversation (`/debriefs/pm-agent?change=<id>`), which shows the whole change
+      live, undone) sits under the PM agent page's headline; Home has no PM agent conversation (`/debriefs/changes?change=<id>`; the old `/debriefs/pm-agent` link redirects), which shows the whole change
       (the whole rule for a pinned rule, the wording before and after), the decision buttons
       outside the conversation, and that change's own conversation (All messages toggles the
       whole thread). Notifications and old `/debriefs?change=` links go there too. The clinical

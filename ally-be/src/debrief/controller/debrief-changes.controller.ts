@@ -58,15 +58,10 @@ export class DebriefChangesController {
       'Home (v2): the score headline, changes that wait for a person (always-ask only) and this week',
   })
   async home(@Req() req: AuthedRequest) {
-    // The clinical advisor sees only the pinned-rule changes they decide (spec C5).
+    // The clinical advisor sees the score but none of the changes (spec C5).
     const can = (await this.view.viewer(req.user.id)).can;
     return this.changes.home(new Date(), {
-      pinnedRulesOnly: !can.pmAgent,
-      can: {
-        pinnedRules: can.approvePinnedRule,
-        budgets: can.ownerSettings,
-        changes: can.pmAgent,
-      },
+      can: { budgets: can.ownerSettings, changes: can.pmAgent },
     });
   }
 
@@ -77,15 +72,10 @@ export class DebriefChangesController {
       "The Debrief PM agent's changes in plain words, newest activity first; ?state=waits|trying|building|testing|live|undone|stopped|turned_down",
   })
   async list(@Req() req: AuthedRequest, @Query('state') state?: string) {
-    // The clinical advisor gets only the pinned-rule changes they take part in, never the rest.
+    // Changes are the Ally team's and the owner's; the clinical advisor gets none.
     const can = (await this.view.viewer(req.user.id)).can;
-    const out = await this.changes.list(state);
-    if (can.pmAgent) return out;
-    return {
-      changes: can.approvePinnedRule
-        ? out.changes.filter((c) => c.kindKey === 'pinned_rule')
-        : [],
-    };
+    if (!can.pmAgent) return { changes: [] };
+    return this.changes.list(state);
   }
 
   @Get('changes/:id')
@@ -94,12 +84,7 @@ export class DebriefChangesController {
   async get(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     const can = (await this.view.viewer(req.user.id)).can;
     const change = await this.changes.get(id);
-    if (
-      !can.pmAgent &&
-      !(can.approvePinnedRule && change.kindKey === 'pinned_rule')
-    ) {
-      throw new NotFoundException('Change not found');
-    }
+    if (!can.pmAgent) throw new NotFoundException('Change not found');
     return change;
   }
 

@@ -12,6 +12,7 @@ import { Chatbot, ChatbotMemberRole, ChatbotStatus } from "@types";
 import { BotSettingsTab } from "./BotSettingsTab";
 import { AllConnectorsTab } from "./ConnectorsTab";
 import { CorpusTab } from "./CorpusTab";
+import { FirstAssistantOverlay } from "./FirstAssistantOverlay";
 import { fill, LoadError } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
 import { HOME } from "../AssistantHome/copy";
@@ -73,9 +74,15 @@ export const WhatsAppBot: React.FC = () => {
     [setSearchParams],
   );
 
+  // First visit with no assistants: open straight into building the first one. Closing it leaves
+  // the page exactly as it was (the empty state), and stays closed for the rest of the session.
+  const showFirstRun =
+    activeTab === "bots" && !isLoading && !isError && canCreate && !data?.chatbots.length;
+
   // Chunk 20d-2: the page in the v2 look (DESIGN.md), like the assistant's own home.
   return (
     <div className="ally-v2 ally-list-page">
+      {showFirstRun && <FirstAssistantOverlay />}
       <header className="ally-list-page__head">
         <div className="ally-list-page__title">
           <h1 className="ally-display">{en.whatsappBot.title}</h1>

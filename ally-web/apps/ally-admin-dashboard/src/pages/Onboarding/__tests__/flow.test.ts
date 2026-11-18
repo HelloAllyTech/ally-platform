@@ -54,7 +54,14 @@ describe("one screen at a time (chunk 20d)", () => {
   });
 
   it("goes design → building → make it yours → checkup → share → live", () => {
-    const all = { reading: true, safety: true, built: false, make: false, checkup: false };
+    const all = {
+      interview: true,
+      reading: true,
+      safety: true,
+      built: false,
+      make: false,
+      checkup: false,
+    };
     expect(screenFor(view({ step: "design" }), all)).toBe("design");
     // The builder writes the assistant in the design turn: Building shows while it does.
     expect(screenFor(view({ step: "design" }), all, true)).toBe("building");
@@ -70,8 +77,23 @@ describe("one screen at a time (chunk 20d)", () => {
     expect(screenFor(view({ step: "published", status: "published" }), all)).toBe("live");
   });
 
+  it("shows the interview chat until the owner says that's everything", () => {
+    const interview = view({
+      step: "learned",
+      source: { website: null, description: null, interview: true },
+    });
+    expect(screenFor(interview, NOTHING_PASSED)).toBe("interview");
+    // A fresh open of an interview draft still lands on the chat, not past it.
+    expect(screenFor(interview, passedFromStep(interview, {}))).toBe("interview");
+    expect(screenFor(interview, { ...NOTHING_PASSED, interview: true, reading: true })).toBe(
+      "learned",
+    );
+    expect(passedFromStep(view({ step: "gaps" }), {}).interview).toBe(true);
+  });
+
   it("resumes past everything before the draft's step", () => {
     expect(passedFromStep(view({ step: "share" }), {})).toEqual({
+      interview: true,
       reading: true,
       safety: true,
       built: true,

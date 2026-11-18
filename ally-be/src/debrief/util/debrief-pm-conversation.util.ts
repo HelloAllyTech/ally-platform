@@ -1,6 +1,5 @@
-import type { DebriefAction, DebriefCan } from './debrief-console-roles.util';
+import type { DebriefAction } from './debrief-console-roles.util';
 import { alwaysAsk } from './debrief-always-ask.util';
-import { changeKindOf } from './debrief-console-view.util';
 import { normaliseForQuote, unmatchedQuotes } from './debrief-cards.util';
 import type {
   DebriefPmMessage,
@@ -29,40 +28,26 @@ export function isExplicitYes(text: string): boolean {
 /** Never a learner's words: anything here is staff text, but keep messages bounded. */
 export const MAX_MESSAGE_CHARS = 4000;
 
+/** A pinned-rule item from before pinned rules moved to the Skills Store; history only. */
 export function isPinnedRuleChange(idea: {
   change?: Record<string, any> | null;
 }): boolean {
-  const change = idea.change ?? {};
-  return (
-    change.ideaKind === 'pinned_rule' || changeKindOf(change) === 'pinned_rules'
-  );
+  return idea.change?.ideaKind === 'pinned_rule';
 }
 
 /**
- * Who may carry out an action on this change (debrief-console-roles.util.ts):
- * a pinned-rule decision is the clinical advisor's or the owner's, a budget
+ * Who may carry out an action on this change (debrief-console-roles.util.ts): a budget
  * increase the owner's, everything else the PM agent permission's.
  */
-export function requiredAction(
-  idea: {
-    change?: Record<string, any> | null;
-    evidence?: Record<string, any> | null;
-  },
-  decision: boolean,
-): DebriefAction {
+export function requiredAction(idea: {
+  change?: Record<string, any> | null;
+  evidence?: Record<string, any> | null;
+}): DebriefAction {
   // The core's always-ask list (debrief-always-ask.util.ts), its locked kinds only.
   const kind = alwaysAsk(idea, {
     askLowConfidence: false,
     askModels: false,
   })?.kind;
-  if (
-    decision &&
-    (isPinnedRuleChange(idea) ||
-      kind === 'pinned_rule' ||
-      kind === 'safety_reader')
-  ) {
-    return 'approvePinnedRule';
-  }
   if (
     kind === 'budget_increase' ||
     idea.change?.budgetOnly ||
@@ -75,23 +60,9 @@ export function requiredAction(
 
 /** Who to name when someone lacks the permission. */
 export function whoDecides(action: DebriefAction): string {
-  switch (action) {
-    case 'approvePinnedRule':
-      return 'the clinical advisor or the owner';
-    case 'ownerSettings':
-      return 'the owner';
-    default:
-      return 'the Ally team or the owner';
-  }
-}
-
-/** May this viewer read and post in the conversation, and how much of it? */
-export function conversationAccess(
-  can: Pick<DebriefCan, 'pmAgent' | 'approvePinnedRule'>,
-): 'all' | 'pinned_rules' | 'none' {
-  if (can.pmAgent) return 'all';
-  if (can.approvePinnedRule) return 'pinned_rules';
-  return 'none';
+  return action === 'ownerSettings'
+    ? 'the owner'
+    : 'the Ally team or the owner';
 }
 
 /** The contract's `PmMessage` (V2_AUTONOMY API contract). */

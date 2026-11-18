@@ -95,7 +95,7 @@ export interface BotDraftView {
   step: BotDraftStep;
   version: number;
   chatbotId: string | null;
-  source: { website: string | null; description: string | null };
+  source: { website: string | null; description: string | null; interview?: boolean };
   crawl: {
     status: "idle" | "running" | "done" | "partial" | "failed";
     domain: string | null;

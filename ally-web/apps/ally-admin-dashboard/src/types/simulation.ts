@@ -114,6 +114,8 @@ export interface behaviourStateInstruction {
 export interface behaviourInstruction {
   id?: string;
   category: enumBehaviourInstructionCategory;
+  /** Points per detection, -100..100; null/absent = category default (+10 / -10). */
+  score?: number | null;
   behaviors: string[];
   instructions: string[];
   stateInstructions?: behaviourStateInstruction[];
@@ -169,7 +171,7 @@ export interface SimulationInput {
    * these two any more (`enableFeedback`, retired 2026-08-31).
    */
   feedbackTabs?: { debrief: boolean; transcript: boolean };
-  /** Debrief risk-cue option: null/unset = Standard, or an option's key. */
+  /** Debrief risk-cue choice: "part_of_practice", or null/unset = No. */
   debriefRiskCueOption?: string | null;
   fillerEnabled?: boolean;
   languageGlossaryEnabled?: boolean;

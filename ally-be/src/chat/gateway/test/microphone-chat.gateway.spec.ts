@@ -209,6 +209,161 @@ describe('MicrophoneChatGateway', () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    delete process.env.MICROPHONE_RECONNECT_GRACE_MS;
+    jest.useRealTimers();
+  });
+
+  describe('reconnect grace period', () => {
+    const GRACE = 60_000;
+    beforeEach(() => {
+      jest.useFakeTimers();
+      process.env.MICROPHONE_RECONNECT_GRACE_MS = String(GRACE);
+      mockChatService.isChatEnded.mockResolvedValue(false);
+      mockChatService.endChat.mockResolvedValue(null);
+      gatewayPrivate.server = { sockets: { sockets: new Map() } };
+    });
+
+    const recording = (sid: string, chatId: number, userId = 1) => ({
+      ...mockSession,
+      id: sid,
+      chatId,
+      userId,
+    });
+    const socket = (sid: string, userId = 1) => ({
+      ...mockSocket,
+      id: sid,
+      data: { user: { ...mockSocket.data.user, id: userId } },
+    });
+
+    it('holds a dropped recording open instead of ending it', async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+
+      await gateway.handleDisconnect(socket('a'));
+
+      expect(mockChatService.endChat).not.toHaveBeenCalled();
+      expect(gatewayPrivate.pendingEnds.has(7)).toBe(true);
+    });
+
+    it('ends it, flagged as a disconnect, once the grace period passes', async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+      await gateway.handleDisconnect(socket('a'));
+
+      await jest.advanceTimersByTimeAsync(GRACE - 1);
+      expect(mockChatService.endChat).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(1);
+
+      expect(mockChatService.endChat).toHaveBeenCalledWith(
+        7,
+        undefined,
+        StreamEndReason.CLIENT_DISCONNECT,
+      );
+      expect(gatewayPrivate.pendingEnds.has(7)).toBe(false);
+    });
+
+    it('resumes the recording when the same counsellor sends audio for it again', async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+      await gateway.handleDisconnect(socket('a'));
+
+      // The client reconnects on a new socket and carries on sending audio.
+      gatewayPrivate.sessions.b = recording('b', PLACEHOLDER_CHAT_ID);
+      mockChatService.getChatById.mockResolvedValue({ id: 7, counselorId: 1 });
+      await gateway.handleAudioMessage(socket('b') as any, {
+        audioData: 'AAAA',
+        chatId: 7,
+      });
+
+      expect(mockStreamFileProcessorService.saveAudio).toHaveBeenCalled();
+      expect(gatewayPrivate.pendingEnds.has(7)).toBe(false);
+      await jest.advanceTimersByTimeAsync(GRACE * 2);
+      expect(mockChatService.endChat).not.toHaveBeenCalled();
+      expect(gatewayPrivate.sessions.b.chatId).toBe(7);
+    });
+
+    it("does not let another user's socket resume someone else's recording", async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+      await gateway.handleDisconnect(socket('a'));
+
+      gatewayPrivate.sessions.x = recording('x', PLACEHOLDER_CHAT_ID, 99);
+      mockChatService.getChatById.mockResolvedValue({ id: 7, counselorId: 1 });
+      await gateway.handleAudioMessage(socket('x', 99) as any, {
+        audioData: 'AAAA',
+        chatId: 7,
+      });
+
+      expect(mockStreamFileProcessorService.saveAudio).not.toHaveBeenCalled();
+      expect(gatewayPrivate.pendingEnds.has(7)).toBe(true);
+    });
+
+    it('ends a held recording right away when the counsellor starts a new one', async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+      await gateway.handleDisconnect(socket('a'));
+      gatewayPrivate.sessions.b = recording('b', PLACEHOLDER_CHAT_ID);
+      mockChatService.getChatsByCouncilorId.mockResolvedValue(null);
+
+      await gateway.startAudioChat(socket('b') as any, {
+        platform: 'WEB' as any,
+      });
+
+      expect(mockChatService.endChat).toHaveBeenCalledWith(
+        7,
+        undefined,
+        StreamEndReason.CLIENT_DISCONNECT,
+      );
+      expect(gatewayPrivate.pendingEnds.size).toBe(0);
+      expect(mockStreamFileProcessorService.startCallStream).toHaveBeenCalled();
+    });
+
+    it('does not hold a recording the counsellor already ended (End, then the socket closes)', async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+      mockChatService.isChatEnded.mockResolvedValue(true);
+
+      await gateway.handleDisconnect(socket('a'));
+
+      expect(gatewayPrivate.pendingEnds.has(7)).toBe(false);
+      await jest.advanceTimersByTimeAsync(GRACE);
+      expect(mockChatService.endChat).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when the chat was ended another way during the grace period', async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+      await gateway.handleDisconnect(socket('a'));
+      mockChatService.isChatEnded.mockResolvedValue(true);
+
+      await jest.advanceTimersByTimeAsync(GRACE);
+
+      expect(mockChatService.endChat).not.toHaveBeenCalled();
+    });
+
+    it('janitor leaves a chat alone when a live socket has already resumed it', async () => {
+      gatewayPrivate.server = { sockets: { sockets: new Map([['b', {}]]) } };
+      gatewayPrivate.sessions = {
+        'dead-sid': recording('dead-sid', 7),
+        b: recording('b', 7),
+      };
+
+      await gatewayPrivate.reconcileSessions();
+      await jest.advanceTimersByTimeAsync(GRACE * 2);
+
+      expect(mockChatService.endChat).not.toHaveBeenCalled();
+      expect(gatewayPrivate.sessions['dead-sid']).toBeUndefined();
+    });
+
+    it('drains held recordings on shutdown instead of dropping them', async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+      await gateway.handleDisconnect(socket('a'));
+
+      await gateway.onModuleDestroy();
+
+      expect(mockChatService.endChat).toHaveBeenCalledWith(
+        7,
+        undefined,
+        StreamEndReason.CLIENT_DISCONNECT,
+      );
+      expect(gatewayPrivate.pendingEnds.size).toBe(0);
+    });
+  });
+
   describe('afterInit', () => {
     it('should set up authentication middleware', () => {
       gateway.afterInit(mockServer);
@@ -260,6 +415,9 @@ describe('MicrophoneChatGateway', () => {
     });
 
     it('should end a recording only once when disconnect is delivered twice', async () => {
+      // Grace period 0: the original end-right-away behaviour.
+      process.env.MICROPHONE_RECONNECT_GRACE_MS = '0';
+      mockChatService.isChatEnded.mockResolvedValue(false);
       await gateway.handleConnection(mockSocket);
       gatewayPrivate.sessions[mockSocket.id].chatId = 99;
 
@@ -284,6 +442,9 @@ describe('MicrophoneChatGateway', () => {
     });
 
     it('should end chat when valid chatId exists', async () => {
+      // Grace period 0: the original end-right-away behaviour.
+      process.env.MICROPHONE_RECONNECT_GRACE_MS = '0';
+      mockChatService.isChatEnded.mockResolvedValue(false);
       gatewayPrivate.sessions = {
         [mockSocket.id]: { ...mockSession, chatId: 1 },
       };
@@ -313,6 +474,9 @@ describe('MicrophoneChatGateway', () => {
     });
 
     it('should handle error when endChat fails', async () => {
+      // Grace period 0: the original end-right-away behaviour.
+      process.env.MICROPHONE_RECONNECT_GRACE_MS = '0';
+      mockChatService.isChatEnded.mockResolvedValue(false);
       gatewayPrivate.sessions = {
         [mockSocket.id]: { ...mockSession, chatId: 1 },
       };
@@ -333,6 +497,9 @@ describe('MicrophoneChatGateway', () => {
 
   describe('reconcileSessions (janitor)', () => {
     it('finalizes an orphaned recording whose socket is gone (no disconnect event)', async () => {
+      // Grace period 0: the original end-right-away behaviour.
+      process.env.MICROPHONE_RECONNECT_GRACE_MS = '0';
+      mockChatService.isChatEnded.mockResolvedValue(false);
       // Live socket set does NOT contain the stale session's id.
       gatewayPrivate.server = { sockets: { sockets: new Map() } };
       gatewayPrivate.sessions = {

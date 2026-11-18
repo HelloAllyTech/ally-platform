@@ -1,7 +1,6 @@
 import React from "react";
 
 import { en } from "@constants";
-import { DebriefChange } from "@types";
 
 type Part = { text: string; kind: "same" | "removed" | "added" };
 
@@ -82,39 +81,5 @@ export const Wording: React.FC<{ before: string; after: string }> = ({ before, a
         </p>
       </div>
     </div>
-  );
-};
-
-/**
- * The whole rule, so the person deciding reads all of it, not a fragment: open by default, in a
- * scrolling box, with the changed passage marked when it is a change.
- */
-export const WholeRule: React.FC<{
-  rule: NonNullable<DebriefChange["rule"]>;
-  changed: boolean;
-}> = ({ rule, changed }) => {
-  const t = en.debriefs.v2.home;
-  return (
-    <details open className="bg-white" data-testid="needs-rule">
-      <summary className="cursor-pointer py-1 text-[13px] font-semibold text-typography-900">
-        {changed ? t.wholeRuleChanged(rule.name) : t.wholeRule(rule.name)}
-      </summary>
-      {rule.stale && (
-        <p className="m-0 py-1 text-[13px] text-[#8A3800]" data-testid="needs-rule-stale">
-          {t.ruleStale}
-        </p>
-      )}
-      <div className="max-h-[420px] overflow-y-auto whitespace-pre-wrap border border-neutral-100 px-3 py-2 text-sm leading-normal">
-        {rule.segments.map((seg, k) =>
-          seg.changed ? (
-            <mark key={k} className="bg-success-50 text-success-600">
-              {seg.text}
-            </mark>
-          ) : (
-            <span key={k}>{seg.text}</span>
-          ),
-        )}
-      </div>
-    </details>
   );
 };

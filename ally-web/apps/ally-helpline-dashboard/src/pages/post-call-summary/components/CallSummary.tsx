@@ -34,7 +34,12 @@ import CustomFieldValuesPanel from "@pages/calls/components/custom-fields/Custom
 import { RootState } from "@store";
 import { ChatSummaryStatus, SessionType, SummaryFieldKey } from "@types";
 import { CustomFieldEditPermission, CustomFieldValue } from "@types";
-import { getEstimatedSummaryGenerationTime, getFormattedDateTime, hasPermissions } from "@utils";
+import {
+  convertSecondsToDuration,
+  getEstimatedSummaryGenerationTime,
+  getFormattedDateTime,
+  hasPermissions,
+} from "@utils";
 
 import { SummaryLoading } from ".";
 import SummaryFieldInput from "./SummaryFieldInput";
@@ -322,10 +327,21 @@ const CallSummary: FC<CallSummaryProps> = ({
       case SummaryFieldKey.CallId:
         return callSummary?.details?.chatId || summaryData.callId;
       case SummaryFieldKey.CallDuration: {
+        // Same format and labels as the Scribe Logs table ("3 mins 7 secs").
+        // This used to print the count twice ("3 3 minutes": the translation
+        // already includes {{count}}) and drop the seconds.
         const duration = callSummary?.details?.callDuration || summaryData.callDuration;
-        return duration
-          ? `${Math.floor(Number(duration) / 60)} ${t("common.minutes_other", { count: Math.floor(Number(duration) / 60) })}`
-          : "--";
+        return convertSecondsToDuration(Number(duration) || undefined, {
+          labels: {
+            lessThanOneMinute: t("calls.duration.lessThanOneMinute", "Less than 1 min"),
+            hour: t("calls.duration.hour", "hr"),
+            hours: t("calls.duration.hours", "hrs"),
+            minute: t("calls.duration.minute", "min"),
+            minutes: t("calls.duration.minutes", "mins"),
+            second: t("calls.duration.second", "sec"),
+            seconds: t("calls.duration.seconds", "secs"),
+          },
+        });
       }
       case SummaryFieldKey.CallDate:
         return getFormattedDateTime(callSummary?.details?.startTime, "do MMMM yyyy");
@@ -522,8 +538,8 @@ const CallSummary: FC<CallSummaryProps> = ({
         {isFailedSummary ? (
           // Summary generation failed but the transcript was saved: let the
           // user retry generation or fill the fields in manually and save.
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#c4901f] bg-[#f3e6c9] px-4 py-3 mb-2">
-            <span className="text-[#6b4f22] font-primary text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-status-ochreDot bg-status-ochreBg px-4 py-3 mb-2">
+            <span className="text-status-ochreFg font-primary text-sm">
               {t("summary.generationFailedEditable")}
             </span>
             <Button onClick={handleRetrySummary} disabled={isRetrying} className="shrink-0">
@@ -532,14 +548,28 @@ const CallSummary: FC<CallSummaryProps> = ({
             </Button>
           </div>
         ) : (
-          <InfoBanner
-            message={t("summary.disclaimer")}
-            icon={() => (
-              <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+          <>
+            {callSummary?.incompleteRecording && (
+              // The connection dropped mid-recording and the client did not
+              // come back in time: the audio, and so the summary, is partial.
+              <InfoBanner
+                message={t("summary.incompleteRecording")}
+                icon={() => (
+                  <Warning className="border-status-ochreDot border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+                )}
+                wrapperClassName="border-status-ochreDot bg-status-ochreBg mb-2"
+                messageClassName="text-status-ochreFg"
+              />
             )}
-            wrapperClassName="border-[#c4901f] bg-[#f3e6c9]"
-            messageClassName="text-[#6b4f22]"
-          />
+            <InfoBanner
+              message={t("summary.disclaimer")}
+              icon={() => (
+                <Warning className="border-status-ochreDot border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+              )}
+              wrapperClassName="border-status-ochreDot bg-status-ochreBg"
+              messageClassName="text-status-ochreFg"
+            />
+          </>
         )}
         {headerContent}
         <div className={`overflow-y-auto font-primary pb-[60px] ${className}`}>

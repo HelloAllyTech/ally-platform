@@ -104,7 +104,7 @@ import {
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import { SkillExperimentRouterService } from '../../skill-experiment/service/skill-experiment-router.service';
 import { ExecutionManager } from '../../common/execution/execution-manager';
-import { DEBRIEF_AGENT_KEY } from '../../debrief/constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   ALLY_AI_PROMPT_PREFIX,
   ALLY_AI_LEARN_PROMPT_PREFIX,
@@ -162,6 +162,11 @@ export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
   'ally_ai_summary_dictation_summary',
   'ally_ai_summary_condense_chunk',
   'ally_ai_analysis_counselor_analysis',
+  // Scribe v2 note harness (shadow runs for tenants that have it on).
+  'ally_ai_scribe_note_generate',
+  'ally_ai_scribe_note_map_segment',
+  'ally_ai_scribe_note_repair',
+  'ally_ai_scribe_note_speaker_roles',
 ] as const;
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';

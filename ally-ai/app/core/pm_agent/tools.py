@@ -168,6 +168,12 @@ class ReleaseDraftArgs(BaseModel):
     replace: Optional[str] = None
     setting_key: Optional[str] = None
     setting_value: Optional[float] = None
+    setting_fields: Optional[List[str]] = Field(
+        None,
+        description="setting_key roleplayFields only: the optional roleplay fields "
+        "the debrief should read, as a list (empty = none). Call with the key and "
+        "no list to be told which fields exist and which are on.",
+    )
     agent: Optional[RegistryAgentManifest] = None
     run_ids: List[str] = Field(
         default_factory=list,

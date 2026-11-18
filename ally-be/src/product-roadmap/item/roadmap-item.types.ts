@@ -68,12 +68,8 @@ export interface ItemRow {
   author: PersonRef;
   lead?: PersonRef;
   votes: number;
-  /**
-   * Position in the queue, 1-based and unique, over every idea that is not yet released (the same
-   * `queueRank` the sort uses, so the number can never disagree with the order). Absent once an
-   * idea is released, declined or closed.
-   */
-  rank?: number;
+  /** Position in the composite-score queue (1 = first); null when the idea is not ranked. */
+  queueRank: number | null;
   votedByMe: boolean;
   starred: boolean;
   starredBy?: PersonRef;

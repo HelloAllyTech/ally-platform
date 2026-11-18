@@ -7,6 +7,7 @@ import { ChatSummaryStatus } from '../../chat/entity/chat.entity';
 import { TranscribeAndSummarizeRequestMessage } from '../dto/transcribe-and-summarize-request.model';
 import { AppConfigService } from 'src/config/config.service';
 import { AiService, TRANSCRIPTION_PIPELINE_PROMPT_CODES } from './ai.service';
+import { ScribeNoteHarnessService } from '../../chat/service/scribe-note-harness.service';
 
 @Injectable()
 export class AiEventService {
@@ -18,6 +19,8 @@ export class AiEventService {
     private readonly chatService: ChatService,
     private readonly configService: AppConfigService,
     private readonly aiService: AiService,
+    @Inject(forwardRef(() => ScribeNoteHarnessService))
+    private readonly scribeNoteHarnessService: ScribeNoteHarnessService,
   ) {}
 
   async publishTranscribeAudioEvent(
@@ -31,8 +34,23 @@ export class AiEventService {
     try {
       // The pipeline's prompts from the Skills Store ride on the message:
       // ally-ai runs its own (minimal) file for any prompt missing here.
+      // A caller that doesn't pass `mode` (the audio-retry consumer) would
+      // otherwise send a DICTATION recording through the scribe summary
+      // prompt. The chat's own recorded mode is the source of truth.
+      const mode =
+        event.mode ??
+        (await this.chatService
+          .getSessionMode(event.chat_id)
+          .catch(() => null)) ??
+        undefined;
+      // Scribe v2 shadow run, for tenants that have it on (never throws).
+      const noteHarness =
+        event.note_harness ??
+        (await this.scribeNoteHarnessService.buildRequest(event.chat_id));
       const message: TranscribeAndSummarizeRequestMessage = {
         ...event,
+        mode,
+        ...(noteHarness ? { note_harness: noteHarness } : {}),
         correlation_id: correlationId,
         prompts: await this.aiService.getPromptOverrides(
           TRANSCRIPTION_PIPELINE_PROMPT_CODES,

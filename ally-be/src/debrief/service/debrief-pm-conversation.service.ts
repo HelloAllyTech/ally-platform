@@ -14,10 +14,8 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
 import { AgentReleaseAuditAction } from '../../llm-agent/harness/enum/harness.enum';
-import {
-  DEBRIEF_AGENT_KEY,
-  DEBRIEF_MODELS,
-} from '../constants/debrief-release.constants';
+import { DEBRIEF_MODELS } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   DebriefPmMessage,
   PmAbout,
@@ -35,7 +33,6 @@ import { alwaysAsk } from '../util/debrief-always-ask.util';
 import { DebriefChangesService } from './debrief-changes.service';
 import {
   changeName,
-  conversationAccess,
   isExplicitYes,
   isPinnedRuleChange,
   MAX_MESSAGE_CHARS,
@@ -71,13 +68,9 @@ export const CONVERSATION_TURN_CAP_USD = 0.25;
 /** ally-ai answers within ~10–30 s; past this the turn is failed. */
 export const CONVERSATION_TIMEOUT_MS = 120_000;
 /**
- * ally-ai's checkpoint thread for the console's one shared conversation; the
- * clinical advisor's turns have their own, so the agent never brings the rest
- * of the thread into an advisor's answer (C4).
+ * ally-ai's checkpoint thread for the console's one shared conversation.
  */
 export const PM_CONVERSATION_THREAD = 'debrief-pm-conversation';
-export const PM_CONVERSATION_ADVISOR_THREAD =
-  'debrief-pm-conversation:pinned-rules';
 /** A pause older than this lapses: the next message turns it down. */
 const PLAN_TTL_MS = 24 * 60 * 60 * 1000;
 /**
@@ -109,13 +102,6 @@ export const CONVERSATION_TURN_TOOLS: readonly PmAgentGatewayTool[] = [
   'change_retry',
   'change_hold_language',
   'changes_pause',
-];
-/** The clinical advisor's turn: read and decide pinned-rule changes, nothing else. */
-export const ADVISOR_TURN_TOOLS: readonly PmAgentGatewayTool[] = [
-  'change_read',
-  'prompt_read',
-  'change_approve',
-  'change_turn_down',
 ];
 
 /** A refusal the agent reads (200 `{ refused }`) and relays in plain words. */
@@ -155,19 +141,18 @@ interface PmConversationResponse {
  * shared thread in `debrief_pm_messages`, the record the console reads. A
  * person's message runs the PM agent in ally-ai (`POST
  * /api/v1/pm-agent/conversation`), a Deep Agent on a checkpoint thread
- * (`PM_CONVERSATION_THREAD`; the advisor's own), with only the new message,
+ * (`PM_CONVERSATION_THREAD`), with only the new message,
  * what the person is looking at and its evidence, and a token for the
  * conversation's tools. The agent replies and acts only through those tools,
  * served here; each action is recorded on the person's message, on the change
  * (`evidence.conversation`) and in the audit with the person's words.
  *
  * Permissions are today's (debrief-console-roles.util.ts): the Ally team and
- * the owner (`pmAgent`) read and post; the clinical advisor only about
- * pinned-rule changes. Approving or turning down a change, and retrying one
+ * the owner (`pmAgent`) read and post; nobody else. Approving or turning down a change, and retrying one
  * that always asks, pause ally-ai's turn (LangGraph human-in-the-loop); the
  * pause is kept on the reply (`plan`). The thread's next message resolves it:
- * the same person's explicit yes, with the permission — a pinned rule the
- * advisor's or owner's, a budget increase the owner's — resumes with approve
+ * the same person's explicit yes, with the permission — a budget increase the
+ * owner's, everything else the Ally team's or the owner's — resumes with approve
  * and a token signed for them (`approved`); anything else resumes with reject
  * and their words, and the agent answers them.
  *
@@ -200,27 +185,15 @@ export class DebriefPmConversationService {
 
   // --- the thread ---------------------------------------------------------------------
 
-  /** Pinned-rule changes' ids: the advisor's whole view of the thread. */
-  private async pinnedRuleIdeaIds(): Promise<string[]> {
-    const rows: Array<{ id: string; change: Record<string, any> }> =
-      await this.dataSource.query(
-        `SELECT id, change FROM agent_lessons WHERE "agentKey" = $1`,
-        [DEBRIEF_AGENT_KEY],
-      );
-    return rows.filter((r) => isPinnedRuleChange(r)).map((r) => r.id);
-  }
-
   /**
    * `GET pm-agent/conversation?before&limit&about`: newest page, oldest first.
-   * `about` (a change id) narrows to the messages about that change. The
-   * clinical advisor sees only messages about pinned-rule changes.
+   * `about` (a change id) narrows to the messages about that change.
    */
   async list(
     viewer: DebriefViewer,
     opts: { before?: string; limit?: number; about?: string },
   ): Promise<{ messages: PmMessageView[]; more: boolean }> {
-    const access = conversationAccess(viewer.can);
-    if (access === 'none') {
+    if (!viewer.can.pmAgent) {
       throw new ForbiddenException(
         'You cannot read the Debrief PM agent conversation',
       );
@@ -232,14 +205,6 @@ export class DebriefPmConversationService {
         throw new BadRequestException('about must be a change id');
       }
       qb.andWhere(`m.about->>'id' = :about`, { about: opts.about });
-    }
-    if (access === 'pinned_rules') {
-      const ids = await this.pinnedRuleIdeaIds();
-      if (!ids.length) return { messages: [], more: false };
-      qb.andWhere(`m.about->>'kind' = 'change'`).andWhere(
-        `m.about->>'id' IN (:...ids)`,
-        { ids },
-      );
     }
     if (opts.before) {
       if (!UUID.test(opts.before)) {
@@ -302,20 +267,8 @@ export class DebriefPmConversationService {
     const text = String(input.text ?? '').trim();
     if (!text) throw new BadRequestException('Write a message first');
     const about = await this.cleanAbout(input.about);
-    const access = conversationAccess(viewer.can);
-    if (access === 'none') {
+    if (!viewer.can.pmAgent) {
       throw new ForbiddenException('You cannot talk to the Debrief PM agent');
-    }
-    if (access === 'pinned_rules') {
-      const idea =
-        about?.kind === 'change' && about.id
-          ? await this.pm.getIdea(about.id).catch(() => null)
-          : null;
-      if (!idea || !isPinnedRuleChange(idea)) {
-        throw new ForbiddenException(
-          'The clinical advisor talks to the Debrief PM agent about pinned-rule changes only. Open the change from Home.',
-        );
-      }
     }
     const authorName = await this.userName(viewer.userId);
     const person = await this.messages.save(
@@ -328,7 +281,7 @@ export class DebriefPmConversationService {
         actions: [],
       }),
     );
-    const reply = await this.answer(person, viewer, access, about);
+    const reply = await this.answer(person, viewer, about);
     return { messages: [toPmMessage(person), toPmMessage(reply)] };
   }
 
@@ -375,7 +328,7 @@ export class DebriefPmConversationService {
             person,
             viewer,
             idea,
-            requiredAction(idea, a.tool !== 'change_retry'),
+            requiredAction(idea),
             verb(a.tool),
           );
         } catch (e) {
@@ -422,12 +375,6 @@ export class DebriefPmConversationService {
           refuse(`${a.tool} does not wait for a yes`);
         }
         const idea = await this.pm.getIdea(this.ideaId(b));
-        if (
-          conversationAccess(viewer.can) !== 'all' &&
-          !isPinnedRuleChange(idea)
-        ) {
-          refuse('the clinical advisor decides pinned-rule changes only');
-        }
         const decision = a.tool !== 'change_retry';
         if (decision && !['proposed', 'approved'].includes(idea.status)) {
           refuse(
@@ -443,7 +390,7 @@ export class DebriefPmConversationService {
           person,
           viewer,
           idea,
-          requiredAction(idea, decision),
+          requiredAction(idea),
           verb(a.tool),
         );
         const languages = normaliseLanguages(b.languages);
@@ -534,13 +481,9 @@ export class DebriefPmConversationService {
   private async answer(
     person: DebriefPmMessage,
     viewer: DebriefViewer,
-    access: 'all' | 'pinned_rules',
     about: PmAbout | null,
   ): Promise<DebriefPmMessage> {
-    const threadId =
-      access === 'all'
-        ? PM_CONVERSATION_THREAD
-        : PM_CONVERSATION_ADVISOR_THREAD;
+    const threadId = PM_CONVERSATION_THREAD;
     const budgetUsd = await this.turnBudget();
     const evidence = await this.aboutEvidence(about);
     let res: PmConversationResponse;
@@ -552,8 +495,7 @@ export class DebriefPmConversationService {
           "This month's learning budget is spent, so I can't look into this now. The owner can raise it in Settings › Budgets.",
       };
     } else {
-      const tools =
-        access === 'all' ? CONVERSATION_TURN_TOOLS : ADVISOR_TURN_TOOLS;
+      const tools = CONVERSATION_TURN_TOOLS;
       const model = DEBRIEF_MODELS.pmAgent;
       const backup = DEBRIEF_MODELS.pmAgentBackup;
       try {
@@ -860,7 +802,7 @@ export class DebriefPmConversationService {
       // Ally team would; every other conversation tool needs a person's turn.
       if (tool === 'change_read') {
         try {
-          return await this.changeRead(this.ideaId(b), 'all');
+          return await this.changeRead(this.ideaId(b));
         } catch (e) {
           if (e instanceof Refused) return { refused: e.message };
           if (e instanceof HttpException && e.getStatus() < 500) {
@@ -873,22 +815,19 @@ export class DebriefPmConversationService {
     }
     try {
       const viewer = await this.view.viewer(person.authorUserId ?? -1);
-      const access = conversationAccess(viewer.can);
+      // The turn was allowed when the message was posted; the permission may have gone since.
+      if (!viewer.can.pmAgent) {
+        refuse('only the Ally team and the owner use the Debrief PM agent');
+      }
       switch (tool) {
         case 'change_read':
-          return await this.changeRead(this.ideaId(b), access);
+          return await this.changeRead(this.ideaId(b));
         case 'session_read':
-          if (access !== 'all') refuse('you can read pinned-rule changes only');
           return await this.sessionRead(this.uuid(b.run_id, 'run_id'));
         case 'change_approve':
         case 'change_turn_down':
           return await this.decide(tool, person, viewer, claims, b);
         default:
-          if (access !== 'all') {
-            refuse(
-              'the clinical advisor decides pinned-rule changes only; the Ally team does the rest',
-            );
-          }
           return await this.act(tool, person, viewer, claims, b);
       }
     } catch (e) {
@@ -925,14 +864,8 @@ export class DebriefPmConversationService {
   }
 
   /** `change_read`: one change in full, for the agent and the context. */
-  async changeRead(
-    ideaId: string,
-    access: 'all' | 'pinned_rules' | 'none' = 'all',
-  ): Promise<Record<string, unknown>> {
+  async changeRead(ideaId: string): Promise<Record<string, unknown>> {
     const idea = await this.pm.getIdea(ideaId);
-    if (access !== 'all' && !isPinnedRuleChange(idea)) {
-      refuse('you can read pinned-rule changes only');
-    }
     const e = idea.evidence ?? {};
     const settings = (await this.ownerSettings.get()) as unknown as Record<
       string,
@@ -981,38 +914,13 @@ export class DebriefPmConversationService {
       rejected_because: e.rejection?.reason ?? null,
       conversation: (e.conversation ?? []).slice(-10),
       // What actually changes, so the agent never describes it from memory:
-      // the passage and its replacement, or for a rule's first sign-off the
-      // rule as written (the version waiting for sign-off).
+      // the passage and its replacement.
       wording:
         typeof idea.change?.find === 'string' &&
         typeof idea.change?.replace === 'string'
           ? { before: idea.change.find, after: idea.change.replace }
           : null,
-      rule_text: await this.ruleText(idea),
     };
-  }
-
-  /** The text of the rule a pinned-rule change is about, trimmed. Never throws. */
-  private async ruleText(idea: Record<string, any>): Promise<string | null> {
-    const code = idea.change?.promptCode;
-    if (idea.change?.ideaKind !== 'pinned_rule' || typeof code !== 'string') {
-      return null;
-    }
-    try {
-      const version = Number.isInteger(Number(idea.change?.version))
-        ? Number(idea.change.version)
-        : null;
-      const [v] = await this.dataSource.query(
-        `SELECT pv.prompt FROM prompts p
-           JOIN prompts_versions pv ON pv."promptId" = p.id
-          WHERE p."promptCode" = $1 AND pv.version = COALESCE($2::int, p."currentVersion")
-          LIMIT 1`,
-        [code, version],
-      );
-      return v?.prompt ? String(v.prompt).slice(0, 6000) : null;
-    } catch {
-      return null;
-    }
   }
 
   /** `session_read`: one session's run summary, never its transcript or a learner's words. */
@@ -1079,11 +987,7 @@ export class DebriefPmConversationService {
       data: { ideaId: idea.id, url: `/debriefs/pm-agent?change=${idea.id}` },
       excludeUserId: person.authorUserId ?? undefined,
     };
-    if (action === 'approvePinnedRule') {
-      await this.notifier?.pinnedRuleDeciders(alert);
-    } else {
-      await this.notifier?.owner(alert);
-    }
+    await this.notifier?.owner(alert);
     const err = new Refused(
       `Only ${who} can ${what} this; I've asked them.`,
     ) as Refused & { recorded?: boolean };
@@ -1115,8 +1019,10 @@ export class DebriefPmConversationService {
         'approving or turning down a change waits for the person’s yes; nothing was done',
       );
     }
-    if (conversationAccess(viewer.can) !== 'all' && !isPinnedRuleChange(idea)) {
-      refuse('the clinical advisor decides pinned-rule changes only');
+    if (isPinnedRuleChange(idea)) {
+      refuse(
+        'a pinned rule is changed in the Skills Store by a pinned editor, not here',
+      );
     }
     if (!['proposed', 'approved'].includes(idea.status)) {
       refuse(
@@ -1127,18 +1033,14 @@ export class DebriefPmConversationService {
       person,
       viewer,
       idea,
-      requiredAction(idea, true),
+      requiredAction(idea),
       verb(tool),
     );
     const note = `From the Debrief PM agent conversation: “${person.text.slice(0, 200)}”`;
     const userId = person.authorUserId!;
     let label: string;
     if (tool === 'change_approve') {
-      if (isPinnedRuleChange(idea)) {
-        await this.pm.approvePinnedRule(idea.id, userId, note);
-      } else {
-        await this.pm.approve(idea.id, userId, note);
-      }
+      await this.pm.approve(idea.id, userId, note);
       label = `Approved ${changeName(idea)}`;
     } else {
       const reason = String(b.reason ?? '')
@@ -1149,11 +1051,7 @@ export class DebriefPmConversationService {
           'say why it is turned down; the Debrief PM agent reads the reason',
         );
       }
-      if (isPinnedRuleChange(idea)) {
-        await this.pm.rejectPinnedRule(idea.id, userId, reason);
-      } else {
-        await this.pm.reject(idea.id, userId, reason);
-      }
+      await this.pm.reject(idea.id, userId, reason);
       label = `Turned down ${changeName(idea)}`;
     }
     await this.record(person, {
@@ -1192,7 +1090,7 @@ export class DebriefPmConversationService {
       person,
       viewer,
       idea,
-      requiredAction(idea, false),
+      requiredAction(idea),
       verb(tool),
     );
     const languages = normaliseLanguages(b.languages);

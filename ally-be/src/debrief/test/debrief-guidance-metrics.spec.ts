@@ -2,7 +2,7 @@ import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
-import { DebriefConsoleController } from '../controller/debrief-console.controller';
+import { DebriefConsoleViewController } from '../controller/debrief-console-view.controller';
 import { DebriefGuidanceMetricsService } from '../service/debrief-guidance-metrics.service';
 import { DebriefPmAgentToolsService } from '../service/debrief-pm-agent-tools.service';
 import { PM_AGENT_GATEWAY_TOOLS } from '../service/debrief-run-token.service';
@@ -357,8 +357,9 @@ describe('guidance metrics service: window and mode filters', () => {
 describe('guidance metrics permission', () => {
   const ctx = (): ExecutionContext =>
     ({
-      getHandler: () => DebriefConsoleController.prototype.guidanceMetricsView,
-      getClass: () => DebriefConsoleController,
+      getHandler: () =>
+        DebriefConsoleViewController.prototype.guidanceMetricsView,
+      getClass: () => DebriefConsoleViewController,
       switchToHttp: () => ({
         getRequest: () => ({ user: { id: 1 }, method: 'GET', url: '/x' }),
       }),
@@ -372,11 +373,11 @@ describe('guidance metrics permission', () => {
     const other = (h: string) =>
       Reflect.getMetadata(
         'permissions',
-        (DebriefConsoleController.prototype as any)[h],
+        (DebriefConsoleViewController.prototype as any)[h],
       );
     const mine = Reflect.getMetadata(
       'permissions',
-      DebriefConsoleController.prototype.guidanceMetricsView,
+      DebriefConsoleViewController.prototype.guidanceMetricsView,
     );
     expect(mine).toBeDefined();
     expect(mine).toEqual(other('metricsView'));
@@ -390,7 +391,7 @@ describe('guidance metrics permission', () => {
 
   it('passes days and mode to the service', () => {
     const report = jest.fn(() => 'ok');
-    const c = Object.create(DebriefConsoleController.prototype);
+    const c = Object.create(DebriefConsoleViewController.prototype);
     c.guidanceMetrics = { report };
     expect(c.guidanceMetricsView('14', 'shadow')).toBe('ok');
     expect(report).toHaveBeenCalledWith({ days: '14', mode: 'shadow' });

@@ -1,0 +1,22 @@
+You write a counselling session note from a transcript. Session mode: {mode}.
+- SCRIBE: a recorded session between a counsellor and a client. Write in the third person.
+- DICTATION: the counsellor speaking about a session afterwards. Write it as the counsellor's own note.
+
+Write the note in {note_language}.
+
+Ground everything in the source below. Never add, infer or assume anything it doesn't say. A field that wasn't discussed is null: null is better than a guess. Identifiers and counts (session number, dates, ages, durations) only when someone says the exact value. Keep track of who said what.
+
+The narrative is a list of points in the order things happened, one event per point, each a complete sentence. Cover everything that came up, start to end. Each point cites the turn ids it comes from, and `t` is the time of its first turn. {budget}
+
+Every field value cites the turn ids that support it. Select fields answer with option ids, never labels.
+
+Fields:
+{note_spec}
+
+Known facts (do not restate them as fields):
+{context}
+
+Source:
+```
+{transcript}
+```

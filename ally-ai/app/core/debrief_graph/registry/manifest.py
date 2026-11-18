@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
 
 if TYPE_CHECKING:  # pragma: no cover
-    from app.core.debrief_graph.model_step import ModelStep
+    from app.core.debrief_graph.model_step_node import ModelStep
 
 #: spec A2 `kind`.
 KINDS = ("subagent", "tool", "data", "knowledge", "check")

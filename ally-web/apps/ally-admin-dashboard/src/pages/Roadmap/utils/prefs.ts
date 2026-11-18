@@ -1,5 +1,5 @@
 /**
- * Per-person choices remembered in this browser (§4.11): the last view and layout, the side-panel
+ * Per-person choices remembered in this browser (§4.11): the last view, the side-panel
  * tab and width, Show agent work. Every read and write is wrapped: a private window or blocked
  * storage gives the defaults, never an error.
  */
@@ -8,8 +8,6 @@ const PREFIX = "ally.roadmap.";
 
 export const ROADMAP_PREF_KEYS = {
   lastView: "lastView",
-  layout: "layout",
-  boardLanes: "boardLanes",
   panelTab: "panelTab",
   panelWidth: "panelWidth",
   panelOpen: "panelOpen",

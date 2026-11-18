@@ -259,13 +259,12 @@ describe("QueueRow", () => {
     expect(screen.getByText("Plan agent asks: which learners first?")).toBeInTheDocument();
   });
 
-  it("shows the queue rank when the idea has one, and nothing once it is released", () => {
-    const { unmount } = renderRow({ row: row({ rank: 7 }) });
-    const rank = screen.getByText("#7");
-    expect(rank.closest("[title]")).toHaveAttribute("title", en.roadmapV2.row.rankHelp(7));
+  it("shows the queue rank when the idea is ranked, and nothing when it is not", () => {
+    const { unmount } = renderRow({ row: row({ queueRank: 3 }) });
+    expect(screen.getByTestId("queue-rank")).toHaveTextContent("#3");
     unmount();
-    renderRow({ row: row({ shownStage: "shipped" }) });
-    expect(screen.queryByText(/^#\d+$/)).toBeNull();
+    renderRow({ row: row({ queueRank: null }) });
+    expect(screen.queryByTestId("queue-rank")).toBeNull();
   });
 
   it("shows no votes and no menu in the row: it is read, then opened", () => {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 // `Override` isn't re-exported from the main `flutter_riverpod.dart` barrel
 // in this version — only from `misc.dart` (see `pump_app.dart`'s own
@@ -355,6 +356,35 @@ void main() {
     },
   );
 
+  for (final incomplete in [true, false]) {
+    testWidgets(
+      'CallSummaryScreen: ${incomplete ? 'warns' : 'does not warn'} that part of the recording may be missing',
+      (tester) async {
+        final repository = MockCallLogRepository();
+        final summary = CallSummaryDetails(
+          counselorId: 7,
+          fields: {'callId': 1001, 'sessionSummary': 'notes'},
+          isIncompleteRecording: incomplete,
+        );
+        when(() => repository.getCallSummary(1001)).thenAnswer((_) async => summary);
+        when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+
+        await pumpApp(
+          tester,
+          CallSummaryScreen(log: _log),
+          overrides: [
+            callLogRepositoryProvider.overrideWithValue(repository),
+            ..._editorOverrides(visibleFields: const ['sessionSummary']),
+          ],
+        );
+
+        expect(find.byKey(const Key('incomplete-recording-warning')), incomplete ? findsOneWidget : findsNothing);
+        // The AI disclaimer still shows either way.
+        expect(find.byKey(const Key('ai-warning-shield')), findsOneWidget);
+      },
+    );
+  }
+
   testWidgets(
     'CallSummaryScreen: the AI wand writes the enhanced text into the open field, and RN section SVGs render',
     (tester) async {
@@ -533,9 +563,16 @@ void main() {
       when(
         () => repository.updateCallSummary(1001, {'sessionSummary': 'Discussed anxiety'}),
       ).thenAnswer((_) async => summary);
+      // Held open so the generate flow's own summary refetch happens first;
+      // the test then checks one more fetch follows the save itself.
+      final transcriptSaved = Completer<void>();
       when(
-        () => repository.saveNoteTranscript(chatId: 1001, transcript: 'Client discussed anxiety.'),
-      ).thenAnswer((_) async {});
+        () => repository.saveNoteTranscript(
+          chatId: 1001,
+          transcript: 'Client discussed anxiety.',
+          durationSeconds: any(named: 'durationSeconds'),
+        ),
+      ).thenAnswer((_) => transcriptSaved.future);
 
       await pumpApp(
         tester,
@@ -561,16 +598,22 @@ void main() {
       await tester.tap(find.byKey(const Key('voice-note-generate')));
       await tester.pump();
       await tester.pump();
-      // VoiceNoteRecorder.reset() (called once generation succeeds) does
-      // real dart:io file-existence/delete calls on the fake temp path —
-      // the one real-zone window this needs, same as voice_note_section_test.dart.
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pump();
 
       // One fetch from the screen's initial build, one more from the
       // generate flow's invalidation — proving a fresh screen instance for
       // this chatId would no longer see the pre-generation cached summary.
       verify(() => repository.getCallSummary(1001)).called(2);
+
+      // The transcript save is when the backend adds the recording's length
+      // to Call Duration, so the summary must be fetched once more after it.
+      transcriptSaved.complete();
+      // VoiceNoteRecorder.reset() (called once generation succeeds) does
+      // real dart:io file-existence/delete calls on the fake temp path —
+      // the one real-zone window this needs, same as voice_note_section_test.dart.
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+      await tester.pump();
+      verify(() => repository.getCallSummary(1001)).called(1);
 
       while (tester.takeException() != null) {}
     },

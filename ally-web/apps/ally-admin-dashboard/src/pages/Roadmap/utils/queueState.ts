@@ -1,11 +1,11 @@
-import type { RoadmapItemsQuery, RoadmapQueueSort, RoadmapQueueView, RoadmapRole } from "@types";
+import type { RoadmapItemsQuery, RoadmapQueueSort, RoadmapQueueView } from "@types";
 
 /**
  * The Queue's state, and its one URL-safe encoding (§4.11 "Everything has a link").
  *
  * The filter params are EXACTLY the query params of `GET /v1/roadmap/items` (P2 contract), so the
  * URL, the request and a saved view's `state.queue` are one encoding: lists comma-joined, flags
- * `1`. Page-only state (the open idea, the layout, the saved view) uses keys the API never reads.
+ * `1`. Page-only state (the open idea, the saved view) uses keys the API never reads.
  */
 
 /**
@@ -70,15 +70,12 @@ export interface QueueFilters {
   month?: string;
 }
 
-export type QueueLayout = "list" | "board";
-
 export interface QueueState {
   /** The default view you are on. A saved view reads as All with its own filters (`savedViewId`). */
   view: DefaultViewId;
   filters: QueueFilters;
   /** Absent = the view's own default sort. */
   sort?: RoadmapQueueSort;
-  layout: QueueLayout;
   /** The saved view this state started from, if any. */
   savedViewId?: string;
   /** The idea open in the reading pane. */
@@ -86,7 +83,7 @@ export interface QueueState {
 }
 
 /** URL keys the page owns; the API never sees these. */
-export const PAGE_KEYS = { open: "open", layout: "layout", savedView: "sv" } as const;
+export const PAGE_KEYS = { open: "open", savedView: "sv" } as const;
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -119,10 +116,6 @@ export const orderViews = <T extends string>(
   );
   return [...picked, ...allowed.filter(view => !picked.includes(view))];
 };
-
-/** The List | Board switch is retired; kept for the Board code that stays behind it. */
-export const canUseBoard = (role: RoadmapRole | undefined): boolean =>
-  role === "builder" || role === "owner";
 
 /** The sort a default view opens on. Legacy view ids fall back to Rank. */
 export const defaultSortFor = (view: string): RoadmapQueueSort =>
@@ -226,7 +219,7 @@ export const paramsToFilters = (
  */
 export const decodeQueueState = (
   search: URLSearchParams,
-  remembered?: Partial<Pick<QueueState, "layout">> & { view?: string },
+  remembered?: { view?: string },
 ): QueueState => {
   const fromUrl = readView(search.get("view"));
   const fromMemory = readView(remembered?.view);
@@ -236,15 +229,10 @@ export const decodeQueueState = (
   const rawSort = search.get("sort") as RoadmapQueueSort | null;
   const sort = rawSort && QUEUE_SORTS.includes(rawSort) ? rawSort : undefined;
 
-  const rawLayout = search.get(PAGE_KEYS.layout);
-  const wantsBoard = rawLayout ? rawLayout === "board" : remembered?.layout === "board";
-  const layout: QueueLayout = wantsBoard ? "board" : "list";
-
   // Filters a legacy view name implies (For you, Leading) ride along; the URL's own come after.
   const state: QueueState = {
     view,
     filters: normaliseFilters({ ...chosen.filters, ...paramsToFilters(search) }),
-    layout,
   };
   if (sort) state.sort = sort;
   const savedViewId = search.get(PAGE_KEYS.savedView);
@@ -262,7 +250,6 @@ export const encodeQueueState = (state: QueueState): URLSearchParams => {
   if (state.sort && state.sort !== defaultSortFor(state.savedViewId ? "saved" : state.view)) {
     params.set("sort", state.sort);
   }
-  if (state.layout === "board") params.set(PAGE_KEYS.layout, "board");
   if (state.savedViewId) params.set(PAGE_KEYS.savedView, state.savedViewId);
   if (state.open) params.set(PAGE_KEYS.open, state.open);
   return params;
@@ -343,12 +330,11 @@ export const savedViewPayload = (state: QueueState): Record<string, string> => {
 /** Read a saved view's payload back. Unknown or disallowed views fall back like a URL does. */
 export const stateFromSavedView = (
   payload: Record<string, string>,
-  layout: QueueLayout,
   savedViewId: string,
 ): QueueState => {
   const decoded = decodeQueueState(new URLSearchParams(payload));
   // A saved view is its own list: it starts from All, whatever view it was saved from. The
   // default view it was saved on (To do, say) is part of its filters, so nothing is lost.
   const filters = normaliseFilters({ ...DEFAULT_VIEWS[decoded.view].filters, ...decoded.filters });
-  return { ...decoded, view: "all", filters, layout, savedViewId, open: undefined };
+  return { ...decoded, view: "all", filters, savedViewId, open: undefined };
 };

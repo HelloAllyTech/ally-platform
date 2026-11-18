@@ -97,13 +97,16 @@ function build(
     owner?: Record<string, unknown>;
     progressProfile?: unknown;
     progressInsert?: Error;
+    /** The owner settings read fails with this. */
+    ownerFails?: Error;
+    /** The language-pin lookup (DebriefChangeHoldsService); absent in most tests. */
+    holds?: unknown;
     /** The ally-ai model catalogue; the seed's models by default. */
     catalog?: string[];
     debriefTabOff?: boolean;
     /** The roleplay's two Debrief choices, and what the services answer for them. */
     riskCueOption?: string | null;
     framework?: unknown;
-    riskCue?: unknown;
   } = {},
 ) {
   const saved: any[] = [];
@@ -178,6 +181,7 @@ function build(
       async (code: string, version: number | null) =>
         `live ${code}@${version ?? 'current'}`,
     ),
+    recordPromptPins: jest.fn(async () => undefined),
     currentPromptVersions: jest.fn(async (codes: string[]) =>
       Object.fromEntries(codes.map((c) => [c, 2])),
     ),
@@ -226,10 +230,13 @@ function build(
   };
   const agentLogs = { record: jest.fn(async () => 0) };
   const ownerSettings = {
-    get: jest.fn(async () => ({
-      ...defaultOwnerSettings(),
-      ...(opts.owner ?? {}),
-    })),
+    get: jest.fn(async () => {
+      if (opts.ownerFails) throw opts.ownerFails;
+      return {
+        ...defaultOwnerSettings(),
+        ...(opts.owner ?? {}),
+      };
+    }),
   };
   const progressResults = {
     insert: jest.fn(async () => {
@@ -255,12 +262,9 @@ function build(
     agentLogs as any,
     ownerSettings as any,
     progressResults as any,
-    undefined,
+    opts.holds as any,
     opts.framework
       ? ({ forTenant: jest.fn(async () => opts.framework) } as any)
-      : undefined,
-    opts.riskCue
-      ? ({ resolve: jest.fn(async () => opts.riskCue) } as any)
       : undefined,
   );
   const request = () => (graph.run.mock.calls as any[][])[0]?.[0];
@@ -303,16 +307,6 @@ describe('DebriefRunnerService', () => {
       skills: [{ key: 'presence', name: 'Presence' }],
       areas: [],
     };
-    const option = {
-      key: 'part_of_practice',
-      name: 'Part of the practice',
-      version: 4,
-      handling: 'assessed',
-      wordListRaises: true,
-      supportLinesOnCue: false,
-      wording: 'A cue here is the practice itself.',
-    };
-
     it('sends no framework when the library has none: no skills, Standard, legacy labels', async () => {
       const { svc, request } = build();
       await svc.run('s1', { mode: DebriefRunMode.LIVE });
@@ -330,16 +324,16 @@ describe('DebriefRunnerService', () => {
       });
       expect(s.speaker_labels).toBe('legacy');
       // Standard reads the pinned definition: the prompt is the store's live text, untouched.
+      expect(request().contract_version).toBe(1);
       expect(request().prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition]).toMatch(
         /^live /,
       );
     });
 
-    it('sends the organisation’s framework and the chosen option, and an option’s own wording replaces the pinned definition', async () => {
+    it('sends the organisation’s framework and the practised choice; the pinned definition always stays', async () => {
       const { svc, request, context, saved } = build({
         riskCueOption: 'part_of_practice',
         framework: custom,
-        riskCue: option,
       });
       await svc.run('s1', { mode: DebriefRunMode.LIVE });
       const s = request().session;
@@ -350,8 +344,8 @@ describe('DebriefRunnerService', () => {
         handling: 'assessed',
         word_list_raises: true,
       });
-      expect(request().prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition]).toBe(
-        'A cue here is the practice itself.',
+      expect(request().prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition]).toMatch(
+        /^live /,
       );
       // The progress profile is built for this roleplay's skills and named competencies.
       expect(context.progressProfile).toHaveBeenCalledWith(
@@ -360,6 +354,7 @@ describe('DebriefRunnerService', () => {
         's1',
         expect.anything(),
         { framework: custom, competencies: ['open questions'] },
+        expect.anything(),
       );
       // The run records what it used, so a later edit never changes a past debrief.
       const ws = saved[saved.length - 1]?.workspace ?? {};
@@ -368,12 +363,14 @@ describe('DebriefRunnerService', () => {
         ids: ['DG-0300'],
         areas: [],
       });
+      // The handling is also a typed column on the run, set when it starts.
+      expect(saved[saved.length - 1]?.riskCueHandling).toBe('assessed');
       expect(ws.riskCueOption).toMatchObject({
         key: 'part_of_practice',
-        version: 4,
+        version: 1,
         handling: 'assessed',
-        supportLinesOnCue: false,
-        wording: 'A cue here is the practice itself.',
+        supportLinesOnCue: true,
+        wording: null,
       });
     });
 
@@ -469,8 +466,9 @@ describe('DebriefRunnerService', () => {
         expect(prompts).toHaveProperty(code);
       }
       expect(prompts[DEBRIEF_PROMPT_CODES.writer]).toBe('challenger text');
+      // Not named by the release, so pinned to the version current when the release was first used.
       expect(prompts[DEBRIEF_PROMPT_CODES.safetyReader]).toBe(
-        `live ${DEBRIEF_PROMPT_CODES.safetyReader}@current`,
+        `live ${DEBRIEF_PROMPT_CODES.safetyReader}@2`,
       );
     });
 
@@ -616,6 +614,24 @@ describe('DebriefRunnerService', () => {
       expect(practice.optionsFor).toHaveBeenCalledWith(7, 't1', 's1');
     });
 
+    it('a retried run keeps what its earlier attempt spent in its estimate', async () => {
+      const { svc } = build();
+      const failed = {
+        id: 'run-9',
+        scenarioSessionId: 's1',
+        mode: DebriefRunMode.LIVE,
+        status: DebriefRunStatus.RUNNING,
+        skipReason: 'safety_reader_failed',
+        cards: null,
+        fallbackRung: 6,
+        // retryRun stored the first attempt's estimate here before starting the second.
+        workspace: { retries: 1, priorEstimatedUsd: 0.03 },
+      } as any;
+      const run = await svc.retry(failed);
+      // This attempt's 0.0712 plus the first attempt's 0.03.
+      expect(run.estimatedCostUsd).toBe('0.1012');
+    });
+
     it('holds the run for a person at the monthly cap, without calling the graph', async () => {
       const { svc, graph } = build({
         monthToDate: {
@@ -676,6 +692,20 @@ describe('DebriefRunnerService', () => {
       expect(run.workspace?.languageSource).toBe('detected');
     });
 
+    it('a pin that cannot be read fails the attempt: nothing is claimed and the graph is not called', async () => {
+      const { svc, graph } = build({
+        holds: {
+          releaseForSession: jest.fn(async () => {
+            throw new Error('db down');
+          }),
+        },
+      });
+      await expect(
+        svc.run('s1', { mode: DebriefRunMode.LIVE }),
+      ).rejects.toThrow('db down');
+      expect(graph.run).not.toHaveBeenCalled();
+    });
+
     it('reads the case memory for a case session, and debriefs on when an optional read fails', async () => {
       const { svc, request } = build({
         inCase: true,
@@ -686,6 +716,54 @@ describe('DebriefRunnerService', () => {
         'Meena told you about her exams.',
       );
       expect(request().context.live_detections).toEqual([]);
+    });
+
+    it('says what it could not read: the run keeps a note of each failed read', async () => {
+      const { svc, saved } = build({
+        inCase: true,
+        live: new Error('db down'),
+      });
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      const ws = saved[saved.length - 1]?.workspace ?? {};
+      expect(ws.dataNotes).toEqual([
+        {
+          contextKey: 'live_detections',
+          item: 'live_detections',
+          why: 'db down',
+        },
+      ]);
+    });
+
+    it('notes the owner settings falling back to their defaults, and still debriefs', async () => {
+      const { svc, saved } = build({
+        ownerFails: new Error('settings table locked'),
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
+      const ws = saved[saved.length - 1]?.workspace ?? {};
+      expect(ws.dataNotes).toEqual([
+        {
+          contextKey: 'owner_settings',
+          item: null,
+          why: 'settings table locked',
+        },
+      ]);
+    });
+
+    it('records what the run ran: a hash of the release bundle and the prompt version each step used', async () => {
+      const { svc, saved } = build();
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      const run = saved[saved.length - 1];
+      expect(run?.bundleHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(run?.promptVersions).toBeDefined();
+      expect(typeof run?.promptVersions).toBe('object');
+    });
+
+    it('keeps no note when every read worked', async () => {
+      const { svc, saved } = build();
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      const ws = saved[saved.length - 1]?.workspace ?? {};
+      expect(ws).not.toHaveProperty('dataNotes');
     });
   });
 
@@ -840,6 +918,7 @@ describe('DebriefRunnerService', () => {
           framework: expect.objectContaining({ skills: [] }),
           competencies: expect.any(Array),
         }),
+        expect.anything(),
       );
       expect(request().prompts).toHaveProperty(DEBRIEF_PROMPT_CODES.progress);
     });

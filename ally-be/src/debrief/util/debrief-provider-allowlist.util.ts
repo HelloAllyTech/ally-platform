@@ -21,6 +21,13 @@ import {
 export const PROVIDER_ALLOWED_KEY = (p: DebriefProvider) =>
   `providerAllowed.${p}`;
 
+/**
+ * What an organisation's allowlist is when it cannot be read: nothing. A learner's data must never
+ * reach a provider the organisation's contract may forbid, so every reader fails closed through
+ * this one value.
+ */
+export const ALLOWLIST_WHEN_UNREADABLE: DebriefProvider[] = [];
+
 /** The allowlist from an org layer's stored values; every approved provider when nothing is set. */
 export function allowlistFromValues(
   values: Record<string, unknown> | null | undefined,
