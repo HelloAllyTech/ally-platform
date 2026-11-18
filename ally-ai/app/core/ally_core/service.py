@@ -142,3 +142,47 @@ class AllyCoreService:
                 f"is_error={is_error}, stage={stage}, correlation_id={correlation_id}",
             )
             raise
+
+    async def post_note_draft(
+        self,
+        chat_id: int,
+        report: Dict[str, Any],
+        shadow: bool = True,
+        correlation_id: str | None = None,
+    ) -> None:
+        """Deliver a Scribe v2 harness report (POST /api/v1/chats/note-drafts).
+
+        In shadow mode ally-be only stores it for comparison with the v1
+        summary; nothing is shown to the counsellor.
+        """
+        url = f"{self._base_url}/api/v1/chats/note-drafts"
+        headers = {
+            "x-api-key": self._api_key,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        if correlation_id:
+            headers["x-correlation-id"] = correlation_id
+        payload: dict[str, Any] = {
+            "chatId": chat_id,
+            "shadow": shadow,
+            "report": report,
+        }
+        if correlation_id is not None:
+            payload["correlationId"] = correlation_id
+        try:
+            response = await self._client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            # The body may echo the draft back: log the status only.
+            logger.error(
+                f"AllyCore note-drafts failed, status={e.response.status_code}, "
+                f"chat_id={chat_id}, correlation_id={correlation_id}"
+            )
+            raise
+        except httpx.RequestError as e:
+            logger.error(
+                f"AllyCore note-drafts network error={type(e).__name__}, "
+                f"chat_id={chat_id}, correlation_id={correlation_id}"
+            )
+            raise

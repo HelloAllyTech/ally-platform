@@ -474,6 +474,76 @@ class SharedWorkerTypeLayInputs(PromptInputs):
     prompt = PromptInfo(code="ally_ai_shared_worker_type_lay")
 
 
+class ScribeNoteGenerateInputs(PromptInputs):
+    """`scribe_note/generate.txt` — Scribe v2 note harness, the main pass."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scribe_note_generate",
+        name="Scribe note (v2)",
+        description=(
+            "Writes a session note from the transcript: a time-ordered narrative "
+            "and the tenant's AI fields, each citing the turns it rests on."
+        ),
+        category="Scribe",
+    )
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    mode: str
+    note_spec: str
+    budget: str
+    transcript: str
+    context: Optional[str] = None
+    note_language: Optional[str] = None
+
+
+class ScribeNoteMapSegmentInputs(PromptInputs):
+    """`scribe_note/map_segment.txt` — timeline notes for one part of a long
+    session."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scribe_note_map_segment",
+        name="Scribe note (v2): one part of a long session",
+        description=(
+            "Turns one part of a long transcript into time-ordered notes and field "
+            "evidence, which the main pass then writes the note from."
+        ),
+        category="Scribe",
+    )
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    mode: str
+    segment: str
+    note_spec: str
+    transcript: str
+    budget: Optional[str] = None
+    context: Optional[str] = None
+    note_language: Optional[str] = None
+
+
+class ScribeNoteRepairInputs(PromptInputs):
+    """`scribe_note/repair.txt` — one rewrite when the draft falls short."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scribe_note_repair",
+        name="Scribe note (v2): repair",
+        description=(
+            "Rewrites a note draft that missed events from the transcript, keeping "
+            "time order and evidence."
+        ),
+        category="Scribe",
+    )
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    mode: str
+    problem: str
+    draft: str
+    note_spec: str
+    budget: str
+    transcript: str
+    context: Optional[str] = None
+    note_language: Optional[str] = None
+
+
 class SummaryCondenseChunkInputs(PromptInputs):
     """`summary/condense_chunk.txt`."""
 

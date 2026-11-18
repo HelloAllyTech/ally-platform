@@ -224,6 +224,16 @@ def _format_live_notes(live_notes: Optional[List[str]]) -> str:
     return "\n".join(f"- {note}" for note in cleaned)
 
 
+def _output_name(output_class: Any) -> Optional[str]:
+    """A loggable name for a structured-output target: a Pydantic class, or a
+    JSON schema dict (named by its title)."""
+    if output_class is None:
+        return None
+    if isinstance(output_class, dict):
+        return str(output_class.get("title") or "json_schema")
+    return getattr(output_class, "__name__", type(output_class).__name__)
+
+
 def _structured_summary_template_path(session_mode: Optional[str]) -> str:
     """Pick prompt template for post-call structured summary (scribe vs dictation)."""
     if session_mode and str(session_mode).upper() == SCRIBE_SESSION_MODE_DICTATION:
@@ -501,7 +511,7 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
 
         logger.debug(
             "_invoke_llm: waiting for rate_limiter (output_class=%s)",
-            output_class.__name__ if output_class else None,
+            _output_name(output_class),
         )
         await rate_limiter.acquire()
 
@@ -519,7 +529,7 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
 
             logger.info(
                 "_invoke_llm: calling llm.ainvoke (output_class=%s)",
-                output_class.__name__ if output_class else None,
+                _output_name(output_class),
             )
             # Best-effort token-usage capture: a callback aggregates usage even
             # when with_structured_output drops the raw AIMessage. Guarded so a
@@ -600,7 +610,7 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                         logger.warning(
                             "_invoke_llm: model output was too long and could "
                             "not be parsed (output_class=%s): %s",
-                            output_class.__name__ if output_class else None,
+                            _output_name(output_class),
                             str(e),
                         )
                         raise LLMInvocationFailedException(
@@ -611,7 +621,7 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                         "_invoke_llm: unexpected %s during llm.ainvoke "
                         "(output_class=%s): %s",
                         type(e).__name__,
-                        output_class.__name__ if output_class else None,
+                        _output_name(output_class),
                         str(e),
                     )
                     raise LLMInvocationFailedException(
@@ -980,6 +990,53 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
             setattr(response, key, value)
 
         return response
+
+    async def generate_note_draft(
+        self,
+        chat_history: List[Any],
+        request: Any,
+        session_mode: Optional[str] = None,
+        prompts: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Scribe v2: run the note harness over the diarized turns.
+
+        `request` is a NoteHarnessRequest. Returns a HarnessReport; a failure is
+        recorded on the report, never raised, so a shadow run can't affect the
+        v1 summary.
+        """
+        from app.core.note_harness.harness import (
+            GENERATE_PATH,
+            MAP_SEGMENT_PATH,
+            REPAIR_PATH,
+            NoteHarness,
+        )
+        from app.core.note_harness.transcript import turns_from_messages
+
+        tasks = {
+            GENERATE_PATH: LLMTask.SCRIBE_NOTE.value,
+            MAP_SEGMENT_PATH: LLMTask.SCRIBE_NOTE_MAP.value,
+            REPAIR_PATH: LLMTask.SCRIBE_NOTE_REPAIR.value,
+        }
+
+        def render(path: str, **variables: Any) -> str:
+            return load_and_format(path, prompts=prompts, **variables)
+
+        async def invoke(
+            prompt: str, schema: Dict[str, Any], path: str, max_tokens: int
+        ) -> Dict[str, Any]:
+            # max_tokens is recorded on the budget; the client's own limit
+            # applies until the eval settles the model (DESIGN §6.8).
+            return await self._invoke_llm(
+                prompt,
+                cast(Any, schema),
+                task=tasks[path],
+                llm_override=self._client_for(path, prompts),
+            )
+
+        harness = NoteHarness(render=render, invoke=invoke)
+        return await harness.run(
+            turns_from_messages(chat_history), request, session_mode
+        )
 
     def _chat_history_to_str(self, chat_history: List[ChatMessage]) -> str:
         return "\n".join([f"{msg.role}: {msg.content}" for msg in chat_history])
