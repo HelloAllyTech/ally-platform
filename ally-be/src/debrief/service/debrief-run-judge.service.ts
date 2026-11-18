@@ -40,6 +40,9 @@ export const DEBRIEF_JUDGE_INSTRUCTIONS_CODE = 'debrief_quality_judge_system';
  * claim is never taken over; a claim left by a crashed worker frees after it.
  */
 export const JUDGE_CLAIM_STALE_MINUTES = 15;
+/** A run the judge failed on is tried again after this long, doubling each failure up to the cap. */
+export const JUDGE_RETRY_BASE_MINUTES = 15;
+export const JUDGE_RETRY_MAX_MINUTES = 24 * 60;
 
 export interface RunJudgment {
   model: string;
@@ -304,7 +307,17 @@ export class DebriefRunJudgeService {
         // Only runs with no score: taking the newest runs and skipping the
         // scored ones starved every older run (one cleared for re-scoring
         // after a rubric change was never reached).
-        workspace: Raw((w) => `NOT (coalesce(${w}, '{}'::jsonb) ? 'judge')`),
+        // And not one that failed lately: a run the judge cannot score would otherwise sit among
+        // the newest and, with enough of them, keep every older run from being reached. A failure
+        // waits 15 min, then 30, 60 … up to a day before it is tried again.
+        workspace: Raw(
+          (w) => `NOT (coalesce(${w}, '{}'::jsonb) ? 'judge')
+            AND (${w}->>'judgeFailedAt' IS NULL
+                 OR (${w}->>'judgeFailedAt')::timestamptz
+                      < now() - make_interval(mins => LEAST(${JUDGE_RETRY_MAX_MINUTES},
+                          ${JUDGE_RETRY_BASE_MINUTES}
+                          * power(2, LEAST(COALESCE((${w}->>'judgeFailures')::int, 1), 8) - 1))::int))`,
+        ),
       },
       order: { createdAt: 'DESC' },
       take: limit * 3,
@@ -320,9 +333,29 @@ export class DebriefRunJudgeService {
         this.logger.warn(
           `[debrief] judging run ${run.id} failed: ${(e as Error).message}`,
         );
+        await this.noteFailure(run.id);
       }
     }
     return n;
+  }
+
+  /** Counts a failed attempt, so the drain backs off from this run (see `drain`). */
+  private async noteFailure(runId: string): Promise<void> {
+    await this.runs
+      .query(
+        `UPDATE debrief_runs
+            SET workspace = coalesce(workspace, '{}'::jsonb)
+                  || jsonb_build_object(
+                       'judgeFailures', COALESCE((workspace->>'judgeFailures')::int, 0) + 1,
+                       'judgeFailedAt', now())
+          WHERE id = $1 AND (workspace->'judge') IS NULL`,
+        [runId],
+      )
+      .catch((e: Error) =>
+        this.logger.warn(
+          `[debrief] noting the judge failure on run ${runId} failed: ${e.message}`,
+        ),
+      );
   }
 }
 
