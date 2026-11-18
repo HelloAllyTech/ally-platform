@@ -4,6 +4,7 @@ then build the response ally-be gets.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.core.agent_runtime.check.fixes import (
@@ -55,6 +56,10 @@ def check_reply(
     purpose: Optional[str] = None,
     can_book: bool = False,
     personal: str = "",
+    looked_up: bool = False,
+    found_nothing: bool = False,
+    can_pass_on: bool = True,
+    carried: int = 0,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -83,6 +88,10 @@ def check_reply(
         purpose=purpose,
         can_book=can_book,
         personal=personal,
+        looked_up=looked_up,
+        found_nothing=found_nothing,
+        can_pass_on=can_pass_on,
+        carried=carried,
     )
     verdict = _read_draft(step, ctx)
     # A list's times are cited from the run's records before grounding (chunk 6).
@@ -112,7 +121,14 @@ def _read_draft(step: Dict[str, Any], ctx: CheckContext) -> Verdict:
     replied = (step.get("action") or REPLY_ACTION) == REPLY_ACTION
     intent = AgentIntent(step.get("intent") or AgentIntent.DECLINE)
     answer = plain_text(step.get("answer") or "")
-    if replied and intent == AgentIntent.ANSWER and says_it_has_nothing(answer):
+    # "I don't have any slots on Thursday evening" after a find that found none is
+    # the find's answer, not a decline (chunk 6b).
+    if (
+        replied
+        and intent == AgentIntent.ANSWER
+        and not ctx.found_nothing
+        and says_it_has_nothing(answer)
+    ):
         logger.info("Answer opens by saying it has nothing; treating it as a decline")
         intent = AgentIntent.DECLINE
     return Verdict(
@@ -164,7 +180,7 @@ def _relabel(
         verdict.intent == AgentIntent.ANSWER
         and not step.get("citations")
         and ctx.turn_type in ("smalltalk", "about_bot")
-        and not ctx.passages
+        and not ctx.found
         and not factual
         and not about_organisation
     ):
@@ -172,7 +188,7 @@ def _relabel(
         # nothing searched or cited, is small talk: the same text sent as
         # `smalltalk` would pass, so refusing it only swaps in the fixed wording.
         verdict.intent = AgentIntent.SMALLTALK
-    elif verdict.intent == AgentIntent.SMALLTALK and (factual or ctx.passages):
+    elif verdict.intent == AgentIntent.SMALLTALK and (factual or ctx.found):
         # Small talk does not need a source, but this one either states something
         # checkable (a time, a price) or was written after a search found passages:
         # ground it like an answer. Phone numbers, links and emails are checked
@@ -190,7 +206,13 @@ def _require_sources(
     verdict: Verdict, ctx: CheckContext, about_organisation: bool
 ) -> None:
     if verdict.intent == AgentIntent.ANSWER and not verdict.citations:
-        if ctx.general and ctx.searched and not ctx.passages and not about_organisation:
+        if answers_from_empty_find(verdict.answer, ctx):
+            # "Nothing's free on Thursday evening": a find this run found nothing at
+            # the time asked (chunk 6b). An empty find is an answer, not a missing
+            # source; there is no entry to cite, and the reply states no detail a
+            # record of this run doesn't show.
+            verdict.rejection = None
+        elif ctx.general and ctx.searched and not ctx.found and not about_organisation:
             # General knowledge, on a bot allowed it: about something other than
             # the organisation, and only once a search found nothing. Flagged as
             # ungrounded, as today.
@@ -203,18 +225,18 @@ def _require_sources(
         verdict.rejection = None
     elif verdict.model_declined and verdict.rejection is None:
         names_it = ctx.organisation.named_in(ctx.question)
-        if names_it and not ctx.searched:
+        if names_it and not ctx.searched and not ctx.looked_up:
             # "Does Ally store audio?" → "I don't have that": it never looked.
             logger.info("Agent declined about the organisation without searching")
             verdict.rejection = Rejection.SEARCH_FIRST
-        elif ctx.passages and names_it:
+        elif ctx.found and names_it:
             # It searched, found passages about the organisation, and still said
             # it doesn't have it.
             logger.info("Agent declined although a search found passages")
             # A nudge: the passages may be about something else, so a decline the
             # rewrite still chooses is kept in its own words.
             verdict.rejection, verdict.keeps_text = Rejection.USE_FOUND, True
-        elif ctx.can_search_again and ctx.passages and ctx.turn_type == "question":
+        elif ctx.can_search_again and ctx.found and ctx.turn_type == "question":
             # One search, it found passages but not the answer, and the agent gave
             # up. On short web pages the first query often lands on a heading; a
             # second query with other words found the answer every time in the
@@ -222,6 +244,24 @@ def _require_sources(
             # still declines.
             logger.info("Agent declined after one search; searching again")
             verdict.rejection, verdict.keeps_text = Rejection.SEARCH_AGAIN, True
+
+
+_NUMBER = re.compile(r"\d+")
+
+
+def answers_from_empty_find(answer: str, ctx: CheckContext) -> bool:
+    """An uncited reply that a find which found nothing answers (chunk 6b): every
+    number in it (a time, a day of the month) appears in a list record of this run,
+    so it states nothing the run didn't look up."""
+    if not ctx.found_nothing or not answer.strip():
+        return False
+    records = " ".join(
+        f"{p.get('section_path') or ''} {p.get('text') or ''}"
+        for p in ctx.passages
+        if p.get("record_id")
+    )
+    shown = set(_NUMBER.findall(records))
+    return all(number in shown for number in _NUMBER.findall(answer))
 
 
 # ------------------------------------------------------------------ 4. the result
@@ -253,7 +293,7 @@ def _build_result(
         # unanswered queue reads the same as in v1.
         decline_reason = (
             DeclineReason(ctx.search_gate)
-            if ctx.search_gate and not ctx.passages
+            if ctx.search_gate and not ctx.found
             else DeclineReason.MODEL_DECLINED
         )
     else:

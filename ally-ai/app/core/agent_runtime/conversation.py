@@ -14,7 +14,7 @@ from app.core.agent_runtime.prompt import AGENT_PROMPT_PATH, build_agent_prompt
 from app.core.agent_runtime.schemas import step_schema
 from app.core.agent_runtime.state import BotConfig
 from app.core.agent_runtime.tools.base import Tool
-from app.core.agent_runtime.tools.lists import offers_create
+from app.core.agent_runtime.tools.lists import offers_create, takes_details
 from app.core.config import settings
 from app.core.llm.dispatch import generate_structured
 from app.core.llm_usage.tasks import LLMTask
@@ -69,6 +69,7 @@ async def agent_step(
         memory=memory_section(bot, prompts),
         history_lead=history_lead(bot),
         can_book=offers_create(bot.get("gateway_definitions")),
+        takes_details=takes_details(bot.get("gateway_definitions")),
         channel=bot.get("channel"),
     )
     if not prompt:

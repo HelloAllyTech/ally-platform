@@ -104,13 +104,13 @@ describe('FeatureToggleGuard', () => {
     beforeEach(() => {
       reflector.getAllAndOverride.mockReturnValue({
         featureKey: 'builder',
-        alsoAllowedBy: 'product_planning_lead',
+        alsoAllowedBy: 'debrief_clinical_sign_off',
       });
     });
 
     it('lets a holder of the alternate toggle in, and marks the request', async () => {
       featureToggleService.hasToggle.mockImplementation(
-        async (_id: number, key: string) => key === 'product_planning_lead',
+        async (_id: number, key: string) => key === 'debrief_clinical_sign_off',
       );
       const request: any = { user: platformAdmin, query: {} };
       const context = {
@@ -119,7 +119,7 @@ describe('FeatureToggleGuard', () => {
         getClass: () => undefined,
       } as unknown as ExecutionContext;
       await expect(guard.canActivate(context)).resolves.toBe(true);
-      expect(request.viaAlternateToggle).toBe('product_planning_lead');
+      expect(request.viaAlternateToggle).toBe('debrief_clinical_sign_off');
     });
 
     it('still refuses a caller with neither toggle', async () => {

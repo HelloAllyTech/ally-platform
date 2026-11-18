@@ -137,7 +137,11 @@ export const ShareSection: React.FC<SectionProps> = ({ bot, home, canEdit, canMa
         <WhatsAppNumbers bot={bot} canManage={canManage} />
       </Group>
 
-      <HandoverSettingsGroup field={handover} disabled={!canEdit} />
+      <HandoverSettingsGroup
+        field={handover}
+        disabled={!canEdit}
+        zone={home.fields.timeZone?.value}
+      />
 
       <Group title={t.team} hint={t.teamHint} testId="share-team">
         <TeamList botId={bot.id} canManage={canManage} myUserId={myUserId} />

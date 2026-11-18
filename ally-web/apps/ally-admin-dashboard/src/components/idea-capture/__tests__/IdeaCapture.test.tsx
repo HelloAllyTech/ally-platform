@@ -32,20 +32,17 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 vi.mock("@hooks", () => ({
   useUser: () => ({
     permissions: ["vote:admin:product-roadmap"],
-    features: ["product_roadmap", "product_planning_ideas"],
+    features: ["product_roadmap"],
+    user: { restrictedTenantIds: null },
   }),
 }));
 vi.mock("@constants", () => ({
-  FeatureToggleKey: {
-    PRODUCT_ROADMAP: "product_roadmap",
-    PRODUCT_PLANNING_IDEAS: "product_planning_ideas",
-  },
-  Permissions: { VOTE_PRODUCT_ROADMAP: "vote:admin:product-roadmap" },
   ROUTES: { PRODUCT_ROADMAP: "/product-roadmap" },
 }));
 vi.mock("@types", () => ({ IDEA_DRAFT_TEXT_MAX: 4000 }));
-vi.mock("@utils", () => ({
-  hasFeature: (features: string[] = [], key: string) => features.includes(key),
+vi.mock("../../../pages/ProductRoadmap/utils/access", () => ({
+  canFileIdeas: (permissions: string[] = [], features: string[] = []) =>
+    permissions.includes("vote:admin:product-roadmap") && features.includes("product_roadmap"),
 }));
 vi.mock("@api", () => ({
   useCreateRoadmapIdeaDraftMutation: () => [mocks.createDraft, { isLoading: false }],

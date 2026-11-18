@@ -1,3 +1,4 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import type { AgentRunResponse } from '../../../ai/dto/knowledge.dto';
 import { AiUpstreamError } from '../../../ai/exception/ai-upstream.exception';
 import { ErrorCode } from '../../../exception/error-code.enum';
@@ -348,7 +349,7 @@ describe('ChatbotEngineService', () => {
         });
         const decision = await engine.respond(whatsapp());
         expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-        expect(decision.body).toBe(settings.crisisEscalationText);
+        expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
         expect(decision.alert?.type).toBe('Chatbot Crisis Classifier');
         expect(decision.agent?.runId).toBe('run-from-ally-ai');
       });

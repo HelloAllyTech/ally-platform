@@ -4,8 +4,8 @@ import { BOT_ID, mockAssistantHome } from "./assistantHome.fixture";
 
 /**
  * A1 smoke, at 1440 only: logged out → a deep link → the login screen (no sign-up) → back on the
- * deep link; and a custom login whose only feature is Chatbots lands on its assistants, in the
- * sidebar with Assistants as its only page. The API is mocked; no backend is needed.
+ * deep link; and a custom login whose only feature is Chatbots lands on its assistants with no
+ * Sidebar, only its email and Log out (6b, item 31). The API is mocked; no backend is needed.
  */
 test.skip(({ viewport }) => (viewport?.width ?? 0) < 1000, "A1's smoke runs at 1440 only");
 
@@ -43,11 +43,11 @@ async function logIn(page: Page) {
   const count = await digits.count();
   for (let i = 0; i < count; i++) await digits.nth(i).fill(String((i % 9) + 1));
   // The last digit verifies on its own (master's 04f3c2f8b), so there's no Verify to press.
-  // Logged in once the app has moved on from the login screen.
-  await page.waitForURL(url => !url.pathname.startsWith("/login"));
+  // Logged in once the login screen is gone (it may be drawn at /login or at the page they opened).
+  await expect(digits.first()).toBeHidden();
 }
 
-test("logged out: a deep link goes to login (no sign-up), then back to the deep link", async ({
+test("logged out: a deep link shows the login screen at that URL (no sign-up), and stays there after login", async ({
   page,
 }) => {
   await mockAssistantHome(page);
@@ -55,13 +55,16 @@ test("logged out: a deep link goes to login (no sign-up), then back to the deep 
   const deepLink = `/assistants/${BOT_ID}?section=lists&tool=memory`;
 
   await page.goto(deepLink);
-  await expect(page).toHaveURL(/\/login\?next=/);
-  expect(decodeURIComponent(new URL(page.url()).searchParams.get("next") ?? "")).toBe(deepLink);
+  // The login screen is drawn at the URL they opened: no redirect to /login.
+  await expect(page.getByRole("button", { name: "Next" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/assistants/${BOT_ID}\\?section=lists&tool=memory$`));
   await expect(page.getByText(/sign\s*up/i)).toHaveCount(0);
 
   await logIn(page);
   await expect(page).toHaveURL(new RegExp(`/assistants/${BOT_ID}\\?section=lists&tool=memory$`));
-  await expect(page.getByTestId("admin-sidebar")).toBeVisible();
+  // Assistants is all it has, so it sees the assistant alone (6b, item 31).
+  await expect(page.getByTestId("assistant-only-header")).toBeVisible();
+  await expect(page.getByTestId("admin-sidebar")).toHaveCount(0);
 });
 
 test("sign-up links go to the login screen", async ({ page }) => {
@@ -77,16 +80,14 @@ test("a Chatbots-only custom login lands on its assistants and sees nothing else
   await page.goto("/login");
   await logIn(page);
   await expect(page).toHaveURL(/\/assistants$/);
-  // The sidebar, with Assistants as its one page.
-  const nav = page.getByTestId("admin-sidebar").locator("nav li");
-  await expect(nav).toHaveCount(1);
-  await expect(nav).toContainText("Assistants");
+  // No Sidebar: only its email and Log out (6b, item 31).
+  await expect(page.getByTestId("assistant-only-header")).toContainText("asha@clinic.example");
+  await expect(page.getByTestId("assistant-only-logout")).toBeVisible();
+  await expect(page.getByTestId("admin-sidebar")).toHaveCount(0);
 
-  // Ally admin's pages refuse it: Users needs a toggle it doesn't have.
+  // Ally admin's pages aren't there for it: they lead back to its assistants.
   await page.goto("/user-management");
-  await expect(
-    page.getByText(/not accessible|isn't turned on|not turned on/i).first(),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/assistants$/);
 });
 
 test("an old /chatbots link opens the same assistant under /assistants", async ({ page }) => {

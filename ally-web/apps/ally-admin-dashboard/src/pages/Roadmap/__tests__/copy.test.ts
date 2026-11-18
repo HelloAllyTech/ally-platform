@@ -111,9 +111,9 @@ describe("statusLine", () => {
         },
       });
     expect(building({})).toBe("Building ally-be + admin · PR #412 CI passing");
-    expect(
-      building({ waitingForPr: true, externalBuild: { byUserId: 2, at: "2026-11-10" } }),
-    ).toBe("Brief sent to Claude Code by Priya · waiting for a PR");
+    expect(building({ waitingForPr: true, externalBuild: { byUserId: 2, at: "2026-11-10" } })).toBe(
+      "Brief sent to Claude Code by Priya · waiting for a PR",
+    );
     expect(building({ heldReason: "touches a migration" })).toBe("Held: touches a migration");
     expect(building({ releasing: true })).toBe("Merged · releasing");
   });
@@ -142,7 +142,11 @@ describe("whyHereLine", () => {
   const now = new Date("2026-11-09T10:00:00Z").getTime();
   it("writes each reason", () => {
     expect(
-      whyHereLine({ kind: "agentQuestion", phase: "plan", questionPreview: "which learners first?" }),
+      whyHereLine({
+        kind: "agentQuestion",
+        phase: "plan",
+        questionPreview: "which learners first?",
+      }),
     ).toBe("Plan agent asks: which learners first?");
     expect(whyHereLine({ kind: "mention", by: { id: 3, name: "Ana", role: "builder" } })).toBe(
       "Ana asked you",
@@ -171,7 +175,11 @@ describe("trackerModel", () => {
     ]);
   });
   it("replaces the tracker for Declined and Closed", () => {
-    expect(trackerModel("declined")).toEqual({ kind: "terminal", stage: "declined", label: "Declined" });
+    expect(trackerModel("declined")).toEqual({
+      kind: "terminal",
+      stage: "declined",
+      label: "Declined",
+    });
   });
 });
 

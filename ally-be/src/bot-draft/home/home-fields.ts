@@ -32,6 +32,10 @@ import {
 } from '../../chatbot/type/chatbot.type';
 import { SafetyLockedError } from '../safety-pack/safety-lock';
 import { packFor } from '../safety-pack/safety-packs';
+import {
+  assistantZone,
+  isTimeZone,
+} from '../../chatbot/agent-tools/list-tools';
 import { memorySettingsOf } from '../../chatbot/memory/memory-settings';
 import {
   cleanOwnerNeverStore,
@@ -419,6 +423,34 @@ export const HOME_FIELDS = {
       },
     }),
   } as HomeField<HandoverSettings>,
+
+  /**
+   * Where the business is (chunk 6b, item 9): an IANA time zone, Asia/Kolkata until the owner picks
+   * one. Lists, the assistant's "today", Repeat weekly and memory's dates use it; hand-over hours
+   * keep their own zone. Shown in How it works.
+   */
+  timeZone: {
+    read: (s) =>
+      assistantZone({
+        timeZone: s.chatbot.settings?.timeZone,
+        handover: handoverOf(s.chatbot.settings ?? {}),
+      }),
+    parse: (value) => {
+      const zone = typeof value === 'string' ? value.trim() : '';
+      if (!isTimeZone(zone)) {
+        throw new HomeFieldInvalid('Choose a time zone from the list.');
+      }
+      return zone;
+    },
+    write: (value, s) => ({
+      chatbot: {
+        settings: {
+          ...(s.chatbot.settings ?? {}),
+          timeZone: value,
+        } as ChatbotSettingsOverride,
+      },
+    }),
+  } as HomeField<string>,
 
   /**
    * Remember people between chats (chunk 8a), off by default, and the things it must never remember.

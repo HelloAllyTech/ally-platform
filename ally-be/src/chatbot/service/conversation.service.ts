@@ -477,6 +477,8 @@ export class ConversationService {
     ).map((row) => row.contactId);
     // What the assistant remembered about them, and their chats' summaries (chunk 8a).
     await this.dropMemory([...new Set(contactIds)], conversationIds);
+    // Their entries in the bot's lists (chunk 6b).
+    await this.dropListEntries([...new Set(contactIds)]);
     await this.eraseIdentities([...new Set(contactIds)], channel, placeholders);
   }
 
@@ -504,6 +506,8 @@ export class ConversationService {
       await this.dropToolRuns(conversationIds);
     }
     await this.dropMemory([contactId], conversationIds);
+    // Their entries in the bot's lists (chunk 6b).
+    await this.dropListEntries([contactId]);
     await this.dataSource.query(
       `UPDATE chatbot_contacts SET display_name = NULL, "updatedAt" = now() WHERE id = $1`,
       [contactId],
@@ -620,6 +624,63 @@ export class ConversationService {
   }
 
   // ──────────────────────────────────────────────────────────────── plumbing
+
+  /**
+   * A person's entries in the bot's lists, on erasure (chunk 6b, item 13): every entry of a list
+   * whose person field is them is deleted, with its history; any other relation-to-contact field
+   * that points at them is blanked, in the entry and in its history. Only on an explicit erase,
+   * never from the retention sweep (`blankBefore`): entries are business data with no retention.
+   * One transaction, so an entry is never left half-erased.
+   */
+  private async dropListEntries(contactIds: string[]): Promise<void> {
+    if (!contactIds.length) return;
+    await this.dataSource.transaction(async (m) => {
+      const owned: { id: string }[] = await m.query(
+        `SELECT id FROM collection_records WHERE contact_id = ANY($1::uuid[]) FOR UPDATE`,
+        [contactIds],
+      );
+      const ownedIds = owned.map((r) => r.id);
+      if (ownedIds.length) {
+        await m.query(
+          `DELETE FROM record_events WHERE record_id = ANY($1::uuid[])`,
+          [ownedIds],
+        );
+        // record_links go with their record (ON DELETE CASCADE).
+        await m.query(
+          `DELETE FROM collection_records WHERE id = ANY($1::uuid[])`,
+          [ownedIds],
+        );
+      }
+      const pointing: {
+        record_id: string;
+        field_key: string;
+        target_id: string;
+      }[] = await m.query(
+        `SELECT record_id, field_key, target_id::text AS target_id FROM record_links
+            WHERE target_kind = 'contact' AND target_id = ANY($1::uuid[])`,
+        [contactIds],
+      );
+      for (const link of pointing) {
+        await m.query(
+          `UPDATE collection_records
+              SET data = data - $2::text, "updatedAt" = now()
+            WHERE id = $1 AND data->>$2::text = $3`,
+          [link.record_id, link.field_key, link.target_id],
+        );
+        await m.query(
+          `UPDATE record_events
+              SET before = CASE WHEN before->>$2::text = $3 THEN before - $2::text ELSE before END,
+                  after  = CASE WHEN after->>$2::text  = $3 THEN after  - $2::text ELSE after  END
+            WHERE record_id = $1`,
+          [link.record_id, link.field_key, link.target_id],
+        );
+      }
+      await m.query(
+        `DELETE FROM record_links WHERE target_kind = 'contact' AND target_id = ANY($1::uuid[])`,
+        [contactIds],
+      );
+    });
+  }
 
   /** A person's memory lines and their chats' rolling summaries (chunk 8a), on erasure. */
   private async dropMemory(

@@ -68,7 +68,8 @@ unhelpful behaviours and each competency listed, assessed through its \
 behaviours and named by the competency's name, or by the behaviour itself \
 when it belongs to no named competency. These come first and carry the \
 debrief. Add a skill from the SKILL FRAMEWORK below, writing its exact \
-key (as listed there) in that item's skill field, only when it clearly shaped this session and the roleplay's \
+key (as listed there) in that item's skill field, only when it clearly shaped \
+this session and the roleplay's \
 own expectations do not already cover it. When SKILL FRAMEWORK is none, use \
 only the roleplay's own behaviours and competencies. When the roleplay \
 lists no behaviours and no competencies, use the skills from the SKILL \

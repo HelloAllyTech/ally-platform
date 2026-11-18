@@ -6,13 +6,13 @@ import { toast } from "sonner";
 
 import { ANALYTICS_EVENTS, ANALYTICS_PROPS, Tooltip, useAnalytics } from "@ally-ui-mono/ui-shared";
 import { useCreateRoadmapIdeaDraftMutation, useTranscribeRoadmapIdeaMutation } from "@api";
-import { FeatureToggleKey, Permissions, ROUTES } from "@constants";
+import { ROUTES } from "@constants";
 import { useUser } from "@hooks";
 import { useSpeechCapture } from "@hooks/useSpeechCapture";
 import { IDEA_DRAFT_TEXT_MAX } from "@types";
-import { hasFeature } from "@utils";
 
 import { MicBulbIcon } from "./MicBulbIcon";
+import { canFileIdeas } from "../../pages/ProductRoadmap/utils/access";
 
 const UNSENT_KEY = "ally-admin-idea-capture-unsent";
 const REVEAL_MS = 650;
@@ -64,16 +64,13 @@ const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).leng
  * after the speaker pauses. Until it does, an animated ellipsis sits where the next words will
  * appear, so the lag reads as "working", not "broken". Save waits for any phrase still in flight.
  *
- * Access mirrors filing an opportunity (the VOTE permission, the roadmap toggle and Product
- * Planning — Ideas), because the draft endpoints do; anyone else never sees the button.
+ * Access mirrors filing an opportunity (the VOTE permission and the Roadmap Idea role or
+ * above), because the draft endpoints do; anyone else never sees the button.
  */
 export const IdeaCaptureLauncher: React.FC = () => {
-  const { permissions, features } = useUser();
-  const allowed =
-    !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP) &&
-    hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP) &&
-    // Parking an idea is filing's first step: Product Planning — Ideas, as ally-be checks.
-    hasFeature(features, FeatureToggleKey.PRODUCT_PLANNING_IDEAS);
+  const { permissions, features, user } = useUser();
+  // Parking an idea is filing's first step: the Idea role (or above), as ally-be checks.
+  const allowed = canFileIdeas(permissions, features, user?.restrictedTenantIds != null);
 
   const navigate = useNavigate();
   const { track } = useAnalytics();

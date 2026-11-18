@@ -21,6 +21,7 @@ import {
   todayFor,
 } from '../agent-tools/list-tools';
 import { handoverOf } from '../handover/handover';
+import { assistantZone } from '../agent-tools/list-tools';
 import {
   isPreviewConversation,
   ListToolsService,
@@ -170,16 +171,18 @@ export class AgentRuntimeRunner {
         shown,
       );
       withGateway = Boolean(body.gateway);
-      const response =
-        live && turn.channel.capabilities?.streaming
-          ? await this.aiService.runAgentStreaming(
-              body,
-              (event) => live.onEvent(event),
-              live.signal,
-            )
-          : await this.aiService.runAgent(body);
+      const streamed = Boolean(live && turn.channel.capabilities?.streaming);
+      const response = streamed
+        ? await this.aiService.runAgentStreaming(
+            // Live steps (chunk 6b): only a streamed run, the bot page's or Try it's, asks for
+            // them; WhatsApp can't stream, so its request is unchanged.
+            { ...body, activity: true },
+            (event) => live!.onEvent(event),
+            live!.signal,
+          )
+        : await this.aiService.runAgent(body);
       if (!response?.intent) throw new MalformedAgentResponseError();
-      const { trace, run_id, memory_writes, ...answer } = response;
+      const { trace, run_id, memory_writes, activity, ...answer } = response;
       return {
         response: { ...answer, retrieval: withoutDebugIds(answer.retrieval) },
         latencyMs: Date.now() - startedAt,
@@ -192,6 +195,7 @@ export class AgentRuntimeRunner {
           ...(memory_writes?.length
             ? { memory: { writes: memory_writes, refs: shown.refs } }
             : {}),
+          ...(activity?.length ? { activity } : {}),
         },
       };
     } catch (error) {
@@ -263,7 +267,10 @@ export class AgentRuntimeRunner {
             turn.chatbot,
             turn.contactId,
             run.conversationId,
-            handoverOf(turn.settings).hours?.timeZone,
+            assistantZone({
+              timeZone: turn.chatbot.settings?.timeZone,
+              handover: handoverOf(turn.settings),
+            }),
           )
         : Promise.resolve({ fields: {}, refs: {} }),
     ]);
@@ -305,7 +312,10 @@ export class AgentRuntimeRunner {
               definitions: lists.definitions,
               today: todayFor(
                 new Date(),
-                handoverOf(turn.settings).hours?.timeZone,
+                assistantZone({
+                  timeZone: turn.chatbot.settings?.timeZone,
+                  handover: handoverOf(turn.settings),
+                }),
               ),
             }
           : {}),

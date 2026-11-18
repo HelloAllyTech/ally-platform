@@ -127,8 +127,10 @@ export const ChatbotsLegacyRedirect: React.FC = () => {
  * One assistant: the assistant home (chunk 20d), edge to edge. The classic tabbed page went in CL1;
  * an old `?view=classic` link opens the home, and its `tab=` still lands on the right section.
  */
+// No Chatbots switch needed (chunk 6b): being on the assistant's team is enough, and ally-be answers
+// 404 to anyone who isn't, which the home shows as "You don't have access".
 const ChatbotDetailRoute: React.FC = () => (
-  <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
+  <PrivateLayout fullBleed>
     <AssistantHome />
   </PrivateLayout>
 );
@@ -952,7 +954,8 @@ export const RouteLayout: React.FC = () => {
             path={ROUTES.WHATSAPP_BOT}
             element={
               // Full bleed, as the assistant home: the page draws its own background to the edges.
-              <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
+              // Open to anyone signed in (chunk 6b): it lists only the assistants they're on.
+              <PrivateLayout fullBleed>
                 <WhatsAppBot />
               </PrivateLayout>
             }

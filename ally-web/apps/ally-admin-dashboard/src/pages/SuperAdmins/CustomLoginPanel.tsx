@@ -57,6 +57,9 @@ export const CustomLoginPanel: React.FC<{
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [tenantId, setTenantId] = useState("");
+  const allyTenant = (tenants?.data ?? []).find(
+    tenant => tenant.name.trim().toLowerCase() === "ally",
+  );
   const [ticked, setTicked] = useState<Set<string>>(
     () => new Set(edit ? [] : [FeatureToggleKey.WHATSAPP_BOT]),
   );
@@ -172,6 +175,8 @@ export const CustomLoginPanel: React.FC<{
                   data-testid="custom-login-organisation"
                 >
                   <option value="">{t().choose}</option>
+                  {/* No organisation (6b): Ally's own, where the Ally admins already are. */}
+                  {allyTenant && <option value={allyTenant.id}>{t().noOrganisation}</option>}
                   {(tenants?.data ?? []).map(tenant => (
                     <option key={tenant.id} value={tenant.id}>
                       {tenant.name}

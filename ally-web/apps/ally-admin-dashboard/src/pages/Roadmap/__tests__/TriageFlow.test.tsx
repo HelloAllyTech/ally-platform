@@ -24,14 +24,32 @@ vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
   useSetRoadmapLeadMutation: () => [unwrapOf(vi.fn())],
   useStartRoadmapPlanningMutation: () => [unwrapOf(mockStart), { isLoading: false }],
   useGetRoadmapItemSimilarQuery: () => ({
-    data: { matches: [{ code: "OPP-212", title: "Nudge", shownStage: "accepted", votes: 32, reason: "" }] },
+    data: {
+      matches: [{ code: "OPP-212", title: "Nudge", shownStage: "accepted", votes: 32, reason: "" }],
+    },
   }),
   useGetRoadmapLeadSuggestionsQuery: () => ({
     data: {
       suggestedUserId: 7,
       candidates: [
-        { user: { id: 3, name: "Ana", role: "builder" }, leading: 3, limit: 3, freeSlots: 0, appsTouched: [], matchingIdeas: 0, score: 10 },
-        { user: { id: 7, name: "Priya", role: "builder" }, leading: 1, limit: 3, freeSlots: 2, appsTouched: ["admin"], matchingIdeas: 4, score: 5 },
+        {
+          user: { id: 3, name: "Ana", role: "builder" },
+          leading: 3,
+          limit: 3,
+          freeSlots: 0,
+          appsTouched: [],
+          matchingIdeas: 0,
+          score: 10,
+        },
+        {
+          user: { id: 7, name: "Priya", role: "builder" },
+          leading: 1,
+          limit: 3,
+          freeSlots: 2,
+          appsTouched: ["admin"],
+          matchingIdeas: 4,
+          score: 5,
+        },
       ],
     },
     isLoading: false,
@@ -42,7 +60,9 @@ vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGetRoadmapItemQuery: (code: string) => ({ data: detail(code), isLoading: false }),
 }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), custom: vi.fn(), dismiss: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), custom: vi.fn(), dismiss: vi.fn() },
+}));
 
 import { toast } from "sonner";
 
@@ -123,16 +143,26 @@ describe("To triage (§4.6)", () => {
     const pane = screen.getByRole("article");
     expect(within(pane).getByText("Learners mid-course")).toBeInTheDocument();
     expect(within(pane).getByText("OPP-212")).toBeInTheDocument();
-    expect(within(pane).getByRole("button", { name: en.roadmapV2.review.accept })).toBeInTheDocument();
-    expect(within(pane).getByRole("button", { name: en.roadmapV2.review.acceptWithLead })).toBeInTheDocument();
-    expect(within(pane).getByRole("button", { name: en.roadmapV2.review.decline })).toBeInTheDocument();
+    expect(
+      within(pane).getByRole("button", { name: en.roadmapV2.review.accept }),
+    ).toBeInTheDocument();
+    expect(
+      within(pane).getByRole("button", { name: en.roadmapV2.review.acceptWithLead }),
+    ).toBeInTheDocument();
+    expect(
+      within(pane).getByRole("button", { name: en.roadmapV2.review.decline }),
+    ).toBeInTheDocument();
   });
 
   it("A accepts the selected idea and offers an 8-second undo", async () => {
     renderTriage();
     fireEvent.keyDown(window, { key: "a" });
-    await waitFor(() => expect(mockReview).toHaveBeenCalledWith({ code: "OPP-414", decision: "accept" }));
-    await waitFor(() => expect(toast.custom).toHaveBeenCalledWith(expect.any(Function), { duration: 8_000 }));
+    await waitFor(() =>
+      expect(mockReview).toHaveBeenCalledWith({ code: "OPP-414", decision: "accept" }),
+    );
+    await waitFor(() =>
+      expect(toast.custom).toHaveBeenCalledWith(expect.any(Function), { duration: 8_000 }),
+    );
   });
 
   it("X selects rows, then A applies to all of them in one batch", async () => {
@@ -156,7 +186,9 @@ describe("To triage (§4.6)", () => {
       </Provider>,
     );
     fireEvent.keyDown(window, { key: "x" });
-    expect(await screen.findByRole("region", { name: en.roadmapV2.triage.selected(2) })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: en.roadmapV2.triage.selected(2) }),
+    ).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "a" });
     await waitFor(() =>
       expect(mockBatch).toHaveBeenCalledWith([
@@ -182,7 +214,9 @@ describe("To triage (§4.6)", () => {
 
   it("phone and tablet get Review mode, not bulk select", () => {
     renderTriage({ breakpoint: "phone" });
-    expect(screen.getByRole("button", { name: en.roadmapV2.triage.reviewMode })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: en.roadmapV2.triage.reviewMode }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(en.roadmapV2.triage.keysHint)).not.toBeInTheDocument();
   });
 });
@@ -201,9 +235,13 @@ describe("the decline box", () => {
     );
     const box = await screen.findByLabelText(en.roadmapV2.review.declineReason);
     await waitFor(() => expect(box).toHaveValue(en.roadmapV2.review.templates.overlaps("OPP-212")));
-    fireEvent.click(screen.getAllByRole("button", { name: en.roadmapV2.review.declineSend }).at(-1)!);
+    fireEvent.click(
+      screen.getAllByRole("button", { name: en.roadmapV2.review.declineSend }).at(-1)!,
+    );
     await waitFor(() =>
-      expect(onDecline).toHaveBeenCalledWith({ "OPP-414": en.roadmapV2.review.templates.overlaps("OPP-212") }),
+      expect(onDecline).toHaveBeenCalledWith({
+        "OPP-414": en.roadmapV2.review.templates.overlaps("OPP-212"),
+      }),
     );
   });
 });
@@ -216,7 +254,9 @@ describe("the lead picker", () => {
     expect(radios[0]).toBeChecked();
     expect(screen.getByText("2 of 3 slots free · built 4 admin ideas")).toBeInTheDocument();
     expect(screen.getByText(en.roadmapV2.review.leadFull)).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("button", { name: en.roadmapV2.review.leadConfirm }).at(-1)!);
+    fireEvent.click(
+      screen.getAllByRole("button", { name: en.roadmapV2.review.leadConfirm }).at(-1)!,
+    );
     await waitFor(() => expect(onPick).toHaveBeenCalledWith({ id: 7, name: "Priya" }));
   });
 });
@@ -258,14 +298,24 @@ describe("the idea page's primary action (P3 / P3b)", () => {
   });
 
   it("the author of a declined idea gets New idea; others get nothing", () => {
-    const declined = { shownStage: "declined" as const, statusParts: { stage: "declined" as const, byUserId: 9, at: null } };
+    const declined = {
+      shownStage: "declined" as const,
+      statusParts: { stage: "declined" as const, byUserId: 9, at: null },
+    };
     const author = wrap(
-      <PrimaryAction item={detail("OPP-9", { ...declined, can: {}, declineReason: "Needs evidence" })} onApproveDesign={vi.fn()} />,
+      <PrimaryAction
+        item={detail("OPP-9", { ...declined, can: {}, declineReason: "Needs evidence" })}
+        onApproveDesign={vi.fn()}
+      />,
     );
     expect(screen.getByRole("button", { name: en.roadmapV2.newIdea.button })).toBeInTheDocument();
     author.unmount();
-    wrap(<PrimaryAction item={detail("OPP-9", { ...declined, can: {} })} onApproveDesign={vi.fn()} />);
-    expect(screen.queryByRole("button", { name: en.roadmapV2.newIdea.button })).not.toBeInTheDocument();
+    wrap(
+      <PrimaryAction item={detail("OPP-9", { ...declined, can: {} })} onApproveDesign={vi.fn()} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: en.roadmapV2.newIdea.button }),
+    ).not.toBeInTheDocument();
   });
 
   it("reduced motion: triage rows render the same rows and actions", () => {

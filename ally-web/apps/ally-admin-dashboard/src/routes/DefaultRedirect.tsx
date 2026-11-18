@@ -8,8 +8,9 @@ import {
   useGetUserPreferencesQuery,
   useGetCharacterLibraryEnabledQuery,
   useGetFeatureTogglesQuery,
+  useGetChatbotsQuery,
 } from "@api";
-import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle, en } from "@constants";
+import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle, SIDEBAR_ITEMS, en } from "@constants";
 // Import the specific module rather than the "@utils" barrel: the barrel pulls
 // in Redux-logger and component dependencies that this root-path redirect has no
 // need for, and would otherwise bloat its chunk.
@@ -63,6 +64,9 @@ export const DefaultRedirect: React.FC = () => {
   const { data: features, isLoading: isFeaturesLoading } = useGetFeatureTogglesQuery(undefined, {
     skip: !isAuthenticated,
   });
+  // The assistants whose team they're on (chunk 6b): someone with nothing else lands on them.
+  const { data: assistants } = useGetChatbotsQuery(undefined, { skip: !isAuthenticated });
+  const onATeam = Boolean(assistants?.chatbots?.length);
 
   // Post-login, these gates have been seen to never clear (white page at "/",
   // reported 2026-11-10): rather than render nothing forever, show a spinner
@@ -133,7 +137,11 @@ export const DefaultRedirect: React.FC = () => {
     },
   });
 
-  if (!items.length && enabledFeatures.includes(FeatureToggleKey.WHATSAPP_BOT)) {
+  // Nothing in the navigation but their assistants (chunk 6b): they land on those. With Chatbots
+  // switched on, the assistants page also lets them make one.
+  const onlyAssistants =
+    !items.length || (items.length === 1 && items[0].id === SIDEBAR_ITEMS.WHATSAPP_BOT);
+  if (onlyAssistants && (onATeam || enabledFeatures.includes(FeatureToggleKey.WHATSAPP_BOT))) {
     return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
   }
 

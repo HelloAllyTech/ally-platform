@@ -264,7 +264,10 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
             value={boolLabel}
             valueClassName={`${isEditable ? "text-typography-900" : "text-typography-800"} text-lg font-primary`}
             onChange={v =>
-              handleChange(field.fieldDefinitionId, v === "Yes" ? "true" : v === "No" ? "false" : null)
+              handleChange(
+                field.fieldDefinitionId,
+                v === "Yes" ? "true" : v === "No" ? "false" : null,
+              )
             }
             options={["--", "Yes", "No"]}
           />

@@ -1,4 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
+import { crisisReply } from '../../bot-draft/safety-pack/safety-packs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type {
@@ -69,8 +70,38 @@ export const AGENT_PROMPT_CODES = [
   AGENT_SYSTEM_PROMPT_CODE,
   // What it knows about the person (chunk 8a); used only when the bot's memory is on.
   'ally_ai_agent_memory',
+  // How it uses the business's lists (chunk 6). Missing until 6b, so a run always used the
+  // default text in ally-ai's code, never the Skills Store's live version.
+  'ally_ai_agent_lists',
 ];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
+
+/**
+ * The crisis reply (chunk 6b, item 25): `crisisReply`, which always carries a phone number. The
+ * bot's own wording is its crisis text, or its own crisis keyword template on the keyword path; the
+ * platform's text and templates are never sent. The same on the keyword and the classifier paths.
+ */
+export function crisisTextFor(
+  turn: Pick<ChatTurn, 'chatbot' | 'settings'>,
+  template?: { chatbotId?: string | null; responseText?: string | null } | null,
+): string {
+  const fill = (text: string) =>
+    text.replace(
+      /\{helpline_numbers\}/g,
+      turn.settings.helplineNumbers || 'your local crisis line',
+    );
+  const ownTemplate =
+    template?.chatbotId && template.chatbotId === turn.chatbot.id
+      ? template.responseText?.trim()
+      : '';
+  const ownText = turn.chatbot.settings?.crisisEscalationText?.trim();
+  const own = ownTemplate || ownText;
+  return crisisReply({
+    pack: turn.chatbot.safetyPack,
+    helplineNumbers: turn.settings.helplineNumbers,
+    own: own ? fill(own) : null,
+  });
+}
 
 /** Purposes with a section of their own in the Skills Store (chunk 20a-2). */
 const PURPOSE_SECTIONS = new Set(['answer', 'enquiries', 'training', 'guide']);
@@ -83,13 +114,18 @@ export function purposePromptCodes(purpose?: string | null): string[] {
 }
 
 /**
- * Bring in customers' variant for an assistant that can book (chunk 8a): loaded with the purpose,
- * and ally-ai picks it when the run offers a create tool.
+ * A purpose's variant for an assistant with list tools, loaded with the purpose; ally-ai picks it
+ * from the tools the run offers. Bring in customers when it can book (chunk 8a); Answer questions
+ * when it can save a person's details for the team (chunk 6b: a create on a list `takes_details`).
  */
 export function bookingPurposePromptCodes(purpose?: string | null): string[] {
-  return purpose === 'enquiries'
-    ? ['ally_ai_agent_purpose_enquiries_can_book']
-    : [];
+  if (purpose === 'enquiries') {
+    return ['ally_ai_agent_purpose_enquiries_can_book'];
+  }
+  if (purpose === 'answer') {
+    return ['ally_ai_agent_purpose_answer_takes_details'];
+  }
+  return [];
 }
 /** Used by bots allowed to answer beyond their documents. */
 const GENERAL_ANSWER_PROMPT_CODE = 'ally_ai_knowledge_answer_general';
@@ -250,15 +286,16 @@ export class ChatbotEngineService {
   /** The fixed safety reply for a crisis keyword, with its Slack alert. */
   private keywordCrisis(
     turn: ChatTurn,
-    template: { id: string; responseText?: string | null },
+    template: {
+      id: string;
+      responseText?: string | null;
+      chatbotId?: string | null;
+    },
   ): ChatbotDecision {
-    const { chatbot, settings, sender } = turn;
+    const { chatbot, sender } = turn;
     return {
       handledBy: WaHandledBy.CRISIS,
-      body: this.settingsService.renderPlaceholders(
-        template.responseText || settings.crisisEscalationText,
-        settings,
-      ),
+      body: crisisTextFor(turn, template),
       templateId: template.id,
       alert: this.alert(
         200,
@@ -506,7 +543,7 @@ export class ChatbotEngineService {
     ran: PromptsRan,
     { notOnList }: { notOnList: boolean },
   ): ChatbotDecision {
-    const { chatbot, settings, sender } = turn;
+    const { chatbot, sender } = turn;
     const who = notOnList ? ' for a sender who is not on its list' : '';
     const outcome = notOnList
       ? 'The fixed safety reply was sent. The sender is not linked to an Ally account, so the ' +
@@ -514,10 +551,7 @@ export class ChatbotEngineService {
       : 'The fixed safety reply was sent and the answer was discarded.';
     return {
       handledBy: WaHandledBy.CRISIS,
-      body: this.settingsService.renderPlaceholders(
-        settings.crisisEscalationText,
-        settings,
-      ),
+      body: crisisTextFor(turn),
       retrievalMeta: { ...ran },
       alert: this.alert(
         200,

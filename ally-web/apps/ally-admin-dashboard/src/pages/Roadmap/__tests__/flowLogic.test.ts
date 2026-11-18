@@ -41,7 +41,9 @@ describe("findQuote (the source-sentence highlight)", () => {
     const text = "Learners drop off after their FIRST   roleplay because it’s hard.";
     const range = findQuote(text, "after their first roleplay because it's hard.");
     expect(range).not.toBeNull();
-    expect(text.slice(range!.start, range!.end)).toBe("after their FIRST   roleplay because it’s hard");
+    expect(text.slice(range!.start, range!.end)).toBe(
+      "after their FIRST   roleplay because it’s hard",
+    );
   });
 
   it("returns null for a paraphrase", () => {
@@ -87,8 +89,12 @@ describe("dictation helpers", () => {
   });
 
   it("maps the idea cap to its own state and anything else to failed", () => {
-    expect(dictationErrorState({ status: 409, data: { code: "idea_cap_reached" } })).toBe("capReached");
-    expect(dictationErrorState({ status: 502, data: { code: "transcription_failed" } })).toBe("failed");
+    expect(dictationErrorState({ status: 409, data: { code: "idea_cap_reached" } })).toBe(
+      "capReached",
+    );
+    expect(dictationErrorState({ status: 502, data: { code: "transcription_failed" } })).toBe(
+      "failed",
+    );
   });
 
   it("types the words in (or lands them at once under reduced motion) with a space between", () => {
@@ -132,7 +138,11 @@ describe("triage helpers", () => {
   });
 
   it("puts the suggested lead first and explains why", () => {
-    const c = (id: number, score: number, extra: Partial<RoadmapLeadCandidate> = {}): RoadmapLeadCandidate => ({
+    const c = (
+      id: number,
+      score: number,
+      extra: Partial<RoadmapLeadCandidate> = {},
+    ): RoadmapLeadCandidate => ({
       user: { id, name: `P${id}`, role: "builder" },
       leading: 1,
       limit: 3,
@@ -201,7 +211,9 @@ describe("comments and mentions", () => {
     ] as BuilderChatMessage[];
     expect(planStartFeedIndex(feed, rows)).toBe(1);
     expect(planStartFeedIndex(feed, [rows[1]])).toBe(-1);
-    expect(isPlanPost({ ...rows[0], metadata: { planPost: { kind: "answer" } } } as never)).toBe(true);
+    expect(isPlanPost({ ...rows[0], metadata: { planPost: { kind: "answer" } } } as never)).toBe(
+      true,
+    );
   });
 });
 

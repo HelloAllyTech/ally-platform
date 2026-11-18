@@ -10,6 +10,7 @@ from app.core.agent_runtime import memory
 from app.core.agent_runtime.prompt import build_agent_prompt
 from app.core.agent_runtime.schemas import step_schema
 from app.core.agent_runtime.tools import allowed_tools
+from app.core.agent_runtime.tools.lists import takes_details
 from app.core.memory_lines import service as memory_lines
 from app.schemas.agent_runtime import AgentRunRequest, AgentRunResponse
 
@@ -36,6 +37,7 @@ def prompt_for(bot, **kw):
         memory=memory.memory_section(bot),
         history_lead=memory.history_lead(bot),
         can_book=memory.offers_create(bot.get("gateway_definitions")),
+        takes_details=takes_details(bot.get("gateway_definitions")),
         channel=bot.get("channel"),
         **kw,
     )
@@ -124,27 +126,73 @@ class TestPrompt:
         assert summary in prompt
 
 
+VARIANT = "you book it for them in the organisation's lists"
+TAKES = "offer to take their details so the team can get back to them"
+CREATE_LEADS = {
+    "name": "create_leads",
+    "description": "Add an entry to Leads for the person in this chat.",
+    "kind": "create",
+    "input_schema": {"type": "object", "properties": {}},
+    "takes_details": True,
+}
+
+
 class TestCanBook:
     def test_bring_in_customers_with_a_create_tool_gets_the_booking_variant(self):
         bot = lists_bot(persona={"purpose": "enquiries"}, channel="whatsapp")
         prompt = prompt_for(bot)
-        assert "book it yourself once they've confirmed" in prompt
+        assert VARIANT in prompt
         assert "You're talking with them on WhatsApp." in prompt
         assert "say the team will confirm what's free" not in prompt
+        # Chunk 6b: the booking rules are the lists section's, for every purpose.
+        assert "book it yourself straight away" in prompt
 
     def test_without_a_create_tool_it_keeps_todays_text(self):
         bot = lists_bot(FIND_SLOTS, persona={"purpose": "enquiries"})
         prompt = prompt_for(bot)
         assert "say the team will confirm what's free" in prompt
-        assert "book it yourself" not in prompt
+        assert VARIANT not in prompt
 
-    def test_other_purposes_are_unchanged_by_a_create_tool(self):
+    def test_other_purposes_get_the_booking_rules_from_the_lists_section(self):
         prompt = prompt_for(lists_bot(persona={"purpose": "answer"}))
-        assert "book it yourself" not in prompt
+        assert VARIANT not in prompt
+        assert "book it yourself straight away" in prompt
+        assert "Ask for an optional detail at most once." in prompt
 
     def test_the_website_is_named_off_whatsapp(self):
         prompt = prompt_for(lists_bot(persona={"purpose": "enquiries"}, channel="web"))
         assert "You're talking with them on the website." in prompt
+
+
+class TestTakesDetails:
+    """Chunk 6b, item 29: Answer questions offers to take a person's details when
+    it can't answer, only on an assistant with a create tool on such a list."""
+
+    def test_answer_with_a_list_that_takes_details_gets_the_variant(self):
+        prompt = prompt_for(
+            lists_bot(CREATE_LEADS, persona={"purpose": "answer"}, channel="whatsapp")
+        )
+        assert TAKES in prompt
+        assert "never ask for their phone number" in prompt
+        assert "You answer questions about this organisation" in prompt
+
+    def test_without_one_the_answer_section_is_byte_identical(self):
+        from app.core.knowledge_agent.prompt import format_purpose
+
+        plain = format_purpose({"purpose": "answer"})
+        create = {**CREATE_LEADS, "takes_details": False}
+        for bot in (
+            make_bot(persona={"purpose": "answer"}),
+            lists_bot(persona={"purpose": "answer"}),
+            lists_bot(create, persona={"purpose": "answer"}),
+        ):
+            prompt = prompt_for(bot)
+            assert plain in prompt and TAKES not in prompt
+
+    def test_other_purposes_never_get_it(self):
+        for purpose in ("enquiries", "training", "guide"):
+            prompt = prompt_for(lists_bot(CREATE_LEADS, persona={"purpose": purpose}))
+            assert TAKES not in prompt
 
 
 class TestRememberMode:
@@ -504,3 +552,33 @@ class TestMoreTimeAfterAWrite:
             later = cap.when()
             extend_after_write(time.time() - 100)  # would be earlier: ignored
             assert cap.when() == later
+
+
+class TestSystemChannel:
+    """Chunk 6b: the system prompt's first line names the run's channel; on WhatsApp
+    it's exactly what it was, and nothing else in the prompt changes."""
+
+    BEFORE = (
+        "You are the assistant described above, chatting with someone over WhatsApp "
+        "on behalf of the organisation that runs you."
+    )
+
+    def test_whatsapp_is_byte_identical_to_before(self):
+        whatsapp = prompt_for(make_bot(channel="whatsapp"))
+        assert self.BEFORE in whatsapp
+
+    def test_other_channels_change_only_those_words(self):
+        whatsapp = prompt_for(make_bot(channel="whatsapp"))
+        web = prompt_for(make_bot(channel="web"))
+        test = prompt_for(make_bot(channel="test"))
+        assert "chatting with someone on the website on behalf" in web
+        assert "chatting with someone in this chat on behalf" in test
+        assert web.replace("on the website", "over WhatsApp", 1) == whatsapp
+        assert test.replace("in this chat", "over WhatsApp", 1) == whatsapp
+
+    def test_the_seed_differs_from_before_only_in_the_channel(self):
+        from pathlib import Path
+
+        seed = Path("app/prompts/agent/system.txt").read_text()
+        assert seed.replace("{channel}", "over WhatsApp", 1).startswith(self.BEFORE)
+        assert seed.count("{channel}") == 1

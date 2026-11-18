@@ -128,9 +128,12 @@ describe("toItemsQuery", () => {
   });
 
   it("sends the view's default sort, the filters and the cursor for flat views", () => {
-    expect(
-      toItemsQuery({ view: "all", filters: { goal: ["g1"] }, layout: "list" }, "c2"),
-    ).toEqual({ view: "all", goal: "g1", sort: "rank", cursor: "c2" });
+    expect(toItemsQuery({ view: "all", filters: { goal: ["g1"] }, layout: "list" }, "c2")).toEqual({
+      view: "all",
+      goal: "g1",
+      sort: "rank",
+      cursor: "c2",
+    });
   });
 });
 
@@ -157,6 +160,8 @@ describe("saved views", () => {
     expect(queueSignature({ stage: ["a", "b"] }, "rank")).toBe(
       queueSignature({ stage: ["b", "a"] }, "rank"),
     );
-    expect(queueSignature({ stage: ["a"] }, "rank")).not.toBe(queueSignature({ stage: ["a"] }, "votes"));
+    expect(queueSignature({ stage: ["a"] }, "rank")).not.toBe(
+      queueSignature({ stage: ["a"] }, "votes"),
+    );
   });
 });

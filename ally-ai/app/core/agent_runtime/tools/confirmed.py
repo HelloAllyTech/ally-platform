@@ -2,8 +2,8 @@
 
 Before a create or update that points at a dated record (a slot, a class, a table,
 an event), or that sets a date and time itself (a site visit's time, chunk 5b §9),
-the day and time must match what the person said: a time named
-in their latest message or the one before, and their day if they named one
+the day and time must match what the person said: a time named in one of their
+last four messages (two before chunk 6b), and their day if they named one
 ("Thursday", "tomorrow", "19 Nov"), worked out from today where the business is.
 Read from the person's own messages, never from what the model says they said.
 
@@ -75,10 +75,16 @@ _RECORD_DATE = re.compile(
 Day = Tuple[int, int]  # day of month, month
 
 
+#: How many of the person's messages a time can be confirmed in (chunk 6b): a time
+#: they confirmed a few turns back ("11:00", two questions, "yes, book it") still
+#: books. It was two (chunk 6).
+CONFIRM_WINDOW = 4
+
+
 def person_messages(
     history: Optional[Sequence[Mapping[str, Any]]], question: str
 ) -> List[str]:
-    """The person's latest message and the one before it, oldest first."""
+    """The person's last CONFIRM_WINDOW messages, oldest first."""
     said = [
         str(turn.get("content") or "")
         for turn in history or []
@@ -86,7 +92,7 @@ def person_messages(
     ]
     if question and (not said or said[-1].strip() != question.strip()):
         said.append(question)
-    return said[-2:]
+    return said[-CONFIRM_WINDOW:]
 
 
 def is_plain_yes(text: str) -> bool:
@@ -98,10 +104,10 @@ def is_plain_yes(text: str) -> bool:
 def confirmed_texts(
     history: Optional[Sequence[Mapping[str, Any]]], question: str
 ) -> List[str]:
-    """What the person confirmed (8a): their latest two messages, and when the latest
-    is a plain yes, the assistant's message they said yes to, if it named exactly one
-    time. That message is what was sent to them, never the model's account of it, and
-    one time only, so "3 or 4?" answered "yes" confirms neither."""
+    """What the person confirmed (8a): their last four messages (6b), and when the
+    latest is a plain yes, the assistant's message they said yes to, if it named
+    exactly one time. That message is what was sent to them, never the model's
+    account of it, and one time only, so "3 or 4?" answered "yes" confirms neither."""
     said = person_messages(history, question)
     if not said or not is_plain_yes(said[-1]):
         return said
@@ -129,18 +135,67 @@ def today_of(today: str) -> Optional[date]:
     return date(int(match.group(3)), _month(match.group(2)), int(match.group(1)))
 
 
-def named_times(texts: Sequence[str]) -> Set[int]:
-    """Every time of day the person named, as minutes after midnight. "at 4" could
-    be morning or afternoon, so it counts as both."""
+#: A bare hour from 1 to 7 ("at 4", "4:30", "4.30") with no am or pm is the
+#: afternoon or evening (chunk 6b): nobody books 4 in the morning. 8 to 12 stay
+#: both ways.
+_AFTERNOON_HOURS = range(1, 8)
+# "4.30" written with a dot, no am or pm: a time only after "at", "around" and the
+# like, so "2.5 km" or "Rs. 4.50" never reads as one.
+_DOTTED = re.compile(
+    r"\b(?:at|around|about|by|@|~)\s+(1[0-2]|0?[1-9])\.([0-5]\d)\b"
+    r"(?!\s*(?:a\.?\s?m|p\.?\s?m))",
+    re.IGNORECASE,
+)
+
+
+def _either_half(hour: int, minute: int, morning_hours: Set[int]) -> Set[int]:
+    """A time of day said with no am or pm, as minutes after midnight: from 1 to 7
+    the afternoon, unless only the morning time exists (`morning_hours`); 8 to 12
+    either way."""
+    hour %= 12
+    if hour in _AFTERNOON_HOURS:
+        times = {(hour + 12) * 60 + minute}
+        if hour in morning_hours:
+            times.add(hour * 60 + minute)
+        return times
+    return {hour * 60 + minute, (hour + 12) * 60 + minute}
+
+
+def named_times(
+    texts: Sequence[str], morning_hours: Optional[Set[int]] = None
+) -> Set[int]:
+    """Every time of day the person named, as minutes after midnight. With no am or
+    pm, "at 4" is 16:00 (`_either_half`); "at 9" could be morning or evening, so it
+    counts as both. `morning_hours` are the hours from 1 to 7 that the run's records
+    have only in the morning: there "at 7" is 07:00 too."""
+    morning = morning_hours or set()
     times: Set[int] = set()
     for text in texts:
-        times.update(_minutes(m) for m in _CLOCK.finditer(text))
+        for m in _CLOCK.finditer(text):
+            minutes = _minutes(m)
+            ampm = m.group(3) or m.group(5)
+            hour = minutes // 60
+            if ampm or hour not in _AFTERNOON_HOURS or m.group(1).startswith("0"):
+                # "4 pm", "16:00", "07:30" and "11:00" say which time they mean.
+                times.add(minutes)
+            else:
+                times.update(_either_half(hour, minutes % 60, morning))
+        for m in _DOTTED.finditer(text):
+            times.update(_either_half(int(m.group(1)), int(m.group(2)), morning))
         for m in [*_BARE_HOUR.finditer(text), *_OCLOCK.finditer(text)]:
-            hour = int(m.group(1)) % 12
-            times.update({hour * 60, (hour + 12) * 60})
+            times.update(_either_half(int(m.group(1)), 0, morning))
         if _NOON.search(text):
             times.add(12 * 60)
     return times
+
+
+def morning_only_hours(passages: Sequence[Dict[str, Any]]) -> Set[int]:
+    """The hours from 1 to 7 that the run's records have in the morning and not in
+    the afternoon: "at 7" on a list whose only 7 o'clock is 07:00 means that one."""
+    hours = {
+        m[3] // 60 for p in passages if p.get("record_id") for m in record_moments(p)
+    }
+    return {h for h in _AFTERNOON_HOURS if h in hours and h + 12 not in hours}
 
 
 def named_days(texts: Sequence[str], today: Optional[date]) -> Optional[Set[Day]]:
@@ -224,6 +279,7 @@ def _own_time_unconfirmed(
     messages: Sequence[str],
     today: str,
     current_moments: Sequence[Tuple[Day, Optional[int]]],
+    morning_hours: Optional[Set[int]] = None,
 ) -> Optional[str]:
     """Why a date and time the agent wrote itself isn't what the person confirmed, or
     None. A value that isn't a date and time is left to ally-be, which refuses it."""
@@ -243,7 +299,7 @@ def _own_time_unconfirmed(
         f"{_SHORT_DAYS[written.weekday()]} {day} {_SHORT_MONTHS[month - 1]} {year}, "
         f"{minutes // 60:02d}:{minutes % 60:02d}"
     )
-    times = named_times(messages)
+    times = named_times(messages, morning_hours)
     days = named_days(messages, today_of(today))
     if minutes not in times or (days is not None and (day, month) not in days):
         return NOT_CONFIRMED.format(title=title)
@@ -264,6 +320,7 @@ def unconfirmed(
     changes: a target it already has (shown in its passage) isn't being changed."""
     current = _record(passages, updating) if updating else None
     current_moments = _moments(current, "datetime") if current else []
+    morning_hours = morning_only_hours(passages)
     for key, prop in properties.items():
         dated = prop.get("dated")
         value = str(values.get(key) or "").strip()
@@ -271,7 +328,9 @@ def unconfirmed(
             continue
         if not prop.get("relation"):
             # A date and time the agent fills in itself (a site visit's "at", 5b §9).
-            why = _own_time_unconfirmed(value, messages, today, current_moments)
+            why = _own_time_unconfirmed(
+                value, messages, today, current_moments, morning_hours
+            )
             if why:
                 return why
             continue
@@ -282,7 +341,7 @@ def unconfirmed(
         title = str(target.get("section_path") or target.get("document_title") or "")
         if updating and moments and all(m in current_moments for m in moments):
             continue  # the record keeps the target it has
-        times = named_times(messages)
+        times = named_times(messages, morning_hours)
         days = named_days(messages, today_of(today))
         if dated == "datetime" and not times:
             return NOT_CONFIRMED.format(title=title)

@@ -212,38 +212,57 @@ describe('VoiceNoteService', () => {
       // latency scale with its chunk count (each an extra full OpenAI
       // round-trip) — long enough to exceed the mobile client's receive
       // timeout and surface as "no summary generated" for exactly the long
-      // dictations this chunking exists to fix. Deliberately resolve the
-      // chunks out of call order (last chunk fastest) so a regression back
-      // to sequential — or any future implementation that stitches results
-      // as they arrive instead of by chunk position — would both show up
-      // here: timing would scale with the sum of delays, and/or the
-      // transcript would come out reordered.
+      // dictations this chunking exists to fix.
+      //
+      // This checks concurrency structurally, not by wall clock: a 50ms
+      // elapsed-time bound here took 51ms on a loaded CI runner and failed a
+      // production release. Each request is held open until the next
+      // macrotask, so every request already in flight at that point was
+      // issued without waiting for an earlier one. A concurrent
+      // implementation has all three in flight together; a sequential one
+      // never has more than one. The held requests are then released last
+      // chunk first, so an implementation that stitched results as they
+      // arrive, rather than by chunk position, would reorder the transcript.
       const longWav = {
         buffer: buildWav(600),
         mimetype: 'audio/wav',
         size: 100,
       } as Express.Multer.File;
       const chunkTexts = ['first part', 'second part', 'third part'];
-      const delaysMs = [30, 20, 10];
+      const held: Array<{ index: number; resolve: () => void }> = [];
+      const resolvedOrder: number[] = [];
       let callIndex = 0;
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const releaseHeldLastChunkFirst = () => {
+        held
+          .splice(0)
+          .sort((a, b) => b.index - a.index)
+          .forEach(({ resolve }) => resolve());
+      };
       mockTranscriptionsCreate.mockImplementation(() => {
         const index = callIndex++;
-        return new Promise((resolve) =>
-          setTimeout(
-            () => resolve({ text: chunkTexts[index] }),
-            delaysMs[index],
-          ),
-        );
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        return new Promise((resolve) => {
+          held.push({
+            index,
+            resolve: () => {
+              inFlight--;
+              resolvedOrder.push(index);
+              resolve({ text: chunkTexts[index] });
+            },
+          });
+          setImmediate(releaseHeldLastChunkFirst);
+        });
       });
 
-      const startedAt = Date.now();
       const result = await service.generateFromAudio(longWav, undefined);
-      const elapsedMs = Date.now() - startedAt;
 
       expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(3);
+      expect(maxInFlight).toBe(3);
+      expect(resolvedOrder).toEqual([2, 1, 0]);
       expect(result.transcript).toBe('first part second part third part');
-      // Concurrent: ~max(delays)=30ms. Sequential would be ~sum(delays)=60ms.
-      expect(elapsedMs).toBeLessThan(50);
     });
 
     it('does not chunk a long non-WAV (web) recording — a single request, same as before', async () => {

@@ -161,6 +161,8 @@ import { ListRecordsService } from './lists/list-records.service';
     // Lists (chunk 5a).
     ListRecordsService,
     ListDefinitionsService,
+    // The bot page's confirmation card reads the record a reply booked (chunk 6b).
+    ListToolsService,
     // Channels apply memory after a reply (chunk 8a).
     MemoryService,
     SummaryService,

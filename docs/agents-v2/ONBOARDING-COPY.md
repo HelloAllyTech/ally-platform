@@ -1215,3 +1215,29 @@ Whether it may hand over at all (A1: the assistant's owners decide; Ally's platf
 - Open Tools
 - Turn it on in Tools
 - Change this in Tools
+
+## 30. Live steps and the time zone (6b)
+
+**On the bot page and in the bubble, while the assistant works** (one line at a time, each shown for at least 400 ms; `{business}` is the page's title, `{list}` a list's name as the owner wrote it, `{when}` a day and time like "Thu 19 Nov, 11:00"):
+- Reading your message…
+- Searching {business}'s information…
+- Checking free times… (a list of times: slots, times, availability) / Looking in {list}… / Looking it up…
+- Booking {when}… / Saving your details… (a list that takes details, such as Leads)
+- Updating your booking… / Cancelling your booking…
+- Passing this to the team…
+- Writing a reply…
+- Still working on it… (after 12 s with no new step)
+
+**After the reply, one quiet line that opens to the list:**
+- Searched {business}'s information · Checked free times · Looked in {list} · Looked it up · Booked {when} · Saved your details · Updated your booking · Cancelled your booking · Passed this to the team
+- For screen readers: Show what I did / Hide what I did
+
+**The confirmation card** (from the stored entry): Booked / Changed / Cancelled · {list}, then the day and time, then up to three details.
+
+Never shown: tool or field names, ids, what was searched for, memory, or a refusal's code. A crisis or Safety reply shows no steps.
+
+**How it works → the business layer:**
+- Time zone
+- Where your business is. Your lists' times, what your assistant calls today, and Repeat weekly use it.
+
+Hindi for all of the bot page's lines is in `botPage/copy/hi.ts`, marked "needs review".

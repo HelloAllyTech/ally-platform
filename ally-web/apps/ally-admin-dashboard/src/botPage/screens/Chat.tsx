@@ -1,9 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 
-import { ErrorText, Feedback, PageHeader, Sources, TypingDots } from "../components/parts";
+import {
+  ConfirmationCard,
+  ErrorText,
+  Feedback,
+  PageHeader,
+  Sources,
+  StepLine,
+  StepsDone,
+  TypingDots,
+} from "../components/parts";
 import { fill, type BotPageCopy } from "../copy";
+import { doingLine, doneLines, shortWhen } from "../liveSteps";
 
-import type { AnswerFeedback, PublicBotPage, PublicCitation, StatusCode } from "../types";
+import type {
+  AnswerFeedback,
+  PublicBotPage,
+  PublicCitation,
+  PublicConfirmation,
+  PublicStep,
+  StatusCode,
+} from "../types";
 
 export interface ChatItem {
   id: string;
@@ -18,12 +35,20 @@ export interface ChatItem {
   citations: PublicCitation[];
   /** "Was this helpful?" shows under it (chunk Q2a). */
   rateable?: boolean;
+  /** What the assistant did for it (chunk 6b): the collapsed "what I did" line. */
+  steps?: PublicStep[];
+  /** A booking or change made in it (chunk 6b). */
+  confirmation?: PublicConfirmation;
 }
 
 /** The reply being written: what the agent is doing, and the checked text revealed so far. */
 export interface PendingReply {
   status: StatusCode | null;
   text: string;
+  /** The step it's on (chunk 6b): a live step, or "reading" until the first one comes. */
+  step?: PublicStep | "reading" | null;
+  /** Nothing new for a while: "Still working on it…". */
+  slow?: boolean;
 }
 
 export function Chat({
@@ -86,6 +111,14 @@ export function Chat({
   };
 
   // The header says what the assistant is doing while it works, else where its answers come from.
+  const business = branding.title || branding.assistantName;
+  // The step line (chunk 6b) while it works, before any text: never once the reply shows.
+  const stepText =
+    pending && !pending.text && pending.step
+      ? pending.slow
+        ? copy.steps.doing.slow
+        : doingLine(pending.step, copy, business)
+      : null;
   const status = pending
     ? pending.text
       ? copy.chat.typing
@@ -148,7 +181,17 @@ export function Chat({
                   <span className="ally-sr-only">{branding.assistantName}: </span>
                   {m.text}
                 </div>
+                {m.confirmation && (
+                  <ConfirmationCard
+                    confirmation={m.confirmation}
+                    copy={copy}
+                    when={shortWhen(m.confirmation.title)}
+                  />
+                )}
                 <Sources citations={m.citations} copy={copy} />
+                {m.steps && m.steps.length > 0 && (
+                  <StepsDone lines={doneLines(m.steps, copy, business)} copy={copy} />
+                )}
                 {m.rateable && onRate && (
                   <Feedback copy={copy} onRate={feedback => onRate(m.id, feedback)} />
                 )}
@@ -163,6 +206,8 @@ export function Chat({
                     {pending.text}
                     <span aria-hidden="true" className="ally-caret" />
                   </>
+                ) : stepText ? (
+                  <StepLine text={stepText} />
                 ) : (
                   <TypingDots label={copy.chat.status[pending.status ?? "thinking"]} />
                 )}
@@ -173,8 +218,9 @@ export function Chat({
         <div ref={endRef} />
       </main>
 
-      <p role="status" className="ally-sr-only">
-        {pending && !pending.text && pending.status ? copy.chat.status[pending.status] : ""}
+      <p role="status" aria-live="polite" className="ally-sr-only">
+        {stepText ??
+          (pending && !pending.text && pending.status ? copy.chat.status[pending.status] : "")}
       </p>
 
       {!messages.length && !pending && page.suggestedQuestions.length > 0 && (

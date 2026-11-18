@@ -14,3 +14,5 @@ exclude =
     pretrained_models
 per-file-ignores =
     __init__.py:F401
+    # pytest fixtures imported from another test module are "redefined" as test arguments
+    tests/core/debrief_graph/test_guidance_mechanism.py:F811

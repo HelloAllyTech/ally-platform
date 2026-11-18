@@ -68,7 +68,11 @@ SELECT d.chatbot_id, d.day::text AS day,
            AND a.handled_by = 'declined'
            AND (a.retrieval_meta->>'top_similarity')::float
                >= COALESCE((a.retrieval_meta->>'decline_similarity')::float, 1)) AS wrong_decline_suspected,
-       COUNT(*) FILTER (WHERE d.direction = 'outbound' AND d.handled_by = 'human') AS handed_over,
+       -- Chats handed to a person that day (chunk 6b): the assistant's hand-over message, sent
+       -- when someone asked, when the assistant passed it on, or after a second "I don't know".
+       -- Not the team's replies, which it counted before.
+       COUNT(DISTINCT d.conversation_id) FILTER (
+         WHERE d.direction = 'outbound' AND d.handled_by = 'handover') AS handed_over,
        COUNT(*) FILTER (WHERE d.direction = 'outbound' AND d.handled_by = 'crisis') AS crisis,
        COALESCE(MAX(t.up), 0) AS thumbs_up,
        COALESCE(MAX(t.down), 0) AS thumbs_down,

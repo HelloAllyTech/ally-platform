@@ -23,7 +23,12 @@ const unwrapOf = (fn: ReturnType<typeof vi.fn>) =>
 
 vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGetRoadmapDraftQuery: () => ({ data: mockDraft, isLoading: false, isError: false, refetch: vi.fn() }),
+  useGetRoadmapDraftQuery: () => ({
+    data: mockDraft,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
   useRoadmapDraftTurnMutation: () => [unwrapOf(mockTurn)],
   useReopenRoadmapDraftCheckMutation: () => [unwrapOf(mockReopen)],
   useSubmitRoadmapDraftMutation: () => [unwrapOf(mockSubmit)],
@@ -38,9 +43,13 @@ vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
 }));
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGetRoadmapProductGoalsQuery: () => ({ data: [{ id: "g1", name: "Learner return", position: 1 }] }),
+  useGetRoadmapProductGoalsQuery: () => ({
+    data: [{ id: "g1", name: "Learner return", position: 1 }],
+  }),
 }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), custom: vi.fn(), dismiss: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), custom: vi.fn(), dismiss: vi.fn() },
+}));
 
 import { setReduceMotionSwitch, __resetReduceMotionForTests } from "../../../motion/roadmapMotion";
 import { DraftView } from "../drafts/DraftView";
@@ -119,7 +128,8 @@ describe("the draft page (§4.2)", () => {
     renderDraft();
     expect(screen.getByText(en.roadmapV2.draft.privateBanner)).toBeInTheDocument();
     expect(screen.getByText(en.roadmapV2.draft.checksCountLong(3, 5))).toBeInTheDocument();
-    const panel = () => within(screen.getByRole("region", { name: en.roadmapV2.draft.checksTitle }));
+    const panel = () =>
+      within(screen.getByRole("region", { name: en.roadmapV2.draft.checksTitle }));
     const submit = panel().getByRole("button", { name: en.roadmapV2.draft.submit });
     expect(submit).toBeDisabled();
     expect(screen.getByText(en.roadmapV2.draft.submitLocked(3, 5))).toBeInTheDocument();
@@ -145,7 +155,9 @@ describe("the draft page (§4.2)", () => {
     mockTurn.mockReturnValue(draft(1));
     renderDraft();
     fireEvent.click(screen.getAllByRole("button", { name: en.roadmapV2.draft.notQuite })[0]);
-    await waitFor(() => expect(mockReopen).toHaveBeenCalledWith({ code: "OPP-0042", checkId: "who_it_affects" }));
+    await waitFor(() =>
+      expect(mockReopen).toHaveBeenCalledWith({ code: "OPP-0042", checkId: "who_it_affects" }),
+    );
     await waitFor(() => expect(mockTurn).toHaveBeenCalledWith({ code: "OPP-0042" }));
   });
 

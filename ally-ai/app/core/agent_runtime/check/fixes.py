@@ -12,6 +12,7 @@ from app.core.agent_runtime.check.rejections import Rejection
 from app.core.agent_runtime.check.text import (
     SENTENCE_END,
     contact_details,
+    looks_factual,
     mentions_sources,
     normalise_detail,
     repeated_crisis_wording,
@@ -34,11 +35,53 @@ logger = get_logger(__package__)
 # ------------------------------------------------------------------ 3. wording fixes
 
 
+def _looked(ctx: CheckContext) -> bool:
+    """Whether the run looked anything up: a search or a list find (or it has
+    passages, which only a look-up adds)."""
+    return ctx.searched or ctx.looked_up or bool(ctx.found)
+
+
+def _keep_out_of_scope_declines_generic(verdict: Verdict, ctx: CheckContext) -> None:
+    """A decline written without looking anything up (a poem, the weather) may say
+    in general terms what the assistant helps with, but carries no specific fact:
+    no phone number, price, time, link or email (chunk 6b, SP1's evals). Nothing
+    was looked up, so nothing in it can be cited. The sentences carrying one are
+    trimmed, not sent back; if nothing is left, the owner's wording goes out."""
+    if verdict.intent != AgentIntent.DECLINE or not verdict.model_declined:
+        return
+    if _looked(ctx) or not verdict.answer.strip():
+        return
+    if looks_factual(verdict.answer):
+        logger.info("Out-of-scope decline carries specific details; trimming them")
+        verdict.answer = without_sentences(
+            verdict.answer, lambda sentence: not looks_factual(sentence)
+        )
+    if asks_for_contact(ctx.question) and not contact_details(verdict.answer):
+        contact = fallback_contact(ctx.decline_text)
+        if contact:
+            verdict.answer = f"{verdict.answer} {contact}".strip()
+
+
+_ASKS_FOR_CONTACT = re.compile(
+    r"\b(?:phone|mobile|number|contact|e-?mail|whats\s?app|call|reach)\b", re.I
+)
+
+
+def asks_for_contact(question: str) -> bool:
+    """The person asked how to reach someone ("Dr. Kavya's personal mobile?"): a
+    decline then points them to the owner's own contact, word for word (chunk 6b)."""
+    return bool(_ASKS_FOR_CONTACT.search(question or ""))
+
+
 def _drop_unsourced_details(verdict: Verdict, ctx: CheckContext) -> None:
     """Any reply type: a phone number, link or email must be in a passage offered
     this run, or in the owner's own "when it doesn't know" wording, word for word.
-    Sent back, and the sentences carrying one removed."""
-    sources = [*ctx.passages, {"text": ctx.decline_text}]
+    Sent back, and the sentences carrying one removed. The owner's wording counts
+    only once the run looked something up, or when the person asked how to reach
+    someone (chunk 6b): an out-of-scope decline doesn't hand out contact details."""
+    sources = [*ctx.passages]
+    if _looked(ctx) or asks_for_contact(ctx.question):
+        sources.append({"text": ctx.decline_text})
     unsourced = unsupported_details(verdict.answer, sources)
     if unsourced and verdict.rejection in (None, Rejection.UNSOURCED_DETAIL):
         logger.info("Reply carries %d unsourced contact detail(s)", len(unsourced))
@@ -69,6 +112,10 @@ def add_fallback_contact(verdict: Verdict, ctx: CheckContext) -> None:
     if verdict.intent != AgentIntent.DECLINE or not verdict.answer.strip():
         return
     if not verdict.model_declined:
+        return
+    if not _looked(ctx):
+        # Out of scope (a poem, the weather): nothing was looked up, and the reply
+        # stays generic, with no contact to call (chunk 6b).
         return
     contact = fallback_contact(ctx.decline_text)
     if not contact:
@@ -135,8 +182,18 @@ _OFFERS_SLOT = re.compile(
 TEAM_WILL_CONFIRM = "The team will confirm what's free."
 
 
+# Saying a time isn't free offers nothing (chunk 6b): "Nothing's free on Thursday
+# evening", "no slots on Friday", "Thursday is fully booked".
+_NOT_FREE = re.compile(
+    r"\b(?:nothing|none|no(?:\s+\w+){0,2}\s+(?:slots?|times?|appointments?|"
+    r"openings?)|not|isn['’]?t|aren['’]?t|fully\s+booked|booked\s+up)\b",
+    re.IGNORECASE,
+)
+
+
 def offers_slot(sentence: str) -> bool:
-    return bool(_OFFERS_SLOT.search(sentence or ""))
+    sentence = sentence or ""
+    return bool(_OFFERS_SLOT.search(sentence)) and not _NOT_FREE.search(sentence)
 
 
 def _send_back_slot_offers(verdict: Verdict, ctx: CheckContext) -> None:
@@ -153,6 +210,44 @@ def _send_back_slot_offers(verdict: Verdict, ctx: CheckContext) -> None:
     verdict.answer = f"{kept} {TEAM_WILL_CONFIRM}".strip()
     if verdict.rejection is None:
         verdict.rejection, verdict.keeps_text = Rejection.OFFERS_SLOT, True
+
+
+# A promise to pass the request on, or that the team will come back to them
+# ("I'll pass this on to the team", "the team will get back to you", "I've shared
+# your details", "someone will call you").
+_PASSES_ON = re.compile(
+    r"\b(?:i(?:'|’)ll|i\s+will|i\s+can|i(?:'|’)ve|i\s+have|let\s+me|"
+    r"we(?:'|’)ll|we\s+will)"
+    r"\s+(?:also\s+)?(?:pass(?:ed)?|forward(?:ed)?|shar(?:e|ed)|send|sent|"
+    r"let\s+(?:the|our)\s+team\s+know|notif(?:y|ied)|flag(?:ged)?)\b"
+    r"|\b(?:the|our)\s+team\s+(?:will|would|can|should)\s+(?:get\s+back|reach\s+out|"
+    r"contact|call|follow\s+up|be\s+in\s+touch|respond|reply)"
+    r"|\bsomeone\s+(?:from\s+(?:the|our)\s+team\s+)?will\s+(?:get\s+back|reach\s+out|"
+    r"contact|call|follow\s+up|be\s+in\s+touch)",
+    re.IGNORECASE,
+)
+
+
+def passes_on(sentence: str) -> bool:
+    return bool(_PASSES_ON.search(sentence or ""))
+
+
+def _trim_pass_on_promises(verdict: Verdict, ctx: CheckContext) -> None:
+    """With no `hand_over` and no list that takes their details, nothing passes a
+    request on, so the reply never promises to (chunk 6b). The sentence is trimmed;
+    a reply that then gives no way to reach the team gets the owner's contact and
+    is sent back once to say how to reach the team from the information."""
+    if ctx.can_pass_on or not passes_on(verdict.answer):
+        return
+    logger.info("Reply promises to pass something on, with nothing to do it")
+    verdict.answer = without_sentences(verdict.answer, lambda s: not passes_on(s))
+    if contact_details(verdict.answer):
+        return
+    contact = fallback_contact(ctx.decline_text)
+    if contact:
+        verdict.answer = f"{verdict.answer} {contact}".strip()
+    if verdict.rejection is None:
+        verdict.rejection, verdict.keeps_text = Rejection.REACH_TEAM, True
 
 
 def _drop_record_ids(verdict: Verdict, ctx: CheckContext) -> None:
@@ -251,10 +346,12 @@ def _decline_if_nothing_left(verdict: Verdict, ctx: CheckContext) -> None:
 #: Applied in this order to every reply that isn't a decline the check forced.
 WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _drop_record_ids,
+    _keep_out_of_scope_declines_generic,
     _drop_unsourced_details,
     _trim_repeated_crisis_wording,
     _trim_repeated_topic_list,
     _trim_booking_offers,
+    _trim_pass_on_promises,
     _send_back_slot_offers,
     _ground_offered_times,
     _cut_source_phrases,

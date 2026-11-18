@@ -5,16 +5,18 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { InlineLoading } from "@ally-ui-mono/ui-shared";
 // Direct paths, not the @components barrel: suites mock these two on their own.
+import { AssistantOnlyHeader } from "@components/assistant-only/AssistantOnlyHeader";
 import { CommandPaletteProvider } from "@components/command-palette/CommandPaletteProvider";
 import { ErrorBoundary } from "@components/error-boundary";
 import { NotificationBell } from "@components/notification-bell/NotificationBell";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import { Sidebar } from "@components/sidebar";
-import { LOCAL_STORAGE_KEYS, en } from "@constants";
+import { LOCAL_STORAGE_KEYS, ROUTES, en } from "@constants";
 import { useAdminPageView } from "@hooks/useAdminAnalytics";
+import { useAssistantOnly } from "@hooks/useAssistantOnly";
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
-import { loginPathWithNext } from "@utils/loginRedirect";
+import { Login } from "@pages/Login/Login";
 
 import { PageBreadcrumbs } from "./PageBreadcrumbs";
 import { resolveRouteMeta } from "./routeMeta";
@@ -41,10 +43,15 @@ export const PageFallback: React.FC = () => (
 export const AdminShell: React.FC = () => {
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
-  const { pathname, search, hash } = useLocation();
+  const { pathname, search } = useLocation();
   const meta = resolveRouteMeta(pathname, search);
   // Usage tracking: one `admin_page_viewed` per route change (route pattern only, never ids).
   useAdminPageView(pathname);
+  const { assistantOnly } = useAssistantOnly();
+  // The assistants area (the list and every page under it: New assistant, one assistant's home,
+  // onboarding) shows no side navigation, for anyone. `/assistants-x` is not under it.
+  const hideSidebar =
+    pathname === ROUTES.WHATSAPP_BOT || pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`);
   // A URL the table does not know is either a redirect (no title to set) or the 404, which sets its own.
   useDocumentTitle(meta.known ? meta.title : undefined, meta.known);
 
@@ -64,8 +71,36 @@ export const AdminShell: React.FC = () => {
   }, [isMobileNavOpen]);
 
   if (!isAuthenticated) {
-    // Back here after logging in (A1): `/login?next=<this page>`, as `PrivateLayout` does.
-    return <Navigate to={loginPathWithNext(pathname, search, hash)} replace />;
+    // The login screen itself, at the URL they asked for: logging in leaves them on this page.
+    // (`/login` is its own page, so a visit there is not drawn twice.)
+    return <Login />;
+  }
+
+  // Someone whose only way in is an assistant's team (chunk 6b): their assistant and nothing else.
+  if (assistantOnly) {
+    // Every assistants page stays open, New assistant included: that page checks the Assistants
+    // switch itself, so someone with it can create one and someone without it is told so.
+    if (!pathname.startsWith(ROUTES.WHATSAPP_BOT)) {
+      return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
+    }
+    return (
+      <ShellContext.Provider value>
+        <div className="flex h-dvh flex-col bg-white" data-testid="assistant-only-shell">
+          <AssistantOnlyHeader />
+          <main
+            id="admin-main-content"
+            tabIndex={-1}
+            className="relative min-h-0 flex-1 overflow-y-auto outline-none"
+          >
+            <ErrorBoundary resetKey={pathname}>
+              <Suspense fallback={<PageFallback />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
+          </main>
+        </div>
+      </ShellContext.Provider>
+    );
   }
 
   return (
@@ -79,10 +114,12 @@ export const AdminShell: React.FC = () => {
             >
               {en.nav.skipToContent}
             </a>
-            <Sidebar
-              isMobileOpen={isMobileNavOpen}
-              onMobileClose={() => setIsMobileNavOpen(false)}
-            />
+            {!hideSidebar && (
+              <Sidebar
+                isMobileOpen={isMobileNavOpen}
+                onMobileClose={() => setIsMobileNavOpen(false)}
+              />
+            )}
             {/* Single scroll container for the whole app shell: main never scrolls, the padded
                 wrapper is the one scroll area. A page that sets its own overflow fills the wrapper
                 exactly; a tall page with no own overflow scrolls the wrapper — one scrollbar either
@@ -95,22 +132,24 @@ export const AdminShell: React.FC = () => {
               className="flex min-w-0 flex-1 flex-col overflow-hidden outline-none"
             >
               {/* Phone only: the menu button is the one way into navigation there. */}
-              <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:hidden">
-                <button
-                  type="button"
-                  onClick={() => setIsMobileNavOpen(true)}
-                  aria-label={en.common.openMenu}
-                  aria-expanded={isMobileNavOpen}
-                  aria-controls="admin-nav-sidebar"
-                  data-testid="admin-mobile-menu-button"
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
-                >
-                  <Menu size={24} aria-hidden="true" />
-                </button>
-                <div className="ml-auto">
-                  <NotificationBell placement="below" />
+              {!hideSidebar && (
+                <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileNavOpen(true)}
+                    aria-label={en.common.openMenu}
+                    aria-expanded={isMobileNavOpen}
+                    aria-controls="admin-nav-sidebar"
+                    data-testid="admin-mobile-menu-button"
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+                  >
+                    <Menu size={24} aria-hidden="true" />
+                  </button>
+                  <div className="ml-auto">
+                    <NotificationBell placement="below" />
+                  </div>
                 </div>
-              </div>
+              )}
               {/* Full-bleed pages draw their own frame to the edges, so no trail above them. */}
               {meta.known && !meta.fullBleed && <PageBreadcrumbs crumbs={meta.crumbs} />}
               <div

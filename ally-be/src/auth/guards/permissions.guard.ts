@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { isAssistantMemberRoute } from '../decorators/assistant-member-route';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { ErrorCode } from 'src/exception/error-code.enum';
 import {
@@ -45,6 +46,19 @@ export class PermissionsGuard implements CanActivate {
     }>(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
 
     if (!requiredPermissions || requiredPermissions.permissions.length === 0) {
+      return true;
+    }
+    // An assistant's own route: being on its team is enough (chunk 6b); ChatbotMemberGuard checks
+    // the team and the role after this guard.
+    if (isAssistantMemberRoute(this.reflector, context)) {
+      if (!context.switchToHttp().getRequest().user) {
+        throw new UnauthorizedException({
+          message: FAILURE_MESSAGES.UNAUTHENTICATED,
+          error: 'Unauthorized',
+          statusCode: HttpStatus.UNAUTHORIZED,
+          errorCode: ErrorCode.UNAUTHENTICATED,
+        });
+      }
       return true;
     }
 

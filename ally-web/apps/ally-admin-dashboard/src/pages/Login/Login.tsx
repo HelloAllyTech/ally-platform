@@ -39,8 +39,10 @@ export const Login: React.FC = () => {
     };
   }, []);
   const goOn = useCallback(() => {
-    if (mounted.current) navigate(afterLoginPath(location.search), { replace: true });
-  }, [navigate, location.search]);
+    if (!mounted.current) return;
+    const shownAt = `${location.pathname}${location.search}${location.hash}`;
+    navigate(afterLoginPath(location.search, shownAt), { replace: true });
+  }, [navigate, location.pathname, location.search, location.hash]);
   const { user } = useSelector((state: RootState) => state.user);
 
   const [loginSection, setLoginSection] = useState<any>(LoginSection.EMAIL);

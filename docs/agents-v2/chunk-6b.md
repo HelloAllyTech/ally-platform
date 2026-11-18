@@ -1,9 +1,9 @@
 # Chunk 6b — Booking polish, and every open item from the fast track
 
-> Brief for Claude Code. Read `CONTEXT.md`, `STATUS.md` (the open items), `CHUNK-06-NOTES.md`, `CHUNK-05B-NOTES.md`, `CHUNK-08A-NOTES.md` (§5, the Amaha fixes and "Still open"), `CHUNK-03B-NOTES.md` (§6), `CHUNK-03A-NOTES.md` (the retrieval-log items), then this file. Plan first, as usual. <!-- docs-path-lint: planned -->
-> Branch: `feat/agents-v2-sprint-1` (after SP1 on the same branch). Tag commits `[6b]`. Repos: all three.
+> Brief for Claude Code. Read `CONTEXT.md`, `EPIC-6B-R2.md`, `CHUNK-06-NOTES.md`, `CHUNK-05B-NOTES.md`, `CHUNK-08A-NOTES.md` (§5, the Amaha fixes and "Still open"), `CHUNK-03B-NOTES.md` (§6), `CHUNK-03A-NOTES.md` (the retrieval-log items), `CHUNK-A1-NOTES.md` (access is members-only now: eval and checkup tokens must be on the assistant's team) and `CHUNK-SP1-NOTES.md` (the evals behind section F, and lists.txt versions 4 and 5 behind item 29), then this file. Plan first, as usual. <!-- docs-path-lint: planned -->
+> Branch: `feat/agents-v2-6b`, from master (A1 and SP1 are merged). Tag commits `[6b]`. Repos: all three.
 > **One stop for Shehbaz:** every prompt or tool-description text this chunk changes, sent together in one Markdown file. Draft them first and keep building.
-> **Goal:** after 6b, bookings can go on for pilots, and the bot page and bubble show the assistant working. About 1.5 days.
+> **Goal:** after 6b, bookings can go on for pilots, and the bot page and bubble show the assistant working. About 2 days (sections A–F, items 1–30).
 
 ## A. Booking behaviour
 
@@ -83,4 +83,4 @@ Dark mode for the home. Hindi review. WhatsApp buttons for slots (10). Ask me fi
 - [ ] On the bot page and the bubble, a booking shows its live steps, then a collapsed "what I did" line and a confirmation card; a crisis reply shows none; WhatsApp unchanged; Playwright with axe at 1440 and 390
 - [ ] Every item in A–F closed, or listed in the notes with why not
 - [ ] `LAUNCH-CHECKLIST.md`: the line "don't turn Add on for an enquiries pilot" removed; "bookings for pilots after 6b" added
-- [ ] `CHUNK-06B-NOTES.md`; the Progress row; `STATUS.md`'s open items updated <!-- docs-path-lint: planned -->
+- [ ] `CHUNK-06B-NOTES.md`; the Progress row; `PR-6B.md` (what changed, what pilots can now turn on) <!-- docs-path-lint: planned -->

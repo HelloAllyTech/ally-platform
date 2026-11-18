@@ -32,7 +32,13 @@ export function safeNext(raw: string | null | undefined): string | null {
   return raw;
 }
 
-/** Where to go after logging in, from the login page's own query string. */
-export function afterLoginPath(search: string): string {
-  return safeNext(new URLSearchParams(search).get(NEXT_PARAM)) ?? "/";
+/**
+ * Where to go after logging in, from the login page's own query string. `shownAt` is the page the
+ * login screen is drawn on when it stands in for it (a signed-out visitor to `/assistants` sees
+ * the login screen at that same URL): with no `next`, they stay there.
+ */
+export function afterLoginPath(search: string, shownAt?: string): string {
+  const next = safeNext(new URLSearchParams(search).get(NEXT_PARAM));
+  if (next) return next;
+  return safeNext(shownAt) ?? "/";
 }

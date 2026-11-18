@@ -7,6 +7,7 @@ import type {
   PublicFinal,
   PublicMessage,
   PublicSession,
+  PublicStep,
   StatusCode,
   VisitorEvent,
 } from "./types";
@@ -180,7 +181,12 @@ export const botPageApi = {
   async send(
     slug: string,
     message: string,
-    handlers: { onStatus(code: StatusCode): void; onToken(text: string): void },
+    handlers: {
+      onStatus(code: StatusCode): void;
+      onToken(text: string): void;
+      /** A live step (chunk 6b); optional, so older callers are unchanged. */
+      onActivity?(step: PublicStep): void;
+    },
     signal?: AbortSignal,
   ): Promise<PublicFinal> {
     let response: Response;
@@ -211,6 +217,7 @@ export const botPageApi = {
         if (event.type === "error") throw new BotPageApiError("INTERNAL");
         if (event.type === "status") handlers.onStatus((event.data as { code: StatusCode }).code);
         else if (event.type === "token") handlers.onToken((event.data as { text: string }).text);
+        else if (event.type === "activity") handlers.onActivity?.(event.data as PublicStep);
         return false;
       });
     } catch (error) {
