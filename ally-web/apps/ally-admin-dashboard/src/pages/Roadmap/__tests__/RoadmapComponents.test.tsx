@@ -248,6 +248,14 @@ describe("QueueRow", () => {
     expect(screen.getByText("Plan agent asks: which learners first?")).toBeInTheDocument();
   });
 
+  it("shows the queue rank when the idea is ranked, and nothing when it is not", () => {
+    const { unmount } = renderRow({ row: row({ queueRank: 3 }) });
+    expect(screen.getByTestId("queue-rank")).toHaveTextContent("#3");
+    unmount();
+    renderRow({ row: row({ queueRank: null }) });
+    expect(screen.queryByTestId("queue-rank")).toBeNull();
+  });
+
   it("loads a row's vote record only when the reader reaches for it, then shows VoteButton", () => {
     mockOpportunity.mockClear();
     renderRow();

@@ -9148,6 +9148,7 @@ export const en = {
       actions: (code: string) => `Actions for ${code}`,
       votes: (count: number) => (count === 1 ? "1 vote" : `${count} votes`),
       votedByMe: "You voted",
+      rank: (n: number) => `Rank ${n} in the queue`,
       starred: "Starred",
       markRead: "Mark read",
       watch: "Watch",
