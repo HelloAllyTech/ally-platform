@@ -87,13 +87,19 @@ describe('the roleplay brief', () => {
   };
   const values = readRoleplayFields(row);
 
-  it('sends title, description and the default optional fields when a release names none', () => {
+  it('sends only title and description when a release names no optional field (what a debrief read before the registry)', () => {
     expect(roleplayBrief(values)).toEqual({
+      title: 'Intake',
+      description: 'A first call.',
+    });
+    // A release that switches difficulty on gets it, in plain lower case.
+    expect(roleplayBrief(values, ['difficulty'])).toEqual({
       title: 'Intake',
       description: 'A first call.',
       difficulty_level: 'very hard',
     });
-    expect([...ROLEPLAY_FIELDS_DEFAULT]).toEqual(['difficulty']);
+    // No optional field is on by default: a debrief reads exactly what it did before the registry.
+    expect([...ROLEPLAY_FIELDS_DEFAULT]).toEqual([]);
   });
 
   it('adds only the optional fields the release has on, drops empty ones, and ignores unknown keys', () => {
@@ -156,7 +162,7 @@ describe('the roleplayFields setting the PM agent may propose', () => {
     const r = settingRefusal(ROLEPLAY_FIELDS_KEY, undefined);
     expect(r?.reason).toContain('characterProfile');
     expect(r?.reason).toContain('always read');
-    expect(roleplayFieldsCatalogue()).toContain('difficulty (on by default)');
+    expect(roleplayFieldsCatalogue()).toContain('difficulty (off by default)');
   });
 
   it('lists the setting among the ones the PM agent may change', () => {

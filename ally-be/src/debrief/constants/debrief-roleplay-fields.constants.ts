@@ -70,7 +70,6 @@ export const ROLEPLAY_FIELDS: readonly RoleplayFieldDef[] = [
     description:
       'How hard the author set the roleplay, so the coaching fits the level.',
     source: { kind: 'column', name: 'difficultyLevel' },
-    defaultOn: true,
     maxChars: 40,
   },
   {

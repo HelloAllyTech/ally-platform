@@ -316,7 +316,7 @@ describe('Agents config service', () => {
     expect(v.limits.guidanceAgentMaxCalls).toEqual({ min: 0, max: 5 });
     // The optional roleplay fields on (a release naming none uses the defaults), and the declared
     // data access the Agents page draws its matrix from.
-    expect(v.settings.roleplayFields).toEqual(['difficulty']);
+    expect(v.settings.roleplayFields).toEqual([]);
     expect(v.dataAccess.agents.map((a: any) => a.key)).toEqual([
       'safety_reader',
       'analyst',
@@ -328,7 +328,7 @@ describe('Agents config service', () => {
     ]);
     expect(
       v.dataAccess.roleplayFields.map((f: any) => [f.key, f.enabled]),
-    ).toContainEqual(['difficulty', true]);
+    ).toContainEqual(['difficulty', false]);
     expect(
       v.dataAccess.roleplayFields.find((f: any) => f.key === 'title'),
     ).toMatchObject({ alwaysOn: true, enabled: true });
