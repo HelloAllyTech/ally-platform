@@ -326,6 +326,29 @@ describe("Sidebar", () => {
     expect(navigateMock).toHaveBeenCalledWith("/login");
   });
 
+  it("keeps the account menu open while tabbing inside it, and closes on Escape", () => {
+    renderWithProvider(<Sidebar />);
+    const trigger = screen.getByTestId("sidebar-profile-trigger");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    const items = screen.getAllByRole("menuitem");
+    items[0].focus();
+    // Focus moving to the next item is not leaving the menu.
+    fireEvent.blur(items[0], { relatedTarget: items[1] });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    fireEvent.keyDown(items[0], { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("sits above page content in every mode, so its popovers are never painted under it", () => {
+    renderWithProvider(<Sidebar />);
+    expect(screen.getByTestId("admin-sidebar").className).toContain("z-[70]");
+    expect(screen.getByTestId("admin-sidebar").className).not.toContain("md:z-auto");
+  });
+
   it("marks the active tab with aria-current, and only that one", () => {
     renderWithProvider(<Sidebar />);
     const current = screen
@@ -346,16 +369,13 @@ describe("Sidebar", () => {
     expect(screen.getByRole("link", { name: "Analytics" })).not.toHaveAttribute("aria-current");
   });
 
-  it("is a labelled navigation landmark of real links, one section per group", () => {
+  it("is a labelled navigation landmark of real links, with no section headings", () => {
     renderWithProvider(<Sidebar />);
     const nav = screen.getByRole("navigation", { name: "Main navigation" });
     expect(nav).toContainElement(screen.getByRole("link", { name: "Users" }));
     expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/users");
-    ["Create", "People", "Insights", "AI & Languages", "Settings & Logs"].forEach(name =>
-      expect(screen.getByRole("heading", { name })).toBeInTheDocument(),
-    );
-    // No Product section: nothing in it is visible to this user.
-    expect(screen.queryByRole("heading", { name: "Product" })).not.toBeInTheDocument();
+    // One flat list: no group headings.
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
   });
 
   it("lets a modified click through to the browser (new tab) without treating it as navigation", () => {
@@ -368,27 +388,8 @@ describe("Sidebar", () => {
     expect(onMobileClose).not.toHaveBeenCalled();
   });
 
-  it("folds a section away, keeping the current page visible, and remembers it", () => {
+  it("narrows the flat list to the matches while searching", () => {
     renderWithProvider(<Sidebar />);
-    fireEvent.click(screen.getByRole("button", { name: "Collapse AI & Languages" }));
-    expect(screen.queryByText("Scenario Voices")).not.toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("admin_sidebar_collapsed_sections")!)).toEqual([
-      "ai-languages",
-    ]);
-
-    // Folding the section that holds the current page leaves that one row showing.
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Create" }));
-    expect(screen.getByText("Simulation Studio")).toBeInTheDocument();
-    expect(screen.queryByText("Events")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Expand AI & Languages" }));
-    expect(screen.getByText("Scenario Voices")).toBeInTheDocument();
-  });
-
-  it("shows every match while searching, even inside a folded section", () => {
-    localStorage.setItem("admin_sidebar_collapsed_sections", JSON.stringify(["ai-languages"]));
-    renderWithProvider(<Sidebar />);
-    expect(screen.queryByText("Scenario Voices")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Search menu..."), { target: { value: "voices" } });
     expect(screen.getByText("Scenario Voices")).toBeInTheDocument();
     expect(screen.queryByText("Events")).not.toBeInTheDocument();

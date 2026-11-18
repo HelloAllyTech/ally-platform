@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import {
   DndContext,
@@ -34,7 +34,7 @@ import {
   Terminal,
   Tools,
 } from "@icons";
-import { ChevronDown, ChevronRight, Compass, LibraryBig, TrendingUp } from "lucide-react";
+import { Compass, LibraryBig, TrendingUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -72,13 +72,12 @@ import { ReduceMotionMenuItem } from "@components/reduce-motion/ReduceMotionMenu
 import type { NavigationItem } from "@components/types";
 import { SIDEBAR_ITEMS, ROUTES, en, profileSettings, USER_MODAL_FIELDS_IDS } from "@constants";
 import { useClickOutside, useUser } from "@hooks";
-import { groupNavigationItems, isNavItemActive } from "@utils/navigation";
+import { isNavItemActive } from "@utils/navigation";
 
 import { BuilderNavBadge } from "./BuilderNavBadge";
 import { PmAgentNavBadge } from "./PmAgentNavBadge";
 import { RoadmapNavBadge } from "./RoadmapNavBadge";
 import { SortableNavItem } from "./SortableNavItem";
-import { useCollapsedSections } from "./useCollapsedSections";
 import { FeatureToggleKey } from "../../constants/featureToggles";
 
 const EXPANDED_WIDTH = 1200;
@@ -163,21 +162,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    // Tabs reorder inside their own section; a drop onto another section's tab is ignored.
-    const section = sections.find(sec => sec.items.some(item => item.id === String(active.id)));
-    if (!section) return;
-    const ids = section.items.map(item => item.id);
+    const ids = filteredNavigationItems.map(item => item.id);
     const oldIndex = ids.indexOf(String(active.id));
     const newIndex = ids.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
-
-    // The saved order is one flat list: the sections as displayed, with this one rearranged.
-    const nextSection = arrayMove(ids, oldIndex, newIndex);
-    reorderSidebar(
-      sections.flatMap(sec =>
-        sec.id === section.id ? nextSection : sec.items.map(item => item.id),
-      ),
-    );
+    reorderSidebar(arrayMove(ids, oldIndex, newIndex));
   };
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -197,7 +186,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     (isHoverExpandEnabled ? (isPinned && !isRouteForceCollapsed) || isHovered : isExpanded);
   const [openSettings, setOpenSettings] = useState(false);
   const [navSearch, setNavSearch] = useState("");
-  const { collapsed, toggle: toggleSection } = useCollapsedSections();
   const palette = useCommandPalette();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -415,23 +403,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     ? filteredNavigationItems.filter(item => item.label.toLowerCase().includes(query))
     : filteredNavigationItems;
 
-  // Sections come from the full visible list; a search then narrows each section's tabs.
-  const sections = useMemo(
-    () => groupNavigationItems(filteredNavigationItems),
-    [filteredNavigationItems],
-  );
-  const visibleSections = useMemo(
-    () =>
-      sections
-        .map(section => ({
-          ...section,
-          items: isSearching
-            ? section.items.filter(item => item.label.toLowerCase().includes(query))
-            : section.items,
-        }))
-        .filter(section => section.items.length > 0),
-    [sections, isSearching, query],
-  );
   const isActive = (item: NavigationItem) =>
     isNavItemActive(item, location.pathname, location.search);
 
@@ -465,71 +436,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       )}
       <nav aria-label={en.nav.mainNavLabel} className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          {visibleSections.map((section, sectionIndex) => {
-            // A collapsed section still shows the page you are on, so the highlight is never lost.
-            const isCollapsed = showExpanded && !isSearching && collapsed.has(section.id);
-            const shownItems = isCollapsed
-              ? section.items.filter(item => isActive(item))
-              : section.items;
-            const headingId = `sidebar-section-${section.id}`;
-            return (
-              <section
-                key={section.id}
-                aria-labelledby={showExpanded ? headingId : undefined}
-                data-testid={`sidebar-section-${section.id}`}
-                className={
-                  showExpanded
-                    ? "mb-2"
-                    : sectionIndex > 0
-                      ? "mt-2 border-t border-border-light pt-2"
-                      : ""
-                }
-              >
-                {showExpanded && (
-                  <h2 id={headingId} className="m-0">
-                    <button
-                      type="button"
-                      onClick={() => toggleSection(section.id)}
-                      aria-expanded={!isCollapsed}
-                      aria-label={
-                        isCollapsed
-                          ? en.nav.expandSection(section.label)
-                          : en.nav.collapseSection(section.label)
-                      }
-                      disabled={isSearching}
-                      className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-typography-600 hover:text-typography-900 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-default disabled:hover:text-typography-600"
-                    >
-                      {isCollapsed ? (
-                        <ChevronRight size={14} aria-hidden />
-                      ) : (
-                        <ChevronDown size={14} aria-hidden />
-                      )}
-                      <span>{section.label}</span>
-                    </button>
-                  </h2>
-                )}
-                <SortableContext
-                  items={shownItems.map(item => item.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <ul>
-                    {shownItems.map(item => (
-                      <SortableNavItem
-                        key={item.id}
-                        item={item}
-                        icon={renderIcon(item.id)}
-                        isActive={isActive(item)}
-                        isExpanded={showExpanded}
-                        canReorder={canReorder && !isSearching && !isCollapsed}
-                        onNavigate={onMobileClose}
-                        badge={renderBadge(item.id)}
-                      />
-                    ))}
-                  </ul>
-                </SortableContext>
-              </section>
-            );
-          })}
+          <SortableContext
+            items={displayedNavItems.map(item => item.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul>
+              {displayedNavItems.map(item => (
+                <SortableNavItem
+                  key={item.id}
+                  item={item}
+                  icon={renderIcon(item.id)}
+                  isActive={isActive(item)}
+                  isExpanded={showExpanded}
+                  canReorder={canReorder && !isSearching}
+                  onNavigate={onMobileClose}
+                  badge={renderBadge(item.id)}
+                />
+              ))}
+            </ul>
+          </SortableContext>
           {/* Signed in, permissions known, and no page to open: say so, not a blank sidebar. */}
           {showExpanded &&
             !isSearching &&
@@ -578,9 +503,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
   const profileSection = (
     <>
       <div ref={containerRef} className="flex-shrink-0 border-t border-border-light py-4">
-        <div
+        <button
+          type="button"
           onClick={handleUserMenuToggle}
-          className="flex flex-row justify-between items-center h-8 py-0 cursor-pointer"
+          aria-haspopup="menu"
+          aria-expanded={isUserMenuOpen}
+          aria-label={user?.name ? `${user.name}, account menu` : "Account menu"}
+          data-testid="sidebar-profile-trigger"
+          className="flex w-full flex-row justify-between items-center py-0 cursor-pointer rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
         >
           <div className="flex gap-2 items-center w-full justify-center object-cover">
             <div className="w-[40px] h-[40px] rounded-full overflow-hidden flex items-center justify-center">
@@ -611,16 +541,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
               <ArrowDown />
             </div>
           )}
-        </div>
+        </button>
 
         {/* User Menu Dropdown */}
         {isUserMenuOpen && (
           <div
-            onBlur={handleUserMenuToggle}
+            role="menu"
+            aria-label={en.auth.profileSettings}
+            onKeyDown={event => {
+              if (event.key === "Escape") setIsUserMenuOpen(false);
+            }}
+            onBlur={event => {
+              // Close only when focus leaves the menu entirely: tabbing between its own items
+              // must not dismiss it (a plain onBlur toggle did, on the first Tab).
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setIsUserMenuOpen(false);
+              }
+            }}
             className={`absolute bottom-[10px] ${showExpanded ? "left-[230px]" : "left-[100px]"} min-w-[250px] max-md:left-3 max-md:right-3 max-md:bottom-24 max-md:min-w-0 z-[999] mb-2 bg-white border border-border-light rounded-lg shadow-lg`}
           >
             <div className="py-1">
               <button
+                role="menuitem"
                 onClick={handleProfileSettingClick}
                 className="flex flex-row items-center w-full px-4 py-2 gap-2 text-left text-sm text-typography-900 hover:bg-background-secondary"
               >
@@ -629,6 +571,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
               </button>
               <ReduceMotionMenuItem />
               <button
+                role="menuitem"
                 onClick={handleLogout}
                 className="flex flex-row items-center w-full px-4 py-2 gap-2 text-left text-sm text-typography-900 hover:bg-background-secondary transition-colors"
               >
@@ -672,9 +615,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         data-testid="admin-sidebar"
         onMouseEnter={() => isHoverExpandEnabled && setIsHovered(true)}
         onMouseLeave={() => isHoverExpandEnabled && setIsHovered(false)}
-        className={`flex flex-col h-dvh md:h-screen bg-white border-r border-border-light transition-all duration-200 fixed inset-y-0 left-0 z-50 max-w-[85vw] ${
+        className={`flex flex-col h-dvh md:h-screen bg-white border-r border-border-light transition-all duration-200 fixed inset-y-0 left-0 z-[70] max-w-[85vw] ${
           isOverlay ? "md:absolute shadow-xl" : "md:relative"
-        } ${isOverlay ? "md:z-50" : "md:z-auto"} md:max-w-none md:translate-x-0 md:visible ${
+        } md:max-w-none md:translate-x-0 md:visible ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full invisible"
         } ${showExpanded ? "w-64" : "w-24"} p-[12px] font-primary`}
       >
@@ -720,7 +663,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       </div>
       {isMobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-[60] bg-black/50 md:hidden"
           onClick={onMobileClose}
           aria-hidden="true"
           data-testid="admin-sidebar-overlay"
