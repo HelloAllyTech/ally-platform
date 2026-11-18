@@ -703,10 +703,9 @@ async def checks(
     rubric = ctx.prompt(PROMPT_CODES["rubric"])
     evaluator_step = ctx.step_of(state["recipe_key"], Step.EVALUATOR)
     # No model step starts past the run's deadline: ally-be treats a run that outlives
-    # it (plus its
-    # margin) as dead and starts it again, so a step begun now would be paid for twice.
-    # The draft
-    # stands and goes to `decide` unevaluated (below the bar, sent to review).
+    # it (plus its margin) as dead and starts it again, so a step begun now would be
+    # paid for twice. The draft stands and goes to `decide` unevaluated (below the bar,
+    # sent to review).
     if evaluator_step and ctx.time_left_ms(state.get("has_risk_cue", False)) <= 0:
         steps.append(skipped(ctx, estimated, evaluator_step, "deadline"))
         return Command(

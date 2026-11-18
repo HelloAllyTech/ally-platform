@@ -1,13 +1,10 @@
 """The ally-be <-> ally-ai response contract, from one shared fixture.
 
 `docs/debrief-harness/contract-fixture-response.json` is read by this test and by
-ally-be's
-`debrief-graph-contract.spec.ts`. If ally-ai changes what it can send, or ally-be
-changes what it
-can read, one of the two tests fails, so neither side moves alone. The fixture carries
-fields
-nobody declares (`a_*_added_later`) to prove a new optional field passes through both
-sides.
+ally-be's `debrief-graph-contract.spec.ts`. If ally-ai changes what it can send, or
+ally-be changes what it can read, one of the two tests fails, so neither side moves
+alone. The fixture carries fields nobody declares (`a_*_added_later`) to prove a new
+optional field passes through both sides.
 """
 
 from __future__ import annotations
@@ -34,7 +31,7 @@ FIXTURE = json.loads(
 )
 
 
-def test_the_fixture_is_a_response_ally_ai_can_send_and_keeps_what_it_does_not_know():
+def test_the_fixture_is_a_response_ally_ai_can_send_and_it_keeps_what_it_does_not_know():  # noqa: E501
     res = DebriefRunResponse(**FIXTURE)
     out = res.model_dump()
     assert out["contract_version"] == CONTRACT_VERSION == FIXTURE["contract_version"]
@@ -75,8 +72,7 @@ def test_an_older_ally_be_that_sends_no_version_still_makes_a_valid_request():
 
 def test_the_typed_shapes_add_no_keys_the_graph_did_not_send():
     """The route sends `exclude_unset`: a card or step ally-be reads has exactly the
-    keys the
-    graph built, never null or empty ones added by the typed models."""
+    keys the graph built, never null or empty ones added by the typed models."""
     res = DebriefRunResponse(
         status="published",
         cards={"lead": "x"},

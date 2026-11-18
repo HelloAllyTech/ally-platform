@@ -316,8 +316,8 @@ class TestEndings:
 
     async def test_no_model_step_starts_past_the_deadline(self, steps, gateway):
         # The clock jumps past the deadline once the Writer has answered: the draft is
-        # checked by
-        # code but never scored or revised, and goes out below the bar for review.
+        # checked by code but never scored or revised, and goes out below the bar for
+        # review.
         def clock():
             return 10_000_000.0 if steps.count("writer") else 0.0
 
@@ -336,9 +336,8 @@ class TestEndings:
         self, steps, gateway
     ):
         # ally-be treats a run still going at deadline + margin as dead and starts it
-        # again, so a
-        # call that would outlive that is cut off instead of running on (and being paid
-        # twice).
+        # again, so a call that would outlive that is cut off instead of running on (and
+        # being paid twice).
         steps.delay["safety-reader"] = 5.0
 
         def clock():

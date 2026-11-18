@@ -7,14 +7,11 @@ failures (a step with no usable answer is a 502, one that raised is a 500).
 
 How the step files relate (read in this order):
 - `app/core/debrief/steps.py`, `safety_reader.py`: what each AI step says and returns
-  (the prompts and the
-  structured call). One function per step.
+  (the prompts and the structured call). One function per step.
 - `debrief_graph/step_wire.py`: runs those functions in-process and answers in the wire
-  shape the step
-  records and ally-be read (`InProcessSteps`, `StepError`).
+  shape the step records and ally-be read (`InProcessSteps`, `StepError`).
 - `debrief_graph/model_step_inputs.py`: for each of the six steps, what it is sent, how
-  the run view
-  explains it and where the run goes next.
+  the run view explains it and where the run goes next.
 - `debrief_graph/model_step_node.py`: one such step as a graph node (retry, timeout,
   backup model).
 - `debrief_graph/inputs.py`: builds each step's body from the run's state (declared data

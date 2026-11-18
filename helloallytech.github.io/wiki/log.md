@@ -9,6 +9,14 @@ summary: A chronological log tracking all wiki updates and modifications.
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
 
+## [2026-11-18] update | Doc drift fixed: deploy, releases, docs system, ally-be roles — all re-checked against the code.
+
+- `platform/architecture.md` §Deployment: production (all three services and both dashboards) deploys through the `deploy-metal01` Ansible action since the 2026-11-07 cutover, migrations inside the playbook; the manual `deploy-*.yml` workflows still point at the pre-cutover ECS/CloudFront path.
+- `contributing/release-process.md`: per-deployable workflows and tag prefixes (`be-v*`, `ai-v*`, `learn-v*`, `frontend-v*`, `archiver-v*`), no branch protection on `master`, the Ansible deploy and health check, troubleshooting and rollback for the new stack; per-app guides now point inside the monorepo (and were updated: `ally-be`, `ally-ai`, `ally-ai-learn` `.github/RELEASE_GUIDE.md`).
+- `contributing/docs-system.md`: rewritten for the monorepo — root `.docs-map.yml` is the enforced one, wiki edits land in the same PR, `publish-wiki.yml` mirrors to Pages, the `docs-guard` / `concepts` / `docs-paths` jobs, and the weekly sweep described as what it is (a lint, not a claim verifier).
+- `repos/ally-be.md`: roles after the `PLATFORM_ADMIN` collapse plus the additive roles; `notification/` is feed + push + email + Slack; new entries for `chat/` (Scribe) and `helpline/` + `queue/` (text helpline); Analytics Agent gate.
+- Outside the wiki: `docs/scribe-v2/DESIGN.md` status line (phase 3 shadow mode is built) and the `PM_AGENT` toggle description (accepted cards are filed to the roadmap).
+
 ## [2026-11-18] create | `platform/concepts.md`: Core Concepts — the vocabulary map, kept complete by CI.
 
 - New `platform/concepts.md`: one card per core concept (Is / Also called / Composed of / Status + gate / Code / Deep doc) across learning product, counselling & public product, AI platform, internal agent tooling and delivery & ops, plus an Overloaded terms table and a Plumbing list. Status is judged from code on `master`.

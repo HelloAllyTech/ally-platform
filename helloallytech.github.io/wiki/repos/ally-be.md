@@ -2,7 +2,7 @@
 title: ally-be — Core Backend
 tags: [repo, backend, nestjs, api]
 summary: ally-be is the multi-tenant NestJS backend that owns Ally's primary PostgreSQL database and orchestrates auth, real-time voice sessions, the audio/transcription pipeline, AI-driven feedback, and analytics for the counselor-training platform.
-last_reconciled: 2026-11-10
+last_reconciled: 2026-11-18
 ---
 
 # ally-be — Core Backend
@@ -116,13 +116,16 @@ Feature modules live under `src/<domain>/` (controllers, services, DTOs, and `en
   - **Switching it on** (`product-roadmap/cutover/`) is an Owner's action, never a deploy step, and its two routes are the only `/v1/roadmap/*` routes that answer while the flag is off. `GET /v1/roadmap/cutover/preview` lists who becomes Builder and Owner (names and ids) and what will move. `POST /v1/roadmap/cutover` takes the Builder and Owner ids the Owner confirmed and answers 409 if they no longer match. Then, in one transaction, it copies parked idea drafts into private drafts, files an idea (`source = 'migrated_builder_session'`, lead = creator) for each live direct Builder session that has none, accepts every unreviewed idea, switches the flag on last and writes `roadmap_cutover_log`. It is idempotent and deletes nothing. Switching off stays the Builder settings `PATCH`, which brings the old tabs back with their data.
   - `product-roadmap/metrics/`: `GET /v1/roadmap/metrics?from&to` (Owner only; 404 while the flag is off, 403 for anyone else) serves the admin's **Measures** view. It computes from existing tables, with no table of its own: the funnel as a cohort (ideas captured in the range, then how far each got: submitted, accepted, shipped, measured), the median and 75th-percentile time in each stage for moves that finished in the range, the Owner-review wait against its amber line, idle-lead releases, held and failed releases from the auto-release log, and spend per idea from the plan ledger. The aggregation is a pure util (`roadmap-metrics.util.ts`). It reads no transcript, decline reason or draft text, and lists a private draft's spend by code only. The Roadmap's job times (`roadmap_job_*`) are PostHog events, not part of this route.
 - `livekit/` — room lifecycle, participant tracking, agent dispatch, webhook handling.
-- `aws/`, `queue/`, `message-broker/`, `redis/` — AWS wrappers, SQS setup, Redis pub/sub, Redis client.
+- `aws/`, `message-broker/`, `redis/` — AWS wrappers and SQS listeners, Redis pub/sub, Redis client.
+- `chat/`, `audio/`, `audio-ingest/` — **Scribe**: recorded counselling sessions (`chats`, `call_details`), notes with merge-based summary writes, live nudges, encrypted audio uploads and cloud-telephony audio. See [Scribe summary writes](../platform/scribe-summary-writes.md).
+- `helpline/`, `queue/` — the **text helpline**: anonymous talkers' chats with human listeners, claims, presence, supervision, QA and risk flags; `queue/` is its waiting-talker queue, not SQS. Off unless an organisation's `TEXT_HELPLINE_ENABLED` preference is set. See [`docs/text-helpline.md`](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/text-helpline.md).
 - `audit/` — HIPAA-compliant CloudWatch audit logging.
 - `analytics/` — Metabase integration and tenant-specific dashboards.
-- `analytics-agent/` — the **Analytics Agent**: natural-language analytics questions turned into read-only SQL. Owns the trust boundary (table allowlist, denied columns, single-SELECT guard, `READ ONLY` transaction with a statement timeout and row cap) and calls ally-ai to plan the query and narrate the result. Gated on the elevated super-duper-admin tier. See [Analytics Agent](../platform/analytics-agent.md).
+- `analytics-agent/` — the **Analytics Agent**: natural-language analytics questions turned into read-only SQL. Owns the trust boundary (table allowlist, denied columns, single-SELECT guard, `READ ONLY` transaction with a statement timeout and row cap) and calls ally-ai to plan the query and narrate the result. Gated on `FeatureToggleKey.ANALYTICS_AGENT` on top of `ANALYTICS`. See [Analytics Agent](../platform/analytics-agent.md).
 - `badge/`, `community/` — gamification and leaderboards.
 - `language/`, `dynamic-i18n/` — translation service and internationalization.
-- `scheduler/`, `health/`, `rate-limit/`, `notification/`, `database/` — background jobs, health checks, throttling, SES notifications, TypeORM data source/migrations/seeds.
+- `scheduler/`, `health/`, `rate-limit/`, `database/` — background jobs, health checks, throttling, TypeORM data source/migrations/seeds.
+- `notification/` — the in-app notification feed, mobile push (FCM, off unless configured), SES email and Slack; other modules write to the feed.
 
 **WebSocket gateways**
 - `/microphone-chat` — live audio chat with message streaming.
@@ -135,16 +138,19 @@ Feature modules live under `src/<domain>/` (controllers, services, DTOs, and `en
 
 **Rate limiting and client addresses** — `@RateLimit` counts a route against exactly one of the throttlers `RateLimitModule` registers (`THROTTLER_NAMES`), at the route's own limit and window if it gives them, and skips the rest. It has to: `@nestjs/throttler` otherwise runs every registered throttler on every guarded route, and silently ignores an override filed under a name it doesn't know. IP keys work because `main.ts` sets Express `trust proxy` to one hop — the load balancer in front of every deployment — so `req.ip`, which the audit logs also record, is the caller's address and not the balancer's. It is a hop count on purpose: `true` would trust whatever a client writes into `X-Forwarded-For`. A `userId` key needs `@RateLimit` written *above* the route's auth guard, because guard decorators run bottom-up and the throttler needs `req.user`. The guard is switched off in local dev, so verify a limit with `src/rate-limit/test/rate-limited-routes.spec.ts`, not by hammering the local server.
 
-**Roles** — there is no `role` column on `users`. A role *is* a row in `groups` whose `name` is a `UserRole` value, joined through `user_groups`; permissions are unioned across every role a user holds. The nine roles are `CLIENT`, `COUNSELOR`, `LEARNER`, `SIMULATION_REVIEWER`, `SCRIBE_REVIEWER`, `ADMIN`, `MULTI_TENANT_ADMIN`, `SUPER_ADMIN`, and `SUPER_DUPER_ADMIN`.
+**Roles** — there is no `role` column on `users`. A role *is* a row in `groups` whose `name` is a `UserRole` value (`src/common/constants/user.constants.ts`), joined through `user_groups`; permissions are unioned across every role a user holds.
 
-The last two are platform-level and are listed together in `SUPER_ADMIN_ROLES` (`src/common/constants/user.constants.ts`), which every name-based super-admin gate compares against — role guards, the tenant-skip on user creation, exclusion from tenant user lists. `SUPER_DUPER_ADMIN` is the elevated tier, adding the super-admin management surface and roadmap editing. Ally staff hold `SUPER_ADMIN` and reach the console on the standalone admin dashboard (see [ally-web](ally-web.md)).
+- **App roles:** `CLIENT`, `COUNSELOR`, `LEARNER`, and the reviewer roles `SIMULATION_REVIEWER` and `SCRIBE_REVIEWER`.
+- **`ADMIN`** is a tenant's own org admin.
+- **`PLATFORM_ADMIN`** is Ally staff. It replaced `SUPER_ADMIN`, `SUPER_DUPER_ADMIN` and `MULTI_TENANT_ADMIN` (migration `CreatePlatformAdminRole1895000000001`); those rows are kept, unreferenced by new code, for rollback safety. Fine-grained staff access is per-user **admin feature toggles** (`admin_feature_toggles`, keyed by `FeatureToggleKey`), not sub-tiers of the role. Name-based platform gates compare against `PLATFORM_TIER_ROLES`, which lists all four — never against `SUPER_ADMIN_ROLES` alone.
+- **Additive roles**, held alongside an account's normal role and gated by their permissions, never their names: `EVALUATOR` (AI Lab's evaluator portal), `LISTENER` and `HELPLINE_SUPERVISOR` (text helpline), `CLINICAL_ADVISOR` and `DEBRIEF_OWNER` (the Debrief console; platform-managed, so the generic role picker cannot grant them).
 
-A tenth role, `INTERNAL`, existed briefly as a permission-for-permission clone of `SUPER_ADMIN` for staff, paired with a copy of the console mounted at `/admin` on the consumer app. Both were withdrawn (migrations `1878000000000` then `1885000000000`); staff use `SUPER_ADMIN` on the standalone dashboard. The lessons it left are in [memory](../memory.md).
+A role called `INTERNAL` existed briefly as a staff clone of `SUPER_ADMIN`, paired with a copy of the console mounted at `/admin` on the consumer app. Both were withdrawn (migrations `1878000000000` then `1885000000000`). The lessons it left are in [memory](../memory.md).
 
-Two things routinely catch people out here:
+The full vocabulary — roles vs feature toggles vs org preferences vs settings rows — is in [Core Concepts](../platform/concepts.md#roles-and-permissions).
 
-- **Group grants do not inherit.** The `...SUPER_ADMIN_PERMISSIONS` spreads in `permissions.constants.ts` are TypeScript only; the `group_permissions` rows are static once written. A new permission granted to `SUPER_ADMIN` must be granted to `SUPER_DUPER_ADMIN` in the same migration.
-- **`GET /users/me` reports one `role`, chosen by a priority list** (`SUPER_DUPER_ADMIN` > `SUPER_ADMIN` > `ADMIN` > `COUNSELOR` > first row). That is lossy for anyone holding a platform role next to a tenant one — `MULTI_TENANT_ADMIN`, for instance, is absent from the list, so a user who also holds `ADMIN` reports `ADMIN` and gets bounced by the admin console's role gate. Adding a role to the priority list is rarely the fix, since the same field feeds the consumer app. The response therefore also carries a `roles` array; **gate on `roles`, not `role`.**
+- **Group grants do not inherit.** The `...SUPER_ADMIN_PERMISSIONS`-style spreads in `permissions.constants.ts` are TypeScript only; the `group_permissions` rows are static once written. A new permission for platform staff must be granted, in the same migration, to every group that should hold it — `PLATFORM_ADMIN` and, while they still exist, the legacy tier rows.
+- **`GET /users/me` reports one `role`, chosen by a priority list** (`determineUserRole`). That is lossy for anyone holding more than one role — a platform admin who also holds a tenant role, or an additive role such as `LISTENER` next to a normal one. Adding a role to the priority list is rarely the fix, since the same field feeds the consumer app. The response therefore also carries a `roles` array; **gate on `roles`, not `role`.**
 
 Which roles may sign in on a given surface is decided by a client-supplied `allowedRoles` list on every auth call, intersected with the roles the account holds — see [Login `allowedRoles`](../platform/login-allowed-roles.md) for the contract, the outage that retiring a role caused, and the test case to run before removing one.
 
