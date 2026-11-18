@@ -1,3 +1,5 @@
+import time
+
 """The Debrief graph reproduces ally-be's runner: the recipe, the budget and its
 fallback rungs, the backup model and the circuit breaker, the check → evaluate ⇄
 revise loop, the deadline, every ending, and a resume that pays for nothing twice.
@@ -311,6 +313,40 @@ class TestEndings:
             "revision."
         )
         assert steps.count("reviser") == 0
+
+    async def test_no_model_step_starts_past_the_deadline(self, steps, gateway):
+        # The clock jumps past the deadline once the Writer has answered: the draft is checked by
+        # code but never scored or revised, and goes out below the bar for review.
+        def clock():
+            return 10_000_000.0 if steps.count("writer") else 0.0
+
+        result = await run(steps, gateway, clock=clock)
+
+        assert steps.count("writer") == 1
+        assert steps.count("evaluator") == 0
+        assert steps.count("reviser") == 0
+        evaluator = [s for s in result["steps"] if s["step"] == "evaluator"][0]
+        assert (evaluator["status"], evaluator["note"]) == ("skipped", "deadline")
+        assert result["status"] == "below_bar"
+        assert result["cards"] is not None
+        assert result["workspace"]["decision"]["reviewReason"] == "not_evaluated"
+
+    async def test_a_model_call_is_cut_off_where_ally_be_gives_up_on_the_run(
+        self, steps, gateway
+    ):
+        # ally-be treats a run still going at deadline + margin as dead and starts it again, so a
+        # call that would outlive that is cut off instead of running on (and being paid twice).
+        steps.delay["safety-reader"] = 5.0
+
+        def clock():
+            # The run starts at 1 s; once the Safety reader has been called it is hours later.
+            return 10_000_000.0 if steps.calls else 1_000.0
+
+        t0 = time.monotonic()
+        result = await run(steps, gateway, clock=clock)
+
+        assert time.monotonic() - t0 < 3.0
+        assert result["status"] != "published"
 
     async def test_missed_risk_cue_is_shown_and_sent_to_urgent_review(
         self, steps, gateway

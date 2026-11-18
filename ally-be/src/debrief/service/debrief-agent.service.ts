@@ -75,7 +75,7 @@ export const LIVE_START_DELAY_MS = 45_000;
 /** Only recent sessions: a debrief days late is not what a learner waits for. */
 const DRAIN_WINDOW_HOURS = 48;
 /** Well past the longest deadline (risk cue: 3 min) plus a slow drain. */
-const STUCK_AFTER_MINUTES = 10;
+export const STUCK_AFTER_MINUTES = 10;
 /**
  * A session no run has started for this long after it ended is not going to
  * get one soon: the learner gets today's debrief instead of "working".
@@ -111,7 +111,7 @@ const NO_FALLBACK_SKIPS: ReadonlySet<string> = new Set([
 /** A published run still not written into its session this long after it finished is published again. */
 export const REPUBLISH_AFTER_MINUTES = 5;
 const REPUBLISH_BATCH = 20;
-const RESUME_AFTER_MINUTES = 5;
+export const RESUME_AFTER_MINUTES = 5;
 const MAX_RESUMES = 1;
 
 /** The tenant switch: the only per-org setting the Debrief agent has in v1. */

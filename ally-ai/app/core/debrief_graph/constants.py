@@ -73,6 +73,11 @@ class FallbackRung(IntEnum):
 
 #: Seconds one attempt at a step may take before it is retried (on the backup
 #: model when there is one): ally-be's `STEP_TIMEOUT_MS`, now the node timeout.
+#: How long past its deadline a run may go before ally-be gives up on it (ally-be's
+#: `GRAPH_MARGIN_MS`, its HTTP timeout is deadline + this). A model call is cut off here, so
+#: ally-ai never keeps running after ally-be decided the worker was dead and started it again.
+HARD_MARGIN_MS = 60_000.0
+
 STEP_TIMEOUT_S: Dict[str, float] = {
     "safety-reader": 60.0,
     "progress-reader": 50.0,

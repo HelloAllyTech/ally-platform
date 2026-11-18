@@ -284,7 +284,13 @@ def make_model_step(spec: ModelStep):
             with capture_calls() as captured:
                 # The list is shared, so a failed attempt's handler sees it.
                 calls = captured
-                res = await ctx.steps.run(spec.path, sent_body, model, ctx.session_id)
+                # Never past the point ally-be gives up on the run (deadline + margin).
+                res = await asyncio.wait_for(
+                    ctx.steps.run(spec.path, sent_body, model, ctx.session_id),
+                    timeout=max(
+                        ctx.hard_left_s(state.get("has_risk_cue", False)), 0.001
+                    ),
+                )
         except asyncio.CancelledError:
             # The node timeout cancelled this attempt (axios' wording, as before).
             ms = int(spec.timeout() * 1000)
