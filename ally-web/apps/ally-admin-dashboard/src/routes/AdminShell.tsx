@@ -48,9 +48,10 @@ export const AdminShell: React.FC = () => {
   // Usage tracking: one `admin_page_viewed` per route change (route pattern only, never ids).
   useAdminPageView(pathname);
   const { assistantOnly } = useAssistantOnly();
-  // The assistants list is the one page that shows no side navigation, for anyone (its own
-  // sub-pages, e.g. one assistant's home, keep it).
-  const hideSidebar = pathname.replace(/\/+$/, "") === ROUTES.WHATSAPP_BOT;
+  // The assistants area (the list and every page under it: New assistant, one assistant's home,
+  // onboarding) shows no side navigation, for anyone. `/assistants-x` is not under it.
+  const hideSidebar =
+    pathname === ROUTES.WHATSAPP_BOT || pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`);
   // A URL the table does not know is either a redirect (no title to set) or the 404, which sets its own.
   useDocumentTitle(meta.known ? meta.title : undefined, meta.known);
 

@@ -182,20 +182,25 @@ describe("AdminShell", () => {
     });
   });
 
-  it("shows no side navigation on the assistants list, even to someone with other pages", () => {
-    renderShell("/assistants");
-    expect(screen.getByText("assistants")).toBeInTheDocument();
-    expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("admin-mobile-menu-button")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("assistant-only-header")).not.toBeInTheDocument();
+  it("shows no side navigation on the assistants list or any page under it, even to someone with other pages", () => {
+    for (const path of ["/assistants", "/assistants/", "/assistants/new"]) {
+      renderShell(path);
+      expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("admin-mobile-menu-button")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("assistant-only-header")).not.toBeInTheDocument();
+      cleanup();
+    }
+    renderShell("/assistants/new");
+    expect(screen.getByText("new assistant")).toBeInTheDocument();
   });
 
-  it("anyone with other pages keeps the Sidebar elsewhere, assistant sub-pages included", () => {
+  it("anyone with other pages keeps the Sidebar on every other page", () => {
     renderShell("/manage-prompts");
     expect(screen.getByTestId("stub-sidebar")).toBeInTheDocument();
     expect(screen.queryByTestId("assistant-only-header")).not.toBeInTheDocument();
     cleanup();
-    renderShell("/assistants/new");
+    // A path that merely starts with the same letters is not under /assistants.
+    renderShell("/assistants-archive");
     expect(screen.getByTestId("stub-sidebar")).toBeInTheDocument();
   });
 });
