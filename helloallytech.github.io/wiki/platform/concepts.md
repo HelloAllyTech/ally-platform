@@ -570,7 +570,7 @@ out which meaning is in play before you change anything.
 **Is:** The routing and CI machinery that keeps docs findable and in step with the code, for AI sessions first. This page is part of it.
 **Also called:** docs guard, docs map, routing index, wiki
 **Composed of:** `AGENTS.md` routers in each app, mirrored byte-for-byte to `CLAUDE.md`. `.docs-map.yml` rules checked by `docs.yml`, which also runs this page's lint and the docs-path lint. The wiki source lives in `helloallytech.github.io/` and `publish-wiki.yml` mirrors it to GitHub Pages; `gen-routing.py` generates `ROUTING.md` (checked by `routing-index.yml`); `wiki-health.yml` runs a weekly lint.
-**Status:** Live — gate: none (escape with the `docs:skip` label or a `Docs-Skip:` / `Wiki-PR: none — …` trailer)
+**Status:** Live — gate: none (escape with the `docs:skip` label on a PR, a `Docs-Skip:` trailer on a direct push, or `Wiki-PR: none — <reason>` for a `wiki:` rule)
 **Code:** `helloallytech.github.io/` · `scripts/concepts_lint.py` · `.docs-map.yml`
 **Deep doc:** [Documentation System](../contributing/docs-system.md)
 
