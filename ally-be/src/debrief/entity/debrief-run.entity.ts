@@ -126,6 +126,14 @@ export class DebriefRun extends BaseWithoutTenantEntity {
   @Column({ type: 'varchar', length: 80, nullable: true })
   judgePromptVersion?: string | null;
 
+  /**
+   * How the run treated risk cues: `alarm` (a cue is a safety moment) or `assessed` (handling it
+   * is the skill practised). Set when the run starts; null on a run from before the column, which
+   * `workspace.riskCueOption` still describes.
+   */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  riskCueHandling?: 'alarm' | 'assessed' | null;
+
   /** How the session's language was found: recorded, detected or detected_low_confidence. */
   @Column({ type: 'varchar', length: 40, nullable: true })
   languageSource?: string | null;

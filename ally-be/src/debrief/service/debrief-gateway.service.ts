@@ -1,4 +1,5 @@
 import { DebriefClinicalListsService } from './debrief-clinical-lists.service';
+import { runRiskCueFacts } from '../util/debrief-risk-cue.util';
 import { ForbiddenException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -267,8 +268,7 @@ export class DebriefGatewayService {
     },
   ) {
     const transcript = await this.context.transcript(run.scenarioSessionId);
-    const handling =
-      body.risk_handling ?? run.workspace?.riskCueOption?.handling;
+    const handling = body.risk_handling ?? runRiskCueFacts(run).handling;
     const failures = runDebriefChecks({
       cards: body.cards,
       transcript,

@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { RISK_CUE_CHOICE_KEYS } from '../constants/scenario-risk-cue-choice.constants';
 import {
+  IsIn,
   IsString,
   IsOptional,
   IsEnum,
@@ -778,7 +780,7 @@ export class UpdateScenarioDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(60)
+  @IsIn(RISK_CUE_CHOICE_KEYS)
   debriefRiskCueOption?: string | null;
 
   @ApiProperty({

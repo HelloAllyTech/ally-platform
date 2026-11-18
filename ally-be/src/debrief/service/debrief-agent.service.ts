@@ -1,5 +1,6 @@
 import { DebriefSlackService } from './debrief-slack.service';
 import { retriesSql } from '../util/debrief-run-columns.util';
+import { runRiskCueFacts } from '../util/debrief-risk-cue.util';
 import {
   BadRequestException,
   ForbiddenException,
@@ -307,18 +308,16 @@ export function withoutPractice<
  */
 export function cueBringsSupportLines(run: {
   hasRiskCue?: boolean | null;
+  riskCueHandling?: string | null;
   workspace?: Record<string, any> | null;
 }): boolean {
   if (run.hasRiskCue !== true) return false;
-  const option = run.workspace?.riskCueOption;
-  if (!option) return true;
-  if (option.supportLinesOnCue === false) return false;
-  if (option.handling !== 'assessed') return true;
-  const cues = run.workspace?.safety?.risk_cues;
-  if (!Array.isArray(cues) || !cues.length) return true;
-  return cues.some(
-    (c: { part_of_practice?: unknown }) => c?.part_of_practice !== true,
-  );
+  const facts = runRiskCueFacts(run);
+  if (!facts.known) return true;
+  if (!facts.supportLinesOnCue) return false;
+  if (!facts.assessed) return true;
+  if (!facts.practisedCues.length) return true;
+  return facts.practisedCues.some((practised) => !practised);
 }
 
 /** The roleplays a debrief's cards link to, once each. */

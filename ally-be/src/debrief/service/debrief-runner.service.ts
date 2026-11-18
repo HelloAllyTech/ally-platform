@@ -649,6 +649,7 @@ export class DebriefRunnerService {
       );
       run.workspace = { ...run.workspace, dataNotes: loaded.problems };
     }
+    run.riskCueHandling = riskCue.handling;
     run.workspace = {
       ...run.workspace,
       // What this run used, kept so a later edit never changes how a past debrief reads.

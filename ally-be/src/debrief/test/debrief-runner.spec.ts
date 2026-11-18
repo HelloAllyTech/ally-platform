@@ -353,6 +353,8 @@ describe('DebriefRunnerService', () => {
         ids: ['DG-0300'],
         areas: [],
       });
+      // The handling is also a typed column on the run, set when it starts.
+      expect(saved[saved.length - 1]?.riskCueHandling).toBe('assessed');
       expect(ws.riskCueOption).toMatchObject({
         key: 'part_of_practice',
         version: 1,

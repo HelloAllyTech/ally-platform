@@ -129,7 +129,7 @@ export class DebriefScoreService {
               COALESCE(r.workspace->'judge'->'hardFails', '[]'::jsonb) AS hard_fails,
               (r.status IN ('published','below_bar')) AS shown,
               r.workspace->'safety'->'risk_cues' AS risk_cues,
-              r.workspace->'riskCueOption'->>'handling' AS risk_handling,
+              COALESCE(r."riskCueHandling", r.workspace->'riskCueOption'->>'handling') AS risk_handling,
               r.cards->'important_moment' AS important_moment,
               COALESCE(r."actualCostUsd", r."estimatedCostUsd")::float
                 + COALESCE((r.workspace->>'askAllySpentUsd')::float, 0) AS session_cost,
