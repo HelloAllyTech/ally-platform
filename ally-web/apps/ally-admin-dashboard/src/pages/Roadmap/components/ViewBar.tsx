@@ -5,22 +5,18 @@ import { motion } from "framer-motion";
 
 import {
   Button,
-  ContentSwitcher,
   Modal,
   OverflowMenu,
   OverflowMenuItem,
   Select,
   SelectItem,
-  Switch,
   TextInput,
-  Tooltip,
 } from "@ally-ui-mono/ui-shared";
-import { TooltipIcon } from "@assets";
 import { en } from "@constants";
 import type { RoadmapQueueSort, RoadmapQueueView, RoadmapSavedView } from "@types";
 
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
-import { QUEUE_SORTS, QueueLayout, defaultSortFor, isSectionedView } from "../utils/queueState";
+import { QUEUE_SORTS, defaultSortFor, isSectionedView } from "../utils/queueState";
 
 interface ViewChipsProps {
   views: RoadmapQueueView[];
@@ -175,39 +171,6 @@ export const SortSelect: React.FC<{
         <SelectItem key={option} value={option} text={copy.by(copy.options[option])} />
       ))}
     </Select>
-  );
-};
-
-/** List | Board, for Builders and Owners. */
-export const LayoutSwitch: React.FC<{
-  layout: QueueLayout;
-  onChange: (layout: QueueLayout) => void;
-}> = ({ layout, onChange }) => {
-  const copy = en.roadmapV2.layout;
-  return (
-    <div className="flex items-center gap-1">
-      <ContentSwitcher
-        size="sm"
-        selectedIndex={layout === "board" ? 1 : 0}
-        onChange={({ name }: { name?: string | number }) =>
-          onChange(name === "board" ? "board" : "list")
-        }
-        aria-label={copy.label}
-        className="w-40"
-      >
-        <Switch name="list" text={copy.list} />
-        <Switch name="board" text={copy.board} />
-      </ContentSwitcher>
-      <Tooltip label={copy.boardHelp} align="bottom">
-        <button
-          type="button"
-          className="inline-flex cursor-pointer items-center"
-          aria-label={copy.boardHelp}
-        >
-          <TooltipIcon />
-        </button>
-      </Tooltip>
-    </div>
   );
 };
 

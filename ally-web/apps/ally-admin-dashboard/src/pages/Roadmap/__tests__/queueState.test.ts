@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   activeFilterCount,
-  canUseBoard,
   decodeQueueState,
   encodeQueueState,
   filterChips,
@@ -24,11 +23,6 @@ describe("viewsForRole", () => {
   it("adds Leading for Builders and To triage for Owners", () => {
     expect(viewsForRole("builder")).toEqual(["for-you", "leading", "all"]);
     expect(viewsForRole("owner")).toEqual(["for-you", "leading", "to-triage", "all"]);
-  });
-  it("offers the Board only to Builders and Owners", () => {
-    expect(canUseBoard("idea")).toBe(false);
-    expect(canUseBoard("builder")).toBe(true);
-    expect(canUseBoard("owner")).toBe(true);
   });
 });
 
@@ -76,7 +70,7 @@ describe("filter encoding", () => {
 describe("URL state", () => {
   it("opens on For you with nothing in the URL", () => {
     const state = decodeQueueState(new URLSearchParams(), "idea");
-    expect(state).toEqual({ view: "for-you", filters: {}, layout: "list" });
+    expect(state).toEqual({ view: "for-you", filters: {} });
   });
 
   it("falls back to For you for a view the role can't see", () => {
@@ -84,51 +78,44 @@ describe("URL state", () => {
     expect(decodeQueueState(new URLSearchParams("view=to-triage"), "owner").view).toBe("to-triage");
   });
 
-  it("remembers the last view and layout when the URL names none", () => {
+  it("remembers the last view when the URL names none", () => {
     const state = decodeQueueState(new URLSearchParams(), "builder", {
       view: "leading",
-      layout: "board",
     });
     expect(state.view).toBe("leading");
-    expect(state.layout).toBe("board");
   });
 
-  it("never gives an Idea person the Board, even from a link", () => {
-    expect(decodeQueueState(new URLSearchParams("layout=board"), "idea").layout).toBe("list");
-  });
-
-  it("round-trips view, filters, sort, layout, saved view and the open idea", () => {
+  it("round-trips view, filters, sort, saved view and the open idea", () => {
     const state = {
       view: "all" as const,
       filters: { stage: ["shipped"], votedByMe: true },
       sort: "votes" as const,
-      layout: "board" as const,
       savedViewId: "v1",
       open: "OPP-388",
     };
     const encoded = encodeQueueState(state);
     expect(encoded.toString()).toBe(
-      "view=all&stage=shipped&votedByMe=1&sort=votes&layout=board&sv=v1&open=OPP-388",
+      "view=all&stage=shipped&votedByMe=1&sort=votes&sv=v1&open=OPP-388",
     );
     expect(decodeQueueState(encoded, "owner")).toEqual(state);
   });
 
   it("omits the view's default sort from the URL", () => {
-    expect(
-      encodeQueueState({ view: "all", filters: {}, sort: "rank", layout: "list" }).toString(),
-    ).toBe("view=all");
+    expect(encodeQueueState({ view: "all", filters: {}, sort: "rank" }).toString()).toBe(
+      "view=all",
+    );
   });
 });
 
 describe("toItemsQuery", () => {
   it("sends no sort for the sectioned views", () => {
-    expect(toItemsQuery({ view: "for-you", filters: {}, layout: "list", sort: "votes" })).toEqual({
+    expect(toItemsQuery({ view: "for-you", filters: {}, sort: "votes" })).toEqual({
       view: "for-you",
     });
   });
 
   it("sends the view's default sort, the filters and the cursor for flat views", () => {
-    expect(toItemsQuery({ view: "all", filters: { goal: ["g1"] }, layout: "list" }, "c2")).toEqual({
+    expect(toItemsQuery({ view: "all", filters: { goal: ["g1"] } }, "c2")).toEqual({
       view: "all",
       goal: "g1",
       sort: "rank",
@@ -143,14 +130,12 @@ describe("saved views", () => {
       view: "all",
       filters: { stage: ["planning"] },
       sort: "newest",
-      layout: "list",
     });
     expect(payload).toEqual({ view: "all", stage: "planning", sort: "newest" });
-    expect(stateFromSavedView(payload, "idea", "list", "v9")).toEqual({
+    expect(stateFromSavedView(payload, "idea", "v9")).toEqual({
       view: "all",
       filters: { stage: ["planning"] },
       sort: "newest",
-      layout: "list",
       savedViewId: "v9",
       open: undefined,
     });
