@@ -9,7 +9,6 @@ import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
 import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import { withPinnedPrompts } from '../util/debrief-releases.util';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_PROMPT_CODES,
   DEBRIEF_SEED_BUNDLE,
@@ -24,6 +23,7 @@ import {
   orchestratorModels,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   DebriefRunArm,

@@ -4,7 +4,7 @@ import { DataSource, IsNull, Repository } from 'typeorm';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
 import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
 import { DebriefChangeHold } from '../entity/debrief-change-hold.entity';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 
 /** Kinds of change a person can pause (C2): prompts, settings, and Builder / Bug Hunter hand-offs. */
 export const PAUSABLE_KINDS = ['prompts', 'settings', 'code'] as const;

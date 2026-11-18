@@ -8,7 +8,7 @@ import {
   settledEndedSessionPredicate,
 } from '../../analytics/util/session-eligibility.util';
 import { debriefOverallSql } from '../../analytics/constants/debrief-quality.constants';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { lengthBand } from '../util/debrief-metrics.util';
 
 export { lengthBand };

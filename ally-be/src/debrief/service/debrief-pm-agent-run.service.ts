@@ -13,7 +13,6 @@ import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.r
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_MODELS,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
   DEBRIEF_PM_AGENT_PROMPT_CODES,
@@ -22,6 +21,7 @@ import {
   PM_AGENT_EDITABLE_PROMPTS,
   PM_AGENT_SETTINGS,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { modelPrices } from '../util/debrief-budget.util';
 import {
   PM_AGENT_GATEWAY_TOOLS,

@@ -4,7 +4,7 @@ import {
   LIVE_START_DELAY_MS,
   learnerProgress,
 } from '../service/debrief-agent.service';
-import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../util/debrief-live.util';
+import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../../common/util/debrief-live.util';
 
 function build(opts: {
   owner?: number;

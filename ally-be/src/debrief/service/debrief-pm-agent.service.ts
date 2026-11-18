@@ -21,13 +21,13 @@ import {
 import { PromptVersioningService } from '../../prompt/service/prompt-versioning.service';
 import { PromptVersionSource } from '../../prompt/entity/prompt-version.entity';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_PROMPT_CODES,
   DebriefBundle,
   DebriefRecipeKey,
   DebriefStep,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { PM_HOLD_DAYS } from '../util/debrief-outcome.util';
 import {
   changeEvidenceRefusal,

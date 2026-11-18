@@ -9,7 +9,7 @@ import { AgentReleaseService } from '../../llm-agent/harness/release/agent-relea
 import { AgentReleaseAuditAction } from '../../llm-agent/harness/enum/harness.enum';
 import { LoggerService } from '../../logger/logger.service';
 import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   CHANGE_STATES,
   ChangeContext,

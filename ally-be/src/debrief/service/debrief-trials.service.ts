@@ -20,7 +20,7 @@ import {
   trialVerdict,
 } from '../util/debrief-ladder.util';
 import { runWithConcurrency } from '../../analytics/util/judge-concurrency.util';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   AgentReleaseAuthorKind,
   AgentReleaseAuditAction,

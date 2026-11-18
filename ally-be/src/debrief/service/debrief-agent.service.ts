@@ -22,12 +22,12 @@ import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants'
 import { settledEndedSessionPredicate } from '../../analytics/util/session-eligibility.util';
 import { runWithConcurrency } from '../../analytics/util/judge-concurrency.util';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_SEED_BUNDLE,
   DebriefProvider,
   DebriefStep,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   PROVIDER_ALLOWED_KEY,
@@ -55,7 +55,7 @@ import {
   DEBRIEF_FALLBACK_TO_TODAY_EVENT,
   DebriefFallbackToTodayEventParams,
   hasLegacyFeedback,
-} from '../util/debrief-live.util';
+} from '../../common/util/debrief-live.util';
 import { todaysDebriefProvider } from '../util/debrief-todays-provider.util';
 import { RUN_STATUS_WRITERS } from '../util/debrief-run-status.util';
 import { cardsForReader } from '../util/debrief-cards.util';

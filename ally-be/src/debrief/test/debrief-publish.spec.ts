@@ -5,7 +5,7 @@ import { DebriefCards } from '../util/debrief-cards.util';
 import {
   hasLegacyFeedback,
   isDebriefAgentLiveForSession,
-} from '../util/debrief-live.util';
+} from '../../common/util/debrief-live.util';
 import {
   areasOfGrowthFromCards,
   claimsFromCards,

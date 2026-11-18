@@ -8,7 +8,7 @@ import {
 } from '@nestjs/swagger';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 
 /**
  * What Simulation Studio asks about a roleplay's Debrief (the risk-cue yes/no and its note) is

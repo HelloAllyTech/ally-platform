@@ -15,8 +15,6 @@
 import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants';
 import { ROLEPLAY_OPTIONAL_KEYS } from './debrief-roleplay-fields.constants';
 
-export const DEBRIEF_AGENT_KEY = 'debrief';
-
 /**
  * The gateway's approved providers (plan §8.9): learner data goes only to
  * providers under a zero-retention, no-training agreement. Adding one is a

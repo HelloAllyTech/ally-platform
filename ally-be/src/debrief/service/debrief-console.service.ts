@@ -10,7 +10,6 @@ import { debriefOverallSql } from '../../analytics/constants/debrief-quality.con
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_MODELS,
   DEBRIEF_REPLY_DEFAULT,
@@ -21,6 +20,7 @@ import {
   providerOfModel,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DebriefRunnerService } from './debrief-runner.service';
 import { DebriefAgentService, DebriefRegion } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';

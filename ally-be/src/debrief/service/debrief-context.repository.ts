@@ -5,10 +5,8 @@ import { resolveWorkerType } from '../../user/enum/user.enum';
 import { TranscriptTurn } from '../util/debrief-cards.util';
 import { guidancePassage } from '../util/debrief-guidance.util';
 import { ClChunk } from '../../context-library/entity/cl-chunk.entity';
-import {
-  DEBRIEF_AGENT_KEY,
-  DebriefProvider,
-} from '../constants/debrief-release.constants';
+import { DebriefProvider } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   ALLOWLIST_WHEN_UNREADABLE,
   allowlistFromValues,

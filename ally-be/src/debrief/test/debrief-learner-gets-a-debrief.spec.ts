@@ -8,7 +8,7 @@ import {
 import { keepOfferedPractice } from '../util/debrief-cards.util';
 import { DebriefPracticeService } from '../service/debrief-practice.service';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
-import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../util/debrief-live.util';
+import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../../common/util/debrief-live.util';
 import {
   modelTier,
   substituteModel,

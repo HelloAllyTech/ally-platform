@@ -7,7 +7,7 @@ import {
   DebriefFallbackToTodayEventParams,
   hasLegacyFeedback,
   isDebriefAgentLiveForSession,
-} from '../../debrief/util/debrief-live.util';
+} from '../../common/util/debrief-live.util';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { CohortContentType } from 'src/cohort/constants/cohort.constants';
 import {
