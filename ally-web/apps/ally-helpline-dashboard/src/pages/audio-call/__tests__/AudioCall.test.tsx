@@ -74,6 +74,11 @@ const mockUseLazyGetCounsellorChatQuery = vi.fn();
 const mockUseEndCallMutation = vi.fn();
 
 vi.mock("@api", () => ({
+  // Segmented recording off: these tests cover the socket path.
+  useGetScribeRecordingConfigQuery: () => ({ data: { enabled: false }, isLoading: false }),
+  useStartScribeRecordingMutation: () => [vi.fn()],
+  useGetSegmentUploadUrlMutation: () => [vi.fn()],
+  useFinalizeScribeRecordingMutation: () => [vi.fn()],
   useLazyGetCounsellorChatQuery: () => [mockGetCounsellorChat, mockUseLazyGetCounsellorChatQuery()],
   useEndCallMutation: () => [mockEndCall, mockUseEndCallMutation()],
   useGetNudgeStatusQuery: () => ({ data: null }),
