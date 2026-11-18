@@ -8764,6 +8764,16 @@ export const en = {
       digestOff: "Weekly email turned off.",
       digestFailed: "Couldn't change your email setting.",
     },
+    concepts: {
+      button: "Core concepts",
+      tooltip: "Core concepts: what each part of Ally is, its code, and whether it's live",
+      title: "Core concepts",
+      source: "View only. The latest version of the Developer Wiki page.",
+      openOnWiki: "Open on the wiki",
+      loading: "Loading core concepts",
+      failed: "Couldn't load the core concepts page.",
+      retry: "Try again",
+    },
     agent: {
       title: "Agent",
       intro: "What the Builder agent costs, how well it does, and the rules it follows.",

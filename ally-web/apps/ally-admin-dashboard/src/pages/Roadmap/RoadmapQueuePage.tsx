@@ -30,7 +30,11 @@ import { IdeaView } from "./components/IdeaView";
 import { NewIdeaButton } from "./components/NewIdeaButton";
 import { QueueList } from "./components/QueueList";
 import { QuickOpen } from "./components/QuickOpen";
-import { RoadmapHelpMenu, RoadmapRoleTabs } from "./components/RoadmapAreaNav";
+import {
+  RoadmapConceptsButton,
+  RoadmapHelpMenu,
+  RoadmapRoleTabs,
+} from "./components/RoadmapAreaNav";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { SaveViewControls, SearchButton, SortSelect, ViewChips } from "./components/ViewBar";
@@ -443,6 +447,7 @@ export const RoadmapQueuePage: React.FC = () => {
                   {copy.mobile.bugs}
                 </Link>
                 <RoadmapRoleTabs role={role} />
+                <RoadmapConceptsButton />
                 <RoadmapHelpMenu />
               </nav>
             )}
