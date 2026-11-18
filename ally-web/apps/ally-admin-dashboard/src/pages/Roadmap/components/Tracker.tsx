@@ -4,13 +4,13 @@ import { Tick } from "@icons";
 import { motion } from "framer-motion";
 
 import { en } from "@constants";
-import type { RoadmapShownStage } from "@types";
+import type { RoadmapShownStage, RoadmapSimpleStage } from "@types";
 
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
 import { trackerModel } from "../utils/copy";
 
 interface TrackerProps {
-  stage: RoadmapShownStage;
+  stage: RoadmapShownStage | RoadmapSimpleStage;
   /** Phone: five thin segments and the stage word, not five labelled steps (§4.17). */
   compact?: boolean;
 }
@@ -18,7 +18,7 @@ interface TrackerProps {
 /**
  * The worded tracker: Submitted · Accepted · Planning · Building · Shipped (D20). A list with text,
  * never dots alone ("Stage 3 of 5: Planning"), so a screen reader hears the same thing the eye sees.
- * Declined and Closed replace the tracker with a single labelled state.
+ * Declined replaces the tracker with a single labelled state.
  *
  * Motion: the connector fills left to right and the current dot scales in from 80% (§4.18
  * "Tracker advances"). Reduced motion lands on the same filled state with a fade.

@@ -103,7 +103,7 @@ describe('RoadmapItemController', () => {
     });
     expect(reader.list).toHaveBeenCalledWith(5, {
       view: 'leading',
-      filters: { stage: ['planning', 'building'], starred: true },
+      filters: { stage: ['being_built'], starred: true },
       sort: 'votes',
       offset: 0,
       limit: 50,

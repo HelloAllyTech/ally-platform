@@ -282,7 +282,7 @@ describe('RoadmapItemReadService.list', () => {
     });
   });
 
-  it('builds To triage for an Owner: review, a lead to pick, idle leads', async () => {
+  it('builds To triage for an Owner: the Backlog only, never an idea someone leads', async () => {
     const pending = item(1, {}, { reviewState: 'pending' });
     const noLead = item(2, { builderSessionId: 's2' }, planSession('s2'));
     const idle = item(
@@ -316,11 +316,11 @@ describe('RoadmapItemReadService.list', () => {
       'OPP-0001',
     ]);
     expect(result.sections.needsLead.map((r) => r.code)).toEqual(['OPP-0002']);
-    expect(result.sections.reassign.map((r) => r.code)).toEqual(['OPP-0003']);
-    expect(result.sections.reassign[0].whyHere).toEqual({
-      kind: 'reassign',
-      idleDays: 9,
-    });
+    // Led ideas (idle or busy) are Being built: Leading shows them, To triage does not.
+    expect(Object.keys(result.sections).sort()).toEqual([
+      'awaitingReview',
+      'needsLead',
+    ]);
   });
 
   it('marks a row unread only when something happened since it was opened', async () => {

@@ -4,6 +4,8 @@ import {
   activeFilterCount,
   canUseBoard,
   decodeQueueState,
+  defaultSortFor,
+  isSectionedView,
   encodeQueueState,
   filterChips,
   filtersToParams,
@@ -191,5 +193,20 @@ describe("saved views", () => {
     expect(queueSignature({ stage: ["a"] }, "rank")).not.toBe(
       queueSignature({ stage: ["a"] }, "votes"),
     );
+  });
+});
+
+describe("sorting by view", () => {
+  it("ranks To triage and All ideas, and leaves only For you with a fixed section order", () => {
+    expect(defaultSortFor("to-triage")).toBe("rank");
+    expect(defaultSortFor("all")).toBe("rank");
+    expect(defaultSortFor("leading")).toBe("waiting");
+    expect(isSectionedView("for-you")).toBe(true);
+    expect(isSectionedView("to-triage")).toBe(false);
+  });
+  it("sends a sort for To triage (so its sections are ordered by it) but not for For you", () => {
+    const triage = toItemsQuery({ view: "to-triage", filters: {}, layout: "list" });
+    expect(triage.sort).toBe("rank");
+    expect(toItemsQuery({ view: "for-you", filters: {}, layout: "list" }).sort).toBeUndefined();
   });
 });

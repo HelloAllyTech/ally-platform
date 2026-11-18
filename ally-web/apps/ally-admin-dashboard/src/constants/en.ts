@@ -9044,14 +9044,18 @@ export const en = {
     } as Record<string, string>,
     sectionCount: (label: string, count: number) => `${label} · ${count}`,
     stages: {
+      // The five stages people see. The finer ones (submitted, accepted, planning, building,
+      // closed) read as the stage they fall in; their detail lives in the status line.
       draft: "Draft",
-      submitted: "Submitted",
-      accepted: "Accepted",
-      planning: "Planning",
-      building: "Building",
+      backlog: "Backlog",
+      being_built: "Being built",
       shipped: "Shipped",
       declined: "Declined",
-      closed: "Closed",
+      submitted: "Backlog",
+      accepted: "Backlog",
+      planning: "Being built",
+      building: "Being built",
+      closed: "Declined",
     } as Record<string, string>,
     trackerLabel: "Where this idea is",
     trackerStep: (index: number, total: number, label: string) =>

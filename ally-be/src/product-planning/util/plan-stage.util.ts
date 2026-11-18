@@ -82,6 +82,54 @@ export type ShownStage =
   | 'declined'
   | 'closed';
 
+/**
+ * The stage the Roadmap shows people: five words, however the plan underneath is going.
+ * Draft is private to its author, then Backlog (filed, nobody leads it), Being built (a Builder
+ * leads it: planning and building alike), Shipped, or Declined. `ShownStage` keeps the finer
+ * detail for the status line and the actions; this is what rows, tabs, filters and the tracker say.
+ */
+export type SimpleStage =
+  | 'draft'
+  | 'backlog'
+  | 'being_built'
+  | 'shipped'
+  | 'declined';
+
+export const SIMPLE_STAGES: SimpleStage[] = [
+  'draft',
+  'backlog',
+  'being_built',
+  'shipped',
+  'declined',
+];
+
+/**
+ * Pure. Submitted is Backlog. Accepted is Backlog until someone leads it. Planning and Building
+ * are Being built. Declined and Closed (not pursuing, archived) are both Declined: either way
+ * nobody is going to build it.
+ */
+export function simpleStageOf(
+  shown: ShownStage,
+  leadUserId: number | null,
+): SimpleStage {
+  switch (shown) {
+    case 'draft':
+      return 'draft';
+    case 'submitted':
+      return 'backlog';
+    case 'accepted':
+      return leadUserId ? 'being_built' : 'backlog';
+    case 'planning':
+    case 'building':
+      return 'being_built';
+    case 'shipped':
+      return 'shipped';
+    case 'declined':
+    case 'closed':
+      return 'declined';
+  }
+}
+
 /** The tracker's five steps, in order (§4.9). */
 export const ITEM_TRACKER: ShownStage[] = [
   'submitted',

@@ -1,4 +1,9 @@
-import type { ShownStage } from 'src/product-planning/util/plan-stage.util';
+import {
+  SIMPLE_STAGES,
+  simpleStageOf,
+  type ShownStage,
+  type SimpleStage,
+} from 'src/product-planning/util/plan-stage.util';
 import type { WhyHere } from './roadmap-item.types';
 
 /**
@@ -24,14 +29,31 @@ export const ITEM_SORTS = [
 ] as const;
 export type ItemSort = (typeof ITEM_SORTS)[number];
 
-const SHOWN_STAGES: ShownStage[] = [
-  'submitted',
-  'accepted',
-  'planning',
-  'building',
-  'shipped',
-  'declined',
-  'closed',
+/**
+ * The `stage` filter speaks the simple stages. The finer values a saved view or an old link may
+ * still carry are read as the stage they fall in, so they narrow to the same ideas, never to nothing.
+ */
+const LEGACY_STAGE: Record<string, SimpleStage> = {
+  new: 'backlog',
+  submitted: 'backlog',
+  accepted: 'backlog',
+  prioritised: 'being_built',
+  planning: 'being_built',
+  building: 'being_built',
+  released: 'shipped',
+  closed: 'declined',
+  archived: 'declined',
+};
+const toSimpleStages = (value: unknown): SimpleStage[] => [
+  ...new Set(
+    list(value)
+      .map((v) =>
+        (SIMPLE_STAGES as string[]).includes(v)
+          ? (v as SimpleStage)
+          : LEGACY_STAGE[v],
+      )
+      .filter((v): v is SimpleStage => !!v),
+  ),
 ];
 const REVIEW_STATES = ['pending', 'accepted', 'declined'] as const;
 type ReviewState = (typeof REVIEW_STATES)[number];
@@ -39,7 +61,8 @@ type ReviewState = (typeof REVIEW_STATES)[number];
 export const DEFAULT_SORT: Record<ItemView, ItemSort> = {
   'for-you': 'waiting',
   leading: 'waiting',
-  'to-triage': 'waiting',
+  // Backlog ideas are ranked like everything not yet released; the Owner picks from the top.
+  'to-triage': 'rank',
   all: 'rank',
 };
 
@@ -48,7 +71,7 @@ export const ITEM_PAGE_MAX = 200;
 
 export interface ItemFilters {
   q?: string;
-  stage?: ShownStage[];
+  stage?: SimpleStage[];
   review?: ReviewState[];
   goal?: string[];
   author?: number[];
@@ -141,7 +164,7 @@ export function parseItemQuery(raw: RawQuery): ItemQuery {
   const limitN = Number(raw.limit);
   const filters: ItemFilters = {
     q,
-    stage: nonEmpty(oneOf(SHOWN_STAGES, raw.stage)),
+    stage: nonEmpty(toSimpleStages(raw.stage)),
     review: nonEmpty(oneOf(REVIEW_STATES, raw.review)),
     goal: nonEmpty(list(raw.goal)),
     author: nonEmpty(ids(raw.author)),
@@ -185,7 +208,8 @@ export function matchesFilters(row: ItemQueryFacts, f: ItemFilters): boolean {
       (digits !== null && codeDigits(row.code) === digits);
     if (!hit) return false;
   }
-  if (f.stage && !f.stage.includes(row.shownStage)) return false;
+  if (f.stage && !f.stage.includes(simpleStageOf(row.shownStage, row.leadId)))
+    return false;
   if (f.review && !f.review.includes(row.reviewState)) return false;
   if (f.goal && !(row.goalId && f.goal.includes(row.goalId))) return false;
   if (f.author && !f.author.includes(row.authorId)) return false;
@@ -298,7 +322,10 @@ function splitFirstLine(description: string | null | undefined): {
   if (line.length <= TITLE_MAX) return { title: line, overflow: '' };
   const space = line.lastIndexOf(' ', TITLE_MAX);
   const cut = space >= TITLE_MAX / 2 ? space : TITLE_MAX;
-  return { title: line.slice(0, cut).trimEnd(), overflow: line.slice(cut).trim() };
+  return {
+    title: line.slice(0, cut).trimEnd(),
+    overflow: line.slice(cut).trim(),
+  };
 }
 
 /** The first line of an idea's text, which is its title (the row has no title column). */
@@ -311,7 +338,9 @@ export function bodyOf(description: string | null | undefined): string | null {
   const text = (description ?? '').trim();
   const newline = text.indexOf('\n');
   const rest = newline < 0 ? '' : text.slice(newline + 1).trim();
-  const body = [splitFirstLine(description).overflow, rest].filter(Boolean).join('\n\n');
+  const body = [splitFirstLine(description).overflow, rest]
+    .filter(Boolean)
+    .join('\n\n');
   return body.length ? body : null;
 }
 

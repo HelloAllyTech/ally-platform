@@ -206,7 +206,7 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
                           </span>
                           <span className="min-w-0 flex-1 truncate">{entry.row.title}</span>
                           <span className="shrink-0 text-xs text-typography-secondary">
-                            {stageWord(entry.row.shownStage)}
+                            {stageWord(entry.row.stage ?? entry.row.shownStage)}
                           </span>
                         </span>
                       ) : entry.kind === "view" ? (

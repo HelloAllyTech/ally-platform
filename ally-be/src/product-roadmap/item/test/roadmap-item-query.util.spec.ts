@@ -49,7 +49,7 @@ describe('parseItemQuery', () => {
 
   it('gives each view its default sort and keeps a valid explicit one', () => {
     expect(parseItemQuery({ view: 'for-you' }).sort).toBe('waiting');
-    expect(parseItemQuery({ view: 'to-triage' }).sort).toBe('waiting');
+    expect(parseItemQuery({ view: 'to-triage' }).sort).toBe('rank');
     expect(parseItemQuery({ view: 'all', sort: 'votes' }).sort).toBe('votes');
     expect(parseItemQuery({ view: 'all', sort: 'nope' }).sort).toBe('rank');
   });
@@ -71,7 +71,8 @@ describe('parseItemQuery', () => {
     });
     expect(q.filters).toEqual({
       q: 'streak',
-      stage: ['planning', 'shipped'],
+      // Finer stages read as the stage they fall in; unknown values are dropped.
+      stage: ['being_built', 'shipped', 'draft'],
       review: ['pending'],
       author: [12, 40],
       service: ['be', 'frontend'],
@@ -97,7 +98,8 @@ describe('matchesFilters', () => {
   });
 
   it('applies every structured filter', () => {
-    expect(matchesFilters(row(), { stage: ['building'] })).toBe(false);
+    expect(matchesFilters(row(), { stage: ['backlog'] })).toBe(false);
+    expect(matchesFilters(row(), { stage: ['being_built'] })).toBe(true);
     expect(matchesFilters(row(), { review: ['accepted'] })).toBe(true);
     expect(matchesFilters(row(), { goal: ['g2'] })).toBe(false);
     expect(matchesFilters(row(), { lead: [2] })).toBe(true);
@@ -106,6 +108,45 @@ describe('matchesFilters', () => {
     expect(matchesFilters(row(), { starred: true })).toBe(false);
     expect(matchesFilters(row(), { openQuestion: true })).toBe(false);
     expect(matchesFilters(row(), { month: '2026-12' })).toBe(true);
+  });
+});
+
+describe('stage filter', () => {
+  const stageOf = (over: Partial<ItemQueryFacts>, stage: string) =>
+    matchesFilters(row(over), { stage: [stage as never] });
+
+  it('puts an idea nobody leads in Backlog, whether or not it was reviewed', () => {
+    expect(
+      stageOf(
+        { shownStage: 'submitted', leadUserId: null } as never,
+        'backlog',
+      ),
+    ).toBe(true);
+    expect(stageOf({ shownStage: 'accepted', leadId: null }, 'backlog')).toBe(
+      true,
+    );
+  });
+
+  it('puts an idea someone leads in Being built, planning or building alike', () => {
+    expect(stageOf({ shownStage: 'accepted', leadId: 2 }, 'being_built')).toBe(
+      true,
+    );
+    expect(stageOf({ shownStage: 'planning', leadId: 2 }, 'being_built')).toBe(
+      true,
+    );
+    expect(stageOf({ shownStage: 'building', leadId: 2 }, 'being_built')).toBe(
+      true,
+    );
+    expect(stageOf({ shownStage: 'accepted', leadId: 2 }, 'backlog')).toBe(
+      false,
+    );
+  });
+
+  it('treats closed like declined and reads old values as the stage they fall in', () => {
+    expect(stageOf({ shownStage: 'closed' }, 'declined')).toBe(true);
+    expect(
+      parseItemQuery({ stage: 'new,accepted,released,archived' }).filters.stage,
+    ).toEqual(['backlog', 'shipped', 'declined']);
   });
 });
 

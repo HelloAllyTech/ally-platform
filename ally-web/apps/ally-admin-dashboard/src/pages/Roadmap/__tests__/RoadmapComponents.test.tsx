@@ -77,6 +77,7 @@ const row = (overrides: Partial<RoadmapItemRow> = {}): RoadmapItemRow => ({
   code: "OPP-388",
   title: "Streak on start screen",
   shownStage: "planning",
+  stage: "being_built",
   statusParts: {
     stage: "planning",
     step: "design",
@@ -326,7 +327,7 @@ describe("reduced motion lands on the same final state", () => {
     setReduceMotionSwitch(true);
     const still = snapshot();
     expect(still).toEqual(moving);
-    expect(still.text).toContain("Planning");
+    expect(still.text).toContain("Being built");
   });
 });
 
@@ -401,12 +402,18 @@ describe("QueueList", () => {
     expect(screen.getByRole("button", { name: en.roadmapV2.updatedPill })).toBeInTheDocument();
   });
 
-  it("groups Leading by stage", () => {
+  it("groups Leading by the five stages: planning and building are both Being built", () => {
     const sections = sectionsFor("leading", {
-      rows: [row({ code: "OPP-1" }), row({ code: "OPP-2", shownStage: "building" })],
-      total: 2,
+      rows: [
+        row({ code: "OPP-1", stage: "being_built" }),
+        row({ code: "OPP-2", shownStage: "building", stage: "being_built" }),
+        row({ code: "OPP-3", shownStage: "shipped", stage: "shipped" }),
+      ],
+      total: 3,
     });
-    expect(sections.map(s => s.key)).toEqual(["planning", "building"]);
+    expect(sections.map(s => s.key)).toEqual(["being_built", "shipped"]);
+    expect(sections[0].rows.map(r => r.code)).toEqual(["OPP-1", "OPP-2"]);
+    expect(sections[0].label).toBe("Being built");
   });
 });
 

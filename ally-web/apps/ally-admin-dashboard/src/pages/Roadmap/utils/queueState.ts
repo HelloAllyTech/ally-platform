@@ -101,8 +101,10 @@ export const canUseBoard = (role: RoadmapRole | undefined): boolean =>
 export const defaultSortFor = (view: RoadmapQueueView): RoadmapQueueSort => {
   switch (view) {
     case "for-you":
-    case "to-triage":
       return "waiting";
+    case "to-triage":
+      // Backlog ideas are ranked like anything not yet released; the Owner picks from the top.
+      return "rank";
     case "leading":
       // "Blocking most first": the server's waiting order puts the ideas held on the lead first.
       return "waiting";
@@ -112,9 +114,11 @@ export const defaultSortFor = (view: RoadmapQueueView): RoadmapQueueSort => {
   }
 };
 
-/** For you and To triage come back in sections, whose order the view defines; they take no sort. */
-export const isSectionedView = (view: RoadmapQueueView): boolean =>
-  view === "for-you" || view === "to-triage";
+/**
+ * For you comes back in sections whose order the view defines, so it takes no sort. To triage keeps
+ * its two sections (unreviewed first) but orders each one by the sort, Rank to begin with.
+ */
+export const isSectionedView = (view: RoadmapQueueView): boolean => view === "for-you";
 
 const splitList = (raw: string | null): string[] | undefined => {
   if (!raw) return undefined;

@@ -619,7 +619,7 @@ const PhoneHeader: React.FC<{
           className="flex min-h-12 min-w-0 flex-1 flex-col justify-center bg-transparent py-1 text-left"
         >
           <span className="text-[11px] tabular-nums leading-tight text-typography-secondary">
-            {item.code} · {copy.stages[item.shownStage]}
+            {item.code} · {copy.stages[item.stage ?? item.shownStage]}
           </span>
           <span
             className={`text-sm font-semibold leading-snug text-typography-primary ${
@@ -646,9 +646,9 @@ const PhoneHeader: React.FC<{
             className="text-xl font-semibold text-typography-primary"
           />
         </motion.div>
-        <Tracker stage={item.shownStage} compact />
+        <Tracker stage={item.stage ?? item.shownStage} compact />
         <p className="m-0 text-sm text-typography-secondary">
-          {copy.stages[item.shownStage]} · {status}
+          {copy.stages[item.stage ?? item.shownStage]} · {status}
         </p>
         <div className="flex items-center gap-2">
           <IdeaVotes item={item} />

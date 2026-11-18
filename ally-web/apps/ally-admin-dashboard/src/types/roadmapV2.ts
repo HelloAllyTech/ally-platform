@@ -18,6 +18,9 @@ export type RoadmapShownStage =
   | "declined"
   | "closed";
 
+/** The stage in five words: what rows, filters and the tracker say. `shownStage` keeps the detail. */
+export type RoadmapSimpleStage = "draft" | "backlog" | "being_built" | "shipped" | "declined";
+
 export type RoadmapWatchLevel = "all" | "milestones" | "none";
 
 export type RoadmapRelation = "author" | "lead" | "owner" | "builder" | "idea";
@@ -137,6 +140,8 @@ export interface RoadmapItemRow {
   code: string;
   title: string;
   shownStage: RoadmapShownStage;
+  /** Draft, Backlog, Being built, Shipped or Declined. */
+  stage: RoadmapSimpleStage;
   statusParts: RoadmapStatusParts | Record<string, unknown>;
   author: RoadmapPersonRef;
   lead?: RoadmapPersonRef;

@@ -274,7 +274,7 @@ export const QueueRow: React.FC<QueueRowProps> = ({
         </button>
 
         <span className="relative flex shrink-0 items-center gap-2 pr-1 text-xs text-typography-secondary">
-          <span className="hidden sm:inline">{stageWord(row.shownStage)}</span>
+          <span className="hidden sm:inline">{stageWord(row.stage ?? row.shownStage)}</span>
           <VoteControl
             id={row.id}
             code={row.code}

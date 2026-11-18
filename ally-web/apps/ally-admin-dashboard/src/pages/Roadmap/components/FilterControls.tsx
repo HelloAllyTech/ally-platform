@@ -31,15 +31,7 @@ import {
 /** What FilterDropdown edits: one string list per section. Flags and month ride as lists too. */
 type FilterDropdownState = Record<string, string[]>;
 
-const STAGE_OPTIONS = [
-  "submitted",
-  "accepted",
-  "planning",
-  "building",
-  "shipped",
-  "declined",
-  "closed",
-];
+const STAGE_OPTIONS = ["backlog", "being_built", "shipped", "declined"];
 const REVIEW_OPTIONS = ["pending", "accepted", "declined"];
 const SERVICE_OPTIONS = ["be", "ai", "learn", "frontend", "mobile"];
 

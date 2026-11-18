@@ -35,7 +35,7 @@ export const OpportunityHeader: React.FC<{
       <span className="shrink-0 pt-1 text-xs tabular-nums text-typography-secondary">
         {item.code}
       </span>
-      <StageChip stage={item.shownStage} />
+      <StageChip stage={item.stage ?? item.shownStage} />
       <CollapsibleTitle
         item={item}
         as={as}
@@ -49,7 +49,9 @@ export const OpportunityHeader: React.FC<{
 );
 
 /** The stage as a word, next to the code, so it is readable even when everything else scrolls. */
-export const StageChip: React.FC<{ stage: RoadmapItemDetail["shownStage"] }> = ({ stage }) => (
+export const StageChip: React.FC<{
+  stage: RoadmapItemDetail["stage"] | RoadmapItemDetail["shownStage"];
+}> = ({ stage }) => (
   <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full border border-border-light px-2 py-0.5 text-xs text-typography-secondary">
     {en.roadmapV2.stages[stage]}
   </span>
@@ -125,7 +127,7 @@ export const HeaderTracker: React.FC<{
   status: string;
 }> = ({ item, status }) => (
   <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-    <Tracker stage={item.shownStage} />
+    <Tracker stage={item.stage ?? item.shownStage} />
     <p className="m-0 text-sm text-typography-secondary" aria-live="polite">
       {status}
     </p>
