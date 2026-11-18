@@ -85,8 +85,19 @@ WHERE d."createdAt" > now() - interval '7 days'
 ORDER BY d."createdAt" DESC;
 ```
 
-The side-by-side review of a v2 draft against the v1 summary for the same chat is the
-phase 1 eval. It needs the annotated session set and its owner (DESIGN §12, item 6).
+## Quality gate (phase 1)
+
+Scorers: `ally-ai/app/core/note_harness/eval.py`, covering fact recall via a model judge,
+order (Kendall tau of the matched facts), field accuracy, invented fields (filled where the
+reference says "not discussed"), and length against the budget. Runner:
+`docs/scribe-v2/scripts/run_eval.py <eval.jsonl> [--model …] [--judge-model …] [--out …]`.
+It runs the v2 pipeline per case, scores v2 and v1's points with the same judge, and
+prints means. The report holds scores only.
+
+The eval set itself (DESIGN §10: 30+ real sessions, reference facts in order, correct
+field values) is PHI. Keep it out of the repo: git ignores everything in
+`docs/scribe-v2/eval/` except the made-up `sample_case.jsonl`, which shows the format.
+It still needs an owner for clinical review (DESIGN §12, item 6).
 
 ## Tests
 
