@@ -964,17 +964,25 @@ export class DebriefAgentService implements OnModuleInit {
     let done = 0;
     await runWithConcurrency(pending, DRAIN_CONCURRENCY, async (s) => {
       const mode = DebriefRunMode.LIVE;
-      // The independent judge scores every debrief, published or not, blind.
-      const run = await this.afterRun(
-        await this.runner.run(s.id, {
-          mode,
-          ...(await this.canaryOptions(s.id, mode)),
-        }),
-      );
-      done++;
-      this.logger.info(
-        `[debrief] ${mode} run ${run.id} session=${s.id} status=${run.status} rung=${run.fallbackRung}`,
-      );
+      try {
+        // The independent judge scores every debrief, published or not, blind.
+        const run = await this.afterRun(
+          await this.runner.run(s.id, {
+            mode,
+            ...(await this.canaryOptions(s.id, mode)),
+          }),
+        );
+        done++;
+        this.logger.info(
+          `[debrief] ${mode} run ${run.id} session=${s.id} status=${run.status} rung=${run.fallbackRung}`,
+        );
+      } catch (e) {
+        // A run that could not start (a pinned release that cannot be read) leaves no run row:
+        // the next drain starts it again, and the others in this batch carry on.
+        this.logger.error(
+          `[debrief] ${mode} run for session ${s.id} could not start, will be retried: ${(e as Error).message}`,
+        );
+      }
     });
     this.logger.info(`[debrief] drain finished ${done}/${pending.length}`);
     return `${done} started`;

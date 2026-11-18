@@ -2,6 +2,7 @@ import { DebriefClinicalListsService } from './debrief-clinical-lists.service';
 import { ForbiddenException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { LoggerService } from '../../logger/logger.service';
 import { ContextRetrievalService } from '../../context-library/service/context-retrieval.service';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
@@ -47,6 +48,10 @@ export interface GuidanceTopic {
  */
 @Injectable()
 export class DebriefGatewayService {
+  private readonly logger = LoggerService.getInstance(
+    DebriefGatewayService.name,
+  );
+
   constructor(
     @InjectRepository(DebriefRun)
     private readonly runs: Repository<DebriefRun>,
@@ -280,16 +285,45 @@ export class DebriefGatewayService {
       shortForm: !!body.short_form,
       hasProgress: !!body.has_progress,
       riskHandling: handling === 'assessed' ? 'assessed' : 'alarm',
-      clinical:
-        (await this.clinicalLists
-          ?.patterns(body.language)
-          .catch(() => undefined)) ?? undefined,
+      clinical: await this.clinicalPatterns(run, body.language),
     });
     return {
       failures,
       weight: checkWeight(failures),
       advisory: [...ADVISORY_CHECKS],
     };
+  }
+
+  /**
+   * The clinical advisor's patterns for the rule checks. When they cannot be read the checks still
+   * run without them (a learner's debrief is never held for this), but it is logged at error and
+   * noted on the run (`workspace.dataNotes`), so a run checked without them says so.
+   */
+  private async clinicalPatterns(run: DebriefRun, language: string) {
+    if (!this.clinicalLists) return undefined;
+    try {
+      return (await this.clinicalLists.patterns(language)) ?? undefined;
+    } catch (e) {
+      const why = (e as Error)?.message?.slice(0, 200) || 'could not be read';
+      this.logger.error(
+        `[debrief] run ${run.id}: the clinical patterns could not be read, rule checks ran without them: ${why}`,
+      );
+      await this.runs
+        .query(
+          `UPDATE debrief_runs
+              SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{dataNotes}',
+                    coalesce(workspace->'dataNotes', '[]'::jsonb) || $2::jsonb)
+            WHERE id = $1`,
+          [
+            run.id,
+            JSON.stringify([
+              { contextKey: 'clinical_patterns', item: null, why },
+            ]),
+          ],
+        )
+        .catch(() => undefined);
+      return undefined;
+    }
   }
 
   renderCards(body: { cards: DebriefCards }) {

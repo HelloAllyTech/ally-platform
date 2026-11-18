@@ -320,10 +320,11 @@ export class DebriefRunnerService {
     const now = opts.now ?? Date.now;
     // V2_AUTONOMY A9: a production session whose language is pinned (a change
     // held or undone for it, or live only for it) runs on the pinned release.
-    // A pin that cannot be read never fails the run: the release in force runs.
+    // A pin that cannot be read fails the attempt (nothing is claimed, the drain
+    // starts it again) rather than running a pinned language on the release in force.
     const pinned =
       !opts.release && opts.mode !== DebriefRunMode.REPLAY
-        ? await this.holds?.releaseForSession(sessionId).catch(() => null)
+        ? await this.holds?.releaseForSession(sessionId)
         : null;
     const { release, bundle: released } = await this.resolveRelease(
       opts.release ?? pinned,

@@ -97,6 +97,8 @@ function build(
     owner?: Record<string, unknown>;
     progressProfile?: unknown;
     progressInsert?: Error;
+    /** The language-pin lookup (DebriefChangeHoldsService); absent in most tests. */
+    holds?: unknown;
     /** The ally-ai model catalogue; the seed's models by default. */
     catalog?: string[];
     debriefTabOff?: boolean;
@@ -254,7 +256,7 @@ function build(
     agentLogs as any,
     ownerSettings as any,
     progressResults as any,
-    undefined,
+    opts.holds as any,
     opts.framework
       ? ({ forTenant: jest.fn(async () => opts.framework) } as any)
       : undefined,
@@ -659,6 +661,20 @@ describe('DebriefRunnerService', () => {
       // The graph's answer fills the run record as detection here did.
       expect(run.language).toBe('ta');
       expect(run.workspace?.languageSource).toBe('detected');
+    });
+
+    it('a pin that cannot be read fails the attempt: nothing is claimed and the graph is not called', async () => {
+      const { svc, graph } = build({
+        holds: {
+          releaseForSession: jest.fn(async () => {
+            throw new Error('db down');
+          }),
+        },
+      });
+      await expect(
+        svc.run('s1', { mode: DebriefRunMode.LIVE }),
+      ).rejects.toThrow('db down');
+      expect(graph.run).not.toHaveBeenCalled();
     });
 
     it('reads the case memory for a case session, and debriefs on when an optional read fails', async () => {
