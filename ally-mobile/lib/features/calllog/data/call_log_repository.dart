@@ -227,6 +227,7 @@ class CallSummaryDetails {
     this.createdAt,
     this.callDuration,
     this.callMode,
+    this.isIncompleteRecording = false,
   });
 
   factory CallSummaryDetails.fromJson(Map<String, dynamic> json) {
@@ -292,8 +293,16 @@ class CallSummaryDetails {
         _ => null,
       },
       callMode: callInfo?['mode'] as String?,
+      // ally-be sets `incompleteRecording` ({reason}) when the recording's
+      // connection dropped and never resumed: the audio, and so the summary,
+      // is partial.
+      isIncompleteRecording: json['incompleteRecording'] != null,
     );
   }
+
+  /// The recording's connection dropped and the app never came back to it, so
+  /// part of the audio is missing; the screen says so above the summary.
+  final bool isIncompleteRecording;
 
   /// RN `details.transcript` — a manual note's saved dictation text, which
   /// `VoiceNoteSection` seeds from so a second dictation appends to it.

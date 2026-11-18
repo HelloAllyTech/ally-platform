@@ -1325,7 +1325,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
                 // RN `CallSummaryDetails.tsx` `alertContainer`: the
                 // AI-generated disclaimer above the section card, with
                 // RN's goldenShield SVG in a carrotOrange ring.
-                return Container(
+                final aiBanner = Container(
                   margin: EdgeInsets.only(top: 10, left: size.s(10), right: size.s(10)),
                   padding: EdgeInsets.all(size.s(10)),
                   decoration: BoxDecoration(
@@ -1361,6 +1361,36 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
                       ),
                     ],
                   ),
+                );
+                if (!summary.isIncompleteRecording) return aiBanner;
+                // The recording's connection dropped and never resumed: say
+                // the summary only covers what was recorded, above the AI
+                // disclaimer and in the same style.
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      key: const Key('incomplete-recording-warning'),
+                      margin: EdgeInsets.only(top: 10, left: size.s(10), right: size.s(10)),
+                      padding: EdgeInsets.all(size.s(10)),
+                      decoration: BoxDecoration(
+                        color: AppColors.amber50,
+                        borderRadius: BorderRadius.circular(size.s(8)),
+                        border: Border.all(color: AppColors.orange400, width: 0.5),
+                      ),
+                      child: Text(
+                        ref.t('callSummary.incompleteRecording'),
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifRegular,
+                          fontSize: 12,
+                          height: 16 / 12,
+                          letterSpacing: 0.2,
+                          color: AppColors.red700,
+                        ),
+                      ),
+                    ),
+                    aiBanner,
+                  ],
                 );
               }
               final section = sections[index - 1];

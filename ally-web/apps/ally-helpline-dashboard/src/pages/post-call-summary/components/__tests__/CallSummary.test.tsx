@@ -352,6 +352,40 @@ describe("CallSummary Component", () => {
   // those refetches is rejected — replacing a summary the counsellor is
   // actively editing with "Summary Not Found" loses their place for a blip
   // they never caused.
+  it("warns that part of the recording may be missing when the connection dropped", () => {
+    render(
+      <CallSummary
+        chatId={1}
+        headerContent={<div>Header</div>}
+        postProcess={postProcess}
+        callSummary={{
+          summaryStatus: ChatSummaryStatus.SUCCESS,
+          incompleteRecording: { reason: "client-disconnect" },
+          details: { chatId: 1, callDuration: 120, callInfo: { notes: "" } },
+        }}
+        isSummaryLoading={false}
+      />,
+    );
+    expect(screen.getByText(/Part of this recording may be missing/)).toBeInTheDocument();
+  });
+
+  it("shows no missing-audio warning for a complete recording", () => {
+    render(
+      <CallSummary
+        chatId={1}
+        headerContent={<div>Header</div>}
+        postProcess={postProcess}
+        callSummary={{
+          summaryStatus: ChatSummaryStatus.SUCCESS,
+          incompleteRecording: null,
+          details: { chatId: 1, callDuration: 120, callInfo: { notes: "" } },
+        }}
+        isSummaryLoading={false}
+      />,
+    );
+    expect(screen.queryByText(/Part of this recording may be missing/)).not.toBeInTheDocument();
+  });
+
   it("keeps the loaded summary when a background refetch fails", () => {
     const loadedSummary = {
       summaryStatus: ChatSummaryStatus.SUCCESS,
@@ -576,7 +610,13 @@ describe("CallSummary — a section with custom fields renders even with zero vi
     // rendering on top of the button it was meant to label, blocking clicks
     // on it entirely, across every enhanceable field.
     vi.mocked(getSectionFields).mockImplementation(() => [
-      { key: "keyConcerns", type: "text", label: "Key Concerns", isEditable: true, isEnhanceable: true },
+      {
+        key: "keyConcerns",
+        type: "text",
+        label: "Key Concerns",
+        isEditable: true,
+        isEnhanceable: true,
+      },
     ]);
     mockGetCustomFieldValues.mockReturnValue({ data: [] });
 
