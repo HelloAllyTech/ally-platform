@@ -548,14 +548,28 @@ const CallSummary: FC<CallSummaryProps> = ({
             </Button>
           </div>
         ) : (
-          <InfoBanner
-            message={t("summary.disclaimer")}
-            icon={() => (
-              <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+          <>
+            {callSummary?.incompleteRecording && (
+              // The connection dropped mid-recording and the client did not
+              // come back in time: the audio, and so the summary, is partial.
+              <InfoBanner
+                message={t("summary.incompleteRecording")}
+                icon={() => (
+                  <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+                )}
+                wrapperClassName="border-[#c4901f] bg-[#f3e6c9] mb-2"
+                messageClassName="text-[#6b4f22]"
+              />
             )}
-            wrapperClassName="border-[#c4901f] bg-[#f3e6c9]"
-            messageClassName="text-[#6b4f22]"
-          />
+            <InfoBanner
+              message={t("summary.disclaimer")}
+              icon={() => (
+                <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+              )}
+              wrapperClassName="border-[#c4901f] bg-[#f3e6c9]"
+              messageClassName="text-[#6b4f22]"
+            />
+          </>
         )}
         {headerContent}
         <div className={`overflow-y-auto font-primary pb-[60px] ${className}`}>

@@ -356,6 +356,35 @@ void main() {
     },
   );
 
+  for (final incomplete in [true, false]) {
+    testWidgets(
+      'CallSummaryScreen: ${incomplete ? 'warns' : 'does not warn'} that part of the recording may be missing',
+      (tester) async {
+        final repository = MockCallLogRepository();
+        final summary = CallSummaryDetails(
+          counselorId: 7,
+          fields: {'callId': 1001, 'sessionSummary': 'notes'},
+          isIncompleteRecording: incomplete,
+        );
+        when(() => repository.getCallSummary(1001)).thenAnswer((_) async => summary);
+        when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+
+        await pumpApp(
+          tester,
+          CallSummaryScreen(log: _log),
+          overrides: [
+            callLogRepositoryProvider.overrideWithValue(repository),
+            ..._editorOverrides(visibleFields: const ['sessionSummary']),
+          ],
+        );
+
+        expect(find.byKey(const Key('incomplete-recording-warning')), incomplete ? findsOneWidget : findsNothing);
+        // The AI disclaimer still shows either way.
+        expect(find.byKey(const Key('ai-warning-shield')), findsOneWidget);
+      },
+    );
+  }
+
   testWidgets(
     'CallSummaryScreen: the AI wand writes the enhanced text into the open field, and RN section SVGs render',
     (tester) async {
