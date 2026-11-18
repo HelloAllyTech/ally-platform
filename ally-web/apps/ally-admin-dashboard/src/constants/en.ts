@@ -9161,6 +9161,7 @@ export const en = {
       open: (code: string, title: string) => `Open ${code}: ${title}`,
       openUnread: (code: string, title: string) => `Open ${code}: ${title}. Unread`,
       actions: (code: string) => `Actions for ${code}`,
+      votesLocked: "Voting is open only while an idea is in the Backlog. The votes it has stay.",
       rank: (n: number) => `#${n}`,
       rankLabel: (n: number) => `Rank ${n}`,
       rankHelp: (n: number) =>

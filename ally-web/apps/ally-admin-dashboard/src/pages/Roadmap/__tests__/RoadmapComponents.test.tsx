@@ -156,9 +156,16 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("locks voting once the idea leaves the Backlog: the count stays, the control goes", () => {
+    wrap(<IdeaVotes item={detail({ vote: true }, { stage: "being_built" })} />);
+    expect(screen.queryByRole("button", { name: "vote-button" })).toBeNull();
+    expect(screen.getByText(en.roadmapV2.row.votes(23))).toBeInTheDocument();
+    expect(screen.getByTitle(en.roadmapV2.row.votesLocked)).toBeInTheDocument();
+  });
+
   it("gives the idea page the real VoteButton, keyed by the opportunity id", () => {
     mockOpportunity.mockClear();
-    wrap(<IdeaVotes item={detail({ vote: true })} />);
+    wrap(<IdeaVotes item={detail({ vote: true }, { stage: "backlog" })} />);
     expect(screen.getByRole("button", { name: "vote-button" })).toBeInTheDocument();
     expect(mockOpportunity).toHaveBeenCalledWith("opp-uuid-388", { skip: false });
   });
@@ -261,13 +268,10 @@ describe("QueueRow", () => {
     expect(screen.queryByText(/^#\d+$/)).toBeNull();
   });
 
-  it("loads a row's vote record only when the reader reaches for it, then shows VoteButton", () => {
-    mockOpportunity.mockClear();
+  it("shows no votes and no menu in the row: it is read, then opened", () => {
     renderRow();
     expect(screen.queryByRole("button", { name: "vote-button" })).toBeNull();
-    expect(mockOpportunity).toHaveBeenLastCalledWith("opp-uuid-388", { skip: true });
-    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${en.roadmapV2.row.vote}:`) }));
-    expect(screen.getByRole("button", { name: "vote-button" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.roadmapV2.row.actions("OPP-388") })).toBeNull();
   });
 
   it("prefetches after a 150 ms mouse hover, but not for a touch", () => {
@@ -284,14 +288,9 @@ describe("QueueRow", () => {
     vi.useRealTimers();
   });
 
-  it("on touch, the swipe actions also exist as visible buttons in the row's ⋯ menu", () => {
+  it("on touch, the swipe actions are there, revealed by a swipe", () => {
     renderRow({ touch: true });
-    // Revealed by swipes (hidden from AT until revealed) …
     expect(screen.getAllByText(en.roadmapV2.row.markRead).length).toBeGreaterThan(0);
-    // … and the ⋯ menu is always there.
-    expect(
-      screen.getByRole("button", { name: en.roadmapV2.row.actions("OPP-388") }),
-    ).toBeInTheDocument();
   });
 });
 

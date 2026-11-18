@@ -76,12 +76,7 @@ const buildNavigationItems = (): NavigationItem[] => {
       section: "create",
     },
     { id: S.BLOG, label: l.blog, path: ROUTES.BLOG, section: "create" },
-    {
-      id: S.PRODUCT_UPDATES,
-      label: l.productUpdates,
-      path: ROUTES.PRODUCT_UPDATES,
-      section: "create",
-    },
+    // Product updates is no longer a primary item: it is a tab of the Roadmap's own top menu.
     // People
     { id: S.USERS, label: l.users, path: ROUTES.USER_MANAGEMENT, section: "people" },
     { id: S.USER_BADGES, label: l.badges, path: ROUTES.USER_BADGES, section: "people" },

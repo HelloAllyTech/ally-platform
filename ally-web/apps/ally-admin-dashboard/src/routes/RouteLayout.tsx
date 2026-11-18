@@ -38,7 +38,6 @@ import {
   TranslationManagement,
   TooltipManagement,
   BlogManagement,
-  ProductUpdates,
   AILab,
   ProductRoadmap,
   RoadmapDraftsPage,
@@ -50,6 +49,7 @@ import {
   RoadmapIdeaPage,
   RoadmapLegacyRedirect,
   RoadmapQueuePage,
+  RoadmapProductUpdatesPage,
   RoadmapSettingsPage,
   RoadmapMeasuresPage,
   UserInterviewsPage,
@@ -565,8 +565,14 @@ export const RouteLayout: React.FC = () => {
               <PrivateLayout
                 requiredPermissions={[Permissions.EDIT_BLOG]}
                 requiredFeature={FeatureToggleKey.PRODUCT_UPDATES}
+                fullBleed
               >
-                <ProductUpdates />
+                {/* A page of the Roadmap's top menu; without a Roadmap role it is the page alone. */}
+                <RoadmapGate fallback={<RoadmapProductUpdatesPage />}>
+                  <RoadmapFrame>
+                    <RoadmapProductUpdatesPage />
+                  </RoadmapFrame>
+                </RoadmapGate>
               </PrivateLayout>
             }
           />

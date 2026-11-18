@@ -3,10 +3,10 @@ import React from "react";
 import { RoadmapTopNav } from "./RoadmapTopNav";
 
 /**
- * The top menu for the Roadmap's pages past the Queue (Drafts, Bugs, Agent, Settings, Measures):
- * the same {@link RoadmapTopNav} as the Queue, so the tabs stay where they are as you move.
+ * The title bar of a Roadmap page on a phone. Everywhere else the Roadmap's sub navigation is drawn
+ * once by the frame, so the tabs stay exactly where they are as you move between pages.
  */
 export const RoadmapAreaHeader: React.FC<{ phone: boolean; current: string }> = ({
   phone,
   current,
-}) => <RoadmapTopNav phone={phone} phoneTitle={current} />;
+}) => (phone ? <RoadmapTopNav phone phoneTitle={current} /> : null);

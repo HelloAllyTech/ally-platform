@@ -370,19 +370,35 @@ const TriageRow: React.FC<{
           aria-current={current ? "true" : undefined}
           className="flex min-w-0 flex-1 items-baseline gap-2 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
         >
-          {row.rank != null && (
-            <span
-              className="min-w-[2.25rem] shrink-0 text-right text-xs font-semibold tabular-nums text-primary-700"
-              title={en.roadmapV2.row.rankHelp(row.rank)}
-            >
-              <span aria-hidden>{en.roadmapV2.row.rank(row.rank)}</span>
-              <span className="sr-only">{en.roadmapV2.row.rankLabel(row.rank)}</span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex items-center gap-2">
+              {row.rank != null && (
+                <span
+                  className="shrink-0 text-xs font-semibold tabular-nums text-primary-700"
+                  title={en.roadmapV2.row.rankHelp(row.rank)}
+                >
+                  <span aria-hidden>{en.roadmapV2.row.rank(row.rank)}</span>
+                  <span className="sr-only">{en.roadmapV2.row.rankLabel(row.rank)}</span>
+                </span>
+              )}
+              <span className="shrink-0 text-xs tabular-nums text-typography-secondary">
+                {row.code}
+              </span>
             </span>
-          )}
-          <span className="shrink-0 text-xs tabular-nums text-typography-secondary">
-            {row.code}
+            <span
+              className="mt-1 line-clamp-2 break-words text-base leading-snug text-typography-primary"
+              title={row.title}
+            >
+              {row.title}
+            </span>
+            {(row.goal?.name || row.author?.name) && (
+              <span className="mt-1 truncate text-xs text-typography-secondary">
+                {[row.goal?.name, row.author?.name ? `Wrote it: ${row.author.name}` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            )}
           </span>
-          <span className="min-w-0 truncate text-sm text-typography-primary">{row.title}</span>
         </button>
         <span
           className={`shrink-0 text-xs tabular-nums ${amber ? "font-semibold text-warning-700" : "text-typography-secondary"}`}

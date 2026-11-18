@@ -25,7 +25,6 @@ import {
   FilterSheet,
   useFilterOptions,
 } from "./components/FilterControls";
-import { ideaUrl } from "./components/IdeaControls";
 import { IdeaView } from "./components/IdeaView";
 import { QueueBoard } from "./components/QueueBoard";
 import { QueueList } from "./components/QueueList";
@@ -284,12 +283,6 @@ export const RoadmapQueuePage: React.FC = () => {
       .then(() => toast.success(copy.actions.watchLevel(copy.actions.watchLevels.all)))
       .catch(() => toast.error(copy.actions.watchFailed));
   };
-  const onCopyLink = (code: string) => {
-    navigator.clipboard
-      .writeText(ideaUrl(code))
-      .then(() => toast.success(copy.actions.copied))
-      .catch(() => toast.error(copy.actions.copyFailed));
-  };
 
   const setView = (view: DefaultViewId) =>
     setState({ view, filters: {}, layout: state.layout, open: state.open }, false);
@@ -456,7 +449,6 @@ export const RoadmapQueuePage: React.FC = () => {
         onOpen={openIdea}
         onMarkRead={onMarkRead}
         onWatch={onWatch}
-        onCopyLink={onCopyLink}
         onLongPress={code => setActionSheetFor(code)}
         onPrefetch={code => prefetch(code)}
       />
@@ -467,11 +459,12 @@ export const RoadmapQueuePage: React.FC = () => {
   return (
     <MotionConfig reducedMotion={reduced ? "always" : "user"}>
       <div className="flex h-full min-h-0 flex-col bg-white">
-        <RoadmapTopNav
-          phone={isPhone}
-          withNewIdea
-          phoneTrailing={<SearchButton compact onClick={() => setQuickOpen(true)} />}
-        />
+        {isPhone && (
+          <RoadmapTopNav
+            phone
+            phoneTrailing={<SearchButton compact onClick={() => setQuickOpen(true)} />}
+          />
+        )}
 
         {viewBar}
 
@@ -577,7 +570,6 @@ export const RoadmapQueuePage: React.FC = () => {
               {[
                 { label: copy.row.openRow, run: () => openIdea(actionSheetFor) },
                 { label: copy.row.watch, run: () => onWatch(actionSheetFor) },
-                { label: copy.row.copyLink, run: () => onCopyLink(actionSheetFor) },
               ].map(action => (
                 <Button
                   key={action.label}

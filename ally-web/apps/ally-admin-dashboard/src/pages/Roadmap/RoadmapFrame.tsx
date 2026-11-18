@@ -9,6 +9,7 @@ import { en } from "@constants";
 
 import { motionTransition, useReducedMotionPreference } from "../../motion";
 import { RoadmapIconButton } from "./components/RoadmapIconButton";
+import { RoadmapTopNav } from "./components/RoadmapTopNav";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
 import { useRoadmapPresence } from "./hooks/useRoadmapJobTimer";
 import {
@@ -138,6 +139,10 @@ export const RoadmapFrame: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <RoadmapFrameContext.Provider value={{ openWhatMoved }}>
       <div className="flex h-full min-h-0 flex-col">
+        {/* The sub navigation of the Roadmap lives here, once, above every page: it never remounts
+            or moves as you go from one to another, and banners sit beneath it. A phone's pages
+            draw their own title bar instead. */}
+        {breakpoint !== "phone" && <RoadmapTopNav phone={false} withNewIdea />}
         <AnimatePresence initial={false}>
           {moved && <MovedBanner key="moved" moved={moved} onDismiss={dismissMoved} />}
           {showTip && (
