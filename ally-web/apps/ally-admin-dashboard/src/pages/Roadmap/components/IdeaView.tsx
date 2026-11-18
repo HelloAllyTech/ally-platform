@@ -27,6 +27,7 @@ import type { RoadmapItemDetail } from "@types";
 
 import { BottomSheet } from "./BottomSheet";
 import { Conversation } from "./Conversation";
+import { IdeaBannerControls } from "./IdeaBannerControls";
 import {
   CopyLinkButton,
   IdeaStar,
@@ -36,7 +37,7 @@ import {
   PrimaryAction,
 } from "./IdeaControls";
 import { IdeaPanelContent } from "./IdeaPanels";
-import { HeaderTracker, OpportunityHeader } from "./OpportunityHeader";
+import { BANNER_TONE, HeaderTracker, OpportunityHeader } from "./OpportunityHeader";
 import { PeopleChips } from "./PeopleChips";
 import { ShippedCard } from "./ShippedCard";
 import { Tracker } from "./Tracker";
@@ -354,6 +355,7 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
       item={item}
       as={mode === "page" ? "h1" : "h2"}
       headingRef={headingRef}
+      controls={<IdeaBannerControls item={item} />}
       actions={
         <>
           <IdeaVotes item={item} />
@@ -631,7 +633,11 @@ const PhoneHeader: React.FC<{
   useEffect(() => setBarOpen(false), [item.code]);
   return (
     <header className="flex flex-col">
-      <div className="sticky top-0 z-[3] flex min-h-12 items-start gap-1 border-b border-border-light bg-white px-1">
+      <div
+        className={`sticky top-0 z-[3] flex min-h-12 items-start gap-1 border-b px-1 ${
+          BANNER_TONE[item.stage ?? "draft"] ?? BANNER_TONE.draft
+        }`}
+      >
         <Link
           to={ROUTES.ROADMAP}
           className="inline-flex h-12 shrink-0 items-center px-2 text-sm text-primary-700"
@@ -680,6 +686,7 @@ const PhoneHeader: React.FC<{
         <p className="m-0 text-sm text-typography-secondary">
           {copy.stages[item.stage ?? item.shownStage]} · {status}
         </p>
+        <IdeaBannerControls item={item} />
         <div className="flex items-center gap-2">
           <IdeaVotes item={item} />
           <IdeaWatch item={item} />

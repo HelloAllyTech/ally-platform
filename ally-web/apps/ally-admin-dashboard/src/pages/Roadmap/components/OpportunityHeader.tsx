@@ -9,6 +9,18 @@ import { IdeaTitle } from "./IdeaControls";
 import { Tracker } from "./Tracker";
 
 /**
+ * The banner's colour says where the idea is at a glance: amber for the Backlog, blue while it is
+ * being built, green once shipped, grey when declined. Written out in full so Tailwind keeps them.
+ */
+export const BANNER_TONE: Record<string, string> = {
+  backlog: "border-t-4 border-t-warning-500 border-b-warning-200 bg-warning-50",
+  being_built: "border-t-4 border-t-primary-600 border-b-primary-200 bg-primary-50",
+  shipped: "border-t-4 border-t-success-600 border-b-success-200 bg-success-50",
+  declined: "border-t-4 border-t-neutral-500 border-b-neutral-300 bg-neutral-100",
+  draft: "border-t-4 border-t-neutral-300 border-b-neutral-200 bg-neutral-50",
+};
+
+/**
  * The card's grounding strip: always on screen, whatever stage the idea is at and whichever tab,
  * panel or scroll position you are in. It carries the three things that say *what this card is*:
  * its code, its title and its stage.
@@ -27,10 +39,16 @@ export const OpportunityHeader: React.FC<{
   headingRef?: React.Ref<HTMLHeadingElement>;
   /** Right-hand controls: votes, star, watch, copy link, open full page, close. */
   actions?: React.ReactNode;
+  /** The editable facts: goal, lead, planned month. */
+  controls?: React.ReactNode;
   /** Rows under the grounding strip: tracker and status, people, the primary action. */
   children?: React.ReactNode;
-}> = ({ item, as, headingRef, actions, children }) => (
-  <header className="sticky top-0 z-[3] flex flex-col gap-2 border-b border-border-light bg-white px-4 py-3">
+}> = ({ item, as, headingRef, actions, controls, children }) => (
+  <header
+    className={`sticky top-0 z-[3] flex flex-col gap-2 border-b px-4 py-3 ${
+      BANNER_TONE[item.stage ?? "draft"] ?? BANNER_TONE.draft
+    }`}
+  >
     <div className="flex items-start gap-2">
       <span className="shrink-0 pt-1 text-xs tabular-nums text-typography-secondary">
         {item.code}
@@ -44,6 +62,7 @@ export const OpportunityHeader: React.FC<{
       />
       {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
     </div>
+    {controls}
     {children}
   </header>
 );
@@ -52,7 +71,7 @@ export const OpportunityHeader: React.FC<{
 export const StageChip: React.FC<{
   stage: RoadmapItemDetail["stage"] | RoadmapItemDetail["shownStage"];
 }> = ({ stage }) => (
-  <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full border border-border-light px-2 py-0.5 text-xs text-typography-secondary">
+  <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full border border-black/10 bg-white/80 px-2 py-0.5 text-xs font-semibold text-typography-primary">
     {en.roadmapV2.stages[stage]}
   </span>
 );

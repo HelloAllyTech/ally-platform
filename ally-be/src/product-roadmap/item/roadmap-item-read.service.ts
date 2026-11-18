@@ -1149,6 +1149,7 @@ export class RoadmapItemReadService {
         ...(c.goalId && c.goalName
           ? { goal: { id: c.goalId, name: c.goalName } }
           : {}),
+        plannedMonth: c.plannedMonth,
         updatedAt: c.lastActivityAt,
         stageSince: c.stageSince,
       };

@@ -154,6 +154,8 @@ export interface RoadmapItemRow {
   unread: boolean;
   whyHere?: RoadmapWhyHere;
   goal?: { id: string; name: string };
+  /** YYYY-MM the Owner planned it for; null when unscheduled. */
+  plannedMonth?: string | null;
   updatedAt: string;
   stageSince: string;
 }

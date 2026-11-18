@@ -80,6 +80,8 @@ export interface ItemRow {
   unread: boolean;
   whyHere?: WhyHere;
   goal?: { id: string; name: string };
+  /** 'YYYY-MM' the Owner planned it for, or null when unscheduled. */
+  plannedMonth: string | null;
   updatedAt: string;
   stageSince: string;
 }
