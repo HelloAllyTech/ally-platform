@@ -1,10 +1,14 @@
 # Which documentation covers which code across the ally-platform monorepo.
 #
-# Read by the shared docs-guard workflow on every PR, and by the weekly wiki reconciler.
-# Because helloallytech.github.io/ lives inside this monorepo, `wiki:<page>` rules can now
-# also be satisfied by directly touching `helloallytech.github.io/wiki/<page>` in the same PR!
+# Read by the shared docs-guard job in .github/workflows/docs.yml on every PR and push.
+# Spec: helloallytech.github.io/wiki/contributing/docs-system.md
 #
-# Escape hatch: add the `docs:skip` label, or a `Wiki-PR: none — <reason>` / `Docs-Skip:` trailer.
+# The wiki lives in this monorepo, so require a wiki page by its plain path
+# (`requires: helloallytech.github.io/wiki/<page>`); the PR satisfies it by touching the page.
+# The legacy `wiki:<page>` form is met only by a `Wiki-PR:` line in the PR description.
+#
+# Escape hatches: the `docs:skip` label on a PR; `Wiki-PR: none — <reason>` for wiki: rules;
+# a `Docs-Skip: <reason>` commit trailer only on a direct push to master.
 
 version: 1
 repo: ally-platform

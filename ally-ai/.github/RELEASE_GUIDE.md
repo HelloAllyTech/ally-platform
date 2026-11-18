@@ -10,43 +10,24 @@ to this service.
 
 | | |
 |---|---|
-| Workflow | **Production Release** (`.github/workflows/production-release.yaml`) |
+| Workflow | `production-release-ally-ai.yaml` in the monorepo's root `.github/workflows/` |
 | Release branch | `master` |
+| Tag | `ai-vX.Y.Z` |
 | Runtime in CI | Python 3.12 |
 | Package manager | Poetry (venv cached on `poetry.lock`) |
-| Deployment | AWS ECS |
-| Runs migrations | Weaviate schema migrations — see `app/migrations/` |
+| Deployment | Ansible playbook via the `deploy-metal01` action (production stack, since the 2026-11-07 cutover) |
+| Runs migrations | Weaviate schema migrations (`app/migrations/`), run inside the playbook |
 
-## Deployment target
+## Deployment
 
-- **Cluster**: `ally-prd-mb-ecs-cluster`
-- **ECS service**: `ally-prd-svc-core-ai`
-- **Task definition**: `ally-prd-td-core-ai`
-- **Container**: `ally-prd-cntr-core-ai`
+The release workflow's deploy job runs the `ally_ai.yml` playbook from the private infra repo
+through `.github/actions/deploy-metal01`, then polls the service's health endpoint until it answers. Its
+inputs are repository secrets (the deploy SSH key, the infra deploy key and the Ansible
+vault password) — see the comment at the top of that action. Container logs, restarts and
+recovery are in the infra repo's runbook, not here: this repository is public.
 
-## Required repository variables
-
-Settings → Secrets and variables → Actions → Variables:
-
-```
-PRD_AWS_ROLE          # AWS IAM role ARN for production
-PRD_AWS_REGION
-PRD_ECR_REPOSITORY
-```
-
-## Verify a deployment
-
-```bash
-aws ecs describe-services \
-  --cluster ally-prd-mb-ecs-cluster \
-  --services ally-prd-svc-core-ai
-
-aws ecs list-tasks \
-  --cluster ally-prd-mb-ecs-cluster \
-  --service-name ally-prd-svc-core-ai
-
-aws logs tail /ecs/ally-prd-cntr-core-ai --follow
-```
+The ECS cluster, service and task-definition names this guide used to list belong to the
+pre-cutover stack and no longer receive production releases.
 
 ## Notes specific to this service
 
@@ -57,8 +38,8 @@ aws logs tail /ecs/ally-prd-cntr-core-ai --follow
   this repo's default prompts to ally-be's prompt management — `v1.21.0` brought the new
   helpline prompts to production with no manual step. In that default command the chain is
   `&&` and the script exits 1 when `ALLY_CORE__ENDPOINT`/`ALLY_CORE__API_KEY` are unset or
-  ally-be rejects the sync, so a failed sync stops the API from starting (the ECS task
-  definitions live in AWS, not here — check them before relying on that). Local compose
+  ally-be rejects the sync, so a failed sync stops the API from starting (production's
+  container command is set by the infra playbook, not here — check it before relying on that). Local compose
   (`docker-compose.local.yml`) continues past a failed sync instead, which is why a local
   ally-be can hold older prompts than the code. `make sync-prompts` pushes defaults
   without a deploy.
