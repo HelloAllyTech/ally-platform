@@ -59,6 +59,10 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 - **ally-web/mobile <-> ally-be**: REST API + Socket.IO WebSockets (`/microphone-chat`, `/cloud-telephony-chat`, `/scenario-report`)
 - **ally-ai-learn <-> LiveKit**: Agent worker connects to LiveKit rooms for voice sessions
 
+## Core concepts — read before an unfamiliar area, update in the same PR
+
+[`helloallytech.github.io/wiki/platform/concepts.md`](helloallytech.github.io/wiki/platform/concepts.md) has one card per core concept (what it is, what it's made of, its code, whether it's Live/Dark and what gates it) and a table of overloaded terms ("Skill", "Track", "Chat", "Builder"…). Read the card before working in an area you don't know. **Adding, retiring, renaming or re-gating a concept — a new module, page or feature directory, a new `FeatureToggleKey`, a changed default that flips Live/Dark — updates its card in the same PR.** CI enforces the coverage (`python3 scripts/concepts_lint.py`); the status is on you.
+
 ## Product and engineering guidance — the Context Library
 
 Whenever a product or engineering judgement comes up — before an implementation plan, and again
