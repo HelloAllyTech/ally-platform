@@ -9148,6 +9148,7 @@ export const en = {
       actions: (code: string) => `Actions for ${code}`,
       votes: (count: number) => (count === 1 ? "1 vote" : `${count} votes`),
       votedByMe: "You voted",
+      rank: (n: number) => `Rank ${n} in the queue`,
       starred: "Starred",
       markRead: "Mark read",
       watch: "Watch",
@@ -9207,15 +9208,6 @@ export const en = {
         activity: "Last activity",
         stageAge: "Longest in stage",
       } as Record<string, string>,
-    },
-    layout: {
-      label: "Layout",
-      list: "List",
-      board: "Board",
-      boardByGoal: "By goal",
-      boardByMonth: "By month",
-      boardHelp:
-        "The planning board. Goal and month lanes can be dragged; stages can't, because an idea's stage follows what has happened to it.",
     },
     savedViews: {
       save: "Save view",

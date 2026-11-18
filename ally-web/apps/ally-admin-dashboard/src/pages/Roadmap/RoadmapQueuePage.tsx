@@ -5,7 +5,7 @@ import { MotionConfig, motion } from "framer-motion";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { Button, SidePanel } from "@ally-ui-mono/ui-shared";
+import { Button } from "@ally-ui-mono/ui-shared";
 import {
   rowsOfItemsResponse,
   useGetRoadmapItemsQuery,
@@ -28,19 +28,12 @@ import {
 import { ideaUrl } from "./components/IdeaControls";
 import { IdeaView } from "./components/IdeaView";
 import { NewIdeaButton } from "./components/NewIdeaButton";
-import { QueueBoard } from "./components/QueueBoard";
 import { QueueList } from "./components/QueueList";
 import { QuickOpen } from "./components/QuickOpen";
 import { RoadmapHelpMenu, RoadmapRoleTabs } from "./components/RoadmapAreaNav";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
-import {
-  LayoutSwitch,
-  SaveViewControls,
-  SearchButton,
-  SortSelect,
-  ViewChips,
-} from "./components/ViewBar";
+import { SaveViewControls, SearchButton, SortSelect, ViewChips } from "./components/ViewBar";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useQueueSavedViews } from "./hooks/useQueueSavedViews";
 import { hasReadingPane, useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
@@ -53,9 +46,7 @@ import { queueKeyAction, stepSelection } from "./utils/keyboard";
 import { ROADMAP_PREF_KEYS, readPref, writePref } from "./utils/prefs";
 import {
   QueueFilters,
-  QueueLayout,
   QueueState,
-  canUseBoard,
   decodeQueueState,
   encodeQueueState,
   hasActiveFilters,
@@ -87,12 +78,9 @@ export const RoadmapQueuePage: React.FC = () => {
     () =>
       decodeQueueState(searchParams, role, {
         view: readPref<RoadmapQueueView | undefined>(ROADMAP_PREF_KEYS.lastView, undefined),
-        layout: readPref<QueueLayout | undefined>(ROADMAP_PREF_KEYS.layout, undefined),
       }),
     [searchParams, role],
   );
-  // The Board isn't offered below laptop width (§4.17); the list covers it.
-  const layout: QueueLayout = state.layout === "board" && withPane ? "board" : "list";
 
   const setState = useCallback(
     (next: QueueState, replace = true) => setSearchParams(encodeQueueState(next), { replace }),
@@ -101,8 +89,7 @@ export const RoadmapQueuePage: React.FC = () => {
 
   useEffect(() => {
     writePref(ROADMAP_PREF_KEYS.lastView, state.view);
-    writePref(ROADMAP_PREF_KEYS.layout, state.layout);
-  }, [state.view, state.layout]);
+  }, [state.view]);
 
   // ── data ────────────────────────────────────────────────────────────────────────────────────
   const [cursor, setCursor] = useState<string | undefined>();
@@ -110,9 +97,7 @@ export const RoadmapQueuePage: React.FC = () => {
   const baseKey = JSON.stringify(baseQuery);
   useEffect(() => setCursor(undefined), [baseKey]);
   const query = useMemo(() => (cursor ? { ...baseQuery, cursor } : baseQuery), [baseQuery, cursor]);
-  const { data, isLoading, isFetching, isError, refetch } = useGetRoadmapItemsQuery(query, {
-    skip: layout === "board",
-  });
+  const { data, isLoading, isFetching, isError, refetch } = useGetRoadmapItemsQuery(query);
 
   // The For you badge (Needs you) and the To triage count. Same cache entry as an unfiltered view.
   const { data: forYou } = useGetRoadmapItemsQuery({ view: "for-you" });
@@ -199,7 +184,7 @@ export const RoadmapQueuePage: React.FC = () => {
   const overlayOpen =
     quickOpen || shortcutsOpen || filterSheetOpen || !!actionSheetFor || triageOverlay;
   // To triage, for an Owner, is the triage screen (§4.6): its own rows, keys and Summary pane.
-  const triageMode = state.view === "to-triage" && !!can.review && layout === "list";
+  const triageMode = state.view === "to-triage" && !!can.review;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -288,13 +273,12 @@ export const RoadmapQueuePage: React.FC = () => {
 
   const views = viewsForRole(role);
   const setView = (view: RoadmapQueueView) =>
-    setState({ view, filters: {}, layout: state.layout, open: state.open }, false);
+    setState({ view, filters: {}, open: state.open }, false);
   const setFilters = (filters: QueueFilters) => setState({ ...state, filters });
   const setSort = (sort: RoadmapQueueSort) => setState({ ...state, sort });
-  const setLayout = (next: QueueLayout) => setState({ ...state, layout: next });
   const selectSaved = (view: RoadmapSavedView) =>
     setState({
-      ...stateFromSavedView(view.state.queue ?? {}, role, state.layout, view.id),
+      ...stateFromSavedView(view.state.queue ?? {}, role, view.id),
       open: state.open,
     });
 
@@ -325,7 +309,6 @@ export const RoadmapQueuePage: React.FC = () => {
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <FilterButton filters={state.filters} options={filterOptions} onChange={setFilters} />
             {sortControl}
-            {canUseBoard(role) && withPane && <LayoutSwitch layout={layout} onChange={setLayout} />}
             <SearchButton onClick={() => setQuickOpen(true)} />
           </div>
         )}
@@ -470,11 +453,7 @@ export const RoadmapQueuePage: React.FC = () => {
 
         {viewBar}
 
-        {layout === "board" ? (
-          <div className="min-h-0 flex-1 overflow-auto">
-            <QueueBoard onOpen={openIdea} />
-          </div>
-        ) : triageMode ? (
+        {triageMode ? (
           <TriageView
             data={data}
             isLoading={isLoading}
@@ -509,28 +488,6 @@ export const RoadmapQueuePage: React.FC = () => {
           </div>
         ) : (
           list
-        )}
-
-        {/* On the Board, a card opens the same reading pane, over the lanes. */}
-        {layout === "board" && (
-          <SidePanel
-            open={!!state.open}
-            onClose={closePane}
-            title={state.open ?? ""}
-            closeLabel={copy.closePane}
-            width="min(720px, 100vw)"
-          >
-            {state.open && (
-              <IdeaView
-                key={state.open}
-                code={state.open}
-                mode="pane"
-                breakpoint={breakpoint}
-                presence={presence}
-                onOpenFull={() => navigate(ROUTES.ROADMAP_IDEA(state.open!))}
-              />
-            )}
-          </SidePanel>
         )}
 
         {isPhone && (
