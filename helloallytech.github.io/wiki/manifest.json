@@ -114,7 +114,7 @@
       "summary": "",
       "tags": [],
       "last_reconciled": "",
-      "words": 806,
+      "words": 845,
       "url": "https://tech.helloally.ai/#/wiki/index.md",
       "skip_reason": "human navigation catalog — ROUTING.md supersedes it for agents"
     },
@@ -127,7 +127,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 13955,
+      "words": 14064,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -169,7 +169,7 @@
         "reference"
       ],
       "last_reconciled": "2026-11-10",
-      "words": 1357,
+      "words": 1438,
       "url": "https://tech.helloally.ai/#/wiki/platform/agent-guide.md",
       "skip_reason": ""
     },
@@ -261,6 +261,22 @@
       "last_reconciled": "2026-10-29",
       "words": 4609,
       "url": "https://tech.helloally.ai/#/wiki/platform/builder-agent.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/concepts.md",
+      "title": "Core Concepts",
+      "summary": "The vocabulary map of the platform — every core concept as a card (what it is, what it is made of, which code owns it, whether it is live and what gates it) plus the overloaded terms that trip agents up. CI keeps it complete.",
+      "tags": [
+        "platform",
+        "concepts",
+        "glossary",
+        "agents",
+        "reference"
+      ],
+      "last_reconciled": "2026-11-18",
+      "words": 9673,
+      "url": "https://tech.helloally.ai/#/wiki/platform/concepts.md",
       "skip_reason": ""
     },
     {

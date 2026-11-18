@@ -7,7 +7,7 @@ import { FeatureToggleKey, Permissions, ROUTES, en } from "@constants";
 import { hasFeature, hasPermissions } from "@utils";
 
 import { NewIdeaButton } from "./NewIdeaButton";
-import { RoadmapMoreMenu, RoleTabKey, tabLabel } from "./RoadmapAreaNav";
+import { RoadmapConceptsButton, RoadmapMoreMenu, RoleTabKey, tabLabel } from "./RoadmapAreaNav";
 import { useRoadmapRole } from "../RoadmapGate";
 
 type TopTab = "queue" | "drafts" | "bugs" | "updates" | RoleTabKey;
@@ -125,6 +125,7 @@ export const RoadmapTopNav: React.FC<{
         )}
       </div>
       <div className="flex items-center gap-2">
+        {!phone && <RoadmapConceptsButton />}
         {!phone && withNewIdea && <NewIdeaButton />}
         {phone && phoneTrailing}
       </div>

@@ -2,9 +2,9 @@
 
 A synthetic set whose right answers are known by construction. Each case is one
 change that `change_read` returns either with its text (`wording` before and
-after) or without it, and one question asking for that text. The real conversation agent (`run_conversation`, the live default prompt
-and the PM agent's models) answers through a fake gateway; nothing reaches
-ally-be.
+after) or without it, and one question asking for that text. The real
+conversation agent (`run_conversation`, the live default prompt and the PM
+agent's models) answers through a fake gateway; nothing reaches ally-be.
 
 Scoring mirrors ally-be's quote check (`pmReplyUnmatched` in
 `ally-be/src/debrief/util/debrief-pm-conversation.util.ts`):

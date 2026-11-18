@@ -10,6 +10,7 @@ import { ROUTES, en } from "@constants";
 import type { RoadmapRole } from "@types";
 
 import { requestShortcuts, useRoadmapFrame } from "../RoadmapFrame";
+import { ConceptsButton } from "./ConceptsDrawer";
 import { canSeeAgent, canSeeMeasures, canSeeSettings } from "../utils/redirects";
 
 export type RoleTabKey = "agent" | "settings" | "measures";
@@ -126,13 +127,19 @@ export const RoadmapMoreMenu: React.FC<{
   );
 };
 
+/** The book icon beside ? in the Roadmap header: the Core Concepts page, for every role. */
+export const RoadmapConceptsButton: React.FC = () => {
+  const { openConcepts } = useRoadmapFrame();
+  return <ConceptsButton onOpen={openConcepts} />;
+};
+
 /** Agent and Settings on a phone: the bottom bar's ⋯ opens these (§4.17). */
 export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => void }> = ({
   role,
   onNavigate,
 }) => {
   const copy = en.roadmapV2Tools;
-  const { openWhatMoved } = useRoadmapFrame();
+  const { openWhatMoved, openConcepts } = useRoadmapFrame();
   const tabs = roleTabsFor(role);
   return (
     <div className="flex flex-col gap-4">
@@ -160,6 +167,16 @@ export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => v
         className="flex min-h-12 items-center text-left text-base text-primary-700"
       >
         {copy.help.whatMoved}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate();
+          openConcepts();
+        }}
+        className="flex min-h-12 items-center text-left text-base text-primary-700"
+      >
+        {copy.concepts.button}
       </button>
     </div>
   );
