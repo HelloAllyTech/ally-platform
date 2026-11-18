@@ -9209,15 +9209,6 @@ export const en = {
         stageAge: "Longest in stage",
       } as Record<string, string>,
     },
-    layout: {
-      label: "Layout",
-      list: "List",
-      board: "Board",
-      boardByGoal: "By goal",
-      boardByMonth: "By month",
-      boardHelp:
-        "The planning board. Goal and month lanes can be dragged; stages can't, because an idea's stage follows what has happened to it.",
-    },
     savedViews: {
       save: "Save view",
       update: (name: string) => `Update "${name}"`,
