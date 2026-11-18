@@ -1301,7 +1301,14 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
             chatId: _chatId,
             onValuesApplied: _applyVoiceValues,
             onCustomValuesApplied: _reseedCustomFields,
-            onTranscriptSaved: () => ref.invalidate(chatMessagesProvider(_chatId)),
+            // The transcript save is also when the backend adds this
+            // recording's length to the call duration, so refresh the summary
+            // too, not just the transcript tab — otherwise Call Duration stays
+            // stale until the note is reopened.
+            onTranscriptSaved: () {
+              ref.invalidate(chatMessagesProvider(_chatId));
+              ref.invalidate(callSummaryProvider(_chatId));
+            },
             existingTranscript: summary.transcript,
           ),
         Expanded(
