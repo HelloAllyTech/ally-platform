@@ -298,7 +298,7 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
             className={carbonField.input}
             type={field.fieldType === CustomFieldType.NUMBER ? "number" : "text"}
             disabled={!isEditable}
-            value={resolveOptionId(field, value) ?? ""}
+            value={value ?? ""}
             onChange={e => handleChange(field.fieldDefinitionId, e.target.value || null)}
             {...formFieldProtectionProps}
             // Scrolling over a focused number input silently changes its value
@@ -322,7 +322,7 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
             labelText={field.name}
             hideLabel
             disabled={!isEditable}
-            value={value ?? ""}
+            value={resolveOptionId(field, value) ?? ""}
             onChange={e => handleChange(field.fieldDefinitionId, e.target.value || null)}
           >
             <SelectItem value="" text="--" />
