@@ -2,6 +2,9 @@ import React, { lazy, Suspense, useCallback, useEffect, useState } from "react";
 
 import { createPortal } from "react-dom";
 
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+
 import { COPY } from "../Onboarding/copy";
 
 import "./first-assistant-overlay.css";
@@ -59,14 +62,15 @@ export const FirstAssistantOverlay: React.FC = () => {
       aria-label={COPY.header}
       data-testid="first-assistant-overlay"
     >
-      <button
+      <Button
+        variant={ButtonVariant.ICON}
         type="button"
         className="ally-first-assistant__close"
         aria-label={CLOSE_LABEL}
         onClick={close}
       >
         <span aria-hidden="true">×</span>
-      </button>
+      </Button>
       <Suspense fallback={null}>
         <OnboardingStart onLeave={close} />
       </Suspense>
