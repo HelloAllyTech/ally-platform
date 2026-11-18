@@ -13172,6 +13172,10 @@ export const en = {
             name: "Nightly check",
             what: "Measures yesterday’s debriefs against the days before and sends some to a person",
           },
+          "debrief-roleplay-field-drift": {
+            name: "Roleplay field check",
+            what: "Looks for a roleplay field that newly saved roleplays stopped filling in, and tells the Ally team",
+          },
           "debrief-judge-anchor": {
             name: "Judge drift",
             what: "Scores a fixed set of debriefs again for the quality score, to catch drift (learning budget)",

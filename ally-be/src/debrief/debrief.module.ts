@@ -51,6 +51,7 @@ import { DebriefBuilderRequesterService } from './service/debrief-builder-reques
 import { DebriefPmAgentToolsService } from './service/debrief-pm-agent-tools.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefNightlyService } from './service/debrief-nightly.service';
+import { DebriefRoleplayDriftService } from './service/debrief-roleplay-drift.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
@@ -222,6 +223,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     DebriefAudioService,
     DebriefNotifier,
     DebriefNightlyService,
+    DebriefRoleplayDriftService,
     DebriefReviewService,
     GuideCrisisService,
     // Runs the debrief / PM agent jobs when their stored schedule says.

@@ -57,6 +57,42 @@ export function cleanRoleplayField(
   return t && def.key === 'difficulty' ? t.toLowerCase().replace(/_/g, ' ') : t;
 }
 
+/** What a field's raw value should look like, or null when it is fine (an empty value is fine). */
+export function roleplayFieldShapeProblem(
+  def: RoleplayFieldDef,
+  raw: unknown,
+): string | null {
+  if (raw === null || raw === undefined) return null;
+  if (def.key === 'stages') {
+    const ok =
+      Array.isArray(raw) &&
+      raw.every(
+        (s) =>
+          s && typeof s === 'object' && typeof (s as any).name === 'string',
+      );
+    return ok ? null : 'expected a list of stages, each with a name';
+  }
+  return typeof raw === 'string' ? null : 'expected text';
+}
+
+/**
+ * Fields a release reads that arrived in the wrong shape (a field renamed or reshaped in the
+ * creation code looks like this). The run skips them and says so, so it never fails on one.
+ */
+export function roleplayFieldProblems(
+  values: RoleplayFieldValues | null | undefined,
+  setting?: unknown,
+): Array<{ key: string; label: string; why: string }> {
+  const on = new Set(enabledRoleplayKeys(setting));
+  const out: Array<{ key: string; label: string; why: string }> = [];
+  for (const f of ROLEPLAY_FIELDS) {
+    if (!f.alwaysOn && !on.has(f.key)) continue;
+    const why = roleplayFieldShapeProblem(f, values?.[f.key]);
+    if (why) out.push({ key: f.key, label: f.label, why });
+  }
+  return out;
+}
+
 /**
  * The optional fields a release has on: its `roleplayFields` setting (unknown keys ignored), or
  * the defaults when it names none.

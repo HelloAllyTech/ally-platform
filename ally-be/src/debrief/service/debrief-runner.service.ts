@@ -59,7 +59,10 @@ import {
   debriefDataProviders,
   loadDebriefData,
 } from './debrief-data-providers';
-import { roleplayBrief } from '../util/debrief-roleplay-brief.util';
+import {
+  roleplayBrief,
+  roleplayFieldProblems,
+} from '../util/debrief-roleplay-brief.util';
 import { emptyFramework } from '../constants/debrief-framework.constants';
 import {
   DEBRIEF_ORCHESTRATOR_TOOLS,
@@ -626,6 +629,17 @@ export class DebriefRunnerService {
     const liveDetections = (loaded.context.live_detections ?? []) as unknown[];
     const caseMemory = loaded.context.case_memory;
     const cohort = loaded.context.cohort;
+    // A roleplay field in the wrong shape is skipped by the brief; say so on the run.
+    for (const p of roleplayFieldProblems(
+      session.roleplayFields,
+      bundle.settings?.roleplayFields,
+    )) {
+      loaded.problems.push({
+        contextKey: 'scenario',
+        item: 'roleplay_brief',
+        why: `${p.label}: ${p.why}`,
+      });
+    }
     if (loaded.problems.length) {
       // A run that read less than it should says so; the Agent logs can show it.
       this.logger.warn(
