@@ -324,6 +324,7 @@ describe('DebriefRunnerService', () => {
       });
       expect(s.speaker_labels).toBe('legacy');
       // Standard reads the pinned definition: the prompt is the store's live text, untouched.
+      expect(request().contract_version).toBe(1);
       expect(request().prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition]).toMatch(
         /^live /,
       );
@@ -362,6 +363,8 @@ describe('DebriefRunnerService', () => {
         ids: ['DG-0300'],
         areas: [],
       });
+      // The handling is also a typed column on the run, set when it starts.
+      expect(saved[saved.length - 1]?.riskCueHandling).toBe('assessed');
       expect(ws.riskCueOption).toMatchObject({
         key: 'part_of_practice',
         version: 1,
@@ -745,6 +748,15 @@ describe('DebriefRunnerService', () => {
           why: 'settings table locked',
         },
       ]);
+    });
+
+    it('records what the run ran: a hash of the release bundle and the prompt version each step used', async () => {
+      const { svc, saved } = build();
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      const run = saved[saved.length - 1];
+      expect(run?.bundleHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(run?.promptVersions).toBeDefined();
+      expect(typeof run?.promptVersions).toBe('object');
     });
 
     it('keeps no note when every read worked', async () => {

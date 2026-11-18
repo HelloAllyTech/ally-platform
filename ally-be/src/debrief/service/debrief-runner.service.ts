@@ -56,6 +56,8 @@ import { DebriefFrameworkService } from './debrief-framework.service';
 import { resolveRiskCue } from '../util/debrief-risk-cue.util';
 import { checkTransition } from '../util/debrief-run-status.util';
 import { Degraded } from '../util/debrief-degraded.util';
+import { canonicalHash } from '../../llm-agent/harness/release/canonical-hash.util';
+import { DEBRIEF_CONTRACT_VERSION } from '../util/debrief-graph-contract.util';
 import {
   DataProvider,
   debriefDataProviders,
@@ -359,7 +361,8 @@ export class DebriefRunnerService {
         degraded,
       });
       if ('ended' in prepared) return prepared.ended;
-      const retries = Number(run.workspace?.retries ?? 0) || 0;
+      const retries =
+        Number(run.retries ?? 0) || Number(run.workspace?.retries ?? 0) || 0;
       const res = await this.graph.run(
         {
           ...prepared.request,
@@ -494,6 +497,7 @@ export class DebriefRunnerService {
     // and `language_recorded: false`; the graph reads the language from what
     // the learner wrote and answers it with `language` and
     // `workspace.languageSource` (the Console counts these per organisation).
+    if (session.languageRecorded) run.languageSource = 'recorded';
     run.workspace = {
       ...run.workspace,
       ...(session.languageRecorded ? { languageSource: 'recorded' } : {}),
@@ -665,6 +669,15 @@ export class DebriefRunnerService {
       );
       run.workspace = { ...run.workspace, dataNotes: loaded.problems };
     }
+    run.riskCueHandling = riskCue.handling;
+    // What this run ran, so it can be reproduced without a join.
+    run.bundleHash = canonicalHash(bundle);
+    run.promptVersions = Object.fromEntries(
+      Object.entries(promptVersions).map(([code, v]) => [
+        code,
+        v && typeof v === 'object' ? 'override' : v,
+      ]),
+    );
     run.workspace = {
       ...run.workspace,
       // What this run used, kept so a later edit never changes how a past debrief reads.
@@ -701,6 +714,7 @@ export class DebriefRunnerService {
 
     return {
       request: {
+        contract_version: DEBRIEF_CONTRACT_VERSION,
         run_id: run.id,
         scenario_session_id: sessionId,
         mode: opts.mode,
@@ -809,6 +823,10 @@ export class DebriefRunnerService {
     }
     const status = res.status as DebriefRunStatus;
     run.workspace = { ...run.workspace, ...(res.workspace ?? {}) };
+    const source = run.workspace.languageSource;
+    if (typeof source === 'string' && source) {
+      run.languageSource = source.slice(0, 40);
+    }
     if (status === DebriefRunStatus.FAILED && !run.workspace.decision) {
       run.workspace = {
         ...run.workspace,

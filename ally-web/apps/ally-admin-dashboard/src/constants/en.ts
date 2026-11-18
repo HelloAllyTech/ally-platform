@@ -11555,6 +11555,7 @@ export const en = {
         scoreWeightFlags: "Overall score: weight of cards flagged",
         undoMargin: "Undo when the score drops by more than",
         watchDays: "Days a change is watched after going live",
+        agentLogRetentionDays: "Days an Agent log keeps its messages before they are cleared",
         askLowConfidence: "Changes the Debrief PM agent is not confident about ask a person",
         askModels: "New models or providers ask a person",
         slackChannel: "Slack channel for drops and undos",
@@ -13144,6 +13145,10 @@ export const en = {
           "debrief-audio-retention": {
             name: "Remove deleted sessions' audio",
             what: "Deletes the read-aloud audio of sessions that no longer exist",
+          },
+          "debrief-run-log-retention": {
+            name: "Clear old agent-log text",
+            what: "Clears the exact messages and replies in Agent logs older than the retention days (it keeps cost, timing and step names). Off until an owner turns it on",
           },
           "debrief-autonomy-relock": {
             name: "Re-lock autonomy",

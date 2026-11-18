@@ -1,4 +1,6 @@
 import { DebriefSlackService } from './debrief-slack.service';
+import { retriesSql } from '../util/debrief-run-columns.util';
+import { runRiskCueFacts } from '../util/debrief-risk-cue.util';
 import {
   BadRequestException,
   ForbiddenException,
@@ -291,18 +293,16 @@ export function withoutPractice<
  */
 export function cueBringsSupportLines(run: {
   hasRiskCue?: boolean | null;
+  riskCueHandling?: string | null;
   workspace?: Record<string, any> | null;
 }): boolean {
   if (run.hasRiskCue !== true) return false;
-  const option = run.workspace?.riskCueOption;
-  if (!option) return true;
-  if (option.supportLinesOnCue === false) return false;
-  if (option.handling !== 'assessed') return true;
-  const cues = run.workspace?.safety?.risk_cues;
-  if (!Array.isArray(cues) || !cues.length) return true;
-  return cues.some(
-    (c: { part_of_practice?: unknown }) => c?.part_of_practice !== true,
-  );
+  const facts = runRiskCueFacts(run);
+  if (!facts.known) return true;
+  if (!facts.supportLinesOnCue) return false;
+  if (!facts.assessed) return true;
+  if (!facts.practisedCues.length) return true;
+  return facts.practisedCues.some((practised) => !practised);
 }
 
 /** The roleplays a debrief's cards link to, once each. */
@@ -445,20 +445,21 @@ export class DebriefAgentService implements OnModuleInit {
           SET workspace = jsonb_set(
                 jsonb_set(
                   jsonb_set(coalesce(workspace, '{}'::jsonb), '{retries}',
-                    to_jsonb(COALESCE((workspace->>'retries')::int, 0) + 1)),
+                    to_jsonb(${retriesSql()} + 1)),
                   '{firstStartedAt}',
                   to_jsonb(COALESCE(workspace->>'firstStartedAt',
                                     COALESCE("startedAt", "createdAt")::text))),
                 '{priorEstimatedUsd}',
                 to_jsonb(COALESCE((workspace->>'priorEstimatedUsd')::numeric, 0)
                          + COALESCE("estimatedCostUsd", 0))),
+              "retries" = ${retriesSql()} + 1,
               status = $2,
               "startedAt" = now(),
               "finishedAt" = NULL,
               "updatedAt" = now()
         WHERE id = $1 AND mode = 'live' AND cards IS NULL
           AND status IN ($3, $4)
-          AND COALESCE((workspace->>'retries')::int, 0) < $5
+          AND ${retriesSql()} < $5
         RETURNING id`,
       [
         run.id,
@@ -495,7 +496,7 @@ export class DebriefAgentService implements OnModuleInit {
       `SELECT id FROM debrief_runs
         WHERE mode = 'live' AND cards IS NULL
           AND (status = $1 OR (status = $2 AND "skipReason" = ANY($3::text[])))
-          AND COALESCE((workspace->>'retries')::int, 0) < $4
+          AND ${retriesSql()} < $4
           AND "createdAt" >= now() - make_interval(hours => $5)
         ORDER BY "createdAt" LIMIT $6`,
       [
@@ -531,7 +532,7 @@ export class DebriefAgentService implements OnModuleInit {
           AND status IN ($1, $2, $3)
           AND NOT (coalesce("skipReason", '') = ANY($4::text[]))
           AND NOT (coalesce(workspace, '{}'::jsonb) ? 'fallbackToToday')
-          AND (status = $3 OR COALESCE((workspace->>'retries')::int, 0) >= $5
+          AND (status = $3 OR ${retriesSql()} >= $5
                OR NOT (coalesce("skipReason", '') = ANY($6::text[])))
           AND "createdAt" >= now() - make_interval(hours => $7)
         ORDER BY "createdAt" LIMIT $8`,

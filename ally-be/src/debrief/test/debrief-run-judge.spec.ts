@@ -40,7 +40,7 @@ describe('the run judge is given the Writer’s guidance', () => {
       { ai: { apiUrl: 'http://ai', outboundApiKey: 'k' } } as any,
       agentLogs as any,
     );
-    return { svc, find, agentLogs };
+    return { svc, find, agentLogs, query };
   }
 
   const run = (passages?: string[]) =>
@@ -136,6 +136,26 @@ describe('the run judge is given the Writer’s guidance', () => {
       log,
       { code: DEBRIEF_JUDGE_INSTRUCTIONS_CODE, version: 4 },
       'm',
+    );
+  });
+
+  it('stores the score, model and prompt version as columns too, for SQL that filters on them', async () => {
+    const { svc, query } = build([]);
+    const r = run();
+    const judgment = await svc.judge(r);
+    const store = (query.mock.calls as any[][]).find(([sql]) =>
+      String(sql).includes('"judgeOverall" = $3'),
+    )!;
+    expect(String(store[0])).toContain(
+      '"judgeModel" = $4, "judgePromptVersion" = $5',
+    );
+    expect(store[1][2]).toBe(judgment!.overall);
+    expect(store[1][3]).toBe('m');
+    expect(store[1][4]).toBe(judgment!.promptVersion);
+    // The in-memory run carries them as well, so a later save does not blank them.
+    expect(r.judgeModel).toBe('m');
+    expect(r.judgeOverall).toBe(
+      judgment!.overall == null ? null : String(judgment!.overall),
     );
   });
 });

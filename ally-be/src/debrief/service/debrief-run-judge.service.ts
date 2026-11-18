@@ -195,10 +195,17 @@ export class DebriefRunJudgeService {
       await this.runs.query(
         `UPDATE debrief_runs
             SET workspace = (coalesce(workspace, '{}'::jsonb) - 'judgeClaimedAt')
-                  || jsonb_build_object('judge', $2::jsonb)
+                  || jsonb_build_object('judge', $2::jsonb),
+                "judgeOverall" = $3, "judgeModel" = $4, "judgePromptVersion" = $5
           WHERE id = $1 AND (workspace->'judge') IS NULL
           RETURNING id`,
-        [run.id, JSON.stringify(judgment)],
+        [
+          run.id,
+          JSON.stringify(judgment),
+          judgment.overall,
+          judgment.model.slice(0, 80),
+          judgment.promptVersion.slice(0, 80),
+        ],
       ),
     );
     if (!stored.length) return this.storedJudgment(run);
@@ -220,6 +227,10 @@ export class DebriefRunJudgeService {
       );
     }
     run.workspace = { ...run.workspace, judge: judgment };
+    run.judgeOverall =
+      judgment.overall == null ? null : String(judgment.overall);
+    run.judgeModel = judgment.model.slice(0, 80);
+    run.judgePromptVersion = judgment.promptVersion.slice(0, 80);
     return judgment;
   }
 
