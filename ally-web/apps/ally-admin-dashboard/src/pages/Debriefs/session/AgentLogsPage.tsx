@@ -11,7 +11,7 @@ import { AgentLogEntry, AgentLogsView } from "@types";
 
 import { modelLabels } from "../consoleLabels";
 import { TruncatedTitle } from "../consoleRows";
-import { BackLink } from "../consoleUi";
+import { BackLink, Disclosure } from "../consoleUi";
 import { Details, Found, foundHeading } from "./AgentLogFindings";
 import {
   asObj,
@@ -278,39 +278,32 @@ const Exact: React.FC<{ entry: AgentLogEntry; prompts: Record<string, string> }>
   entry: e,
   prompts,
 }) => {
-  const [open, setOpen] = useState(false);
   const sent = exactInput(e, prompts);
   const reply = pretty(e.output) + (e.error ? `\n\nError: ${e.error}` : "");
   return (
-    <div>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(o => !o)}
-        className="border-0 bg-transparent p-0 text-[13px] text-primary-500 hover:underline"
-        data-testid="log-exact-toggle"
-      >
-        Show the exact message and reply {open ? "▾" : "▸"}
-      </button>
-      {open && (
-        <div className="mt-2 grid grid-cols-2 gap-3" data-testid="log-exact">
-          {[
-            { label: e.kind === "model" ? "Message as sent" : "Inputs", text: sent },
-            { label: e.kind === "model" ? "Reply" : "Result", text: reply },
-          ].map(p => (
-            <div key={p.label} className="flex min-w-0 flex-col gap-1">
-              <div className="flex items-center text-xs font-semibold">
-                {p.label}
-                <Copy text={p.text} />
-              </div>
-              <pre className="m-0 max-h-[320px] overflow-auto whitespace-pre-wrap break-words bg-white px-3 py-2.5 font-mono text-xs leading-normal">
-                {p.text}
-              </pre>
+    <Disclosure
+      label="Show the exact message and reply ▸"
+      openLabel="Show the exact message and reply ▾"
+      buttonClassName="border-0 bg-transparent p-0 text-[13px] text-primary-500 hover:underline"
+      buttonTestId="log-exact-toggle"
+    >
+      <div className="mt-2 grid grid-cols-2 gap-3" data-testid="log-exact">
+        {[
+          { label: e.kind === "model" ? "Message as sent" : "Inputs", text: sent },
+          { label: e.kind === "model" ? "Reply" : "Result", text: reply },
+        ].map(p => (
+          <div key={p.label} className="flex min-w-0 flex-col gap-1">
+            <div className="flex items-center text-xs font-semibold">
+              {p.label}
+              <Copy text={p.text} />
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+            <pre className="m-0 max-h-[320px] overflow-auto whitespace-pre-wrap break-words bg-white px-3 py-2.5 font-mono text-xs leading-normal">
+              {p.text}
+            </pre>
+          </div>
+        ))}
+      </div>
+    </Disclosure>
   );
 };
 

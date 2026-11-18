@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 import { Link } from "react-router-dom";
 
@@ -145,3 +145,33 @@ export const Tile: React.FC<{
     {children}
   </div>
 );
+
+/**
+ * One open/close control for a block of detail: a text button (`aria-expanded`) that shows or hides
+ * its children. The children are not rendered while closed. `openLabel` defaults to `label`.
+ */
+export const Disclosure: React.FC<{
+  label: React.ReactNode;
+  openLabel?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  buttonClassName?: string;
+  buttonTestId?: string;
+  testId?: string;
+}> = ({ label, openLabel, children, className, buttonClassName, buttonTestId, testId }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={className} data-testid={testId}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+        className={buttonClassName}
+        data-testid={buttonTestId}
+      >
+        {open ? (openLabel ?? label) : label}
+      </button>
+      {open && children}
+    </div>
+  );
+};

@@ -22,7 +22,10 @@ vi.mock("@api", async importOriginal => ({
 }));
 
 // eslint-disable-next-line import/first
-import { groupLabel, MetricsTab, orchestratorRows, targetState } from "../MetricsTab";
+import { MetricsTab } from "../MetricsTab";
+import { orchestratorRows } from "../metrics/AgentsMetricsSection";
+import { targetState } from "../metrics/metricsData";
+import { groupLabel } from "../metrics/MetricsQualitySection";
 // eslint-disable-next-line import/first
 import { kappaWords } from "../metrics/metricsCharts";
 // eslint-disable-next-line import/first
