@@ -376,10 +376,14 @@ export class StreamFileProcessorService
       tempFiles.push(tempFilePath0, tempFilePath1);
 
       // Create encrypted streams using AudioEncryptionUtil
-      const encryptionStream0 =
-        AudioEncryptionUtil.createEncryptionStream(tempFilePath0);
-      const encryptionStream1 =
-        AudioEncryptionUtil.createEncryptionStream(tempFilePath1);
+      const encryptionStream0 = AudioEncryptionUtil.createEncryptionStream(
+        tempFilePath0,
+        (error) => this.onRecordingWriteError(chatId!, error),
+      );
+      const encryptionStream1 = AudioEncryptionUtil.createEncryptionStream(
+        tempFilePath1,
+        (error) => this.onRecordingWriteError(chatId!, error),
+      );
 
       // Create audio upload record using entityManager
       await this.chatAudioUploadsService.createAudioUpload(
@@ -576,8 +580,10 @@ export class StreamFileProcessorService
     );
 
     // Create new encryption stream
-    const newEncryptionStream =
-      AudioEncryptionUtil.createEncryptionStream(newTempFilePath);
+    const newEncryptionStream = AudioEncryptionUtil.createEncryptionStream(
+      newTempFilePath,
+      (error) => this.onRecordingWriteError(chatId, error),
+    );
     fileToFlush.tempFilePath = newTempFilePath;
     fileToFlush.cipher = newEncryptionStream.cipher;
     fileToFlush.writeStream = newEncryptionStream.writeStream;
@@ -622,6 +628,10 @@ export class StreamFileProcessorService
       });
       return;
     }
+
+    // Its file can't be written (see onRecordingWriteError): writing more
+    // would only buffer it in memory, so drop it.
+    if (activeCallStream.partUploadFailed) return;
 
     const audioBuffer = this.processPendingAudioQueue(
       activeCallStream.callId,
@@ -990,6 +1000,27 @@ export class StreamFileProcessorService
         },
       });
     }
+  }
+
+  /**
+   * A recording's temp file could not be written (a full disk, a missing
+   * directory). Fail that recording, not the process: stop writing to it, and
+   * endCallStream then marks its summary FAILED with the reason, as it does
+   * for a failed part upload.
+   */
+  private onRecordingWriteError(chatId: number, error: Error): void {
+    const stream = this.activeCallStreams[chatId];
+    if (stream) stream.partUploadFailed = true;
+    this.logger.error(
+      `Recording file write failed; this recording is lost | ChatId: ${chatId} | ${error.message}`,
+    );
+    this.auditLogger.log({
+      eventType: AUDIT_EVENTS.AUDIO_PROCESSING_FAILED,
+      details: {
+        chatId,
+        reason: `Recording file write failed: ${error.message}`,
+      },
+    });
   }
 
   clearPendingAudioQueue(callId: string) {
