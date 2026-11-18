@@ -1,0 +1,604 @@
+[
+  {
+    "id": "tss-S1",
+    "kind": "in data: Batman high tops ₹4,499",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How much are the Batman high top sneakers?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["4,?499"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S2",
+    "kind": "in data: Orbit backpack ₹3,299, no cart offer",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Price of the Orbit backpack?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["3,?299"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S3",
+    "kind": "in data: 30-day returns",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What's your return policy?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["30[- ]?day|30 days|thirty days"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S4",
+    "kind": "in data: prices include taxes",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Are taxes included in the price?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["inclu"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S5",
+    "kind": "in data: customer care phone and email",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How do I reach customer care?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["6849 ?3328"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S6",
+    "kind": "in data: oversized fit, size down",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Your hoodies look oversized, should I size down?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["siz(e|ing) down|smaller size|one size (down|smaller)"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S7",
+    "kind": "in data: machine wash",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How should I wash the cotton t-shirts?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["machine[- ]wash"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S8",
+    "kind": "in data: membership non-refundable mid-way",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Can I cancel the membership and get my money back?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["non[- ]?refundable|not (be )?refund|no refund"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S9",
+    "kind": "in data: card details not stored",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Do you save my card details?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["(don.t|do not|not|never) (store|save|keep)|third[- ]party"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S10",
+    "kind": "not in data: shipping to Pune, honest, real contact, no estimate offer",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How much is shipping and how long does delivery take to Pune?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["6849 ?3328|connect@thesouledstore\\.com"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S11",
+    "kind": "not in data: cash on delivery, honest with contact",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Do you have cash on delivery?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["6849 ?3328|connect@thesouledstore\\.com"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S12",
+    "kind": "multi-turn: Batman gift in budget, no hand-over, returns",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "I'm looking for a gift for my brother who loves Batman, budget 5000",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["4,?499"],
+          "handover": false
+        }
+      },
+      {
+        "user": "he's UK 9",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "handover": false
+        }
+      },
+      {
+        "user": "what if it doesn't fit?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["30[- ]?day|30 days|exchange"],
+          "handover": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-S16",
+    "kind": "order lookup with no order: asks for order number or points to care",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Where is my order?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["order (number|id|no)|6849 ?3328|connect@thesouledstore\\.com"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "tss-M2",
+    "kind": "memory: 'please remember' is confirmed, not declined",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Please remember for next time: I'm Rohan, I wear size M and UK 9, and I love Spiderman",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic",
+            "I don.t know that",
+            "contact (us|the team)"
+          ],
+          "must": ["remember|noted|I'?ll keep|saved|got it"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "cn-C2",
+    "kind": "in data: 3-month antenatal fitness ₹7,990",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What's the price of the 3-month antenatal fitness plan?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["7,?990"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "cn-C3",
+    "kind": "in data: Level III NICU",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Do you have a NICU? What level?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["level (iii|3)"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "cn-C6",
+    "kind": "in data (site FAQ): baby movements 18 to 25 weeks, sourced",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "When will I feel my baby move?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["18|25"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "cn-C8",
+    "kind": "multi-turn: Apartment package inclusions and ambulance",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "I'm 7 months pregnant, what delivery packages do you have at Bannerghatta Road?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["apartment"]
+        }
+      },
+      {
+        "user": "What's in the Apartment package? Do you give ambulance pickup?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["ambulance"]
+        }
+      },
+      {
+        "user": "Can someone call me tomorrow evening? I'm Asha, 9000000001",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic",
+            "08069524603"
+          ],
+          "must": ["call|99724 ?99724|team"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "sb-P1",
+    "kind": "in data: SEBI RIA number",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Are you SEBI registered? What's your number?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic",
+            "098862 ?73164"
+          ],
+          "must": ["INA200001041"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "sb-P2",
+    "kind": "in data: services",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What services do you offer?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["mutual fund|PMS|advis"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "sb-P5",
+    "kind": "in data: no guaranteed returns",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What's the minimum for PMS, and are returns guaranteed?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["(no|not|aren.t|isn.t|never)\\b.{0,30}guarantee"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "sb-P9",
+    "kind": "in data: none guaranteed",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Are any of your products guaranteed?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["(no|not|none|aren.t|isn.t)\\b.{0,30}guarantee"]
+        }
+      }
+    ]
+  }
+]

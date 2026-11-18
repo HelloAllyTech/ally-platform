@@ -339,6 +339,48 @@ describe('ChatbotEngineService', () => {
       expect(draftLookup?.[1]).toEqual(['bot-1']);
     });
 
+    it("adds the business's sourced contact to a decline whose wording has none (Q3-fast Part 2)", async () => {
+      const query = jest.fn().mockResolvedValue([
+        {
+          learned: {
+            facts: [
+              {
+                section: 'location',
+                text: 'Customer care: +91 22 6849 3328, connect@thesouledstore.com',
+              },
+            ],
+          },
+        },
+      ]);
+      engine = makeEngine({
+        aiService,
+        promptShared,
+        documents: {
+          find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]),
+          manager: { query },
+        },
+      });
+      aiService.runAgent.mockResolvedValueOnce({
+        ...AGENT_ANSWER,
+        intent: 'decline',
+        answer: '',
+        citations: [],
+      });
+      const decision = await engine.respond(
+        turn({
+          settings: {
+            ...settings,
+            declineText:
+              "I'm sorry I don't know that; please ask our front desk.",
+          },
+        }),
+      );
+      expect(decision.body).toContain('please ask our front desk.');
+      expect(decision.body).toContain(
+        'You can reach us on +91 22 6849 3328 / connect@thesouledstore.com.',
+      );
+    });
+
     it('sends the crisis reply at once, with no run, when the check decides first (Q3-fast)', async () => {
       aiService.checkWhatsAppCrisis.mockResolvedValueOnce({
         is_crisis: true,

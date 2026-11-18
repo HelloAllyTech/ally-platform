@@ -184,6 +184,8 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
    * Absent otherwise.
    */
   mood?: 'upset';
+  /** How to reach the business, from its sources (Q3-fast Part 2), for declines. */
+  business_contact?: string;
   /** With `mood`: the business's helplines, for the support line on health assistants. */
   support_helplines?: string;
   /**

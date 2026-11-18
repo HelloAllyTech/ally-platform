@@ -1,0 +1,135 @@
+FAIL! tss-S1 (in data: Batman high tops ₹4,499) [0/3 runs passed]
+      > How much are the Batman high top sneakers?
+      < [clarified/question v2 13377ms] Sorry—I don’t have the price for the Batman high-top sneakers here. Would you like help finding the product page or sizing details for them?
+      ✗ missing /4,?499/
+      > How much are the Batman high top sneakers?
+      < [declined/question v2 14346ms] Sorry — I don’t have the price or stock details for the Batman high-top sneakers in my system right now. Would you like me to help look for other Batman footwea
+      ✗ missing /4,?499/
+      > How much are the Batman high top sneakers?
+      < [clarified/question v2 12762ms] Sorry—I don’t have the price info here. Which Batman high-top sneakers do you mean (men’s or women’s), or can you share the product page link so I can look it u
+      ✗ missing /4,?499/
+FAIL! tss-S2 (in data: Orbit backpack ₹3,299, no cart offer) [0/3 runs passed]
+      > Price of the Orbit backpack?
+      < [declined/question v2 13741ms] Sorry—I don’t have the price for the Orbit backpack available here. Which Orbit backpack do you mean (any specific colour or product link)? I can then try to lo
+      ✗ missing /3,?299/
+      > Price of the Orbit backpack?
+      < [declined/question v2 13396ms] I’m sorry — I don’t have the price details for the Orbit backpack available right now. Please check with our front desk for the exact price. Would you like help
+      ✗ missing /3,?299/
+      > Price of the Orbit backpack?
+      < [clarified/question v2 13399ms] Do you mean the Orbit backpack listed on our site—can you share which product page or the color/variant you’re asking about?
+      ✗ missing /3,?299/
+FAIL! tss-S3 (in data: 30-day returns) [0/3 runs passed]
+      > What's your return policy?
+      < [rag/question v2 8206ms] Here’s what I can confirm from our Terms: returns and related rules are governed by The Souled Store’s Terms & Conditions. The Company may, after reasonable ass
+      ✗ missing /30[- ]?day|30 days|thirty days/
+      > What's your return policy?
+      < [rag/question v2 8038ms] Thanks — I can help. Our Terms say that by using the website you agree to the Terms of Use, and that The Souled Store may, after reasonable assessment, restrict
+      ✗ missing /30[- ]?day|30 days|thirty days/
+      > What's your return policy?
+      < [rag/question v2 7175ms] Our Terms say we may restrict accounts with unusually high return rates or repeated delivery failures, and we may charge a reasonable return-processing fee for 
+      ✗ missing /30[- ]?day|30 days|thirty days/
+pass  tss-S4 (in data: prices include taxes) [3/3 runs passed]
+      > Are taxes included in the price?
+      < [rag/question v2 4819ms] Yes — product pages show prices as “Price incl. of all taxes.” (See product pages for example: [2], [3], [4], [5].) Note that the Terms say The Souled Store may
+      > Are taxes included in the price?
+      < [rag/question v2 5497ms] Yes — product pages show price as “Price incl. of all taxes” (see product note) and the membership introductory fee is stated as inclusive of GST. I can check a
+      > Are taxes included in the price?
+      < [rag/question v2 5272ms] Yes — the product prices on our site are shown inclusive of taxes. For example, product pages state “Price incl. of all taxes” [3][4][5]. Note that the Terms al
+FAIL! tss-S5 (in data: customer care phone and email) [1/3 runs passed]
+      > How do I reach customer care?
+      < [rag/question v2 6814ms] You can contact customer care by email or phone: - Email: connect@thesouledstore.com [3][4] - Alternate email: grievanceofficer@thesouledstore.com [1][2] - Phon
+      ✗ missing /68493328/
+      > How do I reach customer care?
+      < [rag/question v2 5504ms] You can contact customer care by email at connect@thesouledstore.com or by phone at +91 22 6849 3328. For grievance matters you can also email grievanceofficer@
+      ✗ missing /68493328/
+      > How do I reach customer care?
+      < [rag/question v2 5557ms] You can reach customer care by email or phone: grievanceofficer@thesouledstore.com (for grievances) and connect@thesouledstore.com. There's also a phone number 
+FAIL! tss-S6 (in data: oversized fit, size down) [0/3 runs passed]
+      > Your hoodies look oversized, should I size down?
+      < [clarified/question v2 5770ms] Which hoodie are you looking at — can you tell me the product name (for example “Solar Core Hoodie”)?
+      ✗ missing /size down|smaller size|one size (down|smaller)/
+      > Your hoodies look oversized, should I size down?
+      < [rag/question v2 5195ms] A lot of our hoodies are intentionally oversized and the product pages recommend sizing down if you want a regular fit. (See product notes on the Tangerine Flee
+      ✗ missing /size down|smaller size|one size (down|smaller)/
+      > Your hoodies look oversized, should I size down?
+      < [clarified/question v2 6867ms] Most of our hoodie listings are labelled “Oversized” (for example on our men’s and women’s oversized hoodies) [1][2][3][4][5]. Which hoodie are you looking at —
+      ✗ missing /size down|smaller size|one size (down|smaller)/
+FAIL! tss-S7 (in data: machine wash) [1/3 runs passed]
+      > How should I wash the cotton t-shirts?
+      < [rag/question v2 4925ms] You can machine-wash cotton t-shirts (Machine Wash) [5]. Would you like tips on drying or ironing them?
+      > How should I wash the cotton t-shirts?
+      < [declined/question v2 8596ms] Sorry—I don’t have washing/care instructions for cotton t-shirts in the information I can access right now. Would you like me to look up the care details for a 
+      ✗ missing /machine[- ]wash/
+      > How should I wash the cotton t-shirts?
+      < [clarified/question v2 8177ms] Which cotton t-shirt are you asking about — can you tell me the product name or SKU so I can check its care instructions?
+      ✗ missing /machine[- ]wash/
+pass  tss-S8 (in data: membership non-refundable mid-way) [3/3 runs passed]
+      > Can I cancel the membership and get my money back?
+      < [rag/question v2 8344ms] I’m sorry — memberships are non-refundable and non-transferable. The Terms say annual and quarterly memberships won’t be refunded if you cancel them yourself. I
+      > Can I cancel the membership and get my money back?
+      < [rag/question v2 4933ms] You can cancel your membership, but the membership is non-refundable and non-transferable — so you will not get your money back if you cancel yourself. If The S
+      > Can I cancel the membership and get my money back?
+      < [rag/question v2 7374ms] You can cancel, but memberships are non-refundable and non-transferable — so you generally won’t get your money back if you cancel yourself. The Souled Store sa
+pass  tss-S9 (in data: card details not stored) [3/3 runs passed]
+      > Do you save my card details?
+      < [rag/question v2 6942ms] Short answer: no — The Souled Store does not store your payment card details on its servers. The policy says certain sensitive/financial details (including bank
+      > Do you save my card details?
+      < [rag/question v2 6244ms] Short answer: No — we don’t store your payment card details on our servers. The Souled Store uses third‑party payment processors to handle payment information a
+      > Do you save my card details?
+      < [rag/question v2 7372ms] Short answer: No — we don’t store your full card details on our servers. Our policy says certain sensitive information (including bank/payment details and passw
+FAIL! tss-S10 (not in data: shipping to Pune, honest, real contact, no estimate offer) [2/3 runs passed]
+      > How much is shipping and how long does delivery take to Pune?
+      < [rag/question v2 13652ms] I’m sorry—I don’t have the shipping charges or exact delivery time to Pune in the information I can see. For the quickest help, please contact our front desk (M
+      > How much is shipping and how long does delivery take to Pune?
+      < [declined/question v2 15253ms] Sorry—I don’t have the shipping charges or delivery-time to Pune in the information I can access. Please contact our front desk for exact shipping cost and deli
+      > How much is shipping and how long does delivery take to Pune?
+      < [clarified/question v2 6199ms] Which product are you looking to buy so I can check the exact shipping cost and delivery time to Pune for that item?
+      ✗ missing /68493328|connect@thesouledstore\.com/
+FAIL! tss-S11 (not in data: cash on delivery, honest with contact) [0/3 runs passed]
+      > Do you have cash on delivery?
+      < [declined/question v2 16030ms] Sorry—I don’t have information here that says whether we offer Cash on Delivery (COD). Would you like me to check the payment options for a specific product or 
+      ✗ missing /68493328|connect@thesouledstore\.com/
+      > Do you have cash on delivery?
+      < [clarified/question v2 14657ms] Do you want to know if Cash on Delivery is available for a specific product or for orders in general? (Please tell me the product name or 'general')
+      ✗ missing /68493328|connect@thesouledstore\.com/
+      > Do you have cash on delivery?
+      < [declined/question v2 11665ms] I’m sorry — I don’t have any information in our records about whether Cash on Delivery (COD) is offered. Please contact our front desk on the website for confir
+      ✗ missing /68493328|connect@thesouledstore\.com/
+FAIL! tss-S12 (multi-turn: Batman gift in budget, no hand-over, returns) [0/3 runs passed]
+      > I'm looking for a gift for my brother who loves Batman, budget 5000
+      < [clarified/question v2 9322ms] Nice — I can help find the perfect Batman gift. Do you want apparel (like tees/hoodies), accessories (caps, bags), or collectibles/room decor for your brother?
+      ✗ missing /4,?499/
+      > he's UK 9
+      < [clarified/question v2 5667ms] Thanks — quick check: do you want a Batman footwear gift in UK 9 (like shoes/slip‑ons), or would you prefer apparel or accessories I should match to that size?
+      > what if it doesn't fit?
+      < [rag/question v2 8100ms] I’m sorry—I don’t have the store’s returns/exchange policy for footwear in the information I can access. For help with returns or exchanges, you can contact The
+      > I'm looking for a gift for my brother who loves Batman, budget 5000
+      < [clarified/question v2 9870ms] Nice — I can help pick something within ₹5,000. Would you prefer clothing (T‑shirt/hoodie/jacket) or accessories (cap/pack/fanny pack) for your brother?
+      ✗ missing /4,?499/
+      > he's UK 9
+      < [clarified/question v2 2340ms] Great — thanks. Do you want clothing (T‑shirt/hoodie/jacket) or accessories (cap/pack/fanny pack/shoes) as the gift?
+      > what if it doesn't fit?
+      < [rag/question v2 13138ms] If the item doesn’t fit, many Souled Store products are eligible for a 30-day return or exchange under the site’s policy (several product pages show “eligible f
+      > I'm looking for a gift for my brother who loves Batman, budget 5000
+      < [clarified/question v2 10352ms] Would you prefer clothing (T‑shirt, hoodie, jacket) or an accessory (cap, fanny pack, backpack) as a Batman gift for your brother?
+      ✗ missing /4,?499/
+      > he's UK 9
+      < [clarified/question v2 8134ms] Thanks — great to know his size. Do you want me to look for Batman footwear (UK 9) or would you still prefer clothing or an accessory as the gift?
+      > what if it doesn't fit?
+      < [rag/question v2 9771ms] If an item doesn’t fit, our Terms say the company may, after assessment, restrict accounts with unusually high return rates and may charge a reasonable return p
+pass  tss-S16 (order lookup with no order: asks for order number or points to care) [3/3 runs passed]
+      > Where is my order?
+      < [clarified/question v2 2566ms] I can help—could you share your order ID or the phone number/email used to place the order so I can check its status?
+      > Where is my order?
+      < [clarified/question v2 3272ms] I can help track that — could you please share your order ID (or the email/phone used to place the order)?
+      > Where is my order?
+      < [clarified/question v2 4532ms] I can help track it — could you share your order ID or the email / phone you used to place the order?
+FAIL! tss-M2 (memory: 'please remember' is confirmed, not declined) [2/3 runs passed]
+      > Please remember for next time: I'm Rohan, I wear size M and UK 9, and I love Spiderman
+      < [clarified/smalltalk v2 10111ms] Got it, Rohan — I’ll remember you wear size M, UK 9, and that you love Spiderman. Would you like me to look up Spiderman products in your size?
+      > Please remember for next time: I'm Rohan, I wear size M and UK 9, and I love Spiderman
+      < [declined/smalltalk v2 9400ms] I’m sorry, I don’t have that information; please ask our front desk for help.
+      ✗ missing /remember|noted|I'?ll keep|saved|got it/
+      > Please remember for next time: I'm Rohan, I wear size M and UK 9, and I love Spiderman
+      < [clarified/smalltalk v2 4604ms] Got it, Rohan — I’ll remember you wear size M, UK 9, and you love Spiderman. Would you like me to help find Spiderman products in your sizes now?
+4/14 cases passed in every run; 10 must-pass failed

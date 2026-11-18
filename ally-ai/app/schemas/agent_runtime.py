@@ -158,6 +158,15 @@ class AgentRunRequest(KnowledgeAnswerRequest):
     person_name: Optional[str] = Field(
         None, max_length=80, description="The person's name, when it is known."
     )
+    business_contact: Optional[str] = Field(
+        None,
+        max_length=200,
+        description=(
+            "Q3-fast Part 2: how to reach the business, from its sources (a phone "
+            "number and an email). A decline gives it when the owner's decline "
+            "wording carries no contact of its own."
+        ),
+    )
     mood: Optional[Literal["upset"]] = Field(
         None,
         description=(
@@ -225,6 +234,8 @@ class AgentRunRequest(KnowledgeAnswerRequest):
                 bot["gateway_omitted"] = list(self.gateway.omitted)
             if self.gateway.definitions and self.gateway.today:
                 bot["gateway_today"] = self.gateway.today
+        if self.business_contact:
+            bot["business_contact"] = self.business_contact
         # Q3-fast Part 1: only when upset, so every other run is today's.
         if self.mood:
             bot["mood"] = self.mood

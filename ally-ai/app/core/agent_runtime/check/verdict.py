@@ -63,6 +63,12 @@ class CheckContext:
     #: A reply that relays one is an answer about the person's request, not a gap
     #: in what the assistant knows.
     refused: Sequence[str] = ()
+    #: How to reach the business, from its sources (Q3-fast Part 2): what a decline
+    #: gives when the owner's decline wording has no contact of its own.
+    business_contact: str = ""
+    #: The bot remembers people between chats (chunk 8a's memory on). Off, a "please
+    #: remember…" gets a plain "I can't" (Q3-fast Part 2, 17 Nov M2).
+    memory_on: bool = True
 
     @property
     def found(self) -> List[Dict[str, Any]]:

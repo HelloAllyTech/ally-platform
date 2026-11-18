@@ -50,6 +50,7 @@ import { crisisRequest } from './crisis-history';
 import { holdTextUntilCleared } from './live-reply';
 import { isEverydayIdiom } from './everyday-idiom';
 import { looksEmotional } from './looks-emotional';
+import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 import { replyLanguageOf } from './reply-language';
@@ -57,7 +58,9 @@ import {
   aboutAnAnimal,
   type ContactSource,
   contactFromSources,
+  emailIn,
   emergencyNumberFrom,
+  phoneIn,
   runFailedReply,
 } from './run-failed-reply';
 
@@ -610,9 +613,40 @@ export class ChatbotEngineService {
     }
 
     const { response: answer } = answerResult.value;
-    const decision = this.toDecision(turn, answer, ran, degradedAlert);
+    const decision = this.toDecision(
+      await this.withDeclineContact(turn, answer),
+      answer,
+      ran,
+      degradedAlert,
+    );
     if (agent) decision.agent = agent;
     return decision;
+  }
+
+  /**
+   * A decline with no words of its own goes out in the owner's decline wording. When that wording
+   * has no phone or email ("please ask our front desk"), the business's contact from its sources
+   * follows it (Q3-fast Part 2, 17 Nov S10/S11): one honest line, then how to reach them.
+   */
+  private async withDeclineContact(
+    turn: ChatTurn,
+    answer: EngineAnswer,
+  ): Promise<ChatTurn> {
+    const wording = turn.settings.declineText ?? '';
+    if (answer.intent !== 'decline' || answer.answer?.trim()) return turn;
+    if (phoneIn(wording) || emailIn(wording)) return turn;
+    const contact = contactFromSources(
+      await this.businessFacts(turn),
+      turn.settings.helplineNumbers,
+    );
+    if (!contact) return turn;
+    return {
+      ...turn,
+      settings: {
+        ...turn.settings,
+        declineText: `${wording.trim()} You can reach us on ${contact}.`.trim(),
+      },
+    };
   }
 
   /**
@@ -718,41 +752,8 @@ export class ChatbotEngineService {
    * replies that name a number: the run-failed reply (Part 0) and the emergency reply (Part 1). A
    * lookup failure is no facts: the reply goes out without the number.
    */
-  private async businessFacts(turn: ChatTurn): Promise<ContactSource[]> {
-    try {
-      const rows = await this.documentRepository.manager.query<
-        { learned: { facts?: { section?: string; text?: string }[] } | null }[]
-      >(
-        `SELECT learned FROM bot_drafts
-          WHERE chatbot_id = $1
-          ORDER BY "updatedAt" DESC
-          LIMIT 1`,
-        [turn.chatbot.id],
-      );
-      const facts: ContactSource[] = (rows?.[0]?.learned?.facts ?? [])
-        .filter((fact) => typeof fact?.text === 'string')
-        .map((fact) => ({ section: fact.section, text: fact.text as string }));
-      // The owner's notes too (stop 1): what they typed during setup ("For eye emergencies…
-      // call 108"), which the facts list may not carry.
-      const notes = await this.documentRepository.manager.query<
-        { raw_text: string | null }[]
-      >(
-        `SELECT raw_text FROM kb_documents
-          WHERE owner_chatbot_id = $1 AND title = 'Owner notes' AND archived_at IS NULL
-          ORDER BY "updatedAt" DESC
-          LIMIT 1`,
-        [turn.chatbot.id],
-      );
-      const note = notes?.[0]?.raw_text?.trim();
-      return note ? [...facts, { section: 'owner_notes', text: note }] : facts;
-    } catch (error) {
-      this.logger.warn(
-        `Could not read the bot's facts: ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`,
-      );
-      return [];
-    }
+  private businessFacts(turn: ChatTurn): Promise<ContactSource[]> {
+    return businessFacts(this.documentRepository.manager, turn.chatbot.id);
   }
 
   /** The agent's answer, as one reply. */

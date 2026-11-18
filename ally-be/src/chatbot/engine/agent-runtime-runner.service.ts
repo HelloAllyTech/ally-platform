@@ -36,7 +36,9 @@ import {
   MalformedAgentResponseError,
 } from './agent-runtime';
 import type { AgentRunRef, ChatTurn, LiveReply } from './chatbot-engine.types';
+import { businessFacts } from './business-facts';
 import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
+import { contactFromSources } from './run-failed-reply';
 
 /**
  * At most this many document titles are sent as the agent's "what I cover" list: ally-ai's limit on
@@ -245,7 +247,7 @@ export class AgentRuntimeRunner {
   ): Promise<AgentRunRequest> {
     // What it knows about the person (chunk 8a): their lines with memory on, this chat's summary
     // and their name, each only when there is one. Nothing: exactly today's request.
-    const [knowledgeTopics, memory] = await Promise.all([
+    const [knowledgeTopics, memory, facts] = await Promise.all([
       this.knowledgeTopics(knowledge),
       this.memory
         ? this.memory.forRun(
@@ -258,7 +260,11 @@ export class AgentRuntimeRunner {
             }),
           )
         : Promise.resolve({ fields: {}, refs: {} }),
+      // How to reach the business, from its sources (Q3-fast Part 2): a decline gives it
+      // when the owner's decline wording has no contact of its own.
+      businessFacts(this.documentRepository.manager, turn.chatbot.id),
     ]);
+    const contact = contactFromSources(facts, turn.settings.helplineNumbers);
     if (shown) shown.refs = memory.refs;
     const body: AgentRunRequest = {
       ...buildAgentRunRequest(request, {
@@ -269,6 +275,7 @@ export class AgentRuntimeRunner {
         declineText: turn.settings.declineText,
       }),
       ...memory.fields,
+      ...(contact ? { business_contact: contact.slice(0, 200) } : {}),
     };
     if (run.withGateway === false) return body;
     // The tools this bot has on, from its OWN stored settings (chunk 3b), and its list tools

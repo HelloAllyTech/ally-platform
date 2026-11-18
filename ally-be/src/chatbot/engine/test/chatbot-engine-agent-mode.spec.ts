@@ -284,7 +284,10 @@ describe('ChatbotEngineService in Agent mode', () => {
           sender: { externalId: 'x', label: 'x', tenantId: 'tenant-1' },
         }),
       );
-      expect(titles).not.toHaveBeenCalled();
+      // No titles query (the business-facts lookup, Q3-fast Part 2, is another query).
+      expect(
+        titles.mock.calls.filter(([sql]) => String(sql).includes('id = ANY')),
+      ).toEqual([]);
       expect(aiService.runAgent.mock.calls[0][0].knowledge_topics).toEqual([]);
     });
 
