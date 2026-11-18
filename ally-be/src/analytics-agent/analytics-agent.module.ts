@@ -15,7 +15,6 @@ import { AnalyticsAgentConversationService } from './service/analytics-agent-con
 import { AnalyticsAgentService } from './service/analytics-agent.service';
 import { AnalyticsAuditAgentService } from './service/analytics-audit-agent.service';
 import { AnalyticsAuditSchedulerRegistrationService } from './service/analytics-audit-scheduler-registration.service';
-import { AnalyticsAutomationBackendReviewAgent } from './service/analytics-automation-backend-review.agent';
 import { AnalyticsAutomationDbtAgent } from './service/analytics-automation-dbt.agent';
 import { AnalyticsAutomationGithubService } from './service/analytics-automation-github.service';
 import { AnalyticsAutomationPosthogAgent } from './service/analytics-automation-posthog.agent';
@@ -66,7 +65,6 @@ import { SqlExecutorService } from './service/sql-executor.service';
     AnalyticsAuditAgentService,
     AnalyticsAuditSchedulerRegistrationService,
     AnalyticsAutomationGithubService,
-    AnalyticsAutomationBackendReviewAgent,
     AnalyticsAutomationPosthogAgent,
     AnalyticsAutomationDbtAgent,
     AnalyticsAutomationPrReviewAgent,

@@ -4,13 +4,13 @@ import { tool } from 'langchain';
 import { createAppAuth } from '@octokit/auth-app';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { AnalyticsAutomationPrState } from '../entity/analytics-automation-agent-run.entity';
+import type { CheckRun } from '../util/analytics-automation.util';
 import { resolveAutomationRepos } from '../constants/analytics-automation.constants';
 import {
   checkWriteCall,
-  newWriteState,
   noteWriteSucceeded,
   parsePullRequestResult,
-  WRITE_TOOL_NAMES,
+  WriteState,
   WritePolicy,
 } from '../util/analytics-automation-write-guard.util';
 
@@ -39,9 +39,19 @@ const ALLOWED_CALLS: ReadonlySet<string> = new Set([
   'list_commits',
   'pull_request_read',
   'add_issue_comment',
+  'create_pull_request',
+  // Labels on the dbt pull request (a pull request is an issue to GitHub).
+  'issue_read',
+  'issue_write',
 ]);
 
 const TOOLSETS = 'repos,git,pull_requests,issues';
+/**
+ * The read server also gets `actions`, so the CI fixer can read the logs of a
+ * failed job (`get_job_logs`). It is the read-only endpoint, so no tool of that
+ * toolset that changes anything is reachable; the write server does not get it.
+ */
+const READ_TOOLSETS = `${TOOLSETS},actions`;
 
 /** Text of every text block in an MCP tool result, joined. */
 function textOf(content: unknown): string {
@@ -54,6 +64,52 @@ function textOf(content: unknown): string {
         : '',
     )
     .join('');
+}
+
+/**
+ * A tool's answer as one string: a string as is, the text of every text block
+ * of a list joined (a file's text is one such block). Anything else is JSON.
+ */
+export function flattenToolText(output: unknown): string {
+  if (typeof output === 'string') return output;
+  if (Array.isArray(output)) {
+    return output
+      .map((block) =>
+        typeof block === 'string'
+          ? block
+          : (block as { type?: string }).type === 'text'
+            ? String((block as { text?: unknown }).text ?? '')
+            : '',
+      )
+      .filter((text) => text.length > 0)
+      .join('\n\n');
+  }
+  return JSON.stringify(output);
+}
+
+/**
+ * Label names from an `issue_read` `get_labels` answer: a list of labels (or
+ * of names), or an object holding one under `labels`. Null for any other shape.
+ */
+export function parseLabelNames(text: string): string[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const list = Array.isArray(parsed)
+    ? parsed
+    : (parsed as { labels?: unknown } | null)?.labels;
+  if (!Array.isArray(list)) return null;
+  const names = list.map((item) =>
+    typeof item === 'string'
+      ? item
+      : typeof (item as { name?: unknown })?.name === 'string'
+        ? (item as { name: string }).name
+        : null,
+  );
+  return names.every((n): n is string => n !== null) ? names : null;
 }
 
 /**
@@ -116,14 +172,20 @@ export class AnalyticsAutomationGithubService {
         [READ_SERVER]: {
           transport: 'http',
           url: 'https://api.githubcopilot.com/mcp/readonly',
-          headers: { 'X-MCP-Toolsets': TOOLSETS },
+          headers: { 'X-MCP-Toolsets': READ_TOOLSETS },
           authProvider,
+          // `get_file_contents` answers with the file as an embedded RESOURCE
+          // block. The adapter's default puts resources in the artifact, which
+          // the model never sees: it got only "successfully downloaded text
+          // file" and could not edit any file it had not seen in a diff.
+          outputHandling: { resource: 'content' },
         },
         [WRITE_SERVER]: {
           transport: 'http',
           url: 'https://api.githubcopilot.com/mcp/',
           headers: { 'X-MCP-Toolsets': TOOLSETS },
           authProvider,
+          outputHandling: { resource: 'content' },
         },
       },
     });
@@ -161,7 +223,9 @@ export class AnalyticsAutomationGithubService {
             baseRef && !args.ref && !args.sha
               ? { ...args, ref: baseRef }
               : args;
-          return original.invoke(pinned);
+          // One plain string: the status line and the file's full text, so
+          // nothing depends on how the model provider renders content blocks.
+          return flattenToolText(await original.invoke(pinned));
         },
         {
           name: original.name,
@@ -215,29 +279,39 @@ export class AnalyticsAutomationGithubService {
   }
 
   /**
-   * The write tools an agent may hold: create a branch, push files to it, open a
-   * pull request. Each is the real GitHub MCP tool wrapped so that every call is
-   * checked against `policy` BEFORE it reaches GitHub. A refused call is not an
-   * error: the reason comes back as the tool's answer so the model can correct
-   * itself. `onPullRequest` fires once when the pull request is opened.
+   * The write tools an agent may hold, chosen by name from create a branch and
+   * push files (`allow`). Opening the pull request is never a model's tool: the
+   * server does it with {@link openPullRequest} once the review is done. Each
+   * tool is the real GitHub MCP tool wrapped so that every call is checked
+   * against `policy` BEFORE it reaches GitHub. A refused call is not an error:
+   * the reason comes back as the tool's answer so the model can correct itself.
    *
-   * One call to this method is one run's worth of state (which branches and
-   * files it has touched), so build it once per agent run.
+   * `state` records which branches and files the run has touched. The author and
+   * the reviewer of one pull request share one `state`, so the file limit and
+   * "the branch exists" hold across both.
    */
   async guardedWriteTools(
     policy: WritePolicy,
-    onPullRequest: (pr: { number: number; url: string }) => Promise<void>,
+    state: WriteState,
+    allow: readonly ('create_branch' | 'push_files')[],
   ): Promise<McpTools> {
-    const state = newWriteState();
     const upstream = await this.client().listTools(WRITE_SERVER);
     const bare = (name: string) => name.replace(`${WRITE_SERVER}_`, '');
 
     return upstream
-      .filter((t) => WRITE_TOOL_NAMES.has(bare(t.name)))
+      .filter((t) => (allow as readonly string[]).includes(bare(t.name)))
       .map((original) => {
         const name = bare(original.name);
         return tool(
-          async (args: Record<string, unknown>) => {
+          async (given: Record<string, unknown>) => {
+            // Without `from_branch` GitHub branches from the repo's own default
+            // branch, which is not the configured base when a test base is set:
+            // the pull request would then carry unrelated commits. Always branch
+            // from the base the files were read on and the pull request targets.
+            const args =
+              name === 'create_branch' && !given.from_branch
+                ? { ...given, from_branch: policy.base }
+                : given;
             const refusal = checkWriteCall(name, args, policy, state);
             if (refusal) {
               this.logger.warn(`Refused ${name}: ${refusal}`);
@@ -246,15 +320,6 @@ export class AnalyticsAutomationGithubService {
             const result = await original.invoke(args);
             noteWriteSucceeded(name, args, state);
             this.logger.log(this.describeWrite(name, args, policy));
-            if (name === 'create_pull_request') {
-              const pr = parsePullRequestResult(
-                typeof result === 'string' ? result : JSON.stringify(result),
-              );
-              if (!pr) {
-                throw new Error('GitHub did not return a pull request number');
-              }
-              await onPullRequest(pr);
-            }
             return result;
           },
           {
@@ -264,6 +329,34 @@ export class AnalyticsAutomationGithubService {
           },
         );
       }) as unknown as McpTools;
+  }
+
+  /**
+   * Opens the pull request for the branch the agents wrote to. The same guard
+   * as for the tools applies (right repo, branch prefix and base, branch and
+   * files exist, one pull request per run), and a refusal throws.
+   */
+  async openPullRequest(
+    policy: WritePolicy,
+    state: WriteState,
+    input: { head: string; title: string; body: string },
+  ): Promise<{ number: number; url: string }> {
+    const args = {
+      owner: policy.owner,
+      repo: policy.repo,
+      head: input.head,
+      base: policy.base,
+      title: input.title,
+      body: input.body,
+    };
+    const refusal = checkWriteCall('create_pull_request', args, policy, state);
+    if (refusal) throw new Error(`Pull request not opened: ${refusal}`);
+    const content = await this.call('create_pull_request', args);
+    const pr = parsePullRequestResult(textOf(content));
+    if (!pr) throw new Error('GitHub did not return a pull request number');
+    noteWriteSucceeded('create_pull_request', args, state);
+    this.logger.log(this.describeWrite('create_pull_request', args, policy));
+    return pr;
   }
 
   /** One log line for a write that reached GitHub (names and counts, never file contents). */
@@ -305,6 +398,95 @@ export class AnalyticsAutomationGithubService {
       return { state: 'merged' };
     }
     return { state: pr.state === 'closed' ? 'closed' : 'open' };
+  }
+
+  /**
+   * The CI checks on a pull request's current head commit. Throws when GitHub
+   * cannot be asked or answers in a shape this does not know (including when the
+   * GitHub App is not allowed to read checks), so a caller never mistakes
+   * "could not read" for "no checks".
+   */
+  async getCheckRuns(repo: RepoRef, pullNumber: number): Promise<CheckRun[]> {
+    const content = await this.call('pull_request_read', {
+      ...repo,
+      method: 'get_check_runs',
+      pullNumber,
+      perPage: 100,
+    });
+    const parsed = JSON.parse(textOf(content)) as unknown;
+    const list = Array.isArray(parsed)
+      ? parsed
+      : (parsed as { check_runs?: unknown } | null)?.check_runs;
+    if (!Array.isArray(list)) {
+      throw new Error('GitHub did not return a list of check runs');
+    }
+    return list.map((raw) => {
+      const run = raw as Record<string, unknown>;
+      return {
+        id: Number(run.id),
+        name: String(run.name ?? 'check'),
+        status: String(run.status ?? ''),
+        conclusion: typeof run.conclusion === 'string' ? run.conclusion : null,
+        url: typeof run.html_url === 'string' ? run.html_url : null,
+      };
+    });
+  }
+
+  /** The commit a pull request's head is at right now. */
+  async getPullRequestHead(repo: RepoRef, pullNumber: number): Promise<string> {
+    const content = await this.call('pull_request_read', {
+      ...repo,
+      method: 'get',
+      pullNumber,
+    });
+    const pr = JSON.parse(textOf(content)) as { head?: { sha?: unknown } };
+    const sha = pr.head?.sha;
+    if (typeof sha !== 'string' || sha.length < 7) {
+      throw new Error(
+        `Could not read the head of ${repo.owner}/${repo.repo}#${pullNumber}`,
+      );
+    }
+    return sha;
+  }
+
+  /**
+   * Adds one label to a pull request, keeping the labels it already has
+   * (`issue_write` replaces the whole list). `fresh` means the server opened
+   * the pull request moments ago, so when its labels cannot be read it has none
+   * to lose; otherwise an unreadable list throws rather than wipe a person's
+   * labels.
+   */
+  async addPullRequestLabel(
+    repo: RepoRef,
+    pullNumber: number,
+    label: string,
+    opts: { fresh?: boolean } = {},
+  ): Promise<void> {
+    let existing: string[] | null = null;
+    try {
+      const content = await this.call('issue_read', {
+        ...repo,
+        issue_number: pullNumber,
+        method: 'get_labels',
+      });
+      existing = parseLabelNames(textOf(content));
+    } catch (err) {
+      if (!opts.fresh) throw err;
+    }
+    if (existing === null && !opts.fresh) {
+      throw new Error('GitHub did not return the pull request labels');
+    }
+    const labels = [...new Set([...(existing ?? []), label])];
+    if (existing?.includes(label)) return;
+    await this.call('issue_write', {
+      ...repo,
+      method: 'update',
+      issue_number: pullNumber,
+      labels,
+    });
+    this.logger.log(
+      `Labelled ${repo.owner}/${repo.repo}#${pullNumber} "${label}"`,
+    );
   }
 
   async commentOnPullRequest(

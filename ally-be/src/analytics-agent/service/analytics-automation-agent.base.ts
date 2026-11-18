@@ -111,6 +111,35 @@ export function describePlatformPeriod(ctx: AutomationRunContext): string {
   ].join('\n');
 }
 
+/** Where a pull request's CI is, as the agent that watches it reports it. */
+export type AutomationCiState =
+  /** Waiting for the checks to finish. */
+  | 'running'
+  /** A check failed; the agent is working on a fix. */
+  | 'fixing'
+  /** Every check passed. */
+  | 'green'
+  /** Still failing: out of attempts, or the failure is not one the agent can fix. */
+  | 'failed'
+  /** The pull request has no checks at all. */
+  | 'none'
+  /** The checks did not finish in time. */
+  | 'timeout'
+  /** The pull request was merged or closed while CI was being watched. */
+  | 'stopped'
+  /** GitHub could not be asked (including a missing permission to read checks). */
+  | 'unreadable';
+
+export interface AutomationCiProgress {
+  state: AutomationCiState;
+  /** Fix attempts made so far. */
+  attempts: number;
+  /** One line for the person reading the run. */
+  message: string;
+  /** Names of the checks that failed, when any. */
+  failedChecks: string[];
+}
+
 /** Hands a pull request the agent opened to whoever persists it. */
 export interface AutomationPrSink {
   savePullRequest(pr: {
@@ -122,4 +151,6 @@ export interface AutomationPrSink {
     verdict: 'approve' | 'concerns' | 'reject' | null;
     summary: string;
   }): Promise<void>;
+  /** The latest CI state of the pull request; called as it changes. */
+  saveCi(progress: AutomationCiProgress): Promise<void>;
 }

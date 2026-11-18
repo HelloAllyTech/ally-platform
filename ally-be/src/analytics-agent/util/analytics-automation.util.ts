@@ -16,7 +16,8 @@ const DENIED_PATH_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
- * Whether `path` is a plain repo-relative path under one of `allowedPrefixes`
+ * Whether `path` is a plain repo-relative path inside one of `allowedPrefixes`
+ * (a folder ending in "/", or one exact file)
  * and not on the deny list. The model chose the path, so it is checked, not
  * trusted: no `..`, no absolute paths, no backslashes.
  */
@@ -31,7 +32,11 @@ export function isAllowedPath(
   if (path.split('/').some((part) => part === '..' || part === '')) {
     return false;
   }
-  if (!allowedPrefixes.some((prefix) => path.startsWith(prefix))) return false;
+  // An entry ending in "/" is a folder; any other entry is exactly one file.
+  const inScope = allowedPrefixes.some((entry) =>
+    entry.endsWith('/') ? path.startsWith(entry) : path === entry,
+  );
+  if (!inScope) return false;
   return !DENIED_PATH_PATTERNS.some((pattern) => pattern.test(path));
 }
 
@@ -64,6 +69,65 @@ export function fingerprint(kind: string, key: string): string {
 /** Branch an agent's pull request is made on. Always under `automation/`. */
 export function automationBranch(runId: string, agentSlug: string): string {
   return `automation/${runId.slice(0, 8)}/${agentSlug}`;
+}
+
+/**
+ * Whether the changed dbt files on their own mean the models must be rebuilt
+ * once merged: a model's SQL, or a seed. A yml change may or may not (docs and
+ * tests do not; config does), so that is the author's call, OR-ed with this.
+ */
+export function filesNeedDbtBuild(paths: Iterable<string>): boolean {
+  for (const path of paths) {
+    if (path.startsWith('models/') && path.endsWith('.sql')) return true;
+    if (path.startsWith('seeds/')) return true;
+  }
+  return false;
+}
+
+/** One CI check (a GitHub check run) on a pull request's head commit. */
+export interface CheckRun {
+  /** For a GitHub Actions job this is also the job id that `get_job_logs` takes. */
+  id: number;
+  name: string;
+  /** `queued`, `in_progress`, `completed`, ... */
+  status: string;
+  /** Set once `status` is `completed`: `success`, `failure`, `cancelled`, ... */
+  conclusion: string | null;
+  url: string | null;
+}
+
+export type ChecksVerdict =
+  | { state: 'none' }
+  | { state: 'pending'; pending: string[] }
+  | { state: 'green'; count: number }
+  | { state: 'failed'; failed: CheckRun[] };
+
+/** A finished check that does not hold the pull request back. */
+const PASSING_CONCLUSIONS: ReadonlySet<string> = new Set([
+  'success',
+  'neutral',
+  'skipped',
+]);
+
+/**
+ * What a pull request's checks add up to. It waits for EVERY check to finish
+ * before calling it failed, so the fix addresses all of the failures at once and
+ * is not pushed while other checks are still running (a push cancels them).
+ * No checks at all is `none`: the caller decides whether that is "not
+ * registered yet" or "this repo has no CI".
+ */
+export function evaluateChecks(runs: readonly CheckRun[]): ChecksVerdict {
+  if (runs.length === 0) return { state: 'none' };
+  const unfinished = runs.filter((run) => run.status !== 'completed');
+  if (unfinished.length > 0) {
+    return { state: 'pending', pending: unfinished.map((run) => run.name) };
+  }
+  const failed = runs.filter(
+    (run) => !PASSING_CONCLUSIONS.has(run.conclusion ?? ''),
+  );
+  return failed.length > 0
+    ? { state: 'failed', failed }
+    : { state: 'green', count: runs.length };
 }
 
 /** Clips model text that is about to be stored or posted. */

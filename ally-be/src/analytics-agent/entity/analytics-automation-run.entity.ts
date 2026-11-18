@@ -2,13 +2,15 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
 
 /**
- * Where a weekly automation run is. `running` while the two agents that start
- * with it (backend review, PostHog events) are working; `completed` once both
- * have ended; `failed` when the run itself died (the process went away).
+ * Where a weekly automation run is. `running` while the PostHog events agent
+ * and the dbt agent's analysis (definition changes and plan; it edits nothing)
+ * are working; `completed` once both have ended; `failed` when the run itself
+ * died (the process went away).
  *
- * The dbt agent is deliberately NOT part of this state: it waits, possibly for
- * days, on a pull request a person merges, so its progress lives on its own
- * `analytics_automation_agent_runs` row.
+ * The dbt agent's approval and edits are deliberately NOT part of this state:
+ * they wait, possibly for days, on a person and on a pull request a person
+ * merges, so that progress lives on its own `analytics_automation_agent_runs`
+ * row.
  */
 export type AnalyticsAutomationRunStatus = 'running' | 'completed' | 'failed';
 

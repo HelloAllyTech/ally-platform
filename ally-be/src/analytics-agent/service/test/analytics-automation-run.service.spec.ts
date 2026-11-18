@@ -3,18 +3,20 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import { AUTOMATION_LIMITS } from '../../constants/analytics-automation.constants';
 import { AnalyticsAutomationRunService } from '../analytics-automation-run.service';
 
 // The agents and GitHub pull in LangChain and the MCP client; none of it is
 // exercised here, so the real classes are never loaded.
-jest.mock('../analytics-automation-backend-review.agent', () => ({
-  AnalyticsAutomationBackendReviewAgent: class {},
-}));
 jest.mock('../analytics-automation-posthog.agent', () => ({
   AnalyticsAutomationPosthogAgent: class {},
 }));
 jest.mock('../analytics-automation-dbt.agent', () => ({
   AnalyticsAutomationDbtAgent: class {},
+  // The real rule, kept in step with the agent file: a PostHog-dependent item
+  // applies only when the PostHog events were merged.
+  itemApplies: (item: { dependsOnPosthog: boolean }, withEvents: boolean) =>
+    withEvents || !item.dependsOnPosthog,
 }));
 jest.mock('../analytics-automation-github.service', () => ({
   AnalyticsAutomationGithubService: class {},
@@ -63,7 +65,6 @@ function build() {
     findings as never,
     github as never,
     {} as never,
-    {} as never,
     dbt as never,
   );
   return { service, runs, agentRuns, findings, github, dbt };
@@ -73,7 +74,7 @@ const dbtRow = (over: object = {}) => ({
   id: 'dbt1',
   runId: 'run1',
   agent: 'dbt_metrics',
-  status: 'waiting',
+  status: 'analysing',
   note: null,
   prNumber: null,
   decision: null,
@@ -89,6 +90,29 @@ const posthogRow = (over: object = {}) => ({
   prState: null,
   output: {},
   ...over,
+});
+
+/** What the analysis stores on the dbt row: definition changes and a plan. */
+const planOutput = () => ({
+  definitionChanges: [
+    {
+      area: 'database',
+      title: 'New column',
+      description: 'd',
+      sourcePaths: [],
+      affectsDbt: true,
+    },
+  ],
+  items: [
+    {
+      key: 'column:a.b',
+      kind: 'new_column',
+      steps: [],
+      dependsOnPosthog: false,
+    },
+    { key: 'event:e', kind: 'new_event', steps: [], dependsOnPosthog: true },
+  ],
+  withEvents: null,
 });
 
 const findOneRows =
@@ -109,7 +133,7 @@ describe('AnalyticsAutomationRunService.openDbtForApproval', () => {
     await service.openDbtForApproval('run1');
 
     expect(agentRuns.update).toHaveBeenCalledWith(
-      { id: 'dbt1', status: 'waiting' },
+      { id: 'dbt1', status: 'analysing' },
       expect.objectContaining({
         status: 'awaiting_approval',
         note: expect.stringContaining('merged or closed'),
@@ -129,7 +153,7 @@ describe('AnalyticsAutomationRunService.openDbtForApproval', () => {
     await flush();
 
     expect(agentRuns.update).toHaveBeenCalledWith(
-      { id: 'dbt1', status: 'waiting' },
+      { id: 'dbt1', status: 'analysing' },
       expect.objectContaining({ status: 'awaiting_approval' }),
     );
     expect(dbt.analyse).not.toHaveBeenCalled();
@@ -146,7 +170,7 @@ describe('AnalyticsAutomationRunService.openDbtForApproval', () => {
     await service.openDbtForApproval('run1');
 
     expect(agentRuns.update).toHaveBeenCalledWith(
-      { id: 'dbt1', status: 'waiting' },
+      { id: 'dbt1', status: 'analysing' },
       expect.objectContaining({
         status: 'awaiting_approval',
         note: expect.stringContaining('closed without merging'),
@@ -162,13 +186,13 @@ describe('AnalyticsAutomationRunService.openDbtForApproval', () => {
     await service.openDbtForApproval('run1');
 
     expect(agentRuns.update).toHaveBeenCalledWith(
-      { id: 'dbt1', status: 'waiting' },
+      { id: 'dbt1', status: 'analysing' },
       expect.objectContaining({ status: 'awaiting_approval' }),
     );
     expect(dbt.analyse).not.toHaveBeenCalled();
   });
 
-  it('does nothing for a dbt agent that is no longer waiting', async () => {
+  it('does nothing for a dbt agent that is not analysing', async () => {
     const { service, agentRuns, dbt } = build();
     agentRuns.find.mockResolvedValue([
       dbtRow({ status: 'awaiting_approval' }),
@@ -219,7 +243,7 @@ describe('AnalyticsAutomationRunService approve / reject', () => {
     const { service, agentRuns, dbt } = build();
     const row = dbtRow({
       status: 'awaiting_approval',
-      output: { withEvents: false },
+      output: planOutput(),
     });
     agentRuns.findOne.mockImplementation(findOneRows([row, posthogRow()]));
     agentRuns.findOneByOrFail.mockResolvedValue(row);
@@ -241,8 +265,8 @@ describe('AnalyticsAutomationRunService approve / reject', () => {
         decidedBy: 42,
       }),
     );
-    // Approval is what starts the agent: analysis first, then the changes.
-    expect(dbt.analyse).toHaveBeenCalledTimes(1);
+    // The plan was made before approval: approving only applies it.
+    expect(dbt.analyse).not.toHaveBeenCalled();
     expect(dbt.apply).toHaveBeenCalledTimes(1);
     expect(agentRuns.update).toHaveBeenCalledWith(
       'dbt1',
@@ -250,21 +274,102 @@ describe('AnalyticsAutomationRunService approve / reject', () => {
     );
   });
 
-  it('completes without opening a PR when the analysis finds nothing for dbt', async () => {
-    const { service, agentRuns, dbt } = build();
-    const row = dbtRow({
-      status: 'awaiting_approval',
-      output: { withEvents: false },
+  it('applies the whole plan, events included, when the PostHog PR was merged', async () => {
+    const { service, agentRuns, github, dbt } = build();
+    const row = dbtRow({ status: 'awaiting_approval', output: planOutput() });
+    agentRuns.findOne.mockImplementation(
+      findOneRows([
+        row,
+        posthogRow({ prNumber: 7, prState: 'open', prRepo: 'Org/platform' }),
+      ]),
+    );
+    agentRuns.findOneByOrFail.mockResolvedValue({
+      ...row,
+      output: { ...planOutput(), withEvents: true },
     });
-    agentRuns.findOne.mockResolvedValue(row);
-    agentRuns.findOneByOrFail.mockResolvedValue(row);
     agentRuns.createQueryBuilder.mockReturnValue(queryBuilder(1));
-    dbt.analyse.mockResolvedValue({
-      summary: 'Nothing to do.',
-      needsChanges: false,
-      items: [],
-      findings: [],
+    github.getPullRequestState.mockResolvedValue({ state: 'merged' });
+    dbt.apply.mockResolvedValue({
+      summary: 's',
+      pr: { number: 3, url: 'u' },
+      skipped: [],
     });
+
+    await service.approve('dbt1', 1);
+    await flush();
+
+    // The stored plan is kept, with the decision added next to it.
+    expect(agentRuns.update).toHaveBeenCalledWith('dbt1', {
+      output: expect.objectContaining({
+        withEvents: true,
+        definitionChanges: [expect.objectContaining({ title: 'New column' })],
+      }),
+    });
+    expect(
+      dbt.apply.mock.calls[0][1].map((i: { key: string }) => i.key),
+    ).toEqual(['column:a.b', 'event:e']);
+  });
+
+  it('leaves the PostHog-dependent items out when the PostHog PR was closed, and says so on them', async () => {
+    const { service, agentRuns, findings, github, dbt } = build();
+    const row = dbtRow({ status: 'awaiting_approval', output: planOutput() });
+    agentRuns.findOne.mockImplementation(
+      findOneRows([
+        row,
+        posthogRow({ prNumber: 7, prState: 'open', prRepo: 'Org/platform' }),
+      ]),
+    );
+    agentRuns.findOneByOrFail.mockResolvedValue({
+      ...row,
+      output: { ...planOutput(), withEvents: false },
+    });
+    agentRuns.createQueryBuilder.mockReturnValue(queryBuilder(1));
+    github.getPullRequestState.mockResolvedValue({ state: 'closed' });
+    findings.find.mockResolvedValue([
+      { id: 'f1', payload: { key: 'column:a.b' } },
+      { id: 'f2', payload: { key: 'event:e' } },
+    ]);
+    dbt.apply.mockResolvedValue({
+      summary: 's',
+      pr: { number: 3, url: 'u' },
+      skipped: [],
+    });
+
+    await service.approve('dbt1', 1);
+    await flush();
+
+    expect(
+      dbt.apply.mock.calls[0][1].map((i: { key: string }) => i.key),
+    ).toEqual(['column:a.b']);
+    expect(findings.update).toHaveBeenCalledWith('f1', { status: 'included' });
+    expect(findings.update).toHaveBeenCalledWith('f2', {
+      status: 'dropped',
+      detail: expect.stringContaining('not merged'),
+    });
+  });
+
+  it('completes without a PR when only PostHog-dependent items were planned and their PR was closed', async () => {
+    const { service, agentRuns, findings, github, dbt } = build();
+    const eventsOnly = {
+      ...planOutput(),
+      items: planOutput().items.filter((i) => i.dependsOnPosthog),
+    };
+    const row = dbtRow({ status: 'awaiting_approval', output: eventsOnly });
+    agentRuns.findOne.mockImplementation(
+      findOneRows([
+        row,
+        posthogRow({ prNumber: 7, prState: 'open', prRepo: 'Org/platform' }),
+      ]),
+    );
+    agentRuns.findOneByOrFail.mockResolvedValue({
+      ...row,
+      output: { ...eventsOnly, withEvents: false },
+    });
+    agentRuns.createQueryBuilder.mockReturnValue(queryBuilder(1));
+    github.getPullRequestState.mockResolvedValue({ state: 'closed' });
+    findings.find.mockResolvedValue([
+      { id: 'f2', payload: { key: 'event:e' } },
+    ]);
 
     await service.approve('dbt1', 1);
     await flush();
@@ -274,7 +379,7 @@ describe('AnalyticsAutomationRunService approve / reject', () => {
       'dbt1',
       expect.objectContaining({
         status: 'completed',
-        summary: 'Nothing to do.',
+        summary: expect.stringContaining('Nothing to change in dbt'),
       }),
     );
   });
@@ -283,7 +388,7 @@ describe('AnalyticsAutomationRunService approve / reject', () => {
     const { service, agentRuns, dbt } = build();
     const row = dbtRow({
       status: 'awaiting_approval',
-      output: { withEvents: false },
+      output: planOutput(),
     });
     agentRuns.findOne.mockResolvedValue(row);
     agentRuns.findOneByOrFail.mockResolvedValue(row);
@@ -340,9 +445,9 @@ describe('AnalyticsAutomationRunService approve / reject', () => {
 
     expect(agentRuns.update).toHaveBeenCalledWith('ph1', { prState: 'closed' });
     expect(agentRuns.update).toHaveBeenCalledWith('dbt1', {
-      output: { withEvents: false },
+      output: { withEvents: false, applyAttempts: 1 },
     });
-    expect(dbt.analyse).toHaveBeenCalledTimes(1);
+    expect(dbt.analyse).not.toHaveBeenCalled();
   });
 
   it('502s, and starts nothing, when GitHub cannot be asked', async () => {
@@ -396,6 +501,62 @@ describe('AnalyticsAutomationRunService approve / reject', () => {
   });
 });
 
+describe('AnalyticsAutomationRunService CI progress', () => {
+  const sinkOf = (service: unknown) =>
+    (
+      service as {
+        sinkFor(id: string): {
+          saveCi(ci: {
+            state: string;
+            attempts: number;
+            message: string;
+            failedChecks: string[];
+          }): Promise<void>;
+        };
+      }
+    ).sinkFor('dbt1');
+
+  it('saves CI next to the plan instead of replacing it, and shows it as the note while working', async () => {
+    const { service, agentRuns } = build();
+    agentRuns.findOneByOrFail.mockResolvedValue({
+      output: { items: [{ key: 'k' }], definitionChanges: [] },
+    });
+
+    await sinkOf(service).saveCi({
+      state: 'fixing',
+      attempts: 1,
+      message: 'CI failed. Working on a fix.',
+      failedChecks: ['dbt test'],
+    });
+
+    expect(agentRuns.update).toHaveBeenCalledWith('dbt1', {
+      output: {
+        items: [{ key: 'k' }],
+        definitionChanges: [],
+        ci: expect.objectContaining({ state: 'fixing', attempts: 1 }),
+      },
+      note: 'CI failed. Working on a fix.',
+    });
+  });
+
+  it('clears the note once CI has an outcome', async () => {
+    const { service, agentRuns } = build();
+    agentRuns.findOneByOrFail.mockResolvedValue({ output: {} });
+
+    await sinkOf(service).saveCi({
+      state: 'green',
+      attempts: 0,
+      message: 'All checks passed.',
+      failedChecks: [],
+    });
+
+    expect(agentRuns.update).toHaveBeenCalledWith(
+      'dbt1',
+      expect.objectContaining({ note: null }),
+    );
+  });
+});
+
 describe('AnalyticsAutomationRunService starting a run', () => {
   const settled = (id: string, head: string) => ({
     id,
@@ -431,6 +592,7 @@ describe('AnalyticsAutomationRunService starting a run', () => {
     };
     const agentRuns = {
       update: jest.fn().mockResolvedValue({ affected: 0 }),
+      findOne: jest.fn().mockResolvedValue(null),
       find: jest.fn(
         async (opts: { where: { runId: string } }) =>
           agentsOf[opts.where.runId] ??
@@ -440,28 +602,33 @@ describe('AnalyticsAutomationRunService starting a run', () => {
             .map((c, i) => ({ ...c, id: `agent-${i}` })),
       ),
     };
+    const findings = {
+      find: jest.fn().mockResolvedValue([]),
+      delete: jest.fn().mockResolvedValue({ affected: 0 }),
+      save: jest.fn(),
+      create: jest.fn((x) => x),
+    };
     const github = { getBranchHead: jest.fn().mockResolvedValue('head-now') };
-    const backendReview = { run: jest.fn() };
     const posthog = { run: jest.fn() };
+    const dbt = { analyse: jest.fn() };
     const service = new AnalyticsAutomationRunService(
       runs as never,
       agentRuns as never,
-      {} as never,
+      findings as never,
       github as never,
-      backendReview as never,
       posthog as never,
-      {} as never,
+      dbt as never,
     );
-    return { service, created, backendReview, posthog };
+    return { service, created, posthog, dbt, agentRuns, findings };
   }
 
   const finished = [
-    { agent: 'backend_review', status: 'completed' },
     { agent: 'posthog_events', status: 'completed' },
+    { agent: 'dbt_metrics', status: 'awaiting_approval' },
   ];
 
   it('records a completed run with no agent work when the head has not moved', async () => {
-    const { service, created, backendReview, posthog } = startBuild(
+    const { service, created, posthog, dbt } = startBuild(
       [settled('prev', 'head-now')],
       { prev: finished },
     );
@@ -471,13 +638,17 @@ describe('AnalyticsAutomationRunService starting a run', () => {
 
     expect(started.run.status).toBe('completed');
     const agents = created.filter((c) => c.agent);
-    expect(agents).toHaveLength(3);
+    expect(agents).toHaveLength(2);
+    expect(agents.map((a) => a.agent)).toEqual([
+      'posthog_events',
+      'dbt_metrics',
+    ]);
     for (const a of agents) {
       expect(a.status).toBe('completed');
       expect(a.summary).toMatch(/No new commits since the last run/);
     }
-    expect(backendReview.run).not.toHaveBeenCalled();
     expect(posthog.run).not.toHaveBeenCalled();
+    expect(dbt.analyse).not.toHaveBeenCalled();
   });
 
   it('runs the agents when the head moved', async () => {
@@ -493,18 +664,159 @@ describe('AnalyticsAutomationRunService starting a run', () => {
   it('does not treat a run whose PostHog agent failed as the baseline', async () => {
     // The newest run has the same head but its PostHog agent failed: it reviewed
     // nothing, so this run must still do the work.
-    const { service, backendReview } = startBuild(
+    const { service, posthog } = startBuild(
       [settled('failed-run', 'head-now')],
       {
         'failed-run': [
-          { agent: 'backend_review', status: 'completed' },
           { agent: 'posthog_events', status: 'failed' },
+          { agent: 'dbt_metrics', status: 'awaiting_approval' },
         ],
       },
     );
     const started = await service.startManualRun();
     await started.done;
     expect(started.run.status).toBe('running');
-    expect(backendReview.run).toHaveBeenCalled();
+    expect(posthog.run).toHaveBeenCalled();
+  });
+
+  it('after the PostHog agent, analyses dbt BEFORE any approval and offers the plan', async () => {
+    const { service, posthog, dbt, agentRuns, findings } = startBuild(
+      [settled('prev', 'old-head')],
+      { prev: finished },
+    );
+    const event = { name: 'lesson_completed', properties: [], rationale: 'r' };
+    posthog.run.mockResolvedValue({
+      summary: 'PR opened',
+      output: { events: [event] },
+      findings: [],
+    });
+    agentRuns.update.mockResolvedValue({ affected: 1 });
+    agentRuns.findOne.mockResolvedValue({
+      prNumber: 7,
+      prUrl: 'u',
+      prState: 'open',
+      output: { events: [event] },
+    });
+    const items = [
+      {
+        key: 'event:lesson_completed',
+        kind: 'new_event',
+        dependsOnPosthog: true,
+      },
+    ];
+    dbt.analyse.mockResolvedValue({
+      summary: 'Plan',
+      needsChanges: true,
+      definitionChanges: [{ title: 'New column' }],
+      items,
+      findings: [{ title: 'x' }],
+    });
+
+    const started = await service.startManualRun();
+    await started.done;
+
+    // The analysis is told what the PostHog agent proposed and the state of its PR.
+    expect(dbt.analyse).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        events: [event],
+        posthogPr: { number: 7, url: 'u', state: 'open' },
+      }),
+    );
+    expect(findings.save).toHaveBeenCalled();
+    expect(agentRuns.update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'analysing' }),
+    );
+    expect(agentRuns.update).toHaveBeenCalledWith(expect.any(String), {
+      summary: 'Plan',
+      output: expect.objectContaining({
+        definitionChanges: [{ title: 'New column' }],
+        items,
+      }),
+    });
+  });
+
+  it('records the dbt analysis as failed, and still closes the run, when it throws', async () => {
+    const { service, posthog, dbt, agentRuns } = startBuild(
+      [settled('prev', 'old-head')],
+      { prev: finished },
+    );
+    posthog.run.mockResolvedValue({ summary: 's', output: {}, findings: [] });
+    agentRuns.update.mockResolvedValue({ affected: 1 });
+    agentRuns.findOne.mockResolvedValue(null);
+    dbt.analyse.mockRejectedValue(new Error('model down'));
+
+    const started = await service.startManualRun();
+    await started.done;
+
+    expect(agentRuns.update).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ status: 'failed', note: 'model down' }),
+    );
+  });
+
+  it('stamps the waiting dbt row with startedAt, so the stale check never reads the zone-less createdAt', async () => {
+    const { service, created } = startBuild([settled('prev', 'old-head')], {
+      prev: finished,
+    });
+    const started = await service.startManualRun();
+    await started.done;
+    const dbtRowCreated = created.find((c) => c.agent === 'dbt_metrics');
+    expect(dbtRowCreated?.status).toBe('waiting');
+    expect(dbtRowCreated?.startedAt).toBeInstanceOf(Date);
+  });
+
+  it('only fails agent rows by startedAt, and includes waiting ones', async () => {
+    const { service, agentRuns } = build();
+    (service as unknown as { runs: { update: jest.Mock } }).runs.update = jest
+      .fn()
+      .mockResolvedValue({ affected: 0 });
+    await (service as unknown as { failStale(): Promise<void> }).failStale();
+    for (const [where] of agentRuns.update.mock.calls) {
+      expect(Object.keys(where)).not.toContain('createdAt');
+    }
+    const states = agentRuns.update.mock.calls[0][0].status._value;
+    expect(states).toEqual(['waiting', 'running', 'analysing']);
+    // `applying` includes the wait for CI and its fix attempts, so it is failed
+    // later than the others.
+    const applying = agentRuns.update.mock.calls.find(
+      ([where]: [{ status: unknown }]) => where.status === 'applying',
+    );
+    expect(applying).toBeDefined();
+    const cutoff = (applying![0] as { startedAt: { _value: Date } }).startedAt
+      ._value;
+    expect(Date.now() - cutoff.getTime()).toBeGreaterThan(
+      AUTOMATION_LIMITS.STALE_AGENT_MS,
+    );
+  });
+
+  it('does not treat a run whose dbt analysis failed as the baseline', async () => {
+    const { service, posthog } = startBuild(
+      [settled('failed-run', 'head-now')],
+      {
+        'failed-run': [
+          { agent: 'posthog_events', status: 'completed' },
+          { agent: 'dbt_metrics', status: 'failed', decision: null },
+        ],
+      },
+    );
+    const started = await service.startManualRun();
+    await started.done;
+    expect(started.run.status).toBe('running');
+    expect(posthog.run).toHaveBeenCalled();
+  });
+
+  it('still treats a run whose dbt agent failed AFTER approval as the baseline', async () => {
+    const { service, posthog } = startBuild([settled('prev', 'head-now')], {
+      prev: [
+        { agent: 'posthog_events', status: 'completed' },
+        { agent: 'dbt_metrics', status: 'failed', decision: 'approved' },
+      ],
+    });
+    const started = await service.startManualRun();
+    await started.done;
+    expect(started.run.status).toBe('completed');
+    expect(posthog.run).not.toHaveBeenCalled();
   });
 });

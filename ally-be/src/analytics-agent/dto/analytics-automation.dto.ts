@@ -47,14 +47,14 @@ export class AnalyticsAutomationFindingDto {
 
 export class AnalyticsAutomationAgentRunDto {
   @ApiProperty() id!: string;
-  @ApiProperty({ enum: ['backend_review', 'posthog_events', 'dbt_metrics'] })
+  @ApiProperty({ enum: ['posthog_events', 'dbt_metrics'] })
   agent!: AnalyticsAutomationAgentName;
   @ApiProperty() status!: AnalyticsAutomationAgentStatus;
   @ApiPropertyOptional({ nullable: true }) startedAt!: string | null;
   @ApiPropertyOptional({ nullable: true }) finishedAt!: string | null;
   @ApiPropertyOptional({
     nullable: true,
-    description: 'Markdown. For the backend review this is the result.',
+    description: 'Markdown shown to the reader.',
   })
   summary!: string | null;
   @ApiPropertyOptional({
@@ -85,7 +85,7 @@ export class AnalyticsAutomationAgentRunDto {
 }
 
 export class AnalyticsAutomationAgentStatusDto {
-  @ApiProperty({ enum: ['backend_review', 'posthog_events', 'dbt_metrics'] })
+  @ApiProperty({ enum: ['posthog_events', 'dbt_metrics'] })
   agent!: AnalyticsAutomationAgentName;
   @ApiProperty() status!: AnalyticsAutomationAgentStatus;
 }
@@ -107,12 +107,4 @@ export class AnalyticsAutomationRunDetailDto extends AnalyticsAutomationRunSumma
   commitShas!: AnalyticsAutomationCommitShas;
   @ApiProperty({ type: [AnalyticsAutomationAgentRunDto] })
   agentRuns!: AnalyticsAutomationAgentRunDto[];
-}
-
-export class AnalyticsAutomationConfigDto {
-  @ApiProperty({
-    description:
-      'Whether a run may be started by hand (testing only; the server decides).',
-  })
-  manualStartEnabled!: boolean;
 }

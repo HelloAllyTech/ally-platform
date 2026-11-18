@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import {
   AUTOMATION_LIMITS,
   AUTOMATION_WRITE_PATHS,
   POSTHOG_EVENTS_SYSTEM_PROMPT,
 } from '../constants/analytics-automation.constants';
+import {
+  newWriteState,
+  WritePolicy,
+} from '../util/analytics-automation-write-guard.util';
+import { findInstrumentationViolations } from '../util/analytics-automation-instrumentation.util';
 import {
   automationBranch,
   clip,
@@ -18,10 +23,15 @@ import {
   runStructuredAgent,
 } from './analytics-automation-agent.base';
 import { AnalyticsAutomationGithubService } from './analytics-automation-github.service';
-import { AnalyticsAutomationPrReviewAgent } from './analytics-automation-pr-review.agent';
+import {
+  AnalyticsAutomationPrReviewAgent,
+  PrReviewResult,
+  renderReview,
+} from './analytics-automation-pr-review.agent';
 
 const schema = z.object({
   reason: z.string(),
+  prTitle: z.string(),
   events: z.array(
     z.object({
       name: z.string(),
@@ -51,23 +61,41 @@ export interface PosthogAgentResult {
 /** An event name is a short identifier-like string, not a sentence. */
 const EVENT_NAME = /^[\w .:-]{2,80}$/;
 
+/** Names of the events whose properties could carry personal data, with the culprits. */
+function flagEvents(
+  events: { name: string; properties: string[] }[],
+): Map<string, string[]> {
+  const flagged = new Map<string, string[]>();
+  for (const event of events) {
+    const bad = findPhiProperties(event.properties);
+    if (bad.length > 0 || !EVENT_NAME.test(event.name)) {
+      flagged.set(event.name, bad.length > 0 ? bad : ['(invalid event name)']);
+    }
+  }
+  return flagged;
+}
+
 /**
  * Agent 2: decides whether code added since the last run needs new PostHog
- * events and, if so, adds them in a pull request against the platform repo.
+ * events and, if so, adds them on a branch of the platform repo. It does not
+ * open the pull request. The flow is:
  *
- * The agent holds GitHub's write tools (create branch, push files, open pull
- * request), each wrapped by a guard that refuses, in code, anything outside its
- * repo, branch prefix and allowed folders. It opens the pull request without
- * waiting for anyone; a separate review agent then reads it. Merging is a
- * person's decision.
+ *  1. the agent writes the events to its branch (guarded write tools: create
+ *     branch, push files, confined in code to its repo, branch prefix and
+ *     allowed folders);
+ *  2. the review agent reads that branch and fixes what it finds, on the same
+ *     branch;
+ *  3. the server opens the pull request, with the review in its description.
  *
- * What the guard cannot see is the meaning of a property, so the events the
- * agent reports are checked afterwards for personal-data property names. A pull
- * request that fails that check stays open (it is already on GitHub) but is
- * flagged loudly: a comment on the PR and a `reject` verdict.
+ * A branch the reviewer rejects, or whose events still carry personal-data
+ * property names after the review (checked here too, in code), gets no pull
+ * request: the run records why, and the branch stays on GitHub to look at.
+ * Merging is a person's decision.
  */
 @Injectable()
 export class AnalyticsAutomationPosthogAgent {
+  private readonly logger = new Logger(AnalyticsAutomationPosthogAgent.name);
+
   constructor(
     private readonly github: AnalyticsAutomationGithubService,
     private readonly reviewer: AnalyticsAutomationPrReviewAgent,
@@ -78,24 +106,19 @@ export class AnalyticsAutomationPosthogAgent {
     sink: AutomationPrSink,
   ): Promise<PosthogAgentResult> {
     const branch = automationBranch(ctx.runId, 'posthog-events');
-    const opened: { pr?: { number: number; url: string } } = {};
-
-    const writeTools = await this.github.guardedWriteTools(
-      {
-        ...ctx.platform,
-        branchPrefix: `automation/${ctx.runId.slice(0, 8)}/`,
-        allowedPrefixes: AUTOMATION_WRITE_PATHS.posthog,
-        maxFiles: AUTOMATION_LIMITS.MAX_FILES_PER_PR,
-        maxFileBytes: AUTOMATION_LIMITS.MAX_FILE_BYTES,
-      },
-      async (pr) => {
-        opened.pr = pr;
-        await sink.savePullRequest({
-          repo: `${ctx.platform.owner}/${ctx.platform.repo}`,
-          ...pr,
-        });
-      },
-    );
+    const state = newWriteState();
+    const policy: WritePolicy = {
+      ...ctx.platform,
+      branchPrefix: `automation/${ctx.runId.slice(0, 8)}/`,
+      branch,
+      allowedPrefixes: AUTOMATION_WRITE_PATHS.posthog,
+      maxFiles: AUTOMATION_LIMITS.MAX_FILES_PER_PR,
+      maxFileBytes: AUTOMATION_LIMITS.MAX_FILE_BYTES,
+    };
+    const writeTools = await this.github.guardedWriteTools(policy, state, [
+      'create_branch',
+      'push_files',
+    ]);
 
     const proposal = await runStructuredAgent({
       label: 'posthog-events',
@@ -115,100 +138,211 @@ export class AnalyticsAutomationPosthogAgent {
       0,
       AUTOMATION_LIMITS.MAX_EVENTS_PER_PR,
     );
-    const pr = opened.pr;
+    const written = state.branches.has(branch) && state.files.size > 0;
 
-    // Events the agent reported, checked for personal-data property names.
-    const flagged = new Map<string, string[]>();
-    for (const event of events) {
-      const bad = findPhiProperties(event.properties);
-      if (bad.length > 0 || !EVENT_NAME.test(event.name)) {
-        flagged.set(
-          event.name,
-          bad.length > 0 ? bad : ['(invalid event name)'],
-        );
-      }
+    // Without a pushed branch there is nothing to review or open.
+    if (!written) {
+      return this.notOpened(
+        events,
+        `**No pull request opened.** ${proposal.reason}`,
+        'The agent described this event but wrote nothing to the branch.',
+        proposal.reason,
+      );
     }
 
-    const findings = events.map<AutomationFindingInput>((event) => {
-      const problem = flagged.get(event.name);
+    const eventList = (list: typeof events) =>
+      list
+        .map(
+          (e) =>
+            `- \`${e.name}\` (${e.properties.length ? e.properties.join(', ') : 'no properties'}): ${e.rationale}`,
+        )
+        .join('\n');
+
+    // Review, and fix, BEFORE the pull request exists.
+    const knownBefore = flagEvents(events);
+    const instrumentationBefore = findInstrumentationViolations(state.contents);
+    let review: PrReviewResult;
+    try {
+      review = await this.reviewer.review({
+        kind: 'posthog',
+        policy,
+        state,
+        branch,
+        intent: `Add these PostHog events:\n${eventList(events)}`,
+        knownIssues: [
+          ...[...knownBefore].map(
+            ([n, p]) =>
+              `event \`${n}\` has properties that could carry personal or health information (${p.join(', ')}): remove them`,
+          ),
+          ...instrumentationBefore.blocking,
+          ...instrumentationBefore.advisory,
+        ],
+      });
+    } catch (err) {
+      const why = `The review agent failed: ${err instanceof Error ? err.message : String(err)}`;
+      await sink.saveReview({ verdict: null, summary: why });
+      return this.notOpened(
+        events,
+        `**No pull request opened.** The branch \`${branch}\` was written but could not be reviewed. ${why}`,
+        'The branch was written but the review failed, so no pull request was opened.',
+        proposal.reason,
+      );
+    }
+    this.logger.log(
+      `Review of ${branch}: ${review.verdict}, ${review.fixed.length} fixed, ${review.remaining.length} left`,
+    );
+
+    // The events as they are on the branch after the review. Checked again in code.
+    // The reviewer's list is the truth when it gives one: it may have renamed an
+    // event to fit the convention, and the dbt agent must hear the new name.
+    const finalEvents = review.finalEvents
+      ? review.finalEvents
+          .slice(0, AUTOMATION_LIMITS.MAX_EVENTS_PER_PR)
+          .map((f) => {
+            const original = events.find((e) => e.name === f.name);
+            return {
+              name: f.name,
+              properties: f.properties,
+              rationale:
+                original?.rationale ??
+                'Renamed or rewritten by the review agent.',
+              files: original?.files ?? [],
+            };
+          })
+      : knownBefore.size === 0
+        ? events
+        : null;
+    const finalFlagged = flagEvents(
+      review.finalEvents ?? (knownBefore.size === 0 ? events : []),
+    );
+    // The branch as it is after the review's own pushes (they share `state`).
+    const instrumentation = findInstrumentationViolations(state.contents);
+    const blocked =
+      review.verdict === 'reject' ||
+      finalEvents === null ||
+      finalEvents.length === 0 ||
+      finalFlagged.size > 0 ||
+      instrumentation.blocking.length > 0;
+    const reviewBody = renderReview(review);
+
+    if (blocked) {
+      const why =
+        review.verdict === 'reject'
+          ? 'the review agent rejected the branch and could not fix it'
+          : finalEvents === null
+            ? 'events with personal-data properties were found and the review did not report the events left on the branch'
+            : finalEvents.length === 0
+              ? 'the review agent removed every event, so the branch adds nothing to track'
+              : finalFlagged.size > 0
+                ? `events still carry properties that could hold personal or health information (${[...finalFlagged].map(([n, p]) => `${n}: ${p.join(', ')}`).join('; ')})`
+                : `the events do not use the app's existing PostHog instrumentation (${instrumentation.blocking.join('; ')})`;
+      await sink.saveReview({ verdict: 'reject', summary: review.summary });
+      return this.notOpened(
+        events,
+        `**No pull request opened:** ${why}. The branch \`${branch}\` is on GitHub to look at.\n\n${reviewBody}`,
+        `Not opened: ${why}.`,
+        proposal.reason,
+      );
+    }
+
+    const kept = finalEvents;
+    const dropped = events.filter((e) => !kept.some((k) => k.name === e.name));
+    const instrumentationNotes = instrumentation.advisory.length
+      ? [
+          '',
+          '**Instrumentation notes (check these)**',
+          ...instrumentation.advisory.map((note) => `- ${note}`),
+        ]
+      : [];
+    const body = clip(
+      [
+        '**Events**',
+        eventList(kept),
+        '',
+        proposal.reason,
+        ...instrumentationNotes,
+        '',
+        reviewBody,
+      ].join('\n'),
+      AUTOMATION_LIMITS.MAX_BODY_CHARS,
+    );
+    const pr = await this.github.openPullRequest(policy, state, {
+      head: branch,
+      title: clip(
+        proposal.prTitle.trim() || 'Add PostHog events',
+        AUTOMATION_LIMITS.MAX_TITLE_CHARS,
+      ),
+      body,
+    });
+    await sink.savePullRequest({
+      repo: `${ctx.platform.owner}/${ctx.platform.repo}`,
+      ...pr,
+    });
+    await sink.saveReview({ verdict: review.verdict, summary: review.summary });
+
+    // Every event proposed, plus any the review added or renamed into.
+    const recorded = [
+      ...events,
+      ...kept.filter((k) => !events.some((e) => e.name === k.name)),
+    ];
+    const findings = recorded.map<AutomationFindingInput>((event) => {
+      const gone = dropped.some((d) => d.name === event.name);
       return {
         kind: 'posthog_event',
         title: clip(event.name, 200),
-        detail: problem
-          ? `Flagged, do not merge as it is: properties that could carry personal or health information (${problem.join(', ')}).`
-          : pr
-            ? event.rationale
-            : 'The agent described this event but opened no pull request.',
+        detail: gone
+          ? 'Removed by the review agent before the pull request was opened.'
+          : event.rationale,
         payload: {
           name: event.name,
           properties: event.properties,
           files: event.files,
         },
         fingerprint: fingerprint('posthog_event', event.name),
-        status: problem || !pr ? 'dropped' : 'included',
+        status: gone ? 'dropped' : 'included',
       };
     });
 
-    if (!pr) {
-      return {
-        summary: clip(
-          `**No pull request opened.** ${proposal.reason}`,
-          AUTOMATION_LIMITS.MAX_SUMMARY_CHARS,
-        ),
-        output: { reason: proposal.reason, events: [] },
-        findings,
-      };
-    }
-
-    const eventList = events
-      .map(
-        (e) =>
-          `- \`${e.name}\` (${e.properties.length ? e.properties.join(', ') : 'no properties'}): ${e.rationale}`,
-      )
-      .join('\n');
-
-    if (flagged.size > 0) {
-      const warning = `**Automated check failed.** These events have properties that could carry personal or health information: ${[...flagged].map(([n, p]) => `\`${n}\` (${p.join(', ')})`).join('; ')}. Do not merge until they are removed.`;
-      await this.github
-        .commentOnPullRequest(ctx.platform, pr.number, warning)
-        .catch(() => undefined);
-      await sink.saveReview({ verdict: 'reject', summary: warning });
-    } else {
-      try {
-        const review = await this.reviewer.review({
-          kind: 'posthog',
-          repo: ctx.platform,
-          pullNumber: pr.number,
-          intent: `Add these PostHog events:\n${eventList}`,
-        });
-        await sink.saveReview({
-          verdict: review.verdict,
-          summary: review.summary,
-        });
-      } catch (err) {
-        await sink.saveReview({
-          verdict: null,
-          summary: `The review agent failed: ${err instanceof Error ? err.message : String(err)}`,
-        });
-      }
-    }
-
-    // Only events that passed the check are handed on to the dbt agent.
-    const merged = events.filter((e) => !flagged.has(e.name));
+    // Only events that are in the pull request are handed on to the dbt agent.
     return {
       summary: clip(
-        `**Pull request opened:** ${pr.url}\n\n**Events**\n${eventList}\n\n${proposal.reason}`,
+        `**Pull request opened:** ${pr.url}\n\n**Events**\n${eventList(kept)}\n\n${proposal.reason}\n\n${reviewBody}`,
         AUTOMATION_LIMITS.MAX_SUMMARY_CHARS,
       ),
       output: {
         reason: proposal.reason,
-        events: merged.map((e) => ({
+        events: kept.map((e) => ({
           name: e.name,
           properties: e.properties,
           rationale: e.rationale,
         })),
       },
       findings,
+    };
+  }
+
+  /** The result when no pull request was opened: every event is recorded as dropped. */
+  private notOpened(
+    events: z.infer<typeof schema>['events'],
+    summary: string,
+    detail: string,
+    reason: string,
+  ): PosthogAgentResult {
+    return {
+      summary: clip(summary, AUTOMATION_LIMITS.MAX_SUMMARY_CHARS),
+      output: { reason, events: [] },
+      findings: events.map<AutomationFindingInput>((event) => ({
+        kind: 'posthog_event',
+        title: clip(event.name, 200),
+        detail,
+        payload: {
+          name: event.name,
+          properties: event.properties,
+          files: event.files,
+        },
+        fingerprint: fingerprint('posthog_event', event.name),
+        status: 'dropped',
+      })),
     };
   }
 }

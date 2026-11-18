@@ -1,7 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   AnalyticsAutomationAgentRun,
-  AnalyticsAutomationConfig,
   AnalyticsAutomationRunDetail,
   AnalyticsAutomationRunSummary,
 } from "@types";
@@ -35,15 +34,7 @@ export const analyticsAutomationAPI = baseAPI.injectEndpoints({
       providesTags: (_result, _error, id) => [{ type: TAG_TYPES.ANALYTICS_AGENT_AUTOMATION, id }],
     }),
 
-    // Testing aid: whether the server lets a run be started by hand.
-    getAnalyticsAutomationConfig: builder.query<AnalyticsAutomationConfig, void>({
-      query: () => ({
-        url: ApiEndpoints.ANALYTICS_AGENT.AUTOMATION_CONFIG,
-        method: HttpMethod.GET,
-      }),
-    }),
-
-    // Testing aid: start a run now. Returns the new run; the list is refetched.
+    // Run now: start a run on demand. Returns the new run; the list is refetched.
     startAnalyticsAutomationRun: builder.mutation<AnalyticsAutomationRunDetail, void>({
       query: () => ({
         url: ApiEndpoints.ANALYTICS_AGENT.AUTOMATION_RUNS,
@@ -71,7 +62,6 @@ export const analyticsAutomationAPI = baseAPI.injectEndpoints({
 });
 
 export const {
-  useGetAnalyticsAutomationConfigQuery,
   useStartAnalyticsAutomationRunMutation,
   useGetAnalyticsAutomationRunsQuery,
   useGetAnalyticsAutomationRunQuery,

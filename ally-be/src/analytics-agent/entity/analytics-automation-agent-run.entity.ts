@@ -1,21 +1,20 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
 
-/** The three agents of a weekly run. */
-export type AnalyticsAutomationAgentName =
-  | 'backend_review'
-  | 'posthog_events'
-  | 'dbt_metrics';
+/** The two agents of a weekly run. */
+export type AnalyticsAutomationAgentName = 'posthog_events' | 'dbt_metrics';
 
 /**
  * Where one agent is. Plain strings with no CHECK, like every state column in
  * this module.
  *
- * - `backend_review`, `posthog_events`: `running` → `completed` | `failed`.
- * - `dbt_metrics`: `waiting` (the PostHog PR is still open) → `analysing` →
- *   `awaiting_approval` (a proposal for a person) → `applying` → `pr_opened`;
- *   or `rejected`; or `completed` when nothing in dbt needs to change; or
- *   `failed`.
+ * - `posthog_events`: `running` → `completed` | `failed`.
+ * - `dbt_metrics`: `waiting` (the PostHog agent is still working) → `analysing`
+ *   (definition changes and the plan are being worked out; nothing is edited) →
+ *   `awaiting_approval` (the plan is ready for a person) → `applying` →
+ *   `pr_opened`; or `rejected`; or `completed` when nothing in dbt needs to
+ *   change; or `failed`. Rows from before the backend review was removed may
+ *   still say `backend_review`; they are no longer shown.
  */
 export type AnalyticsAutomationAgentStatus =
   | 'running'
@@ -41,8 +40,7 @@ export type AnalyticsAutomationReviewVerdict =
 /**
  * One agent's work inside one run.
  *
- * `summary` is the markdown a reader sees (for the backend review it IS the
- * result); `output` keeps the structured form. The pull request the agent
+ * `summary` is the markdown a reader sees; `output` keeps the structured form. The pull request the agent
  * opened, if any, and the review agent's verdict on it, sit on the row because
  * an agent opens at most one.
  *

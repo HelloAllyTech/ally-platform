@@ -2,19 +2,20 @@
  * Analytics Automation — types mirroring ally-be's
  * `/v1/analytics/agent/automation` DTOs.
  *
- * Once a week the server runs three agents: a backend review (a description of
- * how the backend changed), a PostHog events agent (opens a pull request), and a
- * dbt agent that waits for that pull request to be merged or closed, proposes
- * dbt changes, and edits the dbt repo only after a person approves. Runs are
- * started by the scheduler only; the tab reads them and approves or rejects the
- * dbt proposal.
+ * Once a week the server runs two agents: a PostHog events agent (opens a pull
+ * request) and a dbt agent. The dbt agent first works out what changed in the
+ * platform (the "Metrics / Definition changes" section) and plans its dbt
+ * changes, both read-only and before any approval. It edits the dbt repo only
+ * after a person approves and the PostHog pull request is merged or closed. Runs
+ * are started by the scheduler only; the tab reads them and approves or rejects
+ * the dbt plan.
  */
 
 export type AnalyticsAutomationRunStatus = "running" | "completed" | "failed";
 
-export type AnalyticsAutomationAgentName = "backend_review" | "posthog_events" | "dbt_metrics";
+export type AnalyticsAutomationAgentName = "posthog_events" | "dbt_metrics";
 
-/** `running`/`completed`/`failed` for the first two agents; the rest are the dbt agent's steps. */
+/** `running`/`completed`/`failed` for the PostHog agent; the rest are the dbt agent's steps. */
 export type AnalyticsAutomationAgentStatus =
   | "running"
   | "waiting"
@@ -59,7 +60,7 @@ export interface AnalyticsAutomationAgentRun {
   status: AnalyticsAutomationAgentStatus;
   startedAt: string | null;
   finishedAt: string | null;
-  /** Markdown. For the backend review this is the result. */
+  /** Markdown shown to the reader. */
   summary: string | null;
   /** Why the agent is waiting, or why it failed. */
   note: string | null;
@@ -71,6 +72,42 @@ export interface AnalyticsAutomationAgentRun {
   canApprove: boolean;
   canReject: boolean;
   findings: AnalyticsAutomationFinding[];
+}
+
+/**
+ * One thing that changed in the platform, from the dbt agent's analysis. Stored
+ * in the dbt agent's `output.definitionChanges`.
+ */
+export interface AnalyticsAutomationDefinitionChange {
+  area: "database" | "metric_definition" | "enum" | "other";
+  title: string;
+  description: string;
+  sourcePaths: string[];
+  /** True when dbt would be wrong or stale without a change. */
+  affectsDbt: boolean;
+}
+
+/**
+ * Where the dbt pull request's CI is, from the dbt agent's `output.ci`. While
+ * the agent watches CI it is `running` or `fixing` (the agent pushes fixes to the
+ * same branch when a check fails); the rest are outcomes.
+ */
+export type AnalyticsAutomationCiState =
+  | "running"
+  | "fixing"
+  | "green"
+  | "failed"
+  | "none"
+  | "timeout"
+  | "stopped"
+  | "unreadable";
+
+export interface AnalyticsAutomationCi {
+  state: AnalyticsAutomationCiState;
+  /** Fix attempts made so far. */
+  attempts: number;
+  message: string;
+  failedChecks: string[];
 }
 
 export interface AnalyticsAutomationRunSummary {
@@ -89,7 +126,3 @@ export interface AnalyticsAutomationRunDetail extends AnalyticsAutomationRunSumm
   agentRuns: AnalyticsAutomationAgentRun[];
 }
 
-/** What the server allows. `manualStartEnabled` is a testing aid (see the tab). */
-export interface AnalyticsAutomationConfig {
-  manualStartEnabled: boolean;
-}

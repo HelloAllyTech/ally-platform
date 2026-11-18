@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,7 +15,6 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import {
   useApproveAnalyticsAutomationAgentMutation,
-  useGetAnalyticsAutomationConfigQuery,
   useGetAnalyticsAutomationRunQuery,
   useGetAnalyticsAutomationRunsQuery,
   useRejectAnalyticsAutomationAgentMutation,
@@ -28,6 +27,8 @@ import {
   AnalyticsAutomationAgentName,
   AnalyticsAutomationAgentRun,
   AnalyticsAutomationAgentStatus,
+  AnalyticsAutomationCi,
+  AnalyticsAutomationDefinitionChange,
   AnalyticsAutomationFinding,
   AnalyticsAutomationFindingStatus,
   AnalyticsAutomationPrState,
@@ -38,15 +39,19 @@ import {
 } from "@types";
 
 /**
- * Weekly automation — the tab for the run of three agents the server starts once
- * a week: a backend review, a PostHog events agent and a dbt agent.
+ * Weekly automation — the tab for the run of two agents the server starts once
+ * a week: a PostHog events agent and a dbt agent.
  *
  * Nothing here starts a run: the scheduler does. The tab lists runs in a sidebar
- * (newest open by default), shows what each of the three agents did, and lets a
- * reader approve or reject the dbt agent's proposal — the one decision a person
- * makes. Approve is only offered by the server once the PostHog pull request is
- * merged or closed and the proposal exists, so the button is simply absent
- * before then and the agent's note says what it is waiting for.
+ * (newest open by default) and shows, in order: what the PostHog agent did; the
+ * "Metrics / Definition changes" section (what changed in the backend database
+ * and metric definitions, from the dbt agent's read-only analysis); and the dbt
+ * agent's plan for the dbt repo, which a reader approves or rejects — the one
+ * decision a person makes. The plan is shown before the decision and covers
+ * both outcomes of the PostHog pull request: items that depend on its events are
+ * marked, applied only if it is merged and left out if it is closed. Approve is
+ * only offered by the server once the plan exists, and refused while the PostHog
+ * pull request is open; the agent's note says what it is waiting for.
  *
  * Polls quickly while an agent is working and slowly otherwise, so a run that
  * starts (or a pull request that gets merged) while the tab is open is noticed.
@@ -147,20 +152,25 @@ const FindingList = ({
   findings: AnalyticsAutomationFinding[];
 }) =>
   findings.length === 0 ? null : (
-    <div className="mt-3 border-l-2 border-border-light pl-3">
-      <p className="text-xs font-medium text-typography-700">{title}</p>
-      <ul className="mt-1 flex flex-col gap-2">
+    <div className="mt-4 flex flex-col gap-2">
+      <GroupLabel title={title} />
+      <ul className="flex flex-col gap-2">
         {findings.map(finding => {
           const status = findingStatusMeta(finding.status);
           return (
-            <li key={finding.id} className="flex items-start gap-2 text-sm text-typography-800">
+            <li
+              key={finding.id}
+              className="flex items-start justify-between gap-2 rounded border border-border-light bg-neutral-50 p-3 text-sm text-typography-800"
+            >
+              <span className="flex min-w-0 flex-col gap-1">
+                <span className="break-words font-medium text-typography-900">{finding.title}</span>
+                {finding.detail && (
+                  <span className="break-words text-typography-600">{finding.detail}</span>
+                )}
+              </span>
               <Tag size="sm" type={status.type} className="shrink-0">
                 {status.label}
               </Tag>
-              <span className="min-w-0 break-words">
-                <span className="font-medium">{finding.title}</span>
-                {finding.detail && <span className="text-typography-600"> — {finding.detail}</span>}
-              </span>
             </li>
           );
         })}
@@ -168,16 +178,119 @@ const FindingList = ({
     </div>
   );
 
-/** The pull request an agent opened, its state, and the review agent's verdict on it. */
-const PullRequestBlock = ({ agent }: { agent: AnalyticsAutomationAgentRun }) => {
+const strList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+
+const FILES_SHOWN = 3;
+
+/** File paths as small chips; the rest are summarised ("+2 more") with the full list on hover. */
+const FileChips = ({ label, files }: { label: string; files: string[] }) => {
+  const strings = en.analyticsAutomation;
+  if (files.length === 0) return null;
+  const shown = files.slice(0, FILES_SHOWN);
+  const rest = files.slice(FILES_SHOWN);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs text-typography-500">
+      <span>{label}</span>
+      {shown.map(file => (
+        <code
+          key={file}
+          title={file}
+          className="max-w-full break-all rounded bg-neutral-100 px-1.5 py-0.5 text-typography-700"
+        >
+          {file}
+        </code>
+      ))}
+      {rest.length > 0 && (
+        <span title={rest.join("\n")} className="cursor-help underline decoration-dotted">
+          {fill(strings.filesMore, { count: rest.length })}
+        </span>
+      )}
+    </div>
+  );
+};
+
+/** A small caption above a group of rows. */
+const GroupLabel = ({ title, help }: { title: string; help?: string }) => (
+  <div className="flex flex-col gap-0.5">
+    <p className="text-xs font-semibold uppercase tracking-wide text-typography-600">{title}</p>
+    {help && <p className="text-xs text-typography-500">{help}</p>}
+  </div>
+);
+
+const CI_STATES: AnalyticsAutomationCi["state"][] = [
+  "running",
+  "fixing",
+  "green",
+  "failed",
+  "none",
+  "timeout",
+  "stopped",
+  "unreadable",
+];
+
+/** The dbt agent's view of its pull request's CI, from `output.ci`; null when none was recorded. */
+const readCi = (output: Record<string, unknown>): AnalyticsAutomationCi | null => {
+  const ci = output?.ci as Partial<AnalyticsAutomationCi> | undefined;
+  if (!ci || typeof ci !== "object" || !CI_STATES.includes(ci.state as never)) return null;
+  return {
+    state: ci.state as AnalyticsAutomationCi["state"],
+    attempts: typeof ci.attempts === "number" ? ci.attempts : 0,
+    message: typeof ci.message === "string" ? ci.message : "",
+    failedChecks: strList(ci.failedChecks),
+  };
+};
+
+const ciMeta = (state: AnalyticsAutomationCi["state"]): { type: TagColor; label: string } => {
+  const strings = en.analyticsAutomation;
+  switch (state) {
+    case "running":
+      return { type: "blue", label: strings.ciRunning };
+    case "fixing":
+      return { type: "purple", label: strings.ciFixing };
+    case "green":
+      return { type: "green", label: strings.ciGreen };
+    case "failed":
+      return { type: "red", label: strings.ciFailed };
+    case "none":
+      return { type: "cool-gray", label: strings.ciNone };
+    case "timeout":
+      return { type: "magenta", label: strings.ciTimeout };
+    case "stopped":
+      return { type: "gray", label: strings.ciStopped };
+    default:
+      return { type: "magenta", label: strings.ciUnreadable };
+  }
+};
+
+/** One labelled line inside the pull request panel. */
+const PanelRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+    <span className="w-24 shrink-0 text-xs font-medium text-typography-600">{label}</span>
+    <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
+  </div>
+);
+
+/**
+ * The pull request an agent opened, in one panel: its state, the review agent's
+ * verdict and, for the dbt agent, where the pull request's CI is.
+ */
+const PullRequestBlock = ({
+  agent,
+  showCi = false,
+}: {
+  agent: AnalyticsAutomationAgentRun;
+  showCi?: boolean;
+}) => {
   const strings = en.analyticsAutomation;
   const pr = agent.pullRequest;
   if (!pr) return null;
   const state = prStateMeta(pr.state);
+  const ci = showCi ? readCi(agent.output) : null;
+  const ciTag = ci ? ciMeta(ci.state) : null;
   return (
-    <div className="mt-3 flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-typography-700">{strings.pullRequest}</span>
+    <div className="mt-3 flex flex-col gap-2 rounded border border-border-light bg-neutral-50 p-3">
+      <PanelRow label={strings.pullRequest}>
         <a
           href={pr.url}
           target="_blank"
@@ -189,7 +302,22 @@ const PullRequestBlock = ({ agent }: { agent: AnalyticsAutomationAgentRun }) => 
         <Tag size="sm" type={state.type}>
           {state.label}
         </Tag>
-      </div>
+      </PanelRow>
+      {ci && ciTag && (
+        <PanelRow label={strings.ciTitle}>
+          <Tag size="sm" type={ciTag.type}>
+            {ciTag.label}
+          </Tag>
+          {ci.attempts > 0 && (
+            <span className="text-xs text-typography-500">
+              {fill(strings.ciAttempts, { attempts: ci.attempts })}
+            </span>
+          )}
+          {ci.message && (
+            <span className="min-w-0 break-words text-typography-600">{ci.message}</span>
+          )}
+        </PanelRow>
+      )}
       {agent.review && (
         <Accordion size="sm">
           <AccordionItem
@@ -210,11 +338,252 @@ const PullRequestBlock = ({ agent }: { agent: AnalyticsAutomationAgentRun }) => 
   );
 };
 
+/** The dbt agent's definition changes, or null when none were recorded for this run. */
+const readDefinitionChanges = (
+  output: Record<string, unknown>,
+): AnalyticsAutomationDefinitionChange[] | null => {
+  const list = output?.definitionChanges;
+  if (!Array.isArray(list)) return null;
+  return list.filter(
+    (c): c is AnalyticsAutomationDefinitionChange =>
+      !!c && typeof c === "object" && typeof (c as { title?: unknown }).title === "string",
+  );
+};
+
+const areaLabel = (area: AnalyticsAutomationDefinitionChange["area"]): string => {
+  const strings = en.analyticsAutomation;
+  if (area === "database") return strings.areaDatabase;
+  if (area === "metric_definition") return strings.areaMetricDefinition;
+  if (area === "enum") return strings.areaEnum;
+  return strings.areaOther;
+};
+
+/** A card's title with its help tooltip. */
+const CardTitle = ({
+  title,
+  help,
+  children,
+}: {
+  title: string;
+  help: string;
+  children?: React.ReactNode;
+}) => (
+  <div className="flex flex-wrap items-center gap-2">
+    <h3 className="text-base font-medium text-typography-900">{title}</h3>
+    <Tooltip label={help} align="top">
+      <button type="button" aria-label={help} className="inline-flex cursor-pointer items-center">
+        <TooltipIcon />
+      </button>
+    </Tooltip>
+    {children}
+  </div>
+);
+
+const DefinitionChangeRow = ({ change }: { change: AnalyticsAutomationDefinitionChange }) => {
+  const strings = en.analyticsAutomation;
+  return (
+    <li
+      className={`flex flex-col gap-2 rounded border border-border-light p-3 text-sm ${
+        change.affectsDbt ? "bg-purple-50" : "bg-neutral-50"
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <Tag size="sm" type="outline" className="shrink-0">
+          {areaLabel(change.area)}
+        </Tag>
+        <span className="min-w-0 break-words font-medium text-typography-900">{change.title}</span>
+      </div>
+      <p className="break-words text-typography-700">{change.description}</p>
+      <FileChips label={strings.platformFilesLabel} files={strList(change.sourcePaths)} />
+    </li>
+  );
+};
+
+/**
+ * "Metrics / Definition changes": what changed in the backend database and in
+ * metric definitions. It comes from the dbt agent's read-only analysis, so it is
+ * there before anything is approved; it is its own section only in the UI.
+ * Changes that need a dbt change come first.
+ */
+const DefinitionChangesCard = ({ agent }: { agent: AnalyticsAutomationAgentRun }) => {
+  const strings = en.analyticsAutomation;
+  const changes = readDefinitionChanges(agent.output);
+  const working = agent.status === "waiting" || agent.status === "analysing";
+  const needDbt = changes?.filter(c => c.affectsDbt) ?? [];
+  const awareness = changes?.filter(c => !c.affectsDbt) ?? [];
+
+  let body;
+  if (changes && changes.length > 0) {
+    body = (
+      <div className="mt-3 flex flex-col gap-4">
+        {needDbt.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <GroupLabel title={strings.affectsDbt} />
+            <ul className="flex flex-col gap-2">
+              {needDbt.map((change, index) => (
+                <DefinitionChangeRow key={`${change.title}-${index}`} change={change} />
+              ))}
+            </ul>
+          </div>
+        )}
+        {awareness.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <GroupLabel title={strings.noDbtImpact} />
+            <ul className="flex flex-col gap-2">
+              {awareness.map((change, index) => (
+                <DefinitionChangeRow key={`${change.title}-${index}`} change={change} />
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  } else if (changes) {
+    body = <p className="mt-2 text-sm text-typography-600">{strings.definitionNone}</p>;
+  } else if (working) {
+    body = <p className="mt-2 text-sm text-typography-600">{strings.definitionWorking}</p>;
+  } else if (agent.status === "failed" && agent.note) {
+    body = <p className="mt-2 text-sm text-typography-600">{agent.note}</p>;
+  } else {
+    // A run with no new commits, or one from before this section existed.
+    body = (
+      <p className="mt-2 text-sm text-typography-600">
+        {agent.status === "completed" && agent.summary
+          ? agent.summary
+          : strings.definitionUnavailable}
+      </p>
+    );
+  }
+
+  return (
+    <Tile className="min-w-0">
+      <CardTitle title={strings.definitionTitle} help={strings.definitionHelp}>
+        {changes && changes.length > 0 && (
+          <>
+            <Tag size="sm" type="gray">
+              {fill(strings.definitionCount, { count: changes.length })}
+            </Tag>
+            {needDbt.length > 0 && (
+              <Tag size="sm" type="purple">
+                {fill(strings.definitionNeedDbtCount, { count: needDbt.length })}
+              </Tag>
+            )}
+          </>
+        )}
+      </CardTitle>
+      {body}
+    </Tile>
+  );
+};
+
+const PlanItem = ({ finding, index }: { finding: AnalyticsAutomationFinding; index: number }) => {
+  const strings = en.analyticsAutomation;
+  const status = findingStatusMeta(finding.status);
+  const steps = strList(finding.payload.steps);
+  const files = strList(finding.payload.dbtFiles);
+  return (
+    <li className="flex items-start gap-3 rounded border border-border-light bg-neutral-50 p-3 text-sm text-typography-800">
+      <span
+        aria-hidden="true"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-xs font-medium text-typography-800"
+      >
+        {index}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex items-start justify-between gap-2">
+          <span className="break-words font-medium text-typography-900">{finding.title}</span>
+          <Tag size="sm" type={status.type} className="shrink-0">
+            {status.label}
+          </Tag>
+        </div>
+        {finding.detail && <p className="break-words text-typography-600">{finding.detail}</p>}
+        {steps.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-typography-700">{strings.planSteps}</p>
+            <ol className="mt-1 list-decimal pl-5 text-typography-700">
+              {steps.map((step, stepIndex) => (
+                <li key={stepIndex} className="break-words">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+        <FileChips label={strings.dbtFilesLabel} files={files} />
+      </div>
+    </li>
+  );
+};
+
+/** What the plan comes to under each outcome of the PostHog pull request. */
+const ScenarioTile = ({ title, count, help }: { title: string; count: number; help: string }) => (
+  <div className="flex min-w-0 flex-1 flex-col gap-0.5 rounded border border-border-light bg-background-secondary p-3">
+    <span className="text-xs font-medium text-typography-600">{title}</span>
+    <span className="text-lg font-medium text-typography-900">{count}</span>
+    <span className="text-xs text-typography-500">{help}</span>
+  </div>
+);
+
+/**
+ * The dbt agent's plan, shown before and after the decision. Items that exist
+ * only because of the PostHog events are grouped apart: they are applied if the
+ * PostHog pull request is merged, and left out if it is closed.
+ */
+const PlanBlock = ({ agent }: { agent: AnalyticsAutomationAgentRun }) => {
+  const strings = en.analyticsAutomation;
+  const plan = agent.findings.filter(f => f.kind === "dbt_change");
+  if (plan.length === 0) return null;
+  const always = plan.filter(f => f.payload.dependsOnPosthog !== true);
+  const ifMerged = plan.filter(f => f.payload.dependsOnPosthog === true);
+  const split = ifMerged.length > 0;
+
+  return (
+    <div className="mt-4 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="text-sm font-semibold text-typography-900">{strings.planTitle}</h4>
+        <Tag size="sm" type="gray">
+          {fill(strings.planCount, { count: plan.length })}
+        </Tag>
+      </div>
+      {agent.status === "awaiting_approval" && split && (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <ScenarioTile
+            title={strings.planScenarioMerged}
+            count={plan.length}
+            help={strings.planScenarioMergedHelp}
+          />
+          <ScenarioTile
+            title={strings.planScenarioClosed}
+            count={always.length}
+            help={strings.planScenarioClosedHelp}
+          />
+        </div>
+      )}
+      {always.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {split && <GroupLabel title={strings.planAlways} />}
+          <ul className="flex flex-col gap-2">
+            {always.map((finding, index) => (
+              <PlanItem key={finding.id} finding={finding} index={index + 1} />
+            ))}
+          </ul>
+        </div>
+      )}
+      {split && (
+        <div className="flex flex-col gap-2">
+          <GroupLabel title={strings.planIfMerged} help={strings.planIfMergedHelp} />
+          <ul className="flex flex-col gap-2">
+            {ifMerged.map((finding, index) => (
+              <PlanItem key={finding.id} finding={finding} index={always.length + index + 1} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AGENT_TITLE: Record<AnalyticsAutomationAgentName, () => { title: string; help: string }> = {
-  backend_review: () => ({
-    title: en.analyticsAutomation.agentBackendReview,
-    help: en.analyticsAutomation.agentBackendReviewHelp,
-  }),
   posthog_events: () => ({
     title: en.analyticsAutomation.agentPosthog,
     help: en.analyticsAutomation.agentPosthogHelp,
@@ -243,7 +612,7 @@ const AgentCard = ({
   const { title, help } = AGENT_TITLE[agent.agent]();
   const status = agentStatusMeta(agent.status);
   const isDbt = agent.agent === "dbt_metrics";
-  const retry = isDbt && agent.status === "failed" && agent.canApprove;
+  const retry = isDbt && agent.decision === "approved" && agent.canApprove;
 
   return (
     <Tile className="min-w-0">
@@ -271,19 +640,20 @@ const AgentCard = ({
       {retry && <p className="mt-1 text-sm text-typography-600">{strings.retryNote}</p>}
 
       {agent.summary ? (
-        <div className="mt-3">
+        <div className="mt-3 rounded bg-neutral-50 p-3">
           <Markdown>{agent.summary}</Markdown>
         </div>
       ) : (
         !agent.note && <p className="mt-2 text-sm text-typography-600">{strings.noSummary}</p>
       )}
 
-      <PullRequestBlock agent={agent} />
+      <PullRequestBlock agent={agent} showCi={isDbt} />
 
-      <FindingList
-        title={isDbt ? strings.findingsProposal : strings.findingsEvents}
-        findings={agent.findings}
-      />
+      {isDbt ? (
+        <PlanBlock agent={agent} />
+      ) : (
+        <FindingList title={strings.findingsEvents} findings={agent.findings} />
+      )}
 
       {isDbt && (agent.canApprove || agent.canReject) && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -378,14 +748,17 @@ const RunView = ({ run }: { run: AnalyticsAutomationRunDetail }) => {
       )}
 
       {run.agentRuns.map(agent => (
-        <AgentCard
-          key={agent.id}
-          agent={agent}
-          deciding={approving ? "approve" : rejecting ? "reject" : null}
-          decideError={agent.agent === "dbt_metrics" ? error : null}
-          onApprove={() => void decide("approve", agent.id)}
-          onReject={() => void decide("reject", agent.id)}
-        />
+        <Fragment key={agent.id}>
+          {/* The dbt agent's analysis gets its own section, ahead of its plan and decision. */}
+          {agent.agent === "dbt_metrics" && <DefinitionChangesCard agent={agent} />}
+          <AgentCard
+            agent={agent}
+            deciding={approving ? "approve" : rejecting ? "reject" : null}
+            decideError={agent.agent === "dbt_metrics" ? error : null}
+            onApprove={() => void decide("approve", agent.id)}
+            onReject={() => void decide("reject", agent.id)}
+          />
+        </Fragment>
       ))}
     </div>
   );
@@ -464,8 +837,7 @@ export const AnalyticsAutomationTab = () => {
   const [polling, setPolling] = useState(false);
   const [startError, setStartError] = useState(false);
 
-  // Testing aid: shown only while the server allows a manual start.
-  const config = useGetAnalyticsAutomationConfigQuery();
+  // "Run now": the same run the weekly schedule starts, on demand.
   const [startRun, { isLoading: starting }] = useStartAnalyticsAutomationRunMutation();
 
   const runsQuery = useGetAnalyticsAutomationRunsQuery(undefined, {
@@ -516,31 +888,29 @@ export const AnalyticsAutomationTab = () => {
         <h2 className="text-lg font-medium text-typography-900">{strings.heading}</h2>
         <p className="mt-1 mb-3 text-sm text-typography-600">{strings.intro}</p>
 
-        {config.data?.manualStartEnabled && (
-          <div className="mb-3 flex flex-col gap-2">
-            <div>
-              <Button
-                kind="tertiary"
-                size="sm"
-                disabled={starting || shouldPoll}
-                title={strings.startTestRunHelp}
-                onClick={() => void onStart()}
-              >
-                {starting ? strings.startingTestRun : strings.startTestRun}
-              </Button>
-            </div>
-            {startError && (
-              <InlineNotification
-                kind="error"
-                lowContrast
-                hideCloseButton
-                title=""
-                subtitle={strings.startTestRunFailed}
-                className="max-w-full"
-              />
-            )}
+        <div className="mb-3 flex flex-col gap-2">
+          <div>
+            <Button
+              kind="tertiary"
+              size="sm"
+              disabled={starting || shouldPoll}
+              title={strings.runNowHelp}
+              onClick={() => void onStart()}
+            >
+              {starting ? strings.runNowStarting : strings.runNow}
+            </Button>
           </div>
-        )}
+          {startError && (
+            <InlineNotification
+              kind="error"
+              lowContrast
+              hideCloseButton
+              title=""
+              subtitle={strings.runNowFailed}
+              className="max-w-full"
+            />
+          )}
+        </div>
 
         {!activeId ? null : detail ? (
           <RunView key={detail.id} run={detail} />

@@ -313,8 +313,8 @@ const TABS: TabDef[] = [
     visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_AGENT),
   },
   {
-    // The weekly run of three agents (backend review, PostHog events, dbt
-    // changes), started only by the server's scheduler. Behind the same toggle as
+    // The weekly run of two agents (PostHog events, dbt definition changes and
+    // plan, then the dbt pull request), started only by the server's scheduler. Behind the same toggle as
     // the agent: approving here makes the dbt agent open a pull request.
     //
     // No page-level pickers: a run is not scoped by period or language.

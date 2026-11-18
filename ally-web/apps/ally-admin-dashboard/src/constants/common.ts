@@ -791,7 +791,6 @@ export const ApiEndpoints = {
     // Weekly automation runs (scheduler-started; there is no start endpoint): list
     // them, open one, and approve / reject the dbt agent's proposal.
     AUTOMATION_RUNS: "/v1/analytics/agent/automation/runs",
-    AUTOMATION_CONFIG: "/v1/analytics/agent/automation/config",
     AUTOMATION_RUN_BY_ID: (id: string) => `/v1/analytics/agent/automation/runs/${id}`,
     AUTOMATION_APPROVE: (agentRunId: string) =>
       `/v1/analytics/agent/automation/agents/${agentRunId}/approve`,

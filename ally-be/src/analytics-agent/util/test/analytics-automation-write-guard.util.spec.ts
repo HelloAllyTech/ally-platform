@@ -292,3 +292,45 @@ describe('parsePullRequestResult', () => {
     ).toBeNull();
   });
 });
+
+describe('noteWriteSucceeded keeps what was pushed', () => {
+  it('records the latest content per file, so a later push (the reviewer’s fix) replaces an earlier one', () => {
+    const state = newWriteState();
+    noteWriteSucceeded(
+      'push_files',
+      { files: [{ path: 'ally-be/src/a.ts', content: 'v1' }] },
+      state,
+    );
+    noteWriteSucceeded(
+      'push_files',
+      { files: [{ path: 'ally-be/src/a.ts', content: 'v2' }] },
+      state,
+    );
+    expect(state.files.size).toBe(1);
+    expect(state.contents.get('ally-be/src/a.ts')).toBe('v2');
+  });
+});
+
+describe('checkWriteCall with an exact branch', () => {
+  const exact = { ...policy, branch: BRANCH };
+  it('refuses any other branch under the prefix', () => {
+    expect(
+      checkWriteCall(
+        'create_branch',
+        { owner: policy.owner, repo: policy.repo, branch: `${BRANCH}-2` },
+        exact,
+        newWriteState(),
+      ),
+    ).toMatch(/use exactly the branch/);
+  });
+  it('allows the assigned branch', () => {
+    expect(
+      checkWriteCall(
+        'create_branch',
+        { owner: policy.owner, repo: policy.repo, branch: BRANCH },
+        exact,
+        newWriteState(),
+      ),
+    ).toBeNull();
+  });
+});

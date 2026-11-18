@@ -12,6 +12,12 @@ export interface WritePolicy {
   base: string;
   /** Every branch the agent creates or pushes to starts with this. */
   branchPrefix: string;
+  /**
+   * When set, the ONE branch the agent may create, push to and open from. The
+   * server looks for the agent's work on that name, so a branch named
+   * otherwise would be written and then never reviewed or opened.
+   */
+  branch?: string;
   allowedPrefixes: readonly string[];
   /** Files one run may change, across all its pushes. */
   maxFiles: number;
@@ -22,12 +28,15 @@ export interface WritePolicy {
 export interface WriteState {
   branches: Set<string>;
   files: Set<string>;
+  /** The latest content pushed for each file, so the branch can be checked in code. */
+  contents: Map<string, string>;
   pullRequests: number;
 }
 
 export const newWriteState = (): WriteState => ({
   branches: new Set(),
   files: new Set(),
+  contents: new Map(),
   pullRequests: 0,
 });
 
@@ -58,6 +67,11 @@ export function checkWriteCall(
     str(args.repo)?.toLowerCase() !== policy.repo.toLowerCase()
   ) {
     return `you may only write to ${policy.owner}/${policy.repo}`;
+  }
+
+  const named = str(tool === 'create_pull_request' ? args.head : args.branch);
+  if (policy.branch && named !== null && named !== policy.branch) {
+    return `use exactly the branch "${policy.branch}"`;
   }
 
   if (tool === 'create_branch') {
@@ -135,7 +149,11 @@ export function noteWriteSucceeded(
   } else if (tool === 'push_files' && Array.isArray(args.files)) {
     for (const file of args.files) {
       const path = (file as { path?: unknown })?.path;
-      if (typeof path === 'string') state.files.add(path);
+      const content = (file as { content?: unknown })?.content;
+      if (typeof path === 'string') {
+        state.files.add(path);
+        if (typeof content === 'string') state.contents.set(path, content);
+      }
     }
   } else if (tool === 'create_pull_request') {
     state.pullRequests += 1;

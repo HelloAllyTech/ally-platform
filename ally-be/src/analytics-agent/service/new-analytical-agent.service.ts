@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import {
   AIMessage,
   BaseMessage,
@@ -20,8 +22,12 @@ import {
   AnalyticalAgentTraceHandler,
   buildAgentTrace,
   DbtHeadCommit,
+  isTool,
   parseToolResult,
 } from './analytical-agent-trace';
+import { createDatalyzeTaskTokenMiddleware } from '../util/datalyze-task-token.util';
+
+const logger = new Logger('AnalyticalAgent');
 
 export const LLM = new ChatOpenAI({
   model: process.env.OPENAI_CHAT_MODEL,
@@ -292,13 +298,76 @@ function lastAiText(messages: BaseMessage[]): string | undefined {
   return undefined;
 }
 
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+const clip = (text: string, max = 200) =>
+  text.length > max ? `${text.slice(0, max)}…` : text;
+
+// A few readable lines about one finished run: where the time went, what it cost, what failed.
+// Built from the trace, so it only ever reports what the full JSON line also carries.
+function logRunSummary(
+  runId: string,
+  trace: ReturnType<typeof buildAgentTrace>,
+) {
+  const steps = trace.steps;
+  const byServer = new Map<string, number>();
+  for (const step of steps) {
+    const server = step.toolName.includes('_')
+      ? step.toolName.split('_')[0]
+      : 'other';
+    byServer.set(server, (byServer.get(server) ?? 0) + 1);
+  }
+  const inTools = steps.reduce((n, step) => n + (step.durationMs ?? 0), 0);
+  const tokens = trace.config.tokens;
+  const slowest = [...steps]
+    .filter((step) => step.durationMs !== null)
+    .sort((a, b) => (b.durationMs ?? 0) - (a.durationMs ?? 0))
+    .slice(0, 3)
+    .map(
+      (step) =>
+        `${step.toolName} ${seconds(step.durationMs ?? 0)} (step ${step.step})`,
+    );
+
+  logger.log(
+    [
+      `[${runId}] Answered in ${seconds(trace.durationMs)}`,
+      tokens
+        ? `${tokens.llmCalls} LLM calls, ${tokens.totalTokens.toLocaleString('en-US')} tokens (${tokens.cachedInputTokens.toLocaleString('en-US')} cached)`
+        : 'no token usage reported',
+      `${steps.length} tool calls (${[...byServer].map(([name, n]) => `${name} ${n}`).join(', ') || 'none'})`,
+      `${seconds(inTools)} in tools, the rest model time`,
+    ].join(' | '),
+  );
+  if (slowest.length > 0) {
+    logger.log(`[${runId}] Slowest tool calls: ${slowest.join('; ')}`);
+  }
+  if (trace.sqlQueries.length > 0 || trace.dbtFilesRead.length > 0) {
+    logger.log(
+      `[${runId}] Ran ${trace.sqlQueries.length} SQL queries, read ${trace.dbtFilesRead.length} dbt files, inspected ${trace.tablesInspected.length} tables`,
+    );
+  }
+  for (const error of trace.errors) {
+    logger.warn(
+      `[${runId}] ${error.source === 'tool' ? `${error.toolName} failed at step ${error.step}` : 'LLM error'}: ${clip(error.message)}`,
+    );
+  }
+  if (trace.retries.length > 0) {
+    const stuck = trace.retries.filter((r) => r.retryStatus === 'error').length;
+    logger.warn(
+      `[${runId}] ${trace.retries.length} tool calls repeated after a failure (${stuck} failed again)`,
+    );
+  }
+}
+
 export async function invokeAnalyticalAgent(
   query: string,
   history: AnalyticalAgentHistoryTurn[] = [],
   userId?: string,
   chatId?: string,
 ) {
-  console.log('entered the new function');
+  const runId = randomUUID().slice(0, 8);
+  logger.log(
+    `[${runId}] Question received (${query.length} chars, ${history.length} earlier turns, user ${userId ?? '-'}, chat ${chatId ?? '-'})`,
+  );
   const startedAtMs = Date.now();
   const tools = await client.listTools();
 
@@ -311,19 +380,29 @@ export async function invokeAnalyticalAgent(
     systemPrompt,
     responseFormat: toolStrategy(outputSchema),
     tools,
+    // Fills in Datalyze's task token itself; a hand-copied token kept failing its signature check.
+    middleware: [createDatalyzeTaskTokenMiddleware()],
   });
 
   const inputMessages = buildInputMessages(query, history);
   const traceHandler = new AnalyticalAgentTraceHandler();
-  const answer = await agent.invoke(
-    {
-      messages: inputMessages,
-    },
-    {
-      recursionLimit: RECURSION_LIMIT,
-      callbacks: [traceHandler],
-    },
-  );
+  let answer: Awaited<ReturnType<typeof agent.invoke>>;
+  try {
+    answer = await agent.invoke(
+      {
+        messages: inputMessages,
+      },
+      {
+        recursionLimit: RECURSION_LIMIT,
+        callbacks: [traceHandler],
+      },
+    );
+  } catch (err) {
+    logger.error(
+      `[${runId}] Run failed after ${seconds(Date.now() - startedAtMs)}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
 
   // The model should finish through the structured-output tool. If it replied in plain text
   // instead, use that text rather than returning no response at all.
@@ -332,8 +411,8 @@ export async function invokeAnalyticalAgent(
     (() => {
       const text = lastAiText(answer.messages.slice(inputMessages.length));
       if (text === undefined) return undefined;
-      console.warn(
-        'analytical agent finished without a structured response; falling back to its last message',
+      logger.warn(
+        `[${runId}] Finished without a structured response; using the last message as the answer`,
       );
       return parseStructuredText(text);
     })();
@@ -375,7 +454,9 @@ export async function invokeAnalyticalAgent(
     }));
 
   // Extra telemetry for this question. Built after the run, so it can never change the answer.
-  const dbtFileReads = toolCalls.some((el) => el.name === 'get_file_contents');
+  const dbtFileReads = toolCalls.some((el) =>
+    isTool(el.name, 'get_file_contents'),
+  );
   const headCommit = dbtFileReads
     ? await resolveDbtHeadCommit(tools, toolCalls)
     : null;
@@ -400,14 +481,20 @@ export async function invokeAnalyticalAgent(
     },
   });
 
-  console.log({
-    toolCalls: toolCalls.map((el) => ({
-      name: el.name,
-      args: el.args,
-    })),
-    response: structured,
-    ...trace,
-  });
+  logRunSummary(runId, trace);
+  // The full record of the run, one JSON line on stdout (not behind the log level), for
+  // whoever reads the logs to investigate a run. `runId` ties it to the lines above.
+  console.log(
+    JSON.stringify({
+      runId,
+      toolCalls: toolCalls.map((el) => ({
+        name: el.name,
+        args: el.args,
+      })),
+      response: structured,
+      ...trace,
+    }),
+  );
 
   return {
     toolCalls,
@@ -424,8 +511,10 @@ async function resolveDbtHeadCommit(
   toolCalls: { name: string; args: unknown }[],
 ): Promise<DbtHeadCommit> {
   try {
-    const listCommits = tools.find((tool) => tool.name === 'list_commits');
-    const read = toolCalls.find((call) => call.name === 'get_file_contents');
+    const listCommits = tools.find((tool) => isTool(tool.name, 'list_commits'));
+    const read = toolCalls.find((call) =>
+      isTool(call.name, 'get_file_contents'),
+    );
     const args = (read?.args ?? {}) as { owner?: string; repo?: string };
     if (!listCommits || !args.owner || !args.repo) return null;
 
@@ -442,9 +531,8 @@ async function resolveDbtHeadCommit(
       ? { sha, resolvedAt: new Date().toISOString() }
       : null;
   } catch (err) {
-    console.warn(
-      'could not resolve the dbt repo head commit',
-      err instanceof Error ? err.message : err,
+    logger.warn(
+      `Could not resolve the dbt repo head commit: ${err instanceof Error ? err.message : String(err)}`,
     );
     return null;
   }
