@@ -28,7 +28,7 @@ import { ChangeWhiskers, WhiskerRow } from "../Analytics/ChangeWhiskers";
 import { ChartCard, KpiTile, lineOpts, PALETTE } from "../Analytics/chartKit";
 import { CONTEXT, stableScale } from "../Analytics/chartScales";
 import { TabControls } from "../Analytics/tabControlsSlot";
-import { AgentsSection } from "./metrics/AgentsSection";
+import { AgentsMetricsSection } from "./metrics/AgentsMetricsSection";
 import { BulletRow, BulletRows, NumbersTable, RateDots, RateRow } from "./metrics/metricsCharts";
 import {
   MIN_RATE_SAMPLE,
@@ -47,7 +47,7 @@ import {
 } from "./metrics/metricsData";
 
 export { MIN_RATE_SAMPLE, rateWithRange, targetState, wilson };
-export { orchestratorRows } from "./metrics/AgentsSection";
+export { orchestratorRows } from "./metrics/AgentsMetricsSection";
 
 /**
  * The page's time range, in the weeks the metrics endpoint reads. Rounded up so the window always
@@ -178,7 +178,7 @@ const MetricsBody: React.FC<{
           <EfficiencyCard view={view} />
         </>
       )}
-      <AgentsSection agents={view.agents} />
+      <AgentsMetricsSection agents={view.agents} />
     </div>
   );
 };
