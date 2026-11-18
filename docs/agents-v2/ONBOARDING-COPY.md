@@ -996,7 +996,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - Example
 - Add
 - Add a {detail}
-- Keep at least one.
+- Add at least one of your own.
 - Add the times people can book
 - Pick the days and hours. You can change or remove any of them later.
 - What can your assistant do with {list}?

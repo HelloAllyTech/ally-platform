@@ -139,6 +139,83 @@ const APPOINTMENT_SERVICES = [
   'Family therapy',
 ];
 
+/**
+ * The kind of business an assistant serves, for examples that fit it (Q3d; prod 18 Nov: an eye
+ * hospital, a salon and a coworking space were all offered "Family therapy").
+ */
+export type BusinessKind =
+  | 'therapy'
+  | 'clinic'
+  | 'eye'
+  | 'lab'
+  | 'salon'
+  | 'coworking'
+  | 'education'
+  | 'generic';
+
+/** Appointments' services per kind of business; `generic` when we can't tell. */
+export const APPOINTMENT_EXAMPLES: Record<BusinessKind, string[]> = {
+  therapy: APPOINTMENT_SERVICES,
+  clinic: ['Consultation', 'Follow-up visit', 'Health check-up'],
+  eye: ['Eye check-up', 'LASIK consultation', 'Cataract consultation'],
+  lab: ['Blood test', 'Home sample collection', 'Health check-up package'],
+  salon: ['Haircut', 'Hair colour', 'Facial'],
+  coworking: ['Space tour', 'Meeting room', 'Day pass'],
+  education: ['Counselling session', 'Campus visit', 'Demo class'],
+  generic: ['Consultation', 'Visit', 'Call back'],
+};
+
+/** Setup's industry → kind. The industries not here have no booking examples of their own. */
+const KIND_OF_INDUSTRY: Record<string, BusinessKind> = {
+  mental_health: 'therapy',
+  gp_clinic: 'clinic',
+  pharmacy: 'clinic',
+  diagnostic_lab: 'lab',
+  coaching: 'education',
+  school: 'education',
+};
+
+/**
+ * Words in the business's name or description that tell a kind setup's industries don't have (an
+ * eye hospital is a `gp_clinic`, a salon `wellness`, a coworking space `other`).
+ */
+const KIND_WORDS: [BusinessKind, RegExp][] = [
+  ['eye', /\b(eye|ophthalm\w*|lasik|cataract|retina\w*)\b/i],
+  ['coworking', /\b(co-?working|workspaces?|hot ?desks?|shared offices?)\b/i],
+  [
+    'salon',
+    /\b(salons?|beauty|barbers?|hair ?cuts?|hair ?stylists?|nails?)\b/i,
+  ],
+];
+
+/**
+ * The kind of business: a mental-health assistant is always therapy; otherwise the words in its
+ * name and description, then its industry, then `generic`.
+ */
+export function businessKind({
+  industry,
+  safetyPack,
+  text = '',
+}: {
+  industry?: string | null;
+  safetyPack?: string | null;
+  text?: string;
+}): BusinessKind {
+  if (industry === 'mental_health' || safetyPack === 'mental_health') {
+    return 'therapy';
+  }
+  const byWords = KIND_WORDS.find(([, words]) => words.test(text));
+  if (byWords) return byWords[0];
+  return KIND_OF_INDUSTRY[industry ?? ''] ?? 'generic';
+}
+
+/** The example values that fit a kind of business, per list and field, as `install` takes them. */
+export function examplesFor(
+  kind: BusinessKind,
+): Record<string, Record<string, string[]>> {
+  return { appointments: { service: APPOINTMENT_EXAMPLES[kind] } };
+}
+
 // ---- the catalogue -------------------------------------------------------------------------------
 
 export const READY_MADE: ReadyMadeItem[] = [
@@ -795,10 +872,15 @@ export function listInputFor(
   return { ...rest, fields, rules };
 }
 
-/** The selects that install with example values, for the "Make it yours" step. */
+/**
+ * The selects that install with example values, for the "Make it yours" step: the ones that fit
+ * the business when its kind is known (`examplesFor`), else the catalogue's.
+ */
 export function exampleOptions(
   item: ReadyMadeItem,
+  kind?: BusinessKind,
 ): { list: string; field: string; label: string; examples: string[] }[] {
+  const fitting = kind ? examplesFor(kind) : {};
   return item.lists.flatMap((list) =>
     list.fields
       .filter((f) => f.example_options)
@@ -806,7 +888,8 @@ export function exampleOptions(
         list: list.key,
         field: f.key,
         label: f.label,
-        examples: (f.options?.values as string[]) ?? [],
+        examples:
+          fitting[list.key]?.[f.key] ?? (f.options?.values as string[]) ?? [],
       })),
   );
 }
@@ -816,7 +899,7 @@ export function exampleSets(): string[][] {
   const now = READY_MADE.flatMap((item) =>
     exampleOptions(item).map((o) => o.examples),
   );
-  return [...now, ...EARLIER_EXAMPLES];
+  return [...now, ...Object.values(APPOINTMENT_EXAMPLES), ...EARLIER_EXAMPLES];
 }
 
 const sameSet = (a: string[], b: string[]): boolean => {

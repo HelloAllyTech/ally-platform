@@ -145,6 +145,68 @@ describePg('Lists, the owner’s section (Postgres)', () => {
       expect(reason.required).toBe(false);
     });
 
+    it('Appointments installs with examples that fit the business (Q3d; prod 18 Nov)', async () => {
+      const draft = async (industry: string, name: string, about = '') => {
+        await ds.query(`DELETE FROM bot_drafts WHERE chatbot_id = $1`, [bot]);
+        await ds.query(
+          `INSERT INTO bot_drafts (owner_user_id, industry, draft_config, learned, chatbot_id)
+           VALUES (1, $1, $2, $3, $4)`,
+          [
+            industry,
+            JSON.stringify({ name }),
+            JSON.stringify({
+              facts: about ? [{ section: 'about', text: about }] : [],
+              dropped: 0,
+            }),
+            bot,
+          ],
+        );
+      };
+      const services = async () => {
+        const { lists } = await owner.install(await chatbot(), 'appointments');
+        const list = lists.find((l) => l.key === 'appointments')!;
+        await ds.query(`DELETE FROM collections WHERE chatbot_id = $1`, [bot]);
+        return list.fields.find((f) => f.key === 'service')!.options.values;
+      };
+
+      await draft('gp_clinic', 'Centre for Sight', 'An eye hospital in Delhi.');
+      expect(await owner.businessKindOf(await chatbot())).toBe('eye');
+      expect(await services()).toEqual([
+        'Eye check-up',
+        'LASIK consultation',
+        'Cataract consultation',
+      ]);
+      const { groups } = owner.catalogue('eye');
+      expect(groups[0].items[0].needs_options[0].examples).toEqual([
+        'Eye check-up',
+        'LASIK consultation',
+        'Cataract consultation',
+      ]);
+
+      await draft('wellness', 'Looks Salon');
+      expect(await services()).toEqual(['Haircut', 'Hair colour', 'Facial']);
+
+      await draft('other', 'BHIVE Workspace');
+      expect(await services()).toEqual([
+        'Space tour',
+        'Meeting room',
+        'Day pass',
+      ]);
+
+      await ds.query(`DELETE FROM bot_drafts WHERE chatbot_id = $1`, [bot]);
+      expect(await services()).toEqual(['Consultation', 'Visit', 'Call back']);
+
+      // The owner's own choices still win.
+      const { lists } = await owner.install(await chatbot(), 'appointments', {
+        appointments: { service: ['Root canal'] },
+      });
+      expect(
+        lists
+          .find((l) => l.key === 'appointments')!
+          .fields.find((f) => f.key === 'service')!.options.values,
+      ).toEqual(['Root canal']);
+    });
+
     it('lists the catalogue grouped, with the options to fill in', () => {
       const { groups } = owner.catalogue();
       expect(groups.flatMap((g) => g.items)).toHaveLength(14);

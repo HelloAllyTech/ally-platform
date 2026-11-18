@@ -122,8 +122,8 @@ export class ListController {
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'The ready-made lists an owner can add, grouped' })
   async readyMadeCatalogue(@Param('id', ParseUUIDPipe) id: string) {
-    await this.access.assert(id);
-    return this.owner.catalogue();
+    const { chatbot } = await this.access.assert(id);
+    return this.owner.catalogue(await this.owner.businessKindOf(chatbot));
   }
 
   @Post(':id/lists/ready-made/:name')

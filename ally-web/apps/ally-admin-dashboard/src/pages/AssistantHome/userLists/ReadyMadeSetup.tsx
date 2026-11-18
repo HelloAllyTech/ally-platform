@@ -310,6 +310,9 @@ const MakeItYours: React.FC<{
   const [typed, setTyped] = useState("");
   const [save, { isLoading }] = useUpdateListFieldMutation();
   const [failed, setFailed] = useState(false);
+  // Every example can be removed (Q3d; prod 18 Nov: the last one stayed and was offered); a list
+  // needs at least one choice, so Next waits for one of the owner's own.
+  const empty = values.length === 0 && !typed.trim();
 
   const addOne = () => {
     const v = typed.trim();
@@ -363,7 +366,6 @@ const MakeItYours: React.FC<{
                   variant={ButtonVariant.TEXT}
                   type="button"
                   aria-label={fill(t().details.removeChoice, { value: human(value) })}
-                  disabled={values.length === 1}
                   onClick={() => {
                     setValues(values.filter(v => v !== value));
                     setExamples(examples.filter(v => v !== value));
@@ -392,7 +394,7 @@ const MakeItYours: React.FC<{
               {t().setup.addChoice}
             </Button>
           </div>
-          {values.length === 1 && <p className="ally-field__hint">{t().setup.needOne}</p>}
+          {empty && <p className="ally-field__hint">{t().setup.needOne}</p>}
         </fieldset>
       </div>
       {failed && (
@@ -411,7 +413,7 @@ const MakeItYours: React.FC<{
         <Button
           variant={ButtonVariant.PRIMARY}
           type="button"
-          disabled={isLoading}
+          disabled={isLoading || empty}
           onClick={() => void next()}
         >
           {isLoading ? t().form.saving : t().setup.next}

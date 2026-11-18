@@ -314,7 +314,7 @@ export const USER_LISTS = {
     example: "Example",
     addChoice: "Add",
     choicePlaceholder: "Add a {detail}",
-    needOne: "Keep at least one.",
+    needOne: "Add at least one of your own.",
     timesTitle: "Add the times people can book",
     timesBody: "Pick the days and hours. You can change or remove any of them later.",
     assistantTitle: "What can your assistant do with {list}?",
