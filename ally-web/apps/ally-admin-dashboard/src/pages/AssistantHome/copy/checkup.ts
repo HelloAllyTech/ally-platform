@@ -4,6 +4,7 @@ export const CHECKUP_CONTROLS = {
   measureEmpty: "No questions of this kind yet.",
   alsoAdd: "Also add to checkup",
   summaryGap: "Ready for {clients}, with 1 small gap",
+  summaryNeedFix: "{n} of {total} questions need a fix",
   intro:
     "A checkup asks your assistant the questions customers would ask, then checks each answer against your own pages.",
   steps: {

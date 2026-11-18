@@ -82,6 +82,15 @@ describe("Scorecard", () => {
     expect(screen.getByText("Last checkup: 18 of 20 answered well")).toBeTruthy();
   });
 
+  it("says how many need a fix while the checkup is below the publish gate (Q3-fast)", () => {
+    h.data.current = {
+      ...VIEW,
+      checkup: { passed: 5, total: 14, at: "", ready: false, needFix: 9 },
+    };
+    render(<Scorecard botId="b1" canEdit go={vi.fn()} />);
+    expect(screen.getByTestId("overview-need-fix").textContent).toBe("9 need a fix");
+  });
+
   it("shows the empty state with no conversations this week", () => {
     h.data.current = { ...VIEW, thisWeek: week({ conversations: 0 }) };
     render(<Scorecard botId="b1" canEdit go={vi.fn()} />);

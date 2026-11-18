@@ -154,6 +154,8 @@ export const COPY = {
     added: "Added. Your assistant will use this from now on.",
     allClear:
       "Every question was answered well or declined appropriately. You're ready to try it yourself.",
+    needFix:
+      "{n} of {total} questions need a fix. Answer the ones it couldn't, or look at what went wrong in Checkup once it's live.",
     subtitle:
       "We asked your assistant {total} questions your {clients} ask, and checked every answer against your information. Last run {when}.",
     runAgain: "Run again",
@@ -375,6 +377,7 @@ export const COPY = {
   } as Record<string, string>,
   share: {
     goLiveAnyway: "Go live anyway",
+    publishAnyway: "Publish anyway",
     title: "Who can use it?",
     public: "Anyone with the link",
     publicHelp: "Best for your website, Instagram or WhatsApp status.",

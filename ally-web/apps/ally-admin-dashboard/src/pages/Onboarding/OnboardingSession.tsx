@@ -175,7 +175,16 @@ export const OnboardingView: React.FC<{
               s.mustPass && {
                 message: s.mustPass.message,
                 questions: s.mustPass.questions,
-                onConfirm: () => void s.publish(s.mustPass!.access, s.mustPass!.emails, true),
+                belowGate: s.mustPass.belowGate,
+                onConfirm: () =>
+                  void (s.mustPass!.belowGate
+                    ? s.publish(
+                        s.mustPass!.access,
+                        s.mustPass!.emails,
+                        Boolean(s.mustPass!.confirmedMustPass),
+                        true,
+                      )
+                    : s.publish(s.mustPass!.access, s.mustPass!.emails, true)),
               }
             }
           />

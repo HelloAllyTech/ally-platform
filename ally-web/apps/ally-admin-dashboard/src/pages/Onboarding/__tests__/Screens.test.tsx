@@ -432,6 +432,29 @@ describe("Share", () => {
     expect(onConfirm).toHaveBeenCalled();
   });
 
+  it("below the checkup's quality gate, shows the score and offers Publish anyway (Q3-fast)", () => {
+    const onConfirm = vi.fn();
+    render(
+      <ShareScreen
+        view={view({ step: "share" })}
+        publicAllowed={false}
+        publishing={false}
+        onPublish={vi.fn()}
+        mustPass={{
+          message:
+            "8 of 14 questions need a fix: your assistant answered 38% of its questions well.",
+          questions: [],
+          belowGate: true,
+          onConfirm,
+        }}
+      />,
+    );
+    expect(screen.getByRole("alert").textContent).toContain("38%");
+    expect(screen.queryByText(COPY.share.goLiveAnyway)).toBeNull();
+    fireEvent.click(screen.getByText(COPY.share.publishAnyway));
+    expect(onConfirm).toHaveBeenCalled();
+  });
+
   it("keeps public off with the deck's note while the platform has it off", () => {
     const onPublish = vi.fn();
     render(

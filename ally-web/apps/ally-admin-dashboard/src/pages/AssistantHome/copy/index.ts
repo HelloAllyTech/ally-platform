@@ -219,6 +219,7 @@ export const HOME = {
     cancel: "Cancel",
     saved: "Saved to your notes. The next checkup will ask this.",
     checkupCard: "Last checkup: {passed} of {total} answered well",
+    checkupNeedFix: "{n} need a fix",
     viewCheckup: "View checkup",
     empty: "No conversations yet this week. Share your link to get started.",
   },

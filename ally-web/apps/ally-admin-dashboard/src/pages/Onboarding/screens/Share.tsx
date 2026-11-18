@@ -16,7 +16,12 @@ export const ShareScreen: React.FC<{
   publicAllowed: boolean;
   publishing: boolean;
   /** An owner's Must pass question failed (chunk 20d-2): asked before going live. */
-  mustPass?: { message: string; questions: string[]; onConfirm: () => void } | null;
+  mustPass?: {
+    message: string;
+    questions: string[];
+    belowGate?: boolean;
+    onConfirm: () => void;
+  } | null;
   line?: string;
   onPublish: (access: Access, emails: string[]) => void;
 }> = ({ view, publicAllowed, publishing, line, onPublish, mustPass }) => {
@@ -87,7 +92,7 @@ export const ShareScreen: React.FC<{
               </ul>
             )}
             <Button disabled={publishing} onClick={mustPass.onConfirm}>
-              {COPY.share.goLiveAnyway}
+              {mustPass.belowGate ? COPY.share.publishAnyway : COPY.share.goLiveAnyway}
             </Button>
           </div>
         )}

@@ -238,11 +238,16 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
             </div>
             <div>
               <h3 className="ally-heading">
-                {view.totals.gaps === 1
-                  ? fill(c.summaryGap, { clients })
-                  : view.totals.gaps
-                    ? fill(t.summaryGaps, { clients, gaps: view.totals.gaps })
-                    : fill(t.summaryClear, { clients })}
+                {view.gate && !view.gate.ready
+                  ? fill(c.summaryNeedFix, {
+                      n: view.gate.needFix,
+                      total: view.gate.questions,
+                    })
+                  : view.totals.gaps === 1
+                    ? fill(c.summaryGap, { clients })
+                    : view.totals.gaps
+                      ? fill(t.summaryGaps, { clients, gaps: view.totals.gaps })
+                      : fill(t.summaryClear, { clients })}
               </h3>
               {view.totals.gaps > 0 && (
                 <p className="ally-body">

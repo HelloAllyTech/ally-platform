@@ -329,7 +329,7 @@ export class BotDraftController {
         draft,
         Boolean(dto.confirmMustPass),
       );
-      await this.checkup.assertCanPublish(draft);
+      await this.checkup.assertCanPublish(draft, Boolean(dto.publishAnyway));
     }
     return this.publisher.publish(draft, dto);
   }

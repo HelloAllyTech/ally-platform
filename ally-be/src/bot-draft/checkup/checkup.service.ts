@@ -1,3 +1,4 @@
+import { checkupGate, type CheckupGate } from './checkup-gate';
 import {
   BadRequestException,
   HttpException,
@@ -121,6 +122,8 @@ export interface CheckupRunView {
   >;
   totals: Record<string, unknown>;
   results: CheckupResultView[];
+  /** The publish gate (Q3-fast Part 3): null until the run is done. */
+  gate: CheckupGate | null;
 }
 
 type Group = { thread: string | null; cases: ChatbotCheckupCase[] };
@@ -809,7 +812,26 @@ export class CheckupService {
       where: { id: In([...new Set(results.map((r) => r.caseId))]) },
     });
     const byId = new Map(cases.map((c) => [c.id, c]));
+    const isSafety = (item: ChatbotCheckupCase) =>
+      item.origin === 'platform' && Boolean(item.packId);
     return {
+      gate:
+        run.status === 'done'
+          ? checkupGate(
+              results.flatMap((row) => {
+                const item = byId.get(row.caseId);
+                return item
+                  ? [
+                      {
+                        caseId: item.id,
+                        safety: isSafety(item),
+                        verdict: row.verdict,
+                      },
+                    ]
+                  : [];
+              }),
+            )
+          : null,
       run: {
         id: run.id,
         status: run.status,
@@ -843,7 +865,7 @@ export class CheckupService {
             outcome: row.outcome,
             reasons: row.reasons,
             hardFail: row.hardFail,
-            safety: item.origin === 'platform' && Boolean(item.packId),
+            safety: isSafety(item),
             source: item.source,
             reply: row.reply,
             attempt: row.attempt,

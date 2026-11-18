@@ -323,6 +323,14 @@ export const Scorecard: React.FC<{
           <div className="ally-home__row">
             <p className="ally-body">
               {fill(t.checkupCard, { passed: data.checkup.passed, total: data.checkup.total })}
+              {data.checkup.ready === false && Boolean(data.checkup.needFix) && (
+                <>
+                  {" · "}
+                  <strong data-testid="overview-need-fix">
+                    {fill(t.checkupNeedFix, { n: data.checkup.needFix! })}
+                  </strong>
+                </>
+              )}
             </p>
             <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("checkup")}>
               {t.viewCheckup}

@@ -200,7 +200,13 @@ export const CheckupScreen: React.FC<{ view: BotDraftView; onContinue: () => voi
           />
         ))}
       </ul>
-      {totals && !gaps.length && <p className="ally-body">{t.allClear}</p>}
+      {/* "You're ready" only above the publish gate (Q3-fast Part 3, B18). */}
+      {totals && result?.gate?.ready && !gaps.length && <p className="ally-body">{t.allClear}</p>}
+      {totals && result?.gate && !result.gate.ready && (
+        <p className="ally-body" data-testid="checkup-need-fix">
+          {fill(t.needFix, { n: result.gate.needFix, total: result.gate.questions })}
+        </p>
+      )}
       <div className="ally-btn-row">
         {totals && gaps.length > 0 ? (
           <PrimaryButton onClick={() => setAnswering(true)}>

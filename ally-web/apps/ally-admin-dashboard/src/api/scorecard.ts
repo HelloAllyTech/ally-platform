@@ -30,7 +30,14 @@ export interface Scorecard {
     reply: string;
     question: string | null;
   }[];
-  checkup: { passed: number; total: number; at: string | null } | null;
+  checkup: {
+    passed: number;
+    total: number;
+    at: string | null;
+    /** Q3-fast Part 3: above the publish gate, and how many need a fix (null: not worked out). */
+    ready?: boolean | null;
+    needFix?: number | null;
+  } | null;
 }
 
 /** The live scorecard on the Overview (chunk Q2a). */

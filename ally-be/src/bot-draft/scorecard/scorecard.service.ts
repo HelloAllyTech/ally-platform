@@ -114,6 +114,9 @@ function checkupCard(latest: CheckupRunView | null) {
     passed: accuracy.passed,
     total: accuracy.total,
     at: latest.run.finishedAt,
+    // Q3-fast Part 3: "X need a fix" while below the publish gate, live assistants included.
+    ready: latest.gate?.ready ?? null,
+    needFix: latest.gate?.needFix ?? null,
   };
 }
 
