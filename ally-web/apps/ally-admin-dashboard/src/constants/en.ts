@@ -11025,21 +11025,7 @@ export const en = {
         expand: (title: string) => `Open ${title}`,
         before: "Before",
         after: "After",
-        wholeRule: (name: string) => `The whole ${name}`,
-        wholeRuleChanged: (name: string) =>
-          `The whole ${name} after the change (the change is marked)`,
-        ruleStale:
-          "The rule has changed since this was proposed, so the passage no longer matches. Ask the Debrief PM agent to redo it.",
         evidence: "Evidence",
-        /** The clinical advisor's home: their pending decisions only. */
-        advisorHeadline: (n: number) =>
-          n === 0
-            ? "Nothing needs your decision."
-            : `${n} ${n === 1 ? "change needs" : "changes need"} your decision.`,
-        advisorNeedsHeading: (n: number) =>
-          n === 1
-            ? "Needs you: a change only you or the owner can approve"
-            : `Needs you: ${n} changes only you or the owner can approve`,
         thisWeek: (score: string | null, trend: string | null, live: number, undone: number) =>
           [
             score === null
@@ -11262,7 +11248,6 @@ export const en = {
         alwaysAsks: "Always asks a person",
         lockedHelp: "Always on: this can't be switched off.",
         locked: [
-          { name: "Safety reader text", why: "What counts as a risk cue" },
           { name: "Crisis lines and support copy", why: "What a learner in distress reads" },
           { name: "Budget increases", why: "Lower budgets go ahead on their own" },
         ],

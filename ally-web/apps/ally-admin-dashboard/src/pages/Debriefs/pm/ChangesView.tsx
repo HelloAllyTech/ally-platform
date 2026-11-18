@@ -20,7 +20,7 @@ import { languageLabel } from "../consoleLabels";
 import { analyticsDebriefsPath } from "../consoleRoutes";
 import { DebriefAccess } from "../debriefAccess";
 import { one, scoreTrend } from "../scoreText";
-import { Wording, WholeRule } from "./ChangeText";
+import { Wording } from "./ChangeText";
 import { DecisionButtons } from "./DecisionButtons";
 import { PmConversation } from "./PmConversation";
 
@@ -148,7 +148,6 @@ const Detail: React.FC<{ change: DebriefChange; canAct: boolean; access: Debrief
         </p>
       )}
       {change.wording && <Wording before={change.wording.before} after={change.wording.after} />}
-      {change.rule && <WholeRule rule={change.rule} changed={!!change.wording} />}
       <DecisionButtons change={change} access={access} />
       {/* The title already leads a waiting change; a reason shows only when someone gave one. */}
       {(change.state !== "waits" || change.why) && (

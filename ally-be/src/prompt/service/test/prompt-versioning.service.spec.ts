@@ -476,22 +476,6 @@ describe('PromptVersioningService.promote', () => {
     expect(state.prompt.currentVersion).toBe(2);
   });
 
-  it('a Debrief clinical sign-off may put a pinned version live without the editor list', async () => {
-    const { service, state } = buildStore({
-      prompt: { promptCode: 'debrief_risk_cue_definition', currentVersion: 1 },
-      versions: candidate(),
-      pinnedEditors: [],
-    });
-
-    await asUser(99, () =>
-      service.promote('p1', 2, 1, {
-        confirmPinnedChange: true,
-        signedOffPinnedRule: true,
-      }),
-    );
-    expect(state.prompt.currentVersion).toBe(2);
-  });
-
   it('leaves prompts that are not pinned to every editor', async () => {
     const { service, state } = buildStore({
       prompt: { currentVersion: 1 },

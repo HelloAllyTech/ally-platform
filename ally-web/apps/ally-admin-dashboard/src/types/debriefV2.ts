@@ -63,13 +63,7 @@ export interface DebriefChange {
    * a change with no text (a model, a setting, code).
    */
   wording?: { before: string; after: string } | null;
-  /** A pinned rule in full (sign-off: as it stands; change: after it, the changed passage marked). */
-  rule?: {
-    name: string;
-    segments: Array<{ text: string; changed: boolean }>;
-    stale: boolean;
-  } | null;
-  /** What kind of thing changes (pinned rules are the clinical advisor's or the owner's). */
+  /** What kind of thing changes. */
   kindKey?: "prompt" | "setting" | "budget" | "model" | "code" | "agents" | "change";
   /** Live: Undo now. */
   canUndo: boolean;

@@ -135,7 +135,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
         data: { ideaId: i.id },
       };
       await this.notifier.team(alert);
-      if (a.wait === 'pinned_rule') await this.notifier.owner(alert);
       await this.pmAgent.writeEvidence(i.id, 'expiryWarning', {
         at: now.toISOString(),
         expiresAt: a.expiresAt,
@@ -1134,32 +1133,17 @@ export class DebriefConsoleViewService implements OnModuleInit {
       `SELECT id, status, text, change, evidence, "createdAt" FROM agent_lessons
         WHERE "agentKey" = 'debrief' AND status IN ('proposed','approved')`,
     );
-    let needsYouTeam = 0;
-    let needsYouPinned = 0;
-    const expiring: Array<{
-      id: string;
-      text: string;
-      days: number;
-      pinned: boolean;
-    }> = [];
+    let needsYou = 0;
+    const expiring: Array<{ id: string; text: string; days: number }> = [];
     for (const i of ideas) {
       const a = approvalState(i as any);
       if (!a || a.expired) continue;
-      const pinned = a.wait === 'pinned_rule';
-      if (pinned) needsYouPinned++;
-      else needsYouTeam++;
+      needsYou++;
       if (a.expiringSoon) {
-        expiring.push({
-          id: i.id,
-          text: i.text,
-          days: a.expiresInDays ?? 0,
-          pinned,
-        });
+        expiring.push({ id: i.id, text: i.text, days: a.expiresInDays ?? 0 });
       }
     }
-    const mayApprove = (pinned: boolean) =>
-      pinned ? viewer.can.approvePinnedRule : viewer.can.pmAgent;
-    const mine = expiring.filter((e) => mayApprove(e.pinned));
+    const mine = viewer.can.pmAgent ? expiring : [];
     if (mine.length) {
       banners.push({
         kind: 'approval_expiring',
@@ -1235,9 +1219,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
           ? escalated.length
           : null,
         // The "Needs you" count on the PM agent button, for this role.
-        pmAgentNeedsYou:
-          (viewer.can.pmAgent ? needsYouTeam : 0) +
-          (viewer.can.approvePinnedRule ? needsYouPinned : 0),
+        pmAgentNeedsYou: viewer.can.pmAgent ? needsYou : 0,
       },
       viewer: this.viewerPayload(viewer),
     };
@@ -1391,10 +1373,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
   ideaView(idea: Record<string, any>, viewer: DebriefViewer) {
     const a = approvalState(idea as any);
     const kind = changeKindOf(idea.change);
-    const pinned = idea.change?.ideaKind === 'pinned_rule';
-    const mayDecide = pinned
-      ? viewer.can.approvePinnedRule
-      : viewer.can.pmAgent;
+    const mayDecide = viewer.can.pmAgent;
     const expired = !!idea.evidence?.expiry;
     const st = ideaState(idea as any);
     const budgetOnly = !!idea.change?.budgetOnly;

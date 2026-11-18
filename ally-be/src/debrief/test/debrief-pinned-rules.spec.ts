@@ -10,10 +10,8 @@ import {
   PINNED_RULE_PROMPTS,
 } from '../util/debrief-console-view.util';
 import { PM_AGENT_EDITABLE_PROMPTS } from '../constants/debrief-release.constants';
-import {
-  pinnedRuleName,
-  textAfterChange,
-} from '../util/debrief-pinned-rules.util';
+import { pinnedRuleName } from '../util/debrief-pinned-rules.util';
+import { promptEditRefusal } from '../util/debrief-pm-agent-rules.util';
 
 /**
  * Pinned rules (2026-11-18): ordinary Skills Store prompts that only the named pinned editors can
@@ -27,6 +25,14 @@ describe('pinned rules: who can change them', () => {
     expect(PINNED_RULE_PROMPTS).toHaveLength(6);
     for (const code of PINNED_RULE_CODES) {
       expect(PM_AGENT_EDITABLE_PROMPTS.has(code)).toBe(false);
+    }
+  });
+
+  it('refuses any PM-agent edit of a pinned prompt, the live text notwithstanding', () => {
+    for (const code of PINNED_RULE_CODES) {
+      expect(
+        promptEditRefusal(code, 'a', 'b', 'a long enough text with a in it'),
+      ).not.toBeNull();
     }
   });
 
@@ -118,15 +124,9 @@ describe('Settings › Pinned rules (read-only)', () => {
 });
 
 describe('pinned-rule changes already in the history', () => {
-  it('names a rule without its explanation and highlights the replacement', () => {
+  it('names a rule without its explanation', () => {
     expect(pinnedRuleName(SAFETY)).toBe('Safety rules');
     expect(pinnedRuleName('debrief_quality_rubric')).toBe('Rubric');
     expect(pinnedRuleName('made_up')).toBe('made_up');
-    expect(textAfterChange('a b c', 'b', 'X').segments).toEqual([
-      { text: 'a ', changed: false },
-      { text: 'X', changed: true },
-      { text: ' c', changed: false },
-    ]);
-    expect(textAfterChange('a c', 'b', 'X')).toMatchObject({ stale: true });
   });
 });

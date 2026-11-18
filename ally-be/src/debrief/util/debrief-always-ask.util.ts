@@ -1,16 +1,15 @@
-import { DEBRIEF_PROMPT_CODES } from '../constants/debrief-release.constants';
 import { BUDGET_SETTING_KEYS } from './debrief-releases.util';
 
 /**
  * "Always asks a person" (Debrief v2, A1). Every other change runs the
- * ladder on its own (A3). Locked on, not settings: the Safety reader's text,
- * crisis lines and support copy, budget increases. Settings: low-confidence
+ * ladder on its own (A3). Locked on, not settings: crisis lines and support
+ * copy, budget increases. (The Safety reader's text and the risk cue definition are pinned
+ * prompts the PM agent can never edit, so no change to them can reach this list.) Settings: low-confidence
  * changes (`askLowConfidence`, on by default) and new models or providers
  * (`askModels`, off by default). Model changes within budget never wait
  * otherwise; an organisation's provider allowlist always applies (elsewhere).
  */
 export type AlwaysAskKind =
-  | 'safety_reader'
   | 'crisis_support'
   | 'budget_increase'
   | 'low_confidence'
@@ -23,15 +22,6 @@ export interface AlwaysAsk {
   /** Why it waits, in the owner's words (DebriefChange.waitsBecause). */
   waitsBecause: string;
 }
-
-/** The kinds in the owner's words (Settings › Autonomy). */
-export const ALWAYS_ASK_LABELS: Record<AlwaysAskKind, string> = {
-  safety_reader: 'Safety reader text',
-  crisis_support: 'Crisis lines and support copy',
-  budget_increase: 'Budget increases',
-  low_confidence: 'Changes the Debrief PM agent is not sure about',
-  new_model: 'New models or providers',
-};
 
 /** Budget settings a release carries: the Budgets page's and the session's. */
 const BUDGET_KEYS: readonly string[] = [
@@ -86,16 +76,6 @@ export function alwaysAsk(
   const change = idea.change ?? {};
   const evidence = idea.evidence ?? {};
   const codes = promptCodes(change, evidence);
-  if (
-    codes.includes(DEBRIEF_PROMPT_CODES.safetyReader) ||
-    codes.includes(DEBRIEF_PROMPT_CODES.riskCueDefinition)
-  ) {
-    return {
-      kind: 'safety_reader',
-      locked: true,
-      waitsBecause: 'It changes what the Safety reader looks for.',
-    };
-  }
   if (
     change.touches === 'crisis_lines' ||
     change.touches === 'support_copy' ||

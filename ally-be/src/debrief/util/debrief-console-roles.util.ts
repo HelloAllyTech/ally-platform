@@ -32,9 +32,8 @@ export const DEBRIEF_ACTIONS = {
   escalate: [TEAM, OWNER],
   /** Expert verdict and hard fails. */
   verdict: [ADVISOR],
-  /** PM agent: approve, promote, reject, try it, ask a question, run now; propose a pinned rule. */
+  /** PM agent: approve, promote, reject, try it, ask a question, run now. */
   pmAgent: [TEAM, OWNER],
-  approvePinnedRule: [ADVISOR, OWNER],
   testSets: [TEAM, OWNER],
   /** Roll back, change step models, make a release, shadow-run a session. */
   releases: [TEAM, OWNER],

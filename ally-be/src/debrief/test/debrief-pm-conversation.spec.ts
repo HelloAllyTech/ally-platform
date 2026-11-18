@@ -2,13 +2,11 @@ import { ForbiddenException } from '@nestjs/common';
 import axios from 'axios';
 import {
   DebriefPmConversationService,
-  PM_CONVERSATION_ADVISOR_THREAD,
   PM_CONVERSATION_THREAD,
   QUOTE_CHECK_REPLY,
 } from '../service/debrief-pm-conversation.service';
 import { debriefCan } from '../util/debrief-console-roles.util';
 import {
-  conversationAccess,
   isExplicitYes,
   pmReplyUnmatched,
   requiredAction,
@@ -18,9 +16,10 @@ import {
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 
 const TEAM = [PERMISSIONS.SYSTEM_ACCESS];
-const ADVISOR = [PERMISSIONS.REVIEW_DEBRIEFS];
+const ADVISOR = [PERMISSIONS.REVIEW_DEBRIEFS]; // the clinical advisor: reviews only
 const OWNER = [PERMISSIONS.MANAGE_DEBRIEF_SETTINGS];
 const PINNED = '11111111-1111-1111-1111-111111111111';
+const OLD_PINNED = '77777777-7777-7777-7777-777777777777';
 const PROMPT = '22222222-2222-2222-2222-222222222222';
 const BUDGET = '33333333-3333-3333-3333-333333333333';
 const LIVE = '44444444-4444-4444-4444-444444444444';
@@ -37,13 +36,24 @@ const viewer = (userId: number, perms: string[]) => ({
 });
 
 const ideas: Record<string, Record<string, any>> = {
+  // An ordinary change the team decides (it was a pinned-rule item before pinned rules moved
+  // to the Skills Store).
   [PINNED]: {
     id: PINNED,
-    text: 'Safety rules: name the moment',
+    text: 'Writer: name the moment',
     status: 'proposed',
+    change: { ideaKind: 'prompt_edit', promptCode: 'debrief_writer_system' },
+    evidence: {},
+  },
+  // A pinned-rule item from the old approval flow: history only, never decided here.
+  [OLD_PINNED]: {
+    id: OLD_PINNED,
+    text: 'Safety rules: name the moment',
+    status: 'approved',
     change: {
       ideaKind: 'pinned_rule',
       promptCode: 'debrief_safety_reader_system',
+      firstVersion: true,
     },
     evidence: {},
   },
@@ -186,7 +196,6 @@ function build(opts: {
     stop: jest.fn(async () => ({})),
   };
   const notifier = {
-    pinnedRuleDeciders: jest.fn(async () => 2),
     owner: jest.fn(async () => 1),
   };
   const svc = new DebriefPmConversationService(
@@ -265,13 +274,14 @@ describe('Debrief PM agent conversation: rules', () => {
   });
 
   it('keeps today’s permissions', () => {
-    expect(requiredAction(ideas[PINNED], true)).toBe('approvePinnedRule');
-    expect(requiredAction(ideas[BUDGET], true)).toBe('ownerSettings');
-    expect(requiredAction(ideas[PROMPT], true)).toBe('pmAgent');
-    expect(conversationAccess(debriefCan(TEAM))).toBe('all');
-    expect(conversationAccess(debriefCan(OWNER))).toBe('all');
-    expect(conversationAccess(debriefCan(ADVISOR))).toBe('pinned_rules');
-    expect(conversationAccess(debriefCan([]))).toBe('none');
+    expect(requiredAction(ideas[BUDGET])).toBe('ownerSettings');
+    expect(requiredAction(ideas[PROMPT])).toBe('pmAgent');
+    expect(requiredAction(ideas[PINNED])).toBe('pmAgent');
+    // The Ally team and the owner use the conversation; the clinical advisor does not.
+    expect(debriefCan(TEAM).pmAgent).toBe(true);
+    expect(debriefCan(OWNER).pmAgent).toBe(true);
+    expect(debriefCan(ADVISOR).pmAgent).toBe(false);
+    expect(debriefCan([]).pmAgent).toBe(false);
   });
 
   it('every message names its author', () => {
@@ -297,7 +307,7 @@ describe('Debrief PM agent conversation: rules', () => {
 });
 
 describe('Debrief PM agent conversation: who may read and post', () => {
-  it('the clinical advisor posts only about a pinned-rule change', async () => {
+  it('the clinical advisor cannot post to the PM agent, about a change or not', async () => {
     const { svc } = build({
       person: { authorUserId: 9, text: 'hi' },
       perms: { 9: ADVISOR },
@@ -310,20 +320,20 @@ describe('Debrief PM agent conversation: who may read and post', () => {
     ).rejects.toThrow(ForbiddenException);
     await expect(
       svc.post(viewer(9, ADVISOR), { text: 'What changed?' }),
-    ).rejects.toThrow(/pinned-rule changes only/);
+    ).rejects.toThrow(/cannot talk to the Debrief PM agent/);
   });
 
-  it('the clinical advisor reads only messages about pinned-rule changes', async () => {
-    const { svc, qbCalls } = build({
+  it('the clinical advisor cannot read the conversation; the team reads it, narrowed by change when asked', async () => {
+    const { svc } = build({
       person: { authorUserId: 9, text: 'hi' },
       perms: { 9: ADVISOR },
     });
-    await svc.list(viewer(9, ADVISOR), {});
-    expect(qbCalls).toContain(`m.about->>'id' IN (:...ids)`);
+    await expect(svc.list(viewer(9, ADVISOR), {})).rejects.toThrow(
+      ForbiddenException,
+    );
     const team = build({ person: { authorUserId: 1, text: 'hi' }, perms: {} });
     await team.svc.list(viewer(1, TEAM), { about: PINNED });
     expect(team.qbCalls).toContain(`m.about->>'id' = :about`);
-    expect(team.qbCalls).not.toContain(`m.about->>'id' IN (:...ids)`);
   });
 
   it('someone without the console permissions cannot read it', async () => {
@@ -346,7 +356,7 @@ describe('Debrief PM agent conversation: approvals pause for a yes, from someone
   it('approving without the person’s yes in the token does nothing', async () => {
     const t = build({
       person: { authorUserId: 9, text: 'Approve it' },
-      perms: { 9: ADVISOR },
+      perms: { 9: TEAM },
     });
     const out = await t.svc.callTool('change_approve', CLAIMS, {
       idea_id: PINNED,
@@ -388,15 +398,15 @@ describe('Debrief PM agent conversation: approvals pause for a yes, from someone
     ).toBe(true);
   });
 
-  it('a pinned rule is never decided here: it is changed in the Skills Store by a pinned editor', async () => {
+  it('an old pinned-rule item is never decided here: pinned rules are changed in the Skills Store by a pinned editor', async () => {
     const t = build({
-      person: { authorUserId: 9, text: 'Yes, go ahead.' },
-      perms: { 9: ADVISOR },
+      person: { authorUserId: 1, text: 'Yes, go ahead.' },
+      perms: { 1: TEAM },
     });
     const out = await t.svc.callTool(
       'change_approve',
-      approved('change_approve', PINNED),
-      { idea_id: PINNED },
+      approved('change_approve', OLD_PINNED),
+      { idea_id: OLD_PINNED },
     );
     expect(out.refused).toMatch(
       /changed in the Skills Store by a pinned editor/,
@@ -435,7 +445,7 @@ describe('Debrief PM agent conversation: approvals pause for a yes, from someone
       perms: { 9: ADVISOR },
     });
     const out = await t.svc.callTool('change_undo', CLAIMS, { idea_id: LIVE });
-    expect(out.refused).toMatch(/pinned-rule changes only/);
+    expect(out.refused).toMatch(/only the Ally team and the owner use/);
     expect(t.releases.makeGa).not.toHaveBeenCalled();
   });
 });
@@ -448,17 +458,16 @@ describe('Debrief PM agent conversation: a turn, paused and resumed (ally-ai hum
         tool,
         args: {
           idea_id: ideaId,
-          plan: 'Approve the Safety rules change.',
+          plan: 'Approve the Writer change.',
           ...extra,
         },
-        plan: 'Approve the Safety rules change.',
+        plan: 'Approve the Writer change.',
       },
     ],
   });
   const reply = (over: Record<string, any> = {}) => ({
     status: 'finished',
-    reply:
-      'Approve the Safety rules change. Shall I go ahead? Reply yes to confirm.',
+    reply: 'Approve the Writer change. Shall I go ahead? Reply yes to confirm.',
     pending: null,
     tool_texts: [],
     estimated_cost_usd: 0.01,
@@ -473,40 +482,40 @@ describe('Debrief PM agent conversation: a turn, paused and resumed (ally-ai hum
         tool: 'change_approve',
         ideaId: PINNED,
         args: {},
-        label: 'Approve “Safety rules: name the moment”',
+        label: 'Approve “Writer: name the moment”',
       },
     ],
-    text: 'Approve the Safety rules change.',
-    label: 'Approve “Safety rules: name the moment”',
+    text: 'Approve the Writer change.',
+    label: 'Approve “Writer: name the moment”',
     askedUserId: 9,
     at: new Date().toISOString(),
     usedAt: null,
     ...over,
   });
 
-  it('the advisor asks: the pause is kept with the plan, nothing acted, on the advisor’s own thread', async () => {
+  it('a team member asks: the pause is kept with the plan, nothing acted, on the conversation thread', async () => {
     const t = build({
       person: { authorUserId: 9, text: 'Approve it' },
-      perms: { 9: ADVISOR },
+      perms: { 9: TEAM },
       replies: [reply({ pending: pending() })],
     });
-    const { messages } = await t.svc.post(viewer(9, ADVISOR), {
+    const { messages } = await t.svc.post(viewer(9, TEAM), {
       text: 'Approve it',
       about: { kind: 'change', id: PINNED, label: 'Safety' },
     });
     const body = t.posts()[0];
-    expect(body.thread_id).toBe(PM_CONVERSATION_ADVISOR_THREAD);
+    expect(body.thread_id).toBe(PM_CONVERSATION_THREAD);
     expect(body.resume).toBeNull();
     expect(body).not.toHaveProperty('history');
     expect(body.tools).not.toContain('confirm_plan');
     expect(messages[1].action).toEqual({
-      label: 'Waiting for your yes: approve “Safety rules: name the moment”',
+      label: 'Waiting for your yes: approve “Writer: name the moment”',
       status: 'awaiting_yes',
     });
     const saved = t.saved().find((m) => m.who === 'agent');
     expect(saved.plan).toMatchObject({
       id: 'int-1',
-      threadId: PM_CONVERSATION_ADVISOR_THREAD,
+      threadId: PM_CONVERSATION_THREAD,
       askedUserId: 9,
       actions: [{ tool: 'change_approve', ideaId: PINNED }],
     });
@@ -515,11 +524,11 @@ describe('Debrief PM agent conversation: a turn, paused and resumed (ally-ai hum
   it('the same allowed person’s clear yes resumes with approve and a token for them', async () => {
     const t = build({
       person: { authorUserId: 9, text: 'Yes, go ahead.' },
-      perms: { 9: ADVISOR },
-      paused: paused({ threadId: PM_CONVERSATION_ADVISOR_THREAD }),
-      replies: [reply({ reply: 'Approved the Safety rules change.' })],
+      perms: { 9: TEAM },
+      paused: paused(),
+      replies: [reply({ reply: 'Approved the Writer change.' })],
     });
-    await t.svc.post(viewer(9, ADVISOR), {
+    await t.svc.post(viewer(9, TEAM), {
       text: 'Yes, go ahead.',
       about: { kind: 'change', id: PINNED, label: 'Safety' },
     });
@@ -552,11 +561,11 @@ describe('Debrief PM agent conversation: a turn, paused and resumed (ally-ai hum
     async (_label, userId, text, why) => {
       const t = build({
         person: { authorUserId: userId, text },
-        perms: { 9: ADVISOR, 7: OWNER },
+        perms: { 9: TEAM, 7: OWNER },
         paused: paused(),
         replies: [reply({ reply: 'Nothing was done.' })],
       });
-      await t.svc.post(viewer(userId, userId === 9 ? ADVISOR : OWNER), {
+      await t.svc.post(viewer(userId, userId === 9 ? TEAM : OWNER), {
         text,
         about: { kind: 'change', id: PINNED, label: 'Safety' },
       });
@@ -575,58 +584,68 @@ describe('Debrief PM agent conversation: a turn, paused and resumed (ally-ai hum
   it('a lapsed pause is turned down', async () => {
     const t = build({
       person: { authorUserId: 9, text: 'yes' },
-      perms: { 9: ADVISOR },
+      perms: { 9: TEAM },
       paused: paused({
         at: new Date(Date.now() - 25 * 3600_000).toISOString(),
       }),
       replies: [reply({ reply: 'That lapsed.' })],
     });
-    await t.svc.post(viewer(9, ADVISOR), {
+    await t.svc.post(viewer(9, TEAM), {
       text: 'yes',
       about: { kind: 'change', id: PINNED, label: 'Safety' },
     });
     expect(t.posts()[0].resume.message).toMatch(/lapsed/);
   });
 
-  it('a yes from someone who lost the permission is turned down and the deciders asked', async () => {
+  it('a yes from someone without the permission (a budget is the owner’s) is turned down and the owner asked', async () => {
     const t = build({
       person: { authorUserId: 1, text: 'yes' },
       perms: { 1: TEAM },
-      paused: paused({ askedUserId: 1 }),
-      replies: [
-        reply({ reply: 'Only the clinical advisor or the owner can.' }),
-      ],
+      paused: paused({
+        askedUserId: 1,
+        actions: [
+          {
+            tool: 'change_approve',
+            ideaId: BUDGET,
+            args: {},
+            label: 'Approve it',
+          },
+        ],
+      }),
+      replies: [reply({ reply: 'Only the owner can.' })],
     });
     await t.svc.post(viewer(1, TEAM), { text: 'yes' });
     const { resume } = t.posts()[0];
     expect(resume.decision).toBe('reject');
-    expect(resume.message).toMatch(/clinical advisor or the owner/);
-    expect(t.notifier.pinnedRuleDeciders).toHaveBeenCalled();
+    expect(resume.message).toMatch(/the owner/);
+    expect(t.notifier.owner).toHaveBeenCalled();
   });
 
   it('a pause the person could never say yes to is turned down in the same turn', async () => {
     const t = build({
-      person: { authorUserId: 1, text: 'Approve the safety change' },
+      person: { authorUserId: 1, text: 'Approve the budget change' },
       perms: { 1: TEAM },
       replies: [
-        reply({ pending: pending(), estimated_cost_usd: 0.02 }),
         reply({
-          reply:
-            "Only the clinical advisor or the owner can approve this; I've asked them.",
+          pending: pending('change_approve', BUDGET),
+          estimated_cost_usd: 0.02,
+        }),
+        reply({
+          reply: "Only the owner can approve this; I've asked them.",
           estimated_cost_usd: 0.01,
         }),
       ],
     });
     const { messages } = await t.svc.post(viewer(1, TEAM), {
-      text: 'Approve the safety change',
+      text: 'Approve the budget change',
     });
     const [, second] = t.posts();
     expect(second.resume).toMatchObject({
       interrupt_id: 'int-1',
       decision: 'reject',
     });
-    expect(second.resume.message).toMatch(/clinical advisor or the owner/);
-    expect(t.notifier.pinnedRuleDeciders).toHaveBeenCalled();
+    expect(second.resume.message).toMatch(/the owner/);
+    expect(t.notifier.owner).toHaveBeenCalled();
     expect(messages[1].action).toMatchObject({ status: 'failed' });
     const saved = t.saved().find((m) => m.who === 'agent');
     expect(saved.plan).toBeNull();
@@ -717,7 +736,7 @@ describe('Debrief PM agent conversation: the quote check', () => {
   it('a pause whose reply fails the check is not kept', async () => {
     const t = build({
       person: { authorUserId: 9, text: 'Approve it' },
-      perms: { 9: ADVISOR },
+      perms: { 9: TEAM },
       replies: [
         {
           status: 'finished',
@@ -733,7 +752,7 @@ describe('Debrief PM agent conversation: the quote check', () => {
         },
       ],
     });
-    const { messages } = await t.svc.post(viewer(9, ADVISOR), {
+    const { messages } = await t.svc.post(viewer(9, TEAM), {
       text: 'Approve it',
       about: { kind: 'change', id: PINNED, label: 'Safety' },
     });
@@ -825,7 +844,7 @@ describe('Debrief PM agent conversation: actions that act at once', () => {
     });
     expect(read).toMatchObject({
       id: PINNED,
-      title: 'Safety rules: name the moment',
+      title: 'Writer: name the moment',
     });
   });
 });

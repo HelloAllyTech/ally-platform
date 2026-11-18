@@ -97,7 +97,8 @@ describe('approvals expire after 14 days as "no decision"', () => {
     const idea = {
       status: 'proposed',
       createdAt: '2026-11-01T00:00:00Z',
-      change: { ideaKind: 'pinned_rule' },
+      // A budget change is always-ask, so it is one that can run out.
+      change: { ideaKind: 'release', budgetOnly: true },
       evidence: {},
     };
     expect(approvalState(idea, now)!.expired).toBe(true);

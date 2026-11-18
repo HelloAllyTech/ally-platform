@@ -98,7 +98,6 @@ export const APPROVAL_EXPIRY_DAYS = 14;
 export const APPROVAL_WARN_DAYS = 3;
 
 export type ApprovalWait =
-  | 'pinned_rule'
   | 'handoff'
   | 'start_quick_test'
   | 'promote_budget'
@@ -133,11 +132,8 @@ export function awaitingDecision(idea: {
     if (!e.screen)
       return { wait: 'start_quick_test', since: iso(idea.createdAt) };
   }
-  if (kind === 'pinned_rule') {
-    return idea.status === 'proposed'
-      ? { wait: 'pinned_rule', since: iso(idea.createdAt) }
-      : null;
-  }
+  // A pinned-rule item is history now: nothing waits on it.
+  if (kind === 'pinned_rule') return null;
   if (e.canary?.status === 'passed') {
     return { wait: 'promote', since: iso(e.canary.checkedAt) };
   }
@@ -159,21 +155,21 @@ export function awaitingDecision(idea: {
 
 /**
  * Does this wait run out after APPROVAL_EXPIRY_DAYS (v2 A7)? Only for the
- * always-ask kinds: a pinned-rule proposal, a budget change, or a change the
+ * always-ask kinds: a budget change, or a change the
  * ladder stopped for a person (`evidence.ask`, A1).
  */
 export function expiresWhileWaiting(
   idea: Parameters<typeof awaitingDecision>[0],
   wait: ApprovalWait,
 ): boolean {
-  if (wait === 'pinned_rule' || wait === 'promote_budget') return true;
+  if (wait === 'promote_budget') return true;
   return !!idea.evidence?.ask && !idea.evidence?.approval;
 }
 
 export interface ApprovalState {
   wait: ApprovalWait;
   since: string;
-  /** Null when it never expires: a pinned rule's first version waits until approved. */
+  /** Null when it never expires. */
   expiresAt: string | null;
   /** Whole days left, rounded up; 0 once expired; null when it never expires. */
   expiresInDays: number | null;
@@ -188,12 +184,10 @@ export function approvalState(
 ): ApprovalState | null {
   const w = awaitingDecision(idea);
   if (!w) return null;
-  // A pinned rule's first version: a base version must exist, so it neither
-  // expires nor can be rejected; it waits until it is approved. Debrief v2
-  // (A7): only always-ask changes expire (pinned rules, budgets, and changes
+  // Debrief v2 (A7): only always-ask changes expire (budgets, and changes
   // the ladder stopped for, `evidence.ask`); nothing else waits on a person,
   // so nothing else runs out.
-  if (idea.change?.firstVersion || !expiresWhileWaiting(idea, w.wait)) {
+  if (!expiresWhileWaiting(idea, w.wait)) {
     return {
       ...w,
       expiresAt: null,

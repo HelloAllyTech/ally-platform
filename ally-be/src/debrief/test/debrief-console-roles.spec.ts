@@ -175,7 +175,6 @@ describe('Debrief console role gating', () => {
       comment: true,
       heldDebrief: true,
       verdict: false,
-      approvePinnedRule: false,
       switchOrgOn: false,
       ownerSettings: false,
       emergencyStop: true,
@@ -185,8 +184,9 @@ describe('Debrief console role gating', () => {
       flagDecision: true,
       heldDebrief: false,
       verdict: true,
-      approvePinnedRule: true,
       pmAgent: false,
+      releases: false,
+      ownerSettings: false,
     });
     // A team member granted review:admin:debriefs by hand: escalations are
     // addressed only to the named advisor.

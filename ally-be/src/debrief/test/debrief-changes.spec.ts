@@ -256,9 +256,9 @@ describe('fields the v2 console needs', () => {
   });
 });
 
-describe('a rule sign-off reads in plain words (review 2026-11-16)', () => {
+describe('an old pinned-rule sign-off still reads as history', () => {
   const signOff = idea({
-    status: 'proposed',
+    status: 'approved',
     createdAt: '2026-11-12T05:00:00Z',
     change: {
       ideaKind: 'pinned_rule',
@@ -269,16 +269,22 @@ describe('a rule sign-off reads in plain words (review 2026-11-16)', () => {
     evidence: {},
   });
 
-  it('is titled as a sign-off, says once what the rule does, and has no empty analysis', () => {
+  it('keeps its title, is not waiting for anyone, and has no empty analysis', () => {
     const c = toDebriefChange(signOff, ctx);
     expect(c.title).toBe(
       "Sign off the Judge's instructions (in use since 12 Nov)",
     );
-    expect(c.waitsBecause).toBe(
-      'It tells the judge how to score every debrief. It is already in use, but the clinical advisor or the owner has not checked it yet.',
-    );
+    expect(c.state).toBe('live');
+    expect(c.waitsBecause).toBeNull();
     expect(c.basedOn).toBe('');
     expect(c.kindKey).toBe('pinned_rule');
+    expect(c).not.toHaveProperty('rule');
+  });
+
+  it('never waits, even if one were left open', () => {
+    const open = idea({ ...signOff, status: 'proposed' });
+    expect(approvalState(open as never)).toBeNull();
+    expect(toDebriefChange(open, ctx).state).not.toBe('waits');
   });
 });
 

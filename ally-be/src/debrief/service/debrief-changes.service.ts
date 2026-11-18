@@ -1,8 +1,4 @@
 import {
-  pinnedRuleName,
-  textAfterChange,
-} from '../util/debrief-pinned-rules.util';
-import {
   ConflictException,
   Injectable,
   OnModuleInit,
@@ -147,48 +143,15 @@ export class DebriefChangesService implements OnModuleInit {
   async get(id: string): Promise<DebriefChange> {
     const idea = (await this.pmAgent.getIdea(id)) as IdeaRow;
     const change = toDebriefChange(idea, await this.context());
-    if (change.kindKey === 'pinned_rule') change.rule = await this.ruleOf(idea);
     return change;
-  }
-
-  /**
-   * A pinned rule in full: the version a sign-off is about, or the rule in
-   * force with the change applied and the changed passage marked. Never throws.
-   */
-  private async ruleOf(idea: IdeaRow): Promise<DebriefChange['rule']> {
-    const code = idea.change?.promptCode;
-    if (typeof code !== 'string') return null;
-    try {
-      const version = idea.change?.firstVersion
-        ? Number(idea.change?.version)
-        : null;
-      const [v] = await this.dataSource.query(
-        `SELECT pv.prompt FROM prompts p
-           JOIN prompts_versions pv ON pv."promptId" = p.id
-          WHERE p."promptCode" = $1
-            AND pv.version = COALESCE($2::int, p."currentVersion")
-          LIMIT 1`,
-        [code, Number.isInteger(version) ? version : null],
-      );
-      if (!v?.prompt) return null;
-      const { segments, stale } = textAfterChange(
-        String(v.prompt),
-        idea.change?.find,
-        idea.change?.replace,
-      );
-      return { name: pinnedRuleName(code), segments, stale };
-    } catch {
-      return null;
-    }
   }
 
   /** `GET home` (F1): the headline, what needs a person, this week. */
   async home(
     now = new Date(),
     opts: {
-      pinnedRulesOnly?: boolean;
       /** What this viewer may decide: only those changes are "Needs you". */
-      can?: { pinnedRules: boolean; budgets: boolean; changes: boolean };
+      can?: { budgets: boolean; changes: boolean };
     } = {},
   ): Promise<DebriefHomeV2> {
     const [score, ideas, ctx] = await Promise.all([
@@ -202,13 +165,8 @@ export class DebriefChangesService implements OnModuleInit {
       ({ idea, c }) =>
         c.state === 'waits' &&
         !['needs_code', 'defect'].includes(idea.change?.ideaKind) &&
-        (!opts.pinnedRulesOnly || c.kindKey === 'pinned_rule') &&
         (!opts.can ||
-          (c.kindKey === 'pinned_rule'
-            ? opts.can.pinnedRules
-            : c.kindKey === 'budget'
-              ? opts.can.budgets
-              : opts.can.changes)),
+          (c.kindKey === 'budget' ? opts.can.budgets : opts.can.changes)),
     );
     const weekAgo = now.getTime() - 7 * DAY_MS;
     const within = (v: unknown) =>

@@ -826,7 +826,9 @@ export class DebriefPmAgentService implements OnModuleInit {
       throw new BadRequestException(
         kind === 'registry_agent'
           ? 'registry agents wait for the agent registry (spec step 7)'
-          : 'this idea has no drafted change yet',
+          : kind === 'pinned_rule'
+            ? 'a pinned rule is changed in the Skills Store by a pinned editor, not here'
+            : 'this idea has no drafted change yet',
       );
     }
     // R2-18 (FR-56): the PM agent's own prompt edit reaches learners only

@@ -104,7 +104,6 @@ const CAN_ALL = {
   verdict: false,
   score: false,
   pmAgent: true,
-  approvePinnedRule: false,
   testSets: true,
   releases: true,
   switchOrgOn: false,
@@ -130,7 +129,6 @@ const ADVISOR = {
     flagDecision: true,
     verdict: true,
     score: true,
-    approvePinnedRule: true,
   },
   scorer: true,
 };

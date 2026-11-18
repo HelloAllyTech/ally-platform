@@ -55,7 +55,6 @@ const CAN = (on: boolean) =>
       "verdict",
       "score",
       "pmAgent",
-      "approvePinnedRule",
       "testSets",
       "releases",
       "switchOrgOn",
@@ -69,7 +68,7 @@ const TEAM = {
 };
 const ADVISOR = {
   roles: { allyTeam: false, clinicalAdvisor: true, owner: false, receivesEscalations: true },
-  can: { ...CAN(false), comment: true, verdict: true, approvePinnedRule: true },
+  can: { ...CAN(false), comment: true, verdict: true },
 };
 
 const item = (over: Record<string, unknown> = {}) => ({
@@ -313,22 +312,22 @@ describe("the clinical advisor's home", () => {
     h.sessions.mockReturnValue(page(ITEMS, ADVISOR));
   });
 
-  it("leads with their decision; no Changes, Analytics, Settings, This week or Debrief PM agent", () => {
+  it("is the review list: no headline, Needs you, Changes, Analytics, Settings, This week or Debrief PM agent", () => {
     renderAt();
-    expect(screen.getByTestId("home-headline")).toHaveTextContent("1 change needs your decision.");
-    expect(screen.getByTestId("home-needs-you")).toHaveTextContent(
-      "Needs you: a change only you or the owner can approve",
-    );
+    expect(screen.queryByTestId("home-headline")).toBeNull();
+    expect(screen.queryByTestId("home-needs-you")).toBeNull();
     expect(screen.queryByTestId("changes-button")).toBeNull();
     expect(screen.queryByTestId("analytics-button")).toBeNull();
     expect(screen.queryByTestId("home-more")).toBeNull();
     expect(screen.queryByTestId("home-this-week")).toBeNull();
     expect(screen.queryByTestId("home-pm-accordion")).toBeNull();
+    expect(screen.getAllByTestId("session-card").length).toBeGreaterThan(0);
   });
 
-  it("a deep link opens their change on the Debrief PM agent page", () => {
+  it("an old link to a change goes nowhere for them: they have no changes", () => {
     renderAt("/debriefs?change=c-safety");
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
+    // They stay on Home: the PM agent page (which shows where it is) never opens.
+    expect(screen.queryByTestId("where")).toBeNull();
   });
 });
 

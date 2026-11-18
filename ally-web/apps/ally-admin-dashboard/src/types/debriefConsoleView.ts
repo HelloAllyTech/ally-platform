@@ -26,7 +26,6 @@ export type DebriefCanAction =
   | "escalate"
   | "verdict"
   | "pmAgent"
-  | "approvePinnedRule"
   | "testSets"
   | "releases"
   | "switchOrgOn"

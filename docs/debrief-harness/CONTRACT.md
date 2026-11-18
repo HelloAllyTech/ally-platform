@@ -860,9 +860,7 @@ V2_AUTONOMY C1–C5. One person's message in the console's shared thread, answer
   reviewer (§7d), both with read-only gateway tools (`SUBAGENT_READ_TOOLS`) and every file write denied;
 - **guard**: `PmRunGuard` (model then backup with the circuit breaker, the turn's budget, `llm_usage` as
   `debrief_improver`, step records); LangSmith off;
-- **thread**: the Postgres checkpointer, thread id `debrief-pm-conversation` (the console's shared thread) or
-  `debrief-pm-conversation:pinned-rules` (the clinical advisor's turns, so an advisor's answer never draws on the
-  rest of the thread, C4). Each turn continues from the checkpoint; ally-be sends only the new message.
+- **thread**: the Postgres checkpointer, thread id `debrief-pm-conversation` (the console's one shared thread). Each turn continues from the checkpoint; ally-be sends only the new message.
   `debrief_pm_messages` stays the record the console reads. `503` when the checkpoint database could not be opened.
 
 Instructions: Skills Store `ally_ai_debrief_pm_conversation_system` (default
@@ -871,7 +869,7 @@ Instructions: Skills Store `ally_ai_debrief_pm_conversation_system` (default
 ```jsonc
 {
   "turn_id": "uuid",                 // the person's message id; also the agent token's agentRunId
-  "thread_id": "debrief-pm-conversation" | "debrief-pm-conversation:pinned-rules",
+  "thread_id": "debrief-pm-conversation",
   "model": "gemini-2.5-pro", "backup_model": "gemini-2.5-flash", "prices": { ... },
   "budget_usd": 0.25,                // min(pmAgentRunCapUsd, 0.25, learning budget left)
   "message": "...", "author": "Asha",
