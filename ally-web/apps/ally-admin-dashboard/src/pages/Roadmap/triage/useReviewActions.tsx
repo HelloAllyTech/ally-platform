@@ -30,7 +30,7 @@ export const UndoToast: React.FC<{
   const copy = en.roadmapV2.review;
   return (
     <div
-      className="relative flex w-[356px] max-w-[calc(100vw-2rem)] items-center gap-3 overflow-hidden rounded-md bg-neutral-800 px-4 py-3 text-sm text-white shadow-lg"
+      className="relative flex w-[356px] max-w-[calc(100vw-2rem)] items-center gap-3 overflow-hidden bg-neutral-800 px-4 py-3 text-sm text-white shadow-lg"
       role="status"
       data-testid="roadmap-undo-toast"
     >

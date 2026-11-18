@@ -15,6 +15,7 @@ import { en } from "@constants";
 import type { RoadmapItemRow, RoadmapItemsResponse } from "@types";
 
 import { BottomSheet } from "./BottomSheet";
+import { RoadmapIconButton } from "./RoadmapIconButton";
 import { motionTransition, popVariants, useReducedMotionPreference } from "../../../motion";
 import {
   FLAG_FILTER_KEYS,
@@ -350,14 +351,9 @@ export const FilterChips: React.FC<{
               className="inline-flex items-center gap-1 rounded-[20px] border border-border-light py-0.5 pl-2.5 pr-1 text-xs text-typography-primary"
             >
               {text}
-              <button
-                type="button"
-                aria-label={f.removeChip(text)}
-                onClick={() => onRemove(chip)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-neutral-100"
-              >
+              <RoadmapIconButton label={f.removeChip(text)} onClick={() => onRemove(chip)}>
                 <Close size={12} aria-hidden />
-              </button>
+              </RoadmapIconButton>
             </motion.li>
           );
         })}

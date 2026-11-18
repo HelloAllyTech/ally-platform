@@ -9,6 +9,7 @@ import { useSearchRoadmapQuery } from "@api";
 import { ROUTES, en } from "@constants";
 import type { RoadmapItemRow } from "@types";
 
+import { RoadmapIconButton } from "./RoadmapIconButton";
 import { dialogVariants, motionTransition, useReducedMotionPreference } from "../../../motion";
 import { useDebouncedValue } from "../../ProductRoadmap/useDebouncedValue";
 import { stageWord } from "../utils/copy";
@@ -154,14 +155,9 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
                 onChange={event => setQuery(event.target.value)}
                 className="h-12 min-w-0 flex-1 bg-transparent text-base outline-none"
               />
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label={copy.close}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-neutral-100"
-              >
+              <RoadmapIconButton label={copy.close} onClick={onClose} large>
                 <Close size={18} aria-hidden />
-              </button>
+              </RoadmapIconButton>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto py-2">
               <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-typography-secondary">

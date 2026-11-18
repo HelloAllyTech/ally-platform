@@ -18,6 +18,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { motion } from "framer-motion";
 
+import { Tag } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
@@ -115,28 +116,26 @@ export const QueueTabs: React.FC<QueueTabsProps> = ({
               }
             : undefined
         }
-        className={`relative inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-sm ${
-          selected ? "text-white" : "text-typography-primary hover:bg-neutral-100"
+        className={`relative inline-flex min-h-10 items-center gap-1.5 px-4 text-sm ${
+          selected
+            ? "font-semibold text-typography-primary"
+            : "text-typography-secondary hover:bg-neutral-100 hover:text-typography-primary"
         }`}
       >
         {selected && (
           <motion.span
-            layoutId={reduced ? undefined : "roadmap-view-pill"}
-            className="absolute inset-0 rounded-full bg-primary-600"
+            layoutId={reduced ? undefined : "roadmap-view-underline"}
+            className="absolute inset-x-0 bottom-0 h-0.5 bg-primary-500"
             transition={motionTransition("moderate", "productive", reduced)}
             aria-hidden
           />
         )}
-        <span className="relative inline-flex items-center gap-1">
+        <span className="relative inline-flex items-center gap-1.5">
           {tab.label}
           {tab.badge ? (
-            <span
-              className={`ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold ${
-                selected ? "bg-white text-primary-700" : "bg-primary-600 text-white"
-              }`}
-            >
+            <Tag type={selected ? "blue" : "gray"} size="sm" className="!m-0">
               {tab.badge}
-            </span>
+            </Tag>
           ) : null}
         </span>
       </button>
@@ -159,7 +158,7 @@ export const QueueTabs: React.FC<QueueTabsProps> = ({
     <div className={scroll ? "roadmap-chip-scroll relative min-w-0 flex-1" : "min-w-0"}>
       <ul
         aria-label={copy.viewsLabel}
-        className={`m-0 flex list-none items-center gap-1 p-0 ${
+        className={`m-0 flex list-none items-center gap-0 border-b border-border-light p-0 ${
           scroll
             ? "overflow-x-auto [-webkit-mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-24px),transparent)] [scrollbar-width:none]"
             : "flex-wrap"

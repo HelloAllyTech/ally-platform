@@ -56,7 +56,7 @@ export const RoadmapRoleRadio: React.FC<RoadmapRoleRadioProps> = ({ entry, isSel
       <div
         role="radiogroup"
         aria-label={copy.title}
-        className="flex flex-col divide-y divide-border-light rounded-md border border-border-light"
+        className="flex flex-col divide-y divide-border-light border border-border-light"
       >
         {ROADMAP_ROLE_OPTIONS.map(option => {
           const id = `roadmap-role-${entry.userId}-${option}`;

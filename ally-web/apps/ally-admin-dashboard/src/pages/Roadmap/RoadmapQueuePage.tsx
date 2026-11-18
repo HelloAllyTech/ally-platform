@@ -33,6 +33,7 @@ import { QueueSortSelect } from "./components/QueueSortSelect";
 import { QueueTab, QueueTabs } from "./components/QueueTabs";
 import { QuickOpen } from "./components/QuickOpen";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
+import { RoadmapIconButton } from "./components/RoadmapIconButton";
 import { RoadmapTopNav } from "./components/RoadmapTopNav";
 import { SavedViewControls } from "./components/SavedViewControls";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
@@ -368,14 +369,9 @@ export const RoadmapQueuePage: React.FC = () => {
           >
             {copy.mobile.filterSort}
           </button>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            aria-label={copy.refresh}
-            className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded hover:bg-neutral-100"
-          >
+          <RoadmapIconButton label={copy.refresh} onClick={() => void refresh()} large>
             <Refresh size={18} aria-hidden />
-          </button>
+          </RoadmapIconButton>
         </div>
       )}
       {(filtered || canSaveAsView || saved.active) && (

@@ -59,7 +59,7 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
             <span className="relative">
               <List size={20} aria-hidden />
               {forYouCount ? (
-                <span className="absolute -right-3 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-[10px] text-white">
+                <span className="absolute -right-3 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1 text-xs text-white">
                   {forYouCount}
                 </span>
               ) : null}

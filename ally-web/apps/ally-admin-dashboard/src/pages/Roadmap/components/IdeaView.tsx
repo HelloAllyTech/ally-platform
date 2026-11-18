@@ -39,6 +39,7 @@ import {
 import { IdeaPanelContent } from "./IdeaPanels";
 import { BANNER_TONE, HeaderTracker, OpportunityHeader } from "./OpportunityHeader";
 import { PeopleChips } from "./PeopleChips";
+import { RoadmapIconButton } from "./RoadmapIconButton";
 import { ShippedCard } from "./ShippedCard";
 import { Tracker } from "./Tracker";
 import { motionTransition, paneVariants, useReducedMotionPreference } from "../../../motion";
@@ -363,34 +364,19 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
           <IdeaWatch item={item} />
           <CopyLinkButton code={item.code} />
           {mode === "pane" && onOpenFull && (
-            <button
-              type="button"
-              onClick={onOpenFull}
-              aria-label={copy.openFullPage}
-              className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-neutral-100"
-            >
+            <RoadmapIconButton label={copy.openFullPage} onClick={onOpenFull}>
               <Maximize size={16} aria-hidden />
-            </button>
+            </RoadmapIconButton>
           )}
           {mode === "pane" && onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={copy.closePane}
-              className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-neutral-100"
-            >
+            <RoadmapIconButton label={copy.closePane} onClick={onClose}>
               <Close size={16} aria-hidden />
-            </button>
+            </RoadmapIconButton>
           )}
           {mode === "page" && panelMode === "inline" && !panelOpen && (
-            <button
-              type="button"
-              onClick={() => setPanel(true)}
-              aria-label={copy.idea.panelExpand}
-              className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-neutral-100"
-            >
+            <RoadmapIconButton label={copy.idea.panelExpand} onClick={() => setPanel(true)}>
               <DockToRight size={16} aria-hidden />
-            </button>
+            </RoadmapIconButton>
           )}
         </>
       }
@@ -576,14 +562,12 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
                   className="absolute inset-y-0 -left-1 z-[1] w-2 cursor-col-resize focus-visible:bg-primary-200"
                 />
                 <div className="flex items-center justify-end px-2 pt-1">
-                  <button
-                    type="button"
+                  <RoadmapIconButton
+                    label={copy.idea.panelCollapse}
                     onClick={() => setPanel(false)}
-                    aria-label={copy.idea.panelCollapse}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-neutral-100"
                   >
                     <Close size={16} aria-hidden />
-                  </button>
+                  </RoadmapIconButton>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">{tabbedPanel}</div>
               </motion.aside>
@@ -654,7 +638,7 @@ const PhoneHeader: React.FC<{
           aria-label={`${item.code}. ${item.title}. ${barOpen ? copy.idea.titleHide : copy.idea.titleShow}`}
           className="flex min-h-12 min-w-0 flex-1 flex-col justify-center bg-transparent py-1 text-left"
         >
-          <span className="text-[11px] tabular-nums leading-tight text-typography-secondary">
+          <span className="text-xs tabular-nums leading-tight text-typography-secondary">
             {item.code} · {copy.stages[item.stage ?? item.shownStage]}
           </span>
           <span

@@ -3,6 +3,7 @@ import React from "react";
 import { Tick } from "@icons";
 import { motion } from "framer-motion";
 
+import { Tag } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 import type { RoadmapShownStage, RoadmapSimpleStage } from "@types";
 
@@ -30,10 +31,10 @@ export const Tracker: React.FC<TrackerProps> = ({ stage, compact = false }) => {
 
   if (model.kind === "terminal") {
     return (
-      <p className="text-sm font-medium text-typography-secondary" aria-label={copy.trackerLabel}>
-        <span className="inline-flex items-center rounded-full border border-border-light px-2 py-0.5">
+      <p className="m-0" aria-label={copy.trackerLabel}>
+        <Tag type={model.stage === "declined" ? "red" : "gray"} size="sm" className="!m-0">
           {model.label}
-        </span>
+        </Tag>
       </p>
     );
   }

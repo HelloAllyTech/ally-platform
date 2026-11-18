@@ -266,7 +266,7 @@ const CardBody: React.FC<{ row: RoadmapItemRow; awaitingReview: boolean }> = ({
     row.whyHere && "since" in row.whyHere ? row.whyHere.since : row.stageSince,
   );
   return (
-    <article className="flex h-full flex-col gap-3 overflow-y-auto rounded-2xl border border-border-light bg-white p-5 shadow-lg">
+    <article className="flex h-full flex-col gap-3 overflow-y-auto border border-border-light bg-white p-5">
       <header className="flex items-baseline justify-between gap-2">
         <h3 className="m-0 text-lg font-semibold text-typography-primary">
           <span className="mr-2 text-xs tabular-nums text-typography-secondary">{row.code}</span>

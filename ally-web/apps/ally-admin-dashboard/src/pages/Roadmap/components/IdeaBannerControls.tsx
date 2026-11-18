@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 
 import { toast } from "sonner";
 
+import { Button, Select, SelectItem, Tag } from "@ally-ui-mono/ui-shared";
 import { useGetRoadmapProductGoalsQuery, usePatchRoadmapItemMutation } from "@api";
 import { en } from "@constants";
 import type { RoadmapItemDetail, RoadmapItemPatch } from "@types";
@@ -9,11 +10,6 @@ import type { RoadmapItemDetail, RoadmapItemPatch } from "@types";
 import { useRoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
 import { LeadPicker } from "../triage/LeadPicker";
 import { useReviewActions } from "../triage/useReviewActions";
-
-const FIELD =
-  "inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-black/10 bg-white/80 px-3 text-xs text-typography-primary";
-const LABEL =
-  "shrink-0 text-[11px] font-semibold uppercase tracking-wide text-typography-secondary";
 
 /** 'YYYY-MM' → "Dec 2026". */
 export const monthLabel = (value: string): string => {
@@ -31,37 +27,36 @@ export const monthOptions = (current: string | null | undefined, now = new Date(
   return current && !months.includes(current) ? [current, ...months] : months;
 };
 
-/** A labelled select that looks like a pill; native, so it is reachable and fast everywhere. */
+/** A Carbon Select with its label beside it (inline), at the small size the banner uses. */
 const SelectField: React.FC<{
+  id: string;
   label: string;
   value: string;
   options: { value: string; label: string }[];
   disabled?: boolean;
   onChange: (value: string) => void;
-}> = ({ label, value, options, disabled, onChange }) => (
-  <label className={`${FIELD} cursor-pointer`}>
-    <span className={LABEL}>{label}</span>
-    <select
-      value={value}
-      disabled={disabled}
-      onChange={event => onChange(event.target.value)}
-      className="min-w-0 max-w-[14rem] cursor-pointer truncate border-0 bg-transparent p-0 text-xs font-semibold text-typography-primary outline-none"
-    >
-      {options.map(option => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  </label>
+}> = ({ id, label, value, options, disabled, onChange }) => (
+  <Select
+    id={id}
+    inline
+    size="sm"
+    labelText={label}
+    value={value}
+    disabled={disabled}
+    onChange={(event: React.ChangeEvent<HTMLSelectElement>) => onChange(event.target.value)}
+    className="!w-auto"
+  >
+    {options.map(option => (
+      <SelectItem key={option.value} value={option.value} text={option.label} />
+    ))}
+  </Select>
 );
 
-/** A labelled value you can read but not change. */
+/** A fact you can read but not change: a Carbon Tag, "Goal: Actor realism". */
 const ReadField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <span className={FIELD}>
-    <span className={LABEL}>{label}</span>
-    <span className="truncate font-semibold">{children}</span>
-  </span>
+  <Tag type="gray" size="md" className="!m-0 max-w-full">
+    {label}: {children}
+  </Tag>
 );
 
 /**
@@ -110,6 +105,7 @@ export const IdeaBannerControls: React.FC<{ item: RoadmapItemDetail }> = ({ item
     <div className="flex flex-wrap items-center gap-2" aria-label={en.roadmapV2.idea.panel}>
       {item.can?.editGoal ? (
         <SelectField
+          id={`${item.code}-goal`}
           label={banner.goal}
           value={item.goal?.id ?? ""}
           options={goalOptions}
@@ -122,15 +118,14 @@ export const IdeaBannerControls: React.FC<{ item: RoadmapItemDetail }> = ({ item
 
       {item.can?.editLead ? (
         <>
-          <button
-            type="button"
+          <Button
+            kind="tertiary"
+            size="sm"
             onClick={() => setLeadOpen(true)}
             aria-label={item.lead ? banner.changeLead(item.lead.name) : undefined}
-            className={`${FIELD} cursor-pointer hover:bg-white`}
           >
-            <span className={LABEL}>{banner.lead}</span>
-            <span className="truncate font-semibold">{item.lead?.name ?? banner.leadNone} ▾</span>
-          </button>
+            {banner.lead}: {item.lead?.name ?? banner.leadNone}
+          </Button>
           <LeadPicker
             open={leadOpen}
             code={item.code}
@@ -145,6 +140,7 @@ export const IdeaBannerControls: React.FC<{ item: RoadmapItemDetail }> = ({ item
 
       {item.can?.editMonth ? (
         <SelectField
+          id={`${item.code}-month`}
           label={banner.month}
           value={month}
           options={monthChoices}

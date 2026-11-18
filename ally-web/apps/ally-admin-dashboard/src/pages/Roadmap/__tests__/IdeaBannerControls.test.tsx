@@ -89,9 +89,9 @@ describe("the banner's controls follow can{}", () => {
 
   it("someone who can't edit reads the same facts as plain text, with no controls", () => {
     wrap(<IdeaBannerControls item={item({})} />);
-    expect(screen.getByText("Actor realism")).toBeInTheDocument();
-    expect(screen.getByText("Priya")).toBeInTheDocument();
-    expect(screen.getByText("Dec 2026")).toBeInTheDocument();
+    expect(screen.getByText("Goal: Actor realism")).toBeInTheDocument();
+    expect(screen.getByText("Lead: Priya")).toBeInTheDocument();
+    expect(screen.getByText("Planned: Dec 2026")).toBeInTheDocument();
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
   });

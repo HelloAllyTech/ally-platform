@@ -2,22 +2,36 @@ import React, { useEffect, useState } from "react";
 
 import { ArrowDown, ArrowUp } from "@icons";
 
+import { Tag } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 import type { RoadmapItemDetail } from "@types";
 
 import { IdeaTitle } from "./IdeaControls";
+import { RoadmapIconButton } from "./RoadmapIconButton";
 import { Tracker } from "./Tracker";
+import { simpleStageOfShown } from "../utils/copy";
 
 /**
- * The banner's colour says where the idea is at a glance: amber for the Backlog, blue while it is
- * being built, green once shipped, grey when declined. Written out in full so Tailwind keeps them.
+ * The banner's colour says where the idea is at a glance, in the same hues as the stage's Carbon
+ * Tag (`STAGE_TAG`): purple Backlog, blue Being built, green Shipped, red Declined. A 4px top edge
+ * in the strong step, a tint behind. Written out in full so Tailwind keeps them; the tints and edges
+ * re-theme in dark mode.
  */
 export const BANNER_TONE: Record<string, string> = {
-  backlog: "border-t-4 border-t-warning-500 border-b-warning-200 bg-warning-50",
-  being_built: "border-t-4 border-t-primary-600 border-b-primary-200 bg-primary-50",
-  shipped: "border-t-4 border-t-success-600 border-b-success-200 bg-success-50",
-  declined: "border-t-4 border-t-neutral-500 border-b-neutral-300 bg-neutral-100",
-  draft: "border-t-4 border-t-neutral-300 border-b-neutral-200 bg-neutral-50",
+  backlog: "border-t-4 border-t-purple-600 border-b-purple-200 bg-purple-50",
+  being_built: "border-t-4 border-t-primary-500 border-b-primary-200 bg-primary-50",
+  shipped: "border-t-4 border-t-success-500 border-b-success-200 bg-success-50",
+  declined: "border-t-4 border-t-red-600 border-b-red-200 bg-red-50",
+  draft: "border-t-4 border-t-neutral-400 border-b-neutral-200 bg-neutral-50",
+};
+
+/** The stage's Carbon Tag colour, matching its banner. */
+export const STAGE_TAG: Record<string, "purple" | "blue" | "green" | "red" | "gray"> = {
+  backlog: "purple",
+  being_built: "blue",
+  shipped: "green",
+  declined: "red",
+  draft: "gray",
 };
 
 /**
@@ -67,13 +81,17 @@ export const OpportunityHeader: React.FC<{
   </header>
 );
 
-/** The stage as a word, next to the code, so it is readable even when everything else scrolls. */
+/** The stage as a Carbon Tag, next to the code, so it reads even when everything else scrolls. */
 export const StageChip: React.FC<{
   stage: RoadmapItemDetail["stage"] | RoadmapItemDetail["shownStage"];
 }> = ({ stage }) => (
-  <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full border border-black/10 bg-white/80 px-2 py-0.5 text-xs font-semibold text-typography-primary">
+  <Tag
+    type={STAGE_TAG[simpleStageOfShown(stage)] ?? "gray"}
+    size="sm"
+    className="!m-0 mt-0.5 shrink-0"
+  >
     {en.roadmapV2.stages[stage]}
-  </span>
+  </Tag>
 );
 
 /**
@@ -128,15 +146,13 @@ const ToggleButton: React.FC<{ expanded: boolean; onClick: () => void }> = ({
   const copy = en.roadmapV2.idea;
   const Icon = expanded ? ArrowUp : ArrowDown;
   return (
-    <button
-      type="button"
+    <RoadmapIconButton
+      label={expanded ? copy.titleHide : copy.titleShow}
       onClick={onClick}
-      aria-expanded={expanded}
-      aria-label={expanded ? copy.titleHide : copy.titleShow}
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded hover:bg-neutral-100"
+      expanded={expanded}
     >
       <Icon size={16} aria-hidden />
-    </button>
+    </RoadmapIconButton>
   );
 };
 

@@ -235,14 +235,14 @@ export const QueueList: React.FC<QueueListProps> = ({
             {...popVariants(reduced)}
             transition={motionTransition("moderate", "productive", reduced)}
           >
-            <button
-              type="button"
+            <Button
+              kind="primary"
+              size="sm"
               onClick={onRelease}
-              className="inline-flex min-h-8 items-center gap-1 rounded-full bg-primary-600 px-3 text-xs font-medium text-white shadow"
+              renderIcon={() => <Refresh size={14} aria-hidden />}
             >
-              <Refresh size={14} aria-hidden />
               {copy.updatedPill}
-            </button>
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>

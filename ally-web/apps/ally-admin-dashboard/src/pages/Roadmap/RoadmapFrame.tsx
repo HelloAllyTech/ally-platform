@@ -8,6 +8,7 @@ import { Button, Modal } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 
 import { motionTransition, useReducedMotionPreference } from "../../motion";
+import { RoadmapIconButton } from "./components/RoadmapIconButton";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
 import { useRoadmapPresence } from "./hooks/useRoadmapJobTimer";
 import {
@@ -47,14 +48,9 @@ export const MovedBanner: React.FC<{ moved: MovedState; onDismiss: () => void }>
       <span className="min-w-0 flex-1">
         {copy.banner(copy.from[moved.from] ?? moved.from, copy.landed[moved.landed] ?? "")}
       </span>
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label={copy.dismiss}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded hover:bg-primary-100 md:h-8 md:w-8"
-      >
+      <RoadmapIconButton label={copy.dismiss} onClick={onDismiss} large>
         <Close size={16} aria-hidden />
-      </button>
+      </RoadmapIconButton>
     </motion.div>
   );
 };
@@ -165,14 +161,9 @@ export const RoadmapFrame: React.FC<{ children: React.ReactNode }> = ({ children
               >
                 {copy.shortcutsShow}
               </Button>
-              <button
-                type="button"
-                onClick={closeTip}
-                aria-label={copy.dismiss}
-                className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-neutral-100"
-              >
+              <RoadmapIconButton label={copy.dismiss} onClick={closeTip}>
                 <Close size={16} aria-hidden />
-              </button>
+              </RoadmapIconButton>
             </motion.div>
           )}
         </AnimatePresence>
