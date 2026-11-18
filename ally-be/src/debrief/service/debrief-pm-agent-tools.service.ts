@@ -500,6 +500,7 @@ export class DebriefPmAgentToolsService {
         ...Object.values(DEBRIEF_PROMPT_CODES),
         // The independent judge's instructions (debrief-run-judge.service).
         'debrief_quality_judge_system',
+        'debrief_language_judge_rubric',
       ]),
     ];
     if (!known.includes(code)) {

@@ -39,6 +39,7 @@ describe('the run judge is given the Writer’s guidance', () => {
       } as any,
       { ai: { apiUrl: 'http://ai', outboundApiKey: 'k' } } as any,
       agentLogs as any,
+      { drain: jest.fn(async () => 0) } as any,
     );
     return { svc, find, agentLogs, query };
   }
@@ -234,6 +235,7 @@ describe('judging a run is exclusive', () => {
       } as any,
       { ai: { apiUrl: 'http://ai', outboundApiKey: 'k' } } as any,
       agentLogs as any,
+      { drain: jest.fn(async () => 0) } as any,
     );
     return { row, svc, snapshot, agentLogs };
   }
@@ -346,7 +348,10 @@ describe('the judge drain reaches older unscored runs', () => {
   it('asks only for runs with no score, so scored newer runs cannot starve older ones', async () => {
     const find = jest.fn(async () => []);
     const svc = Object.create(DebriefRunJudgeService.prototype) as any;
-    Object.assign(svc, { runs: { find } });
+    Object.assign(svc, {
+      runs: { find },
+      language: { drain: jest.fn(async () => 0) },
+    });
     await svc.drain(5);
     const where = (find.mock.calls[0] as any)[0].where;
     expect(where.workspace).toBeDefined();
@@ -365,5 +370,47 @@ describe('the judge drain’s pending-runs filter', () => {
     expect(sql.match(/__COLUMN__/g)?.length).toBeGreaterThan(0);
     // TypeORM only rewrites the column name when whitespace, a comma or ")" follows it.
     expect(sql).not.toMatch(/__COLUMN__(?![\s,)])/);
+  });
+});
+
+describe('the language check in the judge drain', () => {
+  const build = (languageDrain: jest.Mock, pending: unknown[] = []) => {
+    const order: string[] = [];
+    const run = {
+      find: jest.fn(async () => {
+        order.push('quality-list');
+        return pending;
+      }),
+    };
+    const svc = new DebriefRunJudgeService(
+      run as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {
+        drain: jest.fn(async (n: number) => {
+          order.push('language');
+          return languageDrain(n);
+        }),
+      } as any,
+    );
+    return { svc, order };
+  };
+
+  it('runs after the quality judge, with the same limit', async () => {
+    const drain = jest.fn(async () => 2);
+    const { svc, order } = build(drain);
+    expect(await svc.drain(5)).toBe(0);
+    expect(order).toEqual(['quality-list', 'language']);
+    expect(drain).toHaveBeenCalledWith(5);
+  });
+
+  it('a failing language check never fails the quality drain', async () => {
+    const { svc } = build(
+      jest.fn(async () => {
+        throw new Error('boom');
+      }),
+    );
+    await expect(svc.drain(5)).resolves.toBe(0);
   });
 });

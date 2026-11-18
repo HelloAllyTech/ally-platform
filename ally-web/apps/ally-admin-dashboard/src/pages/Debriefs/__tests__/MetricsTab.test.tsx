@@ -88,7 +88,19 @@ describe("Debriefs tab: pass rate", () => {
         ...fullView(),
         quality: {
           byWeek: [{ week: "2026-11-02", ...group(24, 30) }],
-          byLanguage: [{ language: "hi-IN", debriefs: 30, ...group(24, 30) }],
+          byLanguage: [
+            {
+              language: "hi-IN",
+              debriefs: 30,
+              ...group(24, 30),
+              languageProblem: {
+                checked: 25,
+                notChecked: 5,
+                withFinding: { n: 7, of: 25, value: 0.28, low: 0.14, high: 0.48 },
+                byType: { wrong_language: 4, script_mix: 3, quote_altered: 1 },
+              },
+            },
+          ],
           bySegment: [
             {
               language: "hi-IN",
@@ -106,6 +118,11 @@ describe("Debriefs tab: pass rate", () => {
       "80% (95% range 62.7%–90.5%, 24 of 30)",
     );
     expect(screen.getByTestId("metrics-quality-weeks")).toHaveTextContent("95% range 62%–90%");
+    const lp = screen.getByTestId("metrics-language-problems");
+    expect(lp).toHaveTextContent("Language problems in the debrief text");
+    expect(lp).toHaveTextContent("28%");
+    expect(lp).toHaveTextContent("Wrong language 4 · Mixed scripts 3");
+    expect(lp).not.toHaveTextContent("wrong_language");
   });
 
   it("draws pass rate by language as sorted dots with whiskers, thin groups hollow and labelled", () => {

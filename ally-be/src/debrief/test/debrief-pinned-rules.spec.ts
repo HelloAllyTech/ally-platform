@@ -21,8 +21,8 @@ import { promptEditRefusal } from '../util/debrief-pm-agent-rules.util';
 const SAFETY = DEBRIEF_PROMPT_CODES.safetyReader;
 
 describe('pinned rules: who can change them', () => {
-  it('names six rules, and the PM agent may edit none of them', () => {
-    expect(PINNED_RULE_PROMPTS).toHaveLength(6);
+  it('names seven rules, and the PM agent may edit none of them', () => {
+    expect(PINNED_RULE_PROMPTS).toHaveLength(7);
     for (const code of PINNED_RULE_CODES) {
       expect(PM_AGENT_EDITABLE_PROMPTS.has(code)).toBe(false);
     }
@@ -101,7 +101,7 @@ describe('Settings › Pinned rules (read-only)', () => {
     });
     const out = await svc.pinnedRules();
     expect(Object.keys(out)).toEqual(['rules']);
-    expect(out.rules).toHaveLength(6);
+    expect(out.rules).toHaveLength(7);
     expect(out.rules[0]).toEqual({
       code: SAFETY,
       label: 'Safety rules',

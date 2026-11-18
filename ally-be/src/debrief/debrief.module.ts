@@ -35,6 +35,9 @@ import { DebriefReviewController } from './controller/debrief-review.controller'
 import { DebriefSchedulesController } from './controller/debrief-schedules.controller';
 import { DebriefScheduleService } from './service/debrief-schedule.service';
 import { DebriefReview } from './entity/debrief-review.entity';
+import { DebriefLanguageJudgment } from './entity/debrief-language-judgment.entity';
+import { DebriefLanguageJudgeService } from './service/debrief-language-judge.service';
+import { JudgeAttemptRepository } from '../analytics/repository/judge-attempt.repository';
 import { DebriefReviewComment } from './entity/debrief-review-comment.entity';
 import { DebriefReviewService } from './service/debrief-review.service';
 import { DebriefFeedback } from './entity/debrief-feedback.entity';
@@ -122,6 +125,8 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
       DebriefLearnerEvent,
       // Expert review (spec Part B): verdicts and comments.
       DebriefReview,
+      // The language check on each debrief's own text (findings only).
+      DebriefLanguageJudgment,
       DebriefReviewComment,
       DebriefReviewAnswer,
       DebriefAgreementSample,
@@ -192,6 +197,8 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     DebriefAggregatesService,
     DebriefRunnerService,
     DebriefRunJudgeService,
+    DebriefLanguageJudgeService,
+    JudgeAttemptRepository,
     DebriefRunLogsService,
     DebriefAgentService,
     DebriefTestSetsService,

@@ -159,9 +159,50 @@ export const QualitySection: React.FC<{
               </ChartCard>
             )}
           </div>
+          <LanguageProblems rows={quality.byLanguage} />
         </>
       )}
     </section>
+  );
+};
+
+/** Top two fault kinds of a language, in plain words (kinds never wrap: two at most). */
+export const topKinds = (byType: Record<string, number>, names: Record<string, string>): string =>
+  Object.entries(byType)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([k, n]) => `${names[k] ?? k} ${n}`)
+    .join(" · ");
+
+export const LanguageProblems: React.FC<{
+  rows: NonNullable<DebriefMetricsView["quality"]>["byLanguage"];
+}> = ({ rows }) => {
+  const s = en.debriefs.metrics.quality.languageProblems;
+  const withCheck = rows.filter(r => r.languageProblem && r.languageProblem.checked > 0);
+  if (withCheck.length === 0) return null;
+  return (
+    <div data-testid="metrics-language-problems">
+      <ChartCard title={s.title} caption={s.caption}>
+        <NumbersTable
+          testId="metrics-language-problems-table"
+          head={[
+            en.debriefs.metrics.quality.cols.language,
+            s.cols.checked,
+            s.cols.withProblem,
+            s.cols.kinds,
+          ]}
+          rows={withCheck.map(r => {
+            const p = r.languageProblem!;
+            return [
+              languageLabel(r.language),
+              String(p.checked),
+              rateWithRange(p.withFinding),
+              topKinds(p.byType, s.types) || s.none,
+            ];
+          })}
+        />
+      </ChartCard>
+    </div>
   );
 };
 

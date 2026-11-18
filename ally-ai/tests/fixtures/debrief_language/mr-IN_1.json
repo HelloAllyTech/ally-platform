@@ -1,0 +1,160 @@
+{
+  "language": "mr-IN",
+  "writer_model": "gemini-3-flash-preview",
+  "scenario": "A young woman, a final-year student, cannot sleep and is afraid of failing her exams; she feels her family's hopes are heavy. No thoughts of self-harm.",
+  "transcript": [
+    {
+      "turn_index": 1,
+      "role": "counselor",
+      "text": "नमस्कार, तुम्ही आज इथे आलात, काहीतरी तुम्हाला त्रास देत आहे असं दिसतंय. तुम्ही कशाबद्दल बोलू इच्छिता?"
+    },
+    {
+      "turn_index": 2,
+      "role": "client",
+      "text": "मला झोप लागत नाहीये आणि परीक्षेची खूप भीती वाटतेय. घरच्यांच्या माझ्याकडून खूप अपेक्षा आहेत, त्यांचं ओझं वाटतंय."
+    },
+    {
+      "turn_index": 3,
+      "role": "counselor",
+      "text": "तुम्हाला परीक्षेची भीती वाटतेय आणि घरच्यांच्या अपेक्षांमुळे तुम्हाला दडपण येतंय असं दिसतंय."
+    },
+    {
+      "turn_index": 4,
+      "role": "client",
+      "text": "हो, त्यांना वाटतं मी खूप चांगली कामगिरी करावी. त्यांच्यासाठी हे खूप महत्त्वाचं आहे, आणि मला ते पूर्ण करता येईल की नाही याची काळजी वाटते."
+    },
+    {
+      "turn_index": 5,
+      "role": "counselor",
+      "text": "या अपेक्षांमुळे तुम्हाला नेमकं कसं वाटतं?"
+    },
+    {
+      "turn_index": 6,
+      "role": "client",
+      "text": "खूप तणाव जाणवतो. अभ्यासात लक्ष लागत नाही आणि सतत तेच विचार डोक्यात फिरतात."
+    },
+    {
+      "turn_index": 7,
+      "role": "counselor",
+      "text": "तुम्ही अभ्यास करत आहात का?"
+    },
+    {
+      "turn_index": 8,
+      "role": "client",
+      "text": "हो, पण लक्ष लागत नाही. पुस्तक समोर असतं पण मन दुसरीकडेच असतं."
+    },
+    {
+      "turn_index": 9,
+      "role": "counselor",
+      "text": "लक्ष लागत नाही म्हणजे नेमकं काय होतं? तुम्हाला काय वाटतं तेव्हा?"
+    },
+    {
+      "turn_index": 10,
+      "role": "client",
+      "text": "एक प्रकारची भीती वाटते, की मी अपयशी ठरेन. मग काहीच सुचत नाही."
+    },
+    {
+      "turn_index": 11,
+      "role": "counselor",
+      "text": "तुम्हाला अपयशाची खूप भीती वाटतेय. तुम्ही थोडा वेळ ब्रेक घेऊन पहा, कदाचित तुम्हाला बरं वाटेल."
+    },
+    {
+      "turn_index": 12,
+      "role": "client",
+      "text": "ब्रेक घेतला तरी तेच विचार येतात. मन शांतच होत नाही."
+    }
+  ],
+  "cards": {
+    "opening": "सत्रात तुम्ही क्लायंटच्या भावना समजून घेण्यावर भर दिलात. यामुळे त्यांना त्यांच्या परीक्षेच्या भीतीबद्दल आणि घरच्यांच्या दबावाबद्दल बोलणे सोपे झाले.",
+    "important_moment": null,
+    "what_worked": [
+      {
+        "skill": "Reflecting feelings/content",
+        "turn_index": 3,
+        "quote": "तुम्हाला परीक्षेची भीती वाटतेय आणि घरच्यांच्या अपेक्षांमुळे तुम्हाला दडपण येतंय असं दिसतंय.",
+        "lead": "तुम्ही क्लायंटच्या भावना चांगल्या प्रकारे ओळखल्यात",
+        "body": "अशा प्रकारे क्लायंटच्या भावनांचे प्रतिबिंब उमटवल्यामुळे त्यांना तुम्ही त्यांचे म्हणणे लक्षपूर्वक ऐकत आहात असा विश्वास मिळाला."
+      },
+      {
+        "skill": "Exploring emotions",
+        "turn_index": 5,
+        "quote": "या अपेक्षांमुळे तुम्हाला नेमकं कसं वाटतं?",
+        "lead": "त्यांच्या खोलवरच्या भावनांचा शोध घेतलात",
+        "body": "असे प्रश्न विचारून तुम्ही त्यांना केवळ परिस्थितीबद्दलच नाही तर त्यांच्या मनातील घालमेलीबद्दल बोलायला प्रोत्साहित केले."
+      }
+    ],
+    "work_on_this": [
+      {
+        "skill": "Avoids premature advice",
+        "turn_index": 11,
+        "quote": "तुम्हाला अपयशाची खूप भीती वाटतेय. तुम्ही थोडा वेळ ब्रेक घेऊन पहा, कदाचित तुम्हाला बरं वाटेल.",
+        "lead": "उपाय सुचवण्यापूर्वी सखोल समजून घेण्याचा प्रयत्न करा",
+        "why": "लवकर सल्ला दिल्यामुळे क्लायंटने तो नाकारला. त्यांच्या भीतीचे कारण आधी पूर्णपणे शोधणे आणि त्यांना स्वतःहून मार्ग शोधायला मदत करणे महत्त्वाचे आहे.",
+        "try_saying": "या अपयशाच्या भीतीबद्दल तुम्ही अधिक सांगू शकाल का?",
+        "scenario_id": null
+      },
+      {
+        "skill": "Uses open questions over closed questions",
+        "turn_index": 7,
+        "quote": "तुम्ही अभ्यास करत आहात का?",
+        "lead": "अधिक माहितीसाठी खुल्या प्रश्नांचा वापर करा",
+        "why": "बंद प्रश्नांमुळे माहिती मर्यादित राहते. त्याऐवजी खुल्या प्रश्नांनी क्लायंटला त्यांच्या संघर्षाबद्दल आणि अभ्यासातील आव्हानांबद्दल सविस्तर सांगण्याची संधी मिळते.",
+        "try_saying": "सध्या तुमच्या अभ्यासाची स्थिती कशी आहे?",
+        "scenario_id": null
+      }
+    ],
+    "practise_next": {
+      "skill": "Avoids premature advice",
+      "reason": "क्लायंटला त्यांचे प्रश्न स्वतः सोडवण्यासाठी आणि त्यांना पूर्णपणे समजून घेतले आहे असे वाटण्यासाठी सल्ला देणे टाळणे महत्त्वाचे आहे.",
+      "scenario_id": null,
+      "try_next": null
+    },
+    "skill_words": [
+      {
+        "skill": "Open-ended questioning",
+        "word": "strength"
+      },
+      {
+        "skill": "Reflecting feelings/content",
+        "word": "strength"
+      },
+      {
+        "skill": "Exploring emotions",
+        "word": "strength"
+      },
+      {
+        "skill": "Avoids premature advice",
+        "word": "keep_practising"
+      },
+      {
+        "skill": "Uses open questions over closed questions",
+        "word": "keep_practising"
+      }
+    ],
+    "skill_labels": [
+      {
+        "skill": "Open-ended questioning",
+        "label": "खुल्या स्वरूपाचे प्रश्न"
+      },
+      {
+        "skill": "Reflecting feelings/content",
+        "label": "भावनांचे प्रतिबिंब उमटवणे"
+      },
+      {
+        "skill": "Exploring emotions",
+        "label": "भावनांचा शोध घेणे"
+      },
+      {
+        "skill": "Avoids premature advice",
+        "label": "घाईने सल्ला देणे टाळणे"
+      },
+      {
+        "skill": "Uses open questions over closed questions",
+        "label": "खुल्या प्रश्नांचा वापर"
+      }
+    ],
+    "reflective_question": "जर क्लायंटने तुमचा सल्ला नाकारला, तर त्यांच्या भावनांना पुन्हा कसे स्पर्श करता येईल याबद्दल तुम्ही काय विचार करता?",
+    "progress_note": null
+  },
+  "rule_checks": "passed"
+}

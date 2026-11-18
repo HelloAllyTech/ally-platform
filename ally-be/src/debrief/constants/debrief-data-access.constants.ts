@@ -323,7 +323,8 @@ export const PM_AGENT_ACCESS: readonly PmToolAccess[] = [
   {
     tool: 'reporting_query',
     kind: 'read',
-    reads: 'Redacted debrief reporting views (no transcripts, no names)',
+    reads:
+      'Redacted debrief reporting views (no transcripts, no names), including language-check counts per language, fault type and card section, with no quotes',
   },
   { tool: 'comments_read', kind: 'read', reads: 'Expert review comments' },
   {

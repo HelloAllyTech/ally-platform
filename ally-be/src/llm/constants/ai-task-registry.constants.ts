@@ -955,6 +955,20 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'DEBRIEF_QUALITY_JUDGE__MODEL',
   },
   {
+    id: 'debrief-language-judge',
+    task: LlmTask.DEBRIEF_LANGUAGE_JUDGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Scheduled: after a debrief is scored, its language is checked',
+    detail:
+      "Is the debrief's own text written well in the session's language? Lists specific " +
+      'faults with the exact words; no score. A different model family from the Writer. ' +
+      'Pinned, and checked by planted-fault tests before it is trusted.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'DEBRIEF_LANGUAGE_JUDGE__MODEL',
+  },
+  {
     id: 'debrief-safety-reader',
     task: LlmTask.DEBRIEF_SAFETY_READER,
     runtime: LlmRuntime.ALLY_AI,

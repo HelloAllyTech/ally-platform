@@ -24,6 +24,10 @@ export const DEBRIEF_REPORTING_VIEWS: Readonly<Record<string, string>> =
       'one row per Debrief PM agent idea: id, created_at, updated_at, status, idea_kind, prompt_code, setting_key, text, release_id, quick_test_lift, quick_test_passed, gate_passed, trial_status, canary_status',
     'debrief_reporting.learner_events':
       'one row per thing a learner did with a live debrief, once per session and kind: created_at, tenant_id, run_id, kind (opened/read_through/listened/practise_next_click/reflection_answered/replied/waited/left_before_ready), platform (web/ios/android or null)',
+    'debrief_reporting.language_checks':
+      'one row per debrief run the language check has read: run_id, created_at, tenant_id, is_test_org, mode, language, finding_count, types (text[] of fault kinds: wrong_language, script_mix, untranslated_chunk, quote_altered, stiff_register, literal_translation, grammar_or_agreement, meaning_drift), judge_model, judge_prompt_version. Use it for the rate: runs with finding_count > 0 over all rows.',
+    'debrief_reporting.language_findings':
+      'one row per language finding, counts only: run_id, created_at, mode, language, error_type, section (which card: opening, important_moment, what_worked, work_on_this, practise_next, skill_names, progress, reflective_question). It holds no quote, no note and no learner text, by design.',
     'debrief_reporting.probes':
       'one row per paired trial on a production session: id, created_at, tenant_id, idea_id, baseline_overall, challenger_overall, baseline_hard_fails, challenger_hard_fails, cost_usd, status',
   });
@@ -133,6 +137,15 @@ export class DebriefReportingService {
                round(avg(helpful::int)::numeric, 3) AS helpful_share
           FROM debrief_reporting.learner_responses
          WHERE ${window} GROUP BY 1, 2, 3 ORDER BY 4 DESC LIMIT 30`,
+      languageFindings: `
+        SELECT language, error_type, section, count(*) AS findings, count(DISTINCT run_id) AS runs
+          FROM debrief_reporting.language_findings
+         WHERE ${prod} AND ${window} GROUP BY 1, 2, 3 ORDER BY 4 DESC LIMIT 40`,
+      languageChecks: `
+        SELECT language, count(*) AS checked,
+               round(avg((finding_count > 0)::int)::numeric, 3) AS with_finding_share
+          FROM debrief_reporting.language_checks
+         WHERE ${prod} AND ${window} GROUP BY 1 ORDER BY 2 DESC LIMIT 20`,
       weekly: `
         SELECT date_trunc('week', created_at) AS week, count(*) AS runs,
                percentile_cont(0.5) WITHIN GROUP (ORDER BY judge_overall) AS judge_median,

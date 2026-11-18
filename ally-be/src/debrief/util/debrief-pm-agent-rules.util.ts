@@ -61,6 +61,7 @@ const never = (area: NeverListArea): Refusal => ({
 const NEVER_PROMPTS: Record<string, NeverListArea> = {
   [DEBRIEF_PROMPT_CODES.rubric]: 'judge',
   debrief_quality_judge_system: 'judge',
+  debrief_language_judge_rubric: 'judge',
   [DEBRIEF_PROMPT_CODES.safetyReader]: 'safety',
   [DEBRIEF_PROMPT_CODES.riskCueDefinition]: 'safety',
   [DEBRIEF_PROMPT_CODES.evaluator]: 'judge',

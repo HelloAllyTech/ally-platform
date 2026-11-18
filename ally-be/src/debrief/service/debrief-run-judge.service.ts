@@ -19,6 +19,7 @@ import { DebriefCards, renderCards } from '../util/debrief-cards.util';
 import { guidancePassage } from '../util/debrief-guidance.util';
 import { ClChunk } from '../../context-library/entity/cl-chunk.entity';
 import { DebriefContextRepository } from './debrief-context.repository';
+import { DebriefLanguageJudgeService } from './debrief-language-judge.service';
 import {
   DebriefRunLogsService,
   JudgeCallLog,
@@ -86,6 +87,7 @@ export class DebriefRunJudgeService {
     private readonly context: DebriefContextRepository,
     private readonly config: AppConfigService,
     private readonly agentLogs: DebriefRunLogsService,
+    private readonly language: DebriefLanguageJudgeService,
   ) {}
 
   /**
@@ -353,6 +355,13 @@ export class DebriefRunJudgeService {
         await this.noteFailure(run.id);
       }
     }
+    // The language check runs after the quality judge, in its own guard: it can neither fail
+    // nor delay the quality judge, and its count is not the drain's (judged runs only).
+    await this.language
+      .drain(limit)
+      .catch((e: Error) =>
+        this.logger.warn(`[debrief] language check drain failed: ${e.message}`),
+      );
     return n;
   }
 

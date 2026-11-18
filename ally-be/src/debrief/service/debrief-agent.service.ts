@@ -1544,7 +1544,7 @@ export class DebriefAgentService implements OnModuleInit {
         `SELECT model, "promptTokens", "completionTokens"
            FROM llm_usage
           WHERE "scenarioSessionId" = $1
-            AND task LIKE 'debrief\\_%' AND task <> 'debrief_quality_judge'
+            AND task LIKE 'debrief\\_%' AND task NOT IN ('debrief_quality_judge', 'debrief_language_judge')
             AND "occurredAt" BETWEEN $2::timestamp - interval '1 minute'
                                  AND $3::timestamp + interval '5 minutes'`,
         [r.scenarioSessionId, r.startedAt, r.finishedAt],

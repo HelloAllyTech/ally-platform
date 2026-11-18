@@ -539,6 +539,14 @@ export interface DebriefFilterOptions {
 
 export type DebriefPassBreakdownRow = { key: string; debriefs: number } & DebriefPassGroup;
 
+/** How a language's debriefs fare on the language check: those with at least one fault, and how many carry each kind. */
+export interface DebriefLanguageProblem {
+  checked: number;
+  notChecked: number;
+  withFinding: DebriefRate;
+  byType: Record<string, number>;
+}
+
 /** The pass rate and its companions for one group of live debriefs (same definition as the eval). */
 export interface DebriefPassGroup {
   passRate: DebriefRate;
@@ -637,7 +645,13 @@ export interface DebriefMetricsView {
   safetyRecall: DebriefSafetyRecallMetric;
   quality?: {
     byWeek: Array<{ week: string } & DebriefPassGroup>;
-    byLanguage: Array<{ language: string; debriefs: number } & DebriefPassGroup>;
+    byLanguage: Array<
+      {
+        language: string;
+        debriefs: number;
+        languageProblem?: DebriefLanguageProblem;
+      } & DebriefPassGroup
+    >;
     bySegment: Array<
       {
         language: string;

@@ -35,6 +35,13 @@ const JUDGE_BAR = 8;
 const DRIFT_SHARE = 0.2;
 /** Steering points lost week on week before it counts as falling. */
 const STEERING_DROP = 3;
+/**
+ * Share of language-checked debriefs with at least one language fault above which a language
+ * is a failure point. 0.2: one debrief in five with a wrong-language sentence, a mixed-script
+ * word or an altered quote is worth a Writer-prompt look; a single odd debrief never is,
+ * because a language needs MIN_RATE_SAMPLE checked debriefs first.
+ */
+export const LANGUAGE_ISSUE_AT_MOST = 0.2;
 /** A stage that fails more often than this is a failure point. */
 const STAGE_FAIL_RATE = 0.05;
 
@@ -43,7 +50,8 @@ export type FailureKind =
   | 'guardrail_breached'
   | 'efficiency_drift'
   | 'steering_falling'
-  | 'stage_failing';
+  | 'stage_failing'
+  | 'language_off_target';
 
 export interface MetricFailurePoint {
   kind: FailureKind;
@@ -83,6 +91,7 @@ export const PM_AGENT_METRICS: Record<string, 'up' | 'down'> = {
   'writer.fail_rate': 'down',
   'evaluator.fail_rate': 'down',
   'guidance_lookup.found_rate': 'up',
+  language_issue_rate: 'down',
 };
 
 const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
@@ -116,6 +125,13 @@ export interface MetricsViewLike {
     experience: ExperienceRates;
   }>;
   baselines: { legacyHardFailRate: Rate; legacyThumbsDownRate: Rate };
+  /** The quality rollup; only the language check's part is read here. */
+  quality?: {
+    byLanguage?: Array<{
+      language: string;
+      languageProblem?: { checked: number; withFinding: Rate };
+    }>;
+  };
   agents: { stages: StageMetrics };
 }
 
@@ -161,6 +177,15 @@ function experiencePoints(
   return out;
 }
 
+/** All languages pooled: debriefs with a language finding over debriefs the check has read. */
+function languageIssueRate(view: MetricsViewLike): Rate {
+  return sumRates(
+    (view.quality?.byLanguage ?? [])
+      .map((l) => l.languageProblem?.withFinding)
+      .filter((r): r is Rate => !!r),
+  );
+}
+
 /** The current value of every named metric over the window, for C5's before/after. */
 export function metricValues(
   view: MetricsViewLike,
@@ -196,6 +221,7 @@ export function metricValues(
     'writer.fail_rate': st?.writer?.failRate?.value ?? null,
     'evaluator.fail_rate': st?.evaluator?.failRate?.value ?? null,
     'guidance_lookup.found_rate': st?.guidanceLookup?.foundRate?.value ?? null,
+    language_issue_rate: languageIssueRate(view).value,
   };
 }
 
@@ -337,6 +363,26 @@ export function metricFailurePoints(
       target: `>= ${prev.steering.value - STEERING_DROP} (last week ${prev.steering.value})`,
       why: 'the steering score fell week on week',
     });
+  }
+
+  // Language faults in the debrief text: overall and per language, only past the sample floor.
+  const langPoint = (segment: string, r: Rate) => {
+    if (r.value == null || r.of < MIN_RATE_SAMPLE) return;
+    if (r.value <= LANGUAGE_ISSUE_AT_MOST) return;
+    points.push({
+      kind: 'language_off_target',
+      name: 'language_issue_rate',
+      segment,
+      value: r3(r.value),
+      n: r.of,
+      target: `<= ${LANGUAGE_ISSUE_AT_MOST}`,
+      why: `too many debriefs have a language fault for ${segment} (see debrief_reporting.language_findings for which kinds)`,
+    });
+  };
+  langPoint('all', languageIssueRate(view));
+  for (const l of view.quality?.byLanguage ?? []) {
+    if (l.languageProblem)
+      langPoint(`language=${l.language}`, l.languageProblem.withFinding);
   }
 
   // Stages failing more often (an agent with more hard fails).

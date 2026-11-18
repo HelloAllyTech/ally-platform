@@ -152,6 +152,13 @@ export interface DebriefSettings {
    */
   guidanceAgentMaxCalls?: number;
   /**
+   * The share of debriefs the language check reads, 0 to 1 (2026-11-19). Absent: 1, every debrief
+   * (about 50 a week: pennies). The check runs after a debrief is published, in the background, so
+   * this only moves cost, never what a learner waits for. A run is in or out by a hash of its id,
+   * so a retry decides the same way. A person's setting, not the PM agent's.
+   */
+  languageJudgeSampleRate?: number;
+  /**
    * The guidance tools each step is offered: an object keyed by step name (`GUIDANCE_TOOL_STEPS`),
    * each a subset of `GUIDANCE_TOOL_NAMES`; a step not listed has none. Absent:
    * `GUIDANCE_TOOLS_DEFAULT` (the guidance agent, all three). The gateway refuses a call a step
@@ -821,6 +828,18 @@ export function validateDebriefBundle(
           `settings: guidanceAgentMaxCalls must be a whole number ${r.min}–${r.max}`,
         );
       }
+    }
+    if (
+      s.languageJudgeSampleRate != null &&
+      !(
+        typeof s.languageJudgeSampleRate === 'number' &&
+        s.languageJudgeSampleRate >= 0 &&
+        s.languageJudgeSampleRate <= 1
+      )
+    ) {
+      problems.push(
+        'settings: languageJudgeSampleRate must be between 0 and 1',
+      );
     }
     if (
       s.roleplayFields != null &&

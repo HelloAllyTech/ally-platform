@@ -278,6 +278,18 @@ class FeedbackGroundednessJudgeSettings(BaseModel):
     PROMPT_VERSION: str = Field("v1")
 
 
+class DebriefLanguageJudgeSettings(BaseModel):
+    """Debrief language judge: is the debrief's own text written well in the
+    session's language? Findings only, no score. A different model FAMILY from
+    the debrief Writer (Gemini) so the writer is not graded by itself; the gate
+    (scripts/debrief_language_perturbations.py) is what says the choice holds.
+    Comparisons are valid only within one (MODEL, PROMPT_VERSION) pair."""
+
+    PROVIDER: str = Field("openai")
+    MODEL: str = Field("gpt-5-mini")
+    PROMPT_VERSION: str = Field("v2")
+
+
 class DebriefQualityJudgeSettings(BaseModel):
     """Debrief-quality judge — how good is the whole debrief, scored per rubric
     dimension? The independent judge the debrief quality bar is read from.
@@ -498,6 +510,9 @@ class AppSettings(BaseSettings):
     LLM_USAGE: LLMUsageSettings = Field(default_factory=LLMUsageSettings)
     FEEDBACK_GROUNDEDNESS_JUDGE: FeedbackGroundednessJudgeSettings = Field(
         default_factory=FeedbackGroundednessJudgeSettings
+    )
+    DEBRIEF_LANGUAGE_JUDGE: DebriefLanguageJudgeSettings = Field(
+        default_factory=DebriefLanguageJudgeSettings
     )
     DEBRIEF_QUALITY_JUDGE: DebriefQualityJudgeSettings = Field(
         default_factory=DebriefQualityJudgeSettings

@@ -11985,6 +11985,24 @@ export const en = {
         unjudged: "Not scored yet",
         byWeek: "By week",
         byLanguage: "By language",
+        languageProblems: {
+          title: "Language problems in the debrief text",
+          caption:
+            "Share of checked debriefs with at least one language fault (wrong language, mixed scripts, a changed quote, stiff wording and so on). The check runs after a debrief is published, so a debrief appears here a little later.",
+          cols: { checked: "Checked", withProblem: "With a problem", kinds: "Most common" },
+          none: "None found",
+          notChecked: (n: number) => `${n} not checked yet`,
+          types: {
+            wrong_language: "Wrong language",
+            script_mix: "Mixed scripts",
+            untranslated_chunk: "Left in English",
+            quote_altered: "Quote changed",
+            stiff_register: "Stiff wording",
+            literal_translation: "Word-for-word translation",
+            grammar_or_agreement: "Grammar",
+            meaning_drift: "Meaning changed",
+          } as Record<string, string>,
+        },
         cols: {
           week: "Week",
           language: "Language",

@@ -24,7 +24,7 @@ nobody has to guess. Wire formats, stored JSON, table names and released mobile 
 | **optional agent** | An agent only the planner adds to a session (learner history, cohort, case memory, and so on). | `registry agent`, `orchestrator agent`, `orchestratorAgents` in code. |
 | **run** | One attempt to produce a debrief for one session, with its status and logs. | `debrief_runs`. |
 
-Other screen words: **serious problem** (code: hard fail) is a flaw that fails a debrief whatever its score; **extra evidence round** (code: top-up) is the step that adds agents after a first draft falls below the bar; **reference values** (code: baselines) are the numbers proposed from a month of debriefs.
+Other screen words: **language problem** (code: language finding) is a specific fault in the debrief's own words, written in the session's language: a sentence in the wrong language, letters of two scripts in one word, a phrase left in English, a quote that was changed, stiff or word-for-word wording, a grammar slip, or a meaning that no longer matches the moment it cites. A separate check lists them with the exact words; it gives no score, and the metric is the share of checked debriefs with at least one. It is not the **serious problem** list and not the roleplay client's language quality (a different check, on the client's own turns); **serious problem** (code: hard fail) is a flaw that fails a debrief whatever its score; **extra evidence round** (code: top-up) is the step that adds agents after a first draft falls below the bar; **reference values** (code: baselines) are the numbers proposed from a month of debriefs.
 
 ## Run modes
 

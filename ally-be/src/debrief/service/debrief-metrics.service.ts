@@ -360,12 +360,14 @@ export class DebriefMetricsService {
              r.steps, r.workspace->'judge' AS judge,
              r."learnerTurns" AS learner_turns, r."hasRiskCue" AS risk,
              sc.title AS scenario,
+             lj.id IS NOT NULL AS lang_checked, lj."findingCount" AS lang_count, lj.types AS lang_types,
              (SELECT array_agg(DISTINCT t.title) FROM track_items ti JOIN tracks t ON t.id = ti."trackId"
                WHERE ti."scenarioId" = s."scenarioId") AS courses
         FROM debrief_runs r
         JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
         LEFT JOIN users u ON u.id = s."counselorId"
         LEFT JOIN scenarios sc ON sc.id = s."scenarioId"
+        LEFT JOIN debrief_language_judgments lj ON lj."runId" = r.id
        WHERE r.mode = 'live'
          AND r."createdAt" >= date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})${fsql}`);
     const runs: RolledRun[] = rows.map((r) => ({
@@ -382,6 +384,12 @@ export class DebriefMetricsService {
       learnerTurns:
         r.learner_turns == null ? undefined : Number(r.learner_turns),
       hasRiskCue: r.risk == null ? undefined : !!r.risk,
+      languageCheck: r.lang_checked
+        ? {
+            findingCount: Number(r.lang_count ?? 0),
+            types: Array.isArray(r.lang_types) ? r.lang_types : [],
+          }
+        : null,
     }));
     return passRollup(runs, lengthBand);
   }

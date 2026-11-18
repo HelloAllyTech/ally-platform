@@ -125,6 +125,7 @@ const STEP_NAMES: Record<string, string> = {
   [DEBRIEF_PROMPT_CODES.progressReader]: 'Progress',
   [DEBRIEF_PROMPT_CODES.guidanceAgent]: 'Guidance agent',
   debrief_quality_judge_system: 'Judge',
+  debrief_language_judge_rubric: 'Judge',
 };
 
 const words = (s: string) => {
@@ -143,6 +144,7 @@ const PINNED = new Set([
   DEBRIEF_PROMPT_CODES.rubric,
   DEBRIEF_PROMPT_CODES.evaluator,
   'debrief_quality_judge_system',
+  'debrief_language_judge_rubric',
 ]);
 
 /** "Prompt · Writer", "Pinned rule · Safety reader", "Model · Writer", "Code · Builder". */

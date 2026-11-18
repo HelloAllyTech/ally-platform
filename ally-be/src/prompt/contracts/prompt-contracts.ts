@@ -1419,6 +1419,19 @@ export const DEBRIEF_QUALITY_JUDGE_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/debrief_language/judge_rubric.txt */
+export const DEBRIEF_LANGUAGE_JUDGE_RUBRIC = definePrompt(
+  'debrief_language_judge_rubric',
+  {},
+  {
+    name: 'Debrief Language Judge Rubric',
+    description:
+      "What the debrief language judge is told: check only whether the debrief's own words are written well in the session language, and list specific faults of eight closed kinds with the exact words. The judge composes the language facts, the cited turns and the debrief around this text. A pinned rule: only the named pinned editors can publish a change, which must also bump ally-ai's DEBRIEF_LANGUAGE_JUDGE.PROMPT_VERSION.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/debrief/safety_reader_system.txt */
 export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
   'debrief_safety_reader_system',

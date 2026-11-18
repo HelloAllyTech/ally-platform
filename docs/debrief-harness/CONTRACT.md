@@ -174,7 +174,7 @@ above. Builder and Bug Hunter are never given a token, so they never receive com
 |---|---|---|
 | `comments_read` | `{ "since"?: ISO date (exclusive, on `created_at`), "status"?: "open" \| "resolved" (default both), "ids"?: [uuid, ...], "limit"?: 1–200 (default 100) }` | `{ "comments": [ { "id", "run_id", "session_type", "language", "anchor": { "kind": "transcript" \| "card" \| "debrief", "turn_index", "section", "span_start", "span_end" }, "quoted_text", "body", "tag", "status", "idea": { "id", "status" } \| null, "repeat_of_id", "created_at", "replies": [ { "id", "body", "tag", "created_at" } ] } ], "next_since": ISO \| null }` — expert comment threads, oldest first (spec D8). Never the transcript, the cards or who wrote a comment. `next_since` is set when the page was full; pass it back as `since` |
 | `reporting_query` | `{ "sql": "SELECT …" }` | `ReportingQueryResult` `{ sql, ok, rows?, truncated?, refused? }` — the existing Analytics Agent guard and read-only executor over the redacted `debrief_reporting.*` views only. A refused query answers `refused` (the agent reads it as a tool error) |
-| `metrics_view` | `{ "weeks"?: 4–52 (default 8), "language"?, "recipe"?, …metric filters }` | `{ weeks, failure_points: [ { kind, name, segment, value, n, target, why } ], metrics: { <name>: value }, metric_names }` — spec C2 failure points from `DebriefMetricsService.view()` (`debrief-metric-failures.util.ts`): experience rates off the v9 targets (all, per language, per device), guardrails (hard-fail and thumbs-down above pre-launch, fabricated quotes, judge median below 8), efficiency drift (cost, revision rounds, visible seconds), steering falling, stages failing. Thin samples (n < 20) are left out |
+| `metrics_view` | `{ "weeks"?: 4–52 (default 8), "language"?, "recipe"?, …metric filters }` | `{ weeks, failure_points: [ { kind, name, segment, value, n, target, why } ], metrics: { <name>: value }, metric_names }` — spec C2 failure points from `DebriefMetricsService.view()` (`debrief-metric-failures.util.ts`): experience rates off the v9 targets (all, per language, per device), guardrails (hard-fail and thumbs-down above pre-launch, fabricated quotes, judge median below 8), efficiency drift (cost, revision rounds, visible seconds), steering falling, stages failing, and language faults in the debrief text (`language_issue_rate`, at most 0.2, overall and per language). Thin samples (n < 20) are left out |
 | `guidance_report` | `{ "days"?: 1–90 (default 30), "mode"?: "all"\|"live"\|"shadow" (default all) }` | The Console's guidance-metrics payload (below), unchanged. Read only; counts, timings and entry titles, no transcript text |
 | `idea_propose` | `{ "problem": { title, summary, comment_ids[], metrics: [ { name, value, segment? } ] }, "route": "A"\|"B"\|"C"\|"D", "title", "hypothesis", "expected_effect": { metric, direction: "up"\|"down", by?, note? }, "confidence": { level: "high"\|"low", why } }` | `{ idea_id, route, linked_comments, unknown_comment_ids, baseline: { metric, value }, next }` — writes an `agent_lessons` idea (`change.route`, `change.ideaKind` = `route_a` / `needs_code` / `defect` / `needs_person`; `evidence.problem`, `commentIds`, `metrics`, `forecast` with the named metric's value now, `confidence` `{level, why}` (V2_AUTONOMY A2; one left out is stored as low, so it never skips the always-ask list); `release_draft` may restate it), links the cited comments (`DebriefReviewService.linkIdea`). Refused: no evidence (no existing comment id and no metric), a metric not in `PM_AGENT_METRICS`, more than 5 ideas in one run, a duplicate, autonomy off |
 | `release_draft` | `{ "idea_id", "kind": "prompt_edit"\|"setting"\|"registry_agent", prompt_code/find/replace \| setting_key/setting_value \| agent: { id, description, use_when, skip_when, prompt, tools[], scopes[], eval_cases, model? } }` | `{ ok, idea_id, kind, next }` — route A only; draft only (nothing reaches learners). Refused: the never-list (C4: the rubric and judge prompts, the Safety reader, the PM agent's own instructions, budgets, `passScore`, every owner setting), prompts outside `PM_AGENT_EDITABLE_PROMPTS` (orchestrator prompts only while GA runs the orchestrator), a `find` not exactly once in the live text, a change to `{variables}`, settings outside `PM_AGENT_SETTINGS` ranges, a change that does not apply to GA or fails bundle validation; FR-53 for registry agents (registered tools and A2 scopes only, ≥ 10 eval cases, ≤ 10 experimental, approved model). Registry agents are stored as drafts: the build defines the agents a release can enable, so they are not tested yet |
@@ -1039,3 +1039,37 @@ sum of its call `ms`); `workspace.guidanceGiven [{code, via}]` → codes in `wor
 Writer; `runs` counts runs where it was fetched or given. `planner.decided` = runs whose planner chose the agent
 (`actions`) or listed it in `considered`. Judge = `evaluatorOverall`, else `workspace.judge.overall`; cost =
 `estimatedCostUsd`.
+
+## Debrief language check
+
+A second, separate judge on a debrief's own text: **is it written well in the session's language?** (Not whether the
+coaching is good: that is the debrief-quality judge. Not the roleplay client's language: that is the language-quality
+judge, on the client's turns.) Findings only, no score.
+
+- **ally-ai** `POST /api/v1/debrief-language/judge` (`app/core/debrief_language/`, task `debrief_language_judge`,
+  settings `DEBRIEF_LANGUAGE_JUDGE` provider/model/`PROMPT_VERSION`). Request: `sections` (`{section, text}`: the visible
+  text only, `languageSections` in ally-be), `language`, `language_config` (`languages.evalConfig`: label, variety,
+  diglossia, code-switch partners; all optional), `quoted_turns` (only the transcript turns the cards cite), `rubric` (the
+  pinned Skills Store text, else the code default). Response: `judge_model`, `judge_prompt_version`, `answered`,
+  `findings: [{section, error_type, evidence_quote, note}]`, `dropped`, `log`. Pinned model, temperature 0, never falls back,
+  a different model family from the Writer.
+- **Closed error types:** `wrong_language`, `script_mix`, `untranslated_chunk`, `quote_altered`, `stiff_register`,
+  `literal_translation`, `grammar_or_agreement`, `meaning_drift`. Code, not the model, enforces them: an unknown type, a
+  quote not found in the debrief text, an over-long quote or a duplicate is dropped and counted in `dropped`.
+  `answered: false` (no usable reply) is never stored as "no problems".
+- **ally-be** table `debrief_language_judgments` (migration 1984700000000): one row per run (`runId` unique, cascade),
+  `language`, `judgeModel`, `judgePromptVersion`, `findings` jsonb, `findingCount`, `types` text[], `judgedAt`. Written by
+  `DebriefLanguageJudgeService`; a normal call never overwrites, a deliberate re-judge (`force`) replaces the row. Ledger family
+  `debrief-language` (3 attempts, 60 min apart).
+- **When it runs:** only in the background `debrief-judge` drain, after the quality judge, inside its own guard; never in the
+  learner's wait, never on the run or publish path, and a failure there cannot fail or delay the quality judge. The share of
+  runs it reads is the release setting `languageJudgeSampleRate` (0 to 1, absent = 1; a person's setting, not the PM agent's),
+  chosen by a hash of the run id so a retry decides the same way.
+- **Metrics:** `quality.byLanguage[].languageProblem = { checked, notChecked, withFinding: Rate, byType: {type: debriefs} }`
+  (same Wilson interval as every rate). Failure point `language_issue_rate` (`language_off_target`), at most 0.2, overall and
+  per language, only past the 20-debrief floor. Metric name `language_issue_rate` (down is better).
+- **PM agent:** a consumer through the redacted views only: `debrief_reporting.language_checks` (one row per checked run) and
+  `debrief_reporting.language_findings` (language x error_type x card section, one row per finding). No quote, no note, no
+  learner text, no names. No new tool and no write access: it proposes general Writer-prompt changes through the normal ladder.
+- **Gate:** `ally-ai/scripts/debrief_language_perturbations.py` (planted faults, look-alike non-faults, flip rate, a
+  second judge for agreement); see the script's header for thresholds. The judge is trusted only while it passes.

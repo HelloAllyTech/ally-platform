@@ -35,6 +35,7 @@ export const PINNED_PROMPTS: ReadonlyMap<string, PinnedPromptReason> = new Map([
   // The debrief-quality judge's own instructions, after the rubric: the same
   // series label (ally-ai's DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION) covers both.
   ['debrief_quality_judge_system', 'judge_rubric'],
+  ['debrief_language_judge_rubric', 'judge_rubric'],
   ['rag_quality_rubric', 'judge_rubric'],
   ['ally_ai_learn_evaluation_actor_goal_system', 'measuring_instrument'],
   ['builder_eval_admin_system', 'measuring_instrument'],
