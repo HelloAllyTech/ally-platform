@@ -7,6 +7,7 @@ import {
   panelTabForStage,
   personLabel,
   quietLine,
+  simpleStageOfShown,
   statusLine,
   trackerModel,
   whyHereLine,
@@ -20,6 +21,7 @@ const row = (overrides: Partial<RoadmapItemRow>): RoadmapItemRow => ({
   code: "OPP-1",
   title: "Streak",
   shownStage: "submitted",
+  stage: "backlog",
   statusParts: { stage: "submitted", since: "2026-11-03T10:00:00Z", votes: 6 },
   author: ravi,
   votes: 6,
@@ -161,25 +163,32 @@ describe("whyHereLine", () => {
 });
 
 describe("trackerModel", () => {
-  it("marks steps before the current one done", () => {
-    const model = trackerModel("planning");
+  it("has three steps: Backlog, Being built, Shipped", () => {
+    const model = trackerModel("being_built");
     expect(model.kind).toBe("steps");
     if (model.kind !== "steps") return;
-    expect(model.steps.map(s => s.state)).toEqual(["done", "done", "current", "todo", "todo"]);
-    expect(model.steps.map(s => s.label)).toEqual([
-      "Submitted",
-      "Accepted",
-      "Planning",
-      "Building",
-      "Shipped",
-    ]);
+    expect(model.steps.map(s => s.state)).toEqual(["done", "current", "todo"]);
+    expect(model.steps.map(s => s.label)).toEqual(["Backlog", "Being built", "Shipped"]);
   });
-  it("replaces the tracker for Declined and Closed", () => {
+  it("reads the finer stages as the stage they fall in", () => {
+    for (const shown of ["planning", "building"] as const) {
+      const model = trackerModel(shown);
+      expect(model.kind === "steps" && model.currentIndex).toBe(1);
+    }
+    for (const shown of ["submitted", "accepted"] as const) {
+      const model = trackerModel(shown);
+      expect(model.kind === "steps" && model.currentIndex).toBe(0);
+    }
+    expect(simpleStageOfShown("closed")).toBe("declined");
+  });
+  it("replaces the tracker for Declined, Closed and Draft", () => {
     expect(trackerModel("declined")).toEqual({
       kind: "terminal",
       stage: "declined",
       label: "Declined",
     });
+    expect(trackerModel("closed")).toMatchObject({ kind: "terminal", stage: "declined" });
+    expect(trackerModel("draft")).toMatchObject({ kind: "terminal", stage: "draft" });
   });
 });
 

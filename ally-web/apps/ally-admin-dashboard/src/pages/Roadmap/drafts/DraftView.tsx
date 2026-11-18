@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { Tick } from "@icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -8,7 +9,6 @@ import { toast } from "sonner";
 import { Button, OverflowMenu, OverflowMenuItem, SkeletonText } from "@ally-ui-mono/ui-shared";
 import { roadmapV2API, useGetRoadmapProductGoalsQuery } from "@api";
 import { ROUTES, en } from "@constants";
-import { Tick } from "@icons";
 
 import { ChecksPanel } from "./ChecksPanel";
 import { DraftConversation, TurnError } from "./DraftConversation";

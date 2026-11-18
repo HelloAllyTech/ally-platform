@@ -4,6 +4,7 @@ import type {
   RoadmapItemRow,
   RoadmapPersonRef,
   RoadmapShownStage,
+  RoadmapSimpleStage,
   RoadmapStatusParts,
   RoadmapWhyHere,
 } from "@types";
@@ -40,30 +41,43 @@ export const usd = (value: number | null | undefined): string => {
 export const stageWord = (stage: RoadmapShownStage | string | undefined): string =>
   (stage && t().stages[stage]) || "";
 
-/** The five tracker steps (D20). Draft comes before them; Declined and Closed replace them. */
-export const TRACKER_STEPS: RoadmapShownStage[] = [
-  "submitted",
-  "accepted",
-  "planning",
-  "building",
-  "shipped",
-];
+/** The tracker's steps: three, because the Roadmap shows five stages in all. Draft comes before them; Declined replaces them. */
+export const TRACKER_STEPS: RoadmapSimpleStage[] = ["backlog", "being_built", "shipped"];
 
 export interface TrackerStep {
-  stage: RoadmapShownStage;
+  stage: RoadmapSimpleStage;
   label: string;
   state: "done" | "current" | "todo";
 }
 
 export type TrackerModel =
   | { kind: "steps"; steps: TrackerStep[]; currentIndex: number }
-  | { kind: "terminal"; stage: RoadmapShownStage; label: string };
+  | { kind: "terminal"; stage: RoadmapSimpleStage; label: string };
 
-export const trackerModel = (stage: RoadmapShownStage): TrackerModel => {
-  if (stage === "declined" || stage === "closed" || stage === "draft") {
-    return { kind: "terminal", stage, label: stageWord(stage) };
+/** A finer stage read as the simple stage it falls in (an idea's own `stage` is better when known). */
+export const simpleStageOfShown = (
+  stage: RoadmapShownStage | RoadmapSimpleStage,
+): RoadmapSimpleStage => {
+  switch (stage) {
+    case "submitted":
+    case "accepted":
+      return "backlog";
+    case "planning":
+    case "building":
+      return "being_built";
+    case "closed":
+      return "declined";
+    default:
+      return stage;
   }
-  const currentIndex = TRACKER_STEPS.indexOf(stage);
+};
+
+export const trackerModel = (stage: RoadmapShownStage | RoadmapSimpleStage): TrackerModel => {
+  const simple = simpleStageOfShown(stage);
+  if (simple === "declined" || simple === "draft") {
+    return { kind: "terminal", stage: simple, label: stageWord(simple) };
+  }
+  const currentIndex = TRACKER_STEPS.indexOf(simple);
   return {
     kind: "steps",
     currentIndex,

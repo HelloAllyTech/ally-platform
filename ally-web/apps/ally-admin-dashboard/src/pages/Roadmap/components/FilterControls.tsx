@@ -15,6 +15,7 @@ import { en } from "@constants";
 import type { RoadmapItemRow, RoadmapItemsResponse } from "@types";
 
 import { BottomSheet } from "./BottomSheet";
+import { RoadmapIconButton } from "./RoadmapIconButton";
 import { motionTransition, popVariants, useReducedMotionPreference } from "../../../motion";
 import {
   FLAG_FILTER_KEYS,
@@ -31,16 +32,7 @@ import {
 /** What FilterDropdown edits: one string list per section. Flags and month ride as lists too. */
 type FilterDropdownState = Record<string, string[]>;
 
-const STAGE_OPTIONS = [
-  "submitted",
-  "accepted",
-  "planning",
-  "building",
-  "shipped",
-  "declined",
-  "closed",
-];
-const REVIEW_OPTIONS = ["pending", "accepted", "declined"];
+const STAGE_OPTIONS = ["backlog", "being_built", "shipped", "declined"];
 const SERVICE_OPTIONS = ["be", "ai", "learn", "frontend", "mobile"];
 
 /** The next 6 and the last 6 months, newest first, as YYYY-MM. */
@@ -69,7 +61,11 @@ export interface FilterOptions {
  * its options load, so FilterDropdown never drops a key from its result (the house-pattern trap).
  * People come from the facets plus the rows on screen, by name, never by id alone.
  */
-export const useFilterOptions = (rows: RoadmapItemRow[]): FilterOptions => {
+export const useFilterOptions = (
+  rows: RoadmapItemRow[],
+  /** On a stage's own view (To do, Building ...) the stage is already chosen: no Stage section. */
+  hideStage = false,
+): FilterOptions => {
   const { data: goals } = useGetRoadmapProductGoalsQuery();
   const { data: facets } = useGetRoadmapFacetsQuery();
   return useMemo(() => {
@@ -94,16 +90,15 @@ export const useFilterOptions = (rows: RoadmapItemRow[]): FilterOptions => {
         .sort((a, b) => a.label.localeCompare(b.label));
 
     const sections: FilterSectionConfig<FilterDropdownState>[] = [
-      {
-        id: "stage",
-        label: f.stage,
-        options: STAGE_OPTIONS.map(v => ({ value: v, label: stages[v] })),
-      },
-      {
-        id: "review",
-        label: f.review,
-        options: REVIEW_OPTIONS.map(v => ({ value: v, label: f.reviewStates[v] })),
-      },
+      ...(hideStage
+        ? []
+        : [
+            {
+              id: "stage",
+              label: f.stage,
+              options: STAGE_OPTIONS.map(v => ({ value: v, label: stages[v] })),
+            },
+          ]),
       { id: "goal", label: f.goal, options: toOptions(goalMap) },
       { id: "author", label: f.author, options: toOptions(authors) },
       { id: "lead", label: f.lead, options: toOptions(leads) },
@@ -119,6 +114,9 @@ export const useFilterOptions = (rows: RoadmapItemRow[]): FilterOptions => {
           { value: "starred", label: f.starred },
           { value: "openQuestion", label: f.openQuestion },
           { value: "votedByMe", label: f.votedByMe },
+          { value: "ledByMe", label: f.ledByMe },
+          { value: "wroteByMe", label: f.wroteByMe },
+          { value: "needsYou", label: f.needsYou },
         ],
       },
       { id: "month", label: f.month, options: monthOptions() },
@@ -128,7 +126,7 @@ export const useFilterOptions = (rows: RoadmapItemRow[]): FilterOptions => {
       labels[String(section.id)] = Object.fromEntries(section.options.map(o => [o.value, o.label]));
     });
     return { sections, labels };
-  }, [goals, facets, rows]);
+  }, [goals, facets, rows, hideStage]);
 };
 
 /** QueueFilters → the dropdown's shape. */
@@ -172,6 +170,9 @@ export const chipText = (chip: FilterChip, labels: FilterOptions["labels"]): str
     case "starred":
     case "openQuestion":
     case "votedByMe":
+    case "ledByMe":
+    case "wroteByMe":
+    case "needsYou":
       return f[chip.key];
     default: {
       const group = {
@@ -350,14 +351,9 @@ export const FilterChips: React.FC<{
               className="inline-flex items-center gap-1 rounded-[20px] border border-border-light py-0.5 pl-2.5 pr-1 text-xs text-typography-primary"
             >
               {text}
-              <button
-                type="button"
-                aria-label={f.removeChip(text)}
-                onClick={() => onRemove(chip)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-neutral-100"
-              >
+              <RoadmapIconButton label={f.removeChip(text)} onClick={() => onRemove(chip)}>
                 <Close size={12} aria-hidden />
-              </button>
+              </RoadmapIconButton>
             </motion.li>
           );
         })}

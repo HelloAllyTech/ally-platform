@@ -2,12 +2,12 @@ import type { RoadmapItemDetail } from "@types";
 
 /**
  * The idea page holds exactly one primary action for you, chosen by stage and role (§4.5), in the
- * plan's order: Accept (Owner) · Pick a lead (Owner) · Start planning (lead or Owner) · Approve
+ * plan's order: Pick a lead (Owner; on an unreviewed idea this accepts it, there is no separate
+ * Accept) · Start planning (lead or Owner) · Approve
  * design · Build ▾ · Merge · Release. `can` decides: a control you can't use is absent, never
  * greyed out (§4.0 #14, §4.5c). When nothing is yours to do the slot holds the quiet line instead.
  */
 export type PrimaryActionKind =
-  | "accept"
   | "pickLead"
   | "startPlanning"
   | "approveDesign"
@@ -27,7 +27,7 @@ export const primaryActionFor = (
   const p = parts(item);
   switch (item.shownStage) {
     case "submitted":
-      return can.review ? "accept" : null;
+      return can.review ? "pickLead" : null;
     case "accepted":
       if (!item.lead && can.pickLead) return "pickLead";
       return can.startPlanning ? "startPlanning" : null;
@@ -48,7 +48,7 @@ export const primaryActionFor = (
 
 /**
  * Which of those exist in P2. The rest arrive with their phases and render nothing until then:
- * Accept / Pick a lead (P3), Start planning (P3b), Build ▾ (P4), Merge and Release (P4/P5, with the
+ * Pick a lead (P3), Start planning (P3b), Build ▾ (P4), Merge and Release (P4/P5, with the
  * release policy). Approve design is live: the Design tab's existing panel does the approving.
  */
 export const PRIMARY_ACTIONS_BUILT: PrimaryActionKind[] = ["approveDesign"];

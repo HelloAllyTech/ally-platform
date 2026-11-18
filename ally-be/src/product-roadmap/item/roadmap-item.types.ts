@@ -1,6 +1,7 @@
 import type {
   ItemStatusParts,
   ShownStage,
+  SimpleStage,
 } from 'src/product-planning/util/plan-stage.util';
 import type {
   RoadmapCapabilities,
@@ -61,6 +62,8 @@ export interface ItemRow {
   code: string;
   title: string;
   shownStage: ShownStage;
+  /** The stage in five words (Draft, Backlog, Being built, Shipped, Declined): what rows, filters and the tracker say. */
+  stage: SimpleStage;
   statusParts: ItemStatusParts;
   author: PersonRef;
   lead?: PersonRef;
@@ -73,6 +76,8 @@ export interface ItemRow {
   unread: boolean;
   whyHere?: WhyHere;
   goal?: { id: string; name: string };
+  /** 'YYYY-MM' the Owner planned it for, or null when unscheduled. */
+  plannedMonth: string | null;
   updatedAt: string;
   stageSince: string;
 }
@@ -127,10 +132,12 @@ export interface ForYouSections {
   recentlyShipped: ItemRow[];
 }
 
+/**
+ * To triage is the Backlog: every idea nobody leads yet, in one list. Ideas that already have a
+ * lead are Being built and live under Leading, not here.
+ */
 export interface ToTriageSections {
-  awaitingReview: ItemRow[];
-  needsLead: ItemRow[];
-  reassign: ItemRow[];
+  backlog: ItemRow[];
 }
 
 export type ItemListResponse =

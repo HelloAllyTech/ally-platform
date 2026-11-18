@@ -10,11 +10,10 @@ import type { RoadmapItemRow, RoadmapItemsResponse } from "@types";
 import { DeclineDialog, DeclineTarget } from "./DeclineDialog";
 import { LeadPicker } from "./LeadPicker";
 import { TriageReviewMode } from "./TriageReviewMode";
-import { TriageSummary } from "./TriageSummary";
 import { workingDaysSince } from "./triageUtils";
 import { triageExit, undoLastReview, useReviewActions } from "./useReviewActions";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
-import { RollingNumber } from "../components/FlowMotion";
+import { IdeaView } from "../components/IdeaView";
 import { sectionsFor } from "../components/QueueList";
 import { RoadmapBreakpoint, hasReadingPane } from "../hooks/useRoadmapBreakpoint";
 import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
@@ -23,7 +22,7 @@ import { isTypingTarget } from "../utils/keyboard";
 /** Waiting more than this many working days turns the age amber (§4.6). */
 export const AMBER_AFTER_WORKING_DAYS = 5;
 
-type Decision = "accept" | "decline";
+type Decision = "assign" | "decline";
 
 interface TriageViewProps {
   data?: RoadmapItemsResponse;
@@ -39,13 +38,15 @@ interface TriageViewProps {
   onVisibleCodes: (codes: string[]) => void;
   /** A dialog of ours is open: the queue page's own keys stand down. */
   onOverlay?: (open: boolean) => void;
+  /** Present while the server has more of the Backlog than has been loaded. */
+  onLoadMore?: () => void;
 }
 
 /**
- * To triage (§4.6, D10, D11) [FP-1684]: Awaiting review · Needs a lead · Reassign?, built for
- * speed. Single keys: A accept · L accept + lead · D decline · X select · U undo (J/K/Enter/Esc
- * stay the queue's). X selects rows, and A, D or L then apply to every selected row; bulk decline
- * asks one reason, editable per idea; one undo reverses the whole batch (§4.11).
+ * To triage (§4.6, D10, D11) [FP-1684]: the Backlog, every idea nobody leads yet, built for speed.
+ * An Owner does one of two things with each: pick a lead (which accepts an unreviewed idea; there
+ * is no separate Accept) or decline it. Single keys: L pick a lead · D decline · X select · U undo
+ * (J/K/Enter/Esc stay the queue's). Each acts on the idea you are on; there is no bulk select.
  *
  * The reading pane shows the Summary first, not the conversation. On a phone or tablet the list
  * opens Review mode: one card at a time, swipe to decide (§4.17). Bulk select isn't offered there.
@@ -61,8 +62,8 @@ export const TriageView: React.FC<TriageViewProps> = ({
   onOpen,
   onVisibleCodes,
   onOverlay,
+  onLoadMore,
 }) => {
-  const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
   const touch = !hasReadingPane(breakpoint);
   const actions = useReviewActions();
@@ -71,7 +72,6 @@ export const TriageView: React.FC<TriageViewProps> = ({
   const codes = useMemo(() => rows.map(r => r.code), [rows]);
   useEffect(() => onVisibleCodes(codes), [codes, onVisibleCodes]);
 
-  const [checked, setChecked] = useState<Set<string>>(() => new Set());
   const [leaving, setLeaving] = useState<Map<string, Decision>>(() => new Map());
   const [declineFor, setDeclineFor] = useState<DeclineTarget[] | null>(null);
   const [leadFor, setLeadFor] = useState<RoadmapItemRow[] | null>(null);
@@ -81,18 +81,11 @@ export const TriageView: React.FC<TriageViewProps> = ({
     [declineFor, leadFor, reviewMode, onOverlay],
   );
 
-  // Rows that left the list drop out of the selection too.
-  useEffect(() => {
-    setChecked(prev => {
-      const next = new Set([...prev].filter(c => codes.includes(c)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [codes]);
-
   const rowBy = useCallback((code: string) => rows.find(r => r.code === code), [rows]);
-  const sectionOf = useCallback(
-    (code: string) => sections.find(s => s.rows.some(r => r.code === code))?.key,
-    [sections],
+  /** Still awaiting review (nobody has accepted it), so it can be declined too. */
+  const needsReview = useCallback(
+    (code: string) => rowBy(code)?.shownStage === "submitted",
+    [rowBy],
   );
 
   const markLeaving = (list: string[], decision: Decision) =>
@@ -108,39 +101,33 @@ export const TriageView: React.FC<TriageViewProps> = ({
       return next;
     });
 
-  /** The rows a key acts on: the checked ones, or the one J/K is on. */
+  /** The row a key acts on: the one J/K is on, or the one open in the pane. */
   const targets = useCallback((): RoadmapItemRow[] => {
-    const list = checked.size ? [...checked] : selected ? [selected] : open ? [open] : [];
+    const list = selected ? [selected] : open ? [open] : [];
     return list.map(rowBy).filter(Boolean) as RoadmapItemRow[];
-  }, [checked, selected, open, rowBy]);
+  }, [selected, open, rowBy]);
 
-  const acceptRows = useCallback(
-    async (list: RoadmapItemRow[], lead?: { id: number; name: string }) => {
-      const review = list.filter(r => sectionOf(r.code) === "awaitingReview");
-      const assign = list.filter(r => sectionOf(r.code) !== "awaitingReview");
+  /** Give these ideas a lead. An unreviewed one is accepted by it; an accepted one just gets it. */
+  const assignRows = useCallback(
+    async (list: RoadmapItemRow[], lead: { id: number; name: string }) => {
+      const review = list.filter(r => needsReview(r.code));
+      const assign = list.filter(r => !needsReview(r.code));
       const codesNow = list.map(r => r.code);
-      markLeaving(codesNow, "accept");
+      markLeaving(codesNow, "assign");
       let ok = true;
       if (review.length === 1 && assign.length === 0) {
-        ok = await actions.accept(review[0].code, lead, () => unmark(codesNow));
+        ok = await actions.assign(review[0].code, lead, () => unmark(codesNow));
       } else if (review.length) {
         ok = await actions.reviewMany(
-          review.map(r => ({
-            code: r.code,
-            decision: "accept" as const,
-            ...(lead ? { leadUserId: lead.id } : {}),
-          })),
+          review.map(r => ({ code: r.code, decision: "accept" as const, leadUserId: lead.id })),
           () => unmark(codesNow),
         );
       }
-      if (lead) {
-        for (const r of assign) ok = (await actions.pickLead(r.code, lead)) && ok;
-      }
+      for (const r of assign) ok = (await actions.pickLead(r.code, lead)) && ok;
       if (!ok) unmark(codesNow);
-      else setChecked(new Set());
       return ok;
     },
-    [actions, sectionOf],
+    [actions, needsReview],
   );
 
   const declineRows = useCallback(
@@ -155,14 +142,13 @@ export const TriageView: React.FC<TriageViewProps> = ({
               () => unmark(list),
             );
       if (!ok) unmark(list);
-      else setChecked(new Set());
       return ok;
     },
     [actions],
   );
 
   const startDecline = (list: RoadmapItemRow[]) => {
-    const declinable = list.filter(r => sectionOf(r.code) === "awaitingReview");
+    const declinable = list.filter(r => needsReview(r.code));
     if (declinable.length)
       setDeclineFor(
         declinable.map(r => ({ code: r.code, title: r.title, goalName: r.goal?.name })),
@@ -177,39 +163,27 @@ export const TriageView: React.FC<TriageViewProps> = ({
       if (isTypingTarget(event.target) || declineFor || leadFor) return;
       if ((event.target as HTMLElement | null)?.closest?.("[role='dialog'], [role='menu']")) return;
       const key = event.key.toLowerCase();
-      if (!["a", "l", "d", "x", "u"].includes(key)) return;
+      if (!["l", "d", "u"].includes(key)) return;
       event.preventDefault();
       if (key === "u") {
         undoLastReview();
         return;
       }
-      if (key === "x") {
-        const code = selected ?? open;
-        if (!code) return;
-        setChecked(prev => {
-          const next = new Set(prev);
-          if (next.has(code)) next.delete(code);
-          else next.add(code);
-          return next;
-        });
-        return;
-      }
       const list = targets();
       if (list.length === 0) return;
-      if (key === "a") void acceptRows(list);
       if (key === "l") setLeadFor(list);
       if (key === "d") startDecline(list);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [touch, declineFor, leadFor, selected, open, targets, acceptRows]);
+  }, [touch, declineFor, leadFor, selected, open, targets, assignRows]);
 
-  // P8: a row awaiting review taking focus (J/K or opened) starts "triage one" for it; Accept or
-  // Decline ends it (useReviewActions). Moving away and back starts a fresh attempt.
+  // P8: a row awaiting review taking focus (J/K or opened) starts "triage one" for it; picking a
+  // lead or Decline ends it (useReviewActions). Moving away and back starts a fresh attempt.
   const jobs = useRoadmapJobTimer();
   const focusedCode = open ?? selected;
-  const focusedAwaiting = !!focusedCode && sectionOf(focusedCode) === "awaitingReview";
+  const focusedAwaiting = !!focusedCode && needsReview(focusedCode);
   useEffect(() => {
     if (focusedCode && focusedAwaiting) {
       jobs.start("triage_one", { itemId: focusedCode, restart: true });
@@ -238,7 +212,6 @@ export const TriageView: React.FC<TriageViewProps> = ({
   }
   if (rows.length === 0) return <AllCaughtUp />;
 
-  const selectMode = checked.size > 0;
   const paneCode = open ?? selected;
 
   const list = (
@@ -271,20 +244,10 @@ export const TriageView: React.FC<TriageViewProps> = ({
                   <TriageRow
                     key={row.code}
                     row={row}
-                    section={section.key}
+                    awaitingReview={row.shownStage === "submitted"}
                     current={paneCode === row.code}
-                    checked={checked.has(row.code)}
-                    selectMode={selectMode && !touch}
                     leaving={leaving.get(row.code) ?? null}
                     touch={touch}
-                    onToggle={() =>
-                      setChecked(prev => {
-                        const next = new Set(prev);
-                        if (next.has(row.code)) next.delete(row.code);
-                        else next.add(row.code);
-                        return next;
-                      })
-                    }
                     onOpen={() => onOpen(row.code)}
                   />
                 ))}
@@ -293,40 +256,14 @@ export const TriageView: React.FC<TriageViewProps> = ({
           </section>
         ),
       )}
+      {onLoadMore && (
+        <div className="flex justify-center py-3">
+          <Button kind="tertiary" size="sm" onClick={onLoadMore}>
+            {copy.loadMore}
+          </Button>
+        </div>
+      )}
       <div className="h-20" aria-hidden />
-      {/* The selection bar rises from the bottom with the count rolling (§4.18 "Bulk select"). */}
-      <AnimatePresence>
-        {selectMode && !touch && (
-          <motion.div
-            className="sticky bottom-0 z-[2] flex items-center gap-2 border-t border-border-light bg-white px-4 py-2 shadow"
-            initial={reduced ? { opacity: 0 } : { y: "100%", opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={reduced ? { opacity: 0 } : { y: "100%", opacity: 0 }}
-            transition={motionTransition("moderate", "productive", reduced)}
-            role="region"
-            aria-label={copy.triage.selected(checked.size)}
-          >
-            <span className="text-sm text-typography-primary" aria-live="polite">
-              <RollingNumber value={checked.size} />{" "}
-              <span className="sr-only">{copy.triage.selected(checked.size)}</span>
-            </span>
-            <Button kind="ghost" size="sm" onClick={() => setChecked(new Set())}>
-              {copy.triage.clearSelection}
-            </Button>
-            <span className="ml-auto flex gap-2">
-              <Button kind="secondary" size="sm" onClick={() => startDecline(targets())}>
-                {copy.review.decline}
-              </Button>
-              <Button kind="tertiary" size="sm" onClick={() => setLeadFor(targets())}>
-                {copy.review.acceptWithLead}
-              </Button>
-              <Button kind="primary" size="sm" onClick={() => void acceptRows(targets())}>
-                {copy.review.accept}
-              </Button>
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 
@@ -343,9 +280,8 @@ export const TriageView: React.FC<TriageViewProps> = ({
         open={!!leadFor}
         code={leadFor?.[0]?.code ?? ""}
         count={leadFor?.length ?? 1}
-        accepting={!!leadFor?.some(r => sectionOf(r.code) === "awaitingReview")}
         onClose={() => setLeadFor(null)}
-        onPick={lead => acceptRows(leadFor ?? [], lead)}
+        onPick={lead => assignRows(leadFor ?? [], lead)}
         sheet={touch}
       />
     </>
@@ -358,12 +294,9 @@ export const TriageView: React.FC<TriageViewProps> = ({
         {dialogs}
         <TriageReviewMode
           open={reviewMode}
-          rows={rows.filter(
-            r => sectionOf(r.code) === "awaitingReview" || sectionOf(r.code) === "needsLead",
-          )}
-          sectionOf={sectionOf}
+          rows={rows}
+          needsReview={needsReview}
           onClose={() => setReviewMode(false)}
-          onAccept={row => acceptRows([row])}
           onDecline={row => startDecline([row])}
           onPickLead={row => setLeadFor([row])}
         />
@@ -374,16 +307,11 @@ export const TriageView: React.FC<TriageViewProps> = ({
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,2fr)_3fr]">
       <div className="flex min-h-0 flex-col border-r border-border-light">{list}</div>
-      <div className="min-h-0 overflow-y-auto">
+      <div className="min-h-0 overflow-hidden">
         {paneCode && rowBy(paneCode) ? (
-          <TriageSummary
-            key={paneCode}
-            code={paneCode}
-            section={sectionOf(paneCode)}
-            onAccept={() => void acceptRows([rowBy(paneCode)!])}
-            onAcceptWithLead={() => setLeadFor([rowBy(paneCode)!])}
-            onDecline={() => startDecline([rowBy(paneCode)!])}
-          />
+          // The whole idea, in place: conversation, details and the actions (Pick a lead,
+          // Decline). Nothing here sends the Owner to another page.
+          <IdeaView key={paneCode} code={paneCode} mode="pane" breakpoint={breakpoint} />
         ) : (
           <p className="p-6 text-sm text-typography-secondary">{copy.readingPaneEmpty}</p>
         )}
@@ -395,27 +323,20 @@ export const TriageView: React.FC<TriageViewProps> = ({
 
 const TriageRow: React.FC<{
   row: RoadmapItemRow;
-  section: string;
+  awaitingReview: boolean;
   current: boolean;
-  checked: boolean;
-  selectMode: boolean;
   leaving: Decision | null;
   touch: boolean;
-  onToggle: () => void;
   onOpen: () => void;
-}> = ({ row, section, current, checked, selectMode, leaving, touch, onToggle, onOpen }) => {
+}> = ({ row, awaitingReview, current, leaving, touch, onOpen }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.triage;
   const why = row.whyHere;
   const since = why && "since" in why ? why.since : row.stageSince;
   const days = workingDaysSince(since);
-  const amber = section === "awaitingReview" && days > AMBER_AFTER_WORKING_DAYS;
-  const age =
-    section === "reassign" && why?.kind === "reassign"
-      ? copy.idle(why.idleDays)
-      : section === "needsLead"
-        ? en.roadmapV2.stages.accepted
-        : copy.waiting(days);
+  // Unreviewed ideas that have waited too long turn amber; the age is the same plain "3d" for all.
+  const amber = awaitingReview && days > AMBER_AFTER_WORKING_DAYS;
+  const age = copy.waiting(days);
 
   return (
     <motion.li
@@ -424,12 +345,12 @@ const TriageRow: React.FC<{
       animate={{
         opacity: leaving ? 0.7 : 1,
         height: "auto",
-        x: leaving && !reduced ? (leaving === "accept" ? 24 : -24) : 0,
+        x: leaving && !reduced ? (leaving === "assign" ? 24 : -24) : 0,
       }}
       exit={reduced ? { opacity: 0 } : { ...triageExit(leaving, reduced), height: 0 }}
       transition={motionTransition("moderate", "productive", reduced)}
       className={`relative list-none overflow-hidden border-b border-border-light ${
-        leaving === "accept"
+        leaving === "assign"
           ? "bg-success-50"
           : leaving === "decline"
             ? "bg-neutral-100"
@@ -441,28 +362,7 @@ const TriageRow: React.FC<{
       data-leaving={leaving ?? undefined}
     >
       <div className={`flex items-center gap-2 pr-4 ${touch ? "min-h-[72px]" : "min-h-12"}`}>
-        <AnimatePresence initial={false}>
-          {selectMode ? (
-            <motion.label
-              key="box"
-              className="flex h-12 w-10 shrink-0 cursor-pointer items-center justify-center"
-              initial={reduced ? { opacity: 0 } : { opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={reduced ? { opacity: 0 } : { opacity: 0, x: -16 }}
-              transition={motionTransition("moderate", "productive", reduced)}
-            >
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={onToggle}
-                aria-label={copy.select(row.code)}
-                className="h-4 w-4"
-              />
-            </motion.label>
-          ) : (
-            <span key="dot" className="w-6 shrink-0" aria-hidden />
-          )}
-        </AnimatePresence>
+        <span className="w-4 shrink-0" aria-hidden />
         <button
           type="button"
           onClick={onOpen}
@@ -470,28 +370,43 @@ const TriageRow: React.FC<{
           aria-current={current ? "true" : undefined}
           className="flex min-w-0 flex-1 items-baseline gap-2 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
         >
-          <span className="shrink-0 text-xs tabular-nums text-typography-secondary">
-            {row.code}
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex items-center gap-2">
+              {typeof row.queueRank === "number" && (
+                <span
+                  className="shrink-0 text-xs font-semibold tabular-nums text-primary-700"
+                  title={en.roadmapV2.row.rankHelp(row.queueRank)}
+                >
+                  <span aria-hidden>#{row.queueRank}</span>
+                  <span className="sr-only">{en.roadmapV2.row.rankLabel(row.queueRank)}</span>
+                </span>
+              )}
+              <span className="shrink-0 text-xs tabular-nums text-typography-secondary">
+                {row.code}
+              </span>
+            </span>
+            <span
+              className="mt-1 line-clamp-2 break-words text-base leading-snug text-typography-primary"
+              title={row.title}
+            >
+              {row.title}
+            </span>
+            {(row.goal?.name || row.author?.name) && (
+              <span className="mt-1 truncate text-xs text-typography-secondary">
+                {[row.goal?.name, row.author?.name ? `Wrote it: ${row.author.name}` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            )}
           </span>
-          <span className="min-w-0 truncate text-sm text-typography-primary">{row.title}</span>
         </button>
         <span
           className={`shrink-0 text-xs tabular-nums ${amber ? "font-semibold text-warning-700" : "text-typography-secondary"}`}
-          title={section === "awaitingReview" ? copy.waitingLong(days) : undefined}
+          title={awaitingReview ? copy.waitingLong(days) : undefined}
         >
           {age}
           {amber && <span className="sr-only"> · {copy.waitingLong(days)}</span>}
         </span>
-        {!selectMode && !touch && (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={copy.select(row.code)}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-typography-secondary opacity-60 hover:bg-neutral-100 hover:opacity-100 focus-visible:opacity-100"
-          >
-            <span aria-hidden className="h-3.5 w-3.5 rounded-sm border border-current" />
-          </button>
-        )}
       </div>
     </motion.li>
   );

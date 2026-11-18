@@ -3,24 +3,23 @@ import React, { useEffect, useRef, useState } from "react";
 import { Notification, StarSolid } from "@icons";
 import { AnimatePresence, PanInfo, motion, useAnimationControls } from "framer-motion";
 
-import { OverflowMenu, OverflowMenuItem } from "@ally-ui-mono/ui-shared";
+import { Tag } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 import type { RoadmapItemRow } from "@types";
 
-import { VoteControl } from "./VoteControl";
+import { STAGE_TAG } from "./OpportunityHeader";
 import {
   haptic,
   motionTransition,
   springTransition,
   useReducedMotionPreference,
 } from "../../../motion";
-import { stageWord, whyHereLine } from "../utils/copy";
+import { simpleStageOfShown, stageWord, whyHereLine } from "../utils/copy";
 
 export interface QueueRowActions {
   onOpen: (code: string) => void;
   onMarkRead: (code: string) => void;
   onWatch: (code: string) => void;
-  onCopyLink: (code: string) => void;
   /** Long-press on touch: the action sheet (open, watch, copy link). */
   onLongPress?: (code: string) => void;
   /** Hovered or focused for 150 ms: prefetch the reading pane (§4.12). */
@@ -35,7 +34,6 @@ interface QueueRowProps extends QueueRowActions {
   /** Phone and tablet: swipe-reveal and long-press are on. */
   touch: boolean;
   /** Every Roadmap role may vote (§3.1); false only where the caller has none. */
-  canVote?: boolean;
   index: number;
 }
 
@@ -59,12 +57,10 @@ export const QueueRow: React.FC<QueueRowProps> = ({
   selected,
   gone = false,
   touch,
-  canVote = true,
   index,
   onOpen,
   onMarkRead,
   onWatch,
-  onCopyLink,
   onLongPress,
   onPrefetch,
 }) => {
@@ -83,6 +79,21 @@ export const QueueRow: React.FC<QueueRowProps> = ({
     },
     [],
   );
+
+  const month = row.plannedMonth
+    ? (() => {
+        const [y, mo] = row.plannedMonth.split("-").map(Number);
+        return y && mo
+          ? new Date(y, mo - 1, 1).toLocaleString("en", { month: "short", year: "numeric" })
+          : row.plannedMonth;
+      })()
+    : null;
+  const facts = [
+    row.goal?.name,
+    row.lead ? `Lead: ${row.lead.name}` : row.stage === "being_built" ? "No lead" : null,
+    month ? `Planned ${month}` : null,
+    row.author?.name ? `Wrote it: ${row.author.name}` : null,
+  ].filter((v): v is string => !!v);
 
   const why = whyHereLine(row.whyHere);
 
@@ -244,71 +255,60 @@ export const QueueRow: React.FC<QueueRowProps> = ({
           onTouchMove={cancelLongPress}
           className="relative min-w-0 flex-1 py-3 pr-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
         >
-          <span className="flex min-w-0 items-baseline gap-2">
+          {/* Line 1: where it stands. Line 2: the title, in full up to two lines. Line 3: what it is
+              about and who has it, so a row can be read before it is opened. */}
+          <span className="flex min-w-0 items-center gap-2">
             {typeof row.queueRank === "number" && (
               <span
-                className="shrink-0 text-sm font-semibold tabular-nums text-primary-700"
-                title={copy.row.rank(row.queueRank)}
+                className="shrink-0 text-xs font-semibold tabular-nums text-primary-700"
+                title={copy.row.rankHelp(row.queueRank)}
                 data-testid="queue-rank"
               >
                 <span aria-hidden>#{row.queueRank}</span>
-                <span className="sr-only">{copy.row.rank(row.queueRank)}</span>
+                <span className="sr-only">{copy.row.rankLabel(row.queueRank)}</span>
               </span>
             )}
             <span className="shrink-0 text-xs tabular-nums text-typography-secondary">
               {row.code}
             </span>
-            <span
-              className={`min-w-0 truncate text-sm ${
-                row.unread ? "font-semibold text-typography-primary" : "text-typography-primary"
-              }`}
-              title={row.title}
+            <Tag
+              type={STAGE_TAG[row.stage ?? simpleStageOfShown(row.shownStage)] ?? "gray"}
+              size="sm"
+              className="!m-0 shrink-0"
             >
-              {row.title}
-            </span>
+              {stageWord(row.stage ?? row.shownStage)}
+            </Tag>
+            {row.starred && (
+              <span
+                title={row.starredBy ? copy.people.starredBy(row.starredBy.name) : copy.row.starred}
+              >
+                <StarSolid size={14} className="text-warning-500" aria-hidden />
+                <span className="sr-only">{copy.row.starred}</span>
+              </span>
+            )}
           </span>
+          <span
+            className={`mt-1 line-clamp-2 block break-words text-base leading-snug ${
+              row.unread ? "font-semibold text-typography-primary" : "text-typography-primary"
+            }`}
+            title={row.title}
+          >
+            {row.title}
+          </span>
+          {facts.length > 0 && (
+            <span
+              className="mt-1 block truncate text-xs text-typography-secondary"
+              title={facts.join(" · ")}
+            >
+              {facts.join(" · ")}
+            </span>
+          )}
           {why && (
             <span className="mt-0.5 block truncate text-xs text-typography-secondary" title={why}>
               {why}
             </span>
           )}
         </button>
-
-        <span className="relative flex shrink-0 items-center gap-2 pr-1 text-xs text-typography-secondary">
-          <span className="hidden sm:inline">{stageWord(row.shownStage)}</span>
-          <VoteControl
-            id={row.id}
-            code={row.code}
-            votes={row.votes}
-            votedByMe={row.votedByMe}
-            canVote={canVote}
-            lazy
-          />
-          {row.starred && (
-            <span
-              title={row.starredBy ? copy.people.starredBy(row.starredBy.name) : copy.row.starred}
-            >
-              <StarSolid size={14} className="text-warning-500" aria-hidden />
-              <span className="sr-only">{copy.row.starred}</span>
-            </span>
-          )}
-        </span>
-
-        <span className="relative flex shrink-0 items-center">
-          <OverflowMenu
-            aria-label={copy.row.actions(row.code)}
-            iconDescription={copy.row.actions(row.code)}
-            flipped
-            size={touch ? "lg" : "sm"}
-          >
-            <OverflowMenuItem itemText={copy.row.openRow} onClick={() => onOpen(row.code)} />
-            {row.unread && (
-              <OverflowMenuItem itemText={copy.row.markRead} onClick={() => onMarkRead(row.code)} />
-            )}
-            <OverflowMenuItem itemText={copy.row.watch} onClick={() => onWatch(row.code)} />
-            <OverflowMenuItem itemText={copy.row.copyLink} onClick={() => onCopyLink(row.code)} />
-          </OverflowMenu>
-        </span>
       </motion.div>
     </motion.li>
   );

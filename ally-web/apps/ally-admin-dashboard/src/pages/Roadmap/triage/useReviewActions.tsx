@@ -30,7 +30,7 @@ export const UndoToast: React.FC<{
   const copy = en.roadmapV2.review;
   return (
     <div
-      className="relative flex w-[356px] max-w-[calc(100vw-2rem)] items-center gap-3 overflow-hidden rounded-md bg-neutral-800 px-4 py-3 text-sm text-white shadow-lg"
+      className="relative flex w-[356px] max-w-[calc(100vw-2rem)] items-center gap-3 overflow-hidden bg-neutral-800 px-4 py-3 text-sm text-white shadow-lg"
       role="status"
       data-testid="roadmap-undo-toast"
     >
@@ -69,8 +69,10 @@ export const undoLastReview = (): boolean => {
 };
 
 /**
- * The Owner's review calls, each with the 8-second undo (§4.6) and haptics (10 ms on accept,
- * 2 × 15 ms on decline; §4.18). One undo token reverses a whole batch.
+ * The Owner's review calls, each with the 8-second undo (§4.6) and haptics (10 ms on a lead,
+ * 2 × 15 ms on decline; §4.18). One undo token reverses a whole batch. There is no plain Accept:
+ * picking a lead is what accepts an unreviewed idea (`assign`), and `pickLead` does the same for
+ * one that was accepted before.
  */
 export const useReviewActions = () => {
   const [review] = useReviewRoadmapItemMutation();
@@ -78,8 +80,8 @@ export const useReviewActions = () => {
   const [undo] = useUndoRoadmapReviewMutation();
   const [setLead] = useSetRoadmapLeadMutation();
   const copy = en.roadmapV2.review;
-  // P8: Accept (with or without a lead) or Decline (with a reason) ends "triage one" (§4.16) when
-  // the row's focus started it. Bulk reviews are not timed per idea.
+  // P8: picking a lead or Decline (with a reason) ends "triage one" (§4.16) when the row's focus
+  // started it. Bulk reviews are not timed per idea.
   const { complete: completeJob } = useRoadmapJobTimer();
 
   const offerUndo = useCallback(
@@ -118,21 +120,18 @@ export const useReviewActions = () => {
     [undo, copy],
   );
 
-  const accept = useCallback(
-    async (code: string, lead?: { id: number; name: string }, onUndone?: () => void) => {
+  /** Pick a lead for an idea still awaiting review: accepts it and gives it the lead in one step. */
+  const assign = useCallback(
+    async (code: string, lead: { id: number; name: string }, onUndone?: () => void) => {
       try {
         const result = await review({
           code,
           decision: "accept",
-          ...(lead ? { leadUserId: lead.id } : {}),
+          leadUserId: lead.id,
         }).unwrap();
         haptic(10);
         completeJob("triage_one", { itemId: code });
-        offerUndo(
-          lead ? copy.acceptedWithLead(code, lead.name) : copy.accepted(code),
-          result.undoToken,
-          onUndone,
-        );
+        offerUndo(copy.leadAssigned(code, lead.name), result.undoToken, onUndone);
         return true;
       } catch {
         toast.error(copy.failed);
@@ -229,13 +228,13 @@ export const useReviewActions = () => {
     [setLead, copy],
   );
 
-  return { accept, decline, reopen, reviewMany, pickLead, handBack };
+  return { assign, decline, reopen, reviewMany, pickLead, handBack };
 };
 
-/** Motion values for the desktop triage row (§4.18): accept slides right, decline left. */
-export const triageExit = (decision: "accept" | "decline" | null, reduced: boolean) => {
+/** Motion values for the desktop triage row (§4.18): a lead slides right, decline left. */
+export const triageExit = (decision: "assign" | "decline" | null, reduced: boolean) => {
   if (!decision || reduced) return { opacity: 0 };
-  return { x: decision === "accept" ? 24 : -24, opacity: 0 };
+  return { x: decision === "assign" ? 24 : -24, opacity: 0 };
 };
 
 export const triageTransition = (reduced: boolean) =>

@@ -77,6 +77,7 @@ const row = (overrides: Partial<RoadmapItemRow> = {}): RoadmapItemRow => ({
   code: "OPP-388",
   title: "Streak on start screen",
   shownStage: "planning",
+  stage: "being_built",
   statusParts: {
     stage: "planning",
     step: "design",
@@ -155,9 +156,16 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("locks voting once the idea leaves the Backlog: the count stays, the control goes", () => {
+    wrap(<IdeaVotes item={detail({ vote: true }, { stage: "being_built" })} />);
+    expect(screen.queryByRole("button", { name: "vote-button" })).toBeNull();
+    expect(screen.getByText(en.roadmapV2.row.votes(23))).toBeInTheDocument();
+    expect(screen.getByTitle(en.roadmapV2.row.votesLocked)).toBeInTheDocument();
+  });
+
   it("gives the idea page the real VoteButton, keyed by the opportunity id", () => {
     mockOpportunity.mockClear();
-    wrap(<IdeaVotes item={detail({ vote: true })} />);
+    wrap(<IdeaVotes item={detail({ vote: true }, { stage: "backlog" })} />);
     expect(screen.getByRole("button", { name: "vote-button" })).toBeInTheDocument();
     expect(mockOpportunity).toHaveBeenCalledWith("opp-uuid-388", { skip: false });
   });
@@ -185,7 +193,10 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
 
 describe("primaryActionFor", () => {
   it("picks one action by stage and can{}", () => {
-    expect(primaryActionFor(detail({ review: true }, { shownStage: "submitted" }))).toBe("accept");
+    // Picking the lead is what accepts an unreviewed idea, so that is its action too.
+    expect(primaryActionFor(detail({ review: true }, { shownStage: "submitted" }))).toBe(
+      "pickLead",
+    );
     expect(
       primaryActionFor(detail({ pickLead: true }, { shownStage: "accepted", lead: undefined })),
     ).toBe("pickLead");
@@ -256,13 +267,10 @@ describe("QueueRow", () => {
     expect(screen.queryByTestId("queue-rank")).toBeNull();
   });
 
-  it("loads a row's vote record only when the reader reaches for it, then shows VoteButton", () => {
-    mockOpportunity.mockClear();
+  it("shows no votes and no menu in the row: it is read, then opened", () => {
     renderRow();
     expect(screen.queryByRole("button", { name: "vote-button" })).toBeNull();
-    expect(mockOpportunity).toHaveBeenLastCalledWith("opp-uuid-388", { skip: true });
-    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${en.roadmapV2.row.vote}:`) }));
-    expect(screen.getByRole("button", { name: "vote-button" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.roadmapV2.row.actions("OPP-388") })).toBeNull();
   });
 
   it("prefetches after a 150 ms mouse hover, but not for a touch", () => {
@@ -279,14 +287,9 @@ describe("QueueRow", () => {
     vi.useRealTimers();
   });
 
-  it("on touch, the swipe actions also exist as visible buttons in the row's ⋯ menu", () => {
+  it("on touch, the swipe actions are there, revealed by a swipe", () => {
     renderRow({ touch: true });
-    // Revealed by swipes (hidden from AT until revealed) …
     expect(screen.getAllByText(en.roadmapV2.row.markRead).length).toBeGreaterThan(0);
-    // … and the ⋯ menu is always there.
-    expect(
-      screen.getByRole("button", { name: en.roadmapV2.row.actions("OPP-388") }),
-    ).toBeInTheDocument();
   });
 });
 
@@ -325,7 +328,7 @@ describe("reduced motion lands on the same final state", () => {
     setReduceMotionSwitch(true);
     const still = snapshot();
     expect(still).toEqual(moving);
-    expect(still.text).toContain("Planning");
+    expect(still.text).toContain("Being built");
   });
 });
 
@@ -400,12 +403,18 @@ describe("QueueList", () => {
     expect(screen.getByRole("button", { name: en.roadmapV2.updatedPill })).toBeInTheDocument();
   });
 
-  it("groups Leading by stage", () => {
+  it("groups Leading by the five stages: planning and building are both Being built", () => {
     const sections = sectionsFor("leading", {
-      rows: [row({ code: "OPP-1" }), row({ code: "OPP-2", shownStage: "building" })],
-      total: 2,
+      rows: [
+        row({ code: "OPP-1", stage: "being_built" }),
+        row({ code: "OPP-2", shownStage: "building", stage: "being_built" }),
+        row({ code: "OPP-3", shownStage: "shipped", stage: "shipped" }),
+      ],
+      total: 3,
     });
-    expect(sections.map(s => s.key)).toEqual(["planning", "building"]);
+    expect(sections.map(s => s.key)).toEqual(["being_built", "shipped"]);
+    expect(sections[0].rows.map(r => r.code)).toEqual(["OPP-1", "OPP-2"]);
+    expect(sections[0].label).toBe("Being built");
   });
 });
 

@@ -17,6 +17,7 @@ import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.se
 import {
   deriveItemStage,
   ItemStage,
+  simpleStageOf,
 } from 'src/product-planning/util/plan-stage.util';
 import {
   capabilitiesFor,
@@ -30,7 +31,6 @@ import {
 } from '../repository/roadmap-opportunity.repository';
 import { RoadmapStrategyGoalService } from '../service/roadmap-strategy-goal.service';
 import { currentPeriodKey } from '../util/roadmap-period.util';
-import { NUDGE_AFTER_DAYS } from '../plan/plan-lead.service';
 import { PlanSessionStore } from '../plan/plan-session.store';
 import {
   PlanSessionDetail,
@@ -79,6 +79,8 @@ const DAY_MS = 86_400_000;
 const RECENTLY_SHIPPED_DAYS = 14;
 /** One section of For you or To triage never returns more than this. */
 const SECTION_MAX = 50;
+/** To triage is the whole Backlog, so it is not cut at the small per-section limit the other views use. */
+const TRIAGE_SECTION_MAX = 500;
 /** Quick open (§4.11). */
 const SEARCH_MAX = 20;
 const RECENT_MAX = 5;
@@ -216,9 +218,17 @@ export class RoadmapItemReadService {
       throw new ForbiddenException('To triage is for Owners.');
     }
     const loaded = await this.loadAll(userId, role);
-    const visible = loaded.cores.filter((c) =>
-      matchesFilters(c, query.filters),
-    );
+    let visible = loaded.cores.filter((c) => matchesFilters(c, query.filters));
+    // Filters about the person asking: ideas they lead, wrote, or that wait on them.
+    const f = query.filters;
+    if (f.ledByMe) visible = visible.filter((c) => c.leadId === userId);
+    if (f.wroteByMe) visible = visible.filter((c) => c.authorId === userId);
+    if (f.needsYou) {
+      visible = visible
+        .filter((c) => c.shownStage !== 'declined' && c.shownStage !== 'closed')
+        .map((c) => ({ ...c, whyHere: this.needsYouWhy(loaded, c) }))
+        .filter((c) => !!c.whyHere);
+    }
     const order = compareRows(query.sort);
 
     if (query.view === 'for-you') {
@@ -239,7 +249,7 @@ export class RoadmapItemReadService {
       for (const key of Object.keys(sections) as (keyof ToTriageSections)[]) {
         out[key] = await this.toRows(
           loaded,
-          sections[key].sort(order).slice(0, SECTION_MAX),
+          sections[key].sort(order).slice(0, TRIAGE_SECTION_MAX),
         );
       }
       return { sections: out };
@@ -585,38 +595,26 @@ export class RoadmapItemReadService {
     return undefined;
   }
 
-  /** To triage (§4.3, §4.6): review, a lead to pick, and idle leads. */
+  /**
+   * To triage (§4.3, §4.6): the Backlog, every idea nobody leads yet, as one list. An unreviewed
+   * idea says it awaits review; the rest say they need a lead. Either way the Owner's move is the
+   * same: pick a lead (which accepts an unreviewed idea) or decline it. Led ideas are Being built.
+   */
   private toTriage(cores: ItemCore[]): CoreSections<ToTriageSections> {
-    const now = Date.now();
-    const awaitingReview = cores
-      .filter((c) => c.shownStage === 'submitted')
-      .map((c) => ({
-        ...c,
-        whyHere: { kind: 'awaitingReview' as const, since: c.stageSince },
-      }));
-    const needsLead = cores
-      .filter((c) => c.shownStage === 'accepted' && c.leadId === null)
-      .map((c) => ({
-        ...c,
-        whyHere: { kind: 'needsLead' as const, since: c.stageSince },
-      }));
-    const reassign = cores
+    const backlog = cores
       .filter(
         (c) =>
-          c.leadId !== null &&
-          (c.shownStage === 'accepted' ||
-            c.shownStage === 'planning' ||
-            c.shownStage === 'building'),
+          c.shownStage === 'submitted' ||
+          (c.shownStage === 'accepted' && c.leadId === null),
       )
-      .map((c) => {
-        const quiet = Date.parse(c.session?.updatedAt ?? c.opp.updatedAt ?? '');
-        const idleDays = Number.isFinite(quiet)
-          ? Math.floor((now - quiet) / DAY_MS)
-          : 0;
-        return { ...c, whyHere: { kind: 'reassign' as const, idleDays } };
-      })
-      .filter((c) => c.whyHere.idleDays >= NUDGE_AFTER_DAYS);
-    return { awaitingReview, needsLead, reassign };
+      .map((c) => ({
+        ...c,
+        whyHere:
+          c.shownStage === 'submitted'
+            ? { kind: 'awaitingReview' as const, since: c.stageSince }
+            : { kind: 'needsLead' as const, since: c.stageSince },
+      }));
+    return { backlog };
   }
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -1135,6 +1133,7 @@ export class RoadmapItemReadService {
         code: c.code,
         title: c.title,
         shownStage: c.shownStage,
+        stage: simpleStageOf(c.shownStage, c.leadId),
         statusParts: c.stage.statusParts,
         author: person(c.authorId, 'author'),
         ...(c.leadId ? { lead: person(c.leadId, 'lead') } : {}),
@@ -1150,6 +1149,7 @@ export class RoadmapItemReadService {
         ...(c.goalId && c.goalName
           ? { goal: { id: c.goalId, name: c.goalName } }
           : {}),
+        plannedMonth: c.plannedMonth,
         updatedAt: c.lastActivityAt,
         stageSince: c.stageSince,
       };

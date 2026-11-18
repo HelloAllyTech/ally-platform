@@ -17,8 +17,9 @@ import { useRoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
 import { primaryActionFor } from "../utils/primaryAction";
 
 /**
- * The idea page's primary action for the steps P3 and P3b own (§4.5): Accept (with Accept + lead
- * and Decline beside it) and Pick a lead for an Owner; Start planning for the lead or an Owner.
+ * The idea page's primary action for the steps P3 and P3b own (§4.5): Pick a lead for an Owner
+ * (with Decline beside it while the idea still awaits review; picking the lead is what accepts it,
+ * there is no separate Accept); Start planning for the lead or an Owner.
  * Also two that only show on a declined idea: Reopen for an Owner (§4.6), and New idea pre-filled
  * with the author's own text, for the author alone (§4.7).
  *
@@ -29,9 +30,7 @@ export const IdeaFlowAction: React.FC<{ item: RoadmapItemDetail; fullWidth?: boo
   fullWidth,
 }) => {
   const action = primaryActionFor(item);
-  if (action === "accept" || action === "pickLead") {
-    return <ReviewButtons item={item} mode={action} fullWidth={fullWidth} />;
-  }
+  if (action === "pickLead") return <ReviewButtons item={item} fullWidth={fullWidth} />;
   if (action === "startPlanning") return <StartPlanningButton item={item} fullWidth={fullWidth} />;
   if (item.shownStage === "declined") {
     if (item.can?.review) return <ReopenButton item={item} fullWidth={fullWidth} />;
@@ -50,60 +49,41 @@ const isDeclinedAuthor = (item: RoadmapItemDetail): boolean =>
 /** True when {@link IdeaFlowAction} renders something for this item. */
 export const hasIdeaFlowAction = (item: RoadmapItemDetail): boolean => {
   const action = primaryActionFor(item);
-  if (action === "accept" || action === "pickLead" || action === "startPlanning") return true;
+  if (action === "pickLead" || action === "startPlanning") return true;
   return item.shownStage === "declined" && (!!item.can?.review || isDeclinedAuthor(item));
 };
 
 const ReviewButtons: React.FC<{
   item: RoadmapItemDetail;
-  mode: "accept" | "pickLead";
   fullWidth?: boolean;
-}> = ({ item, mode, fullWidth }) => {
+}> = ({ item, fullWidth }) => {
   const copy = en.roadmapV2.review;
   const breakpoint = useRoadmapBreakpoint();
   const sheet = breakpoint === "phone" || breakpoint === "tablet";
   const actions = useReviewActions();
   const [leadOpen, setLeadOpen] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
+  const awaitingReview = item.shownStage === "submitted";
   const size = fullWidth ? "lg" : "md";
   const wide = fullWidth ? "flex-1 max-w-none" : "";
 
   return (
     <div className={`flex items-center gap-2 ${fullWidth ? "w-full" : ""}`}>
-      {mode === "accept" ? (
-        <>
-          <Button
-            kind="secondary"
-            size={size}
-            className={wide}
-            onClick={() => setDeclineOpen(true)}
-          >
-            {copy.decline}
-          </Button>
-          <Button kind="tertiary" size={size} className={wide} onClick={() => setLeadOpen(true)}>
-            {copy.acceptWithLead}
-          </Button>
-          <Button
-            kind="primary"
-            size={size}
-            className={wide}
-            onClick={() => void actions.accept(item.code)}
-          >
-            {copy.accept}
-          </Button>
-        </>
-      ) : (
-        <Button kind="primary" size={size} className={wide} onClick={() => setLeadOpen(true)}>
-          {copy.pickLead}
+      {/* Still awaiting review: Decline is the other choice. Picking the lead accepts it. */}
+      {awaitingReview && (
+        <Button kind="secondary" size={size} className={wide} onClick={() => setDeclineOpen(true)}>
+          {copy.decline}
         </Button>
       )}
+      <Button kind="primary" size={size} className={wide} onClick={() => setLeadOpen(true)}>
+        {copy.pickLead}
+      </Button>
       <LeadPicker
         open={leadOpen}
         code={item.code}
-        accepting={mode === "accept"}
         onClose={() => setLeadOpen(false)}
         onPick={lead =>
-          mode === "accept" ? actions.accept(item.code, lead) : actions.pickLead(item.code, lead)
+          awaitingReview ? actions.assign(item.code, lead) : actions.pickLead(item.code, lead)
         }
         sheet={sheet}
       />

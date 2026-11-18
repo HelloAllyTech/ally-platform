@@ -77,15 +77,22 @@ export const CopyLinkButton: React.FC<{ code: string; compact?: boolean }> = ({
 };
 
 /** The idea's votes: the real VoteButton straight away (one record to load, not one per row). */
-export const IdeaVotes: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => (
-  <VoteControl
-    id={item.id}
-    code={item.code}
-    votes={item.votes}
-    votedByMe={item.votedByMe}
-    canVote={!!item.can?.vote}
-  />
-);
+export const IdeaVotes: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
+  // Votes open and close with the stage: you can add and take away votes only while the idea is in
+  // the Backlog. Past it the count stays, and it is locked.
+  const open = item.stage === "backlog";
+  return (
+    <span title={open ? undefined : en.roadmapV2.row.votesLocked}>
+      <VoteControl
+        id={item.id}
+        code={item.code}
+        votes={item.votes}
+        votedByMe={item.votedByMe}
+        canVote={!!item.can?.vote && open}
+      />
+    </span>
+  );
+};
 
 /** Star (Owner only, D16): fills and scales 1 → 1.2 → 1. Others see who starred it, read-only. */
 export const IdeaStar: React.FC<{ item: RoadmapItemDetail; compact?: boolean }> = ({
@@ -329,9 +336,6 @@ export const PrimaryAction: React.FC<{
   }
   if (!PRIMARY_ACTIONS_BUILT.includes(action)) {
     switch (action) {
-      case "accept":
-        // Rendered by IdeaFlowAction above (P3).
-        return null;
       case "pickLead":
         // Rendered by IdeaFlowAction above (P3).
         return null;

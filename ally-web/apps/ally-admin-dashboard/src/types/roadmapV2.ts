@@ -18,6 +18,9 @@ export type RoadmapShownStage =
   | "declined"
   | "closed";
 
+/** The stage in five words: what rows, filters and the tracker say. `shownStage` keeps the detail. */
+export type RoadmapSimpleStage = "draft" | "backlog" | "being_built" | "shipped" | "declined";
+
 export type RoadmapWatchLevel = "all" | "milestones" | "none";
 
 export type RoadmapRelation = "author" | "lead" | "owner" | "builder" | "idea";
@@ -137,6 +140,8 @@ export interface RoadmapItemRow {
   code: string;
   title: string;
   shownStage: RoadmapShownStage;
+  /** Draft, Backlog, Being built, Shipped or Declined. */
+  stage: RoadmapSimpleStage;
   statusParts: RoadmapStatusParts | Record<string, unknown>;
   author: RoadmapPersonRef;
   lead?: RoadmapPersonRef;
@@ -149,6 +154,8 @@ export interface RoadmapItemRow {
   unread: boolean;
   whyHere?: RoadmapWhyHere;
   goal?: { id: string; name: string };
+  /** YYYY-MM the Owner planned it for; null when unscheduled. */
+  plannedMonth?: string | null;
   updatedAt: string;
   stageSince: string;
 }
@@ -215,7 +222,14 @@ export interface RoadmapMeRole {
 
 export type RoadmapQueueView = "for-you" | "leading" | "to-triage" | "all";
 
-export type RoadmapQueueSort = "rank" | "waiting" | "newest" | "votes" | "activity" | "stageAge";
+export type RoadmapQueueSort =
+  | "rank"
+  | "waiting"
+  | "newest"
+  | "votes"
+  | "activity"
+  | "stageAge"
+  | "stageNewest";
 
 /** The query params of `GET /v1/roadmap/items`. Every value is a string, as it travels. */
 export interface RoadmapItemsQuery {
@@ -230,9 +244,13 @@ export interface RoadmapItemsQuery {
   starred?: "1";
   openQuestion?: "1";
   votedByMe?: "1";
+  ledByMe?: "1";
+  wroteByMe?: "1";
+  needsYou?: "1";
   month?: string;
   sort?: RoadmapQueueSort;
   cursor?: string;
+  limit?: string;
 }
 
 export interface RoadmapForYouSections {

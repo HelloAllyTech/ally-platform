@@ -10,12 +10,13 @@ import type {
   RoadmapItemRow,
   RoadmapItemsResponse,
   RoadmapQueueView,
-  RoadmapShownStage,
+  RoadmapSimpleStage,
 } from "@types";
 
 import { NewIdeaButton } from "./NewIdeaButton";
 import { QueueRow, QueueRowActions } from "./QueueRow";
 import { motionTransition, popVariants, useReducedMotionPreference } from "../../../motion";
+import { simpleStageOfShown } from "../utils/copy";
 import { DisplayRow, freezeOrder, liveRows } from "../utils/frozenOrder";
 
 /** A titled group of rows. `key` doubles as the copy key in en.roadmapV2.sections / stages. */
@@ -26,16 +27,8 @@ export interface QueueSection {
 }
 
 const FOR_YOU_SECTIONS = ["needsYou", "yourIdeas", "watching", "recentlyShipped"];
-const TRIAGE_SECTIONS = ["awaitingReview", "needsLead", "reassign"];
-const LEADING_STAGE_ORDER: RoadmapShownStage[] = [
-  "planning",
-  "building",
-  "accepted",
-  "submitted",
-  "shipped",
-  "declined",
-  "closed",
-];
+const TRIAGE_SECTIONS = ["backlog"];
+const LEADING_STAGE_ORDER: RoadmapSimpleStage[] = ["being_built", "shipped", "backlog", "declined"];
 
 /**
  * The response as sections (§4.3): For you and To triage come in the server's own sections, in a
@@ -63,9 +56,10 @@ export const sectionsFor = (
     return LEADING_STAGE_ORDER.map(stage => ({
       key: stage,
       label: copy.stages[stage],
-      rows: rows.filter(row => row.shownStage === stage),
+      rows: rows.filter(row => (row.stage ?? simpleStageOfShown(row.shownStage)) === stage),
     })).filter(section => section.rows.length > 0);
   }
+  if (view === "to-triage") return [{ key: "backlog", label: copy.sections.backlog, rows }];
   return [{ key: "all", rows }];
 };
 
@@ -241,14 +235,14 @@ export const QueueList: React.FC<QueueListProps> = ({
             {...popVariants(reduced)}
             transition={motionTransition("moderate", "productive", reduced)}
           >
-            <button
-              type="button"
+            <Button
+              kind="primary"
+              size="sm"
               onClick={onRelease}
-              className="inline-flex min-h-8 items-center gap-1 rounded-full bg-primary-600 px-3 text-xs font-medium text-white shadow"
+              renderIcon={() => <Refresh size={14} aria-hidden />}
             >
-              <Refresh size={14} aria-hidden />
               {copy.updatedPill}
-            </button>
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>

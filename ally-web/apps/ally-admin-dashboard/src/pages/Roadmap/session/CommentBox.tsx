@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 
 import { motion } from "framer-motion";
 
-import { Button, Tooltip } from "@ally-ui-mono/ui-shared";
+import { Button, TextArea, Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon } from "@assets";
 import { en } from "@constants";
 import type { RoadmapItemDetail, RoadmapPersonRef } from "@types";
@@ -118,12 +118,11 @@ export const CommentBox: React.FC<CommentBoxProps> = ({
   return (
     <div className="flex flex-col gap-1">
       <PendingAnswers pending={pending} onRetry={session.retry} />
-      <div className="relative flex items-end gap-2 rounded border border-border-light p-2 focus-within:border-primary-600">
-        <label className="sr-only" htmlFor={`roadmap-comment-${item.code}`}>
-          {copy.commentLabel}
-        </label>
-        <textarea
+      <div className="relative flex flex-col gap-2">
+        <TextArea
           id={`roadmap-comment-${item.code}`}
+          labelText={copy.commentLabel}
+          hideLabel
           ref={ref}
           rows={large ? 4 : 1}
           value={text}
@@ -160,17 +159,18 @@ export const CommentBox: React.FC<CommentBoxProps> = ({
               send();
             }
           }}
-          className="min-h-10 flex-1 resize-none bg-transparent px-1 text-base outline-none"
         />
-        <DictationButton
-          code={item.code}
-          large={large}
-          boxLabel={copy.commentLabel}
-          onText={words => typeInText(text, words, setText, reduced)}
-        />
-        <Button kind="primary" size={large ? "lg" : "sm"} onClick={send} disabled={!text.trim()}>
-          {copy.commentSend}
-        </Button>
+        <div className="flex items-center justify-end gap-2">
+          <DictationButton
+            code={item.code}
+            large={large}
+            boxLabel={copy.commentLabel}
+            onText={words => typeInText(text, words, setText, reduced)}
+          />
+          <Button kind="primary" size={large ? "lg" : "sm"} onClick={send} disabled={!text.trim()}>
+            {copy.commentSend}
+          </Button>
+        </div>
         {matches.length > 0 && (
           <ul
             id={listId}

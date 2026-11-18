@@ -1,4 +1,9 @@
-import type { ShownStage } from 'src/product-planning/util/plan-stage.util';
+import {
+  SIMPLE_STAGES,
+  simpleStageOf,
+  type ShownStage,
+  type SimpleStage,
+} from 'src/product-planning/util/plan-stage.util';
 import type { WhyHere } from './roadmap-item.types';
 
 /**
@@ -21,17 +26,36 @@ export const ITEM_SORTS = [
   'votes',
   'activity',
   'stageAge',
+  // Most recently moved into its stage first: what Released and Declined are read by.
+  'stageNewest',
 ] as const;
 export type ItemSort = (typeof ITEM_SORTS)[number];
 
-const SHOWN_STAGES: ShownStage[] = [
-  'submitted',
-  'accepted',
-  'planning',
-  'building',
-  'shipped',
-  'declined',
-  'closed',
+/**
+ * The `stage` filter speaks the simple stages. The finer values a saved view or an old link may
+ * still carry are read as the stage they fall in, so they narrow to the same ideas, never to nothing.
+ */
+const LEGACY_STAGE: Record<string, SimpleStage> = {
+  new: 'backlog',
+  submitted: 'backlog',
+  accepted: 'backlog',
+  prioritised: 'being_built',
+  planning: 'being_built',
+  building: 'being_built',
+  released: 'shipped',
+  closed: 'declined',
+  archived: 'declined',
+};
+const toSimpleStages = (value: unknown): SimpleStage[] => [
+  ...new Set(
+    list(value)
+      .map((v) =>
+        (SIMPLE_STAGES as string[]).includes(v)
+          ? (v as SimpleStage)
+          : LEGACY_STAGE[v],
+      )
+      .filter((v): v is SimpleStage => !!v),
+  ),
 ];
 const REVIEW_STATES = ['pending', 'accepted', 'declined'] as const;
 type ReviewState = (typeof REVIEW_STATES)[number];
@@ -39,7 +63,8 @@ type ReviewState = (typeof REVIEW_STATES)[number];
 export const DEFAULT_SORT: Record<ItemView, ItemSort> = {
   'for-you': 'waiting',
   leading: 'waiting',
-  'to-triage': 'waiting',
+  // Backlog ideas are ranked like everything not yet released; the Owner picks from the top.
+  'to-triage': 'rank',
   all: 'rank',
 };
 
@@ -48,7 +73,7 @@ export const ITEM_PAGE_MAX = 200;
 
 export interface ItemFilters {
   q?: string;
-  stage?: ShownStage[];
+  stage?: SimpleStage[];
   review?: ReviewState[];
   goal?: string[];
   author?: number[];
@@ -57,6 +82,11 @@ export interface ItemFilters {
   starred?: boolean;
   openQuestion?: boolean;
   votedByMe?: boolean;
+  /** About the person asking, so the read model applies them (matchesFilters cannot): */
+  ledByMe?: boolean;
+  wroteByMe?: boolean;
+  /** An open question, decision or @mention is waiting on the person asking. */
+  needsYou?: boolean;
   month?: string;
 }
 
@@ -141,7 +171,7 @@ export function parseItemQuery(raw: RawQuery): ItemQuery {
   const limitN = Number(raw.limit);
   const filters: ItemFilters = {
     q,
-    stage: nonEmpty(oneOf(SHOWN_STAGES, raw.stage)),
+    stage: nonEmpty(toSimpleStages(raw.stage)),
     review: nonEmpty(oneOf(REVIEW_STATES, raw.review)),
     goal: nonEmpty(list(raw.goal)),
     author: nonEmpty(ids(raw.author)),
@@ -150,6 +180,9 @@ export function parseItemQuery(raw: RawQuery): ItemQuery {
     starred: flag(raw.starred),
     openQuestion: flag(raw.openQuestion),
     votedByMe: flag(raw.votedByMe),
+    ledByMe: flag(raw.ledByMe),
+    wroteByMe: flag(raw.wroteByMe),
+    needsYou: flag(raw.needsYou),
     month,
   };
   for (const key of Object.keys(filters) as (keyof ItemFilters)[]) {
@@ -185,7 +218,8 @@ export function matchesFilters(row: ItemQueryFacts, f: ItemFilters): boolean {
       (digits !== null && codeDigits(row.code) === digits);
     if (!hit) return false;
   }
-  if (f.stage && !f.stage.includes(row.shownStage)) return false;
+  if (f.stage && !f.stage.includes(simpleStageOf(row.shownStage, row.leadId)))
+    return false;
   if (f.review && !f.review.includes(row.reviewState)) return false;
   if (f.goal && !(row.goalId && f.goal.includes(row.goalId))) return false;
   if (f.author && !f.author.includes(row.authorId)) return false;
@@ -241,6 +275,8 @@ export function compareRows(
         return (a, b) => time(b.lastActivityAt) - time(a.lastActivityAt);
       case 'stageAge':
         return (a, b) => time(a.stageSince) - time(b.stageSince);
+      case 'stageNewest':
+        return (a, b) => time(b.stageSince) - time(a.stageSince);
     }
   })();
   return (a, b) => primary(a, b) || tiebreak(a, b);
@@ -277,21 +313,46 @@ export function page<T>(
   };
 }
 
-/** The first line of an idea's text, which is its title (the row has no title column). */
-export function titleOf(description: string | null | undefined): string {
-  const line = (description ?? '')
-    .split('\n')
-    .map((l) => l.trim())
-    .find((l) => l.length > 0);
-  return (line ?? '').slice(0, 200);
+/** The longest title the idea page shows and lets you save (the PATCH DTO allows the same). */
+export const TITLE_MAX = 200;
+
+/**
+ * Splits the idea's first non-empty line into a title of at most `TITLE_MAX` characters and the
+ * overflow. A longer line is cut at the last space (so a word is not sliced in half) and the rest
+ * moves to the body, so no text is ever dropped between what is stored and what the page shows —
+ * and saving a title edit rebuilds exactly what was stored.
+ */
+function splitFirstLine(description: string | null | undefined): {
+  title: string;
+  overflow: string;
+} {
+  const line =
+    (description ?? '')
+      .split('\n')
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? '';
+  if (line.length <= TITLE_MAX) return { title: line, overflow: '' };
+  const space = line.lastIndexOf(' ', TITLE_MAX);
+  const cut = space >= TITLE_MAX / 2 ? space : TITLE_MAX;
+  return {
+    title: line.slice(0, cut).trimEnd(),
+    overflow: line.slice(cut).trim(),
+  };
 }
 
-/** Everything after the title line, trimmed; null when there is nothing. */
+/** The first line of an idea's text, which is its title (the row has no title column). */
+export function titleOf(description: string | null | undefined): string {
+  return splitFirstLine(description).title;
+}
+
+/** Everything after the title, trimmed (a long first line's overflow, then the later lines); null when there is nothing. */
 export function bodyOf(description: string | null | undefined): string | null {
   const text = (description ?? '').trim();
   const newline = text.indexOf('\n');
-  if (newline < 0) return null;
-  const body = text.slice(newline + 1).trim();
+  const rest = newline < 0 ? '' : text.slice(newline + 1).trim();
+  const body = [splitFirstLine(description).overflow, rest]
+    .filter(Boolean)
+    .join('\n\n');
   return body.length ? body : null;
 }
 

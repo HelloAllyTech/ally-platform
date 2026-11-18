@@ -1,5 +1,8 @@
-import React from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { toast } from "sonner";
+
+import { usePatchRoadmapItemMutation } from "@api";
 import { BuildView, PrdDocPanel, TechnicalDesignPanel } from "@components/builder";
 import { ErrorBoundary } from "@components/error-boundary";
 import { en } from "@constants";
@@ -7,6 +10,7 @@ import type { BuilderSessionDetail, RoadmapItemDetail } from "@types";
 
 import { CodeText } from "./CodeChip";
 import { ShipActions } from "./ReleaseDialog";
+import { SimilarLine } from "../triage/TriageSummary";
 import { IdeaPanelTab, shortDate, usd } from "../utils/copy";
 import { outcomeLine } from "../utils/delight";
 
@@ -29,6 +33,55 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
   </div>
 );
 
+/**
+ * The problem, edited in place by whoever may change the idea's text (`can.editSummary`): saves when
+ * you leave the box, Esc puts back what was there. Everyone else reads it.
+ */
+const ProblemEditor: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
+  const copy = en.roadmapV2.actions.banner;
+  const [patch] = usePatchRoadmapItemMutation();
+  const saved = item.summary?.problem ?? "";
+  const [value, setValue] = useState(saved);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => setValue(saved), [saved]);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  const commit = async () => {
+    const next = value.trim();
+    if (next === saved.trim()) return;
+    try {
+      await patch({ code: item.code, patch: { summary: { problem: next } } }).unwrap();
+    } catch {
+      setValue(saved);
+      toast.error(en.roadmapV2.actions.editFailed);
+    }
+  };
+  return (
+    <textarea
+      ref={ref}
+      rows={2}
+      value={value}
+      maxLength={1000}
+      aria-label={copy.problem}
+      placeholder={copy.problemPlaceholder}
+      onChange={event => setValue(event.target.value)}
+      onBlur={() => void commit()}
+      onKeyDown={event => {
+        if (event.key === "Escape") {
+          setValue(saved);
+          event.stopPropagation();
+          ref.current?.blur();
+        }
+      }}
+      className="w-full resize-none overflow-hidden rounded border border-transparent bg-transparent px-1 py-0.5 text-sm text-typography-primary outline-none hover:border-border-light focus:border-primary-600"
+    />
+  );
+};
+
 export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
   const copy = en.roadmapV2.idea.summary;
   const s = item.summary ?? {};
@@ -43,7 +96,12 @@ export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) =>
         </Field>
       )}
       {item.goal && <Field label={copy.goal}>{item.goal.name}</Field>}
-      {s.problem && (
+      {item.can?.editSummary && (
+        <Field label={copy.problem}>
+          <ProblemEditor item={item} />
+        </Field>
+      )}
+      {!item.can?.editSummary && s.problem && (
         <Field label={copy.problem}>
           <p className="m-0 whitespace-pre-wrap">
             <CodeText text={s.problem} />
@@ -52,6 +110,12 @@ export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) =>
       )}
       {s.who && <Field label={copy.who}>{s.who}</Field>}
       {s.outcome && <Field label={copy.outcome}>{s.outcome}</Field>}
+      {/* The one who decides, deciding: what it overlaps with, right where they read it. */}
+      {item.can?.review && (
+        <Field label={en.roadmapV2.triage.similar}>
+          <SimilarLine code={item.code} bare />
+        </Field>
+      )}
       {why.length > 0 && (
         <Field label={copy.whyRanks}>
           <ul className="m-0 list-disc pl-4">

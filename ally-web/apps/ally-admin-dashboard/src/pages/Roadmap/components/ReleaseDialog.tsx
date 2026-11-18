@@ -2,7 +2,15 @@ import React, { useEffect, useState } from "react";
 
 import { toast } from "sonner";
 
-import { Button, InlineNotification, Modal, SkeletonText, Tag } from "@ally-ui-mono/ui-shared";
+import {
+  Button,
+  InlineNotification,
+  Modal,
+  RadioButton,
+  RadioButtonGroup,
+  SkeletonText,
+  Tag,
+} from "@ally-ui-mono/ui-shared";
 import { useGetRoadmapReleasePlanQuery, useReleaseRoadmapServiceMutation } from "@api";
 import { en } from "@constants";
 import type { RoadmapItemDetail, RoadmapReleasePlan, RoadmapReleaseService } from "@types";
@@ -157,24 +165,24 @@ export const ReleaseDialog: React.FC<ReleaseDialogProps> = ({ open, onClose, ser
   const body = (
     <div className="flex flex-col gap-3">
       {services.length > 1 && (
-        <div role="radiogroup" aria-label={copy.service} className="flex flex-wrap gap-2">
+        <RadioButtonGroup
+          legendText={copy.service}
+          name="roadmap-release-service"
+          orientation="horizontal"
+          valueSelected={service}
+          onChange={(value: string | number | undefined) =>
+            setService(String(value ?? "") as RoadmapReleaseService)
+          }
+        >
           {services.map(s => (
-            <button
+            <RadioButton
               key={s}
-              type="button"
-              role="radio"
-              aria-checked={s === service}
-              onClick={() => setService(s)}
-              className={`min-h-11 rounded-full border px-3 text-sm ${
-                s === service
-                  ? "border-primary-600 bg-primary-50 text-primary-700"
-                  : "border-border-light text-typography-600"
-              }`}
-            >
-              {copy.services[s] ?? s}
-            </button>
+              id={`roadmap-release-service-${s}`}
+              labelText={copy.services[s] ?? s}
+              value={s}
+            />
           ))}
-        </div>
+        </RadioButtonGroup>
       )}
       {isFetching && !plan ? (
         <div aria-busy="true">

@@ -282,7 +282,7 @@ describe('RoadmapItemReadService.list', () => {
     });
   });
 
-  it('builds To triage for an Owner: review, a lead to pick, idle leads', async () => {
+  it('builds To triage for an Owner: one Backlog list, never an idea someone leads', async () => {
     const pending = item(1, {}, { reviewState: 'pending' });
     const noLead = item(2, { builderSessionId: 's2' }, planSession('s2'));
     const idle = item(
@@ -312,15 +312,56 @@ describe('RoadmapItemReadService.list', () => {
     )) as unknown as {
       sections: Record<string, { code: string; whyHere?: any }[]>;
     };
-    expect(result.sections.awaitingReview.map((r) => r.code)).toEqual([
+    // One Backlog list: the unreviewed idea and the accepted one with no lead. The led ideas
+    // (idle or busy) are Being built: Leading shows them, To triage does not.
+    expect(Object.keys(result.sections)).toEqual(['backlog']);
+    expect(result.sections.backlog.map((r) => r.code).sort()).toEqual([
       'OPP-0001',
+      'OPP-0002',
     ]);
-    expect(result.sections.needsLead.map((r) => r.code)).toEqual(['OPP-0002']);
-    expect(result.sections.reassign.map((r) => r.code)).toEqual(['OPP-0003']);
-    expect(result.sections.reassign[0].whyHere).toEqual({
-      kind: 'reassign',
-      idleDays: 9,
+    const why = Object.fromEntries(
+      result.sections.backlog.map((r) => [r.code, r.whyHere?.kind]),
+    );
+    expect(why).toEqual({
+      'OPP-0001': 'awaitingReview',
+      'OPP-0002': 'needsLead',
     });
+  });
+
+  it('filters to the ideas the person leads, wrote, or that wait on them', async () => {
+    const mineAuthored = item(1, { createdBy: ME });
+    const ledByMe = item(
+      2,
+      { builderSessionId: 's2' },
+      planSession('s2', { leadUserId: ME, sessionPlanStage: 'prd' }),
+    );
+    const other = item(3);
+    const waiting = item(
+      4,
+      { builderSessionId: 's4' },
+      planSession('s4', { leadUserId: ME, sessionPlanStage: 'prd' }),
+    );
+    const { service } = build([mineAuthored, ledByMe, other, waiting], {
+      decisions: [
+        {
+          sessionId: 's4',
+          kind: 'question',
+          waitingSince: ago(1),
+          prompt: 'Which learners first?',
+        },
+      ],
+    });
+    const codes = async (q: Record<string, string>) =>
+      (
+        (await service.list(ME, parseItemQuery({ view: 'all', ...q }))) as {
+          rows: { code: string }[];
+        }
+      ).rows
+        .map((r) => r.code)
+        .sort();
+    expect(await codes({ wroteByMe: '1' })).toEqual(['OPP-0001']);
+    expect(await codes({ ledByMe: '1' })).toEqual(['OPP-0002', 'OPP-0004']);
+    expect(await codes({ needsYou: '1' })).toEqual(['OPP-0004']);
   });
 
   it('marks a row unread only when something happened since it was opened', async () => {
