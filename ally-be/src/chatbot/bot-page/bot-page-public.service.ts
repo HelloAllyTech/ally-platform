@@ -84,6 +84,7 @@ import {
   type PublicConfirmation,
   type PublicStep,
 } from './live-steps';
+import { FEEDBACK_UPSERT } from './answer-feedback.sql';
 
 /** What a visitor's browser learns about a page. Nothing internal: no prompts, ids or settings. */
 export interface PublicBotPage {
@@ -816,7 +817,8 @@ export class BotPagePublicService {
   /**
    * "Was this helpful?" (chunk Q2a): the visitor's thumbs up or down on one of the answers in
    * their own conversation. Rating again changes it. Crisis replies, templates and the consent
-   * gate can't be rated. Nothing they wrote is logged.
+   * gate can't be rated. Nothing they wrote is logged. How a repeat is stored:
+   * `answer-feedback.sql.ts`.
    */
   async feedback(
     slug: string,
@@ -850,22 +852,14 @@ export class BotPagePublicService {
       throw publicError(HttpStatus.CONFLICT, 'not_rateable');
     }
     const down = dto.rating === 'down';
-    await db.query(
-      `INSERT INTO chatbot_message_feedback
-         (message_id, chatbot_id, conversation_id, rating, reason, note, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'open')
-       ON CONFLICT (message_id) DO UPDATE SET
-         rating = EXCLUDED.rating, reason = EXCLUDED.reason, note = EXCLUDED.note,
-         status = 'open', handled_by = NULL, handled_at = NULL, "updatedAt" = now()`,
-      [
-        message.id,
-        available.chatbot.id,
-        message.conversation_id,
-        dto.rating,
-        down ? (dto.reason ?? null) : null,
-        down ? dto.note?.trim().slice(0, 300) || null : null,
-      ],
-    );
+    await db.query(FEEDBACK_UPSERT, [
+      message.id,
+      available.chatbot.id,
+      message.conversation_id,
+      dto.rating,
+      down ? (dto.reason ?? null) : null,
+      down ? dto.note?.trim().slice(0, 300) || null : null,
+    ]);
     return { rating: dto.rating };
   }
 
