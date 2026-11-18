@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
   Put,
@@ -189,6 +190,24 @@ export class DebriefLearnerController {
       body.kind,
       DebriefLearnerEventsService.platform(body.platform),
     );
+  }
+
+  @Get('scenarios/:scenarioId/latest-points')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary:
+      "The points from the learner's latest debrief for a roleplay, for its Reminders tab",
+    description:
+      'Empty when their organisation is not switched on or they have no debrief for this roleplay yet.',
+  })
+  async latestPoints(
+    @Param('scenarioId', ParseIntPipe) scenarioId: number,
+    @CurrentUser() user: TokenUser,
+  ) {
+    if (!(await this.agent.isLive(user.tenantId ?? null))) {
+      return { runId: null, workOnThis: [], practiseNext: null };
+    }
+    return this.feedback.latestPoints(scenarioId, user.id);
   }
 
   @Get('sessions/:sessionId/supervisor')

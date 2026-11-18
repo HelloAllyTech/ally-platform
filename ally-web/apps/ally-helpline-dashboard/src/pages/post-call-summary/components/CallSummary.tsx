@@ -34,7 +34,12 @@ import CustomFieldValuesPanel from "@pages/calls/components/custom-fields/Custom
 import { RootState } from "@store";
 import { ChatSummaryStatus, SessionType, SummaryFieldKey } from "@types";
 import { CustomFieldEditPermission, CustomFieldValue } from "@types";
-import { getEstimatedSummaryGenerationTime, getFormattedDateTime, hasPermissions } from "@utils";
+import {
+  convertSecondsToDuration,
+  getEstimatedSummaryGenerationTime,
+  getFormattedDateTime,
+  hasPermissions,
+} from "@utils";
 
 import { SummaryLoading } from ".";
 import SummaryFieldInput from "./SummaryFieldInput";
@@ -322,10 +327,21 @@ const CallSummary: FC<CallSummaryProps> = ({
       case SummaryFieldKey.CallId:
         return callSummary?.details?.chatId || summaryData.callId;
       case SummaryFieldKey.CallDuration: {
+        // Same format and labels as the Scribe Logs table ("3 mins 7 secs").
+        // This used to print the count twice ("3 3 minutes": the translation
+        // already includes {{count}}) and drop the seconds.
         const duration = callSummary?.details?.callDuration || summaryData.callDuration;
-        return duration
-          ? `${Math.floor(Number(duration) / 60)} ${t("common.minutes_other", { count: Math.floor(Number(duration) / 60) })}`
-          : "--";
+        return convertSecondsToDuration(Number(duration) || undefined, {
+          labels: {
+            lessThanOneMinute: t("calls.duration.lessThanOneMinute", "Less than 1 min"),
+            hour: t("calls.duration.hour", "hr"),
+            hours: t("calls.duration.hours", "hrs"),
+            minute: t("calls.duration.minute", "min"),
+            minutes: t("calls.duration.minutes", "mins"),
+            second: t("calls.duration.second", "sec"),
+            seconds: t("calls.duration.seconds", "secs"),
+          },
+        });
       }
       case SummaryFieldKey.CallDate:
         return getFormattedDateTime(callSummary?.details?.startTime, "do MMMM yyyy");
@@ -532,14 +548,28 @@ const CallSummary: FC<CallSummaryProps> = ({
             </Button>
           </div>
         ) : (
-          <InfoBanner
-            message={t("summary.disclaimer")}
-            icon={() => (
-              <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+          <>
+            {callSummary?.incompleteRecording && (
+              // The connection dropped mid-recording and the client did not
+              // come back in time: the audio, and so the summary, is partial.
+              <InfoBanner
+                message={t("summary.incompleteRecording")}
+                icon={() => (
+                  <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+                )}
+                wrapperClassName="border-[#c4901f] bg-[#f3e6c9] mb-2"
+                messageClassName="text-[#6b4f22]"
+              />
             )}
-            wrapperClassName="border-[#c4901f] bg-[#f3e6c9]"
-            messageClassName="text-[#6b4f22]"
-          />
+            <InfoBanner
+              message={t("summary.disclaimer")}
+              icon={() => (
+                <Warning className="border-[#c4901f] border-[0.5px] rounded-[100px] p-2 w-8 h-8 shadow-lg" />
+              )}
+              wrapperClassName="border-[#c4901f] bg-[#f3e6c9]"
+              messageClassName="text-[#6b4f22]"
+            />
+          </>
         )}
         {headerContent}
         <div className={`overflow-y-auto font-primary pb-[60px] ${className}`}>

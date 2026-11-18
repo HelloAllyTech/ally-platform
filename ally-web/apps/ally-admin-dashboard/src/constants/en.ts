@@ -417,7 +417,7 @@ export const en = {
     enterEmailToContinue: "Enter your email address to continue",
     enterEmailPlaceholder: "Enter your email address",
     next: "Next",
-    byTappingNext: "By proceeding, i agree to Ally's",
+    byTappingNext: "By proceeding, I agree to Ally's",
     andAcknowledge: "and acknowledge",
     verifyYourEmail: "Verify your email address",
     enterSecurityCode: "Enter the security code sent to",
@@ -1766,6 +1766,192 @@ export const en = {
     /** Someone who only has their assistant (chunk 6b): the one thing in its frame. */
     logOut: "Log out",
     toYourAssistants: "Go to your assistants",
+    /** The login screen a signed-out visitor sees on any /assistants page (its own wording and layout). */
+    login: {
+      headline: "Build and manage your own custom ",
+      headlineEmphasis: "chatbots.",
+      /** The wordmark at the top left: "Ally" and, in the orange block, "chatbots". */
+      sendCode: "Send code",
+      googleSignIn: "Sign in using Google",
+      capabilities: {
+        heading: "What you can build and control",
+        items: [
+          {
+            id: "knowledge",
+            title: "Teach it from your pages",
+            blurb:
+              "Add documents and website pages. It answers from them and says where each answer came from.",
+          },
+          {
+            id: "voice",
+            title: "Give it a voice",
+            blurb: "Set its tone, add your own instructions and write quick replies.",
+          },
+          {
+            id: "rules",
+            title: "Set the rules",
+            blurb:
+              "Choose topics it politely avoids. Ally's safety rules stay on, and yours are added.",
+          },
+          {
+            id: "handover",
+            title: "Hand over to a person",
+            blurb: "Decide what happens when someone asks to speak to your team.",
+          },
+          {
+            id: "lists",
+            title: "Keep lists",
+            blurb: "Bookings, leads or orders it can look up, add and change.",
+          },
+          {
+            id: "brand",
+            title: "Make it yours",
+            blurb: "Your logo and colours on a public page and a chat bubble on your website.",
+          },
+          {
+            id: "test",
+            title: "Test before you share",
+            blurb: "Try it live, and run a checkup of test questions.",
+          },
+          {
+            id: "access",
+            title: "Choose who gets in",
+            blurb: "Decide who can use it, and connect WhatsApp or your website.",
+          },
+          {
+            id: "learn",
+            title: "Learn from conversations",
+            blurb: "Read every conversation and see the questions it couldn't answer.",
+          },
+        ],
+      },
+      useCasesHeading: "What organisations use it for",
+      previousCases: "Previous use cases",
+      nextCases: "Next use cases",
+      whatItDoes: "What it does",
+      exampleHeading: "Example conversation",
+      exampleNote:
+        "An illustration of the kind of answer an assistant can give from your own pages.",
+      startBuilding: "Log in to build yours",
+      useCases: [
+        {
+          id: "helpline",
+          title: "Helpline and crisis support",
+          blurb: "Share your helpline details and safe next steps, at any hour.",
+          detail: {
+            intro:
+              "People often reach out late at night, or when no one is free to pick up. Your assistant answers calmly and consistently from the guidance you've published, and points people to your team.",
+            points: [
+              "Shares your helpline numbers and opening hours",
+              "Gives clear next steps from your own safety and referral pages",
+              "Never replaces your counsellors; it directs people to them",
+            ],
+            example: {
+              question: "I need to talk to someone tonight.",
+              answer:
+                "I'm glad you reached out. You can call our helpline any time, day or night. If you're in immediate danger, please contact your local emergency services.",
+            },
+          },
+        },
+        {
+          id: "services",
+          title: "Services and eligibility",
+          blurb: "Explain who can apply, what to bring and where to go, in plain words.",
+          detail: {
+            intro:
+              "The same questions arrive every day: am I eligible, what do I bring, where do I go. Your assistant answers them from your own programme pages, so your staff can focus on people who need them most.",
+            points: [
+              "Explains eligibility and the documents to bring",
+              "Gives hours, locations and the steps to apply",
+              "Answers on your website, your page or WhatsApp",
+            ],
+            example: {
+              question: "What do I need to bring to apply for the food programme?",
+              answer:
+                "Please bring a photo ID and proof of address. Distribution runs on Tuesdays and Saturdays, 9 to 1, at the community hall. Would you like directions?",
+            },
+          },
+        },
+        {
+          id: "supporters",
+          title: "Donors and volunteers",
+          blurb: "Handle giving, receipts and sign-ups without tying up your team.",
+          detail: {
+            intro:
+              "Supporters want quick answers about how to give or help. Your assistant handles the everyday questions at any time, so no offer of help waits days for a reply.",
+            points: [
+              "Explains ways to donate and how receipts work",
+              "Describes volunteer roles, shifts and how to sign up",
+              "Passes on the links and contacts you've published",
+            ],
+            example: {
+              question: "How can I volunteer on weekends?",
+              answer:
+                "Weekend shifts are open at the food bank and the youth centre. You can sign up on our volunteer page, and I can tell you what each shift involves.",
+            },
+          },
+        },
+        {
+          id: "training",
+          title: "Staff and volunteer onboarding",
+          blurb: "New teammates get answers from your own policies and guides.",
+          detail: {
+            intro:
+              "New staff and volunteers have a hundred small questions in their first weeks. Your assistant answers from your own handbooks and policies, so they get a consistent answer without waiting for a senior colleague.",
+            points: [
+              "Answers from your policies, guides and checklists",
+              "Keeps everyone working from the same, current information",
+              "Frees experienced staff from repeat questions",
+            ],
+            example: {
+              question: "What do I do if a client tells me something worrying?",
+              answer:
+                "Following the safeguarding policy: make sure the person is safe, note what they said in their own words, and report it to the safeguarding lead the same day. Want the full checklist?",
+            },
+          },
+        },
+        {
+          id: "languages",
+          title: "Reach more communities",
+          blurb: "Meet people in the languages they speak, on the apps they already use.",
+          detail: {
+            intro:
+              "Information is only useful if people can read it. Your assistant can answer in many languages, on channels like WhatsApp that your community already uses, so language is not a barrier to getting help.",
+            points: [
+              "Answers in the language the person writes in",
+              "Works on WhatsApp, your website and your page",
+              "One set of answers to maintain, not one per language",
+            ],
+            example: {
+              question: "क्या आप हिंदी में स्वास्थ्य शिविर के बारे में बता सकते हैं?",
+              answer:
+                "ज़रूर! स्वास्थ्य शिविर शनिवार को सुबह 9 बजे से गाँव के सामुदायिक केंद्र में लगेगा।",
+            },
+          },
+        },
+        {
+          id: "updates",
+          title: "Campaigns and urgent updates",
+          blurb: "Keep your community informed when things change fast.",
+          detail: {
+            intro:
+              "When a camp moves, a deadline shifts or an emergency unfolds, people need the latest answer immediately. Update your pages once and your assistant gives everyone the same current information.",
+            points: [
+              "Answers from your latest published pages",
+              "Handles a surge of questions without extra staff",
+              "Points people to official sources and contacts",
+            ],
+            example: {
+              question: "Is the relief camp still open?",
+              answer:
+                "Yes. The relief camp at the school is open until Friday, with meals at noon and 7 pm. This answer updates as soon as your page does.",
+            },
+          },
+        },
+      ],
+      wordmarkName: "Ally",
+      wordmarkProduct: "chatbots",
+    },
   },
   whatsappBot: {
     navLabel: "Assistants",
@@ -8958,6 +9144,7 @@ export const en = {
       actions: (code: string) => `Actions for ${code}`,
       votes: (count: number) => (count === 1 ? "1 vote" : `${count} votes`),
       votedByMe: "You voted",
+      rank: (n: number) => `Rank ${n} in the queue`,
       starred: "Starred",
       markRead: "Mark read",
       watch: "Watch",
@@ -9017,15 +9204,6 @@ export const en = {
         activity: "Last activity",
         stageAge: "Longest in stage",
       } as Record<string, string>,
-    },
-    layout: {
-      label: "Layout",
-      list: "List",
-      board: "Board",
-      boardByGoal: "By goal",
-      boardByMonth: "By month",
-      boardHelp:
-        "The planning board. Goal and month lanes can be dragged; stages can't, because an idea's stage follows what has happened to it.",
     },
     savedViews: {
       save: "Save view",
@@ -10795,67 +10973,20 @@ export const en = {
     loading: "Loading…",
     error: "Couldn't load notifications.",
   },
-  /** Simulation editor › Debrief choices for one roleplay, and the risk-cue option dialog. */
+  /** Simulation editor › the Debrief's risk-cue question for one roleplay. */
   debriefRoleplayOptions: {
     frameworkLabel: "Debrief skill framework",
     frameworkTip:
       "The skills the debrief assesses beyond this roleplay's own competencies. Pick None to assess only the roleplay's own competencies.",
     defaultSuffix: " (default)",
     none: "None",
-    riskCueLabel: "Risk cues in this roleplay",
+    riskCueLabel: "Is handling a risk conversation the skill practised here?",
     riskCueTip:
-      "What counts as a risk cue when the debrief reads this roleplay, and what the debrief does with one. Standard suits most roleplays.",
-    loading: "Loading…",
-    loadFailed: "Couldn't load the choices. The saved choice is kept.",
-    status: {
-      draft: "Draft, only you can see it",
-      awaiting_approval: "Waiting for a clinical advisor",
-      retired: "Retired",
-    } as Record<string, string>,
-    handlingAlarm: "Every kind of risk cue is an alarm: an important moment and the support lines.",
-    handlingAssessed:
-      "The reader decides, cue by cue, which risk cues are the skill being practised. Those are assessed in the coaching cards; any other cue is still an alarm.",
-    createLink: "Create a risk-cue option",
-    editLink: "Edit",
-    dialog: {
-      titleNew: "Create a risk-cue option",
-      titleEdit: "Edit risk-cue option",
-      name: "Name",
-      wording: "What counts as a risk cue here",
-      wordingMin: "Write at least 60 characters.",
-      handling: "How a risk cue is handled",
-      alarm: "Alarm: every risk cue gets an important moment in the debrief",
-      assessed:
-        "Part of the practice: the reader decides which cues are the skill being practised; those are assessed in the coaching cards, and any other cue still raises the alarm",
-      wordListRaises: "Let the safety word list mark cues as clear",
-      supportLines: "Show the support lines after the character's risk cue",
-      cues: "Lines that ARE a risk cue here",
-      nonCues: "Lines that are NOT a risk cue here",
-      examplesHint: "One example per line.",
-      cuesMin: "Add at least one example.",
-      examplesMax: "Use at most 12 lines.",
-      nameRequired: "Give it a name.",
-      saveDraft: "Save draft",
-      save: "Save changes",
-      saved: "Saved as a draft.",
-      saveFailed: "Couldn't save. Try again.",
-      testIt: "Test it",
-      testing: "Testing… this can take up to a minute.",
-      testFailed: "The test couldn't run. Try again.",
-      testPassed: "Passed. The debrief tells these examples apart correctly.",
-      testNotPassed: "Not passed.",
-      missed: (line: string) => `Missed a risk cue: "${line}"`,
-      wrong: (line: string) => `Flagged as a risk cue by mistake: "${line}"`,
-      run: (n: number) => `Run ${n}`,
-      staleTest: "You changed it since the last test. Test it again.",
-      send: "Send for approval",
-      sent: "Sent. A clinical advisor will review it.",
-      sendFailed: "Couldn't send it for approval.",
-      needsTest: "Pass a test first.",
-      saveFirst: "Save your changes first.",
-      turnedDown: (note: string) => `A clinical advisor turned it down: ${note}`,
-      close: "Close",
-    },
+      "Choose Yes for a roleplay about assessing or responding to risk, such as thoughts of suicide. The debrief then coaches how the learner assessed and responded, instead of treating the cue as an emergency. Any other risk cue the client voices still raises the alarm.",
+    riskCueNo:
+      "No. A risk cue the client voices is a safety moment: the debrief shows it as an important moment with the support lines.",
+    riskCueYes:
+      "Yes. The debrief coaches how the learner assessed and responded. Any other risk cue still raises the alarm.",
   },
   debriefs: {
     /** A Debriefs console page the reader may not see (a 403 from ally-be). */
@@ -10890,21 +11021,7 @@ export const en = {
         expand: (title: string) => `Open ${title}`,
         before: "Before",
         after: "After",
-        wholeRule: (name: string) => `The whole ${name}`,
-        wholeRuleChanged: (name: string) =>
-          `The whole ${name} after the change (the change is marked)`,
-        ruleStale:
-          "The rule has changed since this was proposed, so the passage no longer matches. Ask the Debrief PM agent to redo it.",
         evidence: "Evidence",
-        /** The clinical advisor's home: their pending decisions only. */
-        advisorHeadline: (n: number) =>
-          n === 0
-            ? "Nothing needs your decision."
-            : `${n} ${n === 1 ? "change needs" : "changes need"} your decision.`,
-        advisorNeedsHeading: (n: number) =>
-          n === 1
-            ? "Needs you: a change only you or the owner can approve"
-            : `Needs you: ${n} changes only you or the owner can approve`,
         thisWeek: (score: string | null, trend: string | null, live: number, undone: number) =>
           [
             score === null
@@ -10969,14 +11086,11 @@ export const en = {
       },
       decision: {
         approve: "Approve",
-        signOff: "Sign it off",
         turnDown: "Turn it down",
         confirmTurnDown: "Turn it down",
         reasonLabel: "Why (the Debrief PM agent reads this)",
         reasonPlaceholder: "One line is enough",
         approved: "Approved. It goes through its tests and tries next.",
-        approvedLive: "Approved. It is live for everyone now.",
-        signedOff: "Signed off.",
         turnedDown: "Turned down. The Debrief PM agent has your reason.",
         failed: "That didn't go through. Try again.",
       },
@@ -11130,12 +11244,7 @@ export const en = {
         alwaysAsks: "Always asks a person",
         lockedHelp: "Always on: this can't be switched off.",
         locked: [
-          { name: "Safety reader text", why: "What counts as a risk cue" },
           { name: "Crisis lines and support copy", why: "What a learner in distress reads" },
-          {
-            name: "Pinned rules: rubric, judge and Evaluator instructions",
-            why: "The clinical advisor or owner signs these",
-          },
           { name: "Budget increases", why: "Lower budgets go ahead on their own" },
         ],
         askLowConfidence: {
@@ -12549,7 +12658,6 @@ export const en = {
       autonomyKinds: {
         settings: "Settings",
         prompts: "Prompts and agents",
-        pinned_rules: "Pinned rules",
       } as Record<string, string>,
       autonomyStates: {
         alone: "on its own",
@@ -12566,9 +12674,6 @@ export const en = {
         rejected: "Rejected or withdrawn",
         expired: "Expired (no decision)",
         reverted: "Reverted",
-      } as Record<string, string>,
-      kinds: {
-        pinned_rule: "Pinned rule",
       } as Record<string, string>,
       expired: "No decision",
       expiredNoDecision: "Expired · no decision in 14 days",
@@ -12666,72 +12771,6 @@ export const en = {
       approveCanary: "Approve and try it on some learners",
       recommended: (pct: number) =>
         `Recommended · up to ${pct}% of new debriefs; everyone only after a person puts it live`,
-      approvePinned: "Approve",
-      pinned: {
-        title: "Approve this pinned-rule change?",
-        body: "Your name and today's date are recorded as its approval. The change becomes a draft release, and the Ally team puts it live.",
-        firstTitle: "Approve the rule as it reads now?",
-        firstBody:
-          "Your name and today's date are recorded as its approval. Nothing changes in what runs.",
-        confirm: "Approve",
-        done: "Approved. The Ally team will put it live.",
-        firstDone: "Approved",
-      },
-      pinnedRule: {
-        readWhole: "Read the whole rule",
-        asItReads: (name: string, v: number | null) =>
-          v == null ? `${name} as it reads now` : `${name} v${v}, as it reads now`,
-        afterChange: "As it would read after this change. The new wording is highlighted.",
-        firstVersionIntro:
-          "Written by the Ally engineering team and not yet reviewed by a clinician. Read it, then approve it or ask for a change.",
-        stale:
-          "The rule has changed since this was proposed, and the passage is no longer in it. It can't be approved as it is.",
-        otherOpen: (n: number) =>
-          n === 1
-            ? "Another change to this rule is waiting for approval."
-            : `${n} other changes to this rule are waiting for approval.`,
-        proposedByYou: "You proposed this change.",
-        why: "Why",
-        approved: "Approved. The Ally team will put it live.",
-        approvedFirst: "Approved.",
-        approvedStatus: "Approved",
-        withdrawnStatus: "Withdrawn",
-        withdraw: "Withdraw",
-        askForChange: "Ask for a change",
-        withdrawTitle: "Withdraw your proposal?",
-        withdrawBody: "It closes as withdrawn. You can propose a change to the rule again later.",
-        withdrawDone: "Withdrawn",
-        rejectTitle: "Reject this change?",
-        rejectBody:
-          "The Debrief PM agent reads your reason before it proposes anything like this again.",
-        reasonLabel: "Why are you rejecting it?",
-        reasonRequired: "Say why you are rejecting it.",
-        rejectDone: "Rejected",
-        form: {
-          title: (name: string) => `Ask for a change to the ${name}`,
-          help: "Select the passage to change in the rule, or paste it. Then write the new wording and why.",
-          ruleLabel: "The rule as it reads now",
-          passage: "Passage to change",
-          passageHelp: "Your selection lands here. It must appear exactly once in the rule.",
-          replace: "Replace it with",
-          why: "Why",
-          whyHelp: "The person who approves it reads this.",
-          submit: "Send for approval",
-          cancel: "Cancel",
-          sent: "Sent. It waits in Debrief PM agent › Ideas for the clinical advisor or the owner.",
-          empty: "Select the passage to change in the rule, or paste it.",
-          notFound:
-            "That passage is not in the current rule. Select it in the text, or paste it exactly as it reads.",
-          notUnique:
-            "That passage appears more than once in the rule. Select a longer passage, so it is found only once.",
-          same: "The replacement is the same as the passage. Write the new wording.",
-          noWhy: "Say why the rule should change.",
-          otherOpen: (n: number) =>
-            n === 1
-              ? "Another change to this rule is already waiting. You can still send this one."
-              : `${n} other changes to this rule are already waiting. You can still send this one.`,
-        },
-      },
       basedOn: (what: string) => `Based on: ${what}.`,
       ofNeedYou: (i: number, n: number) => `${i} of ${n} that need you`,
       previous: "Previous",
@@ -12878,7 +12917,6 @@ export const en = {
         progress: "Progress",
         schedules: "Schedules",
         guidance: "Guidance",
-        "risk-cues": "Risk-cue options",
         agents: "Agents",
       } as Record<string, string>,
       agentsHelp:
@@ -12904,8 +12942,79 @@ export const en = {
           case: "Case",
           assessment: "Assessment",
         } as Record<string, string>,
-        revisionRounds: (n: number) => `Up to ${n} revision ${n === 1 ? "round" : "rounds"}`,
-        columns: { step: "Step", prompt: "Prompt", model: "Model", backup: "Backup model" },
+        allAgents: {
+          title: "All agents",
+          help: "Every agent the Debrief uses. A model change applies to every recipe that uses the agent.",
+          none: "No agents to show.",
+          columns: {
+            agent: "Agent",
+            runs: "When it runs",
+            model: "Model",
+            backup: "Backup model",
+            instructions: "Instructions",
+            planner: "Planner may choose",
+          },
+          runs: {
+            always: "Every debrief",
+            some_recipes: "Some recipes",
+            optional: "Optional",
+            planner: "When the planner picks it",
+            off: "Off",
+          } as Record<string, string>,
+          noModel: "No model (code)",
+          noWhat: "Nothing describes it yet.",
+          buildDefault: "Build default",
+        },
+        byRecipe: {
+          title: "Which agents each recipe uses",
+          help: "A tick means the recipe runs that agent.",
+          agent: "Agent",
+          used: "Used",
+          notUsed: "Not used",
+          rounds: "Revision rounds",
+          plannerNote:
+            "The planner chooses its own agents for each session, so they are not listed per recipe.",
+        },
+        dataAccess: {
+          title: "What each agent can read",
+          help: "A tick means the agent is sent that data. This list is checked against what each agent is really sent, so it cannot drift.",
+          data: "Data",
+          control: "Who can change it",
+          controls: {
+            fixed: "Always on",
+            setting: "Can be switched",
+            owner: "Owner only",
+          } as Record<string, string>,
+          personal: "personal",
+          reads: "Reads it",
+          doesNotRead: "Does not read it",
+          onlyWhenNote: "* Only in some runs; hover the star to see when.",
+          onlyWhen: (when: string) => `Only ${when.replace(/^only /i, "")}`,
+          groups: {
+            "this session": "This session",
+            "the roleplay": "The roleplay",
+            "the learner": "The learner",
+            "other learners": "Other learners",
+            "the library": "The library",
+            "other agents": "Other agents",
+          } as Record<string, string>,
+          undeclared: (names: string) =>
+            `Not listed here yet, because what they are sent is not declared: ${names}.`,
+          roleplay: {
+            title: "Roleplay information the debrief reads",
+            note: "Only the Analyst reads the roleplay brief today, and the Safety reader when handling a risk conversation is the skill practised. Ticking a field adds a change to the draft release at the bottom of the page; nothing goes live at once.",
+            always: "Always read",
+            alwaysOn: "always on",
+            defaultOn: "on unless a release says otherwise",
+            toggle: (label: string) => `Read the roleplay's ${label.toLowerCase()}`,
+          },
+          pm: {
+            title: "Debrief PM agent",
+            canRead: "It can read",
+            canDo: "It can do",
+            note: "It can switch optional roleplay fields on through a proposal, but it can never change learner, case or cohort data, and it cannot edit pinned rules.",
+          },
+        },
         optional: "optional",
         noModel: "—",
         noBackup: "No backup",
@@ -12932,10 +13041,6 @@ export const en = {
           toggleLabel: (step: string, tool: string) => `${step}: ${tool}`,
         },
         planner: {
-          title: "Agents the planner may choose",
-          help: "The planner picks from the agents that are turned on here.",
-          none: "No planner agents.",
-          version: (n: number) => `v${n}`,
           toggleLabel: (id: string) => `Planner may choose ${id}`,
         },
         bar: {
@@ -12949,6 +13054,8 @@ export const en = {
             `${recipe} › ${step}: ${model}${backup ? `, backup ${backup}` : ", no backup"}`,
           limit: (n: number) => `Guidance call limit: ${n}`,
           tools: "Guidance tools",
+          roleplayFields: (n: number) =>
+            `Roleplay information the debrief reads: ${n} optional ${n === 1 ? "field" : "fields"}`,
           planner: (id: string, on: boolean) => `Planner agent ${id}: ${on ? "on" : "off"}`,
         },
         success: (version: number) => `Draft release v${version} created`,
@@ -12957,55 +13064,6 @@ export const en = {
         refused: "Some changes were refused. Fix or discard them and try again.",
         forbidden: "You don't have permission to change the agents.",
         failed: "Couldn't create the draft release. Try again.",
-      },
-      riskCuesHelp: "Risk-cue options written for roleplays. Test, then approve or turn down.",
-      riskCues: {
-        loading: "Loading options…",
-        loadFailed: "Couldn't load the options. Reload to try again.",
-        none: "No options yet.",
-        pick: "Select an option to see its details.",
-        list: "Options",
-        version: (n: number) => `v${n}`,
-        status: {
-          draft: "Draft",
-          awaiting_approval: "Waiting for review",
-          approved: "Approved",
-          retired: "Retired",
-        } as Record<string, string>,
-        handling: { alarm: "Alarm", assessed: "Part of the practice" } as Record<string, string>,
-        standardWording: "The standard definition",
-        wording: "What counts as a risk cue",
-        behaviour: "What it does",
-        wordListOn: "The safety word list can mark cues as clear.",
-        wordListOff: "The safety word list does not mark cues as clear.",
-        supportOn: "The support lines show after the character's risk cue.",
-        supportOff: "The support lines do not show after the character's risk cue.",
-        cues: "Lines that are a risk cue",
-        nonCues: "Lines that are not a risk cue",
-        lastTest: "Last test",
-        noTest: "Not tested yet.",
-        testPassed: (n: number) => `Passed on version ${n}.`,
-        testNotPassed: (n: number) => `Not passed on version ${n}.`,
-        testOld: (n: number) => `That test was on version ${n}, not this one.`,
-        runTest: "Run test",
-        testing: "Testing… this can take up to a minute.",
-        testFailed: "The test couldn't run. Try again.",
-        approve: "Approve",
-        approved: "Approved. It can now be picked in roleplays.",
-        approveFailed: "Couldn't approve it.",
-        turnDown: "Turn down",
-        turnedDown: "Turned down. The writer sees your note.",
-        turnDownFailed: "Couldn't turn it down.",
-        noteLabel: "Note to the writer",
-        noteRequired: "Say why, so the writer can fix it.",
-        retire: "Retire",
-        retireTitle: "Retire this option?",
-        retireBody:
-          "Roleplays that use it keep working, but nobody can pick it for another roleplay.",
-        retired: "Retired.",
-        retireFailed: "Couldn't retire it.",
-        cancel: "Cancel",
-        more: "More",
       },
       clinicalHelp:
         "Words the checks look for in every debrief and Ask Ally reply. English applies to every language.",
@@ -13094,6 +13152,10 @@ export const en = {
           "debrief-nightly-check": {
             name: "Nightly check",
             what: "Measures yesterday’s debriefs against the days before and sends some to a person",
+          },
+          "debrief-roleplay-field-drift": {
+            name: "Roleplay field check",
+            what: "Looks for a roleplay field that newly saved roleplays stopped filling in, and tells the Ally team",
           },
           "debrief-judge-anchor": {
             name: "Judge drift",
@@ -13193,7 +13255,7 @@ export const en = {
       weightsHelp:
         "How the weekly steering score weighs each signal, and how soon a learner's flag should be reviewed.",
       pinnedHelp:
-        "Apply to every organisation and change rarely. A change arrives as a proposal in the Debrief PM agent's “Needs you” list, and only the clinical advisor or the owner can approve it.",
+        "These prompts decide what counts as safe, and they apply to every organisation. A few named people edit them in the Skills Store. The Debrief PM agent can read them but never change them.",
       orgs: {
         change: "change",
         supportLine: (line: string) => `Support line: ${line}`,
@@ -13236,7 +13298,6 @@ export const en = {
         kinds: {
           settings: "Settings (not budgets)",
           prompts: "Prompts, agents and default plans",
-          pinned_rules: "Pinned rules",
         } as Record<string, string>,
         cells: { auto: "On its own", ask: "Asks first", off: "Off" } as Record<string, string>,
         never: "Never",
@@ -13274,7 +13335,7 @@ export const en = {
           },
           {
             lead: "Pinned rules",
-            text: "(safety rules, rubric, judge’s instructions) aren’t in this table: the clinical advisor or owner always approves them, and the Debrief PM agent can only suggest a change. Their status is under",
+            text: "(safety rules, rubric, judge’s instructions) aren’t in this table: the Debrief PM agent can never change them. A few named people edit them in the Skills Store. Their versions are under",
             link: "Pinned rules",
           },
         ],
@@ -13337,15 +13398,11 @@ export const en = {
         },
       },
       pinned: {
-        notYet: "The pinned rules' versions show here once ally-be records who approved them.",
-        signed: (who: string, when: string) => `Approved by ${who}, ${when}`,
-        unsigned: "Not approved yet",
-        askForChange: "Ask for a change",
+        notYet: "The pinned rules show here once they are loaded.",
+        updated: (who: string, when: string) => `Last changed by ${who}, ${when}`,
+        writtenByEngineering: "Written by engineering",
+        open: "Open in Skills Store",
         someone: "someone",
-        roles: { clinical_advisor: "the clinical advisor", owner: "the owner" } as Record<
-          string,
-          string
-        >,
       },
     },
     // Analytics › Debriefs additions (redesign 2026-11-12): the console's tiles and spend.

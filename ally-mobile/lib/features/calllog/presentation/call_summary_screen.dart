@@ -30,6 +30,7 @@ import '../../reviews/data/scribe_reviews_repository.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
 import '../data/custom_fields_repository.dart';
+import '../data/custom_field_select_codec.dart';
 import '../data/summary_display_format.dart';
 import '../data/summary_form_state.dart';
 import '../../../core/chat/current_chat_provider.dart';
@@ -856,7 +857,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
   /// `setState`, which rebuilt every section and field on each character.
   void _onFieldTyped(String fieldKey, dynamic value) {
     _form.set(fieldKey, value);
-    if (_form.hasChanges != _saveButtonShownDirty) _dirtyFlag.value++;
+    if (_hasDirtyChanges != _saveButtonShownDirty) _dirtyFlag.value++;
   }
 
   /// Mirrors RN's `SectionHeader`/`toggleSection` (`CallSummaryDetails.tsx`):
@@ -949,17 +950,47 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
   /// never clobbers an in-progress edit.
   void _seedCustomFieldsIfNeeded(List<CustomFieldValue> values) {
     final pending = _customValuesBeforeReseed;
+    var isVoiceReseed = false;
     if (pending != null && !identical(values, pending)) {
       _customFieldsSeededForChatId = null;
       _customValuesBeforeReseed = null;
+      isVoiceReseed = true;
     }
     final key = '$_chatId';
     if (_customFieldsSeededForChatId == key) return;
+    // A re-seed after voice dictation must not wipe picks the counsellor made
+    // but has not saved yet: they stay dirty and win over the dictated value
+    // (the counsellor's explicit choice is never overwritten by the AI).
+    final unsaved = isVoiceReseed
+        ? {for (final id in _dirtyCustomFieldIds) id: _customFieldValues[id]}
+        : const <String, String?>{};
     _customFieldValues
       ..clear()
-      ..addEntries(values.map((v) => MapEntry(v.fieldDefinitionId, v.value)));
-    _dirtyCustomFieldIds.clear();
+      ..addEntries(values.map((v) {
+        // Select values may be stored as ids (web) or labels (older builds);
+        // this form works in labels. See custom_field_select_codec.dart.
+        final def = _customFieldDefById(v.fieldDefinitionId);
+        return MapEntry(v.fieldDefinitionId, def == null ? v.value : selectValueFromWire(def, v.value));
+      }))
+      ..addAll(unsaved);
+    _dirtyCustomFieldIds
+      ..clear()
+      ..addAll(unsaved.keys);
     _customFieldsSeededForChatId = key;
+  }
+
+  CustomFieldDefinition? _customFieldDefById(String id) {
+    for (final d in _customFieldDefs) {
+      if (d.id == id) return d;
+    }
+    return null;
+  }
+
+  /// A custom field's value as the server stores it (select options as ids).
+  String? _wireValue(String id) {
+    final def = _customFieldDefById(id);
+    final value = _customFieldValues[id];
+    return def == null ? value : selectValueToWire(def, value);
   }
 
   /// RN `onCustomValuesApplied` (remount + re-seed): voice dictation wrote
@@ -984,6 +1015,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
   void _onCustomFieldTyped(String fieldDefinitionId, String? value) {
     _customFieldValues[fieldDefinitionId] = value;
     _dirtyCustomFieldIds.add(fieldDefinitionId);
+    if (_hasDirtyChanges != _saveButtonShownDirty) _dirtyFlag.value++;
   }
 
   /// Applies voice-dictated field values: merges them into the form
@@ -1019,7 +1051,12 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
   // custom fields are only ever editable inside a section's edit mode
   // (gated the same way built-in fields are), so this reverts to RN's
   // actual scope.
-  bool get _hasDirtyChanges => _form.hasChanges;
+  //
+  // Scribe v2: the global Save also saves custom fields. Counsellors picked a
+  // value (e.g. Ongoing Risk → Running Away), pressed Save instead of the
+  // section's tick, and lost it — Save must persist everything on screen.
+  bool get _hasDirtyChanges =>
+      _form.hasChanges || _dirtyCustomFieldIds.isNotEmpty;
 
   /// RN's `handleSubmit` — saves every dirty built-in field across the
   /// whole form (not scoped to one section), shared by both the global
@@ -1061,7 +1098,27 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
     try {
       await ref.read(customFieldsRepositoryProvider).upsertValues(
         _chatId,
-        [for (final id in changed) (fieldDefinitionId: id, value: _customFieldValues[id])],
+        [for (final id in changed) (fieldDefinitionId: id, value: _wireValue(id))],
+      );
+      if (mounted) setState(() => _dirtyCustomFieldIds.removeAll(changed));
+      return true;
+    } catch (_) {
+      if (mounted) {
+        showToast(ref.tr('summary.customFieldSaveFailed'), type: ToastType.error);
+      }
+      return false;
+    }
+  }
+
+  /// Saves every dirty custom field, across all sections — the global Save's
+  /// half of the custom-field write (the section tick saves one section).
+  Future<bool> _saveAllCustomFields() async {
+    final changed = _dirtyCustomFieldIds.toList();
+    if (changed.isEmpty) return true;
+    try {
+      await ref.read(customFieldsRepositoryProvider).upsertValues(
+        _chatId,
+        [for (final id in changed) (fieldDefinitionId: id, value: _wireValue(id))],
       );
       if (mounted) setState(() => _dirtyCustomFieldIds.removeAll(changed));
       return true;
@@ -1080,10 +1137,13 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
       _isSaving = true;
       _error = null;
     });
-    await _saveBuiltinFields();
+    final builtinsSaved = await _saveBuiltinFields();
+    final customSaved = await _saveAllCustomFields();
     if (mounted) {
       setState(() => _isSaving = false);
-      widget.onSaveButtonPress();
+      // Stay on the screen when something failed to save, so the counsellor
+      // sees the error and can retry instead of losing the edit.
+      if (builtinsSaved && customSaved) widget.onSaveButtonPress();
     }
   }
 
@@ -1212,10 +1272,16 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
     // unconditionally on every summary open.
     final customFieldsEnabled = ref.watch(customFieldsEnabledProvider).value ?? false;
     if (customFieldsEnabled) {
-      _customFieldDefs = ref.watch(customFieldDefinitionsProvider).value ?? _customFieldDefs;
+      final defsAsync = ref.watch(customFieldDefinitionsProvider);
+      _customFieldDefs = defsAsync.value ?? _customFieldDefs;
       final valuesAsync = ref.watch(customFieldValuesProvider(_chatId));
       final values = valuesAsync.value;
-      if (values != null) _seedCustomFieldsIfNeeded(values);
+      // Seed once both are in: select values are converted to labels using
+      // the definitions, and seeding happens only once per chat. A failed
+      // definitions load still seeds (unconverted) rather than never.
+      if (values != null && (defsAsync.hasValue || defsAsync.hasError)) {
+        _seedCustomFieldsIfNeeded(values);
+      }
     } else {
       _customFieldDefs = const [];
     }
@@ -1235,7 +1301,14 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
             chatId: _chatId,
             onValuesApplied: _applyVoiceValues,
             onCustomValuesApplied: _reseedCustomFields,
-            onTranscriptSaved: () => ref.invalidate(chatMessagesProvider(_chatId)),
+            // The transcript save is also when the backend adds this
+            // recording's length to the call duration, so refresh the summary
+            // too, not just the transcript tab — otherwise Call Duration stays
+            // stale until the note is reopened.
+            onTranscriptSaved: () {
+              ref.invalidate(chatMessagesProvider(_chatId));
+              ref.invalidate(callSummaryProvider(_chatId));
+            },
             existingTranscript: summary.transcript,
           ),
         Expanded(
@@ -1252,7 +1325,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
                 // RN `CallSummaryDetails.tsx` `alertContainer`: the
                 // AI-generated disclaimer above the section card, with
                 // RN's goldenShield SVG in a carrotOrange ring.
-                return Container(
+                final aiBanner = Container(
                   margin: EdgeInsets.only(top: 10, left: size.s(10), right: size.s(10)),
                   padding: EdgeInsets.all(size.s(10)),
                   decoration: BoxDecoration(
@@ -1288,6 +1361,36 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
                       ),
                     ],
                   ),
+                );
+                if (!summary.isIncompleteRecording) return aiBanner;
+                // The recording's connection dropped and never resumed: say
+                // the summary only covers what was recorded, above the AI
+                // disclaimer and in the same style.
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      key: const Key('incomplete-recording-warning'),
+                      margin: EdgeInsets.only(top: 10, left: size.s(10), right: size.s(10)),
+                      padding: EdgeInsets.all(size.s(10)),
+                      decoration: BoxDecoration(
+                        color: AppColors.amber50,
+                        borderRadius: BorderRadius.circular(size.s(8)),
+                        border: Border.all(color: AppColors.orange400, width: 0.5),
+                      ),
+                      child: Text(
+                        ref.t('callSummary.incompleteRecording'),
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifRegular,
+                          fontSize: 12,
+                          height: 16 / 12,
+                          letterSpacing: 0.2,
+                          color: AppColors.red700,
+                        ),
+                      ),
+                    ),
+                    aiBanner,
+                  ],
                 );
               }
               final section = sections[index - 1];

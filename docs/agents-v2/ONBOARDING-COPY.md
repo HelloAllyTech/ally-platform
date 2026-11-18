@@ -16,20 +16,62 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 
 ## 1. Start (`/new`)
 
+The first screen offers four ways to begin, as cards. Picking one shows that way's input, with Back to the cards and × (top right) back to the assistants list.
+
 - **Title:** Build an assistant that knows your business
-- **Subtitle:** Share your website. We'll read it, ask a few questions, and have a tested assistant ready to share in about 5 minutes.
+- **Subtitle:** Choose how you'd like to start. We'll ask a few questions and have a tested assistant ready to share in about 5 minutes.
+- **Cards label (screen readers):** How would you like to start?
+- **Cards, in order:**
+  - Your website: We read your pages and learn what you offer.
+  - Your documents: Upload a brochure, price list or FAQ.
+  - Describe your business: Write a few sentences in your own words.
+  - Interview me: Answer a few questions and we'll build it from that.
+- **Close button (screen readers):** Close and go back to your assistants
+- **Footnote:** We only read the pages you point us to. Nothing is published until you choose to.
+
+### Your website
+
+- **Subtitle:** Share your website. We'll read it and learn what you offer.
 - **Input placeholder:** yourbusiness.com
 - **Primary button:** Start with my website
-- **Secondary options:**
-  - Upload documents instead
-  - Describe my business instead
-- **Footnote:** We only read the pages you point us to. Nothing is published until you choose to.
+
+### Your documents
+
+- **Title:** Upload your documents
+- **Subtitle:** A brochure, price list or FAQ is a good place to start.
+- **Choose button:** Choose files
+- **Limits:** PDFs, Word documents and text files, up to 10 at a time, 20 MB each.
+- **Remove a chosen file (screen readers):** Remove {name}
+- **Primary button:** Start with these documents
+
+### Describe your business
+
+- **Prompt:** Tell me what your business does, who you help, and what people usually ask you. A few sentences is plenty.
+- **Placeholder:** What does your business do, who do you help, and what do people usually ask?
+- **Button:** Continue
+
+### Interview me
+
+- **Title:** Let us interview you
+- **Subtitle:** We'll ask about your business one question at a time. Answer in your own words, and skip anything you'd rather not share.
+- **Button:** Start the interview
+
+The interview screen itself shows the builder's latest question as its heading.
+
+- **Answer box label (screen readers):** Your answer
+- **Answer placeholder:** Type your answer here
+- **Send button:** Send
+- **Finish button (goes on to "What we learned"):** That's everything
 
 ## 2. The builder's opening message
 
 > Hi, I'm here to set up your assistant with you. Paste your website and I'll start reading. You can watch what I find on the right.
 
 **Chips:** Use my website · Upload documents · Describe it instead
+
+**Opening message when they choose "Interview me":**
+
+> Hi, I'll ask you about your business one question at a time, and you can watch what I learn on the right. Answer in your own words, and skip anything you'd rather not share. To begin: what does your business do, and who do you help?
 
 **If they choose "Describe it":**
 
@@ -245,7 +287,7 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 - **Saved indicator:** Saved
 - **Back button:** Back
 - **Footer, left:** Step {n} of {total} · {step name}
-- **Step names:** Start · Reading your website · What we learned · Safety · A few questions · Choose a design · Building · Make it yours · Checkup · Share
+- **Step names:** Start · Interview · Reading your website · What we learned · Safety · A few questions · Choose a design · Building · Make it yours · Checkup · Share
 - **Order:** Choose a design → Building → Make it yours (edits the assistant just built) → Checkup → Share. Until the checkup exists, Make it yours goes straight to Share.
 - **Footer, right:** Your progress is saved. You can come back any time.
 - **Enter hint:** press Enter ↵

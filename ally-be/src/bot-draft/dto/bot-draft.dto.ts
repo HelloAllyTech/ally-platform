@@ -155,6 +155,14 @@ export class CreateBotDraftDto {
   @IsOptional()
   @IsBoolean()
   upload?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Start with the builder interviewing the owner: an empty draft that opens with its first question',
+  })
+  @IsOptional()
+  @IsBoolean()
+  interview?: boolean;
 }
 
 /** "Describe it instead", after a website gave too little (chunk 20a-2). */

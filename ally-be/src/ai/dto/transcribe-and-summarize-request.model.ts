@@ -1,3 +1,4 @@
+import type { NoteHarnessRequestMessage } from 'src/chat/service/scribe-note-harness.service';
 import { ScribeSessionMode } from 'src/common/constants/chat.constants';
 
 export interface TranscribeAndSummarizeRequestMessage {
@@ -16,4 +17,8 @@ export interface TranscribeAndSummarizeRequestMessage {
   // Store (AiService.getPromptOverrides). ally-ai renders diarization and the
   // summary with these, and falls back to its own minimal files without them.
   prompts?: Record<string, unknown>;
+  // Scribe v2 (docs/scribe-v2/DESIGN.md §6): present when the chat's tenant
+  // has the note harness on. ally-ai runs it after delivering the v1 result
+  // and posts the draft to /chats/note-drafts.
+  note_harness?: NoteHarnessRequestMessage;
 }

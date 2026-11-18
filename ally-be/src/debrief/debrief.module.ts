@@ -6,11 +6,8 @@ import { LlmUsageModule } from '../analytics/llm-usage.module';
 import { AwsModule } from '../aws/aws.module';
 import { ContextLibraryModule } from '../context-library/context-library.module';
 import { ClChunk } from '../context-library/entity/cl-chunk.entity';
-import { DebriefRiskCueOption } from './entity/debrief-risk-cue-option.entity';
 import { DebriefFrameworkService } from './service/debrief-framework.service';
 import { DebriefGuidanceIndexService } from './service/debrief-guidance-index.service';
-import { DebriefRiskCueOptionService } from './service/debrief-risk-cue-option.service';
-import { DebriefRiskCueTestService } from './service/debrief-risk-cue-test.service';
 import { DebriefRoleplayOptionsController } from './controller/debrief-roleplay-options.controller';
 import { NotificationModule } from '../notification/notification.module';
 import { GuideCrisisResponse } from '../guide/entity/guide-crisis-response.entity';
@@ -54,6 +51,7 @@ import { DebriefBuilderRequesterService } from './service/debrief-builder-reques
 import { DebriefPmAgentToolsService } from './service/debrief-pm-agent-tools.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefNightlyService } from './service/debrief-nightly.service';
+import { DebriefRoleplayDriftService } from './service/debrief-roleplay-drift.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
@@ -127,9 +125,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
       // The Guide's approved crisis copy, for a learner in crisis in Ask Ally.
       GuideCrisisResponse,
       GuideSignal,
-      // Risk-cue options (what a roleplay's Debrief counts as a risk cue), and the Context
-      // Library entries that hold skill frameworks.
-      DebriefRiskCueOption,
+      // The Context Library entries that hold skill frameworks.
       ClChunk,
     ]),
     AiChatModule,
@@ -150,7 +146,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
   ],
   controllers: [
     DebriefConsoleController,
-    // Simulation Studio's Debrief choices and the clinical advisor's review of risk-cue options.
+    // Simulation Studio: whether the new Debrief is on for a roleplay (its risk-cue question shows only then).
     DebriefRoleplayOptionsController,
     // Debrief v2: Home, Changes (Undo now, Stop now) and the cumulative score.
     DebriefChangesController,
@@ -168,11 +164,9 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
   providers: [
     DebriefAdvisorsService,
     DebriefAgentsConfigService,
-    // Spec DEBRIEF_ACROSS_ROLEPLAYS: the skill framework and risk-cue option a roleplay chose.
+    // Spec DEBRIEF_ACROSS_ROLEPLAYS: the skill framework a learner's organisation can read.
     DebriefFrameworkService,
     DebriefGuidanceIndexService,
-    DebriefRiskCueOptionService,
-    DebriefRiskCueTestService,
     // Debrief v2: the cumulative score, Changes and the watch, Slack posts.
     DebriefScoreService,
     DebriefChangesService,
@@ -229,6 +223,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     DebriefAudioService,
     DebriefNotifier,
     DebriefNightlyService,
+    DebriefRoleplayDriftService,
     DebriefReviewService,
     GuideCrisisService,
     // Runs the debrief / PM agent jobs when their stored schedule says.

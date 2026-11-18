@@ -33,5 +33,10 @@ describe("back where they were after logging in (A1)", () => {
     }
     expect(afterLoginPath("?next=//evil.example")).toBe("/");
     expect(afterLoginPath("")).toBe("/");
+    // Login drawn in place of a page: with no `next`, stay on that page; `next` still wins.
+    expect(afterLoginPath("", "/chatbots?x=1#h")).toBe("/chatbots?x=1#h");
+    expect(afterLoginPath("?next=%2Fa", "/b")).toBe("/a");
+    expect(afterLoginPath("", "//evil.example")).toBe("/");
+    expect(afterLoginPath("", "/login")).toBe("/");
   });
 });

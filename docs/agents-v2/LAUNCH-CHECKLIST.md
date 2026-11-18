@@ -106,7 +106,7 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 
   Each live v1 should match its file in `ally-ai/app/prompts/agent/`.
 - [ ] **Remove `agentRuntimeAllowed` from config** (the production `whatsapp_bot` defaults, Part 0). Nothing reads it any more.
-- [ ] **Migration `1984300000000-KeepEightPassages` runs with ally-be** (data only): the platform's `retrieval.maxPassages` moves from 5 to 8 where it is still 5.
+- [ ] **Migration `1984400000000-KeepEightPassages` runs with ally-be** (data only): the platform's `retrieval.maxPassages` moves from 5 to 8 where it is still 5.
 - [ ] **No re-index of live assistants.** The "What we learned" document is written at publish, and production's assistants will be recreated (decided at Stop 2).
 - [ ] **Watch for a day after deploy:**
   - crisis replies: at-risk and emergency replies per assistant, and false alarms owners report;

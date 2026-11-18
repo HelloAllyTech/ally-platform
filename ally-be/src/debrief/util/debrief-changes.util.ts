@@ -61,7 +61,7 @@ export interface DebriefChange {
   basedOn: string;
   canUndo: boolean;
   canStop: boolean;
-  /** What kind of thing changes, for code that must tell (the advisor sees pinned rules only). */
+  /** What kind of thing changes, for code that must tell. */
   kindKey:
     | 'pinned_rule'
     | 'prompt'
@@ -71,20 +71,10 @@ export interface DebriefChange {
     | 'code'
     | 'agents'
     | 'change';
-  /** The wording before and after, for a prompt or pinned-rule change. */
+  /** The wording before and after, for a prompt change. */
   wording: { before: string; after: string } | null;
   /** One short line for the list: when, and the first measure. */
   summary: string;
-  /**
-   * A pinned rule in full, so the person deciding reads all of it: the rule
-   * as it stands (a sign-off), or as it would read after the change, with
-   * the changed passage marked. Filled by the service; null for other kinds.
-   */
-  rule?: {
-    name: string;
-    segments: Array<{ text: string; changed: boolean }>;
-    stale: boolean;
-  } | null;
 }
 
 /** What the mapping needs besides the idea. */
@@ -216,28 +206,11 @@ const n1 = (x: unknown) =>
     ? '–'
     : (Math.round(Number(x) * 10) / 10).toFixed(1);
 
-/** What each pinned rule does, in one sentence, for the person signing it off. */
-const RULE_PURPOSE: Record<string, string> = {
-  [DEBRIEF_PROMPT_CODES.safetyReader]:
-    'It decides what counts as a risk cue in a roleplay.',
-  [DEBRIEF_PROMPT_CODES.riskCueDefinition]:
-    'It decides which client words are a clear risk cue that every debrief must cover.',
-  [DEBRIEF_PROMPT_CODES.rubric]:
-    'It decides what a good debrief must do; every debrief is scored against it.',
-  debrief_quality_judge_system:
-    'It tells the judge how to score every debrief.',
-};
-
 /** The waits the always-ask list covers (A1): the only ones a person must answer. */
 function waitsFor(idea: IdeaRow): string | null {
   const w = awaitingDecision(idea as Parameters<typeof awaitingDecision>[0]);
   if (!w) return null;
   const e = idea.evidence ?? {};
-  if (w.wait === 'pinned_rule') {
-    return idea.change?.firstVersion
-      ? `${RULE_PURPOSE[idea.change?.promptCode] ?? 'It decides how debriefs are checked.'} It is already in use, but the clinical advisor or the owner has not checked it yet.`
-      : 'It changes a pinned rule, so the clinical advisor or the owner decides.';
-  }
   if (w.wait === 'promote_budget') return 'Budgets are the owner’s to change.';
   if (e.ask && !e.approval && expiresWhileWaiting(idea as never, w.wait)) {
     return String(e.ask.waitsBecause ?? 'It is on the always-ask list.');

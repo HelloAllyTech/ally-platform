@@ -484,6 +484,21 @@ void main() {
     });
   });
 
+  group('CallSummaryDetails.fromJson incompleteRecording', () {
+    test('is set when ally-be flags the recording as incomplete', () {
+      final d = CallSummaryDetails.fromJson({
+        'id': 1,
+        'incompleteRecording': {'reason': 'client-disconnect'},
+      });
+      expect(d.isIncompleteRecording, isTrue);
+    });
+
+    test('is unset when the field is null or absent', () {
+      expect(CallSummaryDetails.fromJson({'id': 1, 'incompleteRecording': null}).isIncompleteRecording, isFalse);
+      expect(CallSummaryDetails.fromJson({'id': 1}).isIncompleteRecording, isFalse);
+    });
+  });
+
   group('updateSummaryName', () {
     test('PATCHes the new summaryName to call-info', () async {
       when(

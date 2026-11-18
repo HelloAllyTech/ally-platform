@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 
 import { Menu } from "@icons";
 import { useDispatch } from "react-redux";
-import { Navigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import { InlineLoading } from "@ally-ui-mono/ui-shared";
 import {
@@ -23,10 +23,22 @@ import {
   normalizeEmailForAllowlist,
 } from "@constants";
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
+import { Login } from "@pages/Login/Login";
 import { setUser, setPermissions, setFeatures } from "@reducer";
-import { hasPermissions, hasFeature, loginPathWithNext } from "@utils";
+import { hasPermissions, hasFeature } from "@utils";
 
 import { ShellContext } from "./ShellContext";
+
+/**
+ * Backoff for re-reading entitlements after a failed load. ally-be restarted on every deploy
+ * (~10 a day), and a page opened inside that gap landed on a dead-end "Couldn't check your
+ * access" screen until someone clicked Try again. The schedule covers ~30s, during which the
+ * reader keeps seeing "Checking your access…"; only after it runs out does the failure screen
+ * appear, and retries continue every STEADY interval (plus on focus/online) behind it so the page
+ * recovers by itself once the API is back.
+ */
+export const ENTITLEMENT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000];
+export const ENTITLEMENT_RETRY_STEADY_MS = 15_000;
 
 interface PrivateLayoutProps {
   children: React.ReactNode;
@@ -114,7 +126,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   // Only used to reset the crash barrier below: React Router reuses this
   // element position across routes, so without a per-route key a page that
   // crashed would keep showing its error panel on the next page you opened.
-  const { pathname, search, hash } = useLocation();
+  const { pathname } = useLocation();
 
   // Phone-only nav drawer (the Sidebar is an in-flow rail from md up). It
   // covers the page, so any navigation and Escape close it.
@@ -136,11 +148,6 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
     if (permissions) dispatch(setPermissions(permissions));
     if (features) dispatch(setFeatures(features));
   }, [userData, permissions, features]);
-
-  if (!isAuthenticated) {
-    // Back here after logging in (A1): `/login?next=<this page>`.
-    return <Navigate to={loginPathWithNext(pathname, search, hash)} replace />;
-  }
 
   // Check if user has permission to access current route
   let hasPermission = true;
@@ -236,16 +243,71 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   // The org toggle is deliberately absent: it is a SECOND grant path, so its failure leaves
   // the feature check to answer, and treating it as fatal would block a platform admin whose
   // own toggle is fine.
-  const entitlementsFailed =
-    routeIsGated && !entitlementsLoading && (isUserError || isPermissionsError || isFeaturesError);
+  //
+  // An error only counts when there is no answer at all. RTK Query keeps the last good `data`
+  // when a refetch is rejected, and that answer is still the user's real entitlements — a blip
+  // on a background refetch must not take away a page they were already allowed to see.
+  const entitlementsUnavailable =
+    routeIsGated &&
+    !entitlementsLoading &&
+    ((isUserError && !userData) ||
+      (isPermissionsError && !permissions) ||
+      (isFeaturesError && !features));
 
   const retryEntitlements = () => {
-    void refetchUser();
-    void refetchPermissions();
-    void refetchFeatures();
+    if (isUserError) void refetchUser();
+    if (isPermissionsError) void refetchPermissions();
+    if (isFeaturesError) void refetchFeatures();
   };
 
-  const gateContent = entitlementsLoading ? (
+  // Retries made since entitlements last loaded cleanly. Not reset while a retry is in
+  // flight (that reads as "loading"), only once everything has an answer again.
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const isRetryBudgetSpent = retryAttempt >= ENTITLEMENT_RETRY_DELAYS_MS.length;
+  useEffect(() => {
+    if (entitlementsLoading) return undefined;
+    if (!entitlementsUnavailable) {
+      setRetryAttempt(0);
+      return undefined;
+    }
+    const delay = ENTITLEMENT_RETRY_DELAYS_MS[retryAttempt] ?? ENTITLEMENT_RETRY_STEADY_MS;
+    const timer = window.setTimeout(() => {
+      setRetryAttempt(attempt => attempt + 1);
+      retryEntitlements();
+    }, delay);
+    return () => window.clearTimeout(timer);
+    // retryEntitlements is rebuilt every render; the flags it reads are covered by
+    // entitlementsUnavailable/retryAttempt changing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entitlementsUnavailable, entitlementsLoading, retryAttempt]);
+
+  // Coming back to the tab or regaining the network is the likeliest moment the API is
+  // reachable again — try straight away rather than waiting out the timer.
+  useEffect(() => {
+    if (!entitlementsUnavailable) return undefined;
+    const retryNow = () => retryEntitlements();
+    window.addEventListener("online", retryNow);
+    window.addEventListener("focus", retryNow);
+    return () => {
+      window.removeEventListener("online", retryNow);
+      window.removeEventListener("focus", retryNow);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entitlementsUnavailable]);
+
+  // After every hook above — an early return before them breaks the hook order.
+  if (!isAuthenticated) {
+    // The login screen itself, at the URL they asked for: logging in leaves them on this page.
+    return <Login />;
+  }
+
+  // Inside the retry budget a failure still reads as "checking" — a deploy restart is over in
+  // seconds and should never be shown to the reader as a broken page.
+  const entitlementsFailed = entitlementsUnavailable && isRetryBudgetSpent;
+  const showEntitlementsChecking =
+    entitlementsLoading || (entitlementsUnavailable && !isRetryBudgetSpent);
+
+  const gateContent = showEntitlementsChecking ? (
     <div
       className="flex h-full min-h-[500px] items-center justify-center"
       data-testid="entitlements-loading"

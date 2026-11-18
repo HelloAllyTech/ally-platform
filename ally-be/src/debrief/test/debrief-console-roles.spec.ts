@@ -98,27 +98,23 @@ describe('Debrief console role gating', () => {
     }
   });
 
-  it('verdicts: the clinical advisor; pinned-rule sign-off: advisor or owner', async () => {
+  it('verdicts: the clinical advisor; pinned rules have no console routes any more', async () => {
     expect(await allowed(ADVISOR, DebriefReviewController, 'verdict')).toBe(
       true,
     );
     expect(await allowed(TEAM, DebriefReviewController, 'verdict')).toBe(false);
-    const C = DebriefConsoleController;
-    expect(await allowed(ADVISOR, C, 'approvePinnedRule')).toBe(true);
-    expect(await allowed(OWNER, C, 'approvePinnedRule')).toBe(true);
-    expect(await allowed(TEAM, C, 'approvePinnedRule')).toBe(false);
-  });
-
-  it('pinned rules: propose, withdraw and reject follow approval (advisor or owner)', async () => {
-    const C = DebriefConsoleController;
+    const C = DebriefConsoleController.prototype as unknown as Record<
+      string,
+      unknown
+    >;
+    // Pinned rules are Skills Store prompts for the named pinned editors: nothing to approve here.
     for (const h of [
-      'proposePinnedRule',
+      'approvePinnedRule',
       'withdrawPinnedRule',
       'rejectPinnedRule',
+      'proposePinnedRule',
     ]) {
-      expect(await allowed(ADVISOR, C, h)).toBe(true);
-      expect(await allowed(OWNER, C, h)).toBe(true);
-      expect(await allowed(TEAM, C, h)).toBe(false);
+      expect(C[h]).toBeUndefined();
     }
   });
 
@@ -134,7 +130,6 @@ describe('Debrief console role gating', () => {
       'editComment',
       'resolveComment',
       'resolveFlag',
-      'approvePinnedRule',
     ]) {
       expect(await allowed(ADVISOR, C, h)).toBe(true);
     }
@@ -180,7 +175,6 @@ describe('Debrief console role gating', () => {
       comment: true,
       heldDebrief: true,
       verdict: false,
-      approvePinnedRule: false,
       switchOrgOn: false,
       ownerSettings: false,
       emergencyStop: true,
@@ -190,8 +184,9 @@ describe('Debrief console role gating', () => {
       flagDecision: true,
       heldDebrief: false,
       verdict: true,
-      approvePinnedRule: true,
       pmAgent: false,
+      releases: false,
+      ownerSettings: false,
     });
     // A team member granted review:admin:debriefs by hand: escalations are
     // addressed only to the named advisor.

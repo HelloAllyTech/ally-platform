@@ -6,14 +6,7 @@ import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import {
-  Button,
-  OverflowMenu,
-  OverflowMenuItem,
-  Select,
-  SelectItem,
-  SkeletonText,
-} from "@ally-ui-mono/ui-shared";
+import { Button, OverflowMenu, OverflowMenuItem, SkeletonText } from "@ally-ui-mono/ui-shared";
 import { roadmapV2API, useGetRoadmapProductGoalsQuery } from "@api";
 import { ROUTES, en } from "@constants";
 
@@ -37,6 +30,7 @@ import { haptic, motionTransition, useReducedMotionPreference } from "../../../m
 import { BottomSheet } from "../components/BottomSheet";
 import { DictationButton } from "../components/DictationButton";
 import { RoadmapDialog } from "../components/RoadmapDialog";
+import { RoadmapDropdown } from "../components/RoadmapDropdown";
 import { typeInText } from "../hooks/useDictation";
 import { useDraftAutosave } from "../hooks/useDraftAutosave";
 import { useOutbox } from "../hooks/useOutbox";
@@ -433,21 +427,18 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
   const goalRow = (
     <div className="flex flex-wrap items-end gap-3">
       <div className="w-64 max-w-full">
-        <Select
+        <RoadmapDropdown
           id={`roadmap-draft-goal-${code ?? "new"}`}
           labelText={`${copy.goal} ${copy.goalOptional}`}
           size="sm"
           value={autosave.goalId ?? ""}
           disabled={readOnly}
-          onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-            autosave.setGoalId(event.target.value || null)
-          }
-        >
-          <SelectItem value="" text={copy.goalNone} />
-          {goalList.map(g => (
-            <SelectItem key={g.id} value={g.id} text={g.name} />
-          ))}
-        </Select>
+          options={[
+            { value: "", label: copy.goalNone },
+            ...goalList.map(g => ({ value: g.id, label: g.name })),
+          ]}
+          onChange={value => autosave.setGoalId(value || null)}
+        />
       </div>
       {suggested && !autosave.goalId && !readOnly && (
         <span className="flex items-center gap-2 text-sm text-typography-secondary">

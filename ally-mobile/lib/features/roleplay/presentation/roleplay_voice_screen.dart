@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/toast/toast.dart';
+import '../../simulations/data/learner_debrief_repository.dart';
 import '../../simulations/data/simulation_models.dart';
 import '../../simulations/data/simulations_repository.dart';
 import '../../simulations/presentation/simulation_feedback_location.dart';
@@ -757,7 +758,15 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   bool _controlsMaximized = false;
 
   bool get _hasTabs =>
-      widget.scenario != null && SessionInfoTabs.hasAnyTab(widget.scenario!);
+      widget.scenario != null &&
+      SessionInfoTabs.hasAnyTab(
+        widget.scenario!,
+        hasDebriefPoints:
+            ref
+                .watch(latestDebriefPointsProvider(widget.scenario!.id))
+                .value !=
+            null,
+      );
 
   @override
   Widget build(BuildContext context) {

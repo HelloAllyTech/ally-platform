@@ -435,11 +435,10 @@ export class DebriefAutonomyService implements OnModuleInit {
         const last = [...policy.relocks].reverse().find((r) => r.kind === kind);
         return {
           kind,
-          configurable: kind !== 'pinned_rules',
+          configurable: true,
           cells: policy.matrix[kind],
           eligible: e.eligible,
-          overridable:
-            kind !== 'pinned_rules' && !e.eligible && !relockReason(kind, f),
+          overridable: !e.eligible && !relockReason(kind, f),
           reason: e.reason,
           eligibility: stepEligibility(kind, f),
           override: policy.overrides?.[kind] ?? null,

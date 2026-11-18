@@ -1,7 +1,7 @@
 import asyncio
 import time
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from app.core.ally_core import AllyCoreService
 from app.core.config import settings
@@ -39,11 +39,27 @@ PIPELINE_PROMPT_CODES = [
     "ally_ai_analysis_counselor_analysis",
 ]
 
+# The prompts the v1 pipeline cannot run without. The cached-prompts fallback
+# needs all of these; the optional ones below are used when present.
+_REQUIRED_PIPELINE_PROMPT_CODES = list(PIPELINE_PROMPT_CODES)
+
+PIPELINE_PROMPT_CODES += [
+    # Scribe v2 note harness (shadow runs). Optional: a store that doesn't
+    # have them yet must not stop the cached fallback for v1.
+    "ally_ai_scribe_note_generate",
+    "ally_ai_scribe_note_map_segment",
+    "ally_ai_scribe_note_repair",
+    "ally_ai_scribe_note_speaker_roles",
+]
+
 # The last text of each pipeline prompt this process received, from a queue
 # message or a fetch. A message without prompts uses it when ally-be can't be
 # reached, rather than wait a visibility timeout: it is the text production was
 # serving moments ago, and the local files are minimal bases.
 _last_good_pipeline_prompts: Dict[str, Any] = {}
+
+# Detached Scribe v2 shadow runs still in flight (strong references).
+_background_tasks: Set["asyncio.Task[None]"] = set()
 
 
 def _remember_pipeline_prompts(prompts: Optional[Dict[str, Any]]) -> None:
@@ -292,6 +308,7 @@ class TranscriptionRequestHandler:
                 correlation_id=correlation_id,
                 stt_provider=stt_provider,
                 stt_attempts=stt_attempts,
+                note_harness=request.note_harness,
             )
 
             logger.info(
@@ -398,6 +415,7 @@ class TranscriptionRequestHandler:
         stt_provider: Optional[str] = None,
         stt_attempts: Optional[List[Dict[str, Any]]] = None,
         prompts: Optional[Dict[str, Any]] = None,
+        note_harness: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Process the transcription result and do diarization + summary, then
@@ -556,6 +574,19 @@ class TranscriptionRequestHandler:
             f"Diarization and summary completed for chat_id {chat_id} "
             f"correlation_id={correlation_id} delivered={delivered}"
         )
+
+        # Scribe v2 shadow run: only once the v1 result is safely delivered,
+        # detached so it never holds the SQS message or delays the counsellor.
+        if note_harness and delivered:
+            self._start_note_harness_shadow(
+                chat_id,
+                messages,
+                note_harness,
+                segments_text=segments_text,
+                session_mode=session_mode,
+                prompts=prompts,
+                correlation_id=correlation_id,
+            )
         await phi_logger.log(
             PHILogEvent(
                 event_type=PHIEvents.DATA_MODIFIED,
@@ -575,6 +606,91 @@ class TranscriptionRequestHandler:
             )
         )
         return delivered
+
+    # A shadow run is abandoned after this long (the v1 summary is already
+    # delivered; this only bounds the background work).
+    _NOTE_HARNESS_SHADOW_TIMEOUT_SECONDS = 600
+
+    def _start_note_harness_shadow(
+        self,
+        chat_id: int,
+        messages: List[ChatMessage],
+        note_harness: Dict[str, Any],
+        session_mode: Optional[str],
+        prompts: Optional[Dict[str, Any]],
+        correlation_id: Optional[str],
+        segments_text: Optional[str] = None,
+    ) -> None:
+        task = asyncio.create_task(
+            self._run_note_harness_shadow(
+                chat_id,
+                messages,
+                note_harness,
+                session_mode=session_mode,
+                prompts=prompts,
+                correlation_id=correlation_id,
+                segments_text=segments_text,
+            )
+        )
+        # Keep a reference so the task isn't garbage-collected mid-run.
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+
+    async def _run_note_harness_shadow(
+        self,
+        chat_id: int,
+        messages: List[ChatMessage],
+        note_harness: Dict[str, Any],
+        session_mode: Optional[str],
+        prompts: Optional[Dict[str, Any]],
+        correlation_id: Optional[str],
+        segments_text: Optional[str] = None,
+    ) -> None:
+        """Run the v2 harness and post its report. Never raises."""
+        from app.core.note_harness.models import HarnessReport, NoteHarnessRequest
+
+        try:
+            request = NoteHarnessRequest.model_validate(note_harness)
+        except Exception as e:  # noqa: BLE001
+            logger.error(
+                f"[NOTE_HARNESS] invalid request for chat_id={chat_id} "
+                f"correlation_id={correlation_id}: {type(e).__name__}"
+            )
+            return
+        try:
+            report = await asyncio.wait_for(
+                self.text_generation_service.generate_note_draft(
+                    messages,
+                    request,
+                    session_mode=session_mode,
+                    prompts=prompts,
+                    segments_text=segments_text,
+                ),
+                timeout=self._NOTE_HARNESS_SHADOW_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            report = HarnessReport(mode=session_mode, error="timeout")
+        except Exception as e:  # noqa: BLE001
+            report = HarnessReport(mode=session_mode, error=type(e).__name__)
+        logger.info(
+            f"[NOTE_HARNESS] chat_id={chat_id} correlation_id={correlation_id} "
+            f"path={report.path} segments={report.segments} "
+            f"calls={report.llm_calls} repaired={report.repaired} "
+            f"source={report.transcript_source} "
+            f"duration_ms={report.duration_ms} error={report.error}"
+        )
+        try:
+            await self.ally_core_service.post_note_draft(
+                chat_id,
+                report.model_dump(),
+                shadow=request.shadow,
+                correlation_id=correlation_id,
+            )
+        except Exception as e:  # noqa: BLE001 - shadow output is best-effort
+            logger.warning(
+                f"[NOTE_HARNESS] could not post the draft for chat_id={chat_id} "
+                f"correlation_id={correlation_id}: {type(e).__name__}"
+            )
 
     async def _generate_summary(
         self,
@@ -647,7 +763,10 @@ class TranscriptionRequestHandler:
                 PIPELINE_PROMPT_CODES
             )
         except Exception as e:  # noqa: BLE001 - any failure means requeue
-            if all(c in _last_good_pipeline_prompts for c in PIPELINE_PROMPT_CODES):
+            if all(
+                c in _last_good_pipeline_prompts
+                for c in _REQUIRED_PIPELINE_PROMPT_CODES
+            ):
                 logger.warning(
                     f"[PROMPT_DELIVERY] Could not fetch the pipeline prompts for "
                     f"chat_id={chat_id} correlation_id={correlation_id}; using "
@@ -666,7 +785,7 @@ class TranscriptionRequestHandler:
             for code, text in (texts or {}).items()
             if isinstance(text, str) and text.strip()
         }
-        missing = [c for c in PIPELINE_PROMPT_CODES if c not in prompts]
+        missing = [c for c in _REQUIRED_PIPELINE_PROMPT_CODES if c not in prompts]
         if missing:
             logger.error(
                 f"[PROMPT_DELIVERY] ally-be has no live text for {missing}; "

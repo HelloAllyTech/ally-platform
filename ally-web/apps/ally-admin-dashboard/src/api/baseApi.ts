@@ -14,10 +14,20 @@ import { loginPathWithNext } from "../utils/loginRedirect";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-const handleLogout = () => {
+export const handleLogout = () => {
+  const wasSignedIn = localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN);
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN);
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED);
+
+  // A session that ran out mid-use: reload the page they are on. Signed out, the admin shows the
+  // login screen at this same URL and logging in leaves them here, so they keep their place with
+  // no redirect to /login. (Not for someone who was never signed in: reloading there would just
+  // repeat the failing request, so they take the redirect below.)
+  if (wasSignedIn) {
+    window.location.reload();
+    return;
+  }
 
   // Raw window.location bypasses the router basename - prefix the Vite base
   // (the app lives under /admin in production, / everywhere else). `next` brings them back to
@@ -87,6 +97,15 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
         );
 
         if (!refreshResult.data) {
+          // Only a refusal of the refresh token means the session is over. A network error or
+          // 5xx is ally-be restarting (every deploy) — logging out then threw away a good
+          // session. Hand back that error instead so the caller can retry once the API is up.
+          const refreshStatus = refreshResult.error?.status;
+          const isSessionRejected =
+            typeof refreshStatus === "number" && refreshStatus >= 400 && refreshStatus < 500;
+          if (refreshResult.error && !isSessionRejected) {
+            return { error: refreshResult.error };
+          }
           handleLogout();
           throw new Error(en.error.noRefreshDataReceived);
         }

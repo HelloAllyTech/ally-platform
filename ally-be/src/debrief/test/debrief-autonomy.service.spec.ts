@@ -70,7 +70,7 @@ describe('DebriefAutonomyService', () => {
       gate_test: 'auto',
       paired_trial: 'auto',
     });
-    expect(policy.matrix.pinned_rules.quick_test).toBe('off');
+    expect(Object.keys(policy.matrix)).toEqual(['settings', 'prompts']);
     expect(
       await service.forIdea({ change: { ideaKind: 'setting' } }, 'gate_test'),
     ).toBe('auto');

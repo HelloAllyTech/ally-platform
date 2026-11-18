@@ -16,11 +16,16 @@ import {
   ALLY_TERMS_URL,
   ALLY_PRIVACY_POLICY_URL,
   ALLY_URL,
+  ROUTES,
   en,
 } from "@constants";
 import { useUser } from "@hooks";
 import { RootState } from "@store";
 import { afterLoginPath, validateEmail, openLinkInNewTab } from "@utils";
+
+import { Capabilities } from "./Capabilities";
+import { LegalDrawer, LegalKind } from "./LegalDrawer";
+import { UseCases } from "./UseCases";
 
 const RESEND_CODE_COUNTDOWN = 60; // 60 seconds
 const DEFAULT_EXPIRES_IN = 10; // 10 minutes
@@ -39,8 +44,19 @@ export const Login: React.FC = () => {
     };
   }, []);
   const goOn = useCallback(() => {
-    if (mounted.current) navigate(afterLoginPath(location.search), { replace: true });
-  }, [navigate, location.search]);
+    if (!mounted.current) return;
+    const shownAt = `${location.pathname}${location.search}${location.hash}`;
+    navigate(afterLoginPath(location.search, shownAt), { replace: true });
+  }, [navigate, location.pathname, location.search, location.hash]);
+  // A signed-out visitor to any assistants page gets this screen drawn there, in its own words and
+  // layout. Sign-in itself (OTP, Google, `next`) is identical everywhere.
+  const isAssistantsLogin =
+    location.pathname === ROUTES.WHATSAPP_BOT ||
+    location.pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`);
+  // Ink on paper: the assistants login's black button on its cream page.
+  const assistantsButton = isAssistantsLogin
+    ? "!bg-[#4338CA] !text-[#FFFFFF] hover:!bg-[#4338CA]/90 disabled:!bg-[#4338CA]/30"
+    : "";
   const { user } = useSelector((state: RootState) => state.user);
 
   const [loginSection, setLoginSection] = useState<any>(LoginSection.EMAIL);
@@ -48,7 +64,14 @@ export const Login: React.FC = () => {
   const [emailError, setEmailError] = useState<string>("");
   const [otp, setOtp] = useState<string>("");
   const [countdown, setCountdown] = useState<number>(0);
-  const [rememberMe, setRememberMe] = useState<boolean>(false);
+  // The assistants login has no checkbox: it always remembers the email (the session itself
+  // already persists). The standard login keeps the opt-in.
+  const [legalOpen, setLegalOpen] = useState<LegalKind | null>(null);
+  const closeLegal = useCallback(() => setLegalOpen(null), []);
+  const focusEmail = useCallback(() => {
+    document.querySelector<HTMLInputElement>('input[type="email"]')?.focus();
+  }, []);
+  const [rememberMe, setRememberMe] = useState<boolean>(isAssistantsLogin);
 
   const [
     generateOTP,
@@ -199,6 +222,98 @@ export const Login: React.FC = () => {
   };
 
   const getLoginSection = () => {
+    if (loginSection === LoginSection.EMAIL && isAssistantsLogin) {
+      const copy = en.assistantsShell.login;
+      const hasGoogle = Boolean(import.meta.env.VITE_GOOGLE_AUTH_CLIENT_ID);
+      return (
+        <motion.div
+          key="email"
+          onKeyDown={e => {
+            if (e.key === "Enter" && !isLoading && !isSubmitDisabled) handleNext();
+          }}
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 50 }}
+          transition={{ duration: 0.4, ease: "easeInOut" }}
+          className="flex flex-col gap-4"
+        >
+          <h1 className="font-secondary text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] text-[#1E1B4B] sm:text-4xl md:text-5xl">
+            {copy.headline}
+            <span className="mt-2 inline-block bg-[#5B4BFF] px-2.5 pb-1 pt-0.5 leading-none text-[#FFFFFF]">
+              {copy.headlineEmphasis}
+            </span>
+          </h1>
+          <TextField
+            fieldSize="medium"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            enterKeyHint="next"
+            aria-label={en.auth.email}
+            value={email}
+            onChange={handleEmailChange as any}
+            errorMessage={emailError}
+            hideError={false}
+            placeholder={en.auth.enterEmailPlaceholder}
+            className="w-full rounded-xs text-base sm:text-lg"
+          />
+          <div
+            className={`grid grid-cols-1 items-center gap-3 ${
+              hasGoogle ? "sm:grid-cols-[1fr_auto_1fr] sm:gap-4" : ""
+            }`}
+          >
+            <Button
+              type="button"
+              className={`h-12 w-full rounded-none text-base ${assistantsButton}`}
+              disabled={isLoading || isSubmitDisabled}
+              onClick={handleNext}
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  {en.auth.generatingOTP}
+                </div>
+              ) : (
+                copy.sendCode
+              )}
+            </Button>
+            {hasGoogle && (
+              <>
+                <span className="text-center text-base text-[#1E1B4B]/60">{en.common.or}</span>
+                <GoogleSignInButton
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  text={copy.googleSignIn}
+                  className="!h-12 !w-full !px-6 [&_span]:!text-base"
+                />
+              </>
+            )}
+          </div>
+          <p className="text-sm leading-relaxed text-[#1E1B4B]/60">
+            {en.auth.byTappingNext}{" "}
+            <button
+              type="button"
+              className="cursor-pointer text-primary-500 hover:text-primary-600"
+              onClick={() => setLegalOpen("terms")}
+            >
+              {en.auth.termsAndConditions}
+            </button>{" "}
+            {en.auth.andAcknowledge}{" "}
+            <button
+              type="button"
+              className="cursor-pointer text-primary-500 hover:text-primary-600"
+              onClick={() => setLegalOpen("privacy")}
+            >
+              {en.auth.privacyPolicy}.
+            </button>
+          </p>
+          <div className="mt-3">
+            <UseCases onStart={focusEmail} />
+          </div>
+          <Capabilities />
+        </motion.div>
+      );
+    }
     if (loginSection === LoginSection.EMAIL) {
       return (
         <motion.div
@@ -355,7 +470,7 @@ export const Login: React.FC = () => {
         </div>
         <Button
           type="button"
-          className="w-full rounded-none mt-2 font-tertiary"
+          className={`w-full rounded-none mt-2 font-tertiary ${assistantsButton}`}
           disabled={isLoading || isSubmitDisabled}
           onClick={handleVerify}
         >
@@ -374,6 +489,33 @@ export const Login: React.FC = () => {
 
   const isSubmitDisabled =
     loginSection === LoginSection.EMAIL ? !email || !!emailError : !otp || otp.length < 4;
+
+  if (isAssistantsLogin) {
+    return (
+      <div
+        className="flex min-h-dvh flex-col items-center overflow-hidden bg-[#F6F5FF] px-6 font-primary text-[#1E1B4B]"
+        data-testid="assistants-login"
+      >
+        {/* Wordmark: the product name, top left of the same column as everything below it, so
+            the wordmark, headline and form share one left edge. */}
+        <div className="w-full max-w-2xl pt-6 md:pt-8">
+          <div
+            className="flex items-center gap-2 font-secondary text-2xl font-semibold tracking-[-0.03em] md:text-3xl"
+            data-testid="assistants-login-wordmark"
+          >
+            <span>{en.assistantsShell.login.wordmarkName}</span>
+            <span className="bg-[#5B4BFF] px-2 pb-0.5 leading-tight text-[#FFFFFF]">
+              {en.assistantsShell.login.wordmarkProduct}
+            </span>
+          </div>
+        </div>
+        <div className="flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 pb-8 pt-4">
+          <AnimatePresence mode="wait">{getLoginSection()}</AnimatePresence>
+        </div>
+        <LegalDrawer kind={legalOpen} onClose={closeLegal} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex font-primary flex-col lg:flex-row min-h-dvh md:h-screen lg:p-8">

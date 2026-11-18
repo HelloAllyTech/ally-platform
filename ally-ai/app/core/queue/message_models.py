@@ -46,6 +46,11 @@ class TranscribeAndSummarizeRequestMessage(BaseQueueMessage):
     # Optional only for messages queued before ally-be sent them: the handler
     # fetches the prompts for those instead of running its minimal defaults.
     prompts: Optional[Dict[str, Any]] = None
+    # Scribe v2: present when the tenant has the note harness on. Holds the
+    # NoteHarnessRequest (note_spec, budget_settings, context, shadow). In
+    # shadow mode the v1 summary is delivered unchanged and the harness draft
+    # is posted separately for comparison.
+    note_harness: Optional[Dict[str, Any]] = None
 
 
 class TranscriptionResultMessage(BaseQueueMessage):

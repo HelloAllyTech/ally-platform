@@ -175,6 +175,15 @@ export const DEBRIEF_SCHEDULE_JOBS: readonly DebriefScheduleJob[] = [
     learningBudget: false,
   },
   {
+    // A registered roleplay field that newly saved roleplays stopped carrying (a rename or a new
+    // shape in the creation code): counts only, tells the Ally team. Calls no model.
+    key: 'debrief-roleplay-field-drift',
+    options: DAY,
+    defaults: daily,
+    locked: false,
+    learningBudget: false,
+  },
+  {
     // Judge drift: the independent check scores the anchor set again.
     key: 'debrief-judge-anchor',
     options: ['weekly', '2weeks'],

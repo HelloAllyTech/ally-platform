@@ -61,6 +61,23 @@
   font-size: 13px;
   color: var(--ally-muted);
 }
+.ally-frame__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ally-ink-2);
+  font: 400 24px/1 var(--ally-font-ui);
+  cursor: pointer;
+}
+.ally-frame__close:hover {
+  background: var(--ally-surface-2);
+  color: var(--ally-ink);
+}
 .ally-saved {
   display: inline-flex;
   align-items: center;
@@ -838,4 +855,57 @@ a.ally-source:hover {
 }
 .ally-pages__group label {
   overflow-wrap: anywhere;
+}
+
+/* ── Start: how to begin (four method cards) ── */
+.ally-methods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.ally-method {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  min-height: 132px;
+  padding: 18px;
+  border-radius: var(--ally-radius-sm);
+  border: 1px solid var(--ally-line-strong);
+  background: var(--ally-surface-2);
+  color: var(--ally-ink);
+  font: 400 15px/1.4 var(--ally-font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.ally-method:hover:not(:disabled) {
+  border-color: var(--ally-ink-2);
+}
+.ally-method:focus-visible {
+  outline: 2px solid var(--ally-accent);
+  outline-offset: 2px;
+}
+.ally-method__icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.ally-method__title {
+  font-weight: 600;
+  font-size: 17px;
+}
+.ally-method__hint {
+  color: var(--ally-muted);
+}
+@media (max-width: 640px) {
+  .ally-methods {
+    grid-template-columns: 1fr;
+  }
+  .ally-method {
+    min-height: 0;
+  }
 }

@@ -91,12 +91,6 @@ export class BuilderSessionVisibilityInterceptor implements NestInterceptor {
     }
     if (!facts) return next.handle();
 
-    // A caller let in by the Product Planning Lead toggle (not Builder's own)
-    // reaches plan sessions only; Builder's own sessions stay Builder users'.
-    if (request.viaAlternateToggle && facts.kind !== BuilderSessionKind.PLAN) {
-      throw new NotFoundException('Builder session not found');
-    }
-
     // A plan is changed only through its own stage's rules (rev 5.2 §B.12):
     // a private draft through the roadmap's idea flow, a shared plan only by
     // its current lead. Reads stay open to everyone who may see the plan.

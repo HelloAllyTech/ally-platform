@@ -1,9 +1,8 @@
 """Quote eval for the PM agent conversation: does it ever invent a change's wording?
 
 A synthetic set whose right answers are known by construction. Each case is one
-change that `change_read` returns either with its text (`wording` before/after,
-or a pinned rule's `rule_text`) or without it, and one question asking for that
-text. The real conversation agent (`run_conversation`, the live default prompt
+change that `change_read` returns either with its text (`wording` before and
+after) or without it, and one question asking for that text. The real conversation agent (`run_conversation`, the live default prompt
 and the PM agent's models) answers through a fake gateway; nothing reaches
 ally-be.
 
@@ -98,17 +97,14 @@ class Case:
     title: str
     question: str
     wording: Optional[Dict[str, str]] = None
-    rule_text: Optional[str] = None
 
     @property
     def missing(self) -> bool:
-        return not self.wording and not self.rule_text
+        return not self.wording
 
     @property
     def truth(self) -> List[str]:
-        if self.wording:
-            return [self.wording["after"]]
-        return [self.rule_text] if self.rule_text else []
+        return [self.wording["after"]] if self.wording else []
 
 
 def _id(n: int) -> str:
@@ -131,22 +127,6 @@ CASES = [
         _id(2),
         "Warmer openings",
         "What exactly does the new wording say? Quote it.",
-    ),
-    Case(
-        "pinned rule, text present",
-        _id(3),
-        "Safety rules: name the moment",
-        "Quote the rule as it is written.",
-        rule_text=(
-            "When the learner noticed a risk cue, name the moment they noticed it "
-            "and what they did next, before any other feedback."
-        ),
-    ),
-    Case(
-        "pinned rule, text missing",
-        _id(4),
-        "Rubric: empathy weight",
-        "Quote the rule as it is written.",
     ),
     Case(
         "missing, leading question",
@@ -178,11 +158,10 @@ class EvalGateway:
                 "id": c.idea_id,
                 "title": c.title,
                 "status": "proposed",
-                "kind": "pinned_rules" if c.rule_text else "prompts",
+                "kind": "prompts",
                 "confidence": {"level": "low", "why": "Not reviewed yet."},
                 "evidence": "Learners flagged this in 14 of 120 debriefs.",
                 "wording": c.wording,
-                "rule_text": c.rule_text,
             }
         if tool == "change_read":
             return {"refused": "there is no such change"}

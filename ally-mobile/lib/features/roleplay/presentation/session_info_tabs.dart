@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/html_rich_text.dart';
+import '../../simulations/data/learner_debrief_repository.dart';
 import '../../simulations/data/simulation_models.dart';
 import 'checklist_panel.dart';
 
@@ -20,7 +21,7 @@ enum SessionInfoTab { checklist, reminders, description }
 /// when its gate fails, not shown-with-an-empty-state. [hasAnyTab] mirrors
 /// RN's `hasTabs`, for the caller to decide whether to render this widget
 /// at all.
-class SessionInfoTabs extends StatefulWidget {
+class SessionInfoTabs extends ConsumerStatefulWidget {
   const SessionInfoTabs({
     super.key,
     required this.scenario,
@@ -30,14 +31,19 @@ class SessionInfoTabs extends StatefulWidget {
   final Scenario scenario;
   final Set<String> triggeredEventIds;
 
-  static bool hasAnyTab(Scenario scenario) =>
-      scenario.hasChecklist || scenario.reminders.isNotEmpty || (scenario.description ?? '').isNotEmpty;
+  /// [hasDebriefPoints]: the learner has points from their last debrief of
+  /// this roleplay, which add to the Reminders tab.
+  static bool hasAnyTab(Scenario scenario, {bool hasDebriefPoints = false}) =>
+      scenario.hasChecklist ||
+      scenario.reminders.isNotEmpty ||
+      hasDebriefPoints ||
+      (scenario.description ?? '').isNotEmpty;
 
   @override
-  State<SessionInfoTabs> createState() => _SessionInfoTabsState();
+  ConsumerState<SessionInfoTabs> createState() => _SessionInfoTabsState();
 }
 
-class _SessionInfoTabsState extends State<SessionInfoTabs> {
+class _SessionInfoTabsState extends ConsumerState<SessionInfoTabs> {
   late SessionInfoTab _activeTab = widget.scenario.hasChecklist
       ? SessionInfoTab.checklist
       : (widget.scenario.reminders.isNotEmpty
@@ -46,12 +52,14 @@ class _SessionInfoTabsState extends State<SessionInfoTabs> {
 
   @override
   Widget build(BuildContext context) {
+    final points = ref.watch(latestDebriefPointsProvider(widget.scenario.id)).value;
     final tabs = [
       if (widget.scenario.hasChecklist) SessionInfoTab.checklist,
-      if (widget.scenario.reminders.isNotEmpty) SessionInfoTab.reminders,
+      if (widget.scenario.reminders.isNotEmpty || points != null) SessionInfoTab.reminders,
       if ((widget.scenario.description ?? '').isNotEmpty) SessionInfoTab.description,
     ];
     if (tabs.isEmpty) return const SizedBox.shrink();
+    final active = tabs.contains(_activeTab) ? _activeTab : tabs.first;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -73,7 +81,7 @@ class _SessionInfoTabsState extends State<SessionInfoTabs> {
                   if (i > 0) const SizedBox(width: 16),
                   _InfoTabButton(
                     tab: tabs[i],
-                    isActive: tabs[i] == _activeTab,
+                    isActive: tabs[i] == active,
                     onTap: () => setState(() => _activeTab = tabs[i]),
                   ),
                 ],
@@ -82,14 +90,14 @@ class _SessionInfoTabsState extends State<SessionInfoTabs> {
           ),
         ),
         Flexible(
-          child: switch (_activeTab) {
+          child: switch (active) {
             SessionInfoTab.checklist => ChecklistPanel(
               mode: checklistModeFromString(widget.scenario.checklistType),
               items: widget.scenario.checklistEvents,
               triggeredEventIds: widget.triggeredEventIds,
               hideHeader: true,
             ),
-            SessionInfoTab.reminders => _DarkPane(child: _RemindersTab(reminders: widget.scenario.reminders)),
+            SessionInfoTab.reminders => _DarkPane(child: _RemindersTab(reminders: widget.scenario.reminders, points: points)),
             SessionInfoTab.description => _DarkPane(
               child: Container(
                 key: const ValueKey('session-info-description'),
@@ -184,34 +192,99 @@ class _InfoTabButton extends ConsumerWidget {
   }
 }
 
-class _RemindersTab extends StatelessWidget {
-  const _RemindersTab({required this.reminders});
+class _RemindersTab extends ConsumerWidget {
+  const _RemindersTab({required this.reminders, this.points});
 
-  // Never empty in practice — the tab only exists when there are
-  // reminders (RN `hasReminders`).
+  // Empty only when the tab exists for the learner's debrief points alone.
   final List<String> reminders;
 
+  /// From the learner's last debrief of this roleplay, shown after the
+  /// scenario's own reminders.
+  final LatestDebriefPoints? points;
+
+  static const _bodyStyle = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontSize: 14,
+    height: 20 / 14,
+    color: Colors.white,
+  );
+
+  static const _labelStyle = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifMedium,
+    fontSize: 13,
+    height: 18 / 13,
+    color: Color(0xFFB8C0CC),
+  );
+
+  Widget _card(Widget child) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: AppColors.darkGray10,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: child,
+  );
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = points;
+    final children = <Widget>[
+      for (final reminder in reminders)
+        _card(Text(reminder, style: _bodyStyle)),
+      if (p != null) ...[
+        Text(
+          ref.t('simulationPage.fromLastDebrief'),
+          key: const ValueKey('session-info-debrief-heading'),
+          style: _labelStyle,
+        ),
+        for (final item in p.workOnThis)
+          _card(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ref.t('postSim.debriefCards.workOnThis'),
+                  style: _labelStyle,
+                ),
+                const SizedBox(height: 4),
+                Text(item.lead, style: _bodyStyle),
+                if (item.trySaying.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '${ref.t('postSim.debriefCards.trySaying')} ${item.trySaying}',
+                    style: _bodyStyle,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        if (p.practiseNext case final next?)
+          _card(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ref.t('postSim.debriefCards.practiseNext'),
+                  style: _labelStyle,
+                ),
+                const SizedBox(height: 4),
+                Text(next.skill, style: _bodyStyle),
+                if (next.reason.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(next.reason, style: _bodyStyle),
+                ],
+              ],
+            ),
+          ),
+      ],
+    ];
     return Column(
       key: const ValueKey('session-info-reminders'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < reminders.length; i++) ...[
+        for (var i = 0; i < children.length; i++) ...[
           if (i > 0) const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: AppColors.darkGray10, borderRadius: BorderRadius.circular(16)),
-            child: Text(
-              reminders[i],
-              style: const TextStyle(
-                fontFamily: AppFonts.ibmPlexSerifRegular,
-                fontSize: 14,
-                height: 20 / 14,
-                color: Colors.white,
-              ),
-            ),
-          ),
+          children[i],
         ],
       ],
     );

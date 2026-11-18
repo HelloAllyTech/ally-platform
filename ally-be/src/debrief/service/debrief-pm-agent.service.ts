@@ -2,10 +2,8 @@ import { ADVISORY_CHECKS, DebriefCheckCode } from '../util/debrief-cards.util';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
-  OnApplicationBootstrap,
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
@@ -41,21 +39,8 @@ import {
   MetricsViewLike,
 } from '../util/debrief-metric-failures.util';
 import { DebriefRunArm, DebriefRunMode } from '../enum/debrief-run.enum';
-import { createHash, randomUUID } from 'crypto';
-import {
-  approvalState,
-  PINNED_RULE_CODES,
-  PINNED_RULE_PROMPTS,
-} from '../util/debrief-console-view.util';
-import {
-  firstVersionHash,
-  firstVersionTitle,
-  PASSAGE_PROBLEM_MESSAGE,
-  passageProblem,
-  pinnedRuleActions,
-  pinnedRuleName,
-  textAfterChange,
-} from '../util/debrief-pinned-rules.util';
+import { randomUUID } from 'crypto';
+import { approvalState } from '../util/debrief-console-view.util';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
 import {
@@ -113,9 +98,7 @@ const SCREEN_CONCURRENCY = 3;
  * records, and spend is read from `llm_usage` and the replay runs.
  */
 @Injectable()
-export class DebriefPmAgentService
-  implements OnModuleInit, OnApplicationBootstrap
-{
+export class DebriefPmAgentService implements OnModuleInit {
   private readonly logger = LoggerService.getInstance(
     DebriefPmAgentService.name,
   );
@@ -169,23 +152,6 @@ export class DebriefPmAgentService
         (n) => `${n} approval${n === 1 ? '' : 's'} expired`,
       ),
     );
-  }
-
-  /**
-   * At boot, once the Skills Store sync and the release defaults have had
-   * time to run: a "Needs you" item for each pinned rule whose version in
-   * force has no approval. The PM agent page and Settings › Pinned rules also
-   * ask, so a slow boot only delays them.
-   */
-  onApplicationBootstrap(): void {
-    if (process.env.NODE_ENV === 'test') return;
-    setTimeout(() => {
-      this.ensureFirstVersionItems(true).catch((e) =>
-        this.logger.warn(
-          `[pm-agent] pinned-rule first versions: ${(e as Error).message}`,
-        ),
-      );
-    }, 30_000).unref();
   }
 
   // --- Learning budget ----------------------------------------------------------
@@ -821,7 +787,7 @@ export class DebriefPmAgentService
       // trial or its learner try-out, never a hand-off, a pinned rule or budgets.
       const k = idea.change?.ideaKind;
       if (
-        ['needs_code', 'defect', 'needs_person', 'pinned_rule'].includes(k) ||
+        ['needs_code', 'defect', 'needs_person'].includes(k) ||
         idea.change?.budgetOnly
       ) {
         throw new ConflictException('this change waits for a person');
@@ -844,11 +810,6 @@ export class DebriefPmAgentService
       );
     }
     const kind = idea.change?.ideaKind;
-    if (kind === 'pinned_rule') {
-      throw new BadRequestException(
-        'a pinned-rule change is approved by the clinical advisor or the owner (approvePinnedRule)',
-      );
-    }
     if (['needs_code', 'defect', 'needs_person'].includes(kind)) {
       if (userId == null) {
         throw new ConflictException('this change waits for a person');
@@ -865,7 +826,9 @@ export class DebriefPmAgentService
       throw new BadRequestException(
         kind === 'registry_agent'
           ? 'registry agents wait for the agent registry (spec step 7)'
-          : 'this idea has no drafted change yet',
+          : kind === 'pinned_rule'
+            ? 'a pinned rule is changed in the Skills Store by a pinned editor, not here'
+            : 'this idea has no drafted change yet',
       );
     }
     // R2-18 (FR-56): the PM agent's own prompt edit reaches learners only
@@ -1430,7 +1393,7 @@ export class DebriefPmAgentService
     return row?.id != null ? Number(row.id) : null;
   }
 
-  // --- Approvals: questions, expiry, pinned rules (plan §11.7) ----------------------
+  // --- Approvals: questions, expiry (plan §11.7) ----------------------
 
   /**
    * "Ask a question" on an item waiting for approval: a thread on the idea,
@@ -1619,508 +1582,6 @@ export class DebriefPmAgentService
     return expired;
   }
 
-  /**
-   * A pinned-rule proposal (plan §11.7 "always a person"): a change to the
-   * safety rules, the rubric or the judge's instructions, written as a find
-   * and replace on the prompt's live text. It waits in the PM agent's "Needs
-   * you" list for the clinical advisor or the owner.
-   */
-  async proposePinnedRule(
-    input: { promptCode: string; find: string; replace: string; why: string },
-    userId: number,
-  ): Promise<{ id: string }> {
-    if (!PINNED_RULE_CODES.has(input.promptCode)) {
-      throw new BadRequestException(
-        `${input.promptCode} is not a pinned rule; pinned: ${[...PINNED_RULE_CODES].join(', ')}`,
-      );
-    }
-    const { bundle } = await this.gaBundle();
-    const live = await this.context.promptText(
-      input.promptCode,
-      bundle.prompts[input.promptCode] ?? null,
-    );
-    if (!live) {
-      throw new NotFoundException(`${input.promptCode} has no live text`);
-    }
-    const problem = passageProblem(live, input.find);
-    if (problem) {
-      throw new BadRequestException(PASSAGE_PROBLEM_MESSAGE[problem]);
-    }
-    if (input.find === input.replace) {
-      throw new BadRequestException(
-        'The replacement is the same as the passage. Write the new wording.',
-      );
-    }
-    const why = (input.why ?? '').trim();
-    if (!why) throw new BadRequestException('Say why the rule should change.');
-    const change = {
-      ideaKind: 'pinned_rule',
-      promptCode: input.promptCode,
-      find: input.find,
-      replace: input.replace,
-    };
-    const hash = createHash('sha256')
-      .update(JSON.stringify(change))
-      .digest('hex');
-    const rows = await this.dataSource.query(
-      `INSERT INTO agent_lessons
-         ("agentKey", kind, scope, status, text, change, evidence, "contentHash", "authorKind")
-       SELECT $1::varchar, 'prompt', 'platform', 'proposed', $2::varchar, $3::jsonb, $4::jsonb,
-              $5::varchar, 'human'
-        WHERE NOT EXISTS (SELECT 1 FROM agent_lessons
-                           WHERE "agentKey" = $1::varchar AND "contentHash" = $5::varchar)
-       RETURNING id`,
-      [
-        DEBRIEF_AGENT_KEY,
-        `${pinnedRuleName(input.promptCode)}: ${why}`.slice(0, 300),
-        JSON.stringify(change),
-        JSON.stringify({ why, proposedBy: userId }),
-        hash,
-      ],
-    );
-    if (!rows?.[0]?.id) {
-      throw new ConflictException(
-        'This change has already been proposed. Find it in Debrief PM agent › Ideas.',
-      );
-    }
-    await this.audit('proposed', rows[0].id, userId, { kind: 'pinned_rule' });
-    // V2: the clinical advisor and the owner decide it from Home, where the
-    // link opens this change and the conversation about it.
-    await this.notifier?.pinnedRuleDeciders({
-      title: 'Debriefs: a pinned-rule change needs approval',
-      body: `Proposed change to the ${pinnedRuleName(input.promptCode)}: ${why}`,
-      data: {
-        ideaId: rows[0].id,
-        url: `/debriefs/pm-agent?change=${rows[0].id}`,
-      },
-      excludeUserId: userId,
-    });
-    return { id: rows[0].id };
-  }
-
-  /**
-   * The clinical advisor or the owner signs a pinned-rule change off: the new
-   * text becomes a Skills Store version and a DRAFT release pins it. Nothing
-   * reaches learners until a person makes that release live (Releases).
-   * The sign-off (who, when) is kept on the idea and read by the pinned-rules
-   * list.
-   */
-  async approvePinnedRule(
-    ideaId: string,
-    userId: number,
-    note?: string,
-  ): Promise<{ releaseId: string; version: number; promptVersion: number }> {
-    const idea = await this.getIdea(ideaId);
-    if (idea.change?.ideaKind !== 'pinned_rule') {
-      throw new BadRequestException('this idea is not a pinned-rule change');
-    }
-    if (idea.status !== 'proposed') {
-      throw new ConflictException(`this idea is ${idea.status}`);
-    }
-    if (approvalState(idea as any)?.expired) {
-      throw new ConflictException(
-        'this approval expired after 14 days with no decision',
-      );
-    }
-    const code = idea.change.promptCode as string;
-    if (idea.change.firstVersion) {
-      return this.approveFirstVersion(idea, userId, note);
-    }
-    const { bundle } = await this.gaBundle();
-    const current = await this.context.promptText(
-      code,
-      bundle.prompts[code] ?? null,
-    );
-    if (!current || !current.includes(idea.change.find)) {
-      throw new ConflictException(
-        'the rule changed since this proposal; its passage is gone',
-      );
-    }
-    const [prompt] = await this.dataSource.query(
-      `SELECT id FROM prompts WHERE "promptCode" = $1`,
-      [code],
-    );
-    if (!prompt) {
-      throw new NotFoundException(`prompt ${code} is not in the Skills Store`);
-    }
-    const latest = await this.prompts.latestVersionOf(prompt.id);
-    const version = await this.prompts.createVersion(
-      prompt.id,
-      {
-        body: current.replace(idea.change.find, idea.change.replace),
-        baseVersion: latest,
-        source: PromptVersionSource.EXPERIMENT,
-        note: `Pinned-rule change ${ideaId}, approved by user ${userId}: ${idea.text}`.slice(
-          0,
-          500,
-        ),
-        evalSummary: null,
-        createdBy: userId,
-      },
-      { translate: 'none' },
-    );
-    const next: DebriefBundle = JSON.parse(JSON.stringify(bundle));
-    let releaseId: string | null = null;
-    let releaseVersion: number | null = null;
-    // The signed-off version becomes the Skills Store's current version for
-    // every reader: the runner (for rules outside the release), the
-    // independent judge (which reads the store's rubric and definition) and
-    // the PM agent. A release pins it too when the rule is in the bundle.
-    {
-      const [{ currentVersion }] = await this.dataSource.query(
-        `SELECT "currentVersion" FROM prompts WHERE id = $1`,
-        [prompt.id],
-      );
-      await this.prompts.promote(
-        prompt.id,
-        version.version,
-        currentVersion ?? null,
-        {
-          confirmPinnedChange: true,
-          signedOffPinnedRule: true,
-          requireTranslations: false,
-        },
-      );
-    }
-    if (code in next.prompts) {
-      next.prompts[code] = version.version;
-      const draft = await this.releases.createDraft(
-        DEBRIEF_AGENT_KEY,
-        next as unknown as Record<string, unknown>,
-        userId,
-        `${idea.text} (${pinnedRuleName(code)} v${version.version})`.slice(
-          0,
-          300,
-        ),
-      );
-      // Plan §8.8: the exact prompt versions it runs, recorded now.
-      await this.runner.pinPrompts(draft);
-      releaseId = draft.id;
-      releaseVersion = draft.version;
-    }
-    const signedAt = new Date().toISOString();
-    await this.writeEvidence(ideaId, 'signoff', {
-      by: userId,
-      at: signedAt,
-      note: note ?? null,
-      promptCode: code,
-      promptVersion: version.version,
-      releaseId,
-    });
-    await this.dataSource.query(
-      `UPDATE agent_lessons SET status = 'approved', "decidedBy" = $2, "decidedAt" = now(),
-              "releaseId" = $3, "updatedAt" = now() WHERE id = $1`,
-      [ideaId, userId, releaseId],
-    );
-    await this.audit('approved', ideaId, userId, {
-      kind: 'pinned_rule',
-      promptCode: code,
-      promptVersion: version.version,
-      releaseId,
-      note: note ?? null,
-    });
-    // The clinical sign-off is the gate for a pinned rule (review
-    // 2026-11-16): at our volume a learner try-out would never finish, so
-    // the signed-off version goes live for everyone at once and is watched
-    // (A5) with automatic undo, like any change that went live.
-    if (releaseId) {
-      const before = await this.releases.getGa(DEBRIEF_AGENT_KEY);
-      const released = await this.releases.makeGa(
-        releaseId,
-        userId,
-        AgentReleaseAuditAction.PROMOTED,
-        note,
-        actorOf(userId),
-      );
-      releaseVersion =
-        (released as { version?: number })?.version ?? releaseVersion;
-      await this.dataSource.query(
-        `UPDATE agent_lessons SET status = 'active', "updatedAt" = now() WHERE id = $1`,
-        [ideaId],
-      );
-      await this.writeEvidence(ideaId, 'canary', {
-        status: 'skipped',
-        reason: 'signed off: a pinned rule goes live on its sign-off',
-        releaseId,
-        version: releaseVersion,
-        promotedAt: new Date().toISOString(),
-      });
-      await this.startWatch(ideaId, releaseId, before?.id ?? null);
-    }
-    return {
-      releaseId: releaseId as string,
-      version: releaseVersion as number,
-      promptVersion: version.version,
-    };
-  }
-
-  /**
-   * Approving a pinned rule's first version: the text live now, written by
-   * engineering and never clinically approved. No new prompt version and no
-   * release; only the approval (who, when) is recorded, the same evidence as
-   * a change's, so Settings › Pinned rules reads "Approved by …".
-   */
-  private async approveFirstVersion(
-    idea: Record<string, any>,
-    userId: number,
-    note?: string,
-  ): Promise<{ releaseId: string; version: number; promptVersion: number }> {
-    const code = idea.change.promptCode as string;
-    const version = Number(idea.change.version);
-    const live = await this.livePinnedRule(code);
-    if (!live || live.version !== version) {
-      throw new ConflictException(
-        `the live ${pinnedRuleName(code)} is no longer v${version}`,
-      );
-    }
-    const at = new Date().toISOString();
-    await this.writeEvidence(idea.id, 'signoff', {
-      by: userId,
-      at,
-      note: note ?? null,
-      promptCode: code,
-      promptVersion: version,
-      releaseId: null,
-      firstVersion: true,
-    });
-    await this.dataSource.query(
-      `UPDATE agent_lessons SET status = 'approved', "decidedBy" = $2, "decidedAt" = now(),
-              "updatedAt" = now() WHERE id = $1`,
-      [idea.id, userId],
-    );
-    await this.audit('approved', idea.id, userId, {
-      kind: 'pinned_rule',
-      firstVersion: true,
-      promptCode: code,
-      promptVersion: version,
-      note: note ?? null,
-    });
-    return {
-      releaseId: null as unknown as string,
-      version: null as unknown as number,
-      promptVersion: version,
-    };
-  }
-
-  /** A pinned rule's version in force (the live release's pin, else the store's current) and its text. */
-  async livePinnedRule(
-    code: string,
-    bundle?: DebriefBundle,
-  ): Promise<{ version: number; text: string } | null> {
-    const b = bundle ?? (await this.gaBundle()).bundle;
-    const [row] = await this.dataSource.query(
-      `SELECT pv.version, pv.prompt FROM prompts p
-         JOIN prompts_versions pv ON pv."promptId" = p.id
-        WHERE p."promptCode" = $1
-          AND pv.version = COALESCE($2::int, p."currentVersion")
-        LIMIT 1`,
-      [code, (b.prompts as Record<string, number | null>)[code] ?? null],
-    );
-    return row ? { version: Number(row.version), text: row.prompt } : null;
-  }
-
-  private firstVersionsCheckedAt = 0;
-
-  /**
-   * Notes "Pinned rules: approval flow": each pinned rule whose version in
-   * force has no approval gets one "Needs you" item, "Approve the current
-   * Safety rules (v1)". Idempotent: a partial unique index on the item's
-   * hash (one per rule and version) makes a second insert a no-op, and none
-   * is made once that version is approved. An open item for an older
-   * version (the rule moved on) is retired. Runs at boot and from the views,
-   * at most once a minute per process unless forced.
-   */
-  async ensureFirstVersionItems(force = false): Promise<number> {
-    const now = Date.now();
-    if (!force && now - this.firstVersionsCheckedAt < 60_000) return 0;
-    this.firstVersionsCheckedAt = now;
-    const { bundle } = await this.gaBundle();
-    let created = 0;
-    for (const { code } of PINNED_RULE_PROMPTS) {
-      const live = await this.livePinnedRule(code, bundle);
-      if (!live) continue;
-      await this.dataSource.query(
-        `UPDATE agent_lessons SET status = 'retired', "updatedAt" = now()
-          WHERE "agentKey" = $1 AND status = 'proposed'
-            AND change->>'ideaKind' = 'pinned_rule' AND (change->>'firstVersion')::boolean
-            AND change->>'promptCode' = $2 AND (change->>'version')::int <> $3`,
-        [DEBRIEF_AGENT_KEY, code, live.version],
-      );
-      const [approved] = await this.dataSource.query(
-        `SELECT 1 FROM agent_lessons
-          WHERE "agentKey" = $1 AND change->>'ideaKind' = 'pinned_rule'
-            AND change->>'promptCode' = $2 AND evidence ? 'signoff'
-            AND (evidence->'signoff'->>'promptVersion')::int = $3
-          LIMIT 1`,
-        [DEBRIEF_AGENT_KEY, code, live.version],
-      );
-      if (approved) continue;
-      const rows = await this.dataSource.query(
-        `INSERT INTO agent_lessons
-           ("agentKey", kind, scope, status, text, change, evidence, "contentHash", "authorKind")
-         VALUES ($1, 'prompt', 'platform', 'proposed', $2, $3::jsonb, '{}'::jsonb, $4, 'system')
-         ON CONFLICT ("agentKey", "contentHash")
-           WHERE (change->>'firstVersion') = 'true' DO NOTHING
-         RETURNING id`,
-        [
-          DEBRIEF_AGENT_KEY,
-          firstVersionTitle(code, live.version),
-          JSON.stringify({
-            ideaKind: 'pinned_rule',
-            promptCode: code,
-            firstVersion: true,
-            version: live.version,
-          }),
-          firstVersionHash(code, live.version),
-        ],
-      );
-      if (rows?.[0]?.id) {
-        created++;
-        await this.audit('proposed', rows[0].id, null, {
-          kind: 'pinned_rule',
-          firstVersion: true,
-          promptCode: code,
-          promptVersion: live.version,
-        });
-      }
-    }
-    return created;
-  }
-
-  /** Withdraw one's own pinned-rule proposal: closed as withdrawn, audited. */
-  async withdrawPinnedRule(ideaId: string, userId: number): Promise<void> {
-    const idea = await this.getIdea(ideaId);
-    if (idea.change?.ideaKind !== 'pinned_rule') {
-      throw new BadRequestException('this idea is not a pinned-rule change');
-    }
-    if (idea.change.firstVersion) {
-      throw new BadRequestException(
-        'a first version cannot be withdrawn; ask for a change instead',
-      );
-    }
-    if (idea.status !== 'proposed') {
-      throw new ConflictException(`this idea is ${idea.status}`);
-    }
-    if (Number(idea.evidence?.proposedBy) !== userId) {
-      throw new ForbiddenException(
-        'only the person who proposed it may withdraw it',
-      );
-    }
-    await this.writeEvidence(ideaId, 'withdrawn', {
-      by: userId,
-      at: new Date().toISOString(),
-    });
-    await this.dataSource.query(
-      `UPDATE agent_lessons SET status = 'retired', "decidedBy" = $2, "decidedAt" = now(),
-              "updatedAt" = now() WHERE id = $1`,
-      [ideaId, userId],
-    );
-    await this.audit('retired', ideaId, userId, {
-      kind: 'pinned_rule',
-      withdrawn: true,
-    });
-  }
-
-  /**
-   * Reject a pinned-rule change (clinical advisor or owner), with a reason
-   * the PM agent reads in `idea_outcomes`. Never a first version (a base
-   * must exist), never one's own proposal (withdraw it).
-   */
-  async rejectPinnedRule(
-    ideaId: string,
-    userId: number,
-    reason: string,
-  ): Promise<void> {
-    const idea = await this.getIdea(ideaId);
-    if (idea.change?.ideaKind !== 'pinned_rule') {
-      throw new BadRequestException('this idea is not a pinned-rule change');
-    }
-    if (idea.change.firstVersion) {
-      throw new BadRequestException(
-        'a first version cannot be rejected; ask for a change instead',
-      );
-    }
-    if (Number(idea.evidence?.proposedBy) === userId) {
-      throw new BadRequestException('withdraw your own proposal instead');
-    }
-    const why = (reason ?? '').trim();
-    if (!why) throw new BadRequestException('Say why you are rejecting it.');
-    await this.rejectIdea(idea, userId, why);
-  }
-
-  /**
-   * What a pinned-rule item carries on the PM agent page: the whole rule with
-   * the changed passage highlighted (advisors cannot open the Skills Store),
-   * the live text a further change is written against, whether another
-   * proposal on the rule is open, and the viewer's buttons.
-   */
-  async pinnedRuleDetails(
-    ideas: Array<Record<string, any>>,
-    viewer: { userId: number; can: { approvePinnedRule: boolean } },
-  ): Promise<void> {
-    const pinned = ideas.filter((i) => i.change?.ideaKind === 'pinned_rule');
-    if (!pinned.length) return;
-    const { bundle } = await this.gaBundle();
-    const live = new Map<string, { version: number; text: string } | null>();
-    for (const i of pinned) {
-      const code = i.change.promptCode as string;
-      if (!live.has(code))
-        live.set(code, await this.livePinnedRule(code, bundle));
-    }
-    const openProposals = (code: string, except: string) =>
-      pinned.filter(
-        (o) =>
-          o.id !== except &&
-          o.status === 'proposed' &&
-          !o.change.firstVersion &&
-          o.change.promptCode === code,
-      ).length;
-    for (const i of pinned) {
-      const code = i.change.promptCode as string;
-      const rule = live.get(code) ?? null;
-      const firstVersion = !!i.change.firstVersion;
-      const mine =
-        !firstVersion && Number(i.evidence?.proposedBy) === viewer.userId;
-      const open = i.status === 'proposed' && !i.approval?.expired;
-      const actions = pinnedRuleActions({
-        open,
-        firstVersion,
-        mine,
-        mayDecide: viewer.can.approvePinnedRule,
-      });
-      const after =
-        open && rule
-          ? textAfterChange(
-              rule.text,
-              firstVersion ? null : i.change.find,
-              i.change.replace,
-            )
-          : null;
-      i.pinnedRule = {
-        name: pinnedRuleName(code),
-        firstVersion,
-        mine,
-        proposedBy: i.evidence?.proposedBy ?? null,
-        liveVersion: rule?.version ?? null,
-        liveText: open ? (rule?.text ?? null) : null,
-        segments: after?.segments ?? null,
-        stale: after?.stale ?? false,
-        otherOpen: open ? openProposals(code, i.id) : 0,
-        approvedNote:
-          i.status === 'approved'
-            ? 'Approved. The Ally team will put it live.'
-            : null,
-      };
-      i.can = {
-        ...(i.can ?? {}),
-        approve: actions.approve,
-        reject: actions.reject,
-        withdraw: actions.withdraw,
-        askForChange: actions.askForChange,
-      };
-    }
-  }
-
   // --- Closing the loop (spec C5, FR-64) ------------------------------------------
 
   /**
@@ -2210,13 +1671,6 @@ export class DebriefPmAgentService
 
   async reject(ideaId: string, userId: number, reason?: string): Promise<void> {
     const idea = await this.getIdea(ideaId);
-    // Pinned rules are the clinical advisor's or the owner's to reject, with
-    // a reason (rejectPinnedRule); this route is the Ally team's.
-    if (idea.change?.ideaKind === 'pinned_rule') {
-      throw new ForbiddenException(
-        'a pinned-rule change is rejected by the clinical advisor or the owner (reject-pinned-rule)',
-      );
-    }
     await this.rejectIdea(idea, userId, reason?.trim() || null);
   }
 
@@ -2243,12 +1697,7 @@ export class DebriefPmAgentService
               "updatedAt" = now() WHERE id = $1`,
       [idea.id, userId],
     );
-    await this.audit('rejected', idea.id, userId, {
-      reason,
-      ...(idea.change?.ideaKind === 'pinned_rule'
-        ? { kind: 'pinned_rule' }
-        : {}),
-    });
+    await this.audit('rejected', idea.id, userId, { reason });
   }
 
   /** The latest run's report, when it ran, and its step records. */

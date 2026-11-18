@@ -35,6 +35,7 @@ export function draftView(draft: BotDraftEntity) {
     source: {
       website: draft.source?.website ?? null,
       description: draft.source?.description ?? null,
+      interview: draft.source?.interview === true,
     },
     crawl: {
       status: crawl.status,

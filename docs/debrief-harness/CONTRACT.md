@@ -100,7 +100,8 @@ lines), every other cue keeps the alarm path. The Writer, Reviser and Evaluator'
 `POST /gateway/checks` carries `risk_handling` and each cue's `part_of_practice`. The response's `has_alarm_risk_cue` says
 whether any cue stayed on the alarm path. The Evaluator also judges progress claims against `PROGRESS` (an unsupported
 "consistent strength" is a hard fail; no keyword list). The
-option's wording still arrives through `prompts["debrief_risk_cue_definition"]`. The run records
+definition of a risk cue always arrives through `prompts["debrief_risk_cue_definition"]` (one pinned definition; a roleplay no longer carries its own wording).
+A roleplay's choice is one yes/no (Studio: "Is handling a risk conversation the skill practised here?", saved as `scenarios.metadata.debriefRiskCueOption` = `part_of_practice` or unset). `word_list_raises` is always true. The run records
 `workspace.frameworkUsed` (id, ids, name, area names) and `workspace.riskCueOption` (key, version, handling, support-lines flag, wording); the graph adds its own `workspace.framework`, `risk_cue` and `speaker_labels`.
 
 **Language (v9 FR-39; moved into the graph 2026-11-11, spec §D1).** ally-be sends what it knows: the session's
@@ -474,7 +475,10 @@ reads as before. The judge (`DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION` v2) lists cue
 
 - **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; since 2026-11-16 the judge's `RiskCue` carries it too).
   A missed clear cue is the `missed_risk_cue` hard fail. A missed possible cue
-  drops that hard fail; the run publishes as `below_bar` and is sent to review.
+  drops that hard fail. The run is sent to review (published as `below_bar`) only when the learner missed or
+  dismissed that cue (the Safety reader's `learner_response` is `missed` or `harmful`, or it has no entry for
+  that turn); a possible cue the learner explored or acknowledged needs no review (2026-11-18). The
+  Evaluator's step line shows the hard fails the run counts (`cue_strength.effective_hard_fails`).
 - **No debrief is held (2026-11-16):** when the best draft fails the bar for any reason (a blocking check, no score,
   or a missed clear risk cue), `decide` still publishes it as `below_bar`, with `workspace.decision.reviewReason`
   `checks_failed` / `not_evaluated` / `missed_risk_cue`. `missed_risk_cue` puts the run at the top of the Console
@@ -856,9 +860,7 @@ V2_AUTONOMY C1–C5. One person's message in the console's shared thread, answer
   reviewer (§7d), both with read-only gateway tools (`SUBAGENT_READ_TOOLS`) and every file write denied;
 - **guard**: `PmRunGuard` (model then backup with the circuit breaker, the turn's budget, `llm_usage` as
   `debrief_improver`, step records); LangSmith off;
-- **thread**: the Postgres checkpointer, thread id `debrief-pm-conversation` (the console's shared thread) or
-  `debrief-pm-conversation:pinned-rules` (the clinical advisor's turns, so an advisor's answer never draws on the
-  rest of the thread, C4). Each turn continues from the checkpoint; ally-be sends only the new message.
+- **thread**: the Postgres checkpointer, thread id `debrief-pm-conversation` (the console's one shared thread). Each turn continues from the checkpoint; ally-be sends only the new message.
   `debrief_pm_messages` stays the record the console reads. `503` when the checkpoint database could not be opened.
 
 Instructions: Skills Store `ally_ai_debrief_pm_conversation_system` (default
@@ -867,7 +869,7 @@ Instructions: Skills Store `ally_ai_debrief_pm_conversation_system` (default
 ```jsonc
 {
   "turn_id": "uuid",                 // the person's message id; also the agent token's agentRunId
-  "thread_id": "debrief-pm-conversation" | "debrief-pm-conversation:pinned-rules",
+  "thread_id": "debrief-pm-conversation",
   "model": "gemini-2.5-pro", "backup_model": "gemini-2.5-flash", "prices": { ... },
   "budget_usd": 0.25,                // min(pmAgentRunCapUsd, 0.25, learning budget left)
   "message": "...", "author": "Asha",

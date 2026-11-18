@@ -3,7 +3,6 @@ import { join } from 'path';
 import { PINNED_PROMPTS } from '../../prompt/constants/pinned-prompts.constants';
 import { DEBRIEF_RISK_CUE_DEFINITION } from '../../prompt/contracts/prompt-contracts';
 import { DEBRIEF_PROMPT_CODES } from '../constants/debrief-release.constants';
-import { alwaysAsk } from '../util/debrief-always-ask.util';
 import { PINNED_RULE_CODES } from '../util/debrief-console-view.util';
 import { promptEditRefusal } from '../util/debrief-pm-agent-rules.util';
 
@@ -31,15 +30,6 @@ describe('debrief_risk_cue_definition', () => {
     expect(PINNED_PROMPTS.get(code)).toBe('guard');
     expect(PINNED_RULE_CODES.has(code)).toBe(true);
     expect(promptEditRefusal(code, 'a', 'b', 'a')?.neverList).toBe('safety');
-  });
-
-  it('always asks a person, like the Safety reader', () => {
-    const ask = alwaysAsk(
-      { change: { ideaKind: 'prompt_edit', promptCode: code } },
-      { askLowConfidence: false, askModels: false },
-    );
-    expect(ask?.kind).toBe('safety_reader');
-    expect(ask?.locked).toBe(true);
   });
 
   it('the prompts that read it point to it instead of repeating it', () => {

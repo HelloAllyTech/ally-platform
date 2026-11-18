@@ -35,19 +35,22 @@ async function mockLogin(page: Page, features: string[]) {
   );
 }
 
+// The standard login's button is "Next"; the assistants login's is "Send code".
+const SEND_CODE = { name: /^(Next|Send code)$/ };
+
 async function logIn(page: Page) {
   await page.getByPlaceholder("Enter your email address").fill("asha@clinic.example");
-  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", SEND_CODE).click();
   const digits = page.locator('input[inputmode="numeric"]');
   await expect(digits.first()).toBeVisible();
   const count = await digits.count();
   for (let i = 0; i < count; i++) await digits.nth(i).fill(String((i % 9) + 1));
   // The last digit verifies on its own (master's 04f3c2f8b), so there's no Verify to press.
-  // Logged in once the app has moved on from the login screen.
-  await page.waitForURL(url => !url.pathname.startsWith("/login"));
+  // Logged in once the login screen is gone (it may be drawn at /login or at the page they opened).
+  await expect(digits.first()).toBeHidden();
 }
 
-test("logged out: a deep link goes to login (no sign-up), then back to the deep link", async ({
+test("logged out: a deep link shows the login screen at that URL (no sign-up), and stays there after login", async ({
   page,
 }) => {
   await mockAssistantHome(page);
@@ -55,8 +58,9 @@ test("logged out: a deep link goes to login (no sign-up), then back to the deep 
   const deepLink = `/assistants/${BOT_ID}?section=lists&tool=memory`;
 
   await page.goto(deepLink);
-  await expect(page).toHaveURL(/\/login\?next=/);
-  expect(decodeURIComponent(new URL(page.url()).searchParams.get("next") ?? "")).toBe(deepLink);
+  // The login screen is drawn at the URL they opened: no redirect to /login.
+  await expect(page.getByRole("button", { name: "Send code" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/assistants/${BOT_ID}\\?section=lists&tool=memory$`));
   await expect(page.getByText(/sign\s*up/i)).toHaveCount(0);
 
   await logIn(page);

@@ -1,6 +1,6 @@
 import { QueryRunner } from 'typeorm';
 import { DEFAULT_WHATSAPP_SETTINGS } from '../../whatsapp/type/whatsapp-settings.type';
-import { KeepEightPassages1984300000000 } from './1984300000000-KeepEightPassages';
+import { KeepEightPassages1984400000000 } from './1984400000000-KeepEightPassages';
 
 const run = async (direction: 'up' | 'down') => {
   const queries: string[] = [];
@@ -10,7 +10,7 @@ const run = async (direction: 'up' | 'down') => {
       return [];
     }),
   } as unknown as QueryRunner;
-  await new KeepEightPassages1984300000000()[direction](queryRunner);
+  await new KeepEightPassages1984400000000()[direction](queryRunner);
   return queries;
 };
 

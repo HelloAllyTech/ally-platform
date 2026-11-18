@@ -11,7 +11,7 @@ Q3d's six fixes were merged in (`tmp/q3d`). Commits are tagged `[Q3-fast]`.
 | 0 One path | No v1 fallback. A failed run sends a fixed reply in English or Hindi, with the business's contact taken from its sources or helplines | `agent-runtime-runner.service.ts`, `run-failed-reply.ts`, `reply-language.ts` |
 | 0b Booking | Free means free. A refusal reaches the customer in words. Tools stay for the whole chat. Picking an option isn't a yes. The reservation title names its table | `list-records.service.ts` `takenOf`, `check/pipeline.py`, `tools/confirmed.py`, `handover.service.ts` |
 | 1 Safety | Four crisis levels: at risk, emergency, upset, none. At-risk and emergency replies come fast, with real numbers. Upset gets a warm reply that still answers. Owners can correct a wrong pack. Young-people assistants have no pre-chat questions. New pack versions: Medical v3, Legal and financial v2 | `crisis_classify.txt`, `safety-packs.ts`, `chatbot-engine.service.ts`, `looks-emotional.ts`, `everyday-idiom.ts` |
-| 2 Answers | No internal voice ("the provided passages…"). No false offers. A decline gives the real contact. The facts setup learned are searched, as a "What we learned" document. 8 passages per search. The fallback contact line is added once | `check/text.py`, `check/fixes.py`, `learned-facts-document.ts`, migration `1984300000000` |
+| 2 Answers | No internal voice ("the provided passages…"). No false offers. A decline gives the real contact. The facts setup learned are searched, as a "What we learned" document. 8 passages per search. The fallback contact line is added once | `check/text.py`, `check/fixes.py`, `learned-facts-document.ts`, migration `1984400000000` |
 | 2b Playbooks | Each list brings its own instructions (booking, details, orders, reference). Owners can add a line per list | `playbooks.py`, `prompts/agent/playbook_*.txt`, `list-tools.ts`, `AssistantBlock.tsx` |
 | 3 Trust in setup | Error, block and captcha pages are never stored as facts, and Cloudflare-hidden emails are decoded. Setup lists "We couldn't read these pages". The message matches the score. Publishing has a quality gate with "Publish anyway". Uploads show "Reading your documents…" until they're read | `crawl/error-page.ts`, `page-parser.ts`, `checkup-gate.ts`, `CheckupScreen.tsx`, `bot-draft-session.service.ts` `reading` |
 | Gaps items | The Safety screen shows the at-risk reply as sent. Ready-made Appointments examples are neutral | `assistant-home.service.ts` `atRiskReply`, `ready-made-lists.ts` |
@@ -79,3 +79,10 @@ Three Postgres tests fail on master too:
   has been version 2 since SP1.
 - Two `inbox.pg.spec.ts` tests fake `accessibleChatbotIds` as `null`, the platform-admin
   shortcut A1 removed.
+- Five shared-store Postgres tests also fail on master as it is now (`a8c5cd1a6`), with the same
+  `null.length` error:
+  - `erasure.pg.spec.ts`: erasing a contact;
+  - `dashboard-parity.pg.spec.ts`: three dashboard views;
+  - `backfill-check.pg.spec.ts`: resuming after a crash.
+
+  Found after merging master.

@@ -7,7 +7,7 @@ import {
   canLeadRoadmapPlans,
   canManageRoadmap,
   canOpenRoadmapBuilder,
-  canQuickAddRoadmap,
+  roadmapRoleFor,
 } from "../utils/access";
 
 const EDIT = Permissions.EDIT_PRODUCT_ROADMAP;
@@ -62,77 +62,73 @@ describe("canOpenRoadmapBuilder", () => {
   });
 });
 
-describe("canQuickAddRoadmap", () => {
-  const VOTE = Permissions.VOTE_PRODUCT_ROADMAP;
-  const QUICK_ADD = FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD;
-  const IDEAS = FeatureToggleKey.PRODUCT_PLANNING_IDEAS;
+const VOTE = Permissions.VOTE_PRODUCT_ROADMAP;
+const VIEW = Permissions.VIEW_PRODUCT_ROADMAP;
+const EDIT_BUILDER = Permissions.EDIT_BUILDER;
+const ROADMAP = FeatureToggleKey.PRODUCT_ROADMAP;
+const BUILDER = FeatureToggleKey.BUILDER;
 
-  it("quick-adds with the vote permission, Ideas and the toggle", () => {
-    expect(canQuickAddRoadmap([VOTE], [IDEAS, QUICK_ADD])).toBe(true);
+const IDEA_PERMS = [VIEW, VOTE];
+const BUILDER_PERMS = [VIEW, VOTE, EDIT_BUILDER];
+const OWNER_PERMS = [VIEW, VOTE, EDIT_BUILDER, EDIT];
+
+describe("roadmapRoleFor", () => {
+  it("reads the same role as ally-be: the highest grant wins", () => {
+    expect(roadmapRoleFor(IDEA_PERMS, [ROADMAP])).toBe("idea");
+    expect(roadmapRoleFor(BUILDER_PERMS, [ROADMAP, BUILDER])).toBe("builder");
+    expect(roadmapRoleFor(OWNER_PERMS, [ROADMAP, BUILDER, TOGGLE])).toBe("owner");
   });
 
-  it("does NOT quick-add without Product Planning — Ideas", () => {
-    // Both filing doors agree on who may file: quick add is Ideas plus its own toggle.
-    expect(canQuickAddRoadmap([VOTE], [QUICK_ADD])).toBe(false);
+  it("needs the permission as well as the toggle", () => {
+    expect(roadmapRoleFor([], [ROADMAP, BUILDER, TOGGLE])).toBe("none");
+    expect(roadmapRoleFor(IDEA_PERMS, [ROADMAP, BUILDER])).toBe("idea");
   });
 
-  it("does NOT quick-add on the vote permission alone", () => {
-    // Every admin can vote; the toggle is the whole distinction.
-    expect(canQuickAddRoadmap([VOTE], [TOGGLE])).toBe(false);
-  });
-
-  it("does NOT quick-add on the toggle alone", () => {
-    expect(canQuickAddRoadmap([Permissions.VIEW_PRODUCT_ROADMAP], [IDEAS, QUICK_ADD])).toBe(false);
-  });
-
-  it("is independent of roadmap manage", () => {
-    // A curator is not a quick-adder, and a quick-adder is not a curator.
-    expect(canQuickAddRoadmap([EDIT, VOTE], [IDEAS, TOGGLE])).toBe(false);
-    expect(canManageRoadmap([EDIT, VOTE], [QUICK_ADD])).toBe(false);
+  it("makes an org-restricted admin a Viewer at most", () => {
+    expect(roadmapRoleFor(OWNER_PERMS, [ROADMAP, BUILDER, TOGGLE], true)).toBe("viewer");
+    expect(roadmapRoleFor([], [], true)).toBe("none");
   });
 
   it("fails closed when toggles could not be loaded", () => {
-    expect(canQuickAddRoadmap([VOTE], [])).toBe(false);
-    expect(canQuickAddRoadmap([VOTE], undefined)).toBe(false);
+    expect(roadmapRoleFor(OWNER_PERMS, [])).toBe("none");
+    expect(roadmapRoleFor(OWNER_PERMS, undefined)).toBe("none");
   });
 });
 
 describe("canFileIdeas", () => {
-  const VOTE = Permissions.VOTE_PRODUCT_ROADMAP;
-  const IDEAS = FeatureToggleKey.PRODUCT_PLANNING_IDEAS;
-
-  it("files with the vote permission and Product Planning — Ideas", () => {
-    expect(canFileIdeas([VOTE], [IDEAS])).toBe(true);
+  it("files with the vote permission and any Roadmap role", () => {
+    expect(canFileIdeas(IDEA_PERMS, [ROADMAP])).toBe(true);
+    expect(canFileIdeas(BUILDER_PERMS, [ROADMAP, BUILDER])).toBe(true);
+    expect(canFileIdeas(OWNER_PERMS, [ROADMAP, BUILDER, TOGGLE])).toBe(true);
   });
 
-  it("does NOT file on the vote permission alone", () => {
-    // An org-restricted admin, or one with Ideas switched off, keeps voting but loses filing.
-    expect(canFileIdeas([VOTE], [FeatureToggleKey.PRODUCT_ROADMAP])).toBe(false);
-  });
-
-  it("does NOT file on the toggle alone", () => {
-    expect(canFileIdeas([Permissions.VIEW_PRODUCT_ROADMAP], [IDEAS])).toBe(false);
-  });
-
-  it("fails closed when toggles could not be loaded", () => {
+  it("does NOT file without a role, or on the vote permission alone", () => {
     expect(canFileIdeas([VOTE], [])).toBe(false);
     expect(canFileIdeas([VOTE], undefined)).toBe(false);
+  });
+
+  it("does NOT file without the vote permission", () => {
+    expect(canFileIdeas([VIEW], [ROADMAP])).toBe(false);
+  });
+
+  it("does NOT file for an org-restricted admin", () => {
+    expect(canFileIdeas(IDEA_PERMS, [ROADMAP], true)).toBe(false);
   });
 });
 
 describe("canLeadRoadmapPlans", () => {
-  it("leads with the Product Planning — Lead toggle", () => {
-    expect(canLeadRoadmapPlans([FeatureToggleKey.PRODUCT_PLANNING_LEAD])).toBe(true);
+  it("leads as a Builder or an Owner", () => {
+    expect(canLeadRoadmapPlans(BUILDER_PERMS, [ROADMAP, BUILDER])).toBe(true);
+    expect(canLeadRoadmapPlans(OWNER_PERMS, [ROADMAP, BUILDER, TOGGLE])).toBe(true);
   });
 
-  it("does not lead on roadmap manage or Builder", () => {
-    expect(
-      canLeadRoadmapPlans([FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, FeatureToggleKey.BUILDER]),
-    ).toBe(false);
+  it("does NOT lead as an Idea", () => {
+    expect(canLeadRoadmapPlans(IDEA_PERMS, [ROADMAP])).toBe(false);
   });
 
-  it("fails closed when toggles could not be loaded", () => {
-    expect(canLeadRoadmapPlans([])).toBe(false);
-    expect(canLeadRoadmapPlans(undefined)).toBe(false);
+  it("fails closed when restricted or toggles could not be loaded", () => {
+    expect(canLeadRoadmapPlans(BUILDER_PERMS, [ROADMAP, BUILDER], true)).toBe(false);
+    expect(canLeadRoadmapPlans(BUILDER_PERMS, [])).toBe(false);
+    expect(canLeadRoadmapPlans(undefined, undefined)).toBe(false);
   });
 });

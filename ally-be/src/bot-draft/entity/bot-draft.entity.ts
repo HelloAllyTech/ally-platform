@@ -43,6 +43,8 @@ export class BotDraftEntity extends BaseWithoutTenantEntity {
     website?: string;
     uploads?: string[];
     description?: string;
+    /** Started with "Interview me": the owner's answers in chat are what gets learned. */
+    interview?: boolean;
     /** The "Owner notes" document publish wrote, so publishing again updates it. */
     ownerNotesDocumentId?: string | null;
     /** The "What we learned" document: the learned facts, one passage each (Q3-fast Part 2). */

@@ -179,6 +179,7 @@ export class BotDraftService {
     name: string;
     website?: string | null;
     description?: string | null;
+    interview?: boolean;
   }): Promise<BotDraftEntity> {
     const userId = currentUserId();
     if (!userId) throw new ForbiddenException('Sign in first.');
@@ -213,6 +214,7 @@ export class BotDraftService {
             autoName: draftConfig.name,
             ...(input.website ? { website: input.website } : {}),
             ...(input.description ? { description: input.description } : {}),
+            ...(input.interview ? { interview: true } : {}),
           },
           draftConfig,
           chatbotId: chatbot.id,

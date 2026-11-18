@@ -19,7 +19,7 @@ exports[`Custom logins: a platform admin with only Chatbots (A1) lists what it c
 
 exports[`Custom logins: a platform admin with only Chatbots (A1) lists what it can still reach (open item): counts 1`] = `
 {
-  "permissionOnly": 589,
+  "permissionOnly": 591,
   "viaOrgPreference": 11,
 }
 `;

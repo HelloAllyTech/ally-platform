@@ -1,0 +1,8 @@
+/* Full-screen first-run layer over the Assistants page. Above the app shell and its menus. */
+.ally-first-assistant {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--ally-bg, #fff);
+  overflow: hidden;
+}

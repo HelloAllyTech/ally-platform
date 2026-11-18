@@ -98,7 +98,7 @@ export const PmAgentPage: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const read = readChangesView(params);
   const change = read.change;
-  // The clinical advisor sees only the changes they decide: no Reports or Test sets.
+  // Only the Ally team and the owner get Reports and Test sets (the clinical advisor has no changes).
   const views = access.pmAgent ? VIEWS : (["changes"] as PmAgentView[]);
   const view = views.includes(read.view) ? read.view : "changes";
   const overview = useGetDebriefOverviewQuery(undefined, { skip: view !== "test-sets" });

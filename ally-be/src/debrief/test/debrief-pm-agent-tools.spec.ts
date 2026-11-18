@@ -852,6 +852,25 @@ describe('content safety for every self-made change (R2-18, FR-56)', () => {
     ).toMatchObject({ ok: true });
   });
 
+  it('roleplayFields travels as a list in setting_fields, and without one the PM agent is told what exists', async () => {
+    const t = tools({ idea: routeA });
+    expect(
+      await t.svc.call('release_draft', CLAIMS, {
+        idea_id: IDEA,
+        kind: 'setting',
+        setting_key: 'roleplayFields',
+        setting_fields: ['characterProfile'],
+      }),
+    ).toMatchObject({ ok: true });
+    const out: any = await t.svc.call('release_draft', CLAIMS, {
+      idea_id: IDEA,
+      kind: 'setting',
+      setting_key: 'roleplayFields',
+    });
+    expect(out.refused).toContain('characterProfile');
+    expect(out.refused).toContain('always read');
+  });
+
   it('judges a prompt edit on what it adds, not what the prompt already holds', () => {
     expect(
       introducedInjectionPattern(

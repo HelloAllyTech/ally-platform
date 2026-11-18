@@ -26,7 +26,6 @@ export type DebriefCanAction =
   | "escalate"
   | "verdict"
   | "pmAgent"
-  | "approvePinnedRule"
   | "testSets"
   | "releases"
   | "switchOrgOn"
@@ -421,8 +420,7 @@ export interface DebriefAttention {
       | "agent_off"
       | "cap"
       | "provider_down"
-      | "language_not_recorded"
-      | "risk_cue_option";
+      | "language_not_recorded";
     level: "red" | "yellow";
     count?: number;
     oldestSince?: string;
@@ -445,7 +443,7 @@ export interface DebriefAttention {
 }
 
 export type DebriefAutonomyStep = "quick_test" | "gate_test" | "paired_trial" | "canary";
-export type DebriefAutonomyKind = "settings" | "prompts" | "pinned_rules";
+export type DebriefAutonomyKind = "settings" | "prompts";
 export type DebriefAutonomyValue = "auto" | "ask" | "off";
 export type DebriefOrgOverride = "default" | "ask" | "never";
 
@@ -522,21 +520,9 @@ export interface DebriefPinnedRulesView {
     code: string;
     label: string;
     version: number | null;
-    pinnedByRelease: boolean;
-    inBundle: boolean;
-    signedBy: { id: number; name: string | null } | null;
-    signedAt: string | null;
-    ideaId: string | null;
-    writtenBy: { id: number; name: string | null } | null;
-    writtenAt: string | null;
-    note: string | null;
-    /** The whole rule in force, for "Ask for a change". */
-    text?: string | null;
-  }>;
-  /** Pinned-rule items still waiting (first versions included). */
-  proposals?: Array<{
-    id: string;
-    change?: { promptCode?: string; firstVersion?: boolean } | null;
+    promptId: string | null;
+    updatedAt: string | null;
+    updatedBy: { id: number; name: string | null } | null;
   }>;
 }
 

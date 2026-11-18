@@ -262,7 +262,9 @@ describe("RoadmapMeasuresPage", () => {
   it("keeps the picked range in the URL", () => {
     mockMetrics.mockReturnValue({ isLoading: false, isError: false, data: metrics() });
     renderPage();
-    fireEvent.change(screen.getByLabelText(copy.rangeLabel), { target: { value: "90" } });
+    // A Carbon listbox, not a native <select>: open it, then pick the option by its words.
+    fireEvent.click(screen.getByRole("combobox", { name: copy.rangeLabel }));
+    fireEvent.click(screen.getByRole("option", { name: copy.ranges["90"] }));
     expect(screen.getByTestId("where")).toHaveTextContent("/roadmap/measures?range=90");
     const [query] = mockMetrics.mock.calls[mockMetrics.mock.calls.length - 1];
     const span = (new Date(query.to).getTime() - new Date(query.from).getTime()) / DAY;

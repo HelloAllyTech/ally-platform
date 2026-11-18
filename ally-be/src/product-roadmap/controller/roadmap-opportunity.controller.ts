@@ -36,7 +36,6 @@ import {
   MergeOpportunitiesDto,
   MonthBoardQueryDto,
   MoveOpportunityDto,
-  QuickAddOpportunityDto,
   RoadmapReferenceImageUploadUrlDto,
   SetAllocationDto,
   SplitOpportunityDto,
@@ -286,51 +285,12 @@ export class RoadmapOpportunityController {
     @CurrentUser() user: TokenUser,
     @Body() dto: CreateOpportunityDto,
   ): Promise<OpportunityResponseDto> {
-    // Filing is the Product Planning — Ideas toggle's (rev 5.2 §B.12): on by
-    // default for platform admins, withheld from org-restricted ones.
+    // Filing is the Idea role's (rev 5.2 §B.12); an org-restricted admin is
+    // a Viewer at most, so it is withheld from them.
     await this.planAccess.assertIdeas(user.id);
     return this.opportunityService.create(user.id, dto, {
       canManage: await this.access.canManage(user.id),
       enforceReadiness: true,
-    });
-  }
-
-  /**
-   * The same filing as `create`, with the readiness gate OFF.
-   *
-   * A deliberate second door, for a named few: the `product_roadmap_quick_add` toggle on top of
-   * the VOTE tier, granted per-admin from Admin User Management. The interview exists so a draft
-   * reaches the board already sharpened; a curator who already knows what belongs on it pays that
-   * cost for nothing, and this is where they skip it. `enforceReadiness: false` is the whole
-   * difference — ownership, images, vector indexing and the realtime event all run as on `create`,
-   * so a quick-added row is indistinguishable from an interviewed one except that `hasBrief` is
-   * false (the DTO cannot carry a brief, and the server would refuse an unsigned one).
-   *
-   * Its own route rather than a flag on `create`: a flag is a bypass any VOTE-tier caller could
-   * send, and the gate would again be a discipline the client chose to keep.
-   */
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD, {
-    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
-  })
-  @Post('opportunities/quick')
-  @ApiOperation({
-    summary: 'File a new opportunity directly, skipping the readiness check',
-    description:
-      'Requires the product_roadmap_quick_add admin toggle. Same body and rules as POST ' +
-      '/opportunities minus readinessToken and brief; `ownerUserId` still needs ' +
-      'edit:admin:product-roadmap.',
-  })
-  @ApiResponse({ status: 201, type: OpportunityResponseDto })
-  async quickAdd(
-    @CurrentUser() user: TokenUser,
-    @Body() dto: QuickAddOpportunityDto,
-  ): Promise<OpportunityResponseDto> {
-    // Quick add is a second filing door, so it needs Ideas too: both doors
-    // must agree on who may file.
-    await this.planAccess.assertIdeas(user.id);
-    return this.opportunityService.create(user.id, dto, {
-      canManage: await this.access.canManage(user.id),
-      enforceReadiness: false,
     });
   }
 

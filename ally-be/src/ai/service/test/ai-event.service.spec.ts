@@ -7,6 +7,8 @@ import { LoggerService } from '../../../logger/logger.service';
 import { ChatSummaryStatus } from '../../../chat/entity/chat.entity';
 import { TranscribeAndSummarizeRequestMessage } from '../../dto/transcribe-and-summarize-request.model';
 import { AiService, TRANSCRIPTION_PIPELINE_PROMPT_CODES } from '../ai.service';
+import { ScribeSessionMode } from '../../../common/constants/chat.constants';
+import { ScribeNoteHarnessService } from '../../../chat/service/scribe-note-harness.service';
 
 const PIPELINE_PROMPTS = {
   ally_ai_audio_diarization: { prompt: 'Diarize.' },
@@ -14,6 +16,9 @@ const PIPELINE_PROMPTS = {
 };
 const mockAiService = {
   getPromptOverrides: jest.fn(),
+};
+const mockNoteHarness = {
+  buildRequest: jest.fn(),
 };
 
 describe('AiEventService', () => {
@@ -38,6 +43,7 @@ describe('AiEventService', () => {
 
     const mockChatService = {
       updateChat: jest.fn(),
+      getSessionMode: jest.fn().mockResolvedValue(null),
     };
 
     mockLogger = {
@@ -49,6 +55,7 @@ describe('AiEventService', () => {
 
     jest.spyOn(LoggerService, 'getInstance').mockReturnValue(mockLogger);
     mockAiService.getPromptOverrides.mockResolvedValue(PIPELINE_PROMPTS);
+    mockNoteHarness.buildRequest.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,6 +73,7 @@ describe('AiEventService', () => {
           useValue: mockConfigService,
         },
         { provide: AiService, useValue: mockAiService },
+        { provide: ScribeNoteHarnessService, useValue: mockNoteHarness },
       ],
     }).compile();
 
@@ -107,6 +115,95 @@ describe('AiEventService', () => {
         expect.any(String),
         expect.objectContaining({ prompts: PIPELINE_PROMPTS }),
       );
+    });
+
+    it('attaches the Scribe v2 note harness request when the tenant has it on', async () => {
+      const noteHarness = {
+        shadow: true,
+        note_spec: { fields: [] },
+        context: {},
+      };
+      mockNoteHarness.buildRequest.mockResolvedValue(noteHarness);
+
+      await service.publishTranscribeAudioEvent({
+        message_type: 'transcribe_and_summarize_request',
+        timestamp: 1,
+        chat_id: 123,
+        audio_url: 's3://x',
+      });
+
+      expect(mockNoteHarness.buildRequest).toHaveBeenCalledWith(123);
+      expect(sqsService.sendMessage.mock.calls[0][1]).toMatchObject({
+        note_harness: noteHarness,
+      });
+    });
+
+    it('sends no note harness request when the tenant has it off', async () => {
+      await service.publishTranscribeAudioEvent({
+        message_type: 'transcribe_and_summarize_request',
+        timestamp: 1,
+        chat_id: 123,
+        audio_url: 's3://x',
+      });
+
+      expect(sqsService.sendMessage.mock.calls[0][1]).not.toHaveProperty(
+        'note_harness',
+      );
+    });
+
+    it("fills a missing mode from the chat's recorded session mode", async () => {
+      sqsService.sendMessage.mockResolvedValue(undefined);
+      chatService.updateChat.mockResolvedValue({} as any);
+      chatService.getSessionMode.mockResolvedValueOnce(
+        ScribeSessionMode.DICTATION,
+      );
+
+      await service.publishTranscribeAudioEvent({
+        message_type: 'transcribe_and_summarize_request',
+        timestamp: 1,
+        chat_id: 7,
+        audio_url: 's3://x',
+      });
+
+      expect(chatService.getSessionMode).toHaveBeenCalledWith(7);
+      expect(sqsService.sendMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ mode: ScribeSessionMode.DICTATION }),
+      );
+    });
+
+    it('keeps a mode the caller passed without looking it up', async () => {
+      sqsService.sendMessage.mockResolvedValue(undefined);
+      chatService.updateChat.mockResolvedValue({} as any);
+
+      await service.publishTranscribeAudioEvent({
+        message_type: 'transcribe_and_summarize_request',
+        timestamp: 1,
+        chat_id: 7,
+        audio_url: 's3://x',
+        mode: ScribeSessionMode.SCRIBE,
+      });
+
+      expect(chatService.getSessionMode).not.toHaveBeenCalled();
+      expect(sqsService.sendMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ mode: ScribeSessionMode.SCRIBE }),
+      );
+    });
+
+    it('still publishes when the mode lookup fails', async () => {
+      sqsService.sendMessage.mockResolvedValue(undefined);
+      chatService.updateChat.mockResolvedValue({} as any);
+      chatService.getSessionMode.mockRejectedValueOnce(new Error('db down'));
+
+      await service.publishTranscribeAudioEvent({
+        message_type: 'transcribe_and_summarize_request',
+        timestamp: 1,
+        chat_id: 7,
+        audio_url: 's3://x',
+      });
+
+      expect(sqsService.sendMessage).toHaveBeenCalled();
     });
 
     it('queues nothing when the prompt store cannot be read', async () => {
@@ -171,6 +268,7 @@ describe('AiEventService', () => {
           },
         } as any,
         mockAiService as any,
+        mockNoteHarness as any,
       );
 
       sqsService.sendMessage.mockResolvedValue(undefined);
@@ -197,6 +295,7 @@ describe('AiEventService', () => {
           },
         } as any,
         mockAiService as any,
+        mockNoteHarness as any,
       );
 
       sqsService.sendMessage.mockResolvedValue(undefined);
@@ -398,6 +497,7 @@ describe('AiEventService', () => {
         chatService,
         minimalConfigService as any,
         mockAiService as any,
+        mockNoteHarness as any,
       );
 
       const mockEvent: TranscribeAndSummarizeRequestMessage = {
@@ -436,6 +536,7 @@ describe('AiEventService', () => {
         chatService,
         nullConfigService as any,
         mockAiService as any,
+        mockNoteHarness as any,
       );
 
       const mockEvent: TranscribeAndSummarizeRequestMessage = {

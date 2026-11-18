@@ -135,7 +135,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
         data: { ideaId: i.id },
       };
       await this.notifier.team(alert);
-      if (a.wait === 'pinned_rule') await this.notifier.owner(alert);
       await this.pmAgent.writeEvidence(i.id, 'expiryWarning', {
         at: now.toISOString(),
         expiresAt: a.expiresAt,
@@ -1112,27 +1111,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
       });
     }
 
-    // Risk-cue options a creator sent for approval: the clinical advisor or the owner decides.
-    if (viewer.roles.clinicalAdvisor || viewer.roles.owner) {
-      try {
-        const [waiting] = await this.dataSource.query(
-          `SELECT count(*)::int AS n FROM debrief_risk_cue_options WHERE status = 'awaiting_approval'`,
-        );
-        const n = Number(waiting?.n ?? 0);
-        if (n > 0) {
-          banners.push({
-            kind: 'risk_cue_option',
-            level: 'yellow',
-            count: n,
-            message: `${n} risk-cue option${n === 1 ? ' is' : 's are'} waiting for your approval.`,
-            link: { page: 'settings', category: 'risk_cue_options' },
-          });
-        }
-      } catch {
-        // The table is new; an unreadable one is no banner, never a broken home.
-      }
-    }
-
     // Canaries reverted on their own in the last 7 days.
     const reverted: Array<Record<string, any>> = await this.dataSource.query(
       `SELECT id, text, evidence->'canary' AS canary FROM agent_lessons
@@ -1155,32 +1133,17 @@ export class DebriefConsoleViewService implements OnModuleInit {
       `SELECT id, status, text, change, evidence, "createdAt" FROM agent_lessons
         WHERE "agentKey" = 'debrief' AND status IN ('proposed','approved')`,
     );
-    let needsYouTeam = 0;
-    let needsYouPinned = 0;
-    const expiring: Array<{
-      id: string;
-      text: string;
-      days: number;
-      pinned: boolean;
-    }> = [];
+    let needsYou = 0;
+    const expiring: Array<{ id: string; text: string; days: number }> = [];
     for (const i of ideas) {
       const a = approvalState(i as any);
       if (!a || a.expired) continue;
-      const pinned = a.wait === 'pinned_rule';
-      if (pinned) needsYouPinned++;
-      else needsYouTeam++;
+      needsYou++;
       if (a.expiringSoon) {
-        expiring.push({
-          id: i.id,
-          text: i.text,
-          days: a.expiresInDays ?? 0,
-          pinned,
-        });
+        expiring.push({ id: i.id, text: i.text, days: a.expiresInDays ?? 0 });
       }
     }
-    const mayApprove = (pinned: boolean) =>
-      pinned ? viewer.can.approvePinnedRule : viewer.can.pmAgent;
-    const mine = expiring.filter((e) => mayApprove(e.pinned));
+    const mine = viewer.can.pmAgent ? expiring : [];
     if (mine.length) {
       banners.push({
         kind: 'approval_expiring',
@@ -1256,9 +1219,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
           ? escalated.length
           : null,
         // The "Needs you" count on the PM agent button, for this role.
-        pmAgentNeedsYou:
-          (viewer.can.pmAgent ? needsYouTeam : 0) +
-          (viewer.can.approvePinnedRule ? needsYouPinned : 0),
+        pmAgentNeedsYou: viewer.can.pmAgent ? needsYou : 0,
       },
       viewer: this.viewerPayload(viewer),
     };
@@ -1412,10 +1373,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
   ideaView(idea: Record<string, any>, viewer: DebriefViewer) {
     const a = approvalState(idea as any);
     const kind = changeKindOf(idea.change);
-    const pinned = idea.change?.ideaKind === 'pinned_rule';
-    const mayDecide = pinned
-      ? viewer.can.approvePinnedRule
-      : viewer.can.pmAgent;
+    const mayDecide = viewer.can.pmAgent;
     const expired = !!idea.evidence?.expiry;
     const st = ideaState(idea as any);
     const budgetOnly = !!idea.change?.budgetOnly;
@@ -1460,20 +1418,19 @@ export class DebriefConsoleViewService implements OnModuleInit {
   }
 
   /**
-   * Settings › Pinned rules: the current version of each (safety rules, the
-   * rubric, the judge's instructions), the version the live release pins,
-   * and who signed it and when — the latest pinned-rule sign-off in the
-   * console, else who wrote the version.
+   * Settings › Pinned rules (read-only): the current version of each rule and who last
+   * changed it. A rule is an ordinary Skills Store prompt; only the pinned editors named
+   * there can put a new version live, and the Debrief PM agent can never edit one.
    */
   async pinnedRules() {
     const { bundle } = await this.pmAgent.gaBundle();
-    const out = [];
+    const rules = [];
     for (const p of PINNED_RULE_PROMPTS) {
       const pinnedVersion =
         (bundle.prompts as Record<string, number | null>)[p.code] ?? null;
       const [v] = await this.dataSource.query(
-        `SELECT pv.version, pv."createdAt", pv."createdBy", pv.note, u.name AS "createdByName",
-                p."currentVersion", pv.prompt
+        `SELECT p.id AS "promptId", pv.version, pv."createdAt", pv."createdBy",
+                u.name AS "createdByName"
            FROM prompts p
            JOIN prompts_versions pv ON pv."promptId" = p.id
            LEFT JOIN users u ON u.id = pv."createdBy"
@@ -1481,43 +1438,18 @@ export class DebriefConsoleViewService implements OnModuleInit {
           LIMIT 1`,
         [p.code, pinnedVersion],
       );
-      const [sign] = await this.dataSource.query(
-        `SELECT l.id, l.evidence->'signoff' AS signoff, u.name
-           FROM agent_lessons l
-           LEFT JOIN users u ON u.id = (l.evidence->'signoff'->>'by')::int
-          WHERE l."agentKey" = 'debrief' AND l.change->>'ideaKind' = 'pinned_rule'
-            AND l.change->>'promptCode' = $1 AND l.evidence ? 'signoff'
-            AND (l.evidence->'signoff'->>'promptVersion')::int = $2
-          ORDER BY l."decidedAt" DESC NULLS LAST LIMIT 1`,
-        [p.code, v?.version ?? -1],
-      );
-      out.push({
+      rules.push({
         code: p.code,
         label: p.label,
         version: v?.version ?? null,
-        pinnedByRelease: pinnedVersion != null,
-        inBundle: p.code in bundle.prompts,
-        signedBy: sign
-          ? { id: Number(sign.signoff.by), name: sign.name ?? null }
-          : null,
-        signedAt: sign ? sign.signoff.at : null,
-        ideaId: sign?.id ?? null,
-        writtenBy: v?.createdBy
+        promptId: v?.promptId ?? null,
+        updatedAt: iso(v?.createdAt),
+        updatedBy: v?.createdBy
           ? { id: Number(v.createdBy), name: v.createdByName ?? null }
           : null,
-        writtenAt: iso(v?.createdAt),
-        note: v?.note ?? null,
-        // The whole rule in force: the clinical advisor and the owner read it
-        // and select a passage to change ("Ask for a change").
-        text: v?.prompt ?? null,
       });
     }
-    const proposals = await this.dataSource.query(
-      `SELECT id, text, change, evidence, status, "createdAt" FROM agent_lessons
-        WHERE "agentKey" = 'debrief' AND change->>'ideaKind' = 'pinned_rule'
-          AND status = 'proposed' ORDER BY "createdAt" ASC`,
-    );
-    return { rules: out, proposals };
+    return { rules };
   }
 
   /** The autonomy view with what this viewer may change. */

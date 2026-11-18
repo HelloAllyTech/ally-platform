@@ -10,6 +10,7 @@ import type { BotDraftView, TranscriptEntry } from "./types";
  * Resume opens the last screen the owner was on. Pure: no React.
  */
 export type OnboardingScreen =
+  | "interview"
   | "reading"
   | "learned"
   | "safety"
@@ -23,6 +24,8 @@ export type OnboardingScreen =
 
 /** Screens the browser moves past on its own (the server's step doesn't change). */
 export interface PassedScreens {
+  /** The interview chat (an "Interview me" draft), until the owner says that's everything. */
+  interview: boolean;
   reading: boolean;
   safety: boolean;
   /** The finished build, whose Continue leads to Make it yours. */
@@ -33,6 +36,7 @@ export interface PassedScreens {
 }
 
 export const NOTHING_PASSED: PassedScreens = {
+  interview: false,
   reading: false,
   safety: false,
   built: false,
@@ -69,6 +73,7 @@ export const screenFor = (
   if (step === "published" || view.status === "published") return "live";
   if (step === "start" || step === "reading") return "reading";
   if (step === "learned") {
+    if (view.source.interview && !passed.interview) return "interview";
     // The reading result stays up (1.2 s, or until "See what I learned") once the read finishes.
     return view.source.website && !passed.reading ? "reading" : "learned";
   }
@@ -97,6 +102,7 @@ export const passedFromStep = (
   stored: Partial<PassedScreens>,
   watched: { reading: boolean; building: boolean } = { reading: false, building: false },
 ): PassedScreens => ({
+  interview: stored.interview ?? reached(view.step, "safety"),
   reading: stored.reading ?? (!watched.reading && view.step !== "reading" && view.step !== "start"),
   safety: stored.safety ?? reached(view.step, "design"),
   built: stored.built ?? (!watched.building && reached(view.step, "share")),
@@ -128,6 +134,7 @@ export const stepPosition = (screen: OnboardingScreen, view: BotDraftView): Step
   const total = 4 + questions + 5;
   const before = 4;
   const index: Record<OnboardingScreen, number> = {
+    interview: 2,
     reading: 2,
     learned: 3,
     safety: 4,
@@ -140,6 +147,7 @@ export const stepPosition = (screen: OnboardingScreen, view: BotDraftView): Step
     live: total,
   };
   const name: Record<OnboardingScreen, string> = {
+    interview: NAMES.interview,
     reading: NAMES.reading,
     learned: NAMES.learned,
     safety: NAMES.safety,

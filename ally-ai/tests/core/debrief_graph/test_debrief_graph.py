@@ -333,14 +333,14 @@ class TestPossibleMissedCue:
     """A missed cue holds the debrief only when it is clear (cue_strength):
     one every signal reads as possible publishes and goes to review."""
 
-    def _read(self, steps, quote, category="hopelessness"):
+    def _read(self, steps, quote, category="hopelessness", response="missed"):
         steps.answers["safety-reader"] = {
             "risk_cues": [
                 {
                     "turn_index": 2,
                     "quote": quote,
                     "category": category,
-                    "learner_response": "missed",
+                    "learner_response": response,
                 }
             ],
             "learner_distress": [],
@@ -369,6 +369,20 @@ class TestPossibleMissedCue:
         assert result["status"] == "below_bar"
         assert result["evaluator_hard_fails"] == []
         assert "possible risk cue" in result["workspace"]["decision"]["why"]
+
+    async def test_a_possible_cue_the_learner_explored_is_published(
+        self, steps, gateway
+    ):
+        # The learner stayed with it, so a debrief that leaves it out needs no
+        # review: published, not below the bar.
+        quote = "अभी कुछ करने का मन नहीं करता"
+        self._read(steps, quote, response="explored")
+        self._evaluator(steps, quote, clear=False)
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "published"
+        assert result["evaluator_hard_fails"] == []
+        assert result["workspace"]["decision"]["possibleMissedCues"] == []
 
     async def test_the_evaluator_calling_it_clear_goes_to_urgent_review(
         self, steps, gateway

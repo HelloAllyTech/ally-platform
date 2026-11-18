@@ -53,10 +53,16 @@ import {
 } from './debrief-run-logs.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefFrameworkService } from './debrief-framework.service';
+import { resolveRiskCue } from '../util/debrief-risk-cue.util';
 import {
-  DebriefRiskCueOptionService,
-  STANDARD_RISK_CUE,
-} from './debrief-risk-cue-option.service';
+  DataProvider,
+  debriefDataProviders,
+  loadDebriefData,
+} from './debrief-data-providers';
+import {
+  roleplayBrief,
+  roleplayFieldProblems,
+} from '../util/debrief-roleplay-brief.util';
 import { emptyFramework } from '../constants/debrief-framework.constants';
 import {
   DEBRIEF_ORCHESTRATOR_TOOLS,
@@ -195,6 +201,9 @@ export class DebriefRunnerService {
     DebriefRunnerService.name,
   );
 
+  /** Where each piece of context data comes from (one provider each). */
+  private readonly dataProviders: DataProvider[];
+
   constructor(
     @InjectRepository(DebriefRun)
     private readonly runs: Repository<DebriefRun>,
@@ -203,7 +212,7 @@ export class DebriefRunnerService {
     private readonly tokens: DebriefRunTokenService,
     private readonly config: AppConfigService,
     private readonly releases: AgentReleaseService,
-    private readonly practice: DebriefPracticeService,
+    practice: DebriefPracticeService,
     private readonly llmModels: LlmModelService,
     private readonly agentLogs: DebriefRunLogsService,
     @Optional() private readonly ownerSettings?: DebriefSettingsService,
@@ -214,9 +223,9 @@ export class DebriefRunnerService {
     @Optional() private readonly holds?: DebriefChangeHoldsService,
     /** The organisation's skill frameworks (Context Library). Absent in unit tests: none. */
     @Optional() private readonly frameworks?: DebriefFrameworkService,
-    /** The roleplay's risk-cue option. Absent in unit tests: Standard. */
-    @Optional() private readonly riskCueOptions?: DebriefRiskCueOptionService,
-  ) {}
+  ) {
+    this.dataProviders = debriefDataProviders({ context, practice });
+  }
 
   /**
    * The LLM catalog as the release check reads it. Its service falls back to
@@ -595,67 +604,48 @@ export class DebriefRunnerService {
     const framework = this.frameworks
       ? await this.frameworks.forTenant(session.tenantId)
       : emptyFramework();
-    const riskCue = this.riskCueOptions
-      ? await this.riskCueOptions.resolve(session.riskCueOption)
-      : STANDARD_RISK_CUE;
+    const riskCue = resolveRiskCue(session.riskCueOption);
     const competencyNames = (session.competencies ?? []).map((c) => c.name);
-    const [
-      liveDetections,
-      caseMemory,
-      pastWorkOnThis,
-      cohort,
-      practiceOptions,
-      { texts: prompts, versions: promptVersions },
-      availability,
-      progressProfile,
-    ] = await Promise.all([
-      orFallback(
-        () => this.context.liveDetections(sessionId, session.scenarioId),
-        [],
-      ),
-      recipe.key === DebriefRecipeKey.CASE
-        ? orFallback(() => this.context.caseMemory(session.id), null)
-        : Promise.resolve(null),
-      session.counselorId
-        ? orFallback(
-            () =>
-              this.context.pastWorkOnThis(
-                session.counselorId!,
-                session.tenantId,
-                sessionId,
-              ),
-            [],
-          )
-        : Promise.resolve([]),
-      orFallback(() => this.context.cohortStats(session), null),
-      this.practice.optionsFor(
-        session.counselorId,
-        session.tenantId,
-        sessionId,
-      ),
-      this.prompts(bundle, opts.promptOverrides),
-      // What the orchestrator's planner may build on (spec A5: presence of
-      // org protocols, past debriefs, cohort and course data), cheap counts.
-      isOrchestrated(bundle)
-        ? orFallback(() => this.context.availability(session), null)
-        : Promise.resolve(null),
-      owner.progressOn && session.counselorId
-        ? orFallback(
-            () =>
-              this.context.progressProfile(
-                session.counselorId!,
-                session.tenantId,
-                sessionId,
-                progressSettings(owner),
-                { framework, competencies: competencyNames },
-              ),
-            null,
-          )
-        : Promise.resolve(null),
-    ]);
-    // An option with its own wording replaces the pinned definition; null keeps the pinned one.
-    if (riskCue.wording) {
-      prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition] = riskCue.wording;
+    const [{ texts: prompts, versions: promptVersions }, loaded] =
+      await Promise.all([
+        this.prompts(bundle, opts.promptOverrides),
+        // Every piece of context data, each from its one provider (debrief-data-providers.ts).
+        loadDebriefData(this.dataProviders, {
+          session,
+          sessionId,
+          recipeKey: recipe.key,
+          orchestrated: isOrchestrated(bundle),
+          progressOn: owner.progressOn,
+          progressProfile: () =>
+            this.context.progressProfile(
+              session.counselorId!,
+              session.tenantId,
+              sessionId,
+              progressSettings(owner),
+              { framework, competencies: competencyNames },
+            ),
+        }),
+      ]);
+    const liveDetections = (loaded.context.live_detections ?? []) as unknown[];
+    const caseMemory = loaded.context.case_memory;
+    const cohort = loaded.context.cohort;
+    // A roleplay field in the wrong shape is skipped by the brief; say so on the run.
+    for (const p of roleplayFieldProblems(
+      session.roleplayFields,
+      bundle.settings?.roleplayFields,
+    )) {
+      loaded.problems.push({
+        contextKey: 'scenario',
+        item: 'roleplay_brief',
+        why: `${p.label}: ${p.why}`,
+      });
+    }
+    if (loaded.problems.length) {
+      // A run that read less than it should says so; the Agent logs can show it.
+      this.logger.warn(
+        `[debrief] ${sessionId}: ${loaded.problems.map((p) => `${p.contextKey} (${p.why})`).join('; ')}`,
+      );
+      run.workspace = { ...run.workspace, dataNotes: loaded.problems };
     }
     run.workspace = {
       ...run.workspace,
@@ -674,7 +664,7 @@ export class DebriefRunnerService {
         handling: riskCue.handling,
         supportLinesOnCue: riskCue.supportLinesOnCue,
         wordListRaises: riskCue.wordListRaises,
-        // The option's own definition (null: the pinned one), so the judge reads what the run read.
+        // Always null now: the pinned definition is the only one (older runs may hold a wording).
         wording: riskCue.wording,
       },
       speakerLabels: bundle.settings?.neutralWording ? 'neutral' : 'legacy',
@@ -711,7 +701,7 @@ export class DebriefRunnerService {
           : {}),
         prices: modelPrices(models),
         session: {
-          ...sessionForGraph(session),
+          ...sessionForGraph(session, bundle.settings?.roleplayFields),
           framework,
           risk_cue: {
             key: riskCue.key,
@@ -724,15 +714,7 @@ export class DebriefRunnerService {
             : 'legacy',
         },
         transcript,
-        context: {
-          live_detections: liveDetections,
-          past_work_on_this: pastWorkOnThis,
-          cohort,
-          case_memory: caseMemory,
-          practice_options: practiceOptions,
-          ...(availability ? { availability } : {}),
-          progress_profile: progressProfile,
-        },
+        context: loaded.context as DebriefGraphRequest['context'],
       },
       promptVersions,
       counselorId: session.counselorId,
@@ -1004,6 +986,7 @@ export class DebriefRunnerService {
 /** The session as the graph reads it (CONTRACT.md §1), in its snake_case. */
 export function sessionForGraph(
   s: DebriefSessionContext,
+  roleplayFields?: unknown,
 ): Record<string, unknown> {
   return {
     id: s.id,
@@ -1019,7 +1002,10 @@ export function sessionForGraph(
     learner_level: s.learnerLevel,
     learner_turns: s.learnerTurns,
     scenario_id: s.scenarioId,
-    scenario: s.scenario,
+    // The roleplay's brief: the always-on fields plus the optional ones this release has on.
+    scenario: s.roleplayFields
+      ? roleplayBrief(s.roleplayFields, roleplayFields)
+      : s.scenario,
     expected_behaviours: s.expectedBehaviours,
     helpful_behaviours: s.helpfulBehaviours ?? [],
     unhelpful_behaviours: s.unhelpfulBehaviours ?? [],

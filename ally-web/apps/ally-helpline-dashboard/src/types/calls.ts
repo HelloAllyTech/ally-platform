@@ -36,6 +36,8 @@ export interface CallLog {
   reviewId: string | null;
   reviewCreatedAt: string | null;
   customFieldValues?: { fieldDefinitionId: string; value?: string | null }[];
+  /** Set when the recording's connection dropped and never resumed: the audio is partial. */
+  incompleteRecording?: { reason: string } | null;
 }
 
 export interface GetCallLogsResponse {

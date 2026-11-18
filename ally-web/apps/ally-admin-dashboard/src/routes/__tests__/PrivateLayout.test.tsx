@@ -1,17 +1,21 @@
 import React from "react";
 
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
-import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterAll, afterEach, beforeEach, vi } from "vitest";
 
 import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle, Permissions } from "@constants";
 import reportUploadReducer from "@reducer/reportUploadReducer";
 
 import * as api from "@api";
 
-import { PrivateLayout } from "../PrivateLayout";
+import {
+  ENTITLEMENT_RETRY_DELAYS_MS,
+  ENTITLEMENT_RETRY_STEADY_MS,
+  PrivateLayout,
+} from "../PrivateLayout";
 import { ShellContext } from "../ShellContext";
 
 vi.mock("@components", async importOriginal => {
@@ -25,6 +29,15 @@ vi.mock("@components", async importOriginal => {
   };
 });
 
+vi.mock("@pages/Login/Login", async () => {
+  const { useLocation } = await import("react-router-dom");
+  return {
+    Login: () => {
+      const { pathname, search, hash } = useLocation();
+      return <div data-testid="login-screen" data-at={`${pathname}${search}${hash}`} />;
+    },
+  };
+});
 vi.mock("@components/notification-bell/NotificationBell", () => ({
   NotificationBell: () => null,
 }));
@@ -124,14 +137,13 @@ describe("PrivateLayout", () => {
     });
   });
 
-  it("redirects to login when not authenticated", () => {
+  it("shows the login screen, not the page, when not authenticated", () => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "false");
 
     render(
       <Provider store={mockStore}>
         <MemoryRouter initialEntries={["/protected"]}>
           <Routes>
-            <Route path={ROUTES.LOGIN} element={<div>LoginPage</div>} />
             <Route
               path="/protected"
               element={
@@ -145,20 +157,16 @@ describe("PrivateLayout", () => {
       </Provider>,
     );
 
-    expect(screen.getByText("LoginPage")).toBeInTheDocument();
+    expect(screen.getByTestId("login-screen")).toBeInTheDocument();
+    expect(screen.queryByText("ProtectedContent")).not.toBeInTheDocument();
   });
 
-  it("keeps the deep link when sending a logged-out visitor to login (A1)", () => {
+  it("draws the login screen at the deep link they opened, so logging in leaves them there (A1)", () => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "false");
-    const Login = () => {
-      const { search } = useLocation();
-      return <div data-testid="login">{new URLSearchParams(search).get("next")}</div>;
-    };
     render(
       <Provider store={mockStore}>
         <MemoryRouter initialEntries={["/assistants/b1?section=lists&tool=memory"]}>
           <Routes>
-            <Route path={ROUTES.LOGIN} element={<Login />} />
             <Route
               path="/assistants/:botId"
               element={
@@ -171,7 +179,8 @@ describe("PrivateLayout", () => {
         </MemoryRouter>
       </Provider>,
     );
-    expect(screen.getByTestId("login").textContent).toBe(
+    expect(screen.getByTestId("login-screen")).toHaveAttribute(
+      "data-at",
       "/assistants/b1?section=lists&tool=memory",
     );
   });
@@ -516,7 +525,83 @@ describe("PrivateLayout", () => {
       expect(screen.queryByText("GatedContent")).not.toBeInTheDocument();
     });
 
-    it("blames the load, not the account, when the fetch fails", () => {
+    // A failure keeps reading as "checking" while the automatic retries run (an API restart on
+    // deploy is over in seconds). Spend the whole budget to reach the failure screen.
+    const spendRetryBudget = () => {
+      for (let i = 0; i < ENTITLEMENT_RETRY_DELAYS_MS.length; i += 1) {
+        act(() => {
+          vi.advanceTimersByTime(ENTITLEMENT_RETRY_DELAYS_MS[i]);
+        });
+      }
+    };
+    const failPermissions = () =>
+      (api.useGetPermissionsQuery as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        refetch: refetchSpy,
+      });
+
+    describe("while the API is briefly unreachable", () => {
+      beforeEach(() => vi.useFakeTimers());
+      afterEach(() => vi.useRealTimers());
+
+      it("keeps saying it is checking and retries by itself", () => {
+        failPermissions();
+        renderGated();
+
+        expect(screen.getByTestId("entitlements-loading")).toBeInTheDocument();
+        expect(screen.queryByTestId("entitlements-failed")).not.toBeInTheDocument();
+        expect(refetchSpy).not.toHaveBeenCalled();
+
+        act(() => {
+          vi.advanceTimersByTime(ENTITLEMENT_RETRY_DELAYS_MS[0]);
+        });
+        expect(refetchSpy).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId("entitlements-loading")).toBeInTheDocument();
+      });
+
+      it("keeps retrying behind the failure screen once the budget is spent", () => {
+        failPermissions();
+        renderGated();
+        spendRetryBudget();
+
+        expect(screen.getByTestId("entitlements-failed")).toBeInTheDocument();
+        const callsSoFar = refetchSpy.mock.calls.length;
+        act(() => {
+          vi.advanceTimersByTime(ENTITLEMENT_RETRY_STEADY_MS);
+        });
+        expect(refetchSpy.mock.calls.length).toBeGreaterThan(callsSoFar);
+      });
+
+      it("retries straight away when the tab regains focus", () => {
+        failPermissions();
+        renderGated();
+
+        act(() => {
+          window.dispatchEvent(new Event("focus"));
+        });
+        expect(refetchSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it("keeps the page when a refetch fails but the last answer is still held", () => {
+      // RTK Query keeps the last good data on a rejected refetch; that is still the user's
+      // real access and must not be replaced by a failure screen.
+      (api.useGetPermissionsQuery as ReturnType<typeof vi.fn>).mockReturnValue({
+        data: [Permissions.EDIT_USER],
+        isLoading: false,
+        isError: true,
+        refetch: refetchSpy,
+      });
+      renderGated();
+
+      expect(screen.getByText("GatedContent")).toBeInTheDocument();
+      expect(screen.queryByTestId("entitlements-failed")).not.toBeInTheDocument();
+    });
+
+    it("blames the load, not the account, when the fetch keeps failing", () => {
+      vi.useFakeTimers();
       (api.useGetFeatureTogglesQuery as ReturnType<typeof vi.fn>).mockReturnValue({
         data: undefined,
         isLoading: false,
@@ -524,6 +609,8 @@ describe("PrivateLayout", () => {
         refetch: refetchSpy,
       });
       renderGated();
+      spendRetryBudget();
+      vi.useRealTimers();
 
       expect(screen.getByTestId("entitlements-failed")).toBeInTheDocument();
       expect(screen.getByText("Couldn't check your access")).toBeInTheDocument();
@@ -532,6 +619,7 @@ describe("PrivateLayout", () => {
     });
 
     it("offers a retry that refetches instead of making the reader reload", () => {
+      vi.useFakeTimers();
       (api.useGetUserQuery as ReturnType<typeof vi.fn>).mockReturnValue({
         data: undefined,
         isLoading: false,
@@ -539,6 +627,9 @@ describe("PrivateLayout", () => {
         refetch: refetchSpy,
       });
       renderGated();
+      spendRetryBudget();
+      vi.useRealTimers();
+      refetchSpy.mockClear();
 
       fireEvent.click(screen.getByTestId("entitlements-retry"));
       expect(refetchSpy).toHaveBeenCalled();

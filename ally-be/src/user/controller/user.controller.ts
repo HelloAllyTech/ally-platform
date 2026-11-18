@@ -114,10 +114,7 @@ export class UserController {
   @Get('me/feature-toggles')
   @UseGuards(JwtAuthGuard)
   async getMyFeatureToggles(@CurrentUser() tokenUser: TokenUser) {
-    // getVisibleKeys, not getEnabledKeys: also hides default-on keys an
-    // org-restricted admin may not use, so the console never shows a door the
-    // service would refuse (Product Planning — Ideas).
-    return this.featureToggleService.getVisibleKeys(Number(tokenUser.id));
+    return this.featureToggleService.getEnabledKeys(Number(tokenUser.id));
   }
 
   @ApiOperation({

@@ -106,3 +106,57 @@ describe("CustomFieldValuesPanel — BOOLEAN field default", () => {
     expect(onValueChange).toHaveBeenCalledWith("cf-bool-1", "true");
   });
 });
+
+describe("CustomFieldValuesPanel — carbon (New note drawer) values", () => {
+  const field = (over: Partial<CustomFieldValue>): CustomFieldValue => ({
+    fieldDefinitionId: "cf-1",
+    name: "Field",
+    fieldType: CustomFieldType.TEXT,
+    sectionKey: "section",
+    sectionLabel: "Section",
+    editPermission: CustomFieldEditPermission.BOTH,
+    fillMode: CustomFieldFillMode.MANUAL,
+    displayOrder: 0,
+    value: null,
+    ...over,
+  });
+
+  it("shows what was typed in a text field", () => {
+    render(
+      <CustomFieldValuesPanel
+        chatId={0}
+        canEdit
+        isCounsellor
+        variant="carbon"
+        externalFieldValues={[field({ name: "Theme" })]}
+        externalLocalValues={{ "cf-1": "Exam stress" }}
+        onValueChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByDisplayValue("Exam stress")).toBeInTheDocument();
+  });
+
+  it("selects the option for a value stored as its label (older mobile builds)", () => {
+    render(
+      <CustomFieldValuesPanel
+        chatId={0}
+        canEdit
+        isCounsellor
+        variant="carbon"
+        externalFieldValues={[
+          field({
+            name: "Ongoing risks",
+            fieldType: CustomFieldType.SINGLE_SELECT,
+            options: [
+              { id: "uuid-run", label: "Running away", order: 0 },
+              { id: "uuid-harm", label: "Self harm", order: 1 },
+            ],
+          }),
+        ]}
+        externalLocalValues={{ "cf-1": "Running away" }}
+        onValueChange={vi.fn()}
+      />,
+    );
+    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("uuid-run");
+  });
+});

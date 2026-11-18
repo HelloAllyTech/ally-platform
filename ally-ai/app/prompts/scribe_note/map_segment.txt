@@ -1,0 +1,13 @@
+You are reading one part of a counselling session transcript. Session mode: {mode}. {segment}.
+
+Write timeline notes for this part only: one point per event, in the order it happened, each a complete sentence in {note_language}, citing the turn ids it comes from, with `t` the time of its first turn. Keep every disclosure, risk, decision and agreed step. Add nothing the transcript doesn't say.
+
+Also note anything in this part that answers one of these fields, with the turn ids, as `field_notes`. Leave it empty if nothing does.
+
+Fields:
+{note_spec}
+
+Transcript part:
+```
+{transcript}
+```

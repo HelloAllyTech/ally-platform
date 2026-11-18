@@ -76,16 +76,17 @@ export class BotDraftController {
   @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
-    summary: 'Start setting up an assistant, from a website or a description',
+    summary:
+      'Start setting up an assistant, from a website, documents, a description or an interview',
     description:
-      'Creates the draft and its draft chatbot. With a website, reading starts in the background (progress on /events); with a description, its details are read into "What we learned".',
+      'Creates the draft and its draft chatbot. With a website, reading starts in the background (progress on /events); with a description, its details are read into "What we learned"; with `interview`, the builder opens by asking its first question and learns from the owner\'s answers in chat.',
   })
   async create(@Body() dto: CreateBotDraftDto) {
     const website = dto.website?.trim();
     const description = dto.description?.trim();
-    if (!website && !description && !dto.upload) {
+    if (!website && !description && !dto.upload && !dto.interview) {
       throw new BadRequestException(
-        'Paste your website, upload documents, or describe your business.',
+        'Paste your website, upload documents, describe your business, or choose the interview.',
       );
     }
     let start: string | null = null;
@@ -102,9 +103,16 @@ export class BotDraftController {
       name: start ? nameFromDomain(displayDomain(start)) : 'Your business',
       website: start,
       description: description ?? null,
+      interview: !!dto.interview && !start && !description,
     });
     const withOwner = await this.drafts.appendTranscript(draft, [
-      { role: 'builder', text: ONBOARDING_COPY.opening },
+      {
+        role: 'builder',
+        text:
+          dto.interview && !start && !description
+            ? ONBOARDING_COPY.interviewOpening
+            : ONBOARDING_COPY.opening,
+      },
       ...(start || description
         ? [{ role: 'owner' as const, text: start ?? description! }]
         : []),

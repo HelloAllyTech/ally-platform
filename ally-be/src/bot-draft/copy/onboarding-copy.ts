@@ -18,6 +18,9 @@ export const ONBOARDING_COPY = {
   openingChips: ['Use my website', 'Upload documents', 'Describe it instead'],
   readingDone:
     "I've read {n} pages. Here's what I learned, and each detail links to the page it came from. Take a quick look: if anything's wrong, tell me or edit it directly.",
+  /** "Interview me": the builder's first question (the owner answers in chat). */
+  interviewOpening:
+    "Hi, I'll ask you about your business one question at a time, and you can watch what I learn on the right. Answer in your own words, and skip anything you'd rather not share. To begin: what does your business do, and who do you help?",
   describedDone:
     "Here's what I took from your description. Take a quick look: if anything's wrong, tell me or edit it directly.",
   looksRight: 'Looks right',
