@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Copy, Notification, StarOutline, StarSolid, Tick } from "@icons";
 import { AnimatePresence, motion } from "framer-motion";
@@ -223,8 +223,16 @@ export const IdeaTitle: React.FC<{
   const copy = en.roadmapV2.actions;
   const [value, setValue] = useState(item.title);
   const [saved, setSaved] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => setValue(item.title), [item.title]);
+  // A title is prose, not a code: it must wrap and show in full. A one-line <input> scrolled
+  // sideways and clipped long titles, so grow the box to fit its content instead.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
   useEffect(() => {
     if (!saved) return undefined;
     const t = setTimeout(() => setSaved(false), 1200);
@@ -260,22 +268,26 @@ export const IdeaTitle: React.FC<{
       tabIndex={-1}
       className={`flex min-w-0 items-center gap-2 outline-none ${className}`}
     >
-      <input
+      <textarea
         ref={inputRef}
+        rows={1}
         aria-label={copy.editTitle}
         value={value}
         maxLength={200}
-        onChange={event => setValue(event.target.value)}
+        onChange={event => setValue(event.target.value.replace(/\n/g, " "))}
         onBlur={commit}
         onKeyDown={event => {
-          if (event.key === "Enter") inputRef.current?.blur();
+          if (event.key === "Enter") {
+            event.preventDefault();
+            inputRef.current?.blur();
+          }
           if (event.key === "Escape") {
             setValue(item.title);
             event.stopPropagation();
             requestAnimationFrame(() => inputRef.current?.blur());
           }
         }}
-        className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 font-[inherit] text-[length:inherit] outline-none transition-colors duration-100 hover:border-border-light focus:border-primary-600"
+        className="min-w-0 flex-1 resize-none overflow-hidden rounded border border-transparent bg-transparent px-1 font-[inherit] text-[length:inherit] outline-none transition-colors duration-100 hover:border-border-light focus:border-primary-600"
       />
       <AnimatePresence>
         {saved && (
