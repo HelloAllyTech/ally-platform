@@ -29,7 +29,10 @@ const formStyle = { display: "flex", flexDirection: "column", gap: 14 } as const
  * way's input, with Back to the choices and × to leave. Presentation only: what each way does is
  * `useOnboardingStart`.
  */
-export const OnboardingStart: React.FC = () => {
+export const OnboardingStart: React.FC<{
+  /** Where "leave" goes. Defaults to the assistants list; the first-run overlay passes its own close. */
+  onLeave?: () => void;
+}> = ({ onLeave }) => {
   const navigate = useNavigate();
   const start = useOnboardingStart();
   const [mode, setMode] = useState<StartMode>("choose");
@@ -43,7 +46,7 @@ export const OnboardingStart: React.FC = () => {
     if (id) navigate(ROUTES.CHATBOT_NEW_SESSION(id));
   };
 
-  const leave = () => navigate(ROUTES.WHATSAPP_BOT);
+  const leave = () => (onLeave ? onLeave() : navigate(ROUTES.WHATSAPP_BOT));
   const choices = () => {
     setMode("choose");
     setFileProblem(null);
