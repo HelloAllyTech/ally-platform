@@ -220,7 +220,14 @@ export interface RoadmapMeRole {
 
 export type RoadmapQueueView = "for-you" | "leading" | "to-triage" | "all";
 
-export type RoadmapQueueSort = "rank" | "waiting" | "newest" | "votes" | "activity" | "stageAge";
+export type RoadmapQueueSort =
+  | "rank"
+  | "waiting"
+  | "newest"
+  | "votes"
+  | "activity"
+  | "stageAge"
+  | "stageNewest";
 
 /** The query params of `GET /v1/roadmap/items`. Every value is a string, as it travels. */
 export interface RoadmapItemsQuery {
@@ -235,9 +242,13 @@ export interface RoadmapItemsQuery {
   starred?: "1";
   openQuestion?: "1";
   votedByMe?: "1";
+  ledByMe?: "1";
+  wroteByMe?: "1";
+  needsYou?: "1";
   month?: string;
   sort?: RoadmapQueueSort;
   cursor?: string;
+  limit?: string;
 }
 
 export interface RoadmapForYouSections {

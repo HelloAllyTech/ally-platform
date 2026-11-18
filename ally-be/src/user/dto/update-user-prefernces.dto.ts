@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
@@ -54,4 +55,11 @@ export class UpdateUserPreferencesDto {
   @IsString({ each: true })
   @ArrayUnique()
   roadmap_queue_tab_order?: string[];
+
+  // Per-user sort for each Roadmap Queue view, by view id (the five defaults; a saved view keeps its
+  // own sort), e.g. { building: 'activity' }. Values are loose strings: the frontend ignores a
+  // sort it no longer offers, so retiring one needs no backend deploy.
+  @IsOptional()
+  @IsObject()
+  roadmap_queue_sorts?: Record<string, string>;
 }

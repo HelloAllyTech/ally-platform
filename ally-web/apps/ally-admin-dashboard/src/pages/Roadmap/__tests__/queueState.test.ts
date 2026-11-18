@@ -1,64 +1,74 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_VIEWS,
+  DEFAULT_VIEW_IDS,
   activeFilterCount,
-  canUseBoard,
   decodeQueueState,
   defaultSortFor,
-  isSectionedView,
+  effectiveFilters,
   encodeQueueState,
   filterChips,
   filtersToParams,
+  orderViews,
   paramsToFilters,
   queueSignature,
+  readView,
   removeChip,
   savedViewPayload,
   stateFromSavedView,
   toItemsQuery,
-  orderViews,
-  viewsForRole,
 } from "../utils/queueState";
 
-describe("viewsForRole", () => {
-  it("gives Idea people All ideas and For you only", () => {
-    expect(viewsForRole("idea")).toEqual(["all", "for-you"]);
-    expect(viewsForRole("viewer")).toEqual(["all", "for-you"]);
+describe("the five default views", () => {
+  it("are All, To do, Building, Released and Declined, in that order", () => {
+    expect(DEFAULT_VIEW_IDS).toEqual(["all", "todo", "building", "released", "declined"]);
   });
-  it("adds Leading for Builders and To triage for Owners, triage first", () => {
-    expect(viewsForRole("builder")).toEqual(["all", "leading", "for-you"]);
-    expect(viewsForRole("owner")).toEqual(["to-triage", "all", "leading", "for-you"]);
+
+  it("split every idea into exactly one stage view, and All has no filter", () => {
+    expect(DEFAULT_VIEWS.all.filters).toEqual({});
+    expect(DEFAULT_VIEWS.todo.filters).toEqual({ stage: ["backlog"] });
+    expect(DEFAULT_VIEWS.building.filters).toEqual({ stage: ["being_built"] });
+    expect(DEFAULT_VIEWS.released.filters).toEqual({ stage: ["shipped"] });
+    expect(DEFAULT_VIEWS.declined.filters).toEqual({ stage: ["declined"] });
   });
-  it("opens on the first tab when nothing is remembered", () => {
-    const state = decodeQueueState(new URLSearchParams(), "owner");
-    expect(state.view).toBe("to-triage");
+
+  it("each open on the sort that fits it", () => {
+    expect(DEFAULT_VIEWS.all.sort).toBe("rank");
+    expect(DEFAULT_VIEWS.todo.sort).toBe("rank");
+    expect(DEFAULT_VIEWS.building.sort).toBe("activity");
+    expect(DEFAULT_VIEWS.released.sort).toBe("stageNewest");
+    expect(DEFAULT_VIEWS.declined.sort).toBe("stageNewest");
+    expect(defaultSortFor("saved")).toBe("rank");
   });
-  it("applies a saved order, drops views the role lost and appends new ones in default order", () => {
-    const owner = viewsForRole("owner");
-    expect(orderViews(owner, ["for-you", "all", "leading", "to-triage"])).toEqual([
-      "for-you",
+
+  it("put the view's own filters under the person's, so a stage can't be filtered away", () => {
+    expect(
+      effectiveFilters({ view: "todo", filters: { goal: ["g1"], stage: ["shipped"] } }),
+    ).toEqual({
+      goal: ["g1"],
+      stage: ["backlog"],
+    });
+    expect(effectiveFilters({ view: "all", filters: { stage: ["shipped"] } })).toEqual({
+      stage: ["shipped"],
+    });
+  });
+});
+
+describe("tab order", () => {
+  it("applies a saved order to default and saved tabs, drops gone ones and appends new ones", () => {
+    const tabs = ["all", "todo", "building", "released", "declined", "my-view"];
+    expect(orderViews(tabs, ["my-view", "declined", "all"])).toEqual([
+      "my-view",
+      "declined",
       "all",
-      "leading",
-      "to-triage",
+      "todo",
+      "building",
+      "released",
     ]);
-    // A Builder who was once an Owner: To triage is gone.
-    expect(orderViews(viewsForRole("builder"), ["to-triage", "for-you", "all"])).toEqual([
-      "for-you",
-      "all",
-      "leading",
-    ]);
-    // Only one view saved: the rest follow in the default order; duplicates and junk are ignored.
-    expect(orderViews(owner, ["leading", "leading", "nope"])).toEqual([
-      "leading",
-      "to-triage",
-      "all",
-      "for-you",
-    ]);
-    expect(orderViews(owner, undefined)).toEqual(owner);
-  });
-  it("offers the Board only to Builders and Owners", () => {
-    expect(canUseBoard("idea")).toBe(false);
-    expect(canUseBoard("builder")).toBe(true);
-    expect(canUseBoard("owner")).toBe(true);
+    // A deleted view's id in the saved order is dropped; duplicates and junk are ignored.
+    expect(orderViews(["all", "todo"], ["gone", "todo", "todo", "nope"])).toEqual(["todo", "all"]);
+    expect(orderViews(tabs, undefined)).toEqual(tabs);
   });
 });
 
@@ -104,27 +114,32 @@ describe("filter encoding", () => {
 });
 
 describe("URL state", () => {
-  it("opens on the first tab with nothing in the URL", () => {
-    const state = decodeQueueState(new URLSearchParams(), "idea");
-    expect(state).toEqual({ view: "all", filters: {}, layout: "list" });
-  });
-
-  it("falls back to the first tab for a view the role can't see", () => {
-    expect(decodeQueueState(new URLSearchParams("view=to-triage"), "builder").view).toBe("all");
-    expect(decodeQueueState(new URLSearchParams("view=to-triage"), "owner").view).toBe("to-triage");
-  });
-
-  it("remembers the last view and layout when the URL names none", () => {
-    const state = decodeQueueState(new URLSearchParams(), "builder", {
-      view: "leading",
-      layout: "board",
+  it("opens on All with nothing in the URL", () => {
+    expect(decodeQueueState(new URLSearchParams())).toEqual({
+      view: "all",
+      filters: {},
+      layout: "list",
     });
-    expect(state.view).toBe("leading");
-    expect(state.layout).toBe("board");
   });
 
-  it("never gives an Idea person the Board, even from a link", () => {
-    expect(decodeQueueState(new URLSearchParams("layout=board"), "idea").layout).toBe("list");
+  it("opens on each default view by its id, and remembers the last one", () => {
+    for (const id of DEFAULT_VIEW_IDS) {
+      expect(decodeQueueState(new URLSearchParams(`view=${id}`)).view).toBe(id);
+    }
+    expect(decodeQueueState(new URLSearchParams(), { view: "building" }).view).toBe("building");
+    expect(decodeQueueState(new URLSearchParams("view=released"), { view: "building" }).view).toBe(
+      "released",
+    );
+  });
+
+  it("reads the old views as the view and filters they fall under now", () => {
+    expect(readView("to-triage")).toEqual({ view: "todo", filters: {} });
+    expect(readView("leading")).toEqual({ view: "all", filters: { ledByMe: true } });
+    expect(readView("for-you")).toEqual({ view: "all", filters: { needsYou: true } });
+    expect(readView("nonsense")).toBeNull();
+    const state = decodeQueueState(new URLSearchParams("view=leading&goal=g1"));
+    expect(state.view).toBe("all");
+    expect(state.filters).toEqual({ ledByMe: true, goal: ["g1"] });
   });
 
   it("round-trips view, filters, sort, layout, saved view and the open idea", () => {
@@ -140,49 +155,85 @@ describe("URL state", () => {
     expect(encoded.toString()).toBe(
       "view=all&stage=shipped&votedByMe=1&sort=votes&layout=board&sv=v1&open=OPP-388",
     );
-    expect(decodeQueueState(encoded, "owner")).toEqual(state);
+    expect(decodeQueueState(encoded)).toEqual(state);
   });
 
   it("omits the view's default sort from the URL", () => {
     expect(
       encodeQueueState({ view: "all", filters: {}, sort: "rank", layout: "list" }).toString(),
     ).toBe("view=all");
+    expect(
+      encodeQueueState({
+        view: "released",
+        filters: {},
+        sort: "stageNewest",
+        layout: "list",
+      }).toString(),
+    ).toBe("view=released");
   });
 });
 
 describe("toItemsQuery", () => {
-  it("sends no sort for the sectioned views", () => {
-    expect(toItemsQuery({ view: "for-you", filters: {}, layout: "list", sort: "votes" })).toEqual({
-      view: "for-you",
+  it("is always the one list: the view's own filters go in as filters", () => {
+    expect(toItemsQuery({ view: "todo", filters: {}, layout: "list" })).toEqual({
+      view: "all",
+      stage: "backlog",
+      sort: "rank",
+    });
+    expect(toItemsQuery({ view: "released", filters: {}, layout: "list" })).toMatchObject({
+      view: "all",
+      stage: "shipped",
+      sort: "stageNewest",
     });
   });
 
-  it("sends the view's default sort, the filters and the cursor for flat views", () => {
-    expect(toItemsQuery({ view: "all", filters: { goal: ["g1"] }, layout: "list" }, "c2")).toEqual({
-      view: "all",
-      goal: "g1",
-      sort: "rank",
-      cursor: "c2",
-    });
+  it("sends the filters, the sort in force and the cursor", () => {
+    expect(
+      toItemsQuery(
+        { view: "all", filters: { goal: ["g1"], needsYou: true }, layout: "list" },
+        "c2",
+      ),
+    ).toEqual({ view: "all", goal: "g1", needsYou: "1", sort: "rank", cursor: "c2" });
+    expect(
+      toItemsQuery({ view: "building", filters: {}, layout: "list", sort: "votes" }).sort,
+    ).toBe("votes");
   });
 });
 
 describe("saved views", () => {
-  it("stores the contract's params plus view and sort, and reads them back", () => {
+  it("stores the contract's params plus view and sort, and reads them back as its own list", () => {
     const payload = savedViewPayload({
       view: "all",
-      filters: { stage: ["planning"] },
+      filters: { stage: ["shipped"] },
       sort: "newest",
       layout: "list",
     });
-    expect(payload).toEqual({ view: "all", stage: "planning", sort: "newest" });
-    expect(stateFromSavedView(payload, "idea", "list", "v9")).toEqual({
+    expect(payload).toEqual({ view: "all", stage: "shipped", sort: "newest" });
+    expect(stateFromSavedView(payload, "list", "v9")).toEqual({
       view: "all",
-      filters: { stage: ["planning"] },
+      filters: { stage: ["shipped"] },
       sort: "newest",
       layout: "list",
       savedViewId: "v9",
       open: undefined,
+    });
+  });
+
+  it("saved from a default view, keeps that view's own filters in the saved view", () => {
+    const payload = savedViewPayload({
+      view: "todo",
+      filters: { goal: ["g1"] },
+      layout: "list",
+    });
+    expect(payload).toEqual({ view: "all", stage: "backlog", goal: "g1" });
+  });
+
+  it("reads an old saved view's For you / Leading / To triage as the filters they mean", () => {
+    expect(stateFromSavedView({ view: "to-triage" }, "list", "v1").filters).toEqual({
+      stage: ["backlog"],
+    });
+    expect(stateFromSavedView({ view: "leading" }, "list", "v2").filters).toEqual({
+      ledByMe: true,
     });
   });
 
@@ -193,20 +244,5 @@ describe("saved views", () => {
     expect(queueSignature({ stage: ["a"] }, "rank")).not.toBe(
       queueSignature({ stage: ["a"] }, "votes"),
     );
-  });
-});
-
-describe("sorting by view", () => {
-  it("ranks To triage and All ideas, and leaves only For you with a fixed section order", () => {
-    expect(defaultSortFor("to-triage")).toBe("rank");
-    expect(defaultSortFor("all")).toBe("rank");
-    expect(defaultSortFor("leading")).toBe("waiting");
-    expect(isSectionedView("for-you")).toBe(true);
-    expect(isSectionedView("to-triage")).toBe(false);
-  });
-  it("sends a sort for To triage (so its sections are ordered by it) but not for For you", () => {
-    const triage = toItemsQuery({ view: "to-triage", filters: {}, layout: "list" });
-    expect(triage.sort).toBe("rank");
-    expect(toItemsQuery({ view: "for-you", filters: {}, layout: "list" }).sort).toBeUndefined();
   });
 });

@@ -150,6 +150,15 @@ describe('stage filter', () => {
   });
 });
 
+describe('flags about the person asking', () => {
+  it('reads ledByMe, wroteByMe and needsYou as flags, dropped unless exactly 1 or true', () => {
+    expect(
+      parseItemQuery({ ledByMe: '1', wroteByMe: 'true', needsYou: '0' })
+        .filters,
+    ).toEqual({ ledByMe: true, wroteByMe: true });
+  });
+});
+
 describe('compareRows', () => {
   const a = row({ id: 'a', code: 'OPP-1', queueRank: 2, votes: 1 });
   const b = row({ id: 'b', code: 'OPP-2', queueRank: 1, votes: 9 });
@@ -161,6 +170,23 @@ describe('compareRows', () => {
       'a',
       'c',
     ]);
+  });
+
+  it('sorts by the most recently moved into the stage first', () => {
+    const early = row({
+      id: 'e',
+      code: 'OPP-5',
+      stageSince: '2026-11-01T00:00:00.000Z',
+    });
+    const late = row({
+      id: 'l',
+      code: 'OPP-6',
+      stageSince: '2026-11-12T00:00:00.000Z',
+    });
+    expect(
+      [early, late].sort(compareRows('stageNewest')).map((r) => r.id),
+    ).toEqual(['l', 'e']);
+    expect(parseItemQuery({ sort: 'stageNewest' }).sort).toBe('stageNewest');
   });
 
   it('sorts by votes, and by waiting longest using why-here first', () => {

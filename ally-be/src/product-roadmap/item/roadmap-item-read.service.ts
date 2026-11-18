@@ -218,9 +218,17 @@ export class RoadmapItemReadService {
       throw new ForbiddenException('To triage is for Owners.');
     }
     const loaded = await this.loadAll(userId, role);
-    const visible = loaded.cores.filter((c) =>
-      matchesFilters(c, query.filters),
-    );
+    let visible = loaded.cores.filter((c) => matchesFilters(c, query.filters));
+    // Filters about the person asking: ideas they lead, wrote, or that wait on them.
+    const f = query.filters;
+    if (f.ledByMe) visible = visible.filter((c) => c.leadId === userId);
+    if (f.wroteByMe) visible = visible.filter((c) => c.authorId === userId);
+    if (f.needsYou) {
+      visible = visible
+        .filter((c) => c.shownStage !== 'declined' && c.shownStage !== 'closed')
+        .map((c) => ({ ...c, whyHere: this.needsYouWhy(loaded, c) }))
+        .filter((c) => !!c.whyHere);
+    }
     const order = compareRows(query.sort);
 
     if (query.view === 'for-you') {

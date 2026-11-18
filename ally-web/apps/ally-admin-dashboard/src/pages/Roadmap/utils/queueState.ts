@@ -8,6 +8,20 @@ import type { RoadmapItemsQuery, RoadmapQueueSort, RoadmapQueueView, RoadmapRole
  * `1`. Page-only state (the open idea, the layout, the saved view) uses keys the API never reads.
  */
 
+/**
+ * The Queue is one list. What used to be separate views are filters: five default views (they can't
+ * be removed) and the saved views a person makes. Every idea is in All, and in exactly one of the
+ * other four: To do (Backlog: nobody leads it), Building, Released, Declined.
+ */
+export type DefaultViewId = "all" | "todo" | "building" | "released" | "declined";
+export const DEFAULT_VIEW_IDS: DefaultViewId[] = [
+  "all",
+  "todo",
+  "building",
+  "released",
+  "declined",
+];
+
 export const QUEUE_VIEWS: RoadmapQueueView[] = ["for-you", "leading", "to-triage", "all"];
 
 export const QUEUE_SORTS: RoadmapQueueSort[] = [
@@ -17,6 +31,7 @@ export const QUEUE_SORTS: RoadmapQueueSort[] = [
   "votes",
   "activity",
   "stageAge",
+  "stageNewest",
 ];
 
 /** Multi-value filters (comma-joined on the wire). */
@@ -24,7 +39,14 @@ export const LIST_FILTER_KEYS = ["stage", "review", "goal", "author", "lead", "s
 export type ListFilterKey = (typeof LIST_FILTER_KEYS)[number];
 
 /** On/off filters (`1` on the wire, absent when off). */
-export const FLAG_FILTER_KEYS = ["starred", "openQuestion", "votedByMe"] as const;
+export const FLAG_FILTER_KEYS = [
+  "starred",
+  "openQuestion",
+  "votedByMe",
+  "ledByMe",
+  "wroteByMe",
+  "needsYou",
+] as const;
 export type FlagFilterKey = (typeof FLAG_FILTER_KEYS)[number];
 
 export interface QueueFilters {
@@ -38,6 +60,12 @@ export interface QueueFilters {
   starred?: boolean;
   openQuestion?: boolean;
   votedByMe?: boolean;
+  /** Ideas I lead. */
+  ledByMe?: boolean;
+  /** Ideas I wrote. */
+  wroteByMe?: boolean;
+  /** Something is waiting on me: an agent question, a decision, an @mention. */
+  needsYou?: boolean;
   /** YYYY-MM. */
   month?: string;
 }
@@ -45,7 +73,8 @@ export interface QueueFilters {
 export type QueueLayout = "list" | "board";
 
 export interface QueueState {
-  view: RoadmapQueueView;
+  /** The default view you are on. A saved view reads as All with its own filters (`savedViewId`). */
+  view: DefaultViewId;
   filters: QueueFilters;
   /** Absent = the view's own default sort. */
   sort?: RoadmapQueueSort;
@@ -61,64 +90,70 @@ export const PAGE_KEYS = { open: "open", layout: "layout", savedView: "sv" } as 
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-/** The order everyone starts with: triage first, then the whole queue, then your own. */
-export const DEFAULT_VIEW_ORDER: RoadmapQueueView[] = ["to-triage", "all", "leading", "for-you"];
-
-/**
- * Which built-in views a role sees (§4.3, [FP-1023]): Idea gets two, Builder adds Leading, Owner
- * adds To triage — in the default order. A person's saved order is applied on top (`orderViews`).
- */
-export const viewsForRole = (role: RoadmapRole | undefined): RoadmapQueueView[] => {
-  const seen: RoadmapQueueView[] =
-    role === "owner"
-      ? ["for-you", "leading", "to-triage", "all"]
-      : role === "builder"
-        ? ["for-you", "leading", "all"]
-        : ["for-you", "all"];
-  return DEFAULT_VIEW_ORDER.filter(view => seen.includes(view));
+/** What each default view is: the filters it implies, and the sort it opens on. */
+export const DEFAULT_VIEWS: Record<
+  DefaultViewId,
+  { filters: QueueFilters; sort: RoadmapQueueSort }
+> = {
+  all: { filters: {}, sort: "rank" },
+  // Backlog: nobody leads it yet. Ranked, so the Owner picks from the top.
+  todo: { filters: { stage: ["backlog"] }, sort: "rank" },
+  building: { filters: { stage: ["being_built"] }, sort: "activity" },
+  released: { filters: { stage: ["shipped"] }, sort: "stageNewest" },
+  declined: { filters: { stage: ["declined"] }, sort: "stageNewest" },
 };
 
+/** A saved view that names no sort opens on Rank. */
+export const SAVED_VIEW_DEFAULT_SORT: RoadmapQueueSort = "rank";
+
 /**
- * Apply a person's saved tab order to the views their role sees. Ids they no longer have are
- * dropped; views the saved list doesn't mention (a role gained since) follow in default order.
+ * Apply a person's saved tab order to the tabs there are (the five defaults and their saved views).
+ * Ids that no longer exist are dropped; tabs the saved list doesn't mention follow, in order.
  */
-export const orderViews = (
-  allowed: RoadmapQueueView[],
+export const orderViews = <T extends string>(
+  allowed: T[],
   saved: readonly string[] | undefined,
-): RoadmapQueueView[] => {
+): T[] => {
   const picked = (saved ?? []).filter(
-    (id, i, all): id is RoadmapQueueView =>
-      allowed.includes(id as RoadmapQueueView) && all.indexOf(id) === i,
+    (id, i, all): id is T => allowed.includes(id as T) && all.indexOf(id) === i,
   );
   return [...picked, ...allowed.filter(view => !picked.includes(view))];
 };
 
-/** The List | Board switch is for Builders and Owners (§4.3). */
+/** The List | Board switch is retired; kept for the Board code that stays behind it. */
 export const canUseBoard = (role: RoadmapRole | undefined): boolean =>
   role === "builder" || role === "owner";
 
-/** Each view's default sort (§4.3 table). */
-export const defaultSortFor = (view: RoadmapQueueView): RoadmapQueueSort => {
-  switch (view) {
-    case "for-you":
-      return "waiting";
-    case "to-triage":
-      // Backlog ideas are ranked like anything not yet released; the Owner picks from the top.
-      return "rank";
-    case "leading":
-      // "Blocking most first": the server's waiting order puts the ideas held on the lead first.
-      return "waiting";
-    case "all":
-    default:
-      return "rank";
-  }
-};
+/** The sort a default view opens on. Legacy view ids fall back to Rank. */
+export const defaultSortFor = (view: string): RoadmapQueueSort =>
+  DEFAULT_VIEWS[view as DefaultViewId]?.sort ?? SAVED_VIEW_DEFAULT_SORT;
+
+/** Legacy: the old For you view came back in sections. Nothing is sectioned any more. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const isSectionedView = (_view: string): boolean => false;
 
 /**
- * For you comes back in sections whose order the view defines, so it takes no sort. To triage keeps
- * its two sections (unreviewed first) but orders each one by the sort, Rank to begin with.
+ * A view name from an old link, a remembered view or a saved view, read as the default view and
+ * extra filters it falls under now: For you was ideas waiting on you, Leading ideas you lead, and
+ * To triage is To do.
  */
-export const isSectionedView = (view: RoadmapQueueView): boolean => view === "for-you";
+export const readView = (
+  raw: string | null | undefined,
+): { view: DefaultViewId; filters: QueueFilters } | null => {
+  if (!raw) return null;
+  if ((DEFAULT_VIEW_IDS as string[]).includes(raw))
+    return { view: raw as DefaultViewId, filters: {} };
+  if (raw === "to-triage") return { view: "todo", filters: {} };
+  if (raw === "leading") return { view: "all", filters: { ledByMe: true } };
+  if (raw === "for-you") return { view: "all", filters: { needsYou: true } };
+  return null;
+};
+
+/** The filters a request or a count carries: the default view's own, then the person's on top. */
+export const effectiveFilters = (state: Pick<QueueState, "view" | "filters">): QueueFilters => ({
+  ...state.filters,
+  ...DEFAULT_VIEWS[state.view].filters,
+});
 
 const splitList = (raw: string | null): string[] | undefined => {
   if (!raw) return undefined;
@@ -186,28 +221,31 @@ export const paramsToFilters = (
 };
 
 /**
- * Read the Queue's state from the URL. A view the role can't see falls back to the first tab, so a
- * shared To triage link opens something useful for an Idea person instead of a 403.
+ * Read the Queue's state from the URL. A view name from before the five default views reads as the
+ * view and filters it falls under now, so an old link or saved view still opens on the same ideas.
  */
 export const decodeQueueState = (
   search: URLSearchParams,
-  role: RoadmapRole | undefined,
-  remembered?: Partial<Pick<QueueState, "view" | "layout">>,
+  remembered?: Partial<Pick<QueueState, "layout">> & { view?: string },
 ): QueueState => {
-  const allowed = viewsForRole(role);
-  const rawView = search.get("view") as RoadmapQueueView | null;
-  const fallbackView =
-    remembered?.view && allowed.includes(remembered.view) ? remembered.view : allowed[0];
-  const view = rawView && allowed.includes(rawView) ? rawView : fallbackView;
+  const fromUrl = readView(search.get("view"));
+  const fromMemory = readView(remembered?.view);
+  const chosen = fromUrl ?? fromMemory ?? { view: "all" as DefaultViewId, filters: {} };
+  const view = chosen.view;
 
   const rawSort = search.get("sort") as RoadmapQueueSort | null;
   const sort = rawSort && QUEUE_SORTS.includes(rawSort) ? rawSort : undefined;
 
   const rawLayout = search.get(PAGE_KEYS.layout);
   const wantsBoard = rawLayout ? rawLayout === "board" : remembered?.layout === "board";
-  const layout: QueueLayout = wantsBoard && canUseBoard(role) ? "board" : "list";
+  const layout: QueueLayout = wantsBoard ? "board" : "list";
 
-  const state: QueueState = { view, filters: paramsToFilters(search), layout };
+  // Filters a legacy view name implies (For you, Leading) ride along; the URL's own come after.
+  const state: QueueState = {
+    view,
+    filters: normaliseFilters({ ...chosen.filters, ...paramsToFilters(search) }),
+    layout,
+  };
   if (sort) state.sort = sort;
   const savedViewId = search.get(PAGE_KEYS.savedView);
   if (savedViewId) state.savedViewId = savedViewId;
@@ -221,20 +259,26 @@ export const encodeQueueState = (state: QueueState): URLSearchParams => {
   const params = new URLSearchParams();
   params.set("view", state.view);
   for (const [key, value] of Object.entries(filtersToParams(state.filters))) params.set(key, value);
-  if (state.sort && state.sort !== defaultSortFor(state.view)) params.set("sort", state.sort);
+  if (state.sort && state.sort !== defaultSortFor(state.savedViewId ? "saved" : state.view)) {
+    params.set("sort", state.sort);
+  }
   if (state.layout === "board") params.set(PAGE_KEYS.layout, "board");
   if (state.savedViewId) params.set(PAGE_KEYS.savedView, state.savedViewId);
   if (state.open) params.set(PAGE_KEYS.open, state.open);
   return params;
 };
 
-/** The request for `GET /v1/roadmap/items`. Sectioned views send no sort; cursor is the page's. */
+/**
+ * The request for `GET /v1/roadmap/items`. It is always the one list (`all`): the default view's
+ * own filters and the person's go in as filters, and `sort` is the one in force. The cursor is the
+ * page's.
+ */
 export const toItemsQuery = (state: QueueState, cursor?: string): RoadmapItemsQuery => {
   const query: RoadmapItemsQuery = {
-    view: state.view,
-    ...(filtersToParams(state.filters) as Omit<RoadmapItemsQuery, "view">),
+    view: "all",
+    ...(filtersToParams(effectiveFilters(state)) as Omit<RoadmapItemsQuery, "view">),
   };
-  if (!isSectionedView(state.view)) query.sort = state.sort ?? defaultSortFor(state.view);
+  query.sort = state.sort ?? defaultSortFor(state.savedViewId ? "saved" : state.view);
   if (cursor) query.cursor = cursor;
   return query;
 };
@@ -288,7 +332,10 @@ export const queueSignature = (filters: QueueFilters, sort: RoadmapQueueSort | u
 
 /** A saved view's payload: the contract's params plus view and sort, all strings. */
 export const savedViewPayload = (state: QueueState): Record<string, string> => {
-  const payload: Record<string, string> = { view: state.view, ...filtersToParams(state.filters) };
+  const payload: Record<string, string> = {
+    view: "all",
+    ...filtersToParams(effectiveFilters(state)),
+  };
   if (state.sort) payload.sort = state.sort;
   return payload;
 };
@@ -296,10 +343,12 @@ export const savedViewPayload = (state: QueueState): Record<string, string> => {
 /** Read a saved view's payload back. Unknown or disallowed views fall back like a URL does. */
 export const stateFromSavedView = (
   payload: Record<string, string>,
-  role: RoadmapRole | undefined,
   layout: QueueLayout,
   savedViewId: string,
 ): QueueState => {
-  const decoded = decodeQueueState(new URLSearchParams(payload), role);
-  return { ...decoded, layout, savedViewId, open: undefined };
+  const decoded = decodeQueueState(new URLSearchParams(payload));
+  // A saved view is its own list: it starts from All, whatever view it was saved from. The
+  // default view it was saved on (To do, say) is part of its filters, so nothing is lost.
+  const filters = normaliseFilters({ ...DEFAULT_VIEWS[decoded.view].filters, ...decoded.filters });
+  return { ...decoded, view: "all", filters, layout, savedViewId, open: undefined };
 };

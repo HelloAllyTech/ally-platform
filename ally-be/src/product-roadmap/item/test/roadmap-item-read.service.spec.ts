@@ -328,6 +328,42 @@ describe('RoadmapItemReadService.list', () => {
     });
   });
 
+  it('filters to the ideas the person leads, wrote, or that wait on them', async () => {
+    const mineAuthored = item(1, { createdBy: ME });
+    const ledByMe = item(
+      2,
+      { builderSessionId: 's2' },
+      planSession('s2', { leadUserId: ME, sessionPlanStage: 'prd' }),
+    );
+    const other = item(3);
+    const waiting = item(
+      4,
+      { builderSessionId: 's4' },
+      planSession('s4', { leadUserId: ME, sessionPlanStage: 'prd' }),
+    );
+    const { service } = build([mineAuthored, ledByMe, other, waiting], {
+      decisions: [
+        {
+          sessionId: 's4',
+          kind: 'question',
+          waitingSince: ago(1),
+          prompt: 'Which learners first?',
+        },
+      ],
+    });
+    const codes = async (q: Record<string, string>) =>
+      (
+        (await service.list(ME, parseItemQuery({ view: 'all', ...q }))) as {
+          rows: { code: string }[];
+        }
+      ).rows
+        .map((r) => r.code)
+        .sort();
+    expect(await codes({ wroteByMe: '1' })).toEqual(['OPP-0001']);
+    expect(await codes({ ledByMe: '1' })).toEqual(['OPP-0002', 'OPP-0004']);
+    expect(await codes({ needsYou: '1' })).toEqual(['OPP-0004']);
+  });
+
   it('marks a row unread only when something happened since it was opened', async () => {
     const seenThenChanged = item(
       1,

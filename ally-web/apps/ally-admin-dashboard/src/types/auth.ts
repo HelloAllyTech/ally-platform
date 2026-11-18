@@ -68,6 +68,8 @@ export interface UserPreferencesData {
   // Ordered Roadmap Queue tab ids ("to-triage" | "all" | "leading" | "for-you"), saved per person
   // so the order follows them across devices. Absent = the default order.
   roadmap_queue_tab_order?: string[];
+  // The sort each Roadmap Queue default view opens on for this person, by view id.
+  roadmap_queue_sorts?: Record<string, string>;
 }
 
 export interface UserState {

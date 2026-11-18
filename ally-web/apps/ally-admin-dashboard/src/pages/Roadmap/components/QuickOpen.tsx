@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useSearchRoadmapQuery } from "@api";
 import { ROUTES, en } from "@constants";
-import type { RoadmapItemRow, RoadmapQueueView } from "@types";
+import type { RoadmapItemRow } from "@types";
 
 import { dialogVariants, motionTransition, useReducedMotionPreference } from "../../../motion";
 import { useDebouncedValue } from "../../ProductRoadmap/useDebouncedValue";
@@ -16,14 +16,14 @@ import { stageWord } from "../utils/copy";
 type Entry =
   | { kind: "newIdea"; label: string }
   | { kind: "idea"; row: RoadmapItemRow }
-  | { kind: "view"; view: RoadmapQueueView; label: string };
+  | { kind: "view"; view: string; label: string };
 
 interface QuickOpenProps {
   open: boolean;
   onClose: () => void;
   onOpenIdea: (code: string) => void;
-  onOpenView: (view: RoadmapQueueView) => void;
-  views: RoadmapQueueView[];
+  onOpenView: (view: string) => void;
+  views: string[];
   /** Phone: full screen (§4.17 "Search opens full screen"). */
   fullScreen: boolean;
 }

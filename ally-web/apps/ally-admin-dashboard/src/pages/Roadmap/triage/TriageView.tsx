@@ -39,6 +39,8 @@ interface TriageViewProps {
   onVisibleCodes: (codes: string[]) => void;
   /** A dialog of ours is open: the queue page's own keys stand down. */
   onOverlay?: (open: boolean) => void;
+  /** Present while the server has more of the Backlog than has been loaded. */
+  onLoadMore?: () => void;
 }
 
 /**
@@ -62,6 +64,7 @@ export const TriageView: React.FC<TriageViewProps> = ({
   onOpen,
   onVisibleCodes,
   onOverlay,
+  onLoadMore,
 }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
@@ -288,6 +291,13 @@ export const TriageView: React.FC<TriageViewProps> = ({
             </ul>
           </section>
         ),
+      )}
+      {onLoadMore && (
+        <div className="flex justify-center py-3">
+          <Button kind="tertiary" size="sm" onClick={onLoadMore}>
+            {copy.loadMore}
+          </Button>
+        </div>
       )}
       <div className="h-20" aria-hidden />
       {/* The selection bar rises from the bottom with the count rolling (§4.18 "Bulk select"). */}

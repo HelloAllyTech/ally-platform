@@ -26,6 +26,8 @@ export const ITEM_SORTS = [
   'votes',
   'activity',
   'stageAge',
+  // Most recently moved into its stage first: what Released and Declined are read by.
+  'stageNewest',
 ] as const;
 export type ItemSort = (typeof ITEM_SORTS)[number];
 
@@ -80,6 +82,11 @@ export interface ItemFilters {
   starred?: boolean;
   openQuestion?: boolean;
   votedByMe?: boolean;
+  /** About the person asking, so the read model applies them (matchesFilters cannot): */
+  ledByMe?: boolean;
+  wroteByMe?: boolean;
+  /** An open question, decision or @mention is waiting on the person asking. */
+  needsYou?: boolean;
   month?: string;
 }
 
@@ -173,6 +180,9 @@ export function parseItemQuery(raw: RawQuery): ItemQuery {
     starred: flag(raw.starred),
     openQuestion: flag(raw.openQuestion),
     votedByMe: flag(raw.votedByMe),
+    ledByMe: flag(raw.ledByMe),
+    wroteByMe: flag(raw.wroteByMe),
+    needsYou: flag(raw.needsYou),
     month,
   };
   for (const key of Object.keys(filters) as (keyof ItemFilters)[]) {
@@ -265,6 +275,8 @@ export function compareRows(
         return (a, b) => time(b.lastActivityAt) - time(a.lastActivityAt);
       case 'stageAge':
         return (a, b) => time(a.stageSince) - time(b.stageSince);
+      case 'stageNewest':
+        return (a, b) => time(b.stageSince) - time(a.stageSince);
     }
   })();
   return (a, b) => primary(a, b) || tiebreak(a, b);

@@ -9026,10 +9026,23 @@ export const en = {
   roadmapV2: {
     title: "Roadmap",
     views: {
+      // The five default views; they can't be removed.
+      all: "All",
+      todo: "To do",
+      building: "Building",
+      released: "Released",
+      declined: "Declined",
+      // Old names (links, saved views) keep a label.
       "for-you": "For you",
       leading: "Leading",
-      "to-triage": "To triage",
-      all: "All ideas",
+      "to-triage": "To do",
+    } as Record<string, string>,
+    viewsHelp: {
+      all: "Every idea, in every stage.",
+      todo: "Backlog: ideas nobody leads yet. Pick a lead, or decline.",
+      building: "Ideas a Builder is working on right now.",
+      released: "Ideas that have shipped.",
+      declined: "Ideas that won't be built.",
     } as Record<string, string>,
     viewsLabel: "Views",
     moreViews: "More",
@@ -9182,6 +9195,9 @@ export const en = {
       starred: "Starred",
       openQuestion: "Has an open question",
       votedByMe: "Voted by me",
+      ledByMe: "Led by me",
+      wroteByMe: "Wrote it: me",
+      needsYou: "Needs you",
       month: "Planned month",
       monthHelp: "Only ideas planned for this month.",
       clear: "Clear filters",
@@ -9212,6 +9228,7 @@ export const en = {
         votes: "Votes",
         activity: "Last activity",
         stageAge: "Longest in stage",
+        stageNewest: "Newest in stage",
       } as Record<string, string>,
     },
     layout: {
@@ -9239,6 +9256,19 @@ export const en = {
       pinned: "Pinned for everyone",
       pinFailed: "Couldn't change pinning.",
       pinHelp: "Pinned views show for everyone with Roadmap access.",
+      // Your own views: only you see them, on every device.
+      menu: (name: string) => `Options for "${name}"`,
+      rename: "Rename",
+      renameTitle: "Rename this view",
+      renameConfirm: "Rename",
+      renamed: (name: string) => `Renamed to "${name}".`,
+      delete: "Delete view",
+      deleteTitle: (name: string) => `Delete "${name}"?`,
+      deleteBody: "Only this saved view goes. The ideas in it stay where they are.",
+      deleteConfirm: "Delete",
+      deleted: (name: string) => `Deleted "${name}".`,
+      deleteFailed: "Couldn't delete this view.",
+      sortSaveFailed: "Couldn't save the sort.",
     },
     empty: {
       needsYou: "Nothing needs you right now.",

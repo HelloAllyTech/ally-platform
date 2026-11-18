@@ -59,6 +59,7 @@ export const sectionsFor = (
       rows: rows.filter(row => (row.stage ?? simpleStageOfShown(row.shownStage)) === stage),
     })).filter(section => section.rows.length > 0);
   }
+  if (view === "to-triage") return [{ key: "backlog", label: copy.sections.backlog, rows }];
   return [{ key: "all", rows }];
 };
 

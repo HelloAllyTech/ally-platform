@@ -60,7 +60,11 @@ export interface FilterOptions {
  * its options load, so FilterDropdown never drops a key from its result (the house-pattern trap).
  * People come from the facets plus the rows on screen, by name, never by id alone.
  */
-export const useFilterOptions = (rows: RoadmapItemRow[]): FilterOptions => {
+export const useFilterOptions = (
+  rows: RoadmapItemRow[],
+  /** On a stage's own view (To do, Building ...) the stage is already chosen: no Stage section. */
+  hideStage = false,
+): FilterOptions => {
   const { data: goals } = useGetRoadmapProductGoalsQuery();
   const { data: facets } = useGetRoadmapFacetsQuery();
   return useMemo(() => {
@@ -85,11 +89,15 @@ export const useFilterOptions = (rows: RoadmapItemRow[]): FilterOptions => {
         .sort((a, b) => a.label.localeCompare(b.label));
 
     const sections: FilterSectionConfig<FilterDropdownState>[] = [
-      {
-        id: "stage",
-        label: f.stage,
-        options: STAGE_OPTIONS.map(v => ({ value: v, label: stages[v] })),
-      },
+      ...(hideStage
+        ? []
+        : [
+            {
+              id: "stage",
+              label: f.stage,
+              options: STAGE_OPTIONS.map(v => ({ value: v, label: stages[v] })),
+            },
+          ]),
       { id: "goal", label: f.goal, options: toOptions(goalMap) },
       { id: "author", label: f.author, options: toOptions(authors) },
       { id: "lead", label: f.lead, options: toOptions(leads) },
@@ -105,6 +113,9 @@ export const useFilterOptions = (rows: RoadmapItemRow[]): FilterOptions => {
           { value: "starred", label: f.starred },
           { value: "openQuestion", label: f.openQuestion },
           { value: "votedByMe", label: f.votedByMe },
+          { value: "ledByMe", label: f.ledByMe },
+          { value: "wroteByMe", label: f.wroteByMe },
+          { value: "needsYou", label: f.needsYou },
         ],
       },
       { id: "month", label: f.month, options: monthOptions() },
@@ -114,7 +125,7 @@ export const useFilterOptions = (rows: RoadmapItemRow[]): FilterOptions => {
       labels[String(section.id)] = Object.fromEntries(section.options.map(o => [o.value, o.label]));
     });
     return { sections, labels };
-  }, [goals, facets, rows]);
+  }, [goals, facets, rows, hideStage]);
 };
 
 /** QueueFilters → the dropdown's shape. */
@@ -158,6 +169,9 @@ export const chipText = (chip: FilterChip, labels: FilterOptions["labels"]): str
     case "starred":
     case "openQuestion":
     case "votedByMe":
+    case "ledByMe":
+    case "wroteByMe":
+    case "needsYou":
       return f[chip.key];
     default: {
       const group = {
