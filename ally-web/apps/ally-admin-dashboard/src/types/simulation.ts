@@ -114,6 +114,8 @@ export interface behaviourStateInstruction {
 export interface behaviourInstruction {
   id?: string;
   category: enumBehaviourInstructionCategory;
+  /** Points per detection, -100..100; null/absent = category default (+10 / -10). */
+  score?: number | null;
   behaviors: string[];
   instructions: string[];
   stateInstructions?: behaviourStateInstruction[];

@@ -1705,6 +1705,17 @@ export const BEHAVIOURS_AND_STATES_INSTRUCTION_TABLE_COLUMNS = [
     minWidth: 220,
     width: "18%",
   },
+  {
+    // Points per detection: -100..100, sign follows the category. Empty = the
+    // category default (+10 / -10). Validated in BehavioursAndStatesInstruction.
+    id: "score",
+    label: "Score",
+    accessor: "score",
+    placeholder: "10",
+    dataType: cellTypes.number,
+    minWidth: 110,
+    width: "8%",
+  },
   ...BEHAVIOUR_STATES.map(state => ({
     id: `stateInstruction_${state.stateId}`,
     label: state.label,

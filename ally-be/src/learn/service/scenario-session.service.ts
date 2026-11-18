@@ -3156,11 +3156,17 @@ export class ScenarioSessionService {
     scenarioSession: ScenarioSessions,
     behaviorInstruction: LearnBehaviorInstructionData,
   ) {
+    // Freeze the points the agent actually applied, so a later edit to the
+    // instruction's score cannot re-score this session. Anything that is not an
+    // integer is stored as NULL, which readers treat as the category default.
+    const applied = behaviorInstruction.behavior_instruction_data.score;
+    const score = Number.isInteger(applied) ? applied : null;
     const record = this.scenarioSessionBehaviorInstructionsRepository.create({
       scenarioSessionId: scenarioSession.id,
       scenarioBehaviorInstructionId:
         behaviorInstruction.behavior_instruction_data.behaviorInstructionId,
       occurredAt: behaviorInstruction.timestamp,
+      score,
     });
     await this.scenarioSessionBehaviorInstructionsRepository.save(record);
   }
