@@ -1,0 +1,31 @@
+tss-S1         vector    7  keyword    5  top 0.505  | How much are the Batman high top sneakers?
+tss-S2         vector    1  keyword None  top 0.521  | Price of the Orbit backpack?
+tss-S3         vector    2  keyword    1  top 0.538  | What's your return policy?
+tss-S4         vector    1  keyword    1  top 0.640  | Are taxes included in the price?
+tss-S5         vector    1  keyword    1  top 0.615  | How do I reach customer care?
+tss-S6         vector None  keyword None  top 0.584  | Your hoodies look oversized, should I size down?
+tss-S7         vector    1  keyword    2  top 0.569  | How should I wash the cotton t-shirts?
+tss-S8         vector    1  keyword    4  top 0.405  | Can I cancel the membership and get my money back?
+tss-S9         vector    1  keyword None  top 0.435  | Do you save my card details?
+tss-S10        vector   11  keyword   17  top 0.423  | How much is shipping and how long does delivery take to Pune?
+tss-S11        vector   11  keyword   18  top 0.451  | Do you have cash on delivery?
+tss-S12        vector None  keyword None  top 0.408  | I'm looking for a gift for my brother who loves Batman, budget 5000
+tss-S12        vector None  keyword   18  top 0.289  | what if it doesn't fit?
+tss-S16        vector None  keyword   19  top 0.452  | Where is my order?
+tss-M2         vector None  keyword    7  top 0.416  | Please remember for next time: I'm Rohan, I wear size M and UK 9, and 
+cn-C2          vector None  keyword None  top 0.581  | What's the price of the 3-month antenatal fitness plan?
+cn-C3          vector    1  keyword    1  top 0.746  | Do you have a NICU? What level?
+cn-C6          vector None  keyword None  top 0.511  | When will I feel my baby move?
+cn-C8          vector    1  keyword None  top 0.716  | I'm 7 months pregnant, what delivery packages do you have at Bannergha
+cn-C8          vector   16  keyword    1  top 0.684  | What's in the Apartment package? Do you give ambulance pickup?
+cn-C8          vector    1  keyword    4  top 0.481  | Can someone call me tomorrow evening? I'm Asha, 9000000001
+sb-P1          vector None  keyword None  top 0.679  | Are you SEBI registered? What's your number?
+sb-P2          vector   16  keyword    2  top 0.470  | What services do you offer?
+sb-P5          vector    2  keyword    4  top 0.604  | What's the minimum for PMS, and are returns guaranteed?
+sb-P9          vector None  keyword None  top 0.310  | Are any of your products guaranteed?
+mp-B9          vector    1  keyword    1  top 0.458  | Do you work with children and teenagers?
+mp-B12         vector None  keyword None  top 0.699  | What therapies do you offer, and where is the Mumbai centre?
+mp-CBT         vector    1  keyword    2  top 0.633  | Do you do CBT?
+ia-B8-address  vector    2  keyword   17  top 0.676  | What's your address in Delhi?
+ia-B13-dinner  vector    1  keyword   10  top 0.579  | What are the dinner timings in Mumbai?
+ho-B10         vector None  keyword None  top 0.678  | Any 3 BHK in Gachibowli under 1.6 crore?

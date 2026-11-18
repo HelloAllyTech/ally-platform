@@ -90,7 +90,7 @@
             "shipping updates",
             "explain (our |the )?guarantee polic"
           ],
-          "must": ["inclu"]
+          "must": ["incl(\\.|usive|ude)"]
         }
       }
     ]
@@ -342,7 +342,9 @@
             "shipping updates",
             "explain (our |the )?guarantee polic"
           ],
-          "must": ["order (number|id|no)|6849 ?3328|connect@thesouledstore\\.com"]
+          "must": [
+            "order (number|id|no)|6849 ?3328|connect@thesouledstore\\.com"
+          ]
         }
       }
     ]
@@ -597,6 +599,202 @@
             "explain (our |the )?guarantee polic"
           ],
           "must": ["(no|not|none|aren.t|isn.t)\\b.{0,30}guarantee"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "mp-B9",
+    "kind": "in data (B9): works with children and adolescents",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Do you work with children and teenagers?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["(child|adolescen|teen)"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "mp-B12",
+    "kind": "in data (B12): therapies and the Mumbai centre's address",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What therapies do you offer, and where is the Mumbai centre?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": [
+            "(CBT|cognitive behaviou?r)",
+            "(Hughes Road|Khareghat|Patkar Marg|400 ?007)"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "mp-CBT",
+    "kind": "in data (B12): CBT is offered",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Do you do CBT?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic",
+            "(don.t|do not|can.t|cannot) (see|find|confirm)"
+          ],
+          "must": ["(CBT|cognitive behaviou?r)"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ia-B8-address",
+    "kind": "in data (B8): the Delhi address",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What's your address in Delhi?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["(The Lodhi|Lodhi Road)"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ia-B13-dinner",
+    "kind": "in data (B13): both Mumbai dinner seatings",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What are the dinner timings in Mumbai?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["(6:45|7:00)", "9:45"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ho-B10",
+    "kind": "in data (B10): Aquantis price per sq ft",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Any 3 BHK in Gachibowli under 1.6 crore?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["8,?499"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ne-checkin",
+    "kind": "in data: Tijara check-in and check-out",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What time is check-in and check-out at Tijara Fort-Palace?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["(2:?00 ?PM|2 ?pm|14:00)", "(11:?00 ?AM|11 ?am)"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "ne-B31",
+    "kind": "in data (B31, as the site now says): advance for weddings",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How much do I need to pay in advance for a wedding?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "provided (material|materials|information|passages?|documents?|sources?)",
+            "If I don.t know the answer",
+            "\\bpassages?\\b",
+            "in (the|my|our) (materials|sources|documents)",
+            "add (it |this |them )?to (your |the )?cart",
+            "(check|get|give you) (a |the )?delivery estimate",
+            "shipping updates",
+            "explain (our |the )?guarantee polic"
+          ],
+          "must": ["100 ?%", "40 days"]
         }
       }
     ]

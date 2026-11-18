@@ -1,0 +1,9 @@
+[
+  {"key": "tss", "url": "https://www.thesouledstore.com/", "expected": {"industry": "other", "pack": "standard"}, "gaps": []},
+  {"key": "cloudnine", "url": "https://www.cloudninecare.com/", "expected": {"industry": "gp_clinic", "pack": "medical"}, "gaps": []},
+  {"key": "scripbox", "url": "https://scripbox.com/", "expected": {"industry": "legal_financial", "pack": "legal_financial"}, "gaps": []},
+  {"key": "mpower", "url": "https://mpowerminds.com/", "expected": {"industry": "mental_health", "pack": "mental_health"}, "gaps": []},
+  {"key": "indian-accent", "url": "https://indianaccent.com/", "expected": {"industry": "restaurant", "pack": "standard"}, "gaps": []},
+  {"key": "honer", "url": "https://www.honerhomes.com/", "expected": {"industry": "real_estate", "pack": "standard"}, "gaps": []},
+  {"key": "neemrana", "url": "https://www.neemranahotels.com/", "expected": {"industry": "other", "pack": "standard"}, "gaps": []}
+]

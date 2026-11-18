@@ -68,6 +68,8 @@ function arg(name: string): string | undefined {
 interface TurnReport {
   user: string;
   reply: string;
+  /** Every step of the agent's run (`--trace`). */
+  trace?: string[];
   handledBy: string;
   turnType: string | null;
   runtime: string | null;
@@ -395,6 +397,7 @@ async function main(): Promise<void> {
             ...(await recordFailures(dataSource, chatbot.id, contact.id, turn)),
           ],
           gatewaySteps: steps,
+          trace: TRACE ? traceOf(decision) : undefined,
           crisis,
           crisisLayer: crisis
             ? decision.templateId
@@ -451,6 +454,12 @@ async function main(): Promise<void> {
               `${t.runtime ? ` ${t.runtime}` : ''} ${t.latencyMs}ms] ${t.reply.replace(/\s+/g, ' ').slice(0, 160)}` +
               (t.failures.length ? `\n      ✗ ${t.failures.join('; ')}` : ''),
           );
+          // --trace (Q3-fast Part 2): every step the agent took, searches included, and the
+          // whole reply, for the answers diagnosis.
+          if (t.trace) {
+            for (const step of t.trace) console.log(`        · ${step}`);
+            console.log(`        = ${t.reply.replace(/\s+/g, ' ')}`);
+          }
         }
       });
     });
@@ -554,6 +563,17 @@ async function crisisPromptVersion(
 
 /** Delete this run's throwaway contacts and conversations, so the inbox and metrics never see them. */
 /** The run's gateway tool steps (chunk 3b): the trace's tool steps that aren't searches. */
+const TRACE = process.argv.includes('--trace');
+
+/** Every step of the agent's run, as one line each (`--trace`). */
+function traceOf(decision: ChatbotDecision): string[] {
+  const trace =
+    decision.agent && 'trace' in decision.agent ? decision.agent.trace : [];
+  return trace.map(
+    (step) => `${step.node} ${step.ms}ms ${step.summary.replace(/\s+/g, ' ')}`,
+  );
+}
+
 function gatewayStepsOf(
   decision: ChatbotDecision,
 ): { summary: string; ms: number }[] | undefined {

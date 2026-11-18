@@ -1,0 +1,31 @@
+sb-P1          fact-rank    1 sim 0.619 | passage-rank None top-passage 0.6788
+sb-P2          fact-rank    1 sim 0.327 | passage-rank 16 top-passage 0.4703
+sb-P5          no fact matches | passage-rank 2
+sb-P9          no fact matches | passage-rank None
+tss-S1         fact-rank    1 sim 0.718 | passage-rank 7 top-passage 0.5047
+tss-S2         no fact matches | passage-rank 1
+tss-S3         fact-rank    1 sim 0.565 | passage-rank 2 top-passage 0.5385
+tss-S4         fact-rank    1 sim 0.645 | passage-rank 1 top-passage 0.6402
+tss-S5         fact-rank    1 sim 0.613 | passage-rank 1 top-passage 0.6154
+tss-S6         no fact matches | passage-rank None
+tss-S7         fact-rank    1 sim 0.479 | passage-rank 1 top-passage 0.5688
+tss-S8         fact-rank    1 sim 0.517 | passage-rank 1 top-passage 0.4047
+tss-S9         fact-rank    1 sim 0.494 | passage-rank 1 top-passage 0.435
+tss-S10        fact-rank    3 sim 0.334 | passage-rank 11 top-passage 0.4235
+tss-S11        fact-rank    1 sim 0.381 | passage-rank 11 top-passage 0.451
+tss-S12        fact-rank    1 sim 0.472 | passage-rank None top-passage 0.4084
+tss-S12        fact-rank    2 sim 0.207 | passage-rank None top-passage 0.2891
+tss-S16        fact-rank    1 sim 0.332 | passage-rank None top-passage 0.4516
+tss-M2         no fact matches | passage-rank None
+cn-C2          fact-rank    2 sim 0.592 | passage-rank None top-passage 0.5811
+cn-C3          fact-rank    7 sim 0.517 | passage-rank 1 top-passage 0.7455
+cn-C6          fact-rank    1 sim 0.590 | passage-rank None top-passage 0.5109
+cn-C8          fact-rank    1 sim 0.650 | passage-rank 1 top-passage 0.7157
+cn-C8          no fact matches | passage-rank 16
+cn-C8          fact-rank    1 sim 0.401 | passage-rank 1 top-passage 0.4815
+ia-B8-address  fact-rank    1 sim 0.530 | passage-rank 2 top-passage 0.676
+ia-B13-dinner  fact-rank    2 sim 0.627 | passage-rank 1 top-passage 0.5789
+mp-B9          fact-rank    1 sim 0.360 | passage-rank 1 top-passage 0.4576
+mp-B12         fact-rank    7 sim 0.511 | passage-rank None top-passage 0.6986
+mp-CBT         fact-rank    1 sim 0.603 | passage-rank 1 top-passage 0.6333
+ho-B10         fact-rank    2 sim 0.571 | passage-rank None top-passage 0.6782
