@@ -34,6 +34,8 @@ export const ONBOARDING_COPY = {
       "We couldn't reach {domain}. Check the address, or upload documents instead.",
     blocked:
       "{domain} asks automated readers not to visit, so we've respected that. Upload documents or describe your business instead.",
+    turned_away:
+      '{domain} showed our reader an error or a security check instead of its pages. Upload documents or describe your business instead.',
     script_heavy:
       'Your site loads most of its content with scripts, so we could only read {n} pages. Add a few documents to fill the gaps.',
     little_found:

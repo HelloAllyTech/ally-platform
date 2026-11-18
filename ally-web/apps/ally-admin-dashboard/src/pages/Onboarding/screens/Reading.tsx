@@ -92,6 +92,19 @@ export const ReadingScreen: React.FC<{
           ))}
         </ul>
       )}
+      {done && Boolean(view.crawl.notRead?.length) && (
+        <section data-testid="not-read" aria-labelledby="not-read-title">
+          <p id="not-read-title" className="ally-label">
+            {COPY.reading.notRead}
+          </p>
+          <p className="ally-small">{COPY.reading.notReadHint}</p>
+          <ul className="ally-small">
+            {view.crawl.notRead!.map(page => (
+              <li key={page.url}>{page.title ? `${page.title} (${page.url})` : page.url}</li>
+            ))}
+          </ul>
+        </section>
+      )}
       {done && (
         <PrimaryButton enterHint={COPY.frame.enterHint} onClick={onDone}>
           {COPY.frame.readingDone}

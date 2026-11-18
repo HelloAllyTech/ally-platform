@@ -14,6 +14,7 @@ import {
   DesignScreen,
   LearnedScreen,
   LiveScreen,
+  ReadingScreen,
   SafetyScreen,
   ShareScreen,
 } from "../Screens";
@@ -133,6 +134,44 @@ describe("What we learned", () => {
       />,
     );
     expect(screen.queryByText(COPY.learned.confirm)).toBeNull();
+  });
+});
+
+describe("Reading your website, pages we couldn't read (Q3-fast Part 3)", () => {
+  const progress = {
+    domain: "sunrise.example",
+    read: 4,
+    findings: [],
+    done: { n: 4, seconds: 12 },
+    startedAt: null,
+  };
+
+  it("lists the pages that showed an error or a security check, once reading is done", () => {
+    render(
+      <ReadingScreen
+        view={view({
+          crawl: {
+            ...view().crawl,
+            notRead: [
+              { url: "https://sunrise.example/fees", title: "403 Forbidden" },
+              { url: "https://sunrise.example/team", title: null },
+            ],
+          },
+        })}
+        reading={progress}
+        onDone={vi.fn()}
+      />,
+    );
+    const list = screen.getByTestId("not-read");
+    expect(list.textContent).toContain(COPY.reading.notRead);
+    expect(list.textContent).toContain(COPY.reading.notReadHint);
+    expect(list.querySelectorAll("li")).toHaveLength(2);
+    expect(list.textContent).toContain("https://sunrise.example/team");
+  });
+
+  it("shows nothing when every page was read", () => {
+    render(<ReadingScreen view={view()} reading={progress} onDone={vi.fn()} />);
+    expect(screen.queryByTestId("not-read")).toBeNull();
   });
 });
 

@@ -1,4 +1,5 @@
 import { readable, toHex, commonColour, detectBrand } from '../crawl/brand';
+import { looksLikeErrorPage } from '../crawl/error-page';
 import { decodeEntities, mainContent, parsePage } from '../crawl/page-parser';
 import { parseRobots } from '../crawl/robots';
 import { parseSitemap } from '../crawl/sitemap';
@@ -272,5 +273,32 @@ describe('nextToRead', () => {
 
   it('still reads blog and news pages last', () => {
     expect(order(['/blog/one', '/fees'])).toEqual(['/fees', '/blog/one']);
+  });
+});
+
+describe('looksLikeErrorPage (Q3-fast Part 3, B16)', () => {
+  it('spots error, block and challenge pages served as a 200', () => {
+    expect(looksLikeErrorPage('403 Forbidden', 'nginx')).toBe(true);
+    expect(looksLikeErrorPage('Access Denied', 'Reference #18.2f')).toBe(true);
+    expect(
+      looksLikeErrorPage(
+        'Home',
+        'Sorry, the page you are looking for could not be found.',
+      ),
+    ).toBe(true);
+    expect(
+      looksLikeErrorPage(null, 'Please verify you are a human to continue.'),
+    ).toBe(true);
+  });
+
+  it('still reads real pages that mention the same words', () => {
+    expect(
+      looksLikeErrorPage('Contact us', 'Visit us at 404 MG Road, Bengaluru.'),
+    ).toBe(false);
+    expect(
+      looksLikeErrorPage('Room guide', 'Room 403 is the X-ray department.'),
+    ).toBe(false);
+    const long = `Our forms are protected by a captcha. ${'We treat anxiety. '.repeat(100)}`;
+    expect(looksLikeErrorPage('Services', long)).toBe(false);
   });
 });

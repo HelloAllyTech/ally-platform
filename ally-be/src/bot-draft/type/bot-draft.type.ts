@@ -92,6 +92,11 @@ export interface CrawlPage {
   url: string;
   title: string | null;
   status: 'read' | 'skipped' | 'failed';
+  /**
+   * Why a page failed (Q3-fast Part 3): the site answered with an error status, or with a 200
+   * page that is really an error, block or captcha. Shown as "We couldn't read these pages".
+   */
+  reason?: 'error_page' | 'http_error';
   documentId?: string | null;
   headings?: string[];
   snippet?: string;
@@ -106,6 +111,8 @@ export interface CrawlBrand {
 export type CrawlProblem =
   | 'unreachable'
   | 'blocked'
+  /** The site answered with an error, block or security check instead of the page (Q3-fast). */
+  | 'turned_away'
   | 'script_heavy'
   | 'little_found'
   | 'daily_limit'

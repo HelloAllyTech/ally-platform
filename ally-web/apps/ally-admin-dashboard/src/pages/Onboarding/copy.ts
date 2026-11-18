@@ -31,6 +31,9 @@ export const COPY = {
     done: "Read {n} pages in {seconds} seconds",
     takingLong: "Still reading. Large sites can take up to 2 minutes.",
     brand: "Found your logo and brand colour",
+    notRead: "We couldn't read these pages",
+    notReadHint:
+      "They showed an error or a security check instead of their content, so we kept nothing from them.",
   },
   learned: {
     title: "What we learned",
@@ -61,6 +64,8 @@ export const COPY = {
         unreachable:
           "We couldn't reach the site. The address may be wrong, or the site may be down.",
         blocked: "The site asks automated readers not to visit, so we've respected that.",
+        turned_away:
+          "The site showed our reader an error or a security check instead of its pages.",
         script_heavy: "The site loads its content with scripts, so we couldn't read it.",
         little_found: "The pages we read didn't say much about your business.",
       },
