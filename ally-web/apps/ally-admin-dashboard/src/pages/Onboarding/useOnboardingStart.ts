@@ -21,6 +21,8 @@ export interface OnboardingStart {
   startWithWebsite: (website: string) => Promise<string | null>;
   startWithDescription: (description: string) => Promise<string | null>;
   startWithFiles: (files: File[]) => Promise<string | null>;
+  /** "Interview me": an empty draft the builder opens by asking its first question. */
+  startWithInterview: () => Promise<string | null>;
 }
 
 /**
@@ -36,7 +38,7 @@ export const useOnboardingStart = (): OnboardingStart => {
   const upload = useDraftUpload();
 
   const start = useCallback(
-    async (body: { website?: string; description?: string }) => {
+    async (body: { website?: string; description?: string; interview?: boolean }) => {
       setError(null);
       try {
         return (await createDraft(body).unwrap()).id;
@@ -78,5 +80,6 @@ export const useOnboardingStart = (): OnboardingStart => {
     startWithWebsite: website => start({ website: website.trim() }),
     startWithDescription: description => start({ description: description.trim() }),
     startWithFiles,
+    startWithInterview: () => start({ interview: true }),
   };
 };

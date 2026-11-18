@@ -7,11 +7,38 @@ export const COPY = {
   start: {
     title: "Build an assistant that knows your business",
     subtitle:
-      "Share your website. We'll read it, ask a few questions, and have a tested assistant ready to share in about 5 minutes.",
+      "Choose how you'd like to start. We'll ask a few questions and have a tested assistant ready to share in about 5 minutes.",
+    methodsLabel: "How would you like to start?",
+    methods: {
+      website: { title: "Your website", hint: "We read your pages and learn what you offer." },
+      documents: {
+        title: "Your documents",
+        hint: "Upload a brochure, price list or FAQ.",
+      },
+      describe: {
+        title: "Describe your business",
+        hint: "Write a few sentences in your own words.",
+      },
+      interview: {
+        title: "Interview me",
+        hint: "Answer a few questions and we'll build it from that.",
+      },
+    },
+    websiteSubtitle: "Share your website. We'll read it and learn what you offer.",
+    documentsTitle: "Upload your documents",
+    documentsSubtitle: "A brochure, price list or FAQ is a good place to start.",
+    documentsStart: "Start with these documents",
+    documentsRemove: "Remove {name}",
+    interviewTitle: "Let us interview you",
+    interviewSubtitle:
+      "We'll ask about your business one question at a time. Answer in your own words, and skip anything you'd rather not share.",
+    interviewButton: "Start the interview",
+    interviewAnswer: "Your answer",
+    interviewAnswerPlaceholder: "Type your answer here",
+    interviewSend: "Send",
+    interviewDone: "That's everything",
     placeholder: "yourbusiness.com",
     primary: "Start with my website",
-    upload: "Upload documents instead",
-    describe: "Describe my business instead",
     footnote: "We only read the pages you point us to. Nothing is published until you choose to.",
     describePrompt:
       "Tell me what your business does, who you help, and what people usually ask you. A few sentences is plenty.",
@@ -304,9 +331,11 @@ export const COPY = {
   frame: {
     saved: "Saved",
     back: "Back",
+    close: "Close and go back to your assistants",
     step: "Step {n} of {total} · {step name}",
     stepNames: {
       start: "Start",
+      interview: "Interview",
       reading: "Reading your website",
       learned: "What we learned",
       safety: "Safety",

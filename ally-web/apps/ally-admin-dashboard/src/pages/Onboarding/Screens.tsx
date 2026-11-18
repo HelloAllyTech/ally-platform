@@ -5,6 +5,7 @@
  */
 export { BuildingScreen } from "./screens/Building";
 export { DesignScreen } from "./screens/Design";
+export { InterviewScreen } from "./screens/Interview";
 export { LearnedScreen } from "./screens/Learned";
 export { LiveScreen, Qr } from "./screens/Live";
 export { QuestionScreen } from "./screens/Question";
