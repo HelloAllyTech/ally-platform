@@ -240,7 +240,7 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
     /**
      * Quick add: file straight onto the board with no readiness token and no brief. Same
      * response and the same cache invalidation as createRoadmapOpportunity, so the new row shows
-     * up wherever an interviewed one would. Only shown to holders of the quick-add toggle — see
+     * up wherever an interviewed one would. Only shown to Roadmap Owners — see
      * canQuickAddRoadmap.
      */
     quickAddRoadmapOpportunity: builder.mutation<

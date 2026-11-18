@@ -31,7 +31,7 @@ interface QuickAddOpportunityModalProps {
  * what it is, which product goal it files under, and (optionally) how big it is. No readiness
  * check, no copilot, no brief — ally-be's `POST opportunities/quick` runs the same filing minus
  * the gate, and the server, not this form, decides who may call it (the
- * `product_roadmap_quick_add` toggle; see canQuickAddRoadmap).
+ * Owner role; see canQuickAddRoadmap).
  *
  * A centred dialog rather than the interview's 64rem side drawer: a three-field form in a
  * drawer that size is mostly empty, and the drawer width is there for the conversation and

@@ -4,17 +4,18 @@ import { RoadmapAdminController } from '../roadmap-admin.controller';
 import { RoadmapIdeaDraftController } from '../roadmap-idea-draft.controller';
 
 /**
- * Every door that files, or leads to filing, needs the Product Planning — Ideas
- * toggle (plans/roadmap-owns-planning rev 5.2 §B.12), checked BEFORE any work.
+ * Every door that files, or leads to filing, needs the Idea role
+ * (Quick Add: the Owner role) (plans/roadmap-owns-planning rev 5.2 §B.12), checked BEFORE any work.
  * The route decorators stay as they were (Product Roadmap tab + VOTE); this is
  * the second gate, in the handler, so the old copilot door, Quick Add and the
  * new plan flow can never disagree about who may file.
  */
-describe('Filing doors require Product Planning — Ideas', () => {
+describe('Filing doors require a Roadmap role', () => {
   const user = { id: 9 } as never;
-  const refused = new ForbiddenException('no ideas toggle');
+  const refused = new ForbiddenException('no roadmap role');
   const planAccess = {
     assertIdeas: jest.fn(async () => Promise.reject(refused)),
+    assertQuickAdd: jest.fn(async () => Promise.reject(refused)),
   };
   const opportunityService = { create: jest.fn() };
   const copilotService = { takeTurn: jest.fn(), streamTurn: jest.fn() };
@@ -61,7 +62,6 @@ describe('Filing doors require Product Planning — Ideas', () => {
 
   it.each([
     ['create (interview filing)', () => opportunity.create(user, {} as never)],
-    ['quickAdd', () => opportunity.quickAdd(user, {} as never)],
     [
       'copilot turn (JSON)',
       () => admin.opportunityInterview(user, { messages: [] } as never),
@@ -77,6 +77,12 @@ describe('Filing doors require Product Planning — Ideas', () => {
     expect(drafts.create).not.toHaveBeenCalled();
     expect(drafts.update).not.toHaveBeenCalled();
     expect(transcription.transcribe).not.toHaveBeenCalled();
+  });
+
+  it('quickAdd is refused before any work, on the Owner role', async () => {
+    await expect(opportunity.quickAdd(user, {} as never)).rejects.toBe(refused);
+    expect(planAccess.assertQuickAdd).toHaveBeenCalledWith(9);
+    expect(opportunityService.create).not.toHaveBeenCalled();
   });
 
   it('refuses the copilot stream before opening it', async () => {

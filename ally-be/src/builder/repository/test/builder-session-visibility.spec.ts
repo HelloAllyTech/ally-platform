@@ -103,20 +103,6 @@ describe('BuilderSessionVisibilityInterceptor', () => {
       ...over,
     });
 
-    it('confines a Lead-only caller to plan sessions', async () => {
-      const { interceptor } = build({ ...plan({}), kind: 'build' });
-      await expect(
-        interceptor.intercept(
-          ctx(
-            'GET',
-            { id: 4 },
-            { viaAlternateToggle: 'product_planning_lead' },
-          ),
-          next,
-        ),
-      ).rejects.toBeInstanceOf(NotFoundException);
-    });
-
     it('lets everyone who may see a plan read it, but only its lead change it', async () => {
       const { interceptor } = build(plan({}));
       await expect(
