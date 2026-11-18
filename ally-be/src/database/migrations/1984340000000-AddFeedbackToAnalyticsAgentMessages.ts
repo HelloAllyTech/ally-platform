@@ -7,8 +7,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * nothing — which is every existing row. Plain varchar, no CHECK, so another
  * rating never needs a migration. Additive and idempotent.
  */
-export class AddFeedbackToAnalyticsAgentMessages1984140000000 implements MigrationInterface {
-  name = 'AddFeedbackToAnalyticsAgentMessages1984140000000';
+export class AddFeedbackToAnalyticsAgentMessages1984340000000 implements MigrationInterface {
+  name = 'AddFeedbackToAnalyticsAgentMessages1984340000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

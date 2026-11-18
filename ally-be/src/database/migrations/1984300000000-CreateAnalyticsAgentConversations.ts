@@ -12,8 +12,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * conversation deletes its turns. Additive only; no CHECK constraints, so
  * nothing here needs listing in check-constraints-cover-enums.spec.ts.
  */
-export class CreateAnalyticsAgentConversations1984100000000 implements MigrationInterface {
-  name = 'CreateAnalyticsAgentConversations1984100000000';
+export class CreateAnalyticsAgentConversations1984300000000 implements MigrationInterface {
+  name = 'CreateAnalyticsAgentConversations1984300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

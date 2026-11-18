@@ -6,8 +6,8 @@ import {
 } from '../datalyze-task-token.util';
 
 // Placeholders, not real tokens: anything without whitespace or backticks will do.
-const TOKEN_1 = 'fake-task-token-one.fake-signature-one';
-const TOKEN_2 = 'fake-task-token-two.fake-signature-two';
+const FIRST_TASK = 'fake-task-token-one.fake-signature-one';
+const SECOND_TASK = 'fake-task-token-two.fake-signature-two';
 
 const result = (text: string) =>
   new ToolMessage({ content: text, tool_call_id: 'x' });
@@ -30,14 +30,14 @@ function setup() {
 describe('extractTaskToken', () => {
   it('reads the token from a text result', () => {
     expect(
-      extractTaskToken(`Do this step.\n\ntask: \`${TOKEN_1}\`\n\nmore`),
-    ).toBe(TOKEN_1);
+      extractTaskToken(`Do this step.\n\ntask: \`${FIRST_TASK}\`\n\nmore`),
+    ).toBe(FIRST_TASK);
   });
 
   it('reads it from content blocks', () => {
     expect(
-      extractTaskToken([{ type: 'text', text: `task: \`${TOKEN_2}\`` }]),
-    ).toBe(TOKEN_2);
+      extractTaskToken([{ type: 'text', text: `task: \`${SECOND_TASK}\`` }]),
+    ).toBe(SECOND_TASK);
   });
 
   it('returns null when there is none', () => {
@@ -55,20 +55,20 @@ describe('createDatalyzeTaskTokenMiddleware', () => {
     await call(
       'datalyze_start_any_analytics_question_metrics_retention_funnels_tracking',
       { request: 'q' },
-      respond(result(`task: \`${TOKEN_1}\``)),
+      respond(result(`task: \`${FIRST_TASK}\``)),
     );
     await call(
       'datalyze_next_step',
       { task: TASK_TOKEN_PLACEHOLDER, report: 'r' },
-      respond(result(`task: \`${TOKEN_2}\``)),
+      respond(result(`task: \`${SECOND_TASK}\``)),
     );
     await call(
       'datalyze_next_step',
       { task: 'a-mangled-copy-of-the-token', report: 'r2' },
       respond(result('complete')),
     );
-    expect(seen[1].args).toEqual({ task: TOKEN_1, report: 'r' });
-    expect(seen[2].args).toEqual({ task: TOKEN_2, report: 'r2' });
+    expect(seen[1].args).toEqual({ task: FIRST_TASK, report: 'r' });
+    expect(seen[2].args).toEqual({ task: SECOND_TASK, report: 'r2' });
   });
 
   it('keeps the last token when a call fails and returns no new one', async () => {
@@ -76,7 +76,7 @@ describe('createDatalyzeTaskTokenMiddleware', () => {
     await call(
       'datalyze_start_task',
       {},
-      respond(result(`task: \`${TOKEN_1}\``)),
+      respond(result(`task: \`${FIRST_TASK}\``)),
     );
     await call(
       'datalyze_next_step',
@@ -88,7 +88,7 @@ describe('createDatalyzeTaskTokenMiddleware', () => {
       { task: TASK_TOKEN_PLACEHOLDER },
       respond(result('done')),
     );
-    expect(seen[2].args.task).toBe(TOKEN_1);
+    expect(seen[2].args.task).toBe(FIRST_TASK);
   });
 
   it('leaves the call alone before any token exists, and other tools alone', async () => {
@@ -106,7 +106,7 @@ describe('createDatalyzeTaskTokenMiddleware', () => {
     await call(
       'github_get_file_contents',
       { path: 'p' },
-      respond(result(`task: \`${TOKEN_2}\``)),
+      respond(result(`task: \`${SECOND_TASK}\``)),
     );
     await call(
       'datalyze_next_step',
@@ -123,7 +123,7 @@ describe('createDatalyzeTaskTokenMiddleware', () => {
     await a.call(
       'datalyze_start_task',
       {},
-      a.respond(result(`task: \`${TOKEN_1}\``)),
+      a.respond(result(`task: \`${FIRST_TASK}\``)),
     );
     await b.call(
       'datalyze_next_step',

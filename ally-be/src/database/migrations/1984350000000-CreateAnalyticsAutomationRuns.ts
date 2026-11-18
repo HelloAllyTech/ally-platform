@@ -14,8 +14,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Additive only; status columns are plain varchar with no CHECK.
  */
-export class CreateAnalyticsAutomationRuns1984150000000 implements MigrationInterface {
-  name = 'CreateAnalyticsAutomationRuns1984150000000';
+export class CreateAnalyticsAutomationRuns1984350000000 implements MigrationInterface {
+  name = 'CreateAnalyticsAutomationRuns1984350000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

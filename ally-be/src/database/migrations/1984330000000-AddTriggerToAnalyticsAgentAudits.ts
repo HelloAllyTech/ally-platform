@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * when they were saved — so the default is `manual`. Plain varchar, no CHECK, so
  * a new trigger never needs a migration. Additive and idempotent.
  */
-export class AddTriggerToAnalyticsAgentAudits1984130000000 implements MigrationInterface {
-  name = 'AddTriggerToAnalyticsAgentAudits1984130000000';
+export class AddTriggerToAnalyticsAgentAudits1984330000000 implements MigrationInterface {
+  name = 'AddTriggerToAnalyticsAgentAudits1984330000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

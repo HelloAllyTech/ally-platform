@@ -15,8 +15,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Additive only; every statement is idempotent. No CHECK constraints.
  */
-export class AddRunStateToAnalyticsAgentAudits1984120000000 implements MigrationInterface {
-  name = 'AddRunStateToAnalyticsAgentAudits1984120000000';
+export class AddRunStateToAnalyticsAgentAudits1984320000000 implements MigrationInterface {
+  name = 'AddRunStateToAnalyticsAgentAudits1984320000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
