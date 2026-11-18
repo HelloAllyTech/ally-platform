@@ -28,6 +28,8 @@ vi.mock("@api", async importOriginal => ({
   useAssignPlatformAdminMutation: () => [vi.fn()],
   useRemovePlatformAdminMutation: () => [vi.fn()],
   useListClinicalAdvisorsQuery: () => ({ data: undefined, isLoading: false }),
+  // The Ally admins list shows Roadmap roles to Owners; nobody here is one.
+  useListRoadmapRolesQuery: () => ({ data: undefined }),
   useGetUserFeatureTogglesQuery: () => ({ data: undefined, isLoading: false }),
   useSetUserFeatureTogglesMutation: () => [vi.fn()],
   useGetTenantsQuery: () => ({ data: undefined }),
