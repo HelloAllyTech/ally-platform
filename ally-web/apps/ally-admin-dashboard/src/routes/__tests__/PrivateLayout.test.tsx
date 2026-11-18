@@ -25,6 +25,15 @@ vi.mock("@components", async importOriginal => {
   };
 });
 
+vi.mock("@pages/Login/Login", async () => {
+  const { useLocation } = await import("react-router-dom");
+  return {
+    Login: () => {
+      const { pathname, search, hash } = useLocation();
+      return <div data-testid="login-screen" data-at={`${pathname}${search}${hash}`} />;
+    },
+  };
+});
 vi.mock("@components/notification-bell/NotificationBell", () => ({
   NotificationBell: () => null,
 }));
@@ -124,14 +133,13 @@ describe("PrivateLayout", () => {
     });
   });
 
-  it("redirects to login when not authenticated", () => {
+  it("shows the login screen, not the page, when not authenticated", () => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "false");
 
     render(
       <Provider store={mockStore}>
         <MemoryRouter initialEntries={["/protected"]}>
           <Routes>
-            <Route path={ROUTES.LOGIN} element={<div>LoginPage</div>} />
             <Route
               path="/protected"
               element={
@@ -145,20 +153,16 @@ describe("PrivateLayout", () => {
       </Provider>,
     );
 
-    expect(screen.getByText("LoginPage")).toBeInTheDocument();
+    expect(screen.getByTestId("login-screen")).toBeInTheDocument();
+    expect(screen.queryByText("ProtectedContent")).not.toBeInTheDocument();
   });
 
-  it("keeps the deep link when sending a logged-out visitor to login (A1)", () => {
+  it("draws the login screen at the deep link they opened, so logging in leaves them there (A1)", () => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "false");
-    const Login = () => {
-      const { search } = useLocation();
-      return <div data-testid="login">{new URLSearchParams(search).get("next")}</div>;
-    };
     render(
       <Provider store={mockStore}>
         <MemoryRouter initialEntries={["/assistants/b1?section=lists&tool=memory"]}>
           <Routes>
-            <Route path={ROUTES.LOGIN} element={<Login />} />
             <Route
               path="/assistants/:botId"
               element={
@@ -171,7 +175,8 @@ describe("PrivateLayout", () => {
         </MemoryRouter>
       </Provider>,
     );
-    expect(screen.getByTestId("login").textContent).toBe(
+    expect(screen.getByTestId("login-screen")).toHaveAttribute(
+      "data-at",
       "/assistants/b1?section=lists&tool=memory",
     );
   });
