@@ -42,6 +42,7 @@ from app.core.knowledge_agent.schemas import (
     DeclineReason,
     KnowledgeAnswer,
     TranslatedQuery,
+    crisis_level,
     is_general,
 )
 from app.core.knowledge_base.corpus import KbCorpus
@@ -345,8 +346,12 @@ class KnowledgeAgentService:
                 )
             )
 
+        level = crisis_level(parsed)
         return {
-            "is_crisis": bool(parsed.is_crisis),
+            # Either fixed reply is a crisis for every caller that reads only this.
+            "is_crisis": level in ("at_risk", "emergency"),
+            "level": level,
+            "self_harm": bool(parsed.self_harm) or level == "at_risk",
             "signal": (parsed.signal or "").strip(),
             "confidence": float(parsed.confidence or 0.0),
             "failed": False,

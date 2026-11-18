@@ -95,6 +95,18 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **Tell support:** Ally admins no longer see Assistants unless it's switched on for them; anyone on an assistant's team opens it without the switch, and someone with nothing else sees only their assistants.
 - [ ] **Erasure now reaches list entries** (an explicit erase only; the retention sweep never touches them). The manual step is gone.
 
+## Q3-fast: one path, booking, safety (`EPIC-Q3-FAST.md`) <!-- docs-path-lint: planned -->
+
+- [ ] **Remove `agentRuntimeAllowed` from the production `whatsapp_bot` defaults** (Part 0). Nothing reads it any more; the value is just left over. Watch the "agent runtime degraded" alert, which now means people got the fixed run-failed reply.
+- [ ] **Publish Part 1's approved prompts in the Skills Store, in this order, after the code is deployed:**
+  - `ally_ai_knowledge_crisis_classify` (the four levels; keep the live model, `gpt-6-luna`, temperature 0);
+  - then check that `ally_ai_agent_upset` and `ally_ai_agent_upset_support` were created by the deploy's sync with the approved text (they are new prompts);
+  - then `ally_ai_builder_system` (rule 3: a stricter pack asked for in setup), once approved.
+- [ ] **After publishing the classifier, watch crisis replies for a day:** at-risk and emergency replies per assistant, and false alarms reported by owners.
+- [ ] **Tell support:**
+  - owners can now correct a wrong safety pack (Safety → "This isn't right for my business"); less strict changes are logged with the owner's reason;
+  - young-people assistants no longer ask for a name or phone before the chat.
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).

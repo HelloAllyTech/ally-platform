@@ -775,6 +775,41 @@ class AgentMemoryInputs(PromptInputs):
     never_store: str
 
 
+class AgentUpsetInputs(PromptInputs):
+    """`agent/upset.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_upset",
+        name="Chatbot Agent: Upset",
+        description=(
+            "When the crisis check finds the person upset but not at risk (Q3-fast "
+            "Part 1): the reply opens warmly and answers normally, with no crisis "
+            "template. Placed after memory, before the safety rules."
+        ),
+    )
+
+
+class AgentUpsetSupportInputs(PromptInputs):
+    """`agent/upset_support.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_upset_support",
+        name="Chatbot Agent: Upset, support line",
+        description=(
+            "Added after the upset section on health and mental-health assistants "
+            "only (Q3-fast Part 1): one gentle line naming the business's support "
+            "and its helpline."
+        ),
+    )
+
+    #: The assistant's name, as the person sees it.
+    organisation: str
+    #: The business's helplines; on a mental-health assistant with none, Tele-MANAS.
+    helplines: str
+    #: " any time" when the number is marked 24x7, otherwise empty (stop 1).
+    any_time: str = ""
+
+
 class MemoryCheckInputs(PromptInputs):
     """`memory/check.txt`."""
 

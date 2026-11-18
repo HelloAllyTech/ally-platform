@@ -94,3 +94,46 @@ describe('packForBusiness', () => {
     expect(packForBusiness(industry, topics as never)).toBe(pack);
   });
 });
+
+describe('crisis and emergency replies in the person language (Q3-fast Part 1)', () => {
+  const packs = require('../safety-pack/safety-packs');
+
+  it.each(['en', 'hi', 'hi-latn'])(
+    'the at-risk reply in %s always has a real number',
+    (language) => {
+      for (const pack of ['mental_health', 'medical', 'standard', null]) {
+        const reply: string = packs.crisisReply({ pack, language });
+        expect(reply).toMatch(/14416/);
+        expect(reply).not.toMatch(/your local crisis line/);
+      }
+    },
+  );
+
+  it('the emergency reply sends them to emergency care, names the business, and adds Tele-MANAS only with self-harm', () => {
+    expect(
+      packs.emergencyReply({
+        organisation: 'Cloudnine',
+        emergencyNumber: '99724 99724',
+      }),
+    ).toBe(
+      'This sounds like an emergency. Please go to the nearest emergency department now, or call 112 or an ambulance on 108. You can also call Cloudnine on 99724 99724.',
+    );
+    expect(packs.emergencyReply({})).not.toMatch(/14416/);
+    expect(packs.emergencyReply({ selfHarm: true })).toMatch(
+      /Tele-MANAS on 14416/,
+    );
+    expect(packs.emergencyReply({ animal: true })).toMatch(
+      /^This sounds like an emergency\. Please go to the nearest emergency department or your nearest vet now/,
+    );
+    // One at-risk reply on every pack (stop 1): Tele-MANAS first, never "if this is an emergency".
+    expect(packs.crisisReply({ pack: 'medical' })).toBe(
+      packs.GENERAL_CRISIS_TEXT,
+    );
+    expect(packs.crisisReply({ pack: 'medical', language: 'hi' })).toMatch(
+      /^लगता है कि यह गंभीर स्थिति हो सकती है।/,
+    );
+    expect(packs.emergencyReply({ language: 'hi-latn' })).toMatch(
+      /^Yeh emergency lagti hai\. .*112 .*108/,
+    );
+  });
+});

@@ -123,4 +123,78 @@ describePg('Assistant home (Postgres)', () => {
     );
     expect(row.rules.never).toEqual(['Quote prices for group sessions']);
   });
+
+  describe('the owner corrects the safety pack (Q3-fast Part 1)', () => {
+    const packOf = async () =>
+      (
+        await dataSource.query(
+          `SELECT safety_pack, rules FROM chatbots WHERE id = $1`,
+          [bot],
+        )
+      )[0];
+
+    it('an equally strict or stricter pack applies at once, with no reason', async () => {
+      await dataSource.query(
+        `UPDATE chatbots SET safety_pack = 'minors' WHERE id = $1`,
+        [bot],
+      );
+      const view = await service.changePack(bot, { pack: 'medical' });
+      expect(view.pack?.id).toBe('medical');
+      const row = await packOf();
+      expect(row.safety_pack).toBe('medical');
+      expect(row.rules.packChange).toMatchObject({
+        from: 'minors',
+        to: 'medical',
+        lessStrict: false,
+        reason: null,
+      });
+    });
+
+    it('a less strict pack needs a reason, then applies and says so', async () => {
+      await dataSource.query(
+        `UPDATE chatbots SET safety_pack = 'minors' WHERE id = $1`,
+        [bot],
+      );
+      await expect(
+        service.changePack(bot, { pack: 'standard' }),
+      ).rejects.toMatchObject({
+        response: { errorCode: 'reason_required' },
+      });
+      expect((await packOf()).safety_pack).toBe('minors');
+
+      const view = await service.changePack(bot, {
+        pack: 'standard',
+        reason:
+          'We are a fine-dining restaurant; the charity page misled setup.',
+      });
+      expect(view.packChange).toMatchObject({
+        from: 'minors',
+        to: 'standard',
+        lessStrict: true,
+        reason:
+          'We are a fine-dining restaurant; the charity page misled setup.',
+      });
+      expect((await packOf()).safety_pack).toBe('standard');
+      // The owner's own rules are kept.
+      expect((await packOf()).rules.never).toEqual([]);
+    });
+
+    it('lists every pack the owner can choose, marking the less strict ones', async () => {
+      await dataSource.query(
+        `UPDATE chatbots SET safety_pack = 'medical' WHERE id = $1`,
+        [bot],
+      );
+      const { safety } = await service.get(bot);
+      const less = Object.fromEntries(
+        safety.choices.map((c) => [c.id, c.lessStrict]),
+      );
+      expect(less).toEqual({
+        mental_health: false,
+        medical: false,
+        minors: true,
+        legal_financial: true,
+        standard: true,
+      });
+    });
+  });
 });

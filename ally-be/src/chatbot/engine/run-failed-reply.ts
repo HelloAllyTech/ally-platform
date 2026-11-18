@@ -84,3 +84,36 @@ export function contactFromSources(
   const helplines = helplineNumbers?.trim();
   return helplines && phoneIn(helplines) ? helplines : null;
 }
+
+/** Words that mark an emergency or round-the-clock line ("Emergency helpline 99724 99724, 24/7"). */
+const EMERGENCY_WORDS =
+  /emergenc|24\s*[x×/*]\s*7|round the clock|ambulance|helpline/i;
+
+/**
+ * The business's own emergency number for the emergency reply (Q3-fast Part 1, C9; stop 1). Read
+ * from its sourced facts and the owner's notes, one sentence at a time: only a sentence that names
+ * an emergency, 24x7 or helpline line counts, and the number taken is the first one after that
+ * word, never the first number of a general contact list ("Call 080…, 080…, 080…"). Else the
+ * owner's helplines when they hold a number. Null when it has neither.
+ */
+export function emergencyNumberFrom(
+  sources: ContactSource[],
+  helplineNumbers?: string | null,
+): string | null {
+  for (const source of sources) {
+    for (const sentence of source.text.split(/(?<=[.!?;\n])\s+|\n+/)) {
+      const at = sentence.search(EMERGENCY_WORDS);
+      if (at < 0) continue;
+      const phone = phoneIn(sentence.slice(at));
+      if (phone) return phone;
+    }
+  }
+  const helplines = helplineNumbers?.trim();
+  return helplines && phoneIn(helplines) ? helplines : null;
+}
+
+/** The message is about an animal (Q3-fast stop 1): the emergency reply also says "your nearest vet". */
+const ANIMAL =
+  /\b(dog|dogs|puppy|cat|cats|kitten|pet|pets|bird|parrot|rabbit|hamster|cow|horse|goat|kutta|kutte|kuttiya|billi|tota)\b|कुत्त|बिल्ली|पालतू/i;
+
+export const aboutAnAnimal = (text: string): boolean => ANIMAL.test(text);

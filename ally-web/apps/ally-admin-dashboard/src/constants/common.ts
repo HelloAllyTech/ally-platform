@@ -1024,6 +1024,7 @@ export const ApiEndpoints = {
     HOME: (id: string) => `/v1/chatbots/${id}/home`,
     HOME_LIST: (id: string, list: string) => `/v1/chatbots/${id}/home/lists/${list}`,
     RULES: (id: string) => `/v1/chatbots/${id}/rules`,
+    SAFETY_PACK: (id: string) => `/v1/chatbots/${id}/safety-pack`,
     LISTS: (id: string) => `/v1/chatbots/${id}/lists`,
     USER_LIST: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}`,
     LIST_RESTORE: (id: string, listId: string) => `/v1/chatbots/${id}/lists/${listId}/restore`,

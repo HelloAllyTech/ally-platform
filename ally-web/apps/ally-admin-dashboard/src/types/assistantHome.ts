@@ -110,6 +110,18 @@ export interface HomeSafety {
   version: string;
   /** What someone who may be at risk is sent when the owner hasn't written their own (20d-2). */
   atRiskReply?: string | null;
+  /** The packs the owner may switch to (Q3-fast), each marked less strict than the current or not. */
+  choices?: { id: string; name: string; summary: string; lessStrict: boolean }[];
+  /** The owner's last change of the pack (Q3-fast). */
+  packChange?: PackChange | null;
+}
+
+export interface PackChange {
+  from: string | null;
+  to: string;
+  reason: string | null;
+  lessStrict: boolean;
+  at: string;
 }
 
 export interface AssistantHomeView {

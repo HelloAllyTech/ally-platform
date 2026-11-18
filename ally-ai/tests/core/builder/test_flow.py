@@ -84,6 +84,30 @@ class TestLearned:
         assert op.value["section"] == "hours"
 
 
+class TestStricterPack:
+    """Q3-fast stop 1: a stricter pack the owner asks for is proposed to ally-be,
+    which applies it only when it is stricter. An unknown id is never passed on."""
+
+    @pytest.mark.asyncio
+    async def test_a_stricter_pack_asked_for_is_proposed(self):
+        fake = FakeLLM(
+            ConverseOut=[
+                {"message": "Care for young people is now on.", "safety_pack": "minors"}
+            ]
+        )
+        res = await run(
+            request("learned", message="Some of our students are under 18"), fake
+        )
+        assert res.stricter_pack == "minors"
+
+    @pytest.mark.asyncio
+    async def test_no_pack_and_unknown_ids_propose_nothing(self):
+        for value in ("", "kids_only"):
+            fake = FakeLLM(ConverseOut=[{"message": "Noted.", "safety_pack": value}])
+            res = await run(request("learned", message="hello"), fake)
+            assert res.stricter_pack is None
+
+
 class TestGaps:
     @pytest.mark.asyncio
     async def test_skip_records_the_answer_and_asks_the_next(self):

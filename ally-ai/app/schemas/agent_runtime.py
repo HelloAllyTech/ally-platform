@@ -158,6 +158,21 @@ class AgentRunRequest(KnowledgeAnswerRequest):
     person_name: Optional[str] = Field(
         None, max_length=80, description="The person's name, when it is known."
     )
+    mood: Optional[Literal["upset"]] = Field(
+        None,
+        description=(
+            "Q3-fast Part 1: ally-be's crisis check found the person upset, not at "
+            "risk. The reply opens warmly. Absent otherwise."
+        ),
+    )
+    support_helplines: Optional[str] = Field(
+        None,
+        max_length=300,
+        description=(
+            "The business's helplines, for the upset section's support line on "
+            "health and mental-health assistants. Absent: Tele-MANAS."
+        ),
+    )
     before_chat: List["BeforeChatAnswer"] = Field(
         default_factory=list,
         max_length=6,
@@ -210,6 +225,11 @@ class AgentRunRequest(KnowledgeAnswerRequest):
                 bot["gateway_omitted"] = list(self.gateway.omitted)
             if self.gateway.definitions and self.gateway.today:
                 bot["gateway_today"] = self.gateway.today
+        # Q3-fast Part 1: only when upset, so every other run is today's.
+        if self.mood:
+            bot["mood"] = self.mood
+            if self.support_helplines:
+                bot["support_helplines"] = self.support_helplines
         # Chunk 8a: each only when present, so a run without them is today's.
         if self.memory is not None:
             bot["memory"] = self.memory.model_dump(mode="json")

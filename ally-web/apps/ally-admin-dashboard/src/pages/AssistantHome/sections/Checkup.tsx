@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 import {
   useAnswerGapMutation,
+  useGetAssistantHomeQuery,
   useGetHistoryQuery,
   useGetCheckupQuery,
   useMarkNotOfferedMutation,
@@ -19,6 +20,7 @@ import { HOME } from "../copy";
 import { dateTime } from "../dates";
 import { Collapsed, Group, SectionHead } from "../fields";
 import { CheckupCases } from "./CheckupCases";
+import { packChangeLine } from "./Safety";
 
 import type { SectionProps } from "./props";
 
@@ -72,6 +74,8 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
 }) => {
   const [polling, setPolling] = useState(false);
   const checkup = useGetCheckupQuery(bot.id, { pollingInterval: polling ? POLL_MS : 0 });
+  // Q3-fast: a pack the owner changed shows here too, since the checkup's safety questions follow it.
+  const packLine = packChangeLine(useGetAssistantHomeQuery(bot.id).data?.safety.packChange);
   // Changes by chat and by hand alike (chunk 20d-2's History).
   const { data: changes } = useGetHistoryQuery(bot.id);
   const [run, runState] = useRunCheckupMutation();
@@ -104,35 +108,42 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
   const compare = checkup.data?.compare;
 
   const head = (
-    <SectionHead
-      title={HOME.sections.checkup}
-      subtitle={c.intro}
-      help={HOME.subtitles.checkup}
-      action={
-        canEdit && (
-          <div className="ally-btn-row">
-            <Button
-              variant={ButtonVariant.TERTIARY}
-              size="sm"
-              type="button"
-              onClick={() => void start("failed")}
-              disabled={running || runState.isLoading || !view}
-            >
-              {c.runs.failed}
-            </Button>
-            <Button
-              variant={ButtonVariant.PRIMARY}
-              size="sm"
-              type="button"
-              onClick={() => void start()}
-              disabled={running || runState.isLoading}
-            >
-              {c.runs.all}
-            </Button>
-          </div>
-        )
-      }
-    />
+    <>
+      <SectionHead
+        title={HOME.sections.checkup}
+        subtitle={c.intro}
+        help={HOME.subtitles.checkup}
+        action={
+          canEdit && (
+            <div className="ally-btn-row">
+              <Button
+                variant={ButtonVariant.TERTIARY}
+                size="sm"
+                type="button"
+                onClick={() => void start("failed")}
+                disabled={running || runState.isLoading || !view}
+              >
+                {c.runs.failed}
+              </Button>
+              <Button
+                variant={ButtonVariant.PRIMARY}
+                size="sm"
+                type="button"
+                onClick={() => void start()}
+                disabled={running || runState.isLoading}
+              >
+                {c.runs.all}
+              </Button>
+            </div>
+          )
+        }
+      />
+      {packLine && (
+        <p className="ally-small" data-testid="checkup-pack-changed">
+          {packLine}
+        </p>
+      )}
+    </>
   );
 
   const howItWorks = (

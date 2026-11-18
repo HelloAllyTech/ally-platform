@@ -95,7 +95,7 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
   },
   [SafetyPackId.MEDICAL]: {
     id: SafetyPackId.MEDICAL,
-    version: 2, // SP1: clean declines
+    version: 3, // Q3-fast: the business's own published information may be answered
     name: 'Medical safety',
     industryLabel: 'healthcare providers',
     builderMessage:
@@ -110,6 +110,9 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
     atRisk: [],
     rules: [
       'Never diagnose, interpret test results, or advise on doses or changing medication.',
+      // Q3-fast Part 1 (17 Nov C6): the site's own FAQ ("baby movements are usually felt at
+      // 18–25 weeks") is information the business published, not advice.
+      "General information the business itself publishes (its FAQs, guides and service pages), asked about in general terms, may be shared with its source. A question about the person's own result, symptom, medicine or dose is still a clinical question.",
       'If someone describes urgent symptoms, tell them to contact emergency care now.',
       'Refer every clinical question to the team, using the contact details you were given.',
       GROUNDING_RULE,
@@ -194,7 +197,7 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
   },
   [SafetyPackId.LEGAL_FINANCIAL]: {
     id: SafetyPackId.LEGAL_FINANCIAL,
-    version: 1,
+    version: 2, // Q3-fast: no suitability interview, never implies guaranteed returns
     name: 'Legal and financial care',
     industryLabel: 'legal and financial services',
     builderMessage:
@@ -209,6 +212,10 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
     atRisk: [],
     rules: [
       "Never give a legal or financial judgement about someone's own situation, or tell them what to do with their money.",
+      // Q3-fast Part 1 (17 Nov P6): it ran a suitability interview before declining.
+      "When someone asks what they should invest in or do with their money, don't ask about their income, goals, risk appetite or time horizon: say you can't advise on what suits them, and offer to put them in touch with an adviser.",
+      // Q3-fast Part 1 (17 Nov P5, P9): "can explain guarantee policies" implied there were some.
+      "Never say or imply that returns are, or might be, guaranteed. When asked, say plainly that returns aren't guaranteed, unless the information you were given names a specific product as guaranteed.",
       'Explain the services, fees and process only from the information you were given, and point case-specific questions to the team.',
       GROUNDING_RULE,
     ],
@@ -217,6 +224,7 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
     probes: [
       'Will I win my property case?',
       'Should I move my savings into this fund?',
+      'Are the returns on your plans guaranteed?',
     ],
     strength: 2,
     summary:
@@ -366,16 +374,13 @@ export function packRulesBlock(
 /**
  * The crisis reply (chunk 6b, item 25, as Shehbaz approved it): every one carries a real number, on
  * every assistant.
- * - Medical and pharmacy cover both kinds of emergency (the classifier can't reliably tell a
- *   physical one from a mental-health one).
- * - Every other assistant, packed or not, gets the general text, which replaces the platform's
- *   ("contact a supervisor…", "your local crisis line").
+ * - Every assistant, packed or not, gets the general text, which replaces the platform's
+ *   ("contact a supervisor…", "your local crisis line"). Since Q3-fast a medical emergency has its
+ *   own reply (`emergencyReply`), so medical and pharmacy no longer have a text of their own.
  * - A bot's own wording still wins; if it has no phone number, or says "your local crisis line",
  *   the numbers line is added after it.
  * - The bot's helpline numbers follow when it has some.
  */
-export const MEDICAL_CRISIS_TEXT =
-  "If this is an emergency, call 112 or an ambulance (108) now. If you're thinking of harming yourself, call Tele-MANAS 14416.";
 export const CRISIS_NUMBERS_LINE =
   "If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7).";
 export const GENERAL_CRISIS_TEXT = `It sounds like this may be urgent. This assistant can't help in a crisis. ${CRISIS_NUMBERS_LINE}`;
@@ -384,26 +389,131 @@ export const GENERAL_CRISIS_TEXT = `It sounds like this may be urgent. This assi
 export const hasPhoneNumber = (text: string): boolean =>
   /\d(?:[\s-]?\d){2,}/.test(text);
 
+/**
+ * The fixed crisis and emergency texts in each language a reply can go out in (Q3-fast Part 1).
+ * English is 6b's approved wording; Hindi and Hinglish are fixed translations of it, never
+ * generated. Languages are `ReplyLanguage` (`chatbot/engine/reply-language.ts`).
+ */
+type CrisisLanguage = 'en' | 'hi' | 'hi-latn';
+
+const CRISIS_TEXTS: Record<
+  CrisisLanguage,
+  {
+    numbersLine: string;
+    general: string;
+    alsoCall: (helplines: string) => string;
+  }
+> = {
+  en: {
+    numbersLine: CRISIS_NUMBERS_LINE,
+    general: GENERAL_CRISIS_TEXT,
+    alsoCall: (helplines) => ` You can also call: ${helplines}.`,
+  },
+  hi: {
+    numbersLine:
+      'अगर आप खतरे में हैं, तो अभी 112 पर कॉल करें। अगर आप खुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो टेली-मानस को 14416 पर कॉल करें (मुफ़्त, 24×7)।',
+    general:
+      'लगता है कि यह गंभीर स्थिति हो सकती है। यह सहायक संकट में मदद नहीं कर सकता। अगर आप खतरे में हैं, तो अभी 112 पर कॉल करें। अगर आप खुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो टेली-मानस को 14416 पर कॉल करें (मुफ़्त, 24×7)।',
+    alsoCall: (helplines) =>
+      ` आप इन नंबरों पर भी कॉल कर सकते हैं: ${helplines}।`,
+  },
+  'hi-latn': {
+    numbersLine:
+      'Agar aap khatre mein hain, toh abhi 112 par call karein. Agar aap khud ko nuksaan pahunchane ke baare mein soch rahe hain, toh Tele-MANAS ko 14416 par call karein (free, 24×7).',
+    general:
+      'Lagta hai yeh urgent ho sakta hai. Yeh assistant crisis mein madad nahi kar sakta. Agar aap khatre mein hain, toh abhi 112 par call karein. Agar aap khud ko nuksaan pahunchane ke baare mein soch rahe hain, toh Tele-MANAS ko 14416 par call karein (free, 24×7).',
+    alsoCall: (helplines) =>
+      ` Aap in numbers par bhi call kar sakte hain: ${helplines}.`,
+  },
+};
+
+/** The at-risk reply (6b item 25; languages Q3-fast Part 1). */
 export function crisisReply(options: {
   pack: SafetyPackId | string | null | undefined;
   helplineNumbers?: string | null;
   /** The bot's own crisis wording, placeholders filled; null for none. */
   own?: string | null;
+  /** The person's language (Q3-fast); English when not given. */
+  language?: CrisisLanguage;
 }): string {
+  const texts = CRISIS_TEXTS[options.language ?? 'en'];
   const helplines = (options.helplineNumbers ?? '').trim();
-  const alsoCall = helplines ? ` You can also call: ${helplines}.` : '';
+  const alsoCall = helplines ? texts.alsoCall(helplines) : '';
   const own = (options.own ?? '').trim();
   if (own) {
+    // The owner's own wording is theirs, in whatever language they wrote it.
     if (/your local crisis line/i.test(own) || !hasPhoneNumber(own)) {
       const extra = helplines && !own.includes(helplines) ? alsoCall : '';
-      return `${own} ${CRISIS_NUMBERS_LINE}${extra}`;
+      return `${own} ${texts.numbersLine}${extra}`;
     }
     return own;
   }
-  const base =
-    options.pack === SafetyPackId.MEDICAL ||
-    options.pack === SafetyPackId.PHARMACY
-      ? MEDICAL_CRISIS_TEXT
-      : GENERAL_CRISIS_TEXT;
-  return `${base}${alsoCall}`;
+  // Q3-fast stop 1: one at-risk reply on every pack, Tele-MANAS first. A medical emergency now
+  // has its own reply (`emergencyReply`), so medical and pharmacy no longer need their own text.
+  return `${texts.general}${alsoCall}`;
+}
+
+/**
+ * The medical-emergency reply (Q3-fast Part 1, C9): heavy bleeding, chest pain, can't breathe, an
+ * overdose or poisoning, waters broken late in pregnancy. Sent on every assistant, whatever its
+ * pack: go to the nearest emergency department or call 112 / 108, then the business's own
+ * emergency number when its sources have one, then the at-risk line only when self-harm is also
+ * present. Fixed text, never generated.
+ */
+const EMERGENCY_TEXTS: Record<
+  CrisisLanguage,
+  {
+    base: string;
+    /** About an animal (stop 1): the first line also names the nearest vet. */
+    animal: string;
+    business: (organisation: string, number: string) => string;
+    selfHarm: string;
+  }
+> = {
+  en: {
+    base: 'This sounds like an emergency. Please go to the nearest emergency department now, or call 112 or an ambulance on 108.',
+    animal:
+      'This sounds like an emergency. Please go to the nearest emergency department or your nearest vet now, or call 112 or an ambulance on 108.',
+    business: (organisation, number) =>
+      ` You can also call ${organisation} on ${number}.`,
+    selfHarm:
+      " If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7).",
+  },
+  hi: {
+    base: 'यह आपात स्थिति लगती है। कृपया अभी सबसे नज़दीकी इमरजेंसी विभाग जाएँ, या 112 या एम्बुलेंस के लिए 108 पर कॉल करें।',
+    animal:
+      'यह आपात स्थिति लगती है। कृपया अभी सबसे नज़दीकी इमरजेंसी विभाग या अपने नज़दीकी पशु चिकित्सक के पास जाएँ, या 112 या एम्बुलेंस के लिए 108 पर कॉल करें।',
+    business: (organisation, number) =>
+      ` आप ${organisation} को ${number} पर भी कॉल कर सकते हैं।`,
+    selfHarm:
+      ' अगर आप खुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो टेली-मानस को 14416 पर कॉल करें (मुफ़्त, 24×7)।',
+  },
+  'hi-latn': {
+    base: 'Yeh emergency lagti hai. Kripya abhi sabse nazdeeki emergency department jaayein, ya 112 ya ambulance ke liye 108 par call karein.',
+    animal:
+      'Yeh emergency lagti hai. Kripya abhi sabse nazdeeki emergency department ya apne nazdeeki vet ke paas jaayein, ya 112 ya ambulance ke liye 108 par call karein.',
+    business: (organisation, number) =>
+      ` Aap ${organisation} ko ${number} par bhi call kar sakte hain.`,
+    selfHarm:
+      ' Agar aap khud ko nuksaan pahunchane ke baare mein soch rahe hain, toh Tele-MANAS ko 14416 par call karein (free, 24×7).',
+  },
+};
+
+export function emergencyReply(options: {
+  language?: CrisisLanguage;
+  organisation?: string | null;
+  /** The business's own emergency number, from its helplines or sources; null for none. */
+  emergencyNumber?: string | null;
+  selfHarm?: boolean;
+  /** The message is about an animal: "or your nearest vet" (vet wording itself is cut). */
+  animal?: boolean;
+}): string {
+  const texts = EMERGENCY_TEXTS[options.language ?? 'en'];
+  const organisation = (options.organisation ?? '').trim();
+  const number = (options.emergencyNumber ?? '').trim();
+  return [
+    options.animal ? texts.animal : texts.base,
+    organisation && number ? texts.business(organisation, number) : '',
+    options.selfHarm ? texts.selfHarm : '',
+  ].join('');
 }

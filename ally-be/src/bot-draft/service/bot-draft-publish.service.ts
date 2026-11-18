@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
+import { prechatFor } from '../../chatbot/bot-page/prechat-minors';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
@@ -166,7 +167,8 @@ export class BotDraftPublishService {
             config.branding.assistantName.trim() || config.assistantName,
         },
         suggestedQuestions: config.suggestedQuestions,
-        prechat: config.prechat,
+        // Young people (Q3-fast Part 1): no name or contact questions before the chat.
+        prechat: prechatFor(config.prechat, config.safetyPackId),
         limits: existing?.settings?.limits ?? DEFAULT_BOT_PAGE_LIMITS,
         language: pageLanguage(config.languages),
       } as never,

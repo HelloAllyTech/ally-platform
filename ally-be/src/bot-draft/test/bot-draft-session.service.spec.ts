@@ -222,6 +222,31 @@ describe('BotDraftSessionService.turn', () => {
     expect(h.store.row().draftConfig.safetyPackId).toBe(SafetyPackId.MEDICAL);
   });
 
+  it('applies a stricter pack the owner asks for in setup, never a weaker one (Q3-fast)', async () => {
+    const h = harness(
+      { step: BotDraftStep.GAPS },
+      reply({ next_step: 'gaps', stricter_pack: 'minors' }),
+    );
+    await h.turn({ text: 'Some of our students are under 18' });
+    expect(h.store.row().draftConfig.safetyPackId).toBe(SafetyPackId.MINORS);
+
+    const weaker = harness(
+      { step: BotDraftStep.GAPS },
+      reply({ next_step: 'gaps', stricter_pack: 'standard' }),
+    );
+    weaker.store.poke({
+      safetyPack: SafetyPackId.MEDICAL,
+      draftConfig: {
+        ...weaker.store.row().draftConfig,
+        safetyPackId: SafetyPackId.MEDICAL,
+      },
+    });
+    await weaker.turn({ text: 'Make it facts only' });
+    expect(weaker.store.row().draftConfig.safetyPackId).toBe(
+      SafetyPackId.MEDICAL,
+    );
+  });
+
   it('builds on the draft as it is now, not as it was when the step began', async () => {
     const h = harness(
       { step: BotDraftStep.DESIGN },

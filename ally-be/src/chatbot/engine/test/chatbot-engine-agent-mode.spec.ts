@@ -403,7 +403,8 @@ describe('ChatbotEngineService in Agent mode', () => {
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
       expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
       expect(decision.isWelcome).toBeUndefined();
-      expect(decision.agent?.runId).toBe('run-1');
+      // Q3-fast Part 1: the verdict came first, so the reply went out with no run at all.
+      expect(aiService.runAgent).not.toHaveBeenCalled();
     });
   });
 });

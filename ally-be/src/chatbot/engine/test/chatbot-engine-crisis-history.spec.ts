@@ -173,6 +173,28 @@ describe('ChatbotEngineService: the crisis check reads earlier messages', () => 
     expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
     expect(aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
   });
+
+  it('leaves a keyword inside an everyday idiom to the classifier (Q3-fast stop 1)', async () => {
+    const aiService = engineAiService(ANSWER, ANSWER);
+    const engine = makeEngine({
+      aiService,
+      promptShared: { getPromptsByOptions: jest.fn().mockResolvedValue([]) },
+      replyService: {
+        match: jest.fn().mockResolvedValue({
+          bypassRag: true,
+          template: { id: 't', kind: WaTemplateKind.CRISIS, responseText: '' },
+        }),
+      },
+    });
+    const decision = await engine.respond(
+      stored({
+        text: "I'm so done with working from home, I want to die of boredom. Do you have day passes?",
+      }),
+    );
+    expect(decision.handledBy).not.toBe(WaHandledBy.CRISIS);
+    expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(1);
+    expect(aiService.runAgent).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('ChatbotEngineService.classifyCrisis (the crisis eval fast mode)', () => {

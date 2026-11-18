@@ -186,6 +186,7 @@ def format_persona(
     can_book: bool = False,
     channel: Optional[str] = None,
     takes_details: bool = False,
+    mood: str = "",
 ) -> str:
     """
     Render a chatbot's persona as a block that goes AHEAD of the answer template.
@@ -203,7 +204,7 @@ def format_persona(
     empty unless the run has list tools. `memory` is what the assistant knows about
     the person (chunk 8a), right after the lists; empty with memory off.
     """
-    if not persona and not lists and not memory:
+    if not persona and not lists and not memory and not mood:
         return ""
     persona = persona or {}
     name = (persona.get("display_name") or "").strip()
@@ -219,7 +220,9 @@ def format_persona(
         channel=channel,
         takes_details=takes_details,
     )
-    if not (name or tone or instructions or rules or purpose or lists or memory):
+    if not (
+        name or tone or instructions or rules or purpose or lists or memory or mood
+    ):
         return ""
 
     lines = ["# Who you are"]
@@ -249,6 +252,10 @@ def format_persona(
         # What the assistant knows about the person (chunk 8a): before the safety
         # rules, which it never overrides.
         lines.append(memory)
+    if mood:
+        # How they feel (Q3-fast Part 1): only when upset, before the safety
+        # rules, which it never overrides.
+        lines.append(mood)
     if rules:
         # Built by ally-be from the bot's safety pack, never from an editor's text; it
         # comes after the instructions so nothing in them can talk it away.

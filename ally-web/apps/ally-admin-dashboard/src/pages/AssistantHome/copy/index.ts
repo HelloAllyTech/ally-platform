@@ -250,6 +250,18 @@ export const HOME = {
     atRisk: "When someone may be at risk",
     atRiskHint: "What it says before pointing people to help.",
     atRiskFromPack: "From your safety rules. This is what it says now, and you can add to it.",
+    // Q3-fast: correcting a pack chosen for the wrong kind of business.
+    notRight: "This isn't right for my business",
+    choose: "Which safety rules fit your business?",
+    lessStrict: "Less strict",
+    reasonLabel: "Why is this right for your business?",
+    reasonHint:
+      "These rules are less strict than the ones you have now. Your reason is kept with the change, and your checkup will show it.",
+    reasonShort: "Please say a little more (at least 10 characters).",
+    change: "Change safety rules",
+    cancel: "Cancel",
+    changed: "Safety rules changed by you on {date}.",
+    changedWhy: "Safety rules changed by you on {date}: “{reason}”",
   },
   page: {
     businessName: "Business name",

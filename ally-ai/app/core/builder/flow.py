@@ -157,6 +157,11 @@ def language_tags(text: str) -> List[str]:
 
 # --- patches -----------------------------------------------------------------
 
+#: The safety packs an owner may ask for in setup (ally-be `SafetyPackId`).
+PACK_IDS = frozenset(
+    {"mental_health", "medical", "pharmacy", "minors", "legal_financial", "standard"}
+)
+
 
 def replace(path: str, value: Any) -> PatchOp:
     return PatchOp(op="replace", path=path, value=value)
@@ -310,6 +315,7 @@ class Step:
         self.deadline: Deadline
         self.patches: List[PatchOp] = []
         self.learned_patches: List[PatchOp] = []
+        self.stricter_pack: Optional[str] = None
         self.source = tasks.corpus(request)
 
     def status(self, code: str) -> None:
@@ -326,6 +332,8 @@ class Step:
         )
         self.patches += proposal_patches(out, self.source)
         self.learned_patches += owner_fact_patches(out)
+        if out.safety_pack.strip() in PACK_IDS:
+            self.stricter_pack = out.safety_pack.strip()
         if out.owner_facts:
             self.source += "\n" + "\n".join(f.text for f in out.owner_facts)
         return out
@@ -336,6 +344,7 @@ class Step:
             patches=patches,
             learned_patches=self.learned_patches,
             dropped_patches=dropped,
+            stricter_pack=self.stricter_pack,
             **fields,
         )
 

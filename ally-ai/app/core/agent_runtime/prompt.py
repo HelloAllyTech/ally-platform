@@ -183,6 +183,7 @@ def build_agent_prompt(
     can_book: bool = False,
     channel: Optional[str] = None,
     takes_details: bool = False,
+    mood: str = "",
 ) -> str:
     """The agent step's prompt. Empty when the template is missing (the caller
     refuses to run unguided)."""
@@ -230,6 +231,7 @@ def build_agent_prompt(
             can_book=can_book,
             channel=channel,
             takes_details=takes_details,
+            mood=mood,
         )
         + body
     )

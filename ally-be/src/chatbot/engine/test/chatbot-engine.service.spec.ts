@@ -339,7 +339,7 @@ describe('ChatbotEngineService', () => {
       expect(draftLookup?.[1]).toEqual(['bot-1']);
     });
 
-    it('lets a crisis verdict override an answer, keeping the run', async () => {
+    it('sends the crisis reply at once, with no run, when the check decides first (Q3-fast)', async () => {
       aiService.checkWhatsAppCrisis.mockResolvedValueOnce({
         is_crisis: true,
         confidence: 0.9,
@@ -349,22 +349,62 @@ describe('ChatbotEngineService', () => {
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
       expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
       expect(decision.alert?.type).toBe('Chatbot Crisis Classifier');
-      expect(decision.agent?.runId).toBe('run-from-ally-ai');
+      expect(aiService.runAgent).not.toHaveBeenCalled();
     });
 
-    it('still gives the crisis reply when the run fails', async () => {
+    it('still gives the crisis reply when the run fails before a late verdict', async () => {
+      engine.levelWaitMs = 0;
       aiService.runAgent.mockRejectedValueOnce(
         upstream(404, ErrorCode.AI_REQUEST_REJECTED),
       );
-      aiService.checkWhatsAppCrisis.mockResolvedValueOnce({
-        is_crisis: true,
-        confidence: 0.9,
-        signal: 'end it',
-      });
+      aiService.checkWhatsAppCrisis.mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({ is_crisis: true, confidence: 0.9, signal: 'end it' }),
+              5,
+            ),
+          ),
+      );
       const decision = await engine.respond(whatsapp());
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
       expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
       expect(decision.agent?.runtime).toBe(AgentRuntimeUsed.V2_FAILED);
+    });
+
+    it('replies in Hinglish, and sends the emergency reply for an emergency (Q3-fast)', async () => {
+      aiService.checkWhatsAppCrisis.mockResolvedValue({
+        is_crisis: true,
+        level: 'at_risk',
+        confidence: 0.9,
+        signal: 'jeene ka mann nahi',
+      });
+      const hinglish = await engine.respond(
+        turn({ text: 'Mujhe ab jeene ka mann nahi karta, kya karun' }),
+      );
+      expect(hinglish.body).toMatch(/^Lagta hai yeh urgent ho sakta hai/);
+      expect(hinglish.body).toContain('14416');
+
+      aiService.checkWhatsAppCrisis.mockResolvedValue({
+        is_crisis: true,
+        level: 'emergency',
+        self_harm: false,
+        confidence: 0.9,
+        signal: 'bleeding heavily',
+      });
+      const emergency = await engine.respond(
+        turn({
+          chatbot: bot({ name: 'Cloudnine' }),
+          settings: { ...settings, helplineNumbers: '99724 99724' },
+          text: "I'm 34 weeks pregnant and bleeding heavily",
+        }),
+      );
+      expect(emergency.body).toBe(
+        'This sounds like an emergency. Please go to the nearest emergency department now, ' +
+          'or call 112 or an ambulance on 108. You can also call Cloudnine on 99724 99724.',
+      );
+      expect(emergency.alert?.message).toContain('a medical emergency');
     });
 
     it('runs the crisis check once, alongside, with the same prompts', async () => {

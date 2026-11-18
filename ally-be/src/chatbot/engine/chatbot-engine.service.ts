@@ -1,5 +1,8 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { crisisReply } from '../../bot-draft/safety-pack/safety-packs';
+import {
+  crisisReply,
+  emergencyReply,
+} from '../../bot-draft/safety-pack/safety-packs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type {
@@ -8,6 +11,7 @@ import type {
   KnowledgeAnswerRequest,
   KnowledgeAudienceRequest,
 } from '../../ai/dto/knowledge.dto';
+import { crisisLevelOf } from '../../ai/dto/knowledge.dto';
 import { AiService } from '../../ai/service/ai.service';
 import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
@@ -44,10 +48,18 @@ import type {
 } from './chatbot-engine.types';
 import { crisisRequest } from './crisis-history';
 import { holdTextUntilCleared } from './live-reply';
+import { isEverydayIdiom } from './everyday-idiom';
+import { looksEmotional } from './looks-emotional';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 import { replyLanguageOf } from './reply-language';
-import { contactFromSources, runFailedReply } from './run-failed-reply';
+import {
+  aboutAnAnimal,
+  type ContactSource,
+  contactFromSources,
+  emergencyNumberFrom,
+  runFailedReply,
+} from './run-failed-reply';
 
 /**
  * The ally-ai prompt codes the answering path owns.
@@ -71,6 +83,9 @@ export const AGENT_PROMPT_CODES = [
   // How it uses the business's lists (chunk 6). Missing until 6b, so a run always used the
   // default text in ally-ai's code, never the Skills Store's live version.
   'ally_ai_agent_lists',
+  // When the crisis check finds the person upset, not at risk (Q3-fast Part 1).
+  'ally_ai_agent_upset',
+  'ally_ai_agent_upset_support',
 ];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 
@@ -80,7 +95,8 @@ const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
  * platform's text and templates are never sent. The same on the keyword and the classifier paths.
  */
 export function crisisTextFor(
-  turn: Pick<ChatTurn, 'chatbot' | 'settings'>,
+  turn: Pick<ChatTurn, 'chatbot' | 'settings'> &
+    Partial<Pick<ChatTurn, 'text' | 'language'>>,
   template?: { chatbotId?: string | null; responseText?: string | null } | null,
 ): string {
   const fill = (text: string) =>
@@ -98,6 +114,8 @@ export function crisisTextFor(
     pack: turn.chatbot.safetyPack,
     helplineNumbers: turn.settings.helplineNumbers,
     own: own ? fill(own) : null,
+    // In the person's language (Q3-fast Part 1, B3): fixed English, Hindi or Hinglish text.
+    language: replyLanguageOf(turn.text ?? '', turn.language),
   });
 }
 
@@ -141,6 +159,31 @@ const runBehind = (
       ? answerResult.reason.agent
       : undefined;
 
+/**
+ * How long a message waits for the crisis check's level before the run starts (Q3-fast Part 1):
+ * long enough for the classifier's p90 (about 2.5 s on the local stack), so an upset person's
+ * reply opens warmly and an at-risk one gets the fixed reply with no run at all. A slower check
+ * still runs beside the run and wins over it.
+ */
+export const LEVEL_WAIT_MS = 2_500;
+
+/** A promise's outcome, never rejecting. */
+const settle = <T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> =>
+  promise.then(
+    (value) => ({ status: 'fulfilled', value }) as const,
+    (reason) => ({ status: 'rejected', reason }) as const,
+  );
+
+/** Null after `ms`, without keeping the process alive. */
+const after = (ms: number): Promise<null> =>
+  new Promise((resolve) => setTimeout(() => resolve(null), ms).unref?.());
+
+/** The check said at risk or an emergency: the fixed reply, now. */
+const isUrgent = (
+  verdict: PromiseSettledResult<CrisisCheckResponse | null>,
+): verdict is PromiseFulfilledResult<CrisisCheckResponse> =>
+  verdict.status === 'fulfilled' && Boolean(verdict.value?.is_crisis);
+
 /** Store version and content hash of each knowledge prompt sent to ally-ai, by code. */
 type PromptsRan = {
   prompt_versions: Record<string, number | null>;
@@ -170,6 +213,8 @@ export class ChatbotEngineService {
   private readonly logger = LoggerService.getInstance(
     ChatbotEngineService.name,
   );
+  /** `LEVEL_WAIT_MS`; specs set 0 to start the run at once and race the check against it. */
+  levelWaitMs = LEVEL_WAIT_MS;
 
   constructor(
     @InjectRepository(ChatbotDocument)
@@ -259,7 +304,11 @@ export class ChatbotEngineService {
       turn.language,
       turn.chatbot.id,
     );
-    if (match && match.template.kind === WaTemplateKind.CRISIS) {
+    if (
+      match &&
+      match.template.kind === WaTemplateKind.CRISIS &&
+      !isEverydayIdiom(turn.text)
+    ) {
       return this.keywordCrisis(turn, match.template);
     }
     if (!turn.settings.crisisClassifierEnabled) return null;
@@ -269,7 +318,7 @@ export class ChatbotEngineService {
         crisisRequest(held ? { ...turn, history: [] } : turn, prompts),
       );
       return crisis?.is_crisis
-        ? this.crisisDecision(turn, crisis, ran, { notOnList: false })
+        ? await this.crisisDecision(turn, crisis, ran, { notOnList: false })
         : null;
     } catch (error) {
       // As in `answer()`: a classifier outage doesn't stop the message; the keyword layer ran.
@@ -319,8 +368,14 @@ export class ChatbotEngineService {
       turn.language,
       chatbot.id,
     );
+    // "I want to die of boredom" (stop 1): a crisis keyword inside an everyday idiom is left to
+    // the classifier, which runs beside the answer.
+    const idiom =
+      match?.template.kind === WaTemplateKind.CRISIS &&
+      isEverydayIdiom(turn.text);
     const usable =
       match &&
+      !idiom &&
       match.bypassRag &&
       (allowed || match.template.kind !== WaTemplateKind.FAQ) &&
       // The agent answers greetings, help and FAQ-style messages itself.
@@ -380,7 +435,9 @@ export class ChatbotEngineService {
           crisisRequest(turn, prompts),
         );
         if (crisis?.is_crisis) {
-          return this.crisisDecision(turn, crisis, ran, { notOnList: true });
+          return await this.crisisDecision(turn, crisis, ran, {
+            notOnList: true,
+          });
         }
       } catch (error) {
         // Swallowed on purpose: the refusal still has to go out.
@@ -427,23 +484,53 @@ export class ChatbotEngineService {
     const knowledge = await this.knowledgeFor(turn);
     const request = buildKnowledgeRequest(turn, prompts, knowledge);
 
-    // Concurrent, not sequential: the classifier adds no latency this way, and `allSettled`
-    // keeps a rejected classifier from taking down an answer that arrived fine. The crisis check
-    // runs once and never depends on the run: a failed run still gets its verdict.
+    // One fast check beside the run (Q3-fast Part 1). It never depends on the run: a failed run
+    // still gets its verdict, and a rejected check never takes down an answer.
     const crisisCheck = settings.crisisClassifierEnabled
       ? this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts))
       : Promise.resolve(null);
-    // A streamed reply's text waits for the crisis check too: none of it is shown before the
-    // check clears the message, and none at all if it doesn't.
-    const [answerResult, crisisResult] = await Promise.allSettled([
+    const checked = settle(crisisCheck);
+
+    // 1. Only for a message that looks emotional (stop 1, option c): the level, if it comes within
+    //    LEVEL_WAIT_MS (the classifier's p90 is about 2.5 s). At risk or an emergency: the fixed
+    //    reply goes out now, with no run at all. Upset: the run is told, so its reply opens warmly.
+    //    Every other message starts its run at once; the check still races it below.
+    const waitMs = looksEmotional(turn.text) ? this.levelWaitMs : 0;
+    const early = await Promise.race([checked, after(waitMs)]);
+    if (early && isUrgent(early)) {
+      return this.crisisDecision(turn, early.value!, ran, { notOnList: false });
+    }
+    const mood =
+      early?.status === 'fulfilled' && crisisLevelOf(early.value) === 'upset'
+        ? 'upset'
+        : undefined;
+
+    // 2. The run. A streamed reply's text waits for the check: none of it is shown before the
+    //    check clears the message, and none at all if it doesn't. A verdict that comes in during
+    //    the run and says at risk or an emergency cancels the run and is sent at once.
+    const stop = new AbortController();
+    const running = settle(
       this.agentRuntime.answer(
         turn,
         request,
         knowledge,
         live && holdTextUntilCleared(live, crisisCheck),
+        { mood, signal: stop.signal },
       ),
-      crisisCheck,
-    ]);
+    );
+    if (!early) {
+      const first = await Promise.race([
+        running.then(() => null),
+        checked.then((verdict) => (isUrgent(verdict) ? verdict : null)),
+      ]);
+      if (first) {
+        stop.abort();
+        return this.crisisDecision(turn, first.value!, ran, {
+          notOnList: false,
+        });
+      }
+    }
+    const [answerResult, crisisResult] = await Promise.all([running, checked]);
     const agent = runBehind(answerResult);
 
     // Crisis wins over the answer, unconditionally. Not gated on confidence: the prompt tells the
@@ -452,7 +539,9 @@ export class ChatbotEngineService {
       crisisResult.status === 'fulfilled' ? crisisResult.value : null;
     if (crisis?.is_crisis) {
       return {
-        ...this.crisisDecision(turn, crisis, ran, { notOnList: false }),
+        ...(await this.crisisDecision(turn, crisis, ran, {
+          notOnList: false,
+        })),
         ...(agent ? { agent } : {}),
       };
     }
@@ -531,28 +620,43 @@ export class ChatbotEngineService {
    * sender not on the bot's list (`notOnList`) the alert says so; otherwise it says the answer that
    * came back alongside was discarded.
    */
-  private crisisDecision(
+  private async crisisDecision(
     turn: ChatTurn,
     crisis: CrisisCheckResponse,
     ran: PromptsRan,
     { notOnList }: { notOnList: boolean },
-  ): ChatbotDecision {
+  ): Promise<ChatbotDecision> {
     const { chatbot, sender } = turn;
     const who = notOnList ? ' for a sender who is not on its list' : '';
     const outcome = notOnList
       ? 'The fixed safety reply was sent. The sender is not linked to an Ally account, so the ' +
         'sender id is the only handle to follow up through.'
       : 'The fixed safety reply was sent and the answer was discarded.';
+    // A medical emergency (Q3-fast Part 1, C9) gets "go to the nearest emergency department now,
+    // call 112 / 108", the business's own emergency number from its sources, and the at-risk line
+    // only when self-harm is also present. Everything else the classifier flags is at risk.
+    const emergency = crisisLevelOf(crisis) === 'emergency';
     return {
       handledBy: WaHandledBy.CRISIS,
-      body: crisisTextFor(turn),
+      body: emergency
+        ? emergencyReply({
+            language: replyLanguageOf(turn.text, turn.language),
+            organisation: chatbot.name,
+            emergencyNumber: emergencyNumberFrom(
+              await this.businessFacts(turn),
+              turn.settings.helplineNumbers,
+            ),
+            selfHarm: Boolean(crisis.self_harm),
+            animal: aboutAnAnimal(turn.text),
+          })
+        : crisisTextFor(turn),
       retrievalMeta: { ...ran },
       alert: this.alert(
         200,
         'crisis',
         `The crisis classifier fired on chatbot "${chatbot.name}"${who} (${turn.channel.type}, ` +
           `sender ${sender.label}, confidence ${crisis.confidence.toFixed(2)}, signal ` +
-          `"${crisis.signal}"). ${outcome}`,
+          `"${crisis.signal}", ${emergency ? 'a medical emergency' : 'at risk'}). ${outcome}`,
         'Chatbot Crisis Classifier',
       ),
     };
@@ -599,7 +703,22 @@ export class ChatbotEngineService {
    * never its decline wording. A lookup failure only leaves the contact out.
    */
   private async runFailedText(turn: ChatTurn): Promise<string> {
-    let facts: { section?: string | null; text: string }[] = [];
+    return runFailedReply(
+      replyLanguageOf(turn.text, turn.language),
+      turn.chatbot.name ?? '',
+      contactFromSources(
+        await this.businessFacts(turn),
+        turn.settings.helplineNumbers,
+      ),
+    );
+  }
+
+  /**
+   * The business's sourced facts (the site reader's and the owner's, on its draft), for the fixed
+   * replies that name a number: the run-failed reply (Part 0) and the emergency reply (Part 1). A
+   * lookup failure is no facts: the reply goes out without the number.
+   */
+  private async businessFacts(turn: ChatTurn): Promise<ContactSource[]> {
     try {
       const rows = await this.documentRepository.manager.query<
         { learned: { facts?: { section?: string; text?: string }[] } | null }[]
@@ -610,21 +729,30 @@ export class ChatbotEngineService {
           LIMIT 1`,
         [turn.chatbot.id],
       );
-      facts = (rows?.[0]?.learned?.facts ?? [])
+      const facts: ContactSource[] = (rows?.[0]?.learned?.facts ?? [])
         .filter((fact) => typeof fact?.text === 'string')
         .map((fact) => ({ section: fact.section, text: fact.text as string }));
+      // The owner's notes too (stop 1): what they typed during setup ("For eye emergencies…
+      // call 108"), which the facts list may not carry.
+      const notes = await this.documentRepository.manager.query<
+        { raw_text: string | null }[]
+      >(
+        `SELECT raw_text FROM kb_documents
+          WHERE owner_chatbot_id = $1 AND title = 'Owner notes' AND archived_at IS NULL
+          ORDER BY "updatedAt" DESC
+          LIMIT 1`,
+        [turn.chatbot.id],
+      );
+      const note = notes?.[0]?.raw_text?.trim();
+      return note ? [...facts, { section: 'owner_notes', text: note }] : facts;
     } catch (error) {
       this.logger.warn(
-        `Could not read the bot's facts for the run-failed reply: ${
+        `Could not read the bot's facts: ${
           error instanceof Error ? error.message : 'unknown error'
         }`,
       );
+      return [];
     }
-    return runFailedReply(
-      replyLanguageOf(turn.text, turn.language),
-      turn.chatbot.name ?? '',
-      contactFromSources(facts, turn.settings.helplineNumbers),
-    );
   }
 
   /** The agent's answer, as one reply. */

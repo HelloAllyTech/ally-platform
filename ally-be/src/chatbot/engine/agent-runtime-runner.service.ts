@@ -150,6 +150,11 @@ export class AgentRuntimeRunner {
     request: KnowledgeAnswerRequest,
     knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
     live?: LiveReply,
+    /**
+     * Q3-fast Part 1: `mood` is the crisis check's "upset", told to the run; `signal` cancels the
+     * run once a crisis or emergency reply has gone out instead.
+     */
+    options: { mood?: 'upset'; signal?: AbortSignal } = {},
   ): Promise<Answered> {
     const runId = agentRunIdFor(turn.providerMessageId);
     const conversationId = turn.conversationId ?? `preview-${randomUUID()}`;
@@ -165,16 +170,24 @@ export class AgentRuntimeRunner {
         shown,
       );
       withGateway = Boolean(body.gateway);
+      if (options.mood) {
+        body.mood = options.mood;
+        const helplines = turn.settings.helplineNumbers?.trim();
+        if (helplines) body.support_helplines = helplines.slice(0, 300);
+      }
       const streamed = Boolean(live && turn.channel.capabilities?.streaming);
+      const signals = [live?.signal, options.signal].filter(
+        (signal): signal is AbortSignal => Boolean(signal),
+      );
       const response = streamed
         ? await this.aiService.runAgentStreaming(
             // Live steps (chunk 6b): only a streamed run, the bot page's or Try it's, asks for
             // them; WhatsApp can't stream, so its request is unchanged.
             { ...body, activity: true },
             (event) => live!.onEvent(event),
-            live!.signal,
+            signals.length ? AbortSignal.any(signals) : undefined,
           )
-        : await this.aiService.runAgent(body);
+        : await this.aiService.runAgent(body, options.signal);
       if (!response?.intent) throw new MalformedAgentResponseError();
       const { trace, run_id, memory_writes, activity, ...answer } = response;
       return {
@@ -193,8 +206,8 @@ export class AgentRuntimeRunner {
         },
       };
     } catch (error) {
-      // The person left Preview: nobody is waiting for a reply.
-      if (live?.signal?.aborted) throw error;
+      // The person left Preview, or a crisis reply went out instead: nobody is waiting.
+      if (live?.signal?.aborted || options.signal?.aborted) throw error;
       const fallbackReason = agentFailureReason(error);
       const agent: AgentRunRef = {
         runtime: AgentRuntimeUsed.V2_FAILED,

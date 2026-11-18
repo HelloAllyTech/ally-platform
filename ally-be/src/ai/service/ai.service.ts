@@ -863,13 +863,18 @@ export class AiService {
     );
   }
 
-  async runAgent(request: AgentRunRequest) {
+  /**
+   * `signal` (Q3-fast Part 1): the crisis check decided first, so the reply no longer waits for
+   * this run; aborting stops waiting for it.
+   */
+  async runAgent(request: AgentRunRequest, signal?: AbortSignal) {
     return this.postKnowledge<AgentRunResponse, AgentRunRequest>(
       ENDPOINTS.AGENT_RUN,
       request,
       {
         timeoutMs: KNOWLEDGE_ANSWER_LIMITS.attemptMs,
         alertOnFailure: false,
+        signal,
       },
     );
   }
@@ -1320,7 +1325,8 @@ export class AiService {
     {
       timeoutMs,
       alertOnFailure = true,
-    }: { timeoutMs: number; alertOnFailure?: boolean },
+      signal,
+    }: { timeoutMs: number; alertOnFailure?: boolean; signal?: AbortSignal },
   ): Promise<R> {
     return this.makeRequest<R, T>(
       endpoint,
@@ -1332,6 +1338,7 @@ export class AiService {
       timeoutMs,
       true,
       alertOnFailure,
+      signal,
     );
   }
 
@@ -1358,6 +1365,8 @@ export class AiService {
     // Off only where the caller raises its own, throttled alert — otherwise a dependency that is
     // down by design (the Agents v2 runtime switched off) pages once per message.
     alertOnFailure = true,
+    // Cancels the request (Q3-fast Part 1: a crisis reply that no longer waits for the run).
+    signal?: AbortSignal,
   ): Promise<R> {
     const requestTimeout = timeoutMs ?? this.maxTimeout;
     const execId = uuidv4();
@@ -1418,6 +1427,7 @@ export class AiService {
         url,
         method,
         data,
+        ...(signal ? { signal } : {}),
       });
       const elapsedMs = Date.now() - startMs;
       const upstreamTraceId =

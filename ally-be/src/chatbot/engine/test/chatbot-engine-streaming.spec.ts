@@ -4,6 +4,7 @@ import type {
   CrisisCheckResponse,
 } from '../../../ai/dto/knowledge.dto';
 import { AiUpstreamError } from '../../../ai/exception/ai-upstream.exception';
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import { ErrorCode } from '../../../exception/error-code.enum';
 import { WaHandledBy } from '../../../whatsapp/enum/whatsapp.enum';
 import { DEFAULT_WHATSAPP_SETTINGS } from '../../../whatsapp/type/whatsapp-settings.type';
@@ -117,11 +118,13 @@ describe('ChatbotEngineService streaming a reply', () => {
   });
 
   it('holds the text until the crisis check clears', async () => {
+    // A check slower than the level wait: the run starts and the check races it.
+    engine.levelWaitMs = 0;
     const crisis = deferredCrisis();
     aiService.checkWhatsAppCrisis.mockReturnValue(crisis.promise);
 
     const decided = engine.respond(turn(), live);
-    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setTimeout(r, 20));
     expect(seen.map((e) => e.event)).toEqual(['run_started', 'status', 'step']);
 
     crisis.resolve({ is_crisis: false, confidence: 0, signal: '' } as never);
@@ -133,6 +136,76 @@ describe('ChatbotEngineService streaming a reply', () => {
       'token',
       'token',
     ]);
+  });
+
+  it('cancels the run and sends the crisis reply as soon as a late verdict says so (Q3-fast)', async () => {
+    engine.levelWaitMs = 0;
+    const crisis = deferredCrisis();
+    aiService.checkWhatsAppCrisis.mockReturnValue(crisis.promise);
+    let cancelled: AbortSignal | undefined;
+    aiService.runAgentStreaming.mockImplementation(
+      (_body: unknown, _onEvent: unknown, signal?: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          cancelled = signal;
+          signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+
+    const decided = engine.respond(turn(), live);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(cancelled).toBeDefined(); // the run had started
+    crisis.resolve({
+      is_crisis: true,
+      confidence: 0.9,
+      signal: 'risk',
+    } as never);
+    const decision = await decided;
+
+    expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
+    expect(cancelled?.aborted).toBe(true);
+    expect(seen.some((e) => e.event === 'token')).toBe(false);
+  });
+
+  it('never shows a reply that had started streaming when a late verdict says at risk (stop 1)', async () => {
+    // Not emotional, so the run starts at once; its text streams before the check answers.
+    engine.levelWaitMs = 2_500;
+    const crisis = deferredCrisis();
+    aiService.checkWhatsAppCrisis.mockReturnValue(crisis.promise);
+    let cancelled: AbortSignal | undefined;
+    aiService.runAgentStreaming.mockImplementation(
+      (
+        _body: unknown,
+        onEvent: (event: AgentStreamEvent) => void,
+        signal?: AbortSignal,
+      ) =>
+        new Promise((_resolve, reject) => {
+          cancelled = signal;
+          for (const event of LIVE) onEvent(event); // tokens included
+          signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+
+    const decided = engine.respond(
+      turn({ text: 'What time do you open on Sunday?' }),
+      live,
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    // The run is going and has produced its text, but none of it reached the person.
+    expect(cancelled).toBeDefined();
+    expect(seen.some((e) => e.event === 'token')).toBe(false);
+
+    crisis.resolve({
+      is_crisis: true,
+      level: 'at_risk',
+      confidence: 0.9,
+      signal: 'risk',
+    } as never);
+    const decision = await decided;
+
+    expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
+    expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
+    expect(cancelled?.aborted).toBe(true);
+    expect(seen.some((e) => e.event === 'token')).toBe(false);
   });
 
   it('drops the held text on a crisis verdict and answers with the crisis reply', async () => {

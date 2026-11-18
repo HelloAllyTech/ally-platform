@@ -218,6 +218,19 @@ export class BotDraftSessionService implements CrawlLearner {
       notes.push({ role: 'builder', text: pack.builderMessage });
     }
 
+    // A stricter pack the owner asked for in setup (Q3-fast stop 1, 18 Nov: "Noted — I'll add
+    // a 'care for young people' safety rule", and nothing changed). Applied only when it is
+    // stricter than the pack on; `setSafety` never lowers one either.
+    const asked = packFor(response.stricter_pack);
+    const current = packFor(draft.draftConfig.safetyPackId);
+    if (asked && (!current || asked.strength > current.strength)) {
+      draft = await this.drafts.setSafety(
+        draft,
+        draft.industry ?? null,
+        asked.id,
+      );
+    }
+
     if (response.patches?.length) {
       const result = await this.tryPatch(draft, response.patches, 'draft');
       draft = result.draft;

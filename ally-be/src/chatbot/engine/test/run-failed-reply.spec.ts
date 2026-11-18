@@ -71,3 +71,82 @@ describe('contactFromSources', () => {
     expect(emailIn('write to hello@ally.test.')).toBe('hello@ally.test');
   });
 });
+
+describe('emergencyNumberFrom (Q3-fast Part 1)', () => {
+  it("takes the business's own emergency or 24x7 line from its facts", () => {
+    const { emergencyNumberFrom } = jest.requireActual('../run-failed-reply');
+    expect(
+      emergencyNumberFrom([
+        { section: 'location', text: 'Bannerghatta Road, call 080 6735 6735' },
+        {
+          section: 'about',
+          text: 'Emergency helpline 99724 99724, 24/7, free',
+        },
+      ]),
+    ).toBe('99724 99724');
+    expect(emergencyNumberFrom([{ text: 'Open 24x7: +91 80 4020 2020' }])).toBe(
+      '+91 80 4020 2020',
+    );
+  });
+
+  it('falls back to the helplines, else none', () => {
+    const { emergencyNumberFrom } = jest.requireActual('../run-failed-reply');
+    expect(
+      emergencyNumberFrom([{ text: 'Call 080 1234 5678' }], '1800 120 820050'),
+    ).toBe('1800 120 820050');
+    expect(
+      emergencyNumberFrom([{ text: 'Call 080 1234 5678' }], ''),
+    ).toBeNull();
+  });
+});
+
+describe('the emergency number, sentence by sentence (Q3-fast stop 1)', () => {
+  const { emergencyNumberFrom, aboutAnAnimal } = jest.requireActual(
+    '../run-failed-reply',
+  );
+
+  it('takes the number after the emergency word, never the first of a general list', () => {
+    expect(
+      emergencyNumberFrom([
+        {
+          text: 'Call 080 1111 2222, 080 3333 4444 or 080 5555 6666; 24x7 helpline 1800 102 4567.',
+        },
+      ]),
+    ).toBe('1800 102 4567');
+    expect(
+      emergencyNumberFrom([
+        {
+          text: 'Call 080 1111 2222, 080 3333 4444, 080 5555 6666 or 080 7777 8888.',
+        },
+      ]),
+    ).toBeNull();
+  });
+
+  it("reads the owner's notes, and a short line like 108 is not the business's number", () => {
+    expect(
+      emergencyNumberFrom(
+        [
+          {
+            section: 'owner_notes',
+            text: 'For eye emergencies, come in or call 108. For anything else call 95949 04015.',
+          },
+        ],
+        '',
+      ),
+    ).toBeNull();
+    expect(
+      emergencyNumberFrom([
+        {
+          section: 'owner_notes',
+          text: 'Our 24/7 emergency line is 95949 04015.',
+        },
+      ]),
+    ).toBe('95949 04015');
+  });
+
+  it('knows when the message is about an animal', () => {
+    expect(aboutAnAnimal('My dog ate dark chocolate')).toBe(true);
+    expect(aboutAnAnimal('mere kutte ne chocolate kha li')).toBe(true);
+    expect(aboutAnAnimal('I got bleach in my eye')).toBe(false);
+  });
+});
