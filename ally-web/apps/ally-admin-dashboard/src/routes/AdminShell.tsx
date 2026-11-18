@@ -41,6 +41,10 @@ export const PageFallback: React.FC = () => (
  * rebuilt per page. Each page's own `PrivateLayout` below only decides access.
  */
 export const AdminShell: React.FC = () => {
+  // Subscribe to the location so this re-renders when the login screen navigates after signing in
+  // (it goes to the URL it is already on): that is what swaps the login for the signed-in shell.
+  // Without it nothing here re-renders, and the visitor stays on the login after logging in.
+  useLocation();
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
   if (!isAuthenticated) {
