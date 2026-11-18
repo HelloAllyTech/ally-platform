@@ -22,6 +22,12 @@ export interface PlanStageFacts {
   /** Outcome reviews scheduled and done. */
   reviewsDue: number;
   reviewsDone: number;
+  /**
+   * An Owner pressed Start planning (lifecycle 2026-11-18): the PRD is under
+   * way whether or not anyone is assigned to build it yet. Undefined keeps
+   * rev 5.2's meaning, where only a lead starts the PRD.
+   */
+  planningStarted?: boolean;
 }
 
 /**
@@ -32,8 +38,8 @@ export interface PlanStageFacts {
  * - After release: LAUNCHING until the checklist is done, then MEASURING until
  *   every scheduled outcome review has run, then LEARNED.
  * - Before release: BUILDING once any build exists, READY once the design is
- *   approved, DESIGN once the PRD is ready, PRD once a lead holds it, FILED
- *   otherwise.
+ *   approved, DESIGN once the PRD is ready, PRD once planning has started
+ *   (or a lead holds it), FILED otherwise.
  */
 export function derivePlanStage(facts: PlanStageFacts): PlanStage {
   if (facts.closed) return PlanStage.CLOSED;
@@ -48,7 +54,7 @@ export function derivePlanStage(facts: PlanStageFacts): PlanStage {
   if (facts.buildStarted) return PlanStage.BUILDING;
   if (facts.designApproved) return PlanStage.READY;
   if (facts.prdReady) return PlanStage.DESIGN;
-  if (facts.leadUserId) return PlanStage.PRD;
+  if (facts.leadUserId || facts.planningStarted === true) return PlanStage.PRD;
   return PlanStage.FILED;
 }
 
@@ -84,8 +90,9 @@ export type ShownStage =
 
 /**
  * The stage the Roadmap shows people: five words, however the plan underneath is going.
- * Draft is private to its author, then Backlog (filed, nobody leads it), Being built (a Builder
- * leads it: planning and building alike), Shipped, or Declined. `ShownStage` keeps the finer
+ * Draft is private to its author, then Backlog ("To do": filed, and planned by the Owner, with
+ * nobody assigned to build it), Being built (an Owner assigned a builder), Shipped ("Released":
+ * a person marked it), or Declined. `ShownStage` keeps the finer
  * detail for the status line and the actions; this is what rows, tabs, filters and the tracker say.
  */
 export type SimpleStage =
@@ -104,9 +111,11 @@ export const SIMPLE_STAGES: SimpleStage[] = [
 ];
 
 /**
- * Pure. Submitted is Backlog. Accepted is Backlog until someone leads it. Planning and Building
- * are Being built. Declined and Closed (not pursuing, archived) are both Declined: either way
- * nobody is going to build it.
+ * Pure. The one rule: an assigned builder (the lead) makes it Being built, and nothing else does
+ * (lifecycle 2026-11-18). So Submitted, Accepted and Planning are Backlog until an Owner assigns
+ * a builder, which only happens once the Owner has closed the plan. Building is Being built.
+ * Declined and Closed (not pursuing, archived) are both Declined: either way nobody is going to
+ * build it.
  */
 export function simpleStageOf(
   shown: ShownStage,
@@ -118,8 +127,8 @@ export function simpleStageOf(
     case 'submitted':
       return 'backlog';
     case 'accepted':
-      return leadUserId ? 'being_built' : 'backlog';
     case 'planning':
+      return leadUserId ? 'being_built' : 'backlog';
     case 'building':
       return 'being_built';
     case 'shipped':
@@ -140,6 +149,9 @@ export const ITEM_TRACKER: ShownStage[] = [
 ];
 
 export type ItemCiState = 'passing' | 'failing' | 'pending' | 'unknown';
+
+/** How the assigned builder builds it: Builder agent here, or outside it. */
+export type ItemBuildMode = 'builder_agent' | 'outside';
 
 /**
  * Everything an idea's stage is derived from. Facts only, like PlanStageFacts:
@@ -173,6 +185,10 @@ export interface ItemStageFacts {
         /** Draft readiness: the five checks. */
         checksMet?: number;
         checksTotal?: number;
+        /** The Owner closed the plan (lifecycle 2026-11-18). */
+        planClosed?: { byUserId: number; at: string } | null;
+        /** How the assigned builder builds it. */
+        buildMode?: ItemBuildMode | null;
       })
     | null;
   /**
@@ -196,6 +212,12 @@ export interface ItemStageFacts {
     releasing: boolean;
     /** Why a release waits for a click (D6), as a held-path id; null when not held. */
     heldReason: string | null;
+    /**
+     * All its merged work is live in production but nobody has marked it
+     * Released. Released is a person's click (lifecycle 2026-11-18), so this
+     * only prompts the builder.
+     */
+    workLive?: boolean;
   };
   shipped?: {
     liveSince: string | null;
@@ -233,10 +255,16 @@ export type ItemStatusParts =
        * Code once a pull request exists.
        */
       externalBuild: { byUserId: number; at: string } | null;
+      /** The Owner closed the plan; null while it is still being planned. */
+      planClosed: { byUserId: number; at: string } | null;
+      /** How the assigned builder said they will build it; null until they say. */
+      buildMode: ItemBuildMode | null;
     }
   | {
       stage: 'building';
       where: 'here' | 'claude_code';
+      /** How the assigned builder said they build it; null until they say. */
+      buildMode: ItemBuildMode | null;
       leadUserId: number | null;
       externalBuild: { byUserId: number; at: string } | null;
       repos: string[];
@@ -249,6 +277,8 @@ export type ItemStatusParts =
       waitingForPr: boolean;
       releasing: boolean;
       heldReason: string | null;
+      /** Live in production, waiting for the builder to mark it Released. */
+      workLive: boolean;
     }
   | {
       stage: 'shipped';
@@ -389,6 +419,7 @@ export function deriveItemStage(facts: ItemStageFacts): ItemStage {
       statusParts: {
         stage: 'building',
         where,
+        buildMode: plan?.buildMode ?? null,
         leadUserId,
         externalBuild,
         repos: facts.build?.repos ?? [],
@@ -397,6 +428,7 @@ export function deriveItemStage(facts: ItemStageFacts): ItemStage {
         waitingForPr: false,
         releasing: facts.build?.releasing ?? false,
         heldReason: facts.build?.heldReason ?? null,
+        workLive: facts.build?.workLive ?? false,
       },
     };
   }
@@ -423,6 +455,8 @@ export function deriveItemStage(facts: ItemStageFacts): ItemStage {
         openQuestions: facts.planning?.openQuestions ?? 0,
         designAwaitingApproval: facts.planning?.designAwaitingApproval ?? false,
         externalBuild,
+        planClosed: plan?.planClosed ?? null,
+        buildMode: plan?.buildMode ?? null,
       },
     };
   }

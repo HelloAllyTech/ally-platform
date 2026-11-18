@@ -25,6 +25,7 @@ vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
   useReviewRoadmapBatchMutation: () => [unwrapOf(vi.fn())],
   useUndoRoadmapReviewMutation: () => [unwrapOf(vi.fn())],
   useSetRoadmapLeadMutation: () => [unwrapOf(vi.fn())],
+  useStartRoadmapPlanningMutation: () => [unwrapOf(vi.fn()), { isLoading: false }],
   useGetRoadmapItemSimilarQuery: () => ({ data: { matches: [] } }),
   useGetRoadmapLeadSuggestionsQuery: () => ({
     data: {
@@ -131,16 +132,13 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("triage_one timing (P8, §4.16)", () => {
-  it("starts when a row awaiting review takes focus and completes on picking its lead", async () => {
+  it("starts when a row awaiting review takes focus and completes on its next step (Start planning)", async () => {
     renderTriage("OPP-414");
     expect(events("roadmap_job_started")).toEqual([
       ["roadmap_job_started", { job: "triage_one", role: "owner", item_id: "OPP-414" }],
     ]);
 
     fireEvent.keyDown(window, { key: "l" });
-    fireEvent.click(
-      (await screen.findAllByRole("button", { name: en.roadmapV2.review.leadConfirm })).at(-1)!,
-    );
     await waitFor(() => expect(events("roadmap_job_completed")).toHaveLength(1));
     const [, props] = events("roadmap_job_completed")[0];
     expect(props).toMatchObject({ job: "triage_one", role: "owner", item_id: "OPP-414" });

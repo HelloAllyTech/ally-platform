@@ -11,6 +11,16 @@ export class RecordExternalBuildDto {
   tool?: 'claude_code';
 }
 
+export class SetBuildModeDto {
+  @ApiProperty({
+    enum: ['builder_agent', 'outside'],
+    description:
+      'How the assigned builder builds it: with the Builder agent here, or outside it (Claude Code, by hand).',
+  })
+  @IsIn(['builder_agent', 'outside'])
+  mode!: 'builder_agent' | 'outside';
+}
+
 export class SetRoadmapRoleDto {
   @ApiProperty({
     enum: ['none', 'idea', 'builder', 'owner'],

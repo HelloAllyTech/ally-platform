@@ -184,7 +184,7 @@ describe('RoadmapDraftService', () => {
     });
   });
 
-  it('counts assistant failures so the page can offer Fill it in yourself', async () => {
+  it('counts assistant failures, and never offers Fill it in yourself (removed 2026-11-18)', async () => {
     const { service, deps, row } = build({
       row: draftRow({ idea: { turnFailures: 1 } }),
     });
@@ -196,7 +196,7 @@ describe('RoadmapDraftService', () => {
     expect(error.getResponse()).toMatchObject({
       code: 'assistant_unavailable',
       failures: 2,
-      selfCheckOffered: true,
+      selfCheckOffered: false,
     });
     expect(row().plan.idea.turnFailures).toBe(2);
   });
@@ -253,31 +253,17 @@ describe('RoadmapDraftService', () => {
     expect(result.firstSubmit).toBe(true);
   });
 
-  it('a self-checked draft files unsigned, with its five answers, marked selfChecked', async () => {
+  it('a self-filled draft no longer counts as ready, and Fill it in yourself answers 410', async () => {
     const selfCheck = Object.fromEntries(
       DRAFT_CHECK_ORDER.map((id) => [id, `answer ${id}`]),
     );
     const { service, deps } = build({
       row: draftRow({ draftGoalId: 'g1', idea: { selfCheck } }),
     });
-    deps.dataSource.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('FROM "roadmap_product_goals"'))
-        return [{ id: 'g1', name: 'Scribe' }];
-      if (sql.includes("jsonb_build_object('filingAt'"))
-        return [[{ id: SESSION }], 1];
-      if (sql.includes('count(*)')) return [{ n: 2 }];
-      return [];
-    });
-    const result = await service.submit(ME, 'OPP-0900', {});
-    const [, dto, extra] = deps.opportunityService.create.mock
-      .calls[0] as any[];
-    expect(extra.enforceReadiness).toBe(false);
-    expect(dto.readinessToken).toBeUndefined();
-    expect(dto.description).toContain("Who it's for: answer who_it_affects");
-    const update = deps.dataSource.query.mock.calls.find(([sql]) =>
-      String(sql).includes(`"reviewState" = 'pending'`),
-    ) as any[];
-    expect(update[1]).toEqual(['opp-1', true, SESSION]);
-    expect(result.firstSubmit).toBe(false);
+    const error = await service.submit(ME, 'OPP-0900', {}).catch((e) => e);
+    expect(error.getStatus()).toBe(422);
+    expect(deps.opportunityService.create).not.toHaveBeenCalled();
+    const gone = await service.selfCheck().catch((e) => e);
+    expect(gone.getStatus()).toBe(410);
   });
 });

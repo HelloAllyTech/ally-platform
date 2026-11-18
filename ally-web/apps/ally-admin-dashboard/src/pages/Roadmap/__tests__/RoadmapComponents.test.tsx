@@ -130,7 +130,7 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
     expect(screen.getByRole("heading", { name: "Streak on start screen" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: en.roadmapV2.actions.approveDesign })).toBeNull();
     // The quiet line stands where the action would be.
-    expect(screen.getByText(/Priya leads this idea/)).toBeInTheDocument();
+    expect(screen.getByText(/Priya builds this idea/)).toBeInTheDocument();
   });
 
   it("an Owner gets the star, the title editor and Approve design", () => {
@@ -192,16 +192,53 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
 });
 
 describe("primaryActionFor", () => {
-  it("picks one action by stage and can{}", () => {
-    // Picking the lead is what accepts an unreviewed idea, so that is its action too.
-    expect(primaryActionFor(detail({ review: true }, { shownStage: "submitted" }))).toBe(
-      "pickLead",
-    );
+  it("picks one action by stage and can{}, in the lifecycle's order", () => {
+    // An Owner plans first: Start planning accepts an idea still waiting.
     expect(
-      primaryActionFor(detail({ pickLead: true }, { shownStage: "accepted", lead: undefined })),
+      primaryActionFor(detail({ review: true, startPlanning: true }, { shownStage: "submitted" })),
+    ).toBe("startPlanning");
+    // A builder is never picked straight from review.
+    expect(
+      primaryActionFor(detail({ review: true, pickLead: true }, { shownStage: "submitted" })),
+    ).toBeNull();
+    const unled = { shownStage: "planning" as const, lead: undefined };
+    expect(primaryActionFor(detail({ closePlan: true, pickLead: false }, unled))).toBe("closePlan");
+    const closedParts = {
+      stage: "planning" as const,
+      step: "prd" as const,
+      leadUserId: null,
+      prdPercent: 50,
+      openQuestions: 0,
+      designAwaitingApproval: false,
+      planClosed: { byUserId: 1, at: "2026-11-18T10:00:00Z" },
+    };
+    expect(
+      primaryActionFor(detail({ pickLead: true }, { ...unled, statusParts: closedParts })),
     ).toBe("pickLead");
     expect(primaryActionFor(detail({ approveDesign: true }))).toBe("approveDesign");
     expect(primaryActionFor(detail({}))).toBeNull();
+  });
+
+  it("gives the builder Mark released once building, and never Released on its own", () => {
+    const building = {
+      shownStage: "building" as const,
+      statusParts: {
+        stage: "building" as const,
+        where: "here" as const,
+        leadUserId: 2,
+        externalBuild: null,
+        repos: [],
+        openPrs: [],
+        mergedPrs: 1,
+        waitingForPr: false,
+        releasing: false,
+        heldReason: null,
+        workLive: true,
+      },
+    };
+    expect(primaryActionFor(detail({ markReleased: true }, building))).toBe("markReleased");
+    expect(primaryActionFor(detail({ merge: true, markReleased: true }, building))).toBe("merge");
+    expect(primaryActionFor(detail({}, building))).toBeNull();
   });
 
   it("renders nothing for the actions later phases build", () => {
@@ -329,7 +366,7 @@ describe("reduced motion lands on the same final state", () => {
     setReduceMotionSwitch(true);
     const still = snapshot();
     expect(still).toEqual(moving);
-    expect(still.text).toContain("Being built");
+    expect(still.text).toContain("Building");
   });
 });
 
@@ -404,7 +441,7 @@ describe("QueueList", () => {
     expect(screen.getByRole("button", { name: en.roadmapV2.updatedPill })).toBeInTheDocument();
   });
 
-  it("groups Leading by the five stages: planning and building are both Being built", () => {
+  it("groups Leading by the five stages: anything with a builder is Building", () => {
     const sections = sectionsFor("leading", {
       rows: [
         row({ code: "OPP-1", stage: "being_built" }),
@@ -415,7 +452,7 @@ describe("QueueList", () => {
     });
     expect(sections.map(s => s.key)).toEqual(["being_built", "shipped"]);
     expect(sections[0].rows.map(r => r.code)).toEqual(["OPP-1", "OPP-2"]);
-    expect(sections[0].label).toBe("Being built");
+    expect(sections[0].label).toBe("Building");
   });
 });
 

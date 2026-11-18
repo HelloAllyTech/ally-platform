@@ -127,6 +127,57 @@ export interface ItemDetail extends ItemRow {
   reviewState?: 'pending' | 'accepted' | 'declined';
   /** Present only for the author and Owners (D10, [FP-0992]). */
   declineReason?: string;
+  /**
+   * Where it started: who, when, how, and the rough idea as it was written
+   * before the interview. Absent for an idea filed with no draft session.
+   */
+  origin?: ItemOrigin;
+  /**
+   * Everything that happened to it after the first word, oldest first, one
+   * entry per milestone: submitted, planned, plan closed, builder assigned or
+   * changed, build mode, releases going live, marked released, declined.
+   * The conversation itself is the session transcript beside it.
+   */
+  timeline: ItemTimelineEntry[];
+}
+
+export interface ItemOrigin {
+  startedAt: string;
+  startedBy: PersonRef | null;
+  captureMode: 'typed' | 'voice' | null;
+  /** The idea as its author wrote it on the draft page. */
+  roughIdea: string | null;
+}
+
+export type ItemTimelineKind =
+  | 'submitted'
+  | 'reviewed'
+  | 'planning_started'
+  | 'plan_closed'
+  | 'plan_reopened'
+  | 'lead_assigned'
+  | 'lead_handed_back'
+  | 'design_approved'
+  | 'build_sent'
+  | 'external_build'
+  | 'build_mode_set'
+  | 'release_live'
+  | 'marked_released'
+  | 'closed'
+  | 'reopened'
+  | 'item_edited'
+  | 'answer_settled';
+
+export interface ItemTimelineEntry {
+  at: string;
+  kind: ItemTimelineKind;
+  actor: PersonRef | null;
+  /**
+   * Kind-specific facts, ids and values only (the UI writes the words):
+   * lead_assigned { from, to } as PersonRefs; build_mode_set { from, to };
+   * reviewed { decision }; item_edited { field }; release_live { service, tag }.
+   */
+  detail?: Record<string, unknown>;
 }
 
 export interface ForYouSections {

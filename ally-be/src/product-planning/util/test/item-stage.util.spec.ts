@@ -164,6 +164,8 @@ describe('deriveItemStage', () => {
           openQuestions: 2,
           designAwaitingApproval: false,
           externalBuild: null,
+          planClosed: null,
+          buildMode: null,
         },
       });
     });
@@ -198,6 +200,8 @@ describe('deriveItemStage', () => {
         openQuestions: 0,
         designAwaitingApproval: false,
         externalBuild: null,
+        planClosed: null,
+        buildMode: null,
       });
     });
   });
@@ -233,6 +237,8 @@ describe('deriveItemStage', () => {
           waitingForPr: false,
           releasing: false,
           heldReason: null,
+          workLive: false,
+          buildMode: null,
         },
       });
     });
@@ -266,6 +272,8 @@ describe('deriveItemStage', () => {
           openQuestions: 0,
           designAwaitingApproval: false,
           externalBuild: sent,
+          planClosed: null,
+          buildMode: null,
         },
       });
     });
@@ -287,6 +295,8 @@ describe('deriveItemStage', () => {
         waitingForPr: false,
         releasing: false,
         heldReason: null,
+        workLive: false,
+        buildMode: null,
       });
       expect(
         derive({

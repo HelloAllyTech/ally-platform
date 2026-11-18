@@ -59,7 +59,20 @@ export type RoadmapCapability =
   | "editGoal"
   | "editSummary"
   | "editLead"
-  | "editMonth";
+  | "editMonth"
+  /** Lifecycle 2026-11-18: an Owner declines at any point before Released. */
+  | "decline"
+  /** An Owner closes the plan; only then can a builder be assigned. */
+  | "closePlan"
+  /** An Owner reopens a closed plan while no builder is assigned. */
+  | "reopenPlan"
+  /** The assigned builder (or an Owner) says how it is built. */
+  | "setBuildMode"
+  /** The assigned builder (or an Owner) marks it Released. Nothing else does. */
+  | "markReleased";
+
+/** How the assigned builder builds it. */
+export type RoadmapBuildMode = "builder_agent" | "outside";
 
 /** What the caller may do. Partial because the server may add keys; a missing key means no. */
 export type RoadmapCan = Partial<Record<RoadmapCapability, boolean>>;
@@ -85,10 +98,14 @@ export type RoadmapStatusParts =
       designAwaitingApproval: boolean;
       /** P4: the brief went to Claude Code and no PR exists yet ("Brief sent … waiting for a PR"). */
       externalBuild?: { byUserId: number; at: string } | null;
+      /** The Owner closed the plan: it waits for a builder. */
+      planClosed?: { byUserId: number; at: string } | null;
+      buildMode?: RoadmapBuildMode | null;
     }
   | {
       stage: "building";
       where: "here" | "claude_code";
+      buildMode?: RoadmapBuildMode | null;
       leadUserId: number | null;
       externalBuild: { byUserId: number; at: string } | null;
       repos: string[];
@@ -97,6 +114,8 @@ export type RoadmapStatusParts =
       waitingForPr: boolean;
       releasing: boolean;
       heldReason: string | null;
+      /** All its work is live in production; the builder still has to mark it Released. */
+      workLive?: boolean;
     }
   | {
       stage: "shipped";
@@ -213,6 +232,43 @@ export interface RoadmapItemDetail extends RoadmapItemRow {
   reviewState?: "pending" | "accepted" | "declined";
   /** Present ONLY for the author and Owners. */
   declineReason?: string;
+  /** Where it started: who, when, by voice or typing, and the rough idea as written. */
+  origin?: RoadmapItemOrigin;
+  /** Every milestone since, oldest first. Absent from an older server. */
+  timeline?: RoadmapTimelineEntry[];
+}
+
+export interface RoadmapItemOrigin {
+  startedAt: string;
+  startedBy: RoadmapPersonRef | null;
+  captureMode: "typed" | "voice" | null;
+  roughIdea: string | null;
+}
+
+export type RoadmapTimelineKind =
+  | "submitted"
+  | "reviewed"
+  | "planning_started"
+  | "plan_closed"
+  | "plan_reopened"
+  | "lead_assigned"
+  | "lead_handed_back"
+  | "design_approved"
+  | "build_sent"
+  | "external_build"
+  | "build_mode_set"
+  | "release_live"
+  | "marked_released"
+  | "closed"
+  | "reopened"
+  | "item_edited"
+  | "answer_settled";
+
+export interface RoadmapTimelineEntry {
+  at: string;
+  kind: RoadmapTimelineKind;
+  actor: RoadmapPersonRef | null;
+  detail?: Record<string, unknown>;
 }
 
 export interface RoadmapMeRole {

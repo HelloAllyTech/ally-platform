@@ -182,7 +182,7 @@ export class ItemReleaseService {
       );
       if (result.live || result.released) {
         this.logger.info(
-          `[ROADMAP-RELEASE] ${result.live} release row(s) went live; ${result.released} opportunit(ies) released.`,
+          `[ROADMAP-RELEASE] ${result.live} release row(s) went live; ${result.released} opportunit(ies) live and waiting for their builder to mark them released.`,
         );
       }
       return result;
@@ -988,11 +988,15 @@ export class ItemReleaseService {
   // ── Releasing opportunities ────────────────────────────────────────────────
 
   /**
-   * Release every in-flight opportunity whose linked work is all live and
-   * that has a link allowed to drive release — its Builder/plan session's PR,
-   * one linked by hand, or (once the brief went to Claude Code) one carrying
-   * its code (`linkDrivesRelease`). Otherwise a code match records the link
-   * and can hold a release back, but never releases.
+   * Count every in-flight opportunity whose linked work is all live and that
+   * has a link allowed to drive release — its Builder/plan session's PR, one
+   * linked by hand, or (once the brief went to Claude Code) one carrying its
+   * code (`linkDrivesRelease`).
+   *
+   * It no longer marks them Released (lifecycle 2026-11-18): Released is only
+   * ever a person's click, the assigned builder's or an Owner's
+   * (`RoadmapItemBuildService.markReleased`). The idea page reads the same
+   * live release rows and prompts the builder to mark it. Writes nothing.
    */
   async releaseShipped(): Promise<number> {
     const linked = await this.linkRepository
@@ -1014,17 +1018,16 @@ export class ItemReleaseService {
       this.externallyBuilt(ids),
     ]);
 
-    let released = 0;
+    let waiting = 0;
     for (const id of ids) {
       const verdict = opportunityShipped(
         links.filter((link) => link.opportunityId === id),
         releases.filter((row) => row.opportunityId === id),
         { externalBuild: externalBuilds.has(id) },
       );
-      if (!verdict.shipped) continue;
-      if (await this.markReleased(id, verdict.liveAt)) released += 1;
+      if (verdict.shipped) waiting += 1;
     }
-    return released;
+    return waiting;
   }
 
   /**
@@ -1042,36 +1045,6 @@ export class ItemReleaseService {
       [ids],
     );
     return new Set((rows ?? []).map((row) => String(row.id)));
-  }
-
-  /**
-   * The one write that moves an opportunity to Released on evidence — the
-   * same stage write the old reconcile made (stage and `releasedAt`, nothing
-   * else; that reconcile had no other side effects to preserve).
-   *
-   * Compare-and-set on the stage: only a row still in flight moves, so a
-   * person archiving or releasing it by hand in the meantime wins, and a
-   * second pass cannot re-stamp `releasedAt`. Never downgrades.
-   *
-   * `releasedAt` is when the work went live where that is known, so a card
-   * released late lands in the month it shipped; "now" otherwise, as before.
-   */
-  async markReleased(
-    opportunityId: string,
-    liveAt: Date | null,
-  ): Promise<boolean> {
-    const result = await this.opportunityRepository.update(
-      { id: opportunityId, stage: In(CANDIDATE_STAGES) },
-      {
-        stage: RoadmapOpportunityStage.RELEASED,
-        releasedAt: liveAt ?? new Date(),
-      },
-    );
-    if (!result.affected) return false;
-    this.logger.info(
-      `[ROADMAP] Opportunity ${opportunityId} released: every service its merged pull requests touched is in a successful production release.`,
-    );
-    return true;
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

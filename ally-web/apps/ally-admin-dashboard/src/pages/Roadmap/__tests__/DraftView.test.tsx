@@ -172,7 +172,7 @@ describe("the draft page (§4.2)", () => {
     expect(screen.getByRole("button", { name: en.roadmapV2.draft.retry })).toBeInTheDocument();
   });
 
-  it("offers Fill it in yourself after two failed turns (§4.13)", async () => {
+  it("never offers Fill it in yourself, even after failed turns: drafts finish in the interview", async () => {
     mockDraft = draft(0);
     mockTurn.mockImplementation(() => {
       throw { status: 503, data: { code: "assistant_unavailable" } };
@@ -182,7 +182,8 @@ describe("the draft page (§4.2)", () => {
     fireEvent.click(button());
     await screen.findByText(en.roadmapV2.draft.assistantUnavailable);
     fireEvent.click(button());
-    expect(await screen.findByText(en.roadmapV2.draft.selfCheckOffer)).toBeInTheDocument();
+    await screen.findByText(en.roadmapV2.draft.assistantUnavailable);
+    expect(screen.queryByText(en.roadmapV2.draft.selfCheckOffer)).not.toBeInTheDocument();
   });
 
   it("autosaves typing to the server with the version it was written on", async () => {

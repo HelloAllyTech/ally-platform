@@ -114,17 +114,9 @@ export function draftChecks(
       label: criteria.get(id)?.label ?? id,
       hint: criteria.get(id)?.hint ?? '',
     };
-    const self = idea?.selfCheck?.[id];
-    if (self && self.trim()) {
-      return {
-        ...base,
-        met: true,
-        source: 'self' as const,
-        evidence: { quote: self.trim(), from: 'text' as const },
-        note: null,
-        reopened: false,
-      };
-    }
+    // "Fill it in yourself" no longer meets a check (lifecycle 2026-11-18): a draft is finished
+    // by its interview, so only the idea agent's verdicts count. Old self-filled answers are
+    // ignored, and the agent checks those drafts again on the next turn.
     const gate = gates.get(id);
     if (reopened.has(id)) {
       return {

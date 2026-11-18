@@ -32,7 +32,6 @@ import {
   PatchRoadmapDraftDto,
   RoadmapDictationDto,
   RoadmapDraftTurnDto,
-  RoadmapSelfCheckDto,
   SubmitRoadmapDraftDto,
 } from './roadmap-draft.dto';
 import { RoadmapDraftService } from './roadmap-draft.service';
@@ -153,14 +152,13 @@ export class RoadmapDraftController {
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
   @Put('drafts/:code/self-check')
-  @ApiOperation({ summary: 'Fill it in yourself: the five checks by hand' })
-  async selfCheck(
-    @Param('code') code: string,
-    @Body() dto: RoadmapSelfCheckDto,
-    @CurrentUser() user: TokenUser,
-  ) {
+  @ApiOperation({
+    summary:
+      'Removed: answers 410. Drafts are finished by the interview (lifecycle 2026-11-18)',
+  })
+  async selfCheck() {
     await this.settings.assertRoadmapV2();
-    return this.drafts.selfCheck(user.id, code, dto);
+    return this.drafts.selfCheck();
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)

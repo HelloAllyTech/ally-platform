@@ -9,6 +9,7 @@ import {
   useReviewRoadmapBatchMutation,
   useReviewRoadmapItemMutation,
   useSetRoadmapLeadMutation,
+  useStartRoadmapPlanningMutation,
   useUndoRoadmapReviewMutation,
 } from "../../../api/roadmapV2Flow";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
@@ -71,14 +72,15 @@ export const undoLastReview = (): boolean => {
 /**
  * The Owner's review calls, each with the 8-second undo (§4.6) and haptics (10 ms on a lead,
  * 2 × 15 ms on decline; §4.18). One undo token reverses a whole batch. There is no plain Accept:
- * picking a lead is what accepts an unreviewed idea (`assign`), and `pickLead` does the same for
- * one that was accepted before.
+ * Start planning accepts an idea still waiting (lifecycle 2026-11-18). A builder is assigned
+ * (`pickLead`) only once the Owner has closed the plan.
  */
 export const useReviewActions = () => {
   const [review] = useReviewRoadmapItemMutation();
   const [batch] = useReviewRoadmapBatchMutation();
   const [undo] = useUndoRoadmapReviewMutation();
   const [setLead] = useSetRoadmapLeadMutation();
+  const [start] = useStartRoadmapPlanningMutation();
   const copy = en.roadmapV2.review;
   // P8: picking a lead or Decline (with a reason) ends "triage one" (§4.16) when the row's focus
   // started it. Bulk reviews are not timed per idea.
@@ -120,25 +122,21 @@ export const useReviewActions = () => {
     [undo, copy],
   );
 
-  /** Pick a lead for an idea still awaiting review: accepts it and gives it the lead in one step. */
-  const assign = useCallback(
-    async (code: string, lead: { id: number; name: string }, onUndone?: () => void) => {
+  /** Start planning: an Owner expands the idea into a plan (accepting it if it was waiting). */
+  const startPlanning = useCallback(
+    async (code: string) => {
       try {
-        const result = await review({
-          code,
-          decision: "accept",
-          leadUserId: lead.id,
-        }).unwrap();
+        await start(code).unwrap();
         haptic(10);
         completeJob("triage_one", { itemId: code });
-        offerUndo(copy.leadAssigned(code, lead.name), result.undoToken, onUndone);
+        toast.success(en.roadmapV2.session.planningStarted);
         return true;
-      } catch {
-        toast.error(copy.failed);
+      } catch (error) {
+        toast.error(errorMessage(error) ?? en.roadmapV2.session.startPlanningFailed);
         return false;
       }
     },
-    [review, offerUndo, copy, completeJob],
+    [start, completeJob],
   );
 
   const decline = useCallback(
@@ -228,7 +226,7 @@ export const useReviewActions = () => {
     [setLead, copy],
   );
 
-  return { assign, decline, reopen, reviewMany, pickLead, handBack };
+  return { startPlanning, decline, reopen, reviewMany, pickLead, handBack };
 };
 
 /** Motion values for the desktop triage row (§4.18): a lead slides right, decline left. */

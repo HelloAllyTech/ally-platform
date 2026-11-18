@@ -14,10 +14,11 @@ import { ROUTES, en } from "@constants";
 import type { RoadmapItemDetail, RoadmapWatchLevel } from "@types";
 
 import { BuildMenu } from "./BuildMenu";
+import { BuildModeControl, buildModeOf } from "./BuildModeControl";
 import { ShipActions } from "./ReleaseDialog";
 import { VoteControl } from "./VoteControl";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
-import { IdeaFlowAction, hasIdeaFlowAction } from "../triage/ReviewActions";
+import { DeclineButton, IdeaFlowAction, hasIdeaFlowAction } from "../triage/ReviewActions";
 import { quietLine } from "../utils/copy";
 import { PRIMARY_ACTIONS_BUILT, primaryActionFor } from "../utils/primaryAction";
 
@@ -327,9 +328,45 @@ export const PrimaryAction: React.FC<{
   onOpenDetails?: (tab: "build" | "ship") => void;
   /** Phone: Build ▾ shows the Claude Code hint; Release slides to confirm. */
   phone?: boolean;
+}> = props => {
+  const action = primaryActionFor(props.item);
+  // The Owner's own steps carry Decline already; beside the builder's, an Owner gets it too, up to
+  // Released (lifecycle 2026-11-18).
+  const ownerStep = action === "startPlanning" || action === "closePlan" || action === "pickLead";
+  const decline =
+    !ownerStep && !!props.item.can?.decline && !!props.item.lead ? (
+      <DeclineButton item={props.item} fullWidth={props.fullWidth} />
+    ) : null;
+  const slot = <PrimaryActionSlot {...props} />;
+  const inner = decline ? (
+    <div className={`flex items-center gap-2 ${props.fullWidth ? "w-full" : ""}`}>
+      {decline}
+      {slot}
+    </div>
+  ) : (
+    slot
+  );
+  // Once a builder is assigned, how it's built sits beside the action (lifecycle 2026-11-18).
+  const showMode =
+    !!props.item.lead && (!!props.item.can?.setBuildMode || buildModeOf(props.item) !== null);
+  if (!showMode) return inner;
+  return (
+    <div className={`flex flex-wrap items-center gap-2 ${props.fullWidth ? "w-full" : ""}`}>
+      <BuildModeControl item={props.item} />
+      {inner}
+    </div>
+  );
+};
+
+const PrimaryActionSlot: React.FC<{
+  item: RoadmapItemDetail;
+  onApproveDesign: () => void;
+  fullWidth?: boolean;
+  onOpenDetails?: (tab: "build" | "ship") => void;
+  phone?: boolean;
 }> = ({ item, onApproveDesign, fullWidth, onOpenDetails, phone }) => {
   const action = primaryActionFor(item);
-  // Accept, Pick a lead, Start planning, and a declined idea's Reopen / New idea (P3, P3b).
+  // Start planning, Close plan, Pick a builder, Mark released, and a declined idea's Reopen / New idea.
   if (hasIdeaFlowAction(item)) return <IdeaFlowAction item={item} fullWidth={fullWidth} />;
   if (!action) {
     return <p className="text-sm text-typography-secondary">{quietLine(item)}</p>;
@@ -337,10 +374,10 @@ export const PrimaryAction: React.FC<{
   if (!PRIMARY_ACTIONS_BUILT.includes(action)) {
     switch (action) {
       case "pickLead":
-        // Rendered by IdeaFlowAction above (P3).
-        return null;
       case "startPlanning":
-        // Rendered by IdeaFlowAction above (P3b).
+      case "closePlan":
+      case "markReleased":
+        // Rendered by IdeaFlowAction above.
         return null;
       case "build":
         return <BuildMenu item={item} phone={phone} fullWidth={fullWidth} />;

@@ -84,6 +84,7 @@ let adminTenantCount = 0;
 // Roadmap v2's role radio (§3.2): answered only for an Owner while roadmap_v2 is on.
 const mockSetRoadmapRole = vi.fn();
 let roadmapRoleEntry: Record<string, unknown> | undefined;
+let roadmapRoleList: { users: Record<string, unknown>[] } | undefined;
 const roadmapToggles = [
   { key: "product_roadmap", label: "Product Roadmap", description: "", enabled: true },
   { key: "builder", label: "Builder", description: "", enabled: true },
@@ -171,6 +172,7 @@ vi.mock("@api", () => ({
   // A stable array per test: a fresh one each render would loop the page's sync effect.
   useGetUserFeatureTogglesQuery: () => ({ data: allToggles, isLoading: false }),
   useGetRoadmapRoleForQuery: () => ({ data: roadmapRoleEntry }),
+  useListRoadmapRolesQuery: () => ({ data: roadmapRoleList }),
   useSetRoadmapRoleForMutation: () => [mockSetRoadmapRole, { isLoading: false }],
   useSetUserFeatureTogglesMutation: () => [mockSetUserFeatureToggles],
   useGetTenantsQuery: () => ({ data: { data: [], count: 0 } }),
@@ -199,7 +201,26 @@ describe("SuperAdmins", () => {
     mockSetUserFeatureToggles.mockReturnValue(resolved);
     mockSetRoadmapRole.mockReturnValue(resolved);
     roadmapRoleEntry = undefined;
+    roadmapRoleList = undefined;
     withToggles([]);
+  });
+
+  it("shows everyone's Roadmap role in one column, for an Owner only", () => {
+    const { unmount } = render(<SuperAdmins />);
+    expect(screen.queryByText("Roadmap role")).not.toBeInTheDocument();
+    unmount();
+    roadmapRoleList = {
+      users: [
+        { userId: 1, name: "Current Admin", role: "owner", restricted: false, setting: "owner" },
+        { userId: 2, name: "Other Admin", role: "builder", restricted: false, setting: "builder" },
+      ],
+    };
+    render(<SuperAdmins />);
+    expect(screen.getByText("Roadmap role")).toBeInTheDocument();
+    expect(screen.getAllByTestId("sa-roadmap-role").map(cell => cell.textContent)).toEqual([
+      "Owner",
+      "Builder",
+    ]);
   });
 
   it("renders the platform admins list", () => {
@@ -348,15 +369,16 @@ describe("SuperAdmins", () => {
       };
       render(<SuperAdmins />);
       fireEvent.click(screen.getByText("Other Admin"));
-      const group = screen.getByRole("radiogroup", { name: "Roadmap role" });
+      // Carbon's RadioButtonGroup is a fieldset (a "group"); each radio's name carries its help line.
+      const group = screen.getByRole("group", { name: "Roadmap role" });
       expect(group).toBeInTheDocument();
-      expect(screen.getByRole("radio", { name: "Builder" })).toBeChecked();
+      expect(screen.getByRole("radio", { name: /^Builder/ })).toBeChecked();
       // The toggles the radio writes are not offered separately.
       expect(screen.queryByRole("switch", { name: "Builder" })).not.toBeInTheDocument();
       expect(screen.queryByRole("switch", { name: "Roadmap manage" })).not.toBeInTheDocument();
       expect(screen.getByRole("switch", { name: "Manage Settings" })).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("radio", { name: "Owner" }));
+      fireEvent.click(screen.getByRole("radio", { name: /^Owner/ }));
       expect(mockSetRoadmapRole).toHaveBeenCalledWith({ userId: 2, role: "owner" });
       expect(mockSetUserFeatureToggles).not.toHaveBeenCalled();
     });
@@ -371,7 +393,7 @@ describe("SuperAdmins", () => {
       };
       render(<SuperAdmins />);
       fireEvent.click(screen.getByText("Current Admin"));
-      const none = screen.getByRole("radio", { name: "None" });
+      const none = screen.getByRole("radio", { name: /^None/ });
       expect(none).toBeDisabled();
       fireEvent.click(none);
       expect(mockSetRoadmapRole).not.toHaveBeenCalled();

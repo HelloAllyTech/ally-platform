@@ -21,7 +21,6 @@ import { ChecksPanel } from "./ChecksPanel";
 import { DraftConversation, TurnError } from "./DraftConversation";
 import { agoText, dueSoon, errorCode, markFirstSubmit, newlyMet } from "./draftUtils";
 import { HighlightedTextBox } from "./HighlightedTextBox";
-import { SelfCheckForm } from "./SelfCheckForm";
 import { SimilarIdeas } from "./SimilarIdeas";
 import {
   useAddRoadmapDraftToMutation,
@@ -30,7 +29,6 @@ import {
   useReopenRoadmapDraftCheckMutation,
   useRestoreRoadmapDraftMutation,
   useRoadmapDraftTurnMutation,
-  useSelfCheckRoadmapDraftMutation,
   useSubmitRoadmapDraftMutation,
 } from "../../../api/roadmapV2Flow";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
@@ -46,15 +44,7 @@ import { useKeyboardInset } from "../hooks/useVisualViewport";
 import { shortDate } from "../utils/copy";
 import { isOfflineError } from "../utils/deviceStore";
 
-import type {
-  RoadmapDraftCheck,
-  RoadmapDraftDetail,
-  RoadmapSelfCheck,
-} from "../../../types/roadmapV2Flow";
-
-/** The assistant unreachable this long, or failing twice, offers Fill it in yourself (§4.13). */
-const SELF_CHECK_AFTER_MS = 2 * 60 * 1000;
-const SELF_CHECK_AFTER_FAILURES = 2;
+import type { RoadmapDraftCheck, RoadmapDraftDetail } from "../../../types/roadmapV2Flow";
 
 interface DraftViewProps {
   /** Undefined on New idea: the draft is made by the first save. */
@@ -185,7 +175,6 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
   // ── turns ─────────────────────────────────────────────────────────────────────────────────────
   const [turn] = useRoadmapDraftTurnMutation();
   const [reopen] = useReopenRoadmapDraftCheckMutation();
-  const [selfCheck] = useSelfCheckRoadmapDraftMutation();
   const [submit] = useSubmitRoadmapDraftMutation();
   const [addTo] = useAddRoadmapDraftToMutation();
   const [discard] = useDiscardRoadmapDraftMutation();
@@ -193,25 +182,11 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
 
   const [running, setRunning] = useState(false);
   const [turnError, setTurnError] = useState<TurnError>(null);
-  const failures = useRef<{ count: number; since: number | null }>({ count: 0, since: null });
-  const [offerSelfCheck, setOfferSelfCheck] = useState(false);
-
-  const noteFailure = (kind: TurnError) => {
-    setTurnError(kind);
-    const f = failures.current;
-    f.count += 1;
-    f.since = f.since ?? Date.now();
-    if (
-      kind === "ceiling" ||
-      f.count >= SELF_CHECK_AFTER_FAILURES ||
-      Date.now() - f.since >= SELF_CHECK_AFTER_MS
-    ) {
-      setOfferSelfCheck(true);
-    }
-  };
+  // "Fill it in yourself" was removed (2026-11-18): a draft is finished by its interview, so a
+  // failing agent only says so, and Check my idea is tried again.
+  const noteFailure = (kind: TurnError) => setTurnError(kind);
   const noteSuccess = () => {
     setTurnError(null);
-    failures.current = { count: 0, since: null };
   };
 
   const classify = (error: unknown): TurnError => {
@@ -292,19 +267,6 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       return;
     }
     void check();
-  };
-
-  const [selfCheckOpen, setSelfCheckOpen] = useState(false);
-  const saveSelfCheck = async (fields: RoadmapSelfCheck) => {
-    if (!code) return false;
-    try {
-      await autosave.flush();
-      await selfCheck({ code, fields }).unwrap();
-      return true;
-    } catch {
-      toast.error(copy.selfCheckFailed);
-      return false;
-    }
   };
 
   // ── submit ────────────────────────────────────────────────────────────────────────────────────
@@ -475,8 +437,6 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       }}
       onSubmit={() => setConfirmOpen(true)}
       hideSubmit={isPhone}
-      onSelfCheck={() => setSelfCheckOpen(true)}
-      showSelfCheckOffer={offerSelfCheck || !!draft.selfCheckOffered}
     />
   ) : null;
 
@@ -688,13 +648,6 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       >
         <p className="m-0 text-sm text-typography-primary">{copy.discardConfirm}</p>
       </RoadmapDialog>
-
-      <SelfCheckForm
-        open={selfCheckOpen}
-        onClose={() => setSelfCheckOpen(false)}
-        onSave={saveSelfCheck}
-        sheet={touch}
-      />
     </motion.div>
   );
 };

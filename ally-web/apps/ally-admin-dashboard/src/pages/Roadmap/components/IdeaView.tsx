@@ -696,7 +696,9 @@ const PhoneCommentButton: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => 
   const copy = en.roadmapV2.session;
   const session = useSessionAnswers(item);
   const [open, setOpen] = useState(false);
-  if (!item.can?.comment || !session.enabled) return null;
+  if (!item.can?.comment) return null;
+  // An older idea with no conversation yet: the sheet's box offers to open one.
+  if (!session.enabled && item.sessionId) return null;
   return (
     <>
       <button

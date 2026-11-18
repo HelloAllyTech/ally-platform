@@ -70,6 +70,8 @@ export interface RoadmapCapabilityItem {
   hasPlan: boolean;
   /** Start planning has been pressed (P3b). */
   planningStarted: boolean;
+  /** The Owner closed the plan: planning is done and the idea can take a builder. */
+  planClosed: boolean;
   /** A technical design is waiting for approval. */
   designAwaitingApproval: boolean;
   /** Planning has reached Ready to build. */
@@ -107,6 +109,16 @@ export interface RoadmapCapabilities {
   star: boolean;
   pinView: boolean;
   exportBrief: boolean;
+  /** Decline at any point before Released (the Owner's call). */
+  decline: boolean;
+  /** Close the plan, so a builder can be assigned (the Owner). */
+  closePlan: boolean;
+  /** Reopen a closed plan while nobody builds it yet (the Owner). */
+  reopenPlan: boolean;
+  /** Say how it is built: Builder agent or outside it (the assigned builder, or an Owner). */
+  setBuildMode: boolean;
+  /** Mark it Released (the assigned builder, or an Owner). */
+  markReleased: boolean;
 }
 
 export const NO_CAPABILITIES: RoadmapCapabilities = Object.freeze({
@@ -129,6 +141,11 @@ export const NO_CAPABILITIES: RoadmapCapabilities = Object.freeze({
   star: false,
   pinView: false,
   exportBrief: false,
+  decline: false,
+  closePlan: false,
+  reopenPlan: false,
+  setBuildMode: false,
+  markReleased: false,
 });
 
 /** What the caller can do anywhere, with no idea in view (the `me/role` answer). */
@@ -146,15 +163,22 @@ export function globalCapabilities(
 
 /**
  * What one person may do to one idea: role, plus relationship, plus the
- * idea's state, following the §3.1 matrix and D10–D18. Pure.
+ * idea's state. Pure. The lifecycle (Sandeep, 2026-11-18):
  *
- * - Shared ideas are open to everyone with board access to vote and comment
- *   (D12, D17); a draft is its author's alone.
+ * - Idea ⊂ Builder ⊂ Owner. Anyone with Idea or above drafts privately and
+ *   submits once the draft is ready; every submitted idea is open to everyone
+ *   to read and comment on, and to vote on (their own included) while it is
+ *   in To do.
+ * - Submitting puts it in To do (Backlog). From then on only an Owner edits it.
+ * - Only an Owner expands it into a plan (Start planning accepts an idea that
+ *   was waiting for review), works the plan, and closes the plan.
+ * - Only once the plan is closed does an Owner assign a builder; assigning one
+ *   is what moves it to Being built. An Owner can change the builder.
+ * - After that the assigned builder leads it: how it is built (Builder agent or
+ *   outside), the build calls, and marking it Released. An Owner can do all of
+ *   that too. Released is only ever a person's click.
+ * - Declining is the Owner's, at any point before Released.
  * - Declined and Closed ideas are read-only for everyone (§4.7).
- * - The lead's build-side calls belong to the lead (a Builder) on their idea
- *   and to any Owner on any idea (D4, D11, §2.1a).
- * - Review, picking the lead, the star, saved-view pins and configuration are
- *   the Owner's (D10, D11, D16, D15).
  */
 export function capabilitiesFor(
   role: RoadmapRole,
@@ -171,23 +195,36 @@ export function capabilitiesFor(
   const terminal = stage === 'declined' || stage === 'closed';
   const shared = !draft;
   const live = shared && !terminal;
-  // The lead's calls: their own idea as a Builder, or any idea as an Owner.
+  const open = live && stage !== 'shipped';
+  // To do: submitted, accepted or being planned, with nobody assigned to build it.
+  const toDo =
+    !item.hasLead &&
+    (stage === 'submitted' || stage === 'accepted' || stage === 'planning');
+  // The builder's calls: the assigned builder on their idea, or any Owner.
   const leads = owner || (builder && rel.isLead);
+  // Build-side calls need someone assigned to build it.
+  const builds = item.hasLead && leads;
 
   return {
-    vote: live && stage !== 'shipped',
+    // Votes are open while it is in To do: once a builder is assigned they lock, and the votes
+    // already cast stay (RoadmapAllocationService.lockedReason says the same).
+    vote: open && !item.hasLead && stage !== 'building',
     comment: live,
     answer: draft ? idea && rel.isAuthor : live && idea,
     watch: shared && idea,
     submit: draft && idea && rel.isAuthor,
     review: owner && stage === 'submitted',
-    pickLead:
-      owner &&
-      (stage === 'accepted' || stage === 'planning' || stage === 'building'),
+    decline: owner && open,
+    // Assign (or change) the builder: only once the plan is closed. An idea
+    // that already has a builder (assigned before plans closed) can always be
+    // handed to another.
+    pickLead: owner && open && (item.planClosed || item.hasLead),
     startPlanning:
-      stage === 'accepted' &&
-      !item.planningStarted &&
-      (owner || (builder && rel.isLead)),
+      owner &&
+      (stage === 'submitted' || stage === 'accepted') &&
+      !item.planningStarted,
+    closePlan: owner && toDo && stage === 'planning' && !item.planClosed,
+    reopenPlan: owner && toDo && item.planClosed,
     settleAnswer:
       live &&
       item.answersConflict &&
@@ -195,18 +232,20 @@ export function capabilitiesFor(
         (builder && rel.isLead) ||
         (!item.hasLead && idea && rel.isAuthor)),
     approveDesign: stage === 'planning' && item.designAwaitingApproval && leads,
-    startBuild: stage === 'planning' && item.readyToBuild && leads,
-    merge: stage === 'building' && item.awaitingMerge && leads,
+    startBuild: stage === 'planning' && item.readyToBuild && builds,
+    merge: stage === 'building' && item.awaitingMerge && builds,
     release: live && item.releaseHeld && leads,
     raiseCeiling: live && item.hasPlan && leads,
-    close: live && stage !== 'shipped' && builder,
+    close: owner && open,
     configure: owner,
     star: live && owner,
     pinView: owner,
-    exportBrief:
-      (stage === 'planning' && item.readyToBuild) || stage === 'building'
-        ? leads
-        : false,
+    exportBrief: builds && (stage === 'planning' || stage === 'building'),
+    setBuildMode: builds && (stage === 'planning' || stage === 'building'),
+    markReleased:
+      open &&
+      stage !== 'submitted' &&
+      (owner || (builder && rel.isLead && item.hasLead)),
   };
 }
 
@@ -222,10 +261,12 @@ export interface RoadmapEditCapabilities {
 /**
  * Who may edit which field in place (§4.11). Pure.
  *
- * - Title, goal and summary: the author while the idea waits for review, the
- *   lead once it is accepted, and an Owner at any point.
- * - Lead and planned month: an Owner (D11). The month stops being editable
- *   once the idea ships, because a shipped idea sits in the month it shipped.
+ * - Once submitted, only an Owner edits an idea: title, goal and summary
+ *   (lifecycle 2026-11-18; the author edits it freely while it is a draft,
+ *   on the draft page).
+ * - Lead: an Owner, once the plan is closed or a builder is already
+ *   assigned. Planned month: an Owner. The month stops being editable once
+ *   the idea ships, because a shipped idea sits in the month it shipped.
  * - Declined and Closed ideas are read-only (§4.7), and a draft is edited on
  *   its own page, not here.
  */
@@ -233,6 +274,10 @@ export function editCapabilitiesFor(
   role: RoadmapRole,
   rel: Pick<RoadmapRelationship, 'isAuthor' | 'isLead'>,
   stage: ShownStage,
+  plan: { planClosed: boolean; hasLead: boolean } = {
+    planClosed: false,
+    hasLead: false,
+  },
 ): RoadmapEditCapabilities {
   const owner = role === 'owner';
   const open =
@@ -240,19 +285,13 @@ export function editCapabilitiesFor(
     stage !== 'draft' &&
     stage !== 'declined' &&
     stage !== 'closed';
-  const text =
-    open &&
-    (owner ||
-      (stage === 'submitted'
-        ? rel.isAuthor
-        : rel.isLead && roleAtLeast(role, 'builder')));
+  const text = open && owner;
   return {
     editTitle: text,
     editGoal: text,
     editSummary: text,
     editLead:
-      owner &&
-      (stage === 'accepted' || stage === 'planning' || stage === 'building'),
+      open && owner && stage !== 'shipped' && (plan.planClosed || plan.hasLead),
     editMonth: open && owner && stage !== 'shipped',
   };
 }

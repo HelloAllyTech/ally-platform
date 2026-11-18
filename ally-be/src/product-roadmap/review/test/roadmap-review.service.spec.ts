@@ -31,7 +31,12 @@ function build(
     (items[code] ??= {
       code,
       shownStage: opts.stage ?? 'submitted',
-      can: { review: true, pickLead: true, ...(opts.can ?? {}) },
+      can: {
+        review: true,
+        decline: true,
+        pickLead: true,
+        ...(opts.can ?? {}),
+      },
     });
   const txQueries: [string, any[]][] = [];
   const manager = {
@@ -192,29 +197,48 @@ describe('RoadmapReviewService', () => {
     });
   });
 
-  it('accept with a lead assigns in the same transaction and tells the lead', async () => {
+  it('never assigns a builder at review: the plan comes first (lifecycle 2026-11-18)', async () => {
     const { service, deps, txQueries } = build();
-    const { undoToken } = await service.review(OWNER, {
-      code: 'OPP-0001',
-      decision: 'accept',
-      leadUserId: BUILDER,
-    });
-    expect(undoToken).toMatch(/\./);
+    await expect(
+      service.review(OWNER, {
+        code: 'OPP-0001',
+        decision: 'accept',
+        leadUserId: BUILDER,
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(
-      txQueries.some(
-        ([sql, p]) =>
-          sql.includes('UPDATE "builder_sessions"') && p[1] === BUILDER,
-      ),
-    ).toBe(true);
-    expect(deps.events.record).toHaveBeenCalledWith(
+      txQueries.some(([sql]) => sql.includes('UPDATE "builder_sessions"')),
+    ).toBe(false);
+    expect(deps.events.record).not.toHaveBeenCalledWith(
       expect.objectContaining({ kind: PlanEventKind.LEAD_ASSIGNED }),
     );
-    expect(deps.inbox.deliver).toHaveBeenCalledWith(
-      expect.objectContaining({
-        kind: RoadmapNotificationKind.ASSIGNED_TO_YOU,
-        directRecipientIds: [BUILDER],
+  });
+
+  it('declines an idea already being planned or built, but not a released one', async () => {
+    const planning = build({ stage: 'planning', can: { review: false } });
+    await planning.service.review(OWNER, {
+      code: 'OPP-0001',
+      decision: 'decline',
+      reason: 'Folded into the re-entry work.',
+    });
+    expect(
+      planning.txQueries.some(
+        ([sql, p]) =>
+          sql.includes('UPDATE "roadmap_opportunities"') && p[1] === 'declined',
+      ),
+    ).toBe(true);
+
+    const shipped = build({
+      stage: 'shipped',
+      can: { review: false, decline: false },
+    });
+    await expect(
+      shipped.service.review(OWNER, {
+        code: 'OPP-0001',
+        decision: 'decline',
+        reason: 'Too late.',
       }),
-    );
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   describe('picking a lead on an idea with no plan session', () => {
@@ -419,16 +443,16 @@ describe('RoadmapReviewService', () => {
     });
   });
 
-  it('Start planning: the lead or an Owner; an Owner with no lead takes it', async () => {
+  it('Start planning: an Owner expands it into a plan and assigns nobody', async () => {
     const { service, deps } = build({
       stage: 'accepted',
       can: { startPlanning: true },
     });
     await service.startPlanning(OWNER, 'OPP-0001');
-    expect(deps.store.update).toHaveBeenCalledWith('s-OPP-0001', {
-      leadUserId: OWNER,
-      updatedBy: OWNER,
-    });
+    expect(deps.store.update).not.toHaveBeenCalledWith(
+      's-OPP-0001',
+      expect.objectContaining({ leadUserId: expect.anything() }),
+    );
     expect(deps.store.patchPlan).toHaveBeenCalledWith(
       's-OPP-0001',
       expect.objectContaining({
@@ -443,6 +467,82 @@ describe('RoadmapReviewService', () => {
     const refused = build({ stage: 'accepted', can: { startPlanning: false } });
     await expect(
       refused.service.startPlanning(AUTHOR, 'OPP-0001'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('Start planning on a submitted idea accepts it', async () => {
+    const { service, deps } = build({
+      stage: 'submitted',
+      can: { startPlanning: true },
+    });
+    await service.startPlanning(OWNER, 'OPP-0001');
+    expect(deps.dataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining(`"reviewState" = 'accepted'`),
+      ['id-OPP-0001', OWNER],
+    );
+    expect(deps.events.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: PlanEventKind.REVIEWED,
+        detail: { decision: 'accept', via: 'start_planning' },
+      }),
+    );
+  });
+
+  it('closes and reopens the plan for an Owner only, with an event each way', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { closePlan: true, reopenPlan: true },
+    });
+    await service.setPlanClosed(OWNER, 'OPP-0001', true);
+    expect(deps.store.patchPlan).toHaveBeenCalledWith(
+      's-OPP-0001',
+      expect.objectContaining({
+        planClosed: expect.objectContaining({ byUserId: OWNER }),
+      }),
+    );
+    await service.setPlanClosed(OWNER, 'OPP-0001', false);
+    expect(deps.store.patchPlan).toHaveBeenCalledWith('s-OPP-0001', {
+      planClosed: null,
+    });
+    expect(deps.events.record).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: PlanEventKind.PLAN_CLOSED }),
+    );
+    expect(deps.events.record).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: PlanEventKind.PLAN_REOPENED }),
+    );
+
+    const refused = build({
+      stage: 'planning',
+      can: { closePlan: false },
+    });
+    await expect(
+      refused.service.setPlanClosed(AUTHOR, 'OPP-0001', true),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('opens the conversation on an older idea with none, for anyone who can comment', async () => {
+    const { service, deps } = build({
+      noSession: true,
+      stage: 'accepted',
+      can: { comment: true },
+    });
+    await service.openConversation(AUTHOR, 'OPP-0001');
+    expect(deps.builderSessions.createSession).toHaveBeenCalled();
+    expect(deps.events.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: PlanEventKind.FILED,
+        detail: { by: 'conversation' },
+      }),
+    );
+    // It assigns nobody and starts nothing.
+    expect(deps.store.update).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ leadUserId: expect.anything() }),
+    );
+
+    const closed = build({ noSession: true, can: { comment: false } });
+    await expect(
+      closed.service.openConversation(AUTHOR, 'OPP-0001'),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
