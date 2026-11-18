@@ -119,6 +119,29 @@ language; the response's `language` and `workspace.languageSource` carry it, and
 Field meanings and values are exactly today's `DebriefRun` columns and workspace keys, so ally-be's apply step,
 the Console, the metrics and the PM agent's reporting views read them unchanged.
 
+### Versioning and tolerance (2026-11-19)
+
+Both sides carry `contract_version` (an integer, now **1**) on `POST /debrief/runs`: ally-be sends it in
+the request, ally-ai answers with it. A missing value means 1, so an older side still works during a
+deploy. Bump it only for a change the other side cannot tolerate; adding an optional field is not one.
+
+- **Unknown fields pass through.** ally-ai's response models allow extras (`extra='allow'`, never
+  `forbid`) and the route sends `exclude_unset`, so a card, step or hard fail has exactly the keys the
+  graph built. ally-be keeps unknown fields too.
+- **Typed on the ally-ai side:** `cards` (`lead`, `what_worked`, `work_on_this`, `important_moment`,
+  `practise_next`), `steps[]` (`step`, `label`, `status`, `startedAt`, `ms`), `evaluator_hard_fails[]` and
+  `check_failures[]` (a `code` is required). `workspace`, `bundle`, `session` and `context` stay plain
+  objects on purpose: ally-be owns their keys.
+- **ally-be reads the response through `normaliseGraphResponse`** (`debrief-graph-contract.util.ts`): a
+  wrongly shaped optional field is dropped with a warning that names its path; a response with no
+  `status`, or non-object `cards` for a debrief that is shown, is a **contract error**: the graph client
+  throws a graph error with status 422, so the run ends as failed (and is retried or falls back) instead
+  of being left for the sweeper or half-applied. A `contract_version` above the one ally-be reads logs a
+  warning.
+- **One fixture, two tests.** `contract-fixture-response.json` in this folder is read by ally-ai's
+  `tests/core/debrief_graph/test_contract_fixture.py` and ally-be's `debrief-graph-contract.spec.ts`. If
+  one side changes what it sends or can read, a test fails; change the fixture and both tests together.
+
 ## 2. Gateway tools — `POST {gateway_url}/tools/:name` (ally-be)
 
 Auth: `Authorization: Bearer <run_token>`. The token is an HS256 JWT signed by ally-be with

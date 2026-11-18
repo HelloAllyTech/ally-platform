@@ -54,6 +54,7 @@ import {
 import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefFrameworkService } from './debrief-framework.service';
 import { resolveRiskCue } from '../util/debrief-risk-cue.util';
+import { DEBRIEF_CONTRACT_VERSION } from '../util/debrief-graph-contract.util';
 import {
   DataProvider,
   debriefDataProviders,
@@ -686,6 +687,7 @@ export class DebriefRunnerService {
 
     return {
       request: {
+        contract_version: DEBRIEF_CONTRACT_VERSION,
         run_id: run.id,
         scenario_session_id: sessionId,
         mode: opts.mode,

@@ -316,6 +316,7 @@ describe('DebriefRunnerService', () => {
       });
       expect(s.speaker_labels).toBe('legacy');
       // Standard reads the pinned definition: the prompt is the store's live text, untouched.
+      expect(request().contract_version).toBe(1);
       expect(request().prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition]).toMatch(
         /^live /,
       );
