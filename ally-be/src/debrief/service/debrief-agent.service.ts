@@ -58,35 +58,20 @@ import { todaysDebriefProvider } from '../util/debrief-todays-provider.util';
 import { RUN_STATUS_WRITERS } from '../util/debrief-run-status.util';
 import { cardsForReader } from '../util/debrief-cards.util';
 import { readableCards } from '../util/debrief-competencies.util';
+import { DEBRIEF_TIMING } from '../constants/debrief-timing.constants';
 import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import {
   DebriefProgress,
   DebriefRunnerService,
 } from './debrief-runner.service';
 
-/** Sessions per 5-minute tick; at today's volume the backlog clears in one or two ticks. */
-const DRAIN_BATCH = 8;
-const DRAIN_CONCURRENCY = 2;
-/**
- * How long after a live session ends its debrief starts: long enough for the
- * last turns to land, short enough that the learner is still on the page.
- * The drain is the backstop if this instance restarts in between.
- */
-export const LIVE_START_DELAY_MS = 45_000;
-/** Only recent sessions: a debrief days late is not what a learner waits for. */
-const DRAIN_WINDOW_HOURS = 48;
-/** Well past the longest deadline (risk cue: 3 min) plus a slow drain. */
-export const STUCK_AFTER_MINUTES = 10;
-/**
- * A session no run has started for this long after it ended is not going to
- * get one soon: the learner gets today's debrief instead of "working".
- */
-export const NO_RUN_GIVE_UP_MINUTES = 30;
-/**
- * A live run that ended without a draft is run again from the start this
- * many times (Gopi, 2026-11-16) before the learner gets today's debrief.
- */
-export const MAX_RETRIES = 1;
+const DRAIN_BATCH = DEBRIEF_TIMING.drainBatch;
+const DRAIN_CONCURRENCY = DEBRIEF_TIMING.drainConcurrency;
+export const LIVE_START_DELAY_MS = DEBRIEF_TIMING.liveStartDelayMs;
+const DRAIN_WINDOW_HOURS = DEBRIEF_TIMING.drainWindowHours;
+export const STUCK_AFTER_MINUTES = DEBRIEF_TIMING.stuckAfterMinutes;
+export const NO_RUN_GIVE_UP_MINUTES = DEBRIEF_TIMING.noRunGiveUpMinutes;
+export const MAX_RETRIES = DEBRIEF_TIMING.maxRetries;
 /**
  * Why a live run may end without a draft and be worth running again: a
  * model step failed, it was stuck, or the budget stopped it (before live
@@ -105,15 +90,10 @@ const NO_FALLBACK_SKIPS: ReadonlySet<string> = new Set([
   'no_transcript',
   'no_session',
 ]);
-/**
- * v9 FR-3: a run still "running" this long is past every deadline (150 s,
- * 180 s with a risk cue), so its worker is gone: resume it, once.
- */
-/** A published run still not written into its session this long after it finished is published again. */
-export const REPUBLISH_AFTER_MINUTES = 5;
-const REPUBLISH_BATCH = 20;
-export const RESUME_AFTER_MINUTES = 5;
-const MAX_RESUMES = 1;
+export const REPUBLISH_AFTER_MINUTES = DEBRIEF_TIMING.republishAfterMinutes;
+const REPUBLISH_BATCH = DEBRIEF_TIMING.republishBatch;
+export const RESUME_AFTER_MINUTES = DEBRIEF_TIMING.resumeAfterMinutes;
+const MAX_RESUMES = DEBRIEF_TIMING.maxResumes;
 
 /** The tenant switch: the only per-org setting the Debrief agent has in v1. */
 export const DEBRIEF_POLICY: PolicySchema = {
@@ -683,7 +663,8 @@ export class DebriefAgentService implements OnModuleInit {
   private async announceReady(run: DebriefRun): Promise<void> {
     const justFinished =
       run.finishedAt &&
-      Date.now() - new Date(run.finishedAt).getTime() < 2 * 60 * 1000;
+      Date.now() - new Date(run.finishedAt).getTime() <
+        DEBRIEF_TIMING.announceWithinMs;
     if (
       run.mode === DebriefRunMode.LIVE &&
       justFinished &&

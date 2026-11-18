@@ -10,3 +10,10 @@ from app.core.debrief_graph import constants
 
 def test_the_hard_margin_matches_ally_bes_graph_margin():
     assert constants.HARD_MARGIN_MS == 60_000.0
+
+
+def test_the_defaults_match_ally_bes_seed():
+    # ally-be's seed bundle: passScore 8, deadlineMs 150000 (checked on its side in
+    # debrief-timing-invariants.spec.ts).
+    assert constants.DEFAULT_PASS_SCORE == 8
+    assert constants.DEFAULT_DEADLINE_MS == 150_000

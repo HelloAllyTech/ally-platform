@@ -10,7 +10,12 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from app.core.debrief import framework
-from app.core.debrief_graph.constants import PROMPT_CODES, Recipe, Step
+from app.core.debrief_graph.constants import (
+    DEFAULT_PASS_SCORE,
+    PROMPT_CODES,
+    Recipe,
+    Step,
+)
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
 from app.core.debrief_graph.guidance_toolbox import for_writer as passages_for_writer
 from app.core.debrief_graph.state import DebriefState as State
@@ -213,7 +218,7 @@ def evaluator_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
         "system_prompt": ctx.prompt(PROMPT_CODES["evaluator"]),
         "fix_prompt": ctx.prompt(PROMPT_CODES["evaluator_fix"]),
-        "pass_score": ctx.setting("passScore", 8),
+        "pass_score": ctx.setting("passScore", DEFAULT_PASS_SCORE),
         # What the debrief may claim over time (null: nothing).
         "progress": state.get("progress"),
         **contract_extras(ctx, "risk_cue", "speaker_labels"),

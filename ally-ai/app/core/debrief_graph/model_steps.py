@@ -10,7 +10,13 @@ from app.core.debrief.cue_strength import effective_hard_fails
 from app.core.debrief_graph import inputs as body
 from app.core.debrief_graph import progress
 from app.core.debrief_graph.agent_logs import code_log
-from app.core.debrief_graph.constants import PROMPT_CODES, FallbackRung, Status, Step
+from app.core.debrief_graph.constants import (
+    DEFAULT_PASS_SCORE,
+    PROMPT_CODES,
+    FallbackRung,
+    Status,
+    Step,
+)
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
 from app.core.debrief_graph.findings import evidence_findings
 from app.core.debrief_graph.model_step import ModelStep
@@ -372,7 +378,9 @@ REVISER = ModelStep(
     body=body.reviser_body,
     round_of=lambda s: s["round"],
     why=lambda s, c: revision_why(
-        s["best"], c.setting("passScore", 8), set(s.get("advisory") or [])
+        s["best"],
+        c.setting("passScore", DEFAULT_PASS_SCORE),
+        set(s.get("advisory") or []),
     ),
     inputs=lambda s, c: [
         f"the best draft so far (round {s['best']['round']})",

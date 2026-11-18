@@ -25,6 +25,8 @@ from app.core.debrief_graph.agent_logs import code_log, origin_of
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
 from app.core.debrief_graph.constants import (
     DEFAULT_ADVISORY_CHECKS,
+    DEFAULT_DEADLINE_MS,
+    DEFAULT_PASS_SCORE,
     PROMPT_CODES,
     FallbackRung,
     Recipe,
@@ -452,7 +454,7 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
             if not (m or {}).get("summary"):
                 continue
             if ctx.time_left_ms(state.get("has_risk_cue", False)) < (
-                ctx.setting("deadlineMs", 150_000) / 2
+                ctx.setting("deadlineMs", DEFAULT_DEADLINE_MS) / 2
             ):
                 update["rung"] = int(FallbackRung.ONE_GUIDANCE_LOOKUP)
                 stopped = "Stopped early to keep time for writing."
@@ -791,9 +793,9 @@ async def score_draft(
         "hardFails": [h["code"] for h in evaluation["hardFails"]] if evaluation else [],
         "checks": [c["code"] for c in draft["checks"]],
     }
-    again = not meets_bar(best, advisory, ctx.setting("passScore", 8)) and state.get(
-        "round", 0
-    ) < _max_rounds(state, ctx)
+    again = not meets_bar(
+        best, advisory, ctx.setting("passScore", DEFAULT_PASS_SCORE)
+    ) and state.get("round", 0) < _max_rounds(state, ctx)
     goto = "revise_gate" if again else "decide"
     if (
         again
@@ -803,7 +805,7 @@ async def score_draft(
     ):
         # D3: the first failed evaluation gets one evidence top-up first.
         goto = "top_up"
-    pass_score = ctx.setting("passScore", 8)
+    pass_score = ctx.setting("passScore", DEFAULT_PASS_SCORE)
     log = code_log(
         ctx,
         "score_draft",
@@ -881,7 +883,7 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
     ctx = runtime.context
     best = state["best"]
     advisory = set(state.get("advisory") or [])
-    pass_score = ctx.setting("passScore", 8)
+    pass_score = ctx.setting("passScore", DEFAULT_PASS_SCORE)
     rnd = state.get("round", 0)
     ev = best.get("evaluation")
     options = body.practice_options(ctx)

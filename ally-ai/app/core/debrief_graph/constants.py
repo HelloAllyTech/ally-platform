@@ -73,6 +73,12 @@ class FallbackRung(IntEnum):
 
 #: Seconds one attempt at a step may take before it is retried (on the backup
 #: model when there is one): ally-be's `STEP_TIMEOUT_MS`, now the node timeout.
+#: The pass mark and the run deadline when a release names none: ally-be's seed values
+#: (`DEBRIEF_SEED_BUNDLE.settings.passScore` and `deadlineMs`), checked against them by
+#: `debrief-timing-invariants.spec.ts` and `test_deadline_margin.py`.
+DEFAULT_PASS_SCORE = 8
+DEFAULT_DEADLINE_MS = 150_000
+
 #: How long past its deadline a run may go before ally-be gives up on it (ally-be's
 #: `GRAPH_MARGIN_MS`, its HTTP timeout is deadline + this). A model call is cut off here, so
 #: ally-ai never keeps running after ally-be decided the worker was dead and started it again.
