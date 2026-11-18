@@ -1,10 +1,11 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { Close, Search } from "@icons";
+import { Close } from "@icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 
+import { Search } from "@ally-ui-mono/ui-shared";
 import { useSearchRoadmapQuery } from "@api";
 import { ROUTES, en } from "@constants";
 import type { RoadmapItemRow } from "@types";
@@ -140,21 +141,24 @@ export const QuickOpen: React.FC<QuickOpenProps> = ({
             }
             style={fullScreen ? { paddingTop: "env(safe-area-inset-top)" } : undefined}
           >
-            <div className="flex items-center gap-2 border-b border-border-light px-3">
-              <Search size={18} className="text-typography-secondary" aria-hidden />
-              <input
-                ref={inputRef}
-                type="search"
-                role="combobox"
-                aria-expanded="true"
-                aria-controls={listId}
-                aria-activedescendant={entries.length ? optionId(highlight) : undefined}
-                aria-label={copy.placeholder}
-                placeholder={copy.placeholder}
-                value={query}
-                onChange={event => setQuery(event.target.value)}
-                className="h-12 min-w-0 flex-1 bg-transparent text-base outline-none"
-              />
+            <div className="flex items-center gap-2 border-b border-border-light">
+              <div className="min-w-0 flex-1">
+                <Search
+                  ref={inputRef}
+                  size="lg"
+                  role="combobox"
+                  aria-expanded="true"
+                  aria-controls={listId}
+                  aria-activedescendant={entries.length ? optionId(highlight) : undefined}
+                  labelText={copy.placeholder}
+                  placeholder={copy.placeholder}
+                  value={query}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    setQuery(event.target.value)
+                  }
+                  onClear={() => setQuery("")}
+                />
+              </div>
               <RoadmapIconButton label={copy.close} onClick={onClose} large>
                 <Close size={18} aria-hidden />
               </RoadmapIconButton>

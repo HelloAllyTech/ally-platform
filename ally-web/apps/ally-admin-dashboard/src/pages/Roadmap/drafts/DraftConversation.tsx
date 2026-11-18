@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 
 import { AnimatePresence, motion } from "framer-motion";
 
-import { Button } from "@ally-ui-mono/ui-shared";
+import { Button, TextArea } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 
 import {
@@ -201,12 +201,11 @@ export const DraftConversation: React.FC<DraftConversationProps> = ({
         </div>
       )}
       {list.length > 0 && !readOnly && (
-        <div className="flex items-end gap-2 rounded border border-border-light p-2 focus-within:border-primary-600">
-          <label htmlFor={`roadmap-draft-answer-${code ?? "new"}`} className="sr-only">
-            {copy.answerLabel}
-          </label>
-          <textarea
+        <div className="flex flex-col gap-2">
+          <TextArea
             id={`roadmap-draft-answer-${code ?? "new"}`}
+            labelText={copy.answerLabel}
+            hideLabel
             value={answer}
             rows={1}
             placeholder={copy.answerPlaceholder}
@@ -217,19 +216,20 @@ export const DraftConversation: React.FC<DraftConversationProps> = ({
                 send();
               }
             }}
-            className="min-h-10 flex-1 resize-none bg-transparent px-1 text-base outline-none"
           />
-          <DictationButton
-            code={code}
-            boxLabel={copy.answerLabel}
-            large={large}
-            onText={words => {
-              typeInText(answer, words, setAnswer, reduced);
-            }}
-          />
-          <Button kind="primary" size="sm" onClick={send} disabled={!answer.trim()}>
-            {copy.send}
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            <DictationButton
+              code={code}
+              boxLabel={copy.answerLabel}
+              large={large}
+              onText={words => {
+                typeInText(answer, words, setAnswer, reduced);
+              }}
+            />
+            <Button kind="primary" size="sm" onClick={send} disabled={!answer.trim()}>
+              {copy.send}
+            </Button>
+          </div>
         </div>
       )}
     </section>

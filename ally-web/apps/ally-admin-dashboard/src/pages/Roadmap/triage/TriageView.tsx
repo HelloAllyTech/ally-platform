@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Tick } from "@icons";
 import { AnimatePresence, motion } from "framer-motion";
 
-import { Button, SkeletonText } from "@ally-ui-mono/ui-shared";
+import { Button, Checkbox, SkeletonText } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 import type { RoadmapItemRow, RoadmapItemsResponse } from "@types";
 
@@ -273,7 +273,6 @@ export const TriageView: React.FC<TriageViewProps> = ({
                     awaitingReview={row.shownStage === "submitted"}
                     current={paneCode === row.code}
                     checked={checked.has(row.code)}
-                    selectMode={selectMode && !touch}
                     leaving={leaving.get(row.code) ?? null}
                     touch={touch}
                     onToggle={() =>
@@ -392,12 +391,11 @@ const TriageRow: React.FC<{
   awaitingReview: boolean;
   current: boolean;
   checked: boolean;
-  selectMode: boolean;
   leaving: Decision | null;
   touch: boolean;
   onToggle: () => void;
   onOpen: () => void;
-}> = ({ row, awaitingReview, current, checked, selectMode, leaving, touch, onToggle, onOpen }) => {
+}> = ({ row, awaitingReview, current, checked, leaving, touch, onToggle, onOpen }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.triage;
   const why = row.whyHere;
@@ -431,28 +429,20 @@ const TriageRow: React.FC<{
       data-leaving={leaving ?? undefined}
     >
       <div className={`flex items-center gap-2 pr-4 ${touch ? "min-h-[72px]" : "min-h-12"}`}>
-        <AnimatePresence initial={false}>
-          {selectMode ? (
-            <motion.label
-              key="box"
-              className="flex h-12 w-10 shrink-0 cursor-pointer items-center justify-center"
-              initial={reduced ? { opacity: 0 } : { opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={reduced ? { opacity: 0 } : { opacity: 0, x: -16 }}
-              transition={motionTransition("moderate", "productive", reduced)}
-            >
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={onToggle}
-                aria-label={copy.select(row.code)}
-                className="h-4 w-4"
-              />
-            </motion.label>
-          ) : (
-            <span key="dot" className="w-6 shrink-0" aria-hidden />
-          )}
-        </AnimatePresence>
+        {/* Selecting is a Carbon Checkbox, shown on desktop for every row (bulk select is not offered on touch). */}
+        {touch ? (
+          <span className="w-4 shrink-0" aria-hidden />
+        ) : (
+          <span className="flex w-10 shrink-0 items-center justify-center">
+            <Checkbox
+              id={`triage-select-${row.code}`}
+              labelText={copy.select(row.code)}
+              hideLabel
+              checked={checked}
+              onChange={onToggle}
+            />
+          </span>
+        )}
         <button
           type="button"
           onClick={onOpen}
@@ -481,16 +471,6 @@ const TriageRow: React.FC<{
           {age}
           {amber && <span className="sr-only"> · {copy.waitingLong(days)}</span>}
         </span>
-        {!selectMode && !touch && (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={copy.select(row.code)}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-typography-secondary opacity-60 hover:bg-neutral-100 hover:opacity-100 focus-visible:opacity-100"
-          >
-            <span aria-hidden className="h-3.5 w-3.5 rounded-sm border border-current" />
-          </button>
-        )}
       </div>
     </motion.li>
   );
