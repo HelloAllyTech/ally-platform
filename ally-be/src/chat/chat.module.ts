@@ -47,6 +47,8 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 
 import { ScribeNoteDraft } from './entity/scribe-note-draft.entity';
 import { ScribeNoteHarnessService } from './service/scribe-note-harness.service';
+import { SegmentedRecordingService } from './service/segmented-recording.service';
+import { SegmentedRecordingController } from './controller/segmented-recording.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Message, Feedback, CallDetails, SummaryFeedback]),
@@ -68,7 +70,11 @@ import { ScribeNoteHarnessService } from './service/scribe-note-harness.service'
     PromptModule,
     LlmAgentModule,
   ],
-  controllers: [ChatController, AudioUploadController],
+  controllers: [
+    SegmentedRecordingController,
+    ChatController,
+    AudioUploadController,
+  ],
   providers: [
     ChatService,
     ChatSummaryService,
@@ -95,6 +101,7 @@ import { ScribeNoteHarnessService } from './service/scribe-note-harness.service'
     ChatSharedService,
     ChatSchedulerRegistrationService,
     ScribeNoteHarnessService,
+    SegmentedRecordingService,
   ],
   exports: [
     ChatService,
