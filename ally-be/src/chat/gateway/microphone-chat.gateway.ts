@@ -689,6 +689,15 @@ export class MicrophoneChatGateway
     const chatId = session.chatId;
     const existing = this.pendingEnds.get(chatId);
     if (existing) clearTimeout(existing.timer);
+    this.pendingEnds.delete(chatId);
+
+    // The counsellor ended it (End, then the socket closes): a normal end,
+    // nothing to hold or finalize.
+    try {
+      if (await this.chatService.isChatEnded(chatId)) return;
+    } catch {
+      // Unknown: fall through and treat it as a drop; finalizeEnd re-checks.
+    }
 
     const graceMs = MicrophoneChatGateway.reconnectGraceMs();
     if (graceMs <= 0) {

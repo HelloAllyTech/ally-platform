@@ -314,6 +314,17 @@ describe('MicrophoneChatGateway', () => {
       expect(mockStreamFileProcessorService.startCallStream).toHaveBeenCalled();
     });
 
+    it('does not hold a recording the counsellor already ended (End, then the socket closes)', async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+      mockChatService.isChatEnded.mockResolvedValue(true);
+
+      await gateway.handleDisconnect(socket('a'));
+
+      expect(gatewayPrivate.pendingEnds.has(7)).toBe(false);
+      await jest.advanceTimersByTimeAsync(GRACE);
+      expect(mockChatService.endChat).not.toHaveBeenCalled();
+    });
+
     it('does nothing when the chat was ended another way during the grace period', async () => {
       gatewayPrivate.sessions = { a: recording('a', 7) };
       await gateway.handleDisconnect(socket('a'));
