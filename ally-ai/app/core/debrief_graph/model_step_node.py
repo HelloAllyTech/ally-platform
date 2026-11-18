@@ -1,5 +1,16 @@
 """One model step as a graph node: the runner's `call()` rebuilt on LangGraph.
 
+
+How the step files relate (read in this order):
+- `app/core/debrief/steps.py`, `safety_reader.py`: what each AI step says and returns (the prompts and the
+  structured call). One function per step.
+- `debrief_graph/step_wire.py`: runs those functions in-process and answers in the wire shape the step
+  records and ally-be read (`InProcessSteps`, `StepError`).
+- `debrief_graph/model_step_inputs.py`: for each of the six steps, what it is sent, how the run view
+  explains it and where the run goes next.
+- `debrief_graph/model_step_node.py`: one such step as a graph node (retry, timeout, backup model).
+- `debrief_graph/inputs.py`: builds each step's body from the run's state (declared data access).
+
 What ally-be's `call()` did by hand is now the node's configuration:
 
 - "retried once, on the backup model": `RetryPolicy(max_attempts=2)`; the
@@ -40,7 +51,7 @@ from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.findings import agent_findings
 from app.core.debrief_graph.records import iso, progress_event, safe_summary
 from app.core.debrief_graph.state import DebriefState
-from app.core.debrief_graph.step_functions import StepError
+from app.core.debrief_graph.step_wire import StepError
 from app.core.llm.capture import capture_calls
 
 #: What a step's success or failure hook returns: extra state, and where to go

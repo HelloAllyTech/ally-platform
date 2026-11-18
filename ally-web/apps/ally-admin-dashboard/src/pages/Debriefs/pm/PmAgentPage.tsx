@@ -86,7 +86,7 @@ const TestSetsView: React.FC<{
 };
 
 /**
- * Changes (v2, U3; the old PM agent page at the same route): what the PM agent changed, grouped
+ * Changes (v2, U3; the Debrief PM agent's page, at `/debriefs/changes`): what the PM agent changed, grouped
  * by where each change is, with the one PM agent conversation beside it. Reports and Test sets
  * stay as tabs. `?view=` picks the tab and `?change=` the change in focus. There is no "Run the PM
  * agent now": a person asks in the conversation ("look at this week's flags now").

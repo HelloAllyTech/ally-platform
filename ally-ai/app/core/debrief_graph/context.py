@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 from app.core.debrief import framework
 from app.core.debrief_graph.constants import DEFAULT_DEADLINE_MS, HARD_MARGIN_MS
 from app.core.debrief_graph.gateway import Gateway
-from app.core.debrief_graph.step_functions import StepRunner
+from app.core.debrief_graph.step_wire import StepRunner
 
 
 def now_ms() -> float:

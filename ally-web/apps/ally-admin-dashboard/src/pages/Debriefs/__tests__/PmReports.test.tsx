@@ -212,7 +212,7 @@ const Where = () => {
 
 const renderAt = (search: string) =>
   render(
-    <MemoryRouter initialEntries={[`/debriefs/pm-agent${search}`]}>
+    <MemoryRouter initialEntries={[`/debriefs/changes${search}`]}>
       <PmAgentPage />
       <Where />
     </MemoryRouter>,
@@ -295,11 +295,11 @@ describe("Changes › Reports", () => {
     // A change's row opens it in Changes; a release without one opens Changes.
     expect(within(live).getByRole("link", { name: "12345678" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent?change=1234567890ab",
+      "/debriefs/changes?change=1234567890ab",
     );
     expect(within(live).getByRole("link", { name: "v6" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent",
+      "/debriefs/changes",
     );
     expect(screen.getByTestId("pm-report-list-reverted")).toHaveTextContent(
       "Undone automatically · 22 Oct · a learner try-out missed a risk cue",
@@ -318,7 +318,7 @@ describe("Changes › Reports", () => {
     expect(screen.getByRole("button", { name: "Download as PDF" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "All changes" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent",
+      "/debriefs/changes",
     );
   });
 

@@ -1,7 +1,7 @@
 """The graph's deciding nodes: recipe and budget, the gates in front of each
 paid step, guidance, the rule checks, scoring, the decision and the ending.
 
-The model steps themselves are built in `model_steps.py`; every node here
+The model steps themselves are built in `model_step_inputs.py`; every node here
 routes with a typed `Command` or follows its static edge.
 """
 

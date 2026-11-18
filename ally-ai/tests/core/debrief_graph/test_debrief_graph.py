@@ -606,7 +606,7 @@ class TestModels:
     ):
         monkeypatch.setitem(constants.STEP_TIMEOUT_S, "safety-reader", 0.05)
         monkeypatch.setattr(
-            "app.core.debrief_graph.model_step.STEP_TIMEOUT_S", constants.STEP_TIMEOUT_S
+            "app.core.debrief_graph.model_step_node.STEP_TIMEOUT_S", constants.STEP_TIMEOUT_S
         )
         steps.delay["safety-reader"] = 1.0
         result = await run(steps, gateway)

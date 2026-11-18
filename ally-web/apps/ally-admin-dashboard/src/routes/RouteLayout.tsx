@@ -89,6 +89,7 @@ import {
 // By path, not through `@pages`: onboarding (chunk 20a) needs nothing the barrel provides.
 
 import { AdminShell } from "./AdminShell";
+import { DebriefsPmAgentRedirect } from "./DebriefsPmAgentRedirect";
 import { DefaultRedirect } from "./DefaultRedirect";
 import { NotFound } from "./NotFound";
 import { PrivateLayout } from "./PrivateLayout";
@@ -1017,13 +1018,14 @@ export const RouteLayout: React.FC = () => {
             }
           />
           <Route
-            path={ROUTES.DEBRIEFS_PM_AGENT}
+            path={ROUTES.DEBRIEFS_CHANGES}
             element={
               <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
                 <PmAgentPage />
               </PrivateLayout>
             }
           />
+          <Route path={ROUTES.DEBRIEFS_PM_AGENT} element={<DebriefsPmAgentRedirect />} />
           <Route
             path={ROUTES.DEBRIEFS_SETTINGS}
             element={

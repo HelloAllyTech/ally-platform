@@ -1,5 +1,7 @@
 # Debrief harness: the ally-be ↔ ally-ai contract
 
+Words used here (change, release, bundle, recipe, plan, step, agent) are defined in [GLOSSARY.md](GLOSSARY.md).
+
 Status: being built (2026-11-10); Ask Ally (§5) moved 2026-11-11. Design: `~/projects/Ally/ally-debrief-orchestrator-spec.md` (Parts A, D, E; Ask Ally §A10, §D2 step 4).
 
 The Debrief agent moves from ally-be's `DebriefRunnerService` to a LangGraph graph in ally-ai. **The graph

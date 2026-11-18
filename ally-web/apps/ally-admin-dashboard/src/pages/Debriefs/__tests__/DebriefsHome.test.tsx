@@ -292,18 +292,18 @@ describe("Needs you: listed on Home, decided on the Debrief PM agent page", () =
   it("a row opens that change on the Debrief PM agent page", () => {
     renderAt();
     fireEvent.click(screen.getByTestId("home-needs-item"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/changes?change=c-safety");
   });
 
   it("the headline's 'needs you' links to the Debrief PM agent", () => {
     renderAt();
     fireEvent.click(screen.getByTestId("home-needs-link"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/changes");
   });
 
   it("an old Home link to a change opens it on the Debrief PM agent page", () => {
     renderAt("/debriefs?change=c-safety");
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?change=c-safety");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/changes?change=c-safety");
   });
 });
 
@@ -423,8 +423,8 @@ describe("old links", () => {
   it.each([
     ["runs", "/debriefs"],
     ["review", "/debriefs"],
-    ["pm-agent", "/debriefs/pm-agent"],
-    ["releases", "/debriefs/pm-agent"],
+    ["pm-agent", "/debriefs/changes"],
+    ["releases", "/debriefs/changes"],
     ["organisations", "/debriefs/settings#orgs"],
     ["settings", "/debriefs/settings"],
     ["knowledge", "/debriefs/settings#guidance"],
@@ -442,7 +442,7 @@ describe("old links", () => {
 
   it("follows the redirect when the page opens", () => {
     renderAt("/debriefs?tab=releases");
-    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent");
+    expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/changes");
   });
 
   it("tells a reader without console access why (PE-02)", () => {

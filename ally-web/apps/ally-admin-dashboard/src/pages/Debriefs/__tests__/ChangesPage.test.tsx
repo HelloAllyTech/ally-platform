@@ -148,7 +148,7 @@ const Where = () => {
 
 const renderAt = (search = "") =>
   render(
-    <MemoryRouter initialEntries={[`/debriefs/pm-agent${search}`]}>
+    <MemoryRouter initialEntries={[`/debriefs/changes${search}`]}>
       <PmAgentPage />
       <Where />
     </MemoryRouter>,

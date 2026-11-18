@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from app.core.debrief_graph.budget import budget_left
 from app.core.debrief_graph.inputs import contract_extras
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
-from app.core.debrief_graph.model_step import ModelStep
+from app.core.debrief_graph.model_step_node import ModelStep
 from app.core.debrief_graph.records import iso
 from app.core.debrief_graph.registry.manifest import REGISTRY, agent_config
 

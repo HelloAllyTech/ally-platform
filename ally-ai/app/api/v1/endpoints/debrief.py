@@ -34,7 +34,7 @@ from app.core.debrief_graph.schemas import (
     DebriefRunRequest,
     DebriefRunResponse,
 )
-from app.core.debrief_graph.step_functions import InProcessSteps
+from app.core.debrief_graph.step_wire import InProcessSteps
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

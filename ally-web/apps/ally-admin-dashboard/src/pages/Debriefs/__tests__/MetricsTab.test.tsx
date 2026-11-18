@@ -114,7 +114,7 @@ describe("Debriefs tab: pass rate", () => {
     expect(lang[3]).toHaveAttribute("data-thin", "true");
     expect(lang[3]).toHaveTextContent("too few to read");
     expect(lang[0]).not.toHaveAttribute("data-thin");
-    expect(lang[0]).toHaveTextContent("Hard fail");
+    expect(lang[0]).toHaveTextContent("Serious problem");
     // The other segments are filters now, not lists.
     expect(screen.queryByTestId("metrics-quality-breakdowns")).toBeNull();
   });
@@ -420,7 +420,7 @@ describe("Debriefs tab: states", () => {
       }),
     );
     expect(screen.getByTestId("metrics-unfiltered-note")).toHaveTextContent(
-      "Not filtered: baselines, uptake lift and the Debrief PM agent.",
+      "Not filtered: reference values, uptake lift and the Debrief PM agent.",
     );
     expect(screen.getByTestId("metrics-filter-more-button-count")).toHaveTextContent("2");
     const chips = screen.getByTestId("metrics-filter-chips");
@@ -550,15 +550,23 @@ describe("the orchestrator's rows in the agents table", () => {
   it("shows the planner's fallbacks, time, choices and skipped-then-missed with ranges", () => {
     expect(
       find(
-        "Planner",
-        "Fell back to the standard plan (planner failed, timed out or could not run)",
+        "Planner (picks extra agents)",
+        "Used the usual steps because the planner failed, timed out or could not run",
       ),
     ).toBe("14.3% (95% range 10%–90%, 1 of 7)");
-    expect(find("Planner", "Why it fell back")).toBe("Planner failed or returned a bad plan (1)");
-    expect(find("Planner", "Time, median / slowest 10%")).toBe("1200 / 3000");
-    expect(find("Planner", "Agents chosen per debrief, mean / median")).toBe("1.3 / 1");
-    expect(find("Planner", "Skipped Protocol check, then its miss showed up")).toContain("1 of 2");
-    expect(find("Top-up", "Debriefs that passed after a top-up added agents")).toContain("1 of 1");
+    expect(find("Planner (picks extra agents)", "Why it used the usual steps")).toBe(
+      "The planner failed or gave an answer that could not be used (1)",
+    );
+    expect(find("Planner (picks extra agents)", "Time, median / slowest 10%")).toBe("1200 / 3000");
+    expect(find("Planner (picks extra agents)", "Agents chosen per debrief, mean / median")).toBe(
+      "1.3 / 1",
+    );
+    expect(
+      find("Planner (picks extra agents)", "Skipped Protocol check, then its miss showed up"),
+    ).toContain("1 of 2");
+    expect(
+      find("Extra evidence round", "Debriefs that passed after the extra round added agents"),
+    ).toContain("1 of 1");
   });
 
   it("gives every registry agent its rows in plain words, plus the agent-specific ones", () => {
