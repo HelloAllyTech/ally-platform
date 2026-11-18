@@ -322,8 +322,13 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       within(moment).getByText("postSim.debriefCards.importantMoment.support"),
     ).toBeInTheDocument();
 
+    // The secondary cards start collapsed; their heading opens them.
     const worked = screen.getByTestId("debrief-card-what-worked");
+    expect(within(worked).queryByText(`“${CARDS.what_worked[0].quote}”`)).not.toBeInTheDocument();
+    expect(within(worked).getByRole("button", { expanded: false })).toBeInTheDocument();
+    fireEvent.click(within(worked).getByRole("button"));
     expect(within(worked).getByText(`“${CARDS.what_worked[0].quote}”`)).toBeInTheDocument();
+    expect(within(worked).getByRole("button", { expanded: true })).toBeInTheDocument();
 
     const trySaying = screen.getByTestId("debrief-try-saying");
     expect(trySaying).toHaveTextContent("postSim.debriefCards.trySaying");
@@ -331,6 +336,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
 
     // Skill words carry text, not colour alone.
     const words = screen.getByTestId("debrief-card-skill-words");
+    fireEvent.click(within(words).getByRole("button"));
     expect(within(words).getByText("postSim.debriefCards.skillWords.strength")).toBeInTheDocument();
     expect(
       within(words).getByText("postSim.debriefCards.skillWords.keep_practising"),
@@ -348,6 +354,18 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
 
     // No numeric score anywhere.
     expect(container.textContent).not.toMatch(/\d+\s*(%|\/\s*\d+)/);
+  });
+
+  it("offers breathing while waiting, only when the learner chooses it", () => {
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "working", steps: [] } });
+    renderTab();
+
+    expect(screen.queryByTestId("breathing-pacer")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("debrief-breathe-start"));
+    expect(screen.getByTestId("breathing-pacer")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("debrief-breathe-stop"));
+    expect(screen.queryByTestId("breathing-pacer")).not.toBeInTheDocument();
+    expect(screen.getByTestId("debrief-breathe-start")).toBeInTheDocument();
   });
 
   it("shows a calm progress panel with the latest step while working, and polls", () => {

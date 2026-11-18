@@ -40,6 +40,7 @@ import {
   SupervisorDebriefFlag,
 } from "@types";
 
+import { BreathingPacer } from "./BreathingPacer";
 import { CardFlag, DebriefHelpful, DebriefPulseCard } from "./DebriefCardFeedback";
 import { DebriefExplainer } from "./DebriefExplainer";
 import { DebriefProgressCard, parseProgressCard } from "./DebriefProgressCard";
@@ -48,6 +49,7 @@ import {
   ListenButton,
   ReadAloudContext,
   ReadAloudStatusLine,
+  useIsAnyBeingRead,
   useIsBeingRead,
 } from "./ReadAloudControls";
 import { useDebriefReadAloud } from "./useDebriefReadAloud";
@@ -97,7 +99,11 @@ const Quote: FC<{ text: string }> = ({ text }) => {
   );
 };
 
-/** One card in the debrief: a list item with a heading. */
+/**
+ * One card in the debrief: a list item with a heading. A [collapsible] card
+ * starts closed and opens from its heading (or while read-aloud is reading
+ * it), so a long debrief is easier to take in.
+ */
 const Card: FC<{
   title: string;
   icon: ReactNode;
@@ -106,8 +112,24 @@ const Card: FC<{
   testId?: string;
   /** The section read-aloud reads for this card, for its highlight. */
   readSection?: string;
-}> = ({ title, icon, tone = "neutral", children, testId, readSection }) => {
+  /** Sections inside this card that read-aloud may read: it opens while one is. */
+  readSections?: string[];
+  collapsible?: boolean;
+}> = ({
+  title,
+  icon,
+  tone = "neutral",
+  children,
+  testId,
+  readSection,
+  readSections,
+  collapsible = false,
+}) => {
   const reading = useIsBeingRead(readSection ?? "");
+  const readingInside = useIsAnyBeingRead(readSections ?? []);
+  const [open, setOpen] = useState(false);
+  const shown = !collapsible || open || reading || readingInside;
+  const bodyId = `${testId ?? title}-body`;
   return (
     <li
       data-testid={testId}
@@ -118,11 +140,34 @@ const Card: FC<{
           : "flex flex-col gap-3 rounded-lg border border-primary-100 bg-white p-4"
       } ${reading ? "ring-2 ring-primary-400 ring-offset-2" : ""}`}
     >
-      <h3 className="flex items-center gap-2 font-primary text-base font-semibold text-typography-900">
-        {icon}
-        {title}
+      <h3 className="font-primary text-base font-semibold text-typography-900">
+        {collapsible ? (
+          <button
+            type="button"
+            aria-expanded={shown}
+            aria-controls={bodyId}
+            onClick={() => setOpen(!shown)}
+            className="flex min-h-[44px] w-full items-center gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+          >
+            {icon}
+            <span className="flex-1">{title}</span>
+            <ChevronDown
+              aria-hidden="true"
+              className={`h-4 w-4 transition-transform motion-reduce:transition-none ${shown ? "rotate-180" : ""}`}
+            />
+          </button>
+        ) : (
+          <span className="flex items-center gap-2">
+            {icon}
+            {title}
+          </span>
+        )}
       </h3>
-      {children}
+      {shown && (
+        <div id={bodyId} className="flex flex-col gap-3">
+          {children}
+        </div>
+      )}
     </li>
   );
 };
@@ -393,6 +438,15 @@ const ReadyCards: FC<{
         {worked.length > 0 && (
           <Card
             testId="debrief-card-what-worked"
+            // Open when the learner flagged a point or a reviewer answered one: the reply must not hide behind a click.
+            collapsible={
+              !supervisor &&
+              !worked.some(
+                ({ index }) =>
+                  !!flagFor(`what_worked[${index}]`) || !!correctionFor(`what_worked[${index}]`),
+              )
+            }
+            readSections={worked.map(({ index }) => `what_worked[${index}]`)}
             title={t("postSim.debriefCards.whatWorked")}
             icon={<ThumbsUp aria-hidden="true" className="h-5 w-5 text-success-600" />}
           >
@@ -508,6 +562,7 @@ const ReadyCards: FC<{
         {cards.skill_words.length > 0 && (
           <Card
             testId="debrief-card-skill-words"
+            collapsible={!supervisor}
             title={t("postSim.debriefCards.skillWords.title")}
             icon={<Star aria-hidden="true" className="h-5 w-5 text-primary-600" />}
           >
@@ -531,6 +586,7 @@ const ReadyCards: FC<{
         {cards.progress_note && (
           <Card
             testId="debrief-card-progress-note"
+            collapsible={!supervisor}
             title={t("postSim.debriefCards.progressNote")}
             icon={<TrendingUp aria-hidden="true" className="h-5 w-5 text-primary-600" />}
           >
@@ -776,6 +832,7 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
   // order the run took them; the current one keeps the spinner.
   const currentLine = view.state === "working" ? progressLine() : null;
   const [doneLines, setDoneLines] = useState<string[]>([]);
+  const [breathing, setBreathing] = useState(false);
   const lastLine = useRef<string | null>(null);
   useEffect(() => {
     if (!currentLine) return;
@@ -811,7 +868,7 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
           aria-hidden="true"
           className="h-5 w-5 shrink-0 animate-spin text-primary-600 motion-reduce:animate-none"
         />
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-1 flex-col gap-1">
           <p className="font-primary text-sm font-semibold text-typography-900">
             {t("postSim.debriefCards.working.title")}
           </p>
@@ -831,6 +888,20 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
               {currentLine}
             </li>
           </ul>
+          {/* Breathing is the learner's choice, never started for them. */}
+          {breathing && <BreathingPacer />}
+          <button
+            type="button"
+            data-testid={breathing ? "debrief-breathe-stop" : "debrief-breathe-start"}
+            onClick={() => setBreathing(b => !b)}
+            className="mt-1 flex min-h-[44px] items-center self-start px-1 font-primary text-sm text-typography-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+          >
+            {t(
+              breathing
+                ? "postSim.debriefCards.working.breatheStop"
+                : "postSim.debriefCards.working.breatheStart",
+            )}
+          </button>
         </div>
       </div>
     );
