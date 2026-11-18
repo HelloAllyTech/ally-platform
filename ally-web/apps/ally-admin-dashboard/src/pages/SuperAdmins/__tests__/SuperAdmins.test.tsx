@@ -369,16 +369,15 @@ describe("SuperAdmins", () => {
       };
       render(<SuperAdmins />);
       fireEvent.click(screen.getByText("Other Admin"));
-      // Carbon's RadioButtonGroup is a fieldset (a "group"); each radio's name carries its help line.
-      const group = screen.getByRole("group", { name: "Roadmap role" });
+      const group = screen.getByRole("radiogroup", { name: "Roadmap role" });
       expect(group).toBeInTheDocument();
-      expect(screen.getByRole("radio", { name: /^Builder/ })).toBeChecked();
+      expect(screen.getByRole("radio", { name: "Builder" })).toBeChecked();
       // The toggles the radio writes are not offered separately.
       expect(screen.queryByRole("switch", { name: "Builder" })).not.toBeInTheDocument();
       expect(screen.queryByRole("switch", { name: "Roadmap manage" })).not.toBeInTheDocument();
       expect(screen.getByRole("switch", { name: "Manage Settings" })).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("radio", { name: /^Owner/ }));
+      fireEvent.click(screen.getByRole("radio", { name: "Owner" }));
       expect(mockSetRoadmapRole).toHaveBeenCalledWith({ userId: 2, role: "owner" });
       expect(mockSetUserFeatureToggles).not.toHaveBeenCalled();
     });
@@ -393,7 +392,7 @@ describe("SuperAdmins", () => {
       };
       render(<SuperAdmins />);
       fireEvent.click(screen.getByText("Current Admin"));
-      const none = screen.getByRole("radio", { name: /^None/ });
+      const none = screen.getByRole("radio", { name: "None" });
       expect(none).toBeDisabled();
       fireEvent.click(none);
       expect(mockSetRoadmapRole).not.toHaveBeenCalled();
