@@ -603,6 +603,24 @@ describe('DebriefRunnerService', () => {
       expect(practice.optionsFor).toHaveBeenCalledWith(7, 't1', 's1');
     });
 
+    it('a retried run keeps what its earlier attempt spent in its estimate', async () => {
+      const { svc } = build();
+      const failed = {
+        id: 'run-9',
+        scenarioSessionId: 's1',
+        mode: DebriefRunMode.LIVE,
+        status: DebriefRunStatus.RUNNING,
+        skipReason: 'safety_reader_failed',
+        cards: null,
+        fallbackRung: 6,
+        // retryRun stored the first attempt's estimate here before starting the second.
+        workspace: { retries: 1, priorEstimatedUsd: 0.03 },
+      } as any;
+      const run = await svc.retry(failed);
+      // This attempt's 0.0712 plus the first attempt's 0.03.
+      expect(run.estimatedCostUsd).toBe('0.1012');
+    });
+
     it('holds the run for a person at the monthly cap, without calling the graph', async () => {
       const { svc, graph } = build({
         monthToDate: {

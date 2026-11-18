@@ -458,9 +458,19 @@ export class DebriefAgentService implements OnModuleInit {
    */
   async retryRun(run: DebriefRun): Promise<DebriefRun | null> {
     const res = await this.dataSource.query(
+      // A retry starts a fresh attempt, but what the first one spent and when it began are kept
+      // (`firstStartedAt`, `priorEstimatedUsd`), so the month's spend and the cost reconcile count it.
       `UPDATE debrief_runs
-          SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{retries}',
-                to_jsonb(COALESCE((workspace->>'retries')::int, 0) + 1)),
+          SET workspace = jsonb_set(
+                jsonb_set(
+                  jsonb_set(coalesce(workspace, '{}'::jsonb), '{retries}',
+                    to_jsonb(COALESCE((workspace->>'retries')::int, 0) + 1)),
+                  '{firstStartedAt}',
+                  to_jsonb(COALESCE(workspace->>'firstStartedAt',
+                                    COALESCE("startedAt", "createdAt")::text))),
+                '{priorEstimatedUsd}',
+                to_jsonb(COALESCE((workspace->>'priorEstimatedUsd')::numeric, 0)
+                         + COALESCE("estimatedCostUsd", 0))),
               status = $2,
               "startedAt" = now(),
               "finishedAt" = NULL,
@@ -1465,7 +1475,8 @@ export class DebriefAgentService implements OnModuleInit {
       startedAt: Date;
       finishedAt: Date;
     }> = await this.dataSource.query(
-      `SELECT id, "scenarioSessionId", "startedAt", "finishedAt"
+      `SELECT id, "scenarioSessionId", "finishedAt",
+              COALESCE((workspace->>'firstStartedAt')::timestamp, "startedAt") AS "startedAt"
          FROM debrief_runs
         WHERE "actualCostUsd" IS NULL AND "finishedAt" IS NOT NULL
           AND "finishedAt" < now() - interval '1 hour'

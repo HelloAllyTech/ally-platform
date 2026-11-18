@@ -802,7 +802,11 @@ export class DebriefRunnerService {
       recipeKey: res.recipe_key ?? run.recipeKey ?? null,
       cards: res.cards ?? null,
       steps: res.steps ?? [],
-      estimatedCostUsd: Number(res.estimated_cost_usd ?? 0).toFixed(4),
+      // This attempt plus what earlier attempts of a retried run spent.
+      estimatedCostUsd: (
+        Number(res.estimated_cost_usd ?? 0) +
+        Number(run.workspace?.priorEstimatedUsd ?? 0)
+      ).toFixed(4),
       fallbackRung: Math.max(run.fallbackRung ?? 0, res.fallback_rung ?? 0),
       // The graph's language: the recorded one, or the one it read from the
       // learner's turns.
