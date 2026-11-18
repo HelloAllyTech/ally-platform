@@ -16,7 +16,10 @@ const TYPICAL_STEPS = 12;
  * Onboarding's start (copy §1), screen 1 of the one-screen flow (chunk 20d). Presentation only:
  * what it does is `useOnboardingStart`.
  */
-export const OnboardingStart: React.FC = () => {
+export const OnboardingStart: React.FC<{
+  /** Where "leave" goes. Defaults to the assistants list; the first-run overlay passes its own close. */
+  onLeave?: () => void;
+}> = ({ onLeave }) => {
   const navigate = useNavigate();
   const start = useOnboardingStart();
   const [mode, setMode] = useState<"website" | "describe">("website");
@@ -45,7 +48,7 @@ export const OnboardingStart: React.FC = () => {
       breadcrumb={COPY.newAssistant}
       progress={0}
       saved={false}
-      onLeave={() => navigate(ROUTES.WHATSAPP_BOT)}
+      onLeave={onLeave ?? (() => navigate(ROUTES.WHATSAPP_BOT))}
     >
       {start.resume && (
         <button

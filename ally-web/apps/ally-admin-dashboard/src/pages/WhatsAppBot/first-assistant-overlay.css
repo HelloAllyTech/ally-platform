@@ -1,0 +1,30 @@
+/* Full-screen first-run layer over the Assistants page. Above the app shell and its menus. */
+.ally-first-assistant {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--ally-bg, #fff);
+  overflow: hidden;
+}
+.ally-first-assistant__close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 20;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ally-ink, #1a1a1a);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ally-first-assistant__close:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+.ally-first-assistant__close:focus-visible {
+  outline: 2px solid var(--ally-ink, #1a1a1a);
+  outline-offset: 2px;
+}
