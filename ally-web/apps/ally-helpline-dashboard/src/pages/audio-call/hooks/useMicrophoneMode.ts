@@ -5,7 +5,15 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { logger } from "@ally-ui-mono/ui-shared";
-import { useEndCallMutation, useLazyGetCounsellorChatQuery, useGetNudgeStatusQuery } from "@api";
+import {
+  useEndCallMutation,
+  useLazyGetCounsellorChatQuery,
+  useGetNudgeStatusQuery,
+  useGetScribeRecordingConfigQuery,
+  useStartScribeRecordingMutation,
+  useGetSegmentUploadUrlMutation,
+  useFinalizeScribeRecordingMutation,
+} from "@api";
 import {
   SocketConnectionTypes,
   SocketDisconnectionReasons,
@@ -37,7 +45,25 @@ import {
   START_DIAGNOSTIC_DELAYS_MS,
 } from "../components/constants";
 import { AUDIO_FILE_SIZE } from "../constants";
+import { SegmentApi, SegmentedRecorder, SegmentUploader, segmentStore } from "../segmented";
 import { Nudge } from "../types";
+
+/** Next segment index per chat, so a reload resumes numbering, not overwrites. */
+const nextIndexKey = (chatId: number) => `ally-scribe-next-segment:${chatId}`;
+const readNextIndex = (chatId: number): number => {
+  try {
+    return Number(localStorage.getItem(nextIndexKey(chatId))) || 0;
+  } catch {
+    return 0;
+  }
+};
+const writeNextIndex = (chatId: number, index: number) => {
+  try {
+    localStorage.setItem(nextIndexKey(chatId), String(index));
+  } catch {
+    /* storage unavailable: a reload restarts numbering at 0 */
+  }
+};
 
 interface UseMicrophoneModeReturn {
   activeChat: Chat | null;
@@ -110,6 +136,25 @@ export const useMicrophoneMode = (mode: string | null): UseMicrophoneModeReturn 
   // reconnected within the window, we give up and surface an error. Cleared on
   // reconnect. Keeps a brief network blip from erroring the recording.
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Segmented recording (the org's switch): audio goes to S3 in ~30 s
+  // segments instead of over the socket, so a dropped socket, a deploy or a
+  // reload loses nothing. The socket stays for the live features only.
+  const { data: recordingConfig, isLoading: isRecordingConfigLoading } =
+    useGetScribeRecordingConfigQuery(undefined, { skip: !user?.userId });
+  const isSegmented = Boolean(recordingConfig?.enabled);
+  const isSegmentedRef = useRef(false);
+  isSegmentedRef.current = isSegmented;
+  const [startScribeRecording] = useStartScribeRecordingMutation();
+  const [getSegmentUploadUrl] = useGetSegmentUploadUrlMutation();
+  const [finalizeScribeRecording] = useFinalizeScribeRecordingMutation();
+  const segmentApi: SegmentApi = {
+    getUploadUrl: (chatId, index, contentType) =>
+      getSegmentUploadUrl({ chatId, index, contentType }).unwrap(),
+    finalize: args => finalizeScribeRecording(args).unwrap(),
+  };
+  const segmentedRecorderRef = useRef<SegmentedRecorder | null>(null);
+  const uploaderRef = useRef<SegmentUploader | null>(null);
   const activeChatId = activeChat?.chatId;
   const userId = user?.userId;
   const isActiveMicrophoneSession = microphoneChatId && !activeChat?.chatId;
@@ -274,6 +319,38 @@ export const useMicrophoneMode = (mode: string | null): UseMicrophoneModeReturn 
   };
 
   const confirmEndSession = async (triggerApi: boolean = true) => {
+    const chatId = activeChatId ?? microphoneChatId;
+    if (isSegmentedRef.current && segmentedRecorderRef.current && uploaderRef.current && chatId) {
+      // Stop, let the last segment and any queued uploads finish, then
+      // finalize (which ends the chat and starts transcription). The audio is
+      // already safe in S3/IndexedDB, so even a failed finalize loses
+      // nothing: the server finishes abandoned recordings itself.
+      const recorder = segmentedRecorderRef.current;
+      const uploader = uploaderRef.current;
+      const saving = toast.loading("Saving recording…");
+      try {
+        await recorder.stop();
+        const { missing } = await uploader.finish(recorder.nextIndex, recorder.recordedMs / 1000);
+        if (missing.length) toast.warning("Part of this recording could not be uploaded.");
+        try {
+          localStorage.removeItem(nextIndexKey(chatId));
+        } catch {
+          /* ignore */
+        }
+      } catch (error) {
+        logger.info(`Finishing segmented recording failed: ${error}`);
+        toast.error(
+          "We couldn't finish saving this recording now; it will be completed automatically.",
+        );
+      } finally {
+        toast.dismiss(saving);
+        cleanupMediaRecorder();
+        segmentedRecorderRef.current = null;
+        uploaderRef.current = null;
+      }
+      endSessionAndNavigate(false, chatId);
+      return;
+    }
     try {
       cleanupMediaRecorder();
       endSessionAndNavigate(triggerApi, activeChatId ?? microphoneChatId);
@@ -342,6 +419,9 @@ export const useMicrophoneMode = (mode: string | null): UseMicrophoneModeReturn 
       }
     },
     [SocketEvent.DISCONNECT]: (reason?: string) => {
+      // Segmented recording doesn't go over the socket: a drop only pauses the
+      // live features, so it never ends the session or shows an error.
+      if (isSegmentedRef.current) return;
       const action = classifyDisconnect(reason);
 
       // We disconnected on purpose (normal end) — the end handlers already tore
@@ -384,6 +464,25 @@ export const useMicrophoneMode = (mode: string | null): UseMicrophoneModeReturn 
     eventCallbacks: socketEventCallbacks,
     connectionType: SocketConnectionTypes.MICROPHONE_MODE,
   });
+
+  const setupSegmentedRecorder = (stream: MediaStream, chatId: number) => {
+    const uploader = new SegmentUploader(chatId, segmentApi, message => toast.warning(message));
+    const recorder = new SegmentedRecorder(
+      stream,
+      recordingConfig?.segmentSeconds ?? 30,
+      (index, blob, contentType) => {
+        writeNextIndex(chatId, index + 1);
+        audioFramesSentRef.current += 1;
+        uploader.enqueue(index, blob, contentType);
+      },
+      readNextIndex(chatId),
+    );
+    uploaderRef.current = uploader;
+    segmentedRecorderRef.current = recorder;
+    recorder.start();
+    // The screen's mute/unmute drives pause/resume/state on this object.
+    setMediaRecorder(recorder as unknown as MediaRecorder);
+  };
 
   const setupMediaRecorder = (stream: MediaStream) => {
     // Setup media recorder
@@ -483,12 +582,28 @@ export const useMicrophoneMode = (mode: string | null): UseMicrophoneModeReturn 
 
   // Emit AUDIO_CHAT_MUTED event when muted
   useEffect(() => {
-    if (isMuted) {
+    if (isMuted && !isSegmentedRef.current) {
       emitSocketEvent(SocketEvent.AUDIO_CHAT_MUTED, {
         chatId: activeChatId ?? microphoneChatId,
       });
     }
   }, [isMuted, activeChatId, microphoneChatId, emitSocketEvent]);
+
+  // Segments recorded before a reload or crash are still in IndexedDB: send
+  // them now. Their recording is resumed, or finished by the server.
+  useEffect(() => {
+    if (!isSegmented) return;
+    void segmentStore.all().then(stored => {
+      const byChat = new Map<number, typeof stored>();
+      stored.forEach(seg => byChat.set(seg.chatId, [...(byChat.get(seg.chatId) ?? []), seg]));
+      byChat.forEach((segs, chatId) => {
+        if (uploaderRef.current && chatId === (activeChatId ?? microphoneChatId)) return;
+        const uploader = new SegmentUploader(chatId, segmentApi);
+        segs.forEach(seg => uploader.enqueue(seg.index, seg.blob, seg.contentType));
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSegmented]);
 
   // Connect socket when user is available
   useEffect(() => {
@@ -539,7 +654,8 @@ export const useMicrophoneMode = (mode: string | null): UseMicrophoneModeReturn 
   // Setup media recorder when stream and chatId are available
   useEffect(() => {
     if (microphoneStream && microphoneChatId) {
-      setupMediaRecorder(microphoneStream);
+      if (isSegmentedRef.current) setupSegmentedRecorder(microphoneStream, microphoneChatId);
+      else setupMediaRecorder(microphoneStream);
     }
   }, [microphoneStream, microphoneChatId]);
 
@@ -591,6 +707,22 @@ export const useMicrophoneMode = (mode: string | null): UseMicrophoneModeReturn 
       // chatId arrives. If the microphone failed, the effect above has already
       // put the error screen up and this never fires.
       if (!microphoneStream) return;
+      // Wait to know which path this org uses.
+      if (isRecordingConfigLoading) return;
+
+      if (isSegmentedRef.current) {
+        setIsStartAudioChatEmitted(true);
+        startScribeRecording({ platform: "WEB", format: "webm" })
+          .unwrap()
+          .then(({ chatId }) => {
+            setMicrophoneChatId(chatId);
+            setIsUserJoined(true);
+          })
+          .catch(() => {
+            setSocketDisconnectionReason(SocketDisconnectionReasons.SOMETHING_WENT_WRONG);
+          });
+        return;
+      }
 
       const socketData = {
         platform: "WEB",
@@ -607,6 +739,7 @@ export const useMicrophoneMode = (mode: string | null): UseMicrophoneModeReturn 
     isStartAudioChatEmitted,
     mode,
     emitSocketEvent,
+    isRecordingConfigLoading,
   ]);
 
   /**

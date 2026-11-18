@@ -170,6 +170,12 @@ export enum PreferenceName {
    */
   SCRIBE_NOTE_HARNESS_SHADOW_ENABLED = 'SCRIBE_NOTE_HARNESS_SHADOW_ENABLED',
   /**
+   * Scribe recordings are saved as segments uploaded straight to S3 by the
+   * app (no server holds the audio), instead of over the live socket. Apps
+   * read it from GET /v1/scribe-recordings/config. OFF when absent.
+   */
+  SCRIBE_SEGMENTED_RECORDING_ENABLED = 'SCRIBE_SEGMENTED_RECORDING_ENABLED',
+  /**
    * Org-level switch letting a tenant's own ADMINs reach the Character Library
    * (list + interview agent + create) for characters scoped to their tenant.
    * OFF when the row is absent. Platform admins do NOT go through this — they
