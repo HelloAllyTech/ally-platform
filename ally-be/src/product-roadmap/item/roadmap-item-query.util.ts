@@ -277,21 +277,41 @@ export function page<T>(
   };
 }
 
-/** The first line of an idea's text, which is its title (the row has no title column). */
-export function titleOf(description: string | null | undefined): string {
-  const line = (description ?? '')
-    .split('\n')
-    .map((l) => l.trim())
-    .find((l) => l.length > 0);
-  return (line ?? '').slice(0, 200);
+/** The longest title the idea page shows and lets you save (the PATCH DTO allows the same). */
+export const TITLE_MAX = 200;
+
+/**
+ * Splits the idea's first non-empty line into a title of at most `TITLE_MAX` characters and the
+ * overflow. A longer line is cut at the last space (so a word is not sliced in half) and the rest
+ * moves to the body, so no text is ever dropped between what is stored and what the page shows —
+ * and saving a title edit rebuilds exactly what was stored.
+ */
+function splitFirstLine(description: string | null | undefined): {
+  title: string;
+  overflow: string;
+} {
+  const line =
+    (description ?? '')
+      .split('\n')
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? '';
+  if (line.length <= TITLE_MAX) return { title: line, overflow: '' };
+  const space = line.lastIndexOf(' ', TITLE_MAX);
+  const cut = space >= TITLE_MAX / 2 ? space : TITLE_MAX;
+  return { title: line.slice(0, cut).trimEnd(), overflow: line.slice(cut).trim() };
 }
 
-/** Everything after the title line, trimmed; null when there is nothing. */
+/** The first line of an idea's text, which is its title (the row has no title column). */
+export function titleOf(description: string | null | undefined): string {
+  return splitFirstLine(description).title;
+}
+
+/** Everything after the title, trimmed (a long first line's overflow, then the later lines); null when there is nothing. */
 export function bodyOf(description: string | null | undefined): string | null {
   const text = (description ?? '').trim();
   const newline = text.indexOf('\n');
-  if (newline < 0) return null;
-  const body = text.slice(newline + 1).trim();
+  const rest = newline < 0 ? '' : text.slice(newline + 1).trim();
+  const body = [splitFirstLine(description).overflow, rest].filter(Boolean).join('\n\n');
   return body.length ? body : null;
 }
 

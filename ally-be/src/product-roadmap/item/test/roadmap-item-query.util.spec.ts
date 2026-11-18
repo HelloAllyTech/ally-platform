@@ -178,6 +178,26 @@ describe('title and body', () => {
     expect(bodyOf('Only a title')).toBeNull();
   });
 
+  it('moves a first line longer than the title cap into the body, losing nothing', () => {
+    const long = `${'word '.repeat(60)}tail-of-the-url`; // one 314-char line
+    const text = `${long}\nLater line.`;
+    const title = titleOf(text);
+    expect(title.length).toBeLessThanOrEqual(200);
+    expect(title.endsWith('word')).toBe(true); // cut at a space, not mid-word
+    const body = bodyOf(text) as string;
+    expect(body.endsWith('tail-of-the-url\n\nLater line.')).toBe(true);
+    // Saving the title unchanged must rebuild every character that was stored.
+    expect(joinDescription(title, body).replace(/\s+/g, ' ')).toBe(
+      text.replace(/\s+/g, ' '),
+    );
+  });
+
+  it('cuts a spaceless first line at the cap and keeps the rest', () => {
+    const text = 'x'.repeat(250);
+    expect(titleOf(text)).toBe('x'.repeat(200));
+    expect(bodyOf(text)).toBe('x'.repeat(50));
+  });
+
   it('joins them back with a blank line, or the title alone', () => {
     expect(joinDescription(' New  title ', 'Body')).toBe('New title\n\nBody');
     expect(joinDescription('New title', null)).toBe('New title');

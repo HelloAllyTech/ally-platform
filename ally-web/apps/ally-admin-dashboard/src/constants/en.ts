@@ -9536,6 +9536,8 @@ export const en = {
     idea: {
       conversation: "Conversation",
       details: "Details",
+      titleShow: "Show the full title",
+      titleHide: "Collapse the title",
       showAgentWork: "Show agent work",
       showAgentWorkHelp:
         "Off: one line per agent step. On: every tool call, diff and log the agent produced. Remembered for you.",

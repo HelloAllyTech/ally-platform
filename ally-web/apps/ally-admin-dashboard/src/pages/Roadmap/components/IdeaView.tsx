@@ -36,6 +36,7 @@ import {
   PrimaryAction,
 } from "./IdeaControls";
 import { IdeaPanelContent } from "./IdeaPanels";
+import { HeaderTracker, OpportunityHeader } from "./OpportunityHeader";
 import { PeopleChips } from "./PeopleChips";
 import { ShippedCard } from "./ShippedCard";
 import { Tracker } from "./Tracker";
@@ -345,16 +346,12 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   const header = isPhone ? (
     <PhoneHeader item={item} collapsed={collapsed} headingRef={headingRef} status={status} />
   ) : (
-    <header className="flex flex-col gap-2 border-b border-border-light px-4 py-3">
-      <div className="flex flex-wrap items-start gap-2">
-        <span className="pt-1 text-xs tabular-nums text-typography-secondary">{item.code}</span>
-        <IdeaTitle
-          item={item}
-          as={mode === "page" ? "h1" : "h2"}
-          headingRef={headingRef}
-          className="min-w-0 flex-1 text-lg font-semibold text-typography-primary"
-        />
-        <div className="flex shrink-0 items-center gap-1">
+    <OpportunityHeader
+      item={item}
+      as={mode === "page" ? "h1" : "h2"}
+      headingRef={headingRef}
+      actions={
+        <>
           <IdeaVotes item={item} />
           <IdeaStar item={item} />
           <IdeaWatch item={item} />
@@ -389,14 +386,10 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
               <DockToRight size={16} aria-hidden />
             </button>
           )}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <Tracker stage={item.shownStage} />
-        <p className="m-0 text-sm text-typography-secondary" aria-live="polite">
-          {status}
-        </p>
-      </div>
+        </>
+      }
+    >
+      <HeaderTracker item={item} status={status} />
       <FirstSubmitNote code={item.code} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col">
@@ -412,7 +405,7 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
           )}
         </div>
       </div>
-    </header>
+    </OpportunityHeader>
   );
 
   // ── reading pane ────────────────────────────────────────────────────────────────────────────
@@ -604,25 +597,38 @@ const PhoneHeader: React.FC<{
 }> = ({ item, collapsed, status, headingRef }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
+  const [barOpen, setBarOpen] = useState(false);
+  useEffect(() => setBarOpen(false), [item.code]);
   return (
     <header className="flex flex-col">
-      <div className="sticky top-0 z-[3] flex h-12 items-center gap-1 border-b border-border-light bg-white px-1">
+      <div className="sticky top-0 z-[3] flex min-h-12 items-start gap-1 border-b border-border-light bg-white px-1">
         <Link
           to={ROUTES.ROADMAP}
-          className="inline-flex h-11 items-center px-2 text-sm text-primary-700"
+          className="inline-flex h-12 shrink-0 items-center px-2 text-sm text-primary-700"
           aria-label={copy.actions.back}
         >
           ‹ {copy.backToQueue}
         </Link>
-        <motion.span
-          className="min-w-0 flex-1 truncate text-base font-semibold text-typography-primary"
-          animate={{ opacity: collapsed ? 1 : 0 }}
-          transition={motionTransition("fast", "productive", reduced)}
-          aria-hidden={!collapsed}
+        {/* The grounding strip: code, stage and title are on screen at every scroll position and in
+            every tab. The title is one line until tapped, then the whole text. */}
+        <button
+          type="button"
+          onClick={() => setBarOpen(open => !open)}
+          aria-expanded={barOpen}
+          aria-label={`${item.code}. ${item.title}. ${barOpen ? copy.idea.titleHide : copy.idea.titleShow}`}
+          className="flex min-h-12 min-w-0 flex-1 flex-col justify-center bg-transparent py-1 text-left"
         >
-          {item.title}
-        </motion.span>
-        <IdeaVotes item={item} />
+          <span className="text-[11px] tabular-nums leading-tight text-typography-secondary">
+            {item.code} · {copy.stages[item.shownStage]}
+          </span>
+          <span
+            className={`text-sm font-semibold leading-snug text-typography-primary ${
+              barOpen ? "" : "truncate"
+            }`}
+          >
+            {item.title}
+          </span>
+        </button>
         <IdeaStar item={item} compact />
         <CopyLinkButton code={item.code} compact />
       </div>
@@ -644,7 +650,10 @@ const PhoneHeader: React.FC<{
         <p className="m-0 text-sm text-typography-secondary">
           {copy.stages[item.shownStage]} · {status}
         </p>
-        <IdeaWatch item={item} />
+        <div className="flex items-center gap-2">
+          <IdeaVotes item={item} />
+          <IdeaWatch item={item} />
+        </div>
       </div>
     </header>
   );
