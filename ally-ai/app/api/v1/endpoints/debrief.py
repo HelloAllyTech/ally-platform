@@ -53,7 +53,11 @@ def get_graph():
     return get_debrief_graph()
 
 
-@router.post("/runs", response_model=DebriefRunResponse, response_model_exclude_unset=True)
+@router.post(
+    "/runs",
+    response_model=DebriefRunResponse,
+    response_model_exclude_unset=True,
+)
 async def debrief_run(
     req: DebriefRunRequest, graph=Depends(get_graph)
 ) -> DebriefRunResponse:
@@ -81,8 +85,9 @@ async def debrief_run(
         gateway=HttpGateway(req.gateway_url, req.run_token),
     )
     result = await run_debrief(graph, ctx, resume=req.resume)
-    # `exclude_unset` keeps every shape exactly as the graph built it (no null or empty keys added
-    # by the typed models); the version is set explicitly so it is always sent.
+    # `exclude_unset` keeps every shape exactly as the graph built it (no null or empty
+    # keys added by the typed models); the version is set explicitly so it is always
+    # sent.
     return DebriefRunResponse(**{**result, "contract_version": CONTRACT_VERSION})
 
 

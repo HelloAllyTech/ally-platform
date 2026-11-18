@@ -136,7 +136,7 @@ class DebriefRunContext:
         )
 
     def hard_left_s(self, has_risk_cue: bool) -> float:
-        """Seconds until ally-be gives up on this run (deadline + margin); can be negative."""
+        """Seconds until ally-be gives up on the run (deadline + margin); may be < 0."""
         return (
             self.deadline_ms(has_risk_cue)
             + HARD_MARGIN_MS
