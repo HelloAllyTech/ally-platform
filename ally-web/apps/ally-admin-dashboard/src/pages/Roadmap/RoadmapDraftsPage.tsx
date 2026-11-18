@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button, CarbonToggle, SkeletonText } from "@ally-ui-mono/ui-shared";
@@ -16,6 +16,7 @@ import {
 } from "../../motion";
 import { NewIdeaButton } from "./components/NewIdeaButton";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
+import { RoadmapTopNav } from "./components/RoadmapTopNav";
 import { agoText, dueSoon } from "./drafts/draftUtils";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
 import { useKeyboardInset } from "./hooks/useVisualViewport";
@@ -47,28 +48,7 @@ export const RoadmapDraftsPage: React.FC = () => {
   return (
     <MotionConfig reducedMotion={reduced ? "always" : "user"}>
       <div className="flex h-full min-h-0 flex-col bg-white">
-        <header className="flex items-center justify-between gap-2 px-4 pb-1 pt-3">
-          <div className="flex min-w-0 items-baseline gap-4">
-            <h1 className="text-xl font-semibold text-typography-primary">{copy.title}</h1>
-            {!isPhone && (
-              <nav aria-label={copy.title} className="flex items-center gap-3 text-sm">
-                <Link to={ROUTES.ROADMAP} className="text-typography-secondary hover:underline">
-                  {copy.mobile.queue}
-                </Link>
-                <span className="font-semibold text-typography-primary" aria-current="page">
-                  {copy.mobile.drafts}
-                </span>
-                <Link
-                  to={ROUTES.ROADMAP_BUGS}
-                  className="text-typography-secondary hover:underline"
-                >
-                  {copy.mobile.bugs}
-                </Link>
-              </nav>
-            )}
-          </div>
-          {!isPhone && <NewIdeaButton />}
-        </header>
+        <RoadmapTopNav phone={isPhone} withNewIdea />
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-light px-4 py-2">
           <p className="m-0 text-sm text-typography-secondary">{copy.drafts.intro}</p>

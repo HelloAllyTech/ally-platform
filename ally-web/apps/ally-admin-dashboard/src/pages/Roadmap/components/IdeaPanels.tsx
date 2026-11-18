@@ -7,6 +7,7 @@ import type { BuilderSessionDetail, RoadmapItemDetail } from "@types";
 
 import { CodeText } from "./CodeChip";
 import { ShipActions } from "./ReleaseDialog";
+import { SimilarLine } from "../triage/TriageSummary";
 import { IdeaPanelTab, shortDate, usd } from "../utils/copy";
 import { outcomeLine } from "../utils/delight";
 
@@ -52,6 +53,12 @@ export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) =>
       )}
       {s.who && <Field label={copy.who}>{s.who}</Field>}
       {s.outcome && <Field label={copy.outcome}>{s.outcome}</Field>}
+      {/* The one who decides, deciding: what it overlaps with, right where they read it. */}
+      {item.can?.review && (
+        <Field label={en.roadmapV2.triage.similar}>
+          <SimilarLine code={item.code} bare />
+        </Field>
+      )}
       {why.length > 0 && (
         <Field label={copy.whyRanks}>
           <ul className="m-0 list-disc pl-4">

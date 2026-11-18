@@ -10,11 +10,11 @@ import type { RoadmapItemRow, RoadmapItemsResponse } from "@types";
 import { DeclineDialog, DeclineTarget } from "./DeclineDialog";
 import { LeadPicker } from "./LeadPicker";
 import { TriageReviewMode } from "./TriageReviewMode";
-import { TriageSummary } from "./TriageSummary";
 import { workingDaysSince } from "./triageUtils";
 import { triageExit, undoLastReview, useReviewActions } from "./useReviewActions";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
 import { RollingNumber } from "../components/FlowMotion";
+import { IdeaView } from "../components/IdeaView";
 import { sectionsFor } from "../components/QueueList";
 import { RoadmapBreakpoint, hasReadingPane } from "../hooks/useRoadmapBreakpoint";
 import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
@@ -363,15 +363,11 @@ export const TriageView: React.FC<TriageViewProps> = ({
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,2fr)_3fr]">
       <div className="flex min-h-0 flex-col border-r border-border-light">{list}</div>
-      <div className="min-h-0 overflow-y-auto">
+      <div className="min-h-0 overflow-hidden">
         {paneCode && rowBy(paneCode) ? (
-          <TriageSummary
-            key={paneCode}
-            code={paneCode}
-            awaitingReview={needsReview(paneCode)}
-            onPickLead={() => setLeadFor([rowBy(paneCode)!])}
-            onDecline={() => startDecline([rowBy(paneCode)!])}
-          />
+          // The whole idea, in place: conversation, details and the actions (Pick a lead,
+          // Decline). Nothing here sends the Owner to another page.
+          <IdeaView key={paneCode} code={paneCode} mode="pane" breakpoint={breakpoint} />
         ) : (
           <p className="p-6 text-sm text-typography-secondary">{copy.readingPaneEmpty}</p>
         )}

@@ -1,7 +1,7 @@
 import React from "react";
 
-import { HelpIcon } from "@icons";
-import { NavLink } from "react-router-dom";
+import { Menu } from "@icons";
+import { NavLink, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { CarbonToggle, OverflowMenu, OverflowMenuItem } from "@ally-ui-mono/ui-shared";
@@ -12,7 +12,7 @@ import type { RoadmapRole } from "@types";
 import { requestShortcuts, useRoadmapFrame } from "../RoadmapFrame";
 import { canSeeAgent, canSeeMeasures, canSeeSettings } from "../utils/redirects";
 
-type RoleTabKey = "agent" | "settings" | "measures";
+export type RoleTabKey = "agent" | "settings" | "measures";
 
 /** The tabs past Queue · My drafts · Bugs, for the roles that have them (§4.1, §4.15; P8). */
 export const roleTabsFor = (role: RoadmapRole): { key: RoleTabKey; to: string }[] => [
@@ -75,24 +75,40 @@ export const DigestToggle: React.FC<{ id?: string }> = ({ id = "roadmap-weekly-d
   );
 };
 
-/** ? : Keyboard shortcuts · What moved · the weekly email (§4.15). */
-export const RoadmapHelpMenu: React.FC<{ showShortcuts?: boolean }> = ({
-  showShortcuts = true,
-}) => {
+/**
+ * The Roadmap's one "more" menu, the last item of the top tabs: Agent, Settings and Measures
+ * (whichever the role has) as sub-options, then Keyboard shortcuts (on the Queue, where they apply),
+ * What moved, and the weekly email (§4.15). One icon, so the tab row is the same on every page.
+ */
+export const RoadmapMoreMenu: React.FC<{
+  role: RoadmapRole;
+  /** The role tab the page is on, if any, to tick it. */
+  active?: RoleTabKey;
+  showShortcuts?: boolean;
+}> = ({ role, active, showShortcuts = false }) => {
   const copy = en.roadmapV2Tools.help;
+  const navigate = useNavigate();
   const { openWhatMoved } = useRoadmapFrame();
   const { data } = useGetRoadmapPreferencesQuery();
   const [save] = useSetRoadmapPreferencesMutation();
   const on = !!data?.weeklyDigest;
+  const label = en.roadmapV2Tools.tabs.moreTitle;
   return (
     <OverflowMenu
-      aria-label={en.roadmapV2Tools.tabs.help}
-      iconDescription={en.roadmapV2Tools.tabs.help}
+      aria-label={label}
+      iconDescription={label}
       flipped
       menuOptionsClass="!z-[9100] !w-72 [&_.cds--overflow-menu-options\_\_btn]:!max-w-none"
-      renderIcon={() => <HelpIcon size={16} aria-hidden />}
-      className="!h-8 !w-8"
+      renderIcon={() => <Menu size={16} aria-hidden />}
+      className={`!h-8 !w-8 ${active ? "!bg-neutral-100" : ""}`}
     >
+      {roleTabsFor(role).map(tab => (
+        <OverflowMenuItem
+          key={tab.key}
+          itemText={`${active === tab.key ? "✓ " : ""}${tabLabel(tab.key)}`}
+          onClick={() => navigate(tab.to)}
+        />
+      ))}
       {showShortcuts && <OverflowMenuItem itemText={copy.shortcuts} onClick={requestShortcuts} />}
       <OverflowMenuItem itemText={copy.whatMoved} onClick={openWhatMoved} />
       {data && (

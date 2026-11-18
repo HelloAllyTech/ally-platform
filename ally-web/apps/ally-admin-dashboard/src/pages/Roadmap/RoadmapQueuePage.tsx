@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { Refresh } from "@icons";
 import { MotionConfig, motion } from "framer-motion";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button, SidePanel } from "@ally-ui-mono/ui-shared";
@@ -27,12 +27,11 @@ import {
 } from "./components/FilterControls";
 import { ideaUrl } from "./components/IdeaControls";
 import { IdeaView } from "./components/IdeaView";
-import { NewIdeaButton } from "./components/NewIdeaButton";
 import { QueueBoard } from "./components/QueueBoard";
 import { QueueList } from "./components/QueueList";
 import { QuickOpen } from "./components/QuickOpen";
-import { RoadmapHelpMenu, RoadmapRoleTabs } from "./components/RoadmapAreaNav";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
+import { RoadmapTopNav } from "./components/RoadmapTopNav";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { SaveViewControls, SearchButton, SortSelect, ViewChips } from "./components/ViewBar";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
@@ -433,34 +432,11 @@ export const RoadmapQueuePage: React.FC = () => {
   return (
     <MotionConfig reducedMotion={reduced ? "always" : "user"}>
       <div className="flex h-full min-h-0 flex-col bg-white">
-        <header className="flex items-center justify-between gap-2 px-4 pb-1 pt-3">
-          <div className="flex min-w-0 items-baseline gap-4">
-            <h1 className="text-xl font-semibold text-typography-primary">{copy.title}</h1>
-            {!isPhone && (
-              <nav aria-label={copy.title} className="flex items-center gap-3 text-sm">
-                <span className="font-semibold text-typography-primary" aria-current="page">
-                  {copy.mobile.queue}
-                </span>
-                <Link
-                  to={ROUTES.ROADMAP_DRAFTS}
-                  className="text-typography-secondary hover:underline"
-                >
-                  {copy.mobile.drafts}
-                </Link>
-                <Link
-                  to={ROUTES.ROADMAP_BUGS}
-                  className="text-typography-secondary hover:underline"
-                >
-                  {copy.mobile.bugs}
-                </Link>
-                <RoadmapRoleTabs role={role} />
-                <RoadmapHelpMenu />
-              </nav>
-            )}
-          </div>
-          {!isPhone && <NewIdeaButton />}
-          {isPhone && <SearchButton compact onClick={() => setQuickOpen(true)} />}
-        </header>
+        <RoadmapTopNav
+          phone={isPhone}
+          withNewIdea
+          phoneTrailing={<SearchButton compact onClick={() => setQuickOpen(true)} />}
+        />
 
         {viewBar}
 
@@ -494,7 +470,6 @@ export const RoadmapQueuePage: React.FC = () => {
                   presence={presence}
                   headingRef={paneHeadingRef}
                   onClose={closePane}
-                  onOpenFull={() => navigate(ROUTES.ROADMAP_IDEA(state.open!))}
                 />
               ) : (
                 <p className="p-6 text-sm text-typography-secondary">{copy.readingPaneEmpty}</p>
@@ -521,7 +496,6 @@ export const RoadmapQueuePage: React.FC = () => {
                 mode="pane"
                 breakpoint={breakpoint}
                 presence={presence}
-                onOpenFull={() => navigate(ROUTES.ROADMAP_IDEA(state.open!))}
               />
             )}
           </SidePanel>

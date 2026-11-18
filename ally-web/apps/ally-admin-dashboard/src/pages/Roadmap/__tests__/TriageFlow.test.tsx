@@ -138,19 +138,24 @@ const renderTriage = (props: Partial<React.ComponentProps<typeof TriageView>> = 
   );
 
 describe("To triage (§4.6)", () => {
-  it("shows the Summary first, with similar ideas and goal fit, then Pick a lead and Decline", () => {
+  it("the pane is the whole idea in place: its details, Pick a lead and Decline, and no page to go to", async () => {
     renderTriage();
-    const pane = screen.getByRole("article");
-    expect(within(pane).getByText("Learners mid-course")).toBeInTheDocument();
-    expect(within(pane).getByText("OPP-212")).toBeInTheDocument();
+    // The idea has no conversation yet, so the pane opens on its details (the Summary).
+    expect(await screen.findByText("Learners mid-course")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: en.roadmapV2.idea.conversation })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: en.roadmapV2.idea.details })).toBeInTheDocument();
+    expect(screen.getByText("OPP-212")).toBeInTheDocument();
+    const pane = screen.getAllByRole("button", { name: en.roadmapV2.review.pickLead });
+    expect(pane.length).toBeGreaterThan(0);
     expect(
-      within(pane).getByRole("button", { name: en.roadmapV2.review.pickLead }),
-    ).toBeInTheDocument();
+      screen.getAllByRole("button", { name: en.roadmapV2.review.decline }).length,
+    ).toBeGreaterThan(0);
+    // There is no separate Accept, and nothing sends the Owner to a full page.
+    expect(screen.queryByRole("button", { name: /^Accept/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Open the idea")).not.toBeInTheDocument();
     expect(
-      within(pane).getByRole("button", { name: en.roadmapV2.review.decline }),
-    ).toBeInTheDocument();
-    // There is no separate Accept: picking the lead is what accepts an unreviewed idea.
-    expect(within(pane).queryByRole("button", { name: /^Accept/ })).not.toBeInTheDocument();
+      screen.queryByRole("button", { name: en.roadmapV2.openFullPage }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows each idea's queue rank on its row", () => {
@@ -159,23 +164,6 @@ describe("To triage (§4.6)", () => {
     });
     expect(screen.getByText("#3")).toBeInTheDocument();
     expect(screen.getByText("#4")).toBeInTheDocument();
-  });
-
-  it("an idea someone has already accepted offers Pick a lead but not Decline", () => {
-    renderTriage({
-      data: {
-        sections: {
-          backlog: [row("OPP-414", { shownStage: "accepted", whyHere: undefined })],
-        },
-      },
-    });
-    const pane = screen.getByRole("article");
-    expect(
-      within(pane).getByRole("button", { name: en.roadmapV2.review.pickLead }),
-    ).toBeInTheDocument();
-    expect(
-      within(pane).queryByRole("button", { name: en.roadmapV2.review.decline }),
-    ).not.toBeInTheDocument();
   });
 
   it("A does nothing any more", () => {
