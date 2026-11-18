@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { LoggerService } from '../../logger/logger.service';
 import { DebriefFeedback } from '../entity/debrief-feedback.entity';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
@@ -18,6 +19,7 @@ import {
   DebriefRunStatus,
 } from '../enum/debrief-run.enum';
 import { DebriefCards, cardsForReader } from '../util/debrief-cards.util';
+import { checkTransition } from '../util/debrief-run-status.util';
 import { readableCards } from '../util/debrief-competencies.util';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefSlackService } from './debrief-slack.service';
@@ -171,6 +173,10 @@ export function sectionText(
  */
 @Injectable()
 export class DebriefFeedbackService {
+  private readonly logger = LoggerService.getInstance(
+    DebriefFeedbackService.name,
+  );
+
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(DebriefRun)
@@ -964,6 +970,14 @@ export class DebriefFeedbackService {
     note: string | undefined,
     patch: Partial<DebriefRun>,
   ) {
+    if (patch.status) {
+      checkTransition(
+        run.status,
+        patch.status,
+        this.logger,
+        `a person (${action})`,
+      );
+    }
     await this.runs.update(run.id, {
       ...patch,
       workspace: {

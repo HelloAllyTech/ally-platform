@@ -55,6 +55,7 @@ import {
   hasLegacyFeedback,
 } from '../util/debrief-live.util';
 import { todaysDebriefProvider } from '../util/debrief-todays-provider.util';
+import { RUN_STATUS_WRITERS } from '../util/debrief-run-status.util';
 import { cardsForReader } from '../util/debrief-cards.util';
 import { readableCards } from '../util/debrief-competencies.util';
 import { DebriefChangeHoldsService } from './debrief-change-holds.service';
@@ -481,9 +482,8 @@ export class DebriefAgentService implements OnModuleInit {
         RETURNING id`,
       [
         run.id,
-        DebriefRunStatus.RUNNING,
-        DebriefRunStatus.NEEDS_PERSON,
-        DebriefRunStatus.FAILED,
+        ...RUN_STATUS_WRITERS.retry.to,
+        ...RUN_STATUS_WRITERS.retry.from,
         MAX_RETRIES,
       ],
     );
@@ -1198,7 +1198,10 @@ export class DebriefAgentService implements OnModuleInit {
           AND NOT (coalesce(workspace, '{}'::jsonb) ? 'review')
           AND coalesce(workspace, '{}'::jsonb) ? 'decision'
         RETURNING id`,
-      [DebriefRunStatus.BELOW_BAR, DebriefRunStatus.NEEDS_PERSON],
+      [
+        ...RUN_STATUS_WRITERS.showHeldDraft.to,
+        ...RUN_STATUS_WRITERS.showHeldDraft.from,
+      ],
     );
     const rows: Array<{ id: string }> = Array.isArray(res?.[0])
       ? res[0]
@@ -1233,9 +1236,8 @@ export class DebriefAgentService implements OnModuleInit {
           AND COALESCE("startedAt", "createdAt") < now() - interval '${STUCK_AFTER_MINUTES} minutes'
         RETURNING id, mode`,
       [
-        DebriefRunStatus.NEEDS_PERSON,
-        DebriefRunStatus.FAILED,
-        DebriefRunStatus.RUNNING,
+        ...RUN_STATUS_WRITERS.sweepStuck.to,
+        ...RUN_STATUS_WRITERS.sweepStuck.from,
       ],
     );
     const rows = Array.isArray(res?.[0]) ? res[0] : (res ?? []);

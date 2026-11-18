@@ -54,6 +54,7 @@ import {
 import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefFrameworkService } from './debrief-framework.service';
 import { resolveRiskCue } from '../util/debrief-risk-cue.util';
+import { checkTransition } from '../util/debrief-run-status.util';
 import {
   DataProvider,
   debriefDataProviders,
@@ -796,6 +797,7 @@ export class DebriefRunnerService {
         },
       };
     }
+    checkTransition(run.status, status, this.logger, 'the graph answer');
     Object.assign(run, {
       status,
       skipReason: res.skip_reason ?? null,
@@ -904,6 +906,7 @@ export class DebriefRunnerService {
         },
       };
     }
+    checkTransition(run.status, status, this.logger, 'the runner');
     Object.assign(run, patch, {
       status,
       steps: [],
