@@ -201,6 +201,8 @@ export const HOME = {
     unansweredTitle: "Questions it didn't know",
     answerIt: "Answer it",
     noUnanswered: "Nothing it didn't know this week.",
+    bookingTitle: "Couldn't complete a booking",
+    bookingHint: "From the last 7 days. These were part of a booking, not questions to answer.",
     thumbsDownTitle: "Answers people weren't happy with",
     correct: "Correct this",
     fine: "It was fine",

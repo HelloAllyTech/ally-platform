@@ -22,6 +22,8 @@ export interface Scorecard {
   lastWeek: WeekStats;
   trend: { day: string; answeredPct: number | null }[];
   unanswered: { id: string; question: string; at: string }[];
+  /** Booking steps that went wrong, last 7 days (Q3d): nothing to Answer. */
+  bookingProblems?: { id: string; question: string; at: string }[];
   thumbsDown: {
     id: string;
     reason: "wrong_info" | "not_answered" | "other" | null;

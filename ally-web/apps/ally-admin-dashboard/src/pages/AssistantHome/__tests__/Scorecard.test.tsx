@@ -88,6 +88,32 @@ describe("Scorecard", () => {
     expect(screen.getByText(t.empty)).toBeTruthy();
   });
 
+  it("shows booking steps apart, with nothing to Answer (Q3d)", () => {
+    h.data.current = {
+      ...VIEW,
+      bookingProblems: [
+        { id: "b1", question: "Yes go ahead.", at: "" },
+        { id: "b2", question: "11 works for me", at: "" },
+      ],
+    };
+    render(<Scorecard botId="b1" canEdit go={vi.fn()} />);
+    const unknown = screen.getByTestId("overview-unanswered");
+    expect(unknown.textContent).toContain("Do you take insurance?");
+    expect(unknown.textContent).not.toContain("Yes go ahead.");
+    const booking = screen.getByTestId("overview-booking-problems");
+    expect(booking.textContent).toContain(t.bookingTitle);
+    expect(booking.textContent).toContain("“Yes go ahead.”");
+    expect(booking.textContent).toContain("“11 works for me”");
+    expect(booking.textContent).not.toContain(t.answerIt);
+    // One Answer it: the real question's.
+    expect(screen.getAllByText(t.answerIt)).toHaveLength(1);
+  });
+
+  it("has no booking group when there's nothing in it", () => {
+    render(<Scorecard botId="b1" canEdit go={vi.fn()} />);
+    expect(screen.queryByTestId("overview-booking-problems")).toBeNull();
+  });
+
   it("Answer it saves the owner's answer", async () => {
     h.answer.mockReturnValue({ ok: true });
     render(<Scorecard botId="b1" canEdit go={vi.fn()} />);
