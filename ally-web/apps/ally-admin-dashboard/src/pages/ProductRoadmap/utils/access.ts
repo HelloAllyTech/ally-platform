@@ -86,24 +86,7 @@ const atLeast = (role: RoadmapRole, floor: RoadmapRole): boolean =>
   ROLE_RANK[role] >= ROLE_RANK[floor];
 
 /**
- * Whether this reader gets the header's quick-add door: a plain form that files straight onto
- * the board, skipping the guided interview and its readiness check.
- *
- * The VOTE permission (the tier that may file at all) AND the Owner role, the pair ally-be's
- * `POST opportunities/quick` checks. Fails closed the same way as the others: an empty `features`
- * (toggle fetch failed) hides the button rather than showing one that answers 403.
- */
-export const canQuickAddRoadmap = (
-  permissions: string[] | undefined,
-  features: string[] | undefined,
-  restricted = false,
-): boolean =>
-  !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP) &&
-  atLeast(roadmapRoleFor(permissions, features, restricted), "owner");
-
-/**
- * Whether this reader may file an idea at all: the guided interview, idea capture (park it) and
- * quick add.
+ * Whether this reader may file an idea at all: the guided interview and idea capture.
  *
  * The VOTE permission AND the Idea role (or above), the pair ally-be checks on every filing
  * door. An org-restricted admin, or one with no Roadmap role, sees no filing button rather than

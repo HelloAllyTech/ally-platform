@@ -474,7 +474,10 @@ reads as before. The judge (`DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION` v2) lists cue
 
 - **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; since 2026-11-16 the judge's `RiskCue` carries it too).
   A missed clear cue is the `missed_risk_cue` hard fail. A missed possible cue
-  drops that hard fail; the run publishes as `below_bar` and is sent to review.
+  drops that hard fail. The run is sent to review (published as `below_bar`) only when the learner missed or
+  dismissed that cue (the Safety reader's `learner_response` is `missed` or `harmful`, or it has no entry for
+  that turn); a possible cue the learner explored or acknowledged needs no review (2026-11-18). The
+  Evaluator's step line shows the hard fails the run counts (`cue_strength.effective_hard_fails`).
 - **No debrief is held (2026-11-16):** when the best draft fails the bar for any reason (a blocking check, no score,
   or a missed clear risk cue), `decide` still publishes it as `below_bar`, with `workspace.decision.reviewReason`
   `checks_failed` / `not_evaluated` / `missed_risk_cue`. `missed_risk_cue` puts the run at the top of the Console

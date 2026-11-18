@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 
-import { Debug, Document, List, Plus, ThreeDot } from "@icons";
+import { Debug, Document, List, ThreeDot } from "@icons";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
+import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
 import { ROUTES, en } from "@constants";
 
 import { BottomSheet } from "./BottomSheet";
@@ -21,10 +22,10 @@ interface RoadmapBottomBarProps {
 }
 
 /**
- * The phone's bottom bar, within thumb reach: Queue · Drafts · ＋ New idea · Bugs · ⋯. It hides
+ * The phone's bottom bar, within thumb reach: Queue · Drafts · New idea · Bugs · ⋯. It hides
  * while the keyboard is open (the caller passes `hidden`) and keeps clear of the home indicator.
  *
- * Drafts is Roadmap's own tab; ＋ is New idea, raised and 56 px.
+ * Drafts is Roadmap's own tab; the raised 56 px button is New idea, the same mic-bulb capture as everywhere else.
  * ⋯ opens Agent and Settings for the roles that have them, plus the weekly email and What moved.
  */
 export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
@@ -79,14 +80,7 @@ export const RoadmapBottomBar: React.FC<RoadmapBottomBarProps> = ({
           </Link>
         </li>
         <li className="flex flex-1 items-start justify-center">
-          <Link
-            to={ROUTES.ROADMAP_NEW_IDEA}
-            aria-label={en.roadmapV2.newIdea.button}
-            tabIndex={hidden ? -1 : 0}
-            className="-mt-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg"
-          >
-            <Plus size={24} aria-hidden />
-          </Link>
+          <IdeaCaptureLauncher size="lg" className="-mt-4 bg-white shadow-lg" />
         </li>
         <li className="flex flex-1">
           <Link

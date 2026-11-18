@@ -36,7 +36,6 @@ import {
   MergeOpportunitiesDto,
   MonthBoardQueryDto,
   MoveOpportunityDto,
-  QuickAddOpportunityDto,
   RoadmapReferenceImageUploadUrlDto,
   SetAllocationDto,
   SplitOpportunityDto,
@@ -292,44 +291,6 @@ export class RoadmapOpportunityController {
     return this.opportunityService.create(user.id, dto, {
       canManage: await this.access.canManage(user.id),
       enforceReadiness: true,
-    });
-  }
-
-  /**
-   * The same filing as `create`, with the readiness gate OFF.
-   *
-   * A deliberate second door, for the few who curate the board: the Owner role on top of the
-   * VOTE tier, set on the Users screen. The interview exists so a draft
-   * reaches the board already sharpened; a curator who already knows what belongs on it pays that
-   * cost for nothing, and this is where they skip it. `enforceReadiness: false` is the whole
-   * difference — ownership, images, vector indexing and the realtime event all run as on `create`,
-   * so a quick-added row is indistinguishable from an interviewed one except that `hasBrief` is
-   * false (the DTO cannot carry a brief, and the server would refuse an unsigned one).
-   *
-   * Its own route rather than a flag on `create`: a flag is a bypass any VOTE-tier caller could
-   * send, and the gate would again be a discipline the client chose to keep.
-   */
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
-    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
-  })
-  @Post('opportunities/quick')
-  @ApiOperation({
-    summary: 'File a new opportunity directly, skipping the readiness check',
-    description:
-      'Requires the Roadmap Owner role. Same body and rules as POST ' +
-      '/opportunities minus readinessToken and brief; `ownerUserId` still needs ' +
-      'edit:admin:product-roadmap.',
-  })
-  @ApiResponse({ status: 201, type: OpportunityResponseDto })
-  async quickAdd(
-    @CurrentUser() user: TokenUser,
-    @Body() dto: QuickAddOpportunityDto,
-  ): Promise<OpportunityResponseDto> {
-    // Owner implies Idea, so both filing doors agree on who may file.
-    await this.planAccess.assertQuickAdd(user.id);
-    return this.opportunityService.create(user.id, dto, {
-      canManage: await this.access.canManage(user.id),
-      enforceReadiness: false,
     });
   }
 

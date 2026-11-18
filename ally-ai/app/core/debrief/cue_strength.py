@@ -241,6 +241,55 @@ def split_missed_cues(
     return clear, possible
 
 
+def effective_hard_fails(
+    hard_fails: List[Dict[str, Any]],
+    evaluator_cues: List[Dict[str, Any]],
+    safety_cues: List[Dict[str, Any]],
+    word_list_raises: bool = True,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """The Evaluator's hard fails as the run counts them, with the missed cues
+    split by ``split_missed_cues``: (hard fails, clear missed, possible missed).
+
+    A ``missed_risk_cue`` hard fail raised only for cues every signal reads as
+    possible is not one (the debrief is published and a person checks it), so
+    it is dropped. The score and the step's one-line summary both use this, so
+    the console never shows a hard fail the run did not count."""
+    clear, possible = split_missed_cues(evaluator_cues, safety_cues, word_list_raises)
+    if possible and not clear:
+        return (
+            [h for h in hard_fails if h["code"] != "missed_risk_cue"],
+            clear,
+            possible,
+        )
+    return list(hard_fails), clear, possible
+
+
+#: How the learner met a cue (Safety reader) that leaves a possible cue worth a
+#: person's look when the debrief also left it out.
+_LEARNER_FAILED = frozenset({"missed", "harmful"})
+
+
+def needs_review(
+    possible_cues: List[Dict[str, Any]], safety_cues: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """The possible cues the debrief left out that a person should still check.
+
+    A possible cue the learner stayed with or explored needs no review when the
+    debrief does not mention it: the learner handled it. One the learner missed
+    or dismissed does, and so does one the Safety reader has no entry for (no
+    answer to read, so it is not discounted). Clear cues are not affected."""
+    keep: List[Dict[str, Any]] = []
+    for cue in possible_cues or []:
+        reads = [
+            c for c in safety_cues or [] if c.get("turn_index") == cue.get("turn_index")
+        ]
+        if not reads or any(
+            c.get("learner_response") in _LEARNER_FAILED for c in reads
+        ):
+            keep.append(cue)
+    return keep
+
+
 def drop_possible_important_moment(
     cards: Dict[str, Any],
     evaluator_cues: List[Dict[str, Any]],

@@ -1298,7 +1298,7 @@
         "whenReady": "Your debrief, when you're ready"
       },
       "practise": {
-        "next": "Practise this next",
+        "next": "Try this in your next practice",
         "this": "Practise this",
         "label": "Practise this in the roleplay \"{{title}}\"",
         "roleplays": "Open my roleplays",
@@ -1321,9 +1321,9 @@
         "error": "Couldn't play the audio. You can still read it below."
       },
       "whatWorked": "What worked",
-      "workOnThis": "Work on this",
+      "workOnThis": "What to strengthen",
       "trySaying": "Try saying:",
-      "practiseNext": "Practise this next",
+      "practiseNext": "Try this in your next practice",
       "practiseAgain": "Practise this again",
       "skillWords": {
         "title": "Your skills in this session",
@@ -1363,6 +1363,9 @@
       "reflectiveQuestion": "One question to think about",
       "working": {
         "title": "Ally is writing your debrief",
+        "breatheStart": "Take a breath while you wait",
+        "breatheStop": "Stop",
+        "breatheCalm": "Breathe in slowly, then out",
         "defaultStep": "Reading your session…",
         "steps": {
           "reading": "Reading your session…",
@@ -1685,6 +1688,7 @@
     "sec": "sec",
     "checklistTab": "Checklist",
     "remindersTab": "Reminders",
+    "fromLastDebrief": "From your last debrief",
     "descriptionTab": "Description",
     "noRemindersYet": "No reminders for this scenario yet.",
     "simulationScore": "Simulation Score",

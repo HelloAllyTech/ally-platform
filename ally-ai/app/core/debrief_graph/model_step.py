@@ -27,6 +27,7 @@ from langgraph.errors import NodeError, NodeTimeoutError
 from langgraph.runtime import Runtime
 from langgraph.types import Command, RetryPolicy
 
+from app.core.debrief_graph import guidance_toolbox
 from app.core.debrief_graph.agent_logs import code_log, model_logs, origin_of
 from app.core.debrief_graph.budget import budget_left
 from app.core.debrief_graph.circuit import (
@@ -36,7 +37,6 @@ from app.core.debrief_graph.circuit import (
 )
 from app.core.debrief_graph.constants import STEP_TIMEOUT_S
 from app.core.debrief_graph.context import DebriefRunContext
-from app.core.debrief_graph import guidance_toolbox
 from app.core.debrief_graph.findings import agent_findings
 from app.core.debrief_graph.records import iso, progress_event, safe_summary
 from app.core.debrief_graph.state import DebriefState
@@ -64,6 +64,9 @@ class ModelStep:
     on_success: Callable[[State, Ctx, Dict[str, Any]], Next]
     on_failure: Callable[[State, Ctx], Next]
     summarise: Optional[Callable[[Dict[str, Any]], str]] = None
+    #: Like `summarise`, for a step whose line depends on the run (its state
+    #: and context), e.g. the Evaluator's hard fails as the run counts them.
+    summarise_in: Optional[Callable[[State, Ctx, Dict[str, Any]], str]] = None
     reasoning: Optional[Callable[[Dict[str, Any]], Optional[str]]] = None
     round_of: Callable[[State], Optional[int]] = lambda state: None
     destinations: Tuple[str, ...] = ()
@@ -308,7 +311,14 @@ def make_model_step(spec: ModelStep):
             "why": spec.why(state, ctx),
             "inputs": spec.inputs(state, ctx),
             "reasoning": _reasoning(spec, res),
-            "output": safe_summary(spec.summarise, res),
+            "output": safe_summary(
+                (
+                    (lambda r: spec.summarise_in(state, ctx, r))
+                    if spec.summarise_in
+                    else spec.summarise
+                ),
+                res,
+            ),
             "budgetLeftUsd": left,
         }
         ctx.attempts.pop(key, None)

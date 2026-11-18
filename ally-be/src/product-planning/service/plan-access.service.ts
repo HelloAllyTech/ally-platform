@@ -19,9 +19,6 @@ const IDEAS_REQUIRED_MESSAGE =
 const LEAD_REQUIRED_MESSAGE =
   'Leading a plan needs the Builder role on the Roadmap. ' +
   'Ask a Roadmap Owner to give you a role on Users.';
-const OWNER_REQUIRED_MESSAGE =
-  'This needs the Owner role on the Roadmap. ' +
-  'Ask a Roadmap Owner to give you a role on Users.';
 
 /**
  * Who may do what in the plan flow (plans/roadmap-owns-planning rev 5.2 §B.12),
@@ -31,7 +28,8 @@ const OWNER_REQUIRED_MESSAGE =
  *  - Idea (author): park, work up and file an idea;
  *  - Builder (lead): everything after filing — take on, PRD, design, build,
  *    launch, outcome review;
- *  - Owner: both, plus the Owner-only quick add.
+ *  - Owner: both. There is no door onto the board that skips the readiness
+ *    check; an idea reaches it only once it is mature enough to submit.
  *
  * Plus one rule no role expresses: an author always reads their own plan.
  * There is no human sign-off role: the lead resolves every review finding,
@@ -62,11 +60,6 @@ export class PlanAccessService {
     return this.atLeast(userId, 'builder');
   }
 
-  /** Owner role: the quick-add filing door, which skips the readiness check. */
-  canQuickAdd(userId: number): Promise<boolean> {
-    return this.atLeast(userId, 'owner');
-  }
-
   /** Park, work up or file an idea — every filing door calls this. */
   async assertIdeas(userId: number): Promise<void> {
     await this.assertAtLeast(userId, 'idea', IDEAS_REQUIRED_MESSAGE);
@@ -74,10 +67,6 @@ export class PlanAccessService {
 
   async assertLead(userId: number): Promise<void> {
     await this.assertAtLeast(userId, 'builder', LEAD_REQUIRED_MESSAGE);
-  }
-
-  async assertQuickAdd(userId: number): Promise<void> {
-    await this.assertAtLeast(userId, 'owner', OWNER_REQUIRED_MESSAGE);
   }
 
   /**

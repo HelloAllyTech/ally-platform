@@ -16,7 +16,8 @@ from langgraph.types import Command
 
 from app.core.debrief.cue_strength import (
     drop_possible_important_moment,
-    split_missed_cues,
+    effective_hard_fails,
+    needs_review,
     with_strength,
 )
 from app.core.debrief_graph import inputs as body
@@ -743,14 +744,12 @@ async def score_draft(
         # A missed cue holds the debrief only when it is clear; one that every
         # signal reads as possible (low mood, burden, grief, guilt) is sent to
         # review with the debrief published (cue_strength.split_missed_cues).
-        clear_missed, possible_missed = split_missed_cues(
+        hard_fails, clear_missed, possible_missed = effective_hard_fails(
+            ev["hard_fails"],
             ev.get("risk_cues") or [],
             (state.get("safety") or {}).get("risk_cues") or [],
             ctx.risk_cue["word_list_raises"],
         )
-        hard_fails = ev["hard_fails"]
-        if possible_missed and not clear_missed:
-            hard_fails = [h for h in hard_fails if h["code"] != "missed_risk_cue"]
         evaluation = {
             "overall": compute_overall(
                 {d["dimension"]: d["score"] for d in ev["dimensions"]},
@@ -759,9 +758,14 @@ async def score_draft(
             "hardFails": hard_fails,
             "fixes": ev.get("fixes") or [],
             "dimensions": ev["dimensions"],
+            # Only the ones a person should look at: a possible cue the learner
+            # handled well and the debrief left out needs no review.
             "possibleMissedCues": [
                 {"turn_index": c.get("turn_index"), "quote": c.get("quote")}
-                for c in possible_missed
+                for c in needs_review(
+                    possible_missed,
+                    (state.get("safety") or {}).get("risk_cues") or [],
+                )
             ],
             "riskCues": ev.get("risk_cues") or [],
         }

@@ -41,16 +41,32 @@ export const PageFallback: React.FC = () => (
  * rebuilt per page. Each page's own `PrivateLayout` below only decides access.
  */
 export const AdminShell: React.FC = () => {
+  // Subscribe to the location so this re-renders when the login screen navigates after signing in
+  // (it goes to the URL it is already on): that is what swaps the login for the signed-in shell.
+  // Without it nothing here re-renders, and the visitor stays on the login after logging in.
+  useLocation();
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
+  if (!isAuthenticated) {
+    // The login screen itself, at the URL they asked for: logging in leaves them on this page.
+    // (`/login` is its own page, so a visit there is not drawn twice.) Kept out of the signed-in
+    // shell below on purpose: its hooks fetch permissions and switches, and a signed-out visitor's
+    // 401 there sends the whole page to `/login?next=…` (baseApi), undoing this.
+    return <Login />;
+  }
+  return <SignedInShell />;
+};
+
+const SignedInShell: React.FC = () => {
   const { pathname, search } = useLocation();
   const meta = resolveRouteMeta(pathname, search);
   // Usage tracking: one `admin_page_viewed` per route change (route pattern only, never ids).
   useAdminPageView(pathname);
   const { assistantOnly } = useAssistantOnly();
-  // The assistants list is the one page that shows no side navigation, for anyone (its own
-  // sub-pages, e.g. one assistant's home, keep it).
-  const hideSidebar = pathname.replace(/\/+$/, "") === ROUTES.WHATSAPP_BOT;
+  // The assistants area (the list and every page under it: New assistant, one assistant's home,
+  // onboarding) shows no side navigation, for anyone. `/assistants-x` is not under it.
+  const hideSidebar =
+    pathname === ROUTES.WHATSAPP_BOT || pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`);
   // A URL the table does not know is either a redirect (no title to set) or the 404, which sets its own.
   useDocumentTitle(meta.known ? meta.title : undefined, meta.known);
 
@@ -68,12 +84,6 @@ export const AdminShell: React.FC = () => {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isMobileNavOpen]);
-
-  if (!isAuthenticated) {
-    // The login screen itself, at the URL they asked for: logging in leaves them on this page.
-    // (`/login` is its own page, so a visit there is not drawn twice.)
-    return <Login />;
-  }
 
   // Someone whose only way in is an assistant's team (chunk 6b): their assistant and nothing else.
   if (assistantOnly) {

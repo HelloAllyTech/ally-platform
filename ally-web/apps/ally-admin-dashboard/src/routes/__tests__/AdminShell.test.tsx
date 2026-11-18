@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Link, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mounts = vi.hoisted(() => ({ sidebar: 0 }));
@@ -30,9 +30,12 @@ vi.mock("@components/scenario-reports-socket-provider/ScenarioReportsSocketProvi
 }));
 vi.mock("@pages/ContextLibrary/upload/UploadDock", () => ({ UploadDockHost: () => null }));
 vi.mock("@ally-ui-mono/ui-shared", () => ({ InlineLoading: () => <div>loading…</div> }));
-const access = vi.hoisted(() => ({ assistantOnly: false }));
+const access = vi.hoisted(() => ({ assistantOnly: false, calls: 0 }));
 vi.mock("@hooks/useAssistantOnly", () => ({
-  useAssistantOnly: () => ({ ready: true, assistantOnly: access.assistantOnly }),
+  useAssistantOnly: () => {
+    access.calls += 1;
+    return { ready: true, assistantOnly: access.assistantOnly };
+  },
 }));
 vi.mock("@components/assistant-only/AssistantOnlyHeader", () => ({
   AssistantOnlyHeader: () => <header data-testid="assistant-only-header">Log out</header>,
@@ -92,6 +95,39 @@ describe("AdminShell", () => {
     expect(screen.getByTestId("login-screen")).toBeInTheDocument();
     expect(screen.queryByText("prompts")).not.toBeInTheDocument();
     expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("swaps the login for the page once they sign in, when the login navigates to the same URL", () => {
+    localStorage.removeItem("adminIsAuthenticated");
+    // What the login does after a successful sign-in: navigate to the URL it is drawn at.
+    const SignedIn: React.FC = () => {
+      const navigate = useNavigate();
+      return (
+        <button onClick={() => navigate("/assistants", { replace: true })}>login finished</button>
+      );
+    };
+    render(
+      <MemoryRouter initialEntries={["/assistants"]}>
+        <SignedIn />
+        <Routes>
+          <Route element={<AdminShell />}>
+            <Route path="/assistants" element={<div>assistants</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("login-screen")).toBeInTheDocument();
+    localStorage.setItem("adminIsAuthenticated", "true");
+    fireEvent.click(screen.getByText("login finished"));
+    expect(screen.queryByTestId("login-screen")).not.toBeInTheDocument();
+    expect(screen.getByText("assistants")).toBeInTheDocument();
+  });
+
+  it("fetches nothing for a signed-out visitor (a 401 would redirect the page to /login)", () => {
+    localStorage.removeItem("adminIsAuthenticated");
+    access.calls = 0;
+    renderShell("/assistants");
+    expect(access.calls).toBe(0);
   });
 
   it("draws the login screen at the URL they asked for, so logging in leaves them there (A1)", () => {
@@ -182,20 +218,25 @@ describe("AdminShell", () => {
     });
   });
 
-  it("shows no side navigation on the assistants list, even to someone with other pages", () => {
-    renderShell("/assistants");
-    expect(screen.getByText("assistants")).toBeInTheDocument();
-    expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("admin-mobile-menu-button")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("assistant-only-header")).not.toBeInTheDocument();
+  it("shows no side navigation on the assistants list or any page under it, even to someone with other pages", () => {
+    for (const path of ["/assistants", "/assistants/", "/assistants/new"]) {
+      renderShell(path);
+      expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("admin-mobile-menu-button")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("assistant-only-header")).not.toBeInTheDocument();
+      cleanup();
+    }
+    renderShell("/assistants/new");
+    expect(screen.getByText("new assistant")).toBeInTheDocument();
   });
 
-  it("anyone with other pages keeps the Sidebar elsewhere, assistant sub-pages included", () => {
+  it("anyone with other pages keeps the Sidebar on every other page", () => {
     renderShell("/manage-prompts");
     expect(screen.getByTestId("stub-sidebar")).toBeInTheDocument();
     expect(screen.queryByTestId("assistant-only-header")).not.toBeInTheDocument();
     cleanup();
-    renderShell("/assistants/new");
+    // A path that merely starts with the same letters is not under /assistants.
+    renderShell("/assistants-archive");
     expect(screen.getByTestId("stub-sidebar")).toBeInTheDocument();
   });
 });

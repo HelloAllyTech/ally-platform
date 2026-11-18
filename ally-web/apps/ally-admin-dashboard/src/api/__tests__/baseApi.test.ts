@@ -220,4 +220,41 @@ describe("403 toast", () => {
     const { silentForbiddenReads } = await import("../baseApi");
     expect(silentForbiddenReads()).toEqual(["/v1/users/me/preferences"]);
   });
+
+  describe("an expired session (handleLogout)", () => {
+    const realLocation = window.location;
+    const reload = vi.fn();
+    const stubLocation = (pathname: string) => {
+      const loc = { pathname, search: "?x=1", hash: "", href: "", reload };
+      Object.defineProperty(window, "location", { configurable: true, value: loc });
+      return loc;
+    };
+
+    afterEach(() => {
+      Object.defineProperty(window, "location", { configurable: true, value: realLocation });
+    });
+
+    it("clears the session and reloads the page they are on, so login shows in place", async () => {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+      localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN, "a");
+      localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN, "r");
+      const loc = stubLocation("/assistants/b1");
+      const { handleLogout } = await import("../baseApi");
+      handleLogout();
+      expect(localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED)).toBeNull();
+      expect(localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN)).toBeNull();
+      expect(localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN)).toBeNull();
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(loc.href).toBe("");
+    });
+
+    it("sends someone who was never signed in to login with next, not a reload loop", async () => {
+      reload.mockClear();
+      const loc = stubLocation("/assistants/b1");
+      const { handleLogout } = await import("../baseApi");
+      handleLogout();
+      expect(reload).not.toHaveBeenCalled();
+      expect(loc.href).toContain("/login?next=");
+    });
+  });
 });

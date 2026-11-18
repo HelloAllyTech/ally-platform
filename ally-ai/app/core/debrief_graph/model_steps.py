@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from app.core.debrief.cue_strength import effective_hard_fails
 from app.core.debrief_graph import inputs as body
 from app.core.debrief_graph import progress
 from app.core.debrief_graph.agent_logs import code_log
@@ -314,6 +315,19 @@ def _current_round(state: State) -> int:
     return state["current"]["round"]
 
 
+def _evaluator_line(state: State, ctx: Ctx, res: Dict[str, Any]) -> str:
+    """The Evaluator's result with the hard fails the run counts, so a
+    missed-cue hard fail raised only for possible cues is not shown."""
+    ev = res["evaluation"]
+    hard_fails, _, _ = effective_hard_fails(
+        ev["hard_fails"],
+        ev.get("risk_cues") or [],
+        (state.get("safety") or {}).get("risk_cues") or [],
+        ctx.risk_cue["word_list_raises"],
+    )
+    return evaluator_summary(res, hard_fails)
+
+
 EVALUATOR = ModelStep(
     prompt_code=PROMPT_CODES["rubric"],
     step=Step.EVALUATOR,
@@ -331,7 +345,7 @@ EVALUATOR = ModelStep(
         "the rubric",
         *(["the learner’s past points"] if s.get("history") else []),
     ],
-    summarise=evaluator_summary,
+    summarise_in=_evaluator_line,
     on_success=_stay,
     on_failure=_stay,
 )

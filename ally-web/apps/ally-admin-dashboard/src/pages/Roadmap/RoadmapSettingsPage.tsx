@@ -11,8 +11,6 @@ import {
   Checkbox,
   InlineNotification,
   Modal,
-  Select,
-  SelectItem,
   SkeletonText,
   TextArea,
   TextInput,
@@ -35,6 +33,7 @@ import { StrategyContextManager } from "../ProductRoadmap/StrategyContextManager
 import { StrategyRankingManager } from "../ProductRoadmap/StrategyRankingManager";
 import { RoadmapAreaHeader } from "./components/RoadmapAreaHeader";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
+import { RoadmapDropdown } from "./components/RoadmapDropdown";
 import { RoadmapSwitchOnSection } from "./cutover/RoadmapSwitchOnSection";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
 import { shortDate } from "./utils/copy";
@@ -262,30 +261,20 @@ export const RoadmapPolicyCard: React.FC<{ settings: RoadmapV2SettingsFields | u
               ))}
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Select
+              <RoadmapDropdown
                 id="roadmap-window-start"
                 labelText={copy.releaseStart}
                 value={String(form.startHour)}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  set("startHour", Number(e.target.value))
-                }
-              >
-                {hours.slice(0, 24).map(h => (
-                  <SelectItem key={h} value={String(h)} text={copy.hour(h)} />
-                ))}
-              </Select>
-              <Select
+                options={hours.slice(0, 24).map(h => ({ value: String(h), label: copy.hour(h) }))}
+                onChange={value => set("startHour", Number(value))}
+              />
+              <RoadmapDropdown
                 id="roadmap-window-end"
                 labelText={copy.releaseEnd}
                 value={String(form.endHour)}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  set("endHour", Number(e.target.value))
-                }
-              >
-                {hours.slice(1).map(h => (
-                  <SelectItem key={h} value={String(h)} text={copy.hour(h)} />
-                ))}
-              </Select>
+                options={hours.slice(1).map(h => ({ value: String(h), label: copy.hour(h) }))}
+                onChange={value => set("endHour", Number(value))}
+              />
               <TextInput
                 id="roadmap-window-tz"
                 labelText={copy.releaseTimeZone}
