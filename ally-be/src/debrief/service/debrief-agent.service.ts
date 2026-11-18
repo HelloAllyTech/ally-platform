@@ -108,6 +108,9 @@ const NO_FALLBACK_SKIPS: ReadonlySet<string> = new Set([
  * v9 FR-3: a run still "running" this long is past every deadline (150 s,
  * 180 s with a risk cue), so its worker is gone: resume it, once.
  */
+/** A published run still not written into its session this long after it finished is published again. */
+export const REPUBLISH_AFTER_MINUTES = 5;
+const REPUBLISH_BATCH = 20;
 const RESUME_AFTER_MINUTES = 5;
 const MAX_RESUMES = 1;
 
@@ -678,6 +681,9 @@ export class DebriefAgentService implements OnModuleInit {
         run.status,
       )
     ) {
+      // The learner reads the debrief from the run's own cards, so "your debrief is ready" does not
+      // wait on writing the supervisor note, memory and ready event into the session. If that write
+      // fails the run carries no `appliedAt`, and the stuck sweep (`republishUnapplied`) does it again.
       await this.publisher?.applyToSession(run);
       await this.notifier.ready(run);
     }
@@ -702,9 +708,10 @@ export class DebriefAgentService implements OnModuleInit {
         const shown = await this.showHeldDrafts();
         const retried = await this.retryFailedRuns();
         const fellBack = await this.fallBackSweep();
-        return resumed + handed + shown + retried + fellBack === 0
+        const republished = await this.republishUnapplied();
+        return resumed + handed + shown + retried + fellBack + republished === 0
           ? 'none stuck'
-          : `${resumed} resumed, ${handed} handed to a person, ${shown} held draft(s) shown, ${retried} retried, ${fellBack} sent to today's debrief`;
+          : `${resumed} resumed, ${handed} handed to a person, ${shown} held draft(s) shown, ${retried} retried, ${fellBack} sent to today's debrief, ${republished} published again`;
       },
     );
     scheduledTaskRegistry.registerConfigurable('debrief-judge', async () => {
@@ -1117,6 +1124,43 @@ export class DebriefAgentService implements OnModuleInit {
       }
     }
     return rows.length;
+  }
+
+  /**
+   * A readable live run whose debrief was never written into its session (a crash between the
+   * run being saved and the publish, or a publish that failed): publish it again. Every publish
+   * write is idempotent. `workspace.appliedAt` is stamped by the publish itself, and a migration
+   * stamped every run that already had one, so only runs finished since are ever picked up.
+   */
+  async republishUnapplied(): Promise<number> {
+    const rows: Array<{ id: string }> = await this.dataSource.query(
+      `SELECT id FROM debrief_runs
+        WHERE mode = 'live' AND status IN ('published', 'below_bar')
+          AND cards IS NOT NULL AND tenant_id IS NOT NULL
+          AND "finishedAt" < now() - make_interval(mins => $1)
+          AND "finishedAt" >= now() - make_interval(hours => $2)
+          AND NOT (coalesce(workspace, '{}'::jsonb) ? 'appliedAt')
+        ORDER BY "finishedAt"
+        LIMIT $3`,
+      [REPUBLISH_AFTER_MINUTES, DRAIN_WINDOW_HOURS, REPUBLISH_BATCH],
+    );
+    let n = 0;
+    for (const { id } of rows ?? []) {
+      try {
+        const run = await this.runs.findOne({ where: { id } });
+        if (run && (await this.publisher?.applyToSession(run))) n++;
+      } catch (e) {
+        this.logger.error(
+          `[debrief] could not publish run ${id} again: ${(e as Error).message}`,
+        );
+      }
+    }
+    if (rows?.length) {
+      this.logger.warn(
+        `[debrief] ${rows.length} run(s) were never written into their session; published ${n} again`,
+      );
+    }
+    return n;
   }
 
   /**
