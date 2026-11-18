@@ -1,3 +1,5 @@
+import type { CreateScenarioDto } from '../../learn/dto/create-scenario.dto';
+
 /**
  * What the Debrief may read about a roleplay (2026-11-18): ONE registry, the single source of truth.
  * The context repository selects exactly these (so a renamed column or metadata key is caught here,
@@ -7,15 +9,24 @@
  * settings, timers, prompts of other agents) are not in the registry at all, so nobody can offer
  * them to a debrief.
  */
+/**
+ * A field name is typed against the roleplay's own creation type, so renaming it there updates this
+ * registry (an editor rename) or fails to compile, never drifts silently.
+ */
+export type RoleplayFieldName = Extract<
+  keyof CreateScenarioDto,
+  | 'title'
+  | 'description'
+  | 'difficultyLevel'
+  | 'prompt'
+  | 'characterProfileText'
+  | 'agentBuilderDescription'
+  | 'stateNames'
+>;
+
 export type RoleplayFieldSource =
-  | {
-      kind: 'column';
-      name: 'title' | 'description' | 'difficultyLevel' | 'prompt';
-    }
-  | {
-      kind: 'metadata';
-      name: 'characterProfileText' | 'agentBuilderDescription' | 'stateNames';
-    };
+  | { kind: 'column'; name: RoleplayFieldName }
+  | { kind: 'metadata'; name: RoleplayFieldName };
 
 export interface RoleplayFieldDef {
   /** The key the setting and the console use. */
