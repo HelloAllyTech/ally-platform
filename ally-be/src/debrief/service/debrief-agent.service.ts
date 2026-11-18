@@ -29,6 +29,7 @@ import {
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   PROVIDER_ALLOWED_KEY,
+  ALLOWLIST_WHEN_UNREADABLE,
   allowlistFromValues,
 } from '../util/debrief-provider-allowlist.util';
 import { GuideSupportLine } from '../../guide/entity/guide-org-profile.entity';
@@ -564,7 +565,8 @@ export class DebriefAgentService implements OnModuleInit {
    * Whether today's debrief may be written for this organisation: its model
    * runs on a provider the organisation allows (plan §8.9, FR-57: a
    * learner's data never goes to a provider the organisation does not
-   * allow). A failed read allows it, as every provider is allowed by default.
+   * allow). A failed read allows nothing (fail closed, as the context repository's allowlist does):
+   * the learner then sees the defined "not available" state, never a stuck one.
    */
   async todaysDebriefAllowed(tenantId: string | null): Promise<boolean> {
     const provider = todaysDebriefProvider();
@@ -577,7 +579,7 @@ export class DebriefAgentService implements OnModuleInit {
       );
       return allowlistFromValues(row?.values).includes(provider);
     } catch {
-      return true;
+      return ALLOWLIST_WHEN_UNREADABLE.includes(provider);
     }
   }
 

@@ -9,7 +9,10 @@ import {
   DEBRIEF_AGENT_KEY,
   DebriefProvider,
 } from '../constants/debrief-release.constants';
-import { allowlistFromValues } from '../util/debrief-provider-allowlist.util';
+import {
+  ALLOWLIST_WHEN_UNREADABLE,
+  allowlistFromValues,
+} from '../util/debrief-provider-allowlist.util';
 import { istMonth } from '../util/debrief-pm-reports.util';
 import {
   assembleProgressProfile,
@@ -842,7 +845,7 @@ export class DebriefContextRepository {
       );
       return allowlistFromValues(row?.values ?? null);
     } catch {
-      return [];
+      return [...ALLOWLIST_WHEN_UNREADABLE];
     }
   }
 
