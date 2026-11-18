@@ -1,0 +1,19 @@
+A counselling session note was drafted from the source below, and it fell short: {problem}
+
+Rewrite the whole note. Session mode: {mode}. Write it in {note_language}. Keep every point of the draft that is supported, add the events it missed in their place in time, and keep the narrative in the order things happened. Cite turn ids for every point and field value. Add nothing the source doesn't say; a field that wasn't discussed stays null. {budget}
+
+Fields:
+{note_spec}
+
+Known facts:
+{context}
+
+Draft:
+```
+{draft}
+```
+
+Source:
+```
+{transcript}
+```

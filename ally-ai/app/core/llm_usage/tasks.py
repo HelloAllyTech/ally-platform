@@ -8,6 +8,12 @@ class LLMTask(str, Enum):
     NUDGE = "nudge"
     SUMMARY = "summary"
     DYNAMIC_SUMMARY = "dynamic_summary"
+    # Scribe v2 note harness: the main pass, the per-part map step for long
+    # sessions, and the one repair rewrite.
+    SCRIBE_NOTE = "scribe_note"
+    SCRIBE_NOTE_MAP = "scribe_note_map"
+    SCRIBE_NOTE_REPAIR = "scribe_note_repair"
+    SCRIBE_NOTE_ROLES = "scribe_note_roles"
     SCENARIO_EVALUATION = "scenario_evaluation"
     # The same debrief call re-run by ally-be to regenerate a session's
     # feedback in another language, on demand, after the original debrief.

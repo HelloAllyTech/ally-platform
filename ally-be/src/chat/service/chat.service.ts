@@ -730,6 +730,20 @@ export class ChatService {
     return this.callDetailsService.decryptCallDetails(callDetails);
   }
 
+  /**
+   * The session mode (SCRIBE / DICTATION) a chat was recorded in, read from its
+   * call details. Looked up by chatId alone — chatId is unique, and callers
+   * include SQS consumers that run without a tenant context. Null when the
+   * chat has no call details.
+   */
+  async getSessionMode(chatId: number): Promise<ScribeSessionMode | null> {
+    const callDetails = await this.callDetailsRepository.findOne({
+      where: { chatId },
+      select: ['id', 'callInfo'],
+    });
+    return (callDetails?.callInfo?.mode as ScribeSessionMode) ?? null;
+  }
+
   async getChatWithCallDetails(
     chatId: number,
   ): Promise<{ chat: Chat | null; callDetails: CallDetails | null }> {

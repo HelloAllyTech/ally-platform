@@ -14,6 +14,7 @@ import '../../../core/theme/rn_scale.dart';
 import '../../../core/network/error_details.dart';
 import '../../../core/widgets/toast/toast_controller.dart';
 import '../data/call_log_repository.dart';
+import '../data/custom_field_select_codec.dart';
 import '../data/call_summary_fields.dart';
 import '../data/custom_fields_repository.dart';
 import '../data/voice_custom_fields.dart';
@@ -196,7 +197,9 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
           updates[value.id] = trimmed;
         } else if (customDefs[value.id] case final def?) {
           final encoded = encodeVoiceCustomValue(def, trimmed);
-          if (encoded != null) customUpdates.add((fieldDefinitionId: def.id, value: encoded));
+          if (encoded != null) {
+            customUpdates.add((fieldDefinitionId: def.id, value: selectValueToWire(def, encoded)));
+          }
         }
       }
       final filled = updates.length + customUpdates.length;

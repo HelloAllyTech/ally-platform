@@ -1,20 +1,13 @@
 import React, { useState } from "react";
 
-import { Pin, Search } from "@icons";
 import { motion } from "framer-motion";
 
-import {
-  Button,
-  Modal,
-  OverflowMenu,
-  OverflowMenuItem,
-  Select,
-  SelectItem,
-  TextInput,
-} from "@ally-ui-mono/ui-shared";
+import { Button, Modal, OverflowMenu, OverflowMenuItem, TextInput } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
+import { Pin, Search } from "@icons";
 import type { RoadmapQueueSort, RoadmapQueueView, RoadmapSavedView } from "@types";
 
+import { RoadmapDropdown } from "./RoadmapDropdown";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
 import { QUEUE_SORTS, defaultSortFor, isSectionedView } from "../utils/queueState";
 
@@ -156,21 +149,19 @@ export const SortSelect: React.FC<{
   const copy = en.roadmapV2.sort;
   if (isSectionedView(view)) return null;
   return (
-    <Select
+    <RoadmapDropdown
       id={id}
       labelText={copy.label}
       hideLabel
       size="sm"
       value={sort ?? defaultSortFor(view)}
-      onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-        onChange(event.target.value as RoadmapQueueSort)
-      }
+      options={QUEUE_SORTS.map(option => ({
+        value: option,
+        label: copy.by(copy.options[option]),
+      }))}
+      onChange={value => onChange(value as RoadmapQueueSort)}
       className="min-w-[10rem]"
-    >
-      {QUEUE_SORTS.map(option => (
-        <SelectItem key={option} value={option} text={copy.by(copy.options[option])} />
-      ))}
-    </Select>
+    />
   );
 };
 

@@ -191,6 +191,7 @@ vi.mock("@pages/post-call-summary/components/SummaryFieldInput", () => ({
     <input
       data-testid={`builtin-${field.key}`}
       aria-label={field.label}
+      placeholder={field.placeholder}
       disabled={disabled}
       value={value ?? ""}
       onChange={e => onChange(field.key, e.target.value)}
@@ -452,6 +453,57 @@ describe("CreateNoteDrawer", () => {
         expect.objectContaining({ durationSeconds: 125 }),
       ),
     );
+  });
+
+  it("says computed fields fill in automatically instead of leaving them blank", () => {
+    mockUseGetSummaryFields.mockReturnValue({ data: ["callId", "age"], isLoading: false });
+    render(<CreateNoteDrawer open onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("builtin-callId")).toHaveAttribute(
+      "placeholder",
+      "Filled in automatically",
+    );
+    expect(screen.getByTestId("builtin-age")).not.toHaveAttribute(
+      "placeholder",
+      "Filled in automatically",
+    );
+  });
+
+  it("hands the saved note over to its details once dictation filled it", async () => {
+    mockUseGetSummaryFields.mockReturnValue({ data: ["age"], isLoading: false });
+    mockGenerateNoteFromAudio.mockReturnValue({
+      unwrap: () =>
+        Promise.resolve({
+          transcript: "Client felt anxious.",
+          values: [{ id: "age", value: "18-24" }],
+        }),
+    });
+    recorderState.status = "stopped";
+    recorderState.blob = new Blob(["x"], { type: "audio/webm" });
+    const onNoteReady = vi.fn();
+
+    render(<CreateNoteDrawer open onClose={vi.fn()} onNoteReady={onNoteReady} />);
+    fireEvent.click(screen.getByTestId("drawer-header-button-voice-note"));
+    fireEvent.click(screen.getByTestId("voice-generate"));
+
+    await waitFor(() => expect(onNoteReady).toHaveBeenCalledWith(123));
+  });
+
+  it("stays open to type into when dictation filled nothing", async () => {
+    mockUseGetSummaryFields.mockReturnValue({ data: ["age"], isLoading: false });
+    mockGenerateNoteFromAudio.mockReturnValue({
+      unwrap: () => Promise.resolve({ transcript: "Hmm.", values: [] }),
+    });
+    recorderState.status = "stopped";
+    recorderState.blob = new Blob(["x"], { type: "audio/webm" });
+    const onNoteReady = vi.fn();
+
+    render(<CreateNoteDrawer open onClose={vi.fn()} onNoteReady={onNoteReady} />);
+    fireEvent.click(screen.getByTestId("drawer-header-button-voice-note"));
+    fireEvent.click(screen.getByTestId("voice-generate"));
+
+    await waitFor(() => expect(mockSaveNoteTranscript).toHaveBeenCalled());
+    expect(onNoteReady).not.toHaveBeenCalled();
   });
 
   it("still creates the note and saves the transcript when no fields are extracted", async () => {

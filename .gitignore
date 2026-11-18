@@ -21,3 +21,7 @@ docker.env
 
 # Skills Store working copy pulled by the prompts CLI: real prompt text, never committed.
 /.prompts/
+
+# Scribe v2 eval sets are real sessions (PHI): never commit them.
+docs/scribe-v2/eval/*
+!docs/scribe-v2/eval/sample_case.jsonl
