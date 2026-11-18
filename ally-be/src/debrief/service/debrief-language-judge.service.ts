@@ -116,6 +116,7 @@ export class DebriefLanguageJudgeService {
       DEBRIEF_LANGUAGE_RUBRIC_CODE,
       null,
     );
+    const allowed = await this.context.providerAllowlist(run.tenantId);
     const { apiUrl, outboundApiKey } = this.config.ai;
     const res = await withJudgeSlot(() =>
       axios.post(
@@ -127,6 +128,9 @@ export class DebriefLanguageJudgeService {
           quoted_turns: citedTurns(cards, transcript),
           rubric,
           scenario_session_id: run.scenarioSessionId,
+          // A learner's text never goes to a provider the organisation does not allow: ally-ai
+          // skips the judge when its own provider is not in this list.
+          allowed_providers: allowed,
         },
         {
           headers: { 'x-api-key': outboundApiKey },
@@ -138,8 +142,21 @@ export class DebriefLanguageJudgeService {
       judge_model: string;
       judge_prompt_version: string;
       answered: boolean;
+      skipped?: string;
       findings: DebriefLanguageFinding[];
     };
+    if (d.skipped) {
+      // Not an error and not a result: this organisation does not allow the judge's provider, so
+      // the debrief is simply not language-checked (the ledger keeps the run from being retried hot).
+      await this.attempts.recordFailure(
+        JudgeAttemptFamily.DEBRIEF_LANGUAGE,
+        run.id,
+        run.tenantId,
+        JudgeAttemptOutcome.EMPTY,
+        `not checked: ${d.skipped}`,
+      );
+      return null;
+    }
     if (!d.answered) {
       await this.attempts.recordFailure(
         JudgeAttemptFamily.DEBRIEF_LANGUAGE,

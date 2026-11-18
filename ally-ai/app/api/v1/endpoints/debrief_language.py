@@ -36,6 +36,9 @@ class DebriefLanguageRequest(BaseModel):
     # The pinned rubric from the Skills Store; the code's text when absent.
     rubric: Optional[str] = None
     scenario_session_id: Optional[str] = None
+    # The providers the learner's organisation allows (ally-be sends its allowlist). When the
+    # judge's own provider is not in the list nothing is sent to it: the answer is `skipped`.
+    allowed_providers: Optional[List[str]] = None
 
 
 class DebriefLanguageResponse(BaseModel):
@@ -44,6 +47,8 @@ class DebriefLanguageResponse(BaseModel):
     # False when the judge produced no usable answer: the caller records a
     # failed attempt, never an empty (clean) result.
     answered: bool
+    # Set instead of calling the model when the organisation does not allow the judge's provider.
+    skipped: Optional[str] = None
     findings: List[LanguageFinding]
     dropped: Dict[str, int] = Field(default_factory=dict)
     log: Optional[Dict[str, Any]] = None
@@ -71,6 +76,16 @@ async def judge(req: DebriefLanguageRequest) -> DebriefLanguageResponse:
     if not any(str(s.get("text", "")).strip() for s in req.sections):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="empty debrief"
+        )
+    cfg = settings.DEBRIEF_LANGUAGE_JUDGE
+    if req.allowed_providers is not None and cfg.PROVIDER not in req.allowed_providers:
+        # A learner's text never goes to a provider the organisation does not allow (FR-57).
+        return DebriefLanguageResponse(
+            judge_model=cfg.MODEL,
+            judge_prompt_version=cfg.PROMPT_VERSION,
+            answered=False,
+            skipped="provider_not_allowed",
+            findings=[],
         )
     t0 = time.monotonic()
     calls: List[Dict[str, Any]] = []

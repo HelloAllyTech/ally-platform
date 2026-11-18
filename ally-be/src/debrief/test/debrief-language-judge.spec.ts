@@ -80,7 +80,9 @@ describe('the language check reads only what the learner reads', () => {
 });
 
 describe('DebriefLanguageJudgeService', () => {
-  function build(opts: { existing?: any; rate?: unknown } = {}) {
+  function build(
+    opts: { existing?: any; rate?: unknown; allowed?: string[] } = {},
+  ) {
     const stored: any[] = opts.existing ? [opts.existing] : [];
     const judgments = {
       findOne: jest.fn(async () => stored[0] ?? null),
@@ -130,6 +132,9 @@ describe('DebriefLanguageJudgeService', () => {
     const context = {
       transcript: jest.fn(async () => TRANSCRIPT),
       promptText: jest.fn(async () => 'PINNED RUBRIC'),
+      providerAllowlist: jest.fn(
+        async () => opts.allowed ?? ['gemini', 'openai'],
+      ),
     };
     const svc = new DebriefLanguageJudgeService(
       judgments as any,
@@ -175,6 +180,30 @@ describe('DebriefLanguageJudgeService', () => {
   });
 
   beforeEach(() => post.mockReset());
+
+  it('sends the organisation’s allowed providers, and a skipped answer stores nothing and is not an error', async () => {
+    const { svc, stored, attempts, context } = build({ allowed: ['gemini'] });
+    post.mockResolvedValueOnce({
+      data: {
+        judge_model: 'gpt-5-mini',
+        judge_prompt_version: 'v2',
+        answered: false,
+        skipped: 'provider_not_allowed',
+        findings: [],
+      },
+    });
+    expect(await svc.judge(run())).toBeNull();
+    expect(context.providerAllowlist).toHaveBeenCalledWith('t');
+    expect(post.mock.calls[0][1].allowed_providers).toEqual(['gemini']);
+    expect(stored).toHaveLength(0);
+    expect(attempts.recordFailure).toHaveBeenCalledWith(
+      expect.anything(),
+      'r1',
+      't',
+      expect.anything(),
+      'not checked: provider_not_allowed',
+    );
+  });
 
   it('sends visible text, language facts, pinned rubric and cited turns; stores findings and types', async () => {
     const { svc, stored, attempts } = build();

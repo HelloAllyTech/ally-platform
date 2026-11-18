@@ -186,6 +186,26 @@ def test_endpoint_empty_debrief_400():
     assert res.status_code == 400
 
 
+def test_endpoint_skips_the_judge_when_its_provider_is_not_allowed(monkeypatch):
+    """A learner's text never goes to a provider the organisation does not allow."""
+    from app.api.v1.endpoints import debrief_language as ep
+
+    async def boom(*a, **k):
+        raise AssertionError("the model must not be called")
+
+    monkeypatch.setattr(ep, "judge_debrief_language", boom)
+    body = {
+        "sections": [{"section": "opening", "text": "नमस्ते"}],
+        "language": "hi-IN",
+        "allowed_providers": ["gemini"],
+    }
+    res = _client().post("/api/v1/debrief-language/judge", json=body)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["answered"] is False and data["skipped"] == "provider_not_allowed"
+    assert data["findings"] == []
+
+
 def test_endpoint_roundtrip(monkeypatch):
     from app.api.v1.endpoints import debrief_language as ep
     from app.core.debrief_language.schemas import JudgedDebriefLanguage, LanguageFinding
