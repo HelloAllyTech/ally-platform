@@ -216,6 +216,8 @@ enum RoadmapTab {
 export const ProductRoadmap: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { permissions, features, user } = useUser();
+  /** An org-restricted admin is a Viewer at most: the filing and lead doors stay shut. */
+  const restricted = user?.restrictedTenantIds != null;
 
   const canVote = !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP);
   // Breadth multiplier. `enabled` comes from the server so the UI and the flag can't disagree;
@@ -239,18 +241,18 @@ export const ProductRoadmap: React.FC = () => {
   const canOpenBuilder = canOpenRoadmapBuilder(permissions, features);
   /**
    * The header's second filing door — a plain form with no readiness check, for the named few
-   * who hold the quick-add toggle. Independent of canManage — see canQuickAddRoadmap.
+   * who hold the Owner role — see canQuickAddRoadmap.
    */
-  const canQuickAdd = canQuickAddRoadmap(permissions, features);
-  /** The guided-interview door: VOTE plus the Product Planning — Ideas toggle (canFileIdeas). */
-  const canFile = canFileIdeas(permissions, features);
+  const canQuickAdd = canQuickAddRoadmap(permissions, features, restricted);
+  /** The guided-interview door: VOTE plus the Idea role (canFileIdeas). */
+  const canFile = canFileIdeas(permissions, features, restricted);
   /**
    * Planning is on server-side (builder_settings.planningEnabled). While it is off the plan
    * routes answer 404 and none of the plan tabs or drawers render, so the roadmap is unchanged.
    */
   const { data: planSettings } = useGetPlanSettingsQuery();
   const planningOn = !!planSettings?.enabled;
-  const canLeadPlans = planningOn && canLeadRoadmapPlans(features);
+  const canLeadPlans = planningOn && canLeadRoadmapPlans(permissions, features, restricted);
   const openPlanId = searchParams.get("plan");
   const openPlan = (id: string | null) => {
     const next = new URLSearchParams(searchParams);

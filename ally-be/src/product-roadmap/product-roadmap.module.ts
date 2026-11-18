@@ -225,7 +225,7 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
      * imports ProductRoadmapModule.
      */
     BuilderModule,
-    /** PlanAccessService: every filing door needs the Product Planning — Ideas toggle. */
+    /** PlanAccessService: every filing door needs the Idea role (RoadmapRoleService). */
     ProductPlanningModule,
     // The opportunity copilot's principles_search/principles_get, on First Principles.
     ContextLibraryModule,

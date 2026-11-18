@@ -368,8 +368,8 @@ export const ApiEndpoints = {
   PRODUCT_ROADMAP: {
     OPPORTUNITIES: "/v1/product-roadmap/opportunities",
     /**
-     * Quick add: the same filing as OPPORTUNITIES with the readiness gate off. Behind the
-     * `product_roadmap_quick_add` admin toggle server-side; a caller without it gets a 403.
+     * Quick add: the same filing as OPPORTUNITIES with the readiness gate off. Needs the
+     * Roadmap Owner role server-side; a caller without it gets a 403.
      */
     OPPORTUNITIES_QUICK: "/v1/product-roadmap/opportunities/quick",
     /**

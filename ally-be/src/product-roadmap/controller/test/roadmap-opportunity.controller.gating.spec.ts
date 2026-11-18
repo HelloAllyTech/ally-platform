@@ -12,10 +12,11 @@ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
  * directly, so guards never run there, and the split lives only in decorators).
  *
  * `create` is the interview's door and sits on the VOTE tier with no toggle.
- * `quickAdd` skips the readiness gate, so it must sit behind the
- * `product_roadmap_quick_add` toggle as well — a quick-add handler that loses
- * its toggle would let every voter file unchecked, which is the bypass the
- * gate exists to close.
+ * `quickAdd` skips the readiness gate, so its handler asserts the Owner role
+ * (PlanAccessService.assertQuickAdd, covered in
+ * roadmap-filing-ideas-toggle.spec.ts) — a quick-add handler that loses that
+ * check would let every voter file unchecked, which is the bypass the gate
+ * exists to close.
  */
 describe('RoadmapOpportunityController — filing route gating', () => {
   const reflector = new Reflector();
@@ -47,17 +48,17 @@ describe('RoadmapOpportunityController — filing route gating', () => {
     ]);
     // The Product Roadmap tab's own toggle, ON by default for every platform
     // admin — not a filing tier. The interview stays the door for everyone
-    // who has the tab; quick add and manage keep their own keys.
+    // who has the tab; quick add is the Owner role's, checked in the handler.
     expect(toggle?.featureKey).toBe(FeatureToggleKey.PRODUCT_ROADMAP);
   });
 
-  it('quickAdd is VOTE-tier AND behind the quick-add toggle', () => {
+  it('quickAdd is VOTE-tier behind the Roadmap tab; the Owner role is checked in the handler', () => {
     const { path, permissions, toggle } = gateOf('quickAdd');
     expect(path).toBe('opportunities/quick');
     expect(permissions?.permissions).toEqual([
       PERMISSIONS.VOTE_PRODUCT_ROADMAP,
     ]);
-    expect(toggle?.featureKey).toBe(FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD);
+    expect(toggle?.featureKey).toBe(FeatureToggleKey.PRODUCT_ROADMAP);
   });
 
   it('quickAdd does not share the manage toggle', () => {

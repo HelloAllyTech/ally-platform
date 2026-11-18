@@ -669,7 +669,7 @@ export class RoadmapAdminController {
     @CurrentUser() user: TokenUser,
     @Body() dto: OpportunityInterviewTurnDto,
   ): Promise<OpportunityInterviewTurnResponseDto> {
-    // The copilot is the filing interview: Product Planning — Ideas, like the
+    // The copilot is the filing interview: the Idea role, like the
     // door it leads to.
     await this.planAccess.assertIdeas(user.id);
     return this.copilotService.takeTurn(

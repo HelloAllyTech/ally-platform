@@ -16,7 +16,7 @@ import { errorMessage } from "./planLabels";
 import { PlanProgress } from "./PlanProgress";
 
 interface MyPlansTabProps {
-  /** Whether the viewer may park and file ideas (VOTE + Product Planning — Ideas). */
+  /** Whether the viewer may park and file ideas (VOTE + the Idea role). */
   canFile: boolean;
   onOpen: (planId: string) => void;
 }

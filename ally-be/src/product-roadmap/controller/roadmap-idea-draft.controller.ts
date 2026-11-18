@@ -64,7 +64,7 @@ export class RoadmapIdeaDraftController {
     @CurrentUser() user: TokenUser,
     @Body() dto: CreateIdeaDraftDto,
   ) {
-    // Parking an idea is the Product Planning — Ideas toggle's. Listing and
+    // Parking an idea is the Idea role's. Listing and
     // discarding your own drafts stay open: they are yours to read and remove.
     await this.planAccess.assertIdeas(user.id);
     return this.drafts.create(user.id, dto);
