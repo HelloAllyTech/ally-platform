@@ -84,7 +84,7 @@ export class SegmentedRecordingController {
   @AuthPermissions([PERMISSIONS.START_MICROPHONE_CHAT])
   @ApiOperation({
     summary:
-      'Finish the recording: checks every segment arrived (409 lists the missing ones), ends the chat and starts transcription',
+      'Finish the recording: checks every segment arrived (status "missing" lists the ones to upload), ends the chat and starts transcription',
   })
   finalize(
     @CurrentUser() user: TokenUser,

@@ -35,7 +35,7 @@ const scribeRecordingsAPI = baseAPI.injectEndpoints({
       }),
     }),
     finalizeScribeRecording: builder.mutation<
-      { status: "finalized" | "already-finalized"; missing: number[] },
+      { status: "finalized" | "already-finalized" | "missing"; missing: number[] },
       { chatId: number; segmentCount: number; durationSeconds?: number; allowPartial?: boolean }
     >({
       query: ({ chatId, ...body }) => ({

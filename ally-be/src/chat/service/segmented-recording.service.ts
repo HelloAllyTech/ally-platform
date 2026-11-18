@@ -57,6 +57,22 @@ const JOIN_TIMEOUT_MS = 10 * 60 * 1000;
 
 type JoinState = 'pending' | 'joining' | 'joined' | 'failed' | 'empty';
 
+/**
+ * Rows from DataSource.query. For UPDATE … RETURNING the postgres driver
+ * returns [rows, affectedCount], not the rows; a SELECT returns the rows.
+ */
+export function returnedRows<T>(result: unknown): T[] {
+  if (
+    Array.isArray(result) &&
+    result.length === 2 &&
+    Array.isArray(result[0]) &&
+    typeof result[1] === 'number'
+  ) {
+    return result[0] as T[];
+  }
+  return (Array.isArray(result) ? result : []) as T[];
+}
+
 /** What `chats.metadata.segmented` holds for a segmented recording. */
 export interface SegmentedMeta {
   format: SegmentFormat;
@@ -220,8 +236,9 @@ export class SegmentedRecordingService {
 
   /**
    * End the recording and start its transcription. Idempotent: a repeat after
-   * success returns the same state. Missing segments are reported (409 with
-   * their indexes) so the client can upload them; with `allowPartial` the
+   * success returns the same state. Missing segments are reported
+   * (status "missing" with their indexes) so the client can upload them and
+   * call again; with `allowPartial` the
    * recording is finished with what arrived and flagged incomplete.
    */
   async finalize(
@@ -232,7 +249,10 @@ export class SegmentedRecordingService {
       durationSeconds?: number;
       allowPartial?: boolean;
     },
-  ): Promise<{ status: 'finalized' | 'already-finalized'; missing: number[] }> {
+  ): Promise<{
+    status: 'finalized' | 'already-finalized' | 'missing';
+    missing: number[];
+  }> {
     const { chat, meta } = await this.ownRecording(userId, chatId);
     if (chat.status !== ChatStatus.ACTIVE) {
       return { status: 'already-finalized', missing: meta.missing ?? [] };
@@ -248,11 +268,11 @@ export class SegmentedRecordingService {
     const missing = [];
     for (let i = 0; i < body.segmentCount; i++)
       if (!present.has(i)) missing.push(i);
+    // Not an error: the client uploads these and calls again. (A 4xx body
+    // would also lose the list: the global exception filter keeps only the
+    // message.)
     if (missing.length && !body.allowPartial) {
-      throw new ConflictException({
-        message: `${missing.length} segment(s) have not arrived yet`,
-        missing,
-      });
+      return { status: 'missing', missing };
     }
     const ended = await this.end(chatId, {
       segmentCount: body.segmentCount,
@@ -263,7 +283,11 @@ export class SegmentedRecordingService {
         : StreamEndReason.COMPLETED,
     });
     if (!ended) return { status: 'already-finalized', missing };
-    void this.joinAndTranscribe(chatId).catch(() => undefined);
+    void this.joinAndTranscribe(chatId).catch((error) =>
+      this.logger.error(
+        `Segmented recording ${chatId}: join could not start: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+    );
     return { status: 'finalized', missing };
   }
 
@@ -277,11 +301,12 @@ export class SegmentedRecordingService {
       reason: StreamEndReason;
     },
   ): Promise<boolean> {
-    const rows: Array<{ id: number }> = await this.dataSource.query(
+    const rawRows: unknown = await this.dataSource.query(
       `UPDATE chats SET status = $2, "endedAt" = now()
         WHERE id = $1 AND status = $3 RETURNING id`,
       [chatId, ChatStatus.ENDED, ChatStatus.ACTIVE],
     );
+    const rows = returnedRows<{ id: number }>(rawRows);
     if (!rows.length) return false;
 
     const incomplete =
@@ -324,9 +349,8 @@ export class SegmentedRecordingService {
    * both deploy colours) run it once. Never throws.
    */
   async joinAndTranscribe(chatId: number): Promise<void> {
-    const claimed: Array<{ metadata: Record<string, any> }> =
-      await this.dataSource.query(
-        `UPDATE chats SET metadata = jsonb_set(
+    const rawClaimed: unknown = await this.dataSource.query(
+      `UPDATE chats SET metadata = jsonb_set(
            jsonb_set(jsonb_set(metadata, '{segmented,joinState}', '"joining"'),
                      '{segmented,joinClaimedAt}', to_jsonb(now()::text)),
            '{segmented,joinAttempts}',
@@ -336,18 +360,20 @@ export class SegmentedRecordingService {
                OR (metadata->'segmented'->>'joinState' = 'joining'
                    AND (metadata->'segmented'->>'joinClaimedAt')::timestamptz < now() - ($3 || ' milliseconds')::interval))
         RETURNING metadata`,
-        [chatId, ChatStatus.ENDED, String(JOIN_STALE_MS)],
-      );
+      [chatId, ChatStatus.ENDED, String(JOIN_STALE_MS)],
+    );
+    const claimed = returnedRows<{ metadata: Record<string, any> }>(rawClaimed);
     if (!claimed.length) return;
     const meta = claimed[0].metadata.segmented as SegmentedMeta;
-    const chat = await this.chatService.getChatByIdForServiceCall(chatId);
-    ExecutionManager.setAuthContext(
-      String(chat?.counselorId ?? chat?.createdBy ?? ''),
-      chat?.tenantId as string,
-    );
 
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), `seg-${chatId}-`));
+    let workDir: string | undefined;
     try {
+      const chat = await this.chatService.getChatByIdForServiceCall(chatId);
+      ExecutionManager.setAuthContext(
+        String(chat?.counselorId ?? chat?.createdBy ?? ''),
+        chat?.tenantId as string,
+      );
+      workDir = fs.mkdtempSync(path.join(os.tmpdir(), `seg-${chatId}-`));
       const keys = await this.segmentKeys(chatId);
       if (keys.length === 0) {
         await this.patchMeta(chatId, { joinState: 'empty' });
@@ -361,14 +387,14 @@ export class SegmentedRecordingService {
       }
       const inputs: string[] = [];
       for (const key of keys) {
-        const file = path.join(workDir, path.basename(key));
+        const file = path.join(workDir as string, path.basename(key));
         fs.writeFileSync(
           file,
           await this.s3Service.getObjectBuffer({ bucket: this.bucket, key }),
         );
         inputs.push(file);
       }
-      const out = path.join(workDir, 'joined.mp3');
+      const out = path.join(workDir as string, 'joined.mp3');
       await SegmentedRecordingService.joinWithFfmpeg(inputs, out);
 
       const joinedKey = `audio-upload/segmented/${chatId}.mp3`;
@@ -433,7 +459,7 @@ export class SegmentedRecordingService {
         `Segmented recording ${chatId}: join attempt ${attempts} failed${finalFailure ? ' (giving up)' : ''}: ${message}`,
       );
     } finally {
-      fs.rmSync(workDir, { recursive: true, force: true });
+      if (workDir) fs.rmSync(workDir, { recursive: true, force: true });
     }
   }
 

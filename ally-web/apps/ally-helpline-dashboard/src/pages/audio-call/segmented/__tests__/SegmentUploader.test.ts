@@ -65,7 +65,7 @@ describe("SegmentUploader", () => {
     const up = new SegmentUploader(7, api);
     stored.set("7:1", { id: "7:1", chatId: 7, index: 1, blob: blob(), contentType: "audio/webm" });
     api.finalize
-      .mockRejectedValueOnce({ data: { missing: [1] } })
+      .mockResolvedValueOnce({ status: "missing", missing: [1] })
       .mockResolvedValueOnce({ status: "finalized", missing: [] });
     const done = up.finish(2, 60);
     await vi.runAllTimersAsync();
@@ -77,7 +77,7 @@ describe("SegmentUploader", () => {
     const up = new SegmentUploader(7, api);
     api.finalize.mockImplementation(async (args: any) => {
       if (args.allowPartial) return { status: "finalized", missing: [3] };
-      throw { data: { missing: [3] } };
+      return { status: "missing", missing: [3] };
     });
     const done = up.finish(4, 120);
     await vi.runAllTimersAsync();

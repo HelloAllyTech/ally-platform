@@ -10,6 +10,7 @@ import {
 import {
   MAX_SEGMENTS,
   SegmentedRecordingService,
+  returnedRows,
 } from '../segmented-recording.service';
 import { ChatStatus, ChatSummaryStatus } from '../../entity/chat.entity';
 import { ExecutionManager } from '../../../common/execution/execution-manager';
@@ -19,6 +20,14 @@ import { StreamEndReason } from '../../constants/chat.constants';
 const TENANT = 'tenant-1';
 const key = (chatId: number, i: number) =>
   SegmentedRecordingService.segmentKey(chatId, i, 'webm');
+
+describe('returnedRows', () => {
+  it('unwraps the postgres [rows, count] of UPDATE … RETURNING', () => {
+    expect(returnedRows([[{ id: 7 }], 1])).toEqual([{ id: 7 }]);
+    expect(returnedRows([[], 0])).toEqual([]);
+    expect(returnedRows([{ id: 7 }])).toEqual([{ id: 7 }]);
+  });
+});
 
 describe('SegmentedRecordingService', () => {
   let service: SegmentedRecordingService;
@@ -154,8 +163,9 @@ describe('SegmentedRecordingService', () => {
       });
       await expect(
         service.finalize(1, 7, { segmentCount: 4 }),
-      ).rejects.toMatchObject({
-        response: { missing: [1, 3] },
+      ).resolves.toEqual({
+        status: 'missing',
+        missing: [1, 3],
       });
       expect(service.joinAndTranscribe).not.toHaveBeenCalled();
     });

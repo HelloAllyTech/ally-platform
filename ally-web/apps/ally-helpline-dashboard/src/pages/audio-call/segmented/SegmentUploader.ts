@@ -81,21 +81,21 @@ export class SegmentUploader {
   ): Promise<{ missing: number[] }> {
     await Promise.allSettled([...this.inFlight.values()]);
     for (let round = 0; round < rounds; round++) {
+      let result: { status: string; missing: number[] };
       try {
-        const r = await this.api.finalize({ chatId: this.chatId, segmentCount, durationSeconds });
-        return { missing: r.missing ?? [] };
-      } catch (error: any) {
-        const missing: number[] = error?.data?.missing ?? error?.missing ?? [];
-        if (!missing.length) {
-          await sleep(backoffMs(round));
-          continue;
-        }
-        for (const index of missing) {
-          const stored = await segmentStore.get(this.chatId, index);
-          if (stored) this.inFlight.set(index, this.upload(index, stored.blob, stored.contentType));
-        }
-        await Promise.allSettled([...this.inFlight.values()]);
+        result = await this.api.finalize({ chatId: this.chatId, segmentCount, durationSeconds });
+      } catch {
+        await sleep(backoffMs(round));
+        continue;
       }
+      // "missing": the server lists segments it doesn't have; re-send them
+      // from IndexedDB and ask again.
+      if (result.status !== "missing") return { missing: result.missing ?? [] };
+      for (const index of result.missing) {
+        const stored = await segmentStore.get(this.chatId, index);
+        if (stored) this.inFlight.set(index, this.upload(index, stored.blob, stored.contentType));
+      }
+      await Promise.allSettled([...this.inFlight.values()]);
     }
     const r = await this.api.finalize({
       chatId: this.chatId,
