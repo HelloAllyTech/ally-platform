@@ -629,8 +629,8 @@ Three things keep this page true. Each covers a gap the others can't see.
    (`--unclaimed` lists just the gaps).
 2. **The `concepts-gates` rule in `.docs-map.yml`** — touching the toggle registry or any
    `*settings*.entity.ts` requires touching this page. That is where a concept flips between
-   Live and Dark without a path changing. If the change moves no status, use a `Docs-Skip:`
-   trailer.
+   Live and Dark without a path changing. If the change moves no status, add the `docs:skip`
+   label to the PR (a `Docs-Skip:` trailer works only on a direct push to `master`).
 3. **The agent rule in `AGENTS.md` / `CLAUDE.md`** — adding, retiring, renaming or re-gating a
    concept updates its card in the same PR.
 

@@ -281,4 +281,4 @@ rules:
       Feature toggles and settings flags decide whether a concept is Live, Dark or Partial,
       and the Core Concepts page states that status per concept. Re-check the Status line of
       the concept this gate belongs to; a change that moves no status (a description, a
-      reordering) can use the `Docs-Skip:` trailer.
+      reordering) can take the `docs:skip` label.
