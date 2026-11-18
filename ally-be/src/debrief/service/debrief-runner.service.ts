@@ -350,7 +350,8 @@ export class DebriefRunnerService {
         now,
       });
       if ('ended' in prepared) return prepared.ended;
-      const retries = Number(run.workspace?.retries ?? 0) || 0;
+      const retries =
+        Number(run.retries ?? 0) || Number(run.workspace?.retries ?? 0) || 0;
       const res = await this.graph.run(
         {
           ...prepared.request,
@@ -481,6 +482,7 @@ export class DebriefRunnerService {
     // and `language_recorded: false`; the graph reads the language from what
     // the learner wrote and answers it with `language` and
     // `workspace.languageSource` (the Console counts these per organisation).
+    if (session.languageRecorded) run.languageSource = 'recorded';
     run.workspace = {
       ...run.workspace,
       ...(session.languageRecorded ? { languageSource: 'recorded' } : {}),
@@ -785,6 +787,10 @@ export class DebriefRunnerService {
     }
     const status = res.status as DebriefRunStatus;
     run.workspace = { ...run.workspace, ...(res.workspace ?? {}) };
+    const source = run.workspace.languageSource;
+    if (typeof source === 'string' && source) {
+      run.languageSource = source.slice(0, 40);
+    }
     if (status === DebriefRunStatus.FAILED && !run.workspace.decision) {
       run.workspace = {
         ...run.workspace,
