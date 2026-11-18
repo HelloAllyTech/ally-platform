@@ -35,4 +35,19 @@ describe('the provider allowlist fails closed', () => {
     expect(await svc.todaysDebriefAllowed('t1')).toBe(true);
     expect(await svc.todaysDebriefAllowed(null)).toBe(true);
   });
+
+  it('a blip records no verdict: the run is decided at the next sweep, not marked "not available" for good', async () => {
+    const svc = Object.create(DebriefAgentService.prototype) as any;
+    svc.overrides = {
+      get: jest.fn(async () => {
+        throw new Error('db blip');
+      }),
+    };
+    svc.dataSource = { query: jest.fn() };
+    svc.logger = { warn: jest.fn() };
+    const run = { id: 'r1', tenantId: 't1', scenarioSessionId: 's1' } as any;
+    expect(await svc.fallBackToToday(run)).toBe(false);
+    expect(svc.dataSource.query).not.toHaveBeenCalled();
+    expect(run.workspace?.fallbackToToday).toBeUndefined();
+  });
 });

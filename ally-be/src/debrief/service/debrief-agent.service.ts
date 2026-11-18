@@ -559,10 +559,12 @@ export class DebriefAgentService implements OnModuleInit {
    * Whether today's debrief may be written for this organisation: its model
    * runs on a provider the organisation allows (plan §8.9, FR-57: a
    * learner's data never goes to a provider the organisation does not
-   * allow). A failed read allows nothing (fail closed, as the context repository's allowlist does):
-   * the learner then sees the defined "not available" state, never a stuck one.
+   * allow). Null when the allowlist could not be read: callers fail closed
+   * (nothing is written) but must not record a verdict from a blip.
    */
-  async todaysDebriefAllowed(tenantId: string | null): Promise<boolean> {
+  private async readTodaysAllowance(
+    tenantId: string | null,
+  ): Promise<boolean | null> {
     const provider = todaysDebriefProvider();
     if (!provider || !tenantId) return true;
     try {
@@ -573,8 +575,20 @@ export class DebriefAgentService implements OnModuleInit {
       );
       return allowlistFromValues(row?.values).includes(provider);
     } catch {
-      return ALLOWLIST_WHEN_UNREADABLE.includes(provider);
+      return null;
     }
+  }
+
+  /**
+   * Whether today's debrief may be written. A failed read allows nothing
+   * (fail closed, as the context repository's allowlist does): the learner
+   * then sees the defined "not available" state, never a stuck one.
+   */
+  async todaysDebriefAllowed(tenantId: string | null): Promise<boolean> {
+    const read = await this.readTodaysAllowance(tenantId);
+    if (read !== null) return read;
+    const provider = todaysDebriefProvider();
+    return !!provider && ALLOWLIST_WHEN_UNREADABLE.includes(provider);
   }
 
   /**
@@ -585,7 +599,16 @@ export class DebriefAgentService implements OnModuleInit {
    * on the run once (`workspace.fallbackToToday`). True when this call did it.
    */
   async fallBackToToday(run: DebriefRun): Promise<boolean> {
-    const allowed = await this.todaysDebriefAllowed(run.tenantId ?? null);
+    const read = await this.readTodaysAllowance(run.tenantId ?? null);
+    if (read === null) {
+      // The allowlist could not be read: write nothing and record no verdict, so the next sweep
+      // decides once it can be read (a blip must not mark a learner "not available" for good).
+      this.logger.warn(
+        `[debrief] run ${run.id}: the provider allowlist could not be read; deciding at the next sweep`,
+      );
+      return false;
+    }
+    const allowed = read;
     const outcome = allowed ? 'today' : 'not_available';
     const res = await this.dataSource.query(
       `UPDATE debrief_runs
