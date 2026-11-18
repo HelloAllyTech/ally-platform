@@ -15,6 +15,7 @@ import {
   useTellBuilderSessionMutation,
   useUndoBuilderDecisionMutation,
 } from "@api";
+import { useClaimCommandPaletteShortcut } from "@components/command-palette/CommandPaletteContext";
 import { ROUTES, en } from "@constants";
 import {
   BuilderDecision,
@@ -583,6 +584,9 @@ export const BuilderRoom: React.FC = () => {
   );
 
   /* ── Keyboard (fine pointer) ──────────────────────────────────────── */
+
+  // ⌘K here is the room's own palette, not the global page palette.
+  useClaimCommandPaletteShortcut();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
