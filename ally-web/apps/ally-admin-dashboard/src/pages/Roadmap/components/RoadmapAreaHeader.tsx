@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { ROUTES, en } from "@constants";
 
-import { RoadmapHelpMenu, RoadmapRoleTabs } from "./RoadmapAreaNav";
+import { RoadmapConceptsButton, RoadmapHelpMenu, RoadmapRoleTabs } from "./RoadmapAreaNav";
 import { useRoadmapRole } from "../RoadmapGate";
 
 /**
@@ -42,7 +42,12 @@ export const RoadmapAreaHeader: React.FC<{ phone: boolean; current: string }> = 
           </nav>
         )}
       </div>
-      {!phone && <RoadmapHelpMenu showShortcuts={false} />}
+      {!phone && (
+        <div className="flex items-center gap-1">
+          <RoadmapConceptsButton />
+          <RoadmapHelpMenu showShortcuts={false} />
+        </div>
+      )}
     </header>
   );
 };

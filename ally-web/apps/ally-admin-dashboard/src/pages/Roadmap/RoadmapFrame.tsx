@@ -8,6 +8,7 @@ import { Button, Modal } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 
 import { motionTransition, useReducedMotionPreference } from "../../motion";
+import { ConceptsDrawer } from "./components/ConceptsDrawer";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
 import { useRoadmapPresence } from "./hooks/useRoadmapJobTimer";
 import {
@@ -22,9 +23,14 @@ import { MovedState, movedStateOf } from "./utils/redirects";
 interface RoadmapFrameValue {
   /** ? → What moved (§4.15). */
   openWhatMoved: () => void;
+  /** The header's book icon → the Core Concepts wiki page, view only. */
+  openConcepts: () => void;
 }
 
-const RoadmapFrameContext = createContext<RoadmapFrameValue>({ openWhatMoved: () => undefined });
+const RoadmapFrameContext = createContext<RoadmapFrameValue>({
+  openWhatMoved: () => undefined,
+  openConcepts: () => undefined,
+});
 
 export const useRoadmapFrame = (): RoadmapFrameValue => useContext(RoadmapFrameContext);
 
@@ -136,11 +142,13 @@ export const RoadmapFrame: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const openWhatMoved = useCallback(() => setWhatMovedOpen(true), []);
+  const [conceptsOpen, setConceptsOpen] = useState(false);
+  const openConcepts = useCallback(() => setConceptsOpen(true), []);
   // Shortcuts need a keyboard: phones and tablets never get the tip.
   const showTip = shortcutsTip && breakpoint !== "phone" && breakpoint !== "tablet";
 
   return (
-    <RoadmapFrameContext.Provider value={{ openWhatMoved }}>
+    <RoadmapFrameContext.Provider value={{ openWhatMoved, openConcepts }}>
       <div className="flex h-full min-h-0 flex-col">
         <AnimatePresence initial={false}>
           {moved && <MovedBanner key="moved" moved={moved} onDismiss={dismissMoved} />}
@@ -179,6 +187,7 @@ export const RoadmapFrame: React.FC<{ children: React.ReactNode }> = ({ children
         <div className="min-h-0 flex-1">{children}</div>
       </div>
       <WhatMovedDialog open={whatMovedOpen} onClose={closeWhatMoved} />
+      <ConceptsDrawer open={conceptsOpen} onClose={() => setConceptsOpen(false)} />
     </RoadmapFrameContext.Provider>
   );
 };
