@@ -169,6 +169,23 @@ describe("Reading your website, pages we couldn't read (Q3-fast Part 3)", () => 
     expect(list.textContent).toContain("https://sunrise.example/team");
   });
 
+  it("says it's reading the documents while an upload is read, never asks for it again (Q3-fast)", () => {
+    render(
+      <ReadingScreen
+        view={view({
+          step: "reading",
+          source: { website: null, description: null },
+          crawl: { ...view().crawl, status: "idle", pagesRead: 0 },
+        })}
+        reading={{ ...progress, done: null, read: 0 }}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("reading-documents").textContent).toBe(COPY.reading.documentsStatus);
+    expect(screen.queryByText(COPY.learned.nothing.upload)).toBeNull();
+    expect(screen.queryByText(/of up to 50 pages/)).toBeNull();
+  });
+
   it("shows nothing when every page was read", () => {
     render(<ReadingScreen view={view()} reading={progress} onDone={vi.fn()} />);
     expect(screen.queryByTestId("not-read")).toBeNull();

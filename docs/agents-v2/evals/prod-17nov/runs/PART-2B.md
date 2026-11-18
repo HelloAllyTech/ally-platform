@@ -9,7 +9,7 @@ goes to Stop 3.
 | Suite | Before (purpose variants) | After (playbooks) |
 |---|---|---|
 | Lists (6b) | 5/6 (`p2b-before-lists.txt`) | 5/6 (`p2b-after-lists.txt`); the same case, `lists-taken-slot`, fails in both |
-| Lead probe, 3 separate runs | 6b: 6/6, 5/6, 5/6 (16/18) | 6/6, 6/6, 6/6 (18/18) (`p2b-leads-run3/4/5.txt`) |
+| Lead probe, 3 separate runs | 6b: 6/6, 5/6, 5/6 (16/18) | 6/6, 6/6, 6/6 (18/18) (`p2b-leads-run3.txt`, `p2b-leads-run4.txt`, `p2b-leads-run5.txt`) |
 
 The lead probe runs one invocation at a time, with the probe's leads (`987654320x`) cleared
 before each: `--repeat` reuses the same phone numbers, so its later runs are refused as duplicates

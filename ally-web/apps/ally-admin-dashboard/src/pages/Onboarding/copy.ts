@@ -31,6 +31,10 @@ export const COPY = {
     done: "Read {n} pages in {seconds} seconds",
     takingLong: "Still reading. Large sites can take up to 2 minutes.",
     brand: "Found your logo and brand colour",
+    documentsTitle: "Reading your documents",
+    documentsStatus: "Reading your documents…",
+    documentsHint:
+      "This usually takes under a minute. We'll show what we learned as soon as it's done.",
     notRead: "We couldn't read these pages",
     notReadHint:
       "They showed an error or a security check instead of their content, so we kept nothing from them.",

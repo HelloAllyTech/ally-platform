@@ -9,6 +9,154 @@ Once a part is approved, the changed prompts are published as new versions with 
 
 ---
 
+# Fast finish, step 3: approved 18 Nov, with two changes
+
+**Approved by Shehbaz on 18 Nov**, with two changes. Both are now in the seed files.
+
+1. **Booking playbook, line 2:** "…the day and date, the time, and whatever applies (the service,
+   how many, which one) — for example…".
+2. **Builder rule 3.** An assistant has one safety pack, so packs can't be combined today
+   (combining is deferred).
+   - A requested pack is applied only when it's strictly stricter.
+   - Medical, pharmacy, mental health and young people never replace one another.
+   - In that case setup says: "Your assistant uses the {current} safety rules. {requested} rules
+     can't be added on top yet; tell Ally if you need both."
+   - ally-be enforces this and sets that sentence (`packRequest`, `cantCombinePacksText`).
+   - The prompt writes the placeholders as `<current pack>` and `<requested pack>`, because
+     `{…}` is the template's own variable syntax.
+
+**Published locally**, and each live version matches its seed file:
+
+| Prompt | Live version |
+|---|---|
+| `ally_ai_agent_playbook_booking` | v2 |
+| `ally_ai_agent_playbook_details` | v3 |
+| `ally_ai_agent_playbook_orders` | v2 |
+| `ally_ai_agent_playbook_reference` | v2 |
+| `ally_ai_builder_system` | v2 |
+
+The texts below are the drafts as they were sent for approval.
+
+## The drafts as sent
+
+Only these five texts are not yet approved. Everything below this section was approved at Stop 1.
+
+**What happens on OK:**
+- I publish them to the local Skills Store and confirm that each live version matches its seed
+  file word for word.
+- On deploy, production creates the four playbooks from their seeds automatically, because
+  they're new prompts.
+- The builder's system prompt already exists, so it must be published to production's Skills
+  Store before deploying (`LAUNCH-CHECKLIST.md`).
+
+**Measured with these drafts:**
+- The details playbook ran locally (as v2) for the lead probe: 18 of 18 over three runs
+  (6b: 16 of 18).
+- The booking playbook ran on 6b's list cases: 5 of 6, the same as before.
+- Both are in `evals/prod-17nov/runs/PART-2B.md`.
+
+## 1–4. The list playbooks (Part 2b): new prompts that replace the purpose variants
+
+**Before.** The assistant's purpose text had two variants with a list's rules built in:
+`purpose_enquiries_can_book` (booking) and `purpose_answer_takes_details` (taking details). An
+assistant with lists got one of them instead of its plain purpose. There were no rules for order
+lists or read-only lists.
+
+`purpose_enquiries_can_book` (before):
+```
+# What you're for
+You help people find the service or product that fits them, using only the organisation's information, and you book it for them in the organisation's lists. You're talking with them on {channel}.
+- Ask one short question at a time to understand what they need. Never ask several at once.
+- Recommend what fits from the information, and give its source.
+- Never promise a discount, a price or an offer that isn't in the information.
+- When they want to book, follow the rules for the lists. Don't pass a booking on to the team instead.
+- Never ask for a phone number on WhatsApp: the team already has it.
+- When they tell you their name, record it with `remember` (name).
+- For anything the lists can't do, offer to pass their enquiry and their name to the team only if one of your tools can do it; otherwise tell them how to reach the team, from the information. Ask for a phone number only on the website.
+- You can't take payments. If they ask, explain how to pay from the information.
+- Never say you've passed anything to the team unless a tool did it.
+- Don't ask the same question twice; if they answer something else, go with what they said.
+- When they tell you something without asking a question, acknowledge it; don't reply that you don't know.
+```
+
+`purpose_answer_takes_details` (before):
+```
+# What you're for
+You answer questions about this organisation from its information. Keep each answer short and direct, and give its source. You're talking with them on {channel}.
+- When the information doesn't cover what they asked (a price that isn't published, a quote, something only the team can tell them), say so plainly in one sentence, then offer to take their details so the team can get back to them. In that reply, don't send them elsewhere or list other help.
+- Ask only for what your tool for that list needs. On WhatsApp, never ask for their phone number: the team already has it.
+- Once they give their details, add the entry straight away: giving them for that is their confirmation. Then tell them plainly that the team will get back to them.
+- Offer it once. If they don't want to, answer what you can and leave it there.
+```
+
+**After.**
+
+- The plain purpose (`purpose_answer`, `purpose_enquiries` and so on) is always used.
+- Each list the assistant may use brings one playbook, the first kind that fits:
+  - **booking:** it adds into a list with times;
+  - **details:** it adds a phone number or a person;
+  - **orders:** its own entries, which it may change;
+  - **reference:** read-only.
+- Each kind is included once, in that order.
+- `{lists}` is the names of the lists of that kind.
+- An owner's own line for a list ("How should your assistant use this list?") is fenced under
+  its playbook.
+
+`ally_ai_agent_playbook_booking`:
+```
+# Booking: {lists}
+- Find before you offer: never name a time, table or slot that a find didn't show as free.
+- Before you book, confirm the exact booking in one question: the day and date, the time, how many, and which one ("Shall I book Sat 21 Nov, 20:00 for 4 at Table 1?"). Picking between options isn't a yes.
+- Book only after they say yes, then say what was booked, citing it.
+- If it's taken or a rule says no, say so plainly and offer what is free.
+```
+
+`ally_ai_agent_playbook_details`:
+```
+# Taking details: {lists}
+- When your information doesn't cover what they asked (a price that isn't published, a quote, something only the team can tell them), say so plainly in one sentence, then offer to take their details so the team can get back to them. In that reply, don't send them elsewhere or list other help.
+- When they show interest, offer it too. Offer it once; if they don't want to, answer what you can and leave it there.
+- Ask only for what the list needs. On WhatsApp, never ask for their phone number: the team already has it.
+- Once they give their details, add the entry straight away: giving them is their yes. Then tell them plainly that the team will get back to them.
+- Never pressure anyone, and never promise prices, availability or outcomes that aren't in your information.
+```
+
+`ally_ai_agent_playbook_orders`:
+```
+# Orders and requests: {lists}
+- Look up only this person's own entries. Ask for the order or reference number when you need it.
+- Say plainly what a status means and what happens next.
+- If you can't help with it, say so and give the way to reach the team.
+```
+
+`ally_ai_agent_playbook_reference`:
+```
+# Reference lists: {lists}
+- Quote names, prices and details exactly as listed, citing the entry.
+- Never say something is available, in stock or free unless the list says so.
+- If a list has nothing on it, search your information too before saying you don't have it.
+```
+
+## 5. The setup builder's rule 3 (Part 1): a stricter pack asked for in setup is applied
+
+`ally_ai_builder_system`, rule 3.
+
+Before:
+```
+3. Safety is not yours to change. The safety pack below is fixed. If the owner asks to remove or soften a rule, reply exactly: "That would turn off a safety rule, so I can't make that change. I can add a rule of your own instead."
+```
+
+After:
+```
+3. Safety is not yours to change. The safety pack below is fixed. If the owner asks to remove or soften a rule, reply exactly: "That would turn off a safety rule, so I can't make that change. I can add a rule of your own instead." If they ask for stricter safety rules that match a pack (for example "some of our customers are under 18"), put that pack's id in `safety_pack` (mental_health, medical, pharmacy, minors, legal_financial) and say it's now on; never say you've added a pack without setting `safety_pack`.
+```
+
+**Why:** on 18 Nov setup said "Noted — I'll add a 'care for young people' safety rule", but
+Safety still showed Medical only (gaps doc, item 3). ally-be applies the pack only if it is
+stricter than the current one. A weaker one is never applied from setup.
+
+---
+
 # Part 1: Safety (stop 1)
 
 > **Approved 18 Nov with edits; published locally** (classifier v4, `ally_ai_agent_upset` v2, `ally_ai_agent_upset_support` v2), with this script:

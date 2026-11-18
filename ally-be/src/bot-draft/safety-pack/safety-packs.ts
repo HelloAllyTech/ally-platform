@@ -302,6 +302,51 @@ export function packForBusiness(
   );
 }
 
+/**
+ * An assistant has one safety pack (fast finish, 18 Nov). Medical, pharmacy, mental health and care
+ * for young people each guard a different kind of risk, so none of them ever replaces another,
+ * whatever their strength: an eye hospital (medical) that asks for young-people rules keeps medical.
+ * Combining packs is deferred.
+ */
+const NOT_INTERCHANGEABLE: ReadonlySet<string> = new Set([
+  SafetyPackId.MEDICAL,
+  SafetyPackId.PHARMACY,
+  SafetyPackId.MENTAL_HEALTH,
+  SafetyPackId.MINORS,
+]);
+
+/**
+ * What setup does with a pack the owner asks for: `apply` it only when it is strictly stricter
+ * than the one on (in `strength` order); `cant_combine` when both are among the four that never
+ * replace each other; otherwise `keep` the one on.
+ */
+export function packRequest(
+  currentId: string | null | undefined,
+  requestedId: string | null | undefined,
+): 'apply' | 'keep' | 'cant_combine' {
+  const asked = requestedId ? packFor(requestedId) : undefined;
+  if (!asked) return 'keep';
+  const current = currentId ? packFor(currentId) : undefined;
+  if (!current) return 'apply';
+  if (asked.id === current.id) return 'keep';
+  if (NOT_INTERCHANGEABLE.has(asked.id) && NOT_INTERCHANGEABLE.has(current.id))
+    return 'cant_combine';
+  return asked.strength > current.strength ? 'apply' : 'keep';
+}
+
+/** "Medical safety" → "Medical", for "the Medical safety rules". */
+const rulesName = (name: string) => name.replace(/\s+safety$/i, '');
+
+/** What setup says when the asked-for pack can't be added (approved 18 Nov). */
+export function cantCombinePacksText(
+  currentId: string,
+  requestedId: string,
+): string {
+  const current = packFor(currentId)!;
+  const asked = packFor(requestedId)!;
+  return `Your assistant uses the ${rulesName(current.name)} safety rules. ${rulesName(asked.name)} rules can't be added on top yet; tell Ally if you need both.`;
+}
+
 export function packFor(
   id: SafetyPackId | string | null | undefined,
 ): SafetyPack | null {

@@ -24,7 +24,12 @@ import {
   PurposeId,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
-import { packFor, packForBusiness } from '../safety-pack/safety-packs';
+import {
+  cantCombinePacksText,
+  packFor,
+  packForBusiness,
+  packRequest,
+} from '../safety-pack/safety-packs';
 import type {
   CrawlProblem,
   LearnedFact,
@@ -221,13 +226,23 @@ export class BotDraftSessionService implements CrawlLearner {
     // A stricter pack the owner asked for in setup (Q3-fast stop 1, 18 Nov: "Noted — I'll add
     // a 'care for young people' safety rule", and nothing changed). Applied only when it is
     // stricter than the pack on; `setSafety` never lowers one either.
-    const asked = packFor(response.stricter_pack);
-    const current = packFor(draft.draftConfig.safetyPackId);
-    if (asked && (!current || asked.strength > current.strength)) {
+    // An assistant has one pack, and medical, pharmacy, mental health and young people never
+    // replace each other: setup says so instead of claiming it's on (fast finish, 18 Nov).
+    let builderText = response.message;
+    const request = packRequest(
+      draft.draftConfig.safetyPackId,
+      response.stricter_pack,
+    );
+    if (request === 'apply') {
       draft = await this.drafts.setSafety(
         draft,
         draft.industry ?? null,
-        asked.id,
+        packFor(response.stricter_pack)!.id,
+      );
+    } else if (request === 'cant_combine') {
+      builderText = cantCombinePacksText(
+        draft.draftConfig.safetyPackId!,
+        response.stricter_pack!,
       );
     }
 
@@ -255,7 +270,7 @@ export class BotDraftSessionService implements CrawlLearner {
 
     const message: Omit<TranscriptEntry, 'id' | 'at'> = {
       role: 'builder',
-      text: response.message,
+      text: builderText,
       ...(response.chips?.length ? { chips: response.chips } : {}),
     };
     draft = await this.drafts.appendTranscript(draft, [
@@ -441,23 +456,74 @@ export class BotDraftSessionService implements CrawlLearner {
    * Same rule as the crawl: a detail that cites no part we sent is dropped.
    */
   async learnFromDocument(draftId: string, documentId: string): Promise<void> {
-    const draft = await this.fresh(draftId);
-    const read = await this.documents.readForOnboarding(documentId);
-    if (!read || !draft.chatbotId || read.ownerChatbotId !== draft.chatbotId) {
-      throw new ConflictException('That document is not part of this setup.');
-    }
-    await this.drafts.addKnowledgeDocument(draftId, documentId);
-    const parts = documentParts(documentId, read);
+    // Shown as "Reading your documents…" until every upload has been read (Q3-fast: the page saw
+    // no facts yet and said "We couldn't find much", asking for the same file again).
+    await this.reading(draftId, documentId, true);
     try {
-      for (let i = 0; i < parts.length; i += DOCUMENT_BATCH) {
-        await this.learnFrom(draftId, parts.slice(i, i + DOCUMENT_BATCH));
+      const draft = await this.fresh(draftId);
+      const read = await this.documents.readForOnboarding(documentId);
+      if (
+        !read ||
+        !draft.chatbotId ||
+        read.ownerChatbotId !== draft.chatbotId
+      ) {
+        throw new ConflictException('That document is not part of this setup.');
       }
-    } catch (error) {
-      // Never a silent dead end: the owner hears it went wrong, and their progress is kept.
-      await this.crawlFinished(draftId, { read: 0, problem: 'generic' });
-      throw error;
+      await this.drafts.addKnowledgeDocument(draftId, documentId);
+      const parts = documentParts(documentId, read);
+      try {
+        for (let i = 0; i < parts.length; i += DOCUMENT_BATCH) {
+          await this.learnFrom(draftId, parts.slice(i, i + DOCUMENT_BATCH));
+        }
+      } catch (error) {
+        // Never a silent dead end: the owner hears it went wrong, and their progress is kept.
+        await this.crawlFinished(draftId, { read: 0, problem: 'generic' });
+        throw error;
+      }
+      await this.crawlFinished(draftId, { read: parts.length });
+    } finally {
+      await this.reading(draftId, documentId, false);
     }
-    await this.crawlFinished(draftId, { read: parts.length });
+  }
+
+  /** Marks an upload as being read before the reply goes back, so the page opens on "reading". */
+  startReading(draftId: string, documentId: string): Promise<void> {
+    return this.reading(draftId, documentId, true);
+  }
+
+  /**
+   * Which uploads are still being read (`source.readingDocuments`). The first one moves a draft
+   * that is at "What we learned" back to "reading"; the last one done (read or failed) moves it on
+   * again. A draft further along (an upload from a later step) keeps its step.
+   */
+  private async reading(
+    draftId: string,
+    documentId: string,
+    started: boolean,
+  ): Promise<void> {
+    await this.withRetry(draftId, async (draft) => {
+      const was = draft.source?.readingDocuments ?? [];
+      const now = started
+        ? [...new Set([...was, documentId])]
+        : was.filter((id) => id !== documentId);
+      const step =
+        started && draft.step === BotDraftStep.LEARNED
+          ? BotDraftStep.READING
+          : !started && !now.length && draft.step === BotDraftStep.READING
+            ? BotDraftStep.LEARNED
+            : draft.step;
+      const saved = await this.drafts.update(draft, {
+        source: { ...draft.source, readingDocuments: now },
+        step,
+      });
+      if (step !== draft.step) {
+        await this.events.publish(draftId, {
+          type: 'step',
+          step,
+          version: saved.version,
+        });
+      }
+    });
   }
 
   /** "Describe it instead": the description is read for facts, sourced to the owner. */

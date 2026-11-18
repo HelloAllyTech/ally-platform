@@ -137,6 +137,8 @@ export class BotDraftController {
     @Body() dto: AddBotDraftDocumentDto,
   ) {
     const draft = await this.drafts.get(id);
+    // "Reading your documents…" from the first view the page gets back (Q3-fast).
+    await this.session.startReading(draft.id, dto.documentId);
     void this.session
       .learnFromDocument(draft.id, dto.documentId)
       .catch((error) =>
@@ -144,7 +146,7 @@ export class BotDraftController {
           `Reading document ${dto.documentId} for draft ${id} failed: ${error instanceof Error ? error.message : 'unknown'}`,
         ),
       );
-    return draftView(draft);
+    return draftView((await this.drafts.findById(draft.id)) ?? draft);
   }
 
   @Post(':id/description')
