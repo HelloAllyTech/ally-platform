@@ -315,7 +315,8 @@ class TestEndings:
         assert steps.count("reviser") == 0
 
     async def test_no_model_step_starts_past_the_deadline(self, steps, gateway):
-        # The clock jumps past the deadline once the Writer has answered: the draft is checked by
+        # The clock jumps past the deadline once the Writer has answered: the draft is
+        # checked by
         # code but never scored or revised, and goes out below the bar for review.
         def clock():
             return 10_000_000.0 if steps.count("writer") else 0.0
@@ -334,12 +335,15 @@ class TestEndings:
     async def test_a_model_call_is_cut_off_where_ally_be_gives_up_on_the_run(
         self, steps, gateway
     ):
-        # ally-be treats a run still going at deadline + margin as dead and starts it again, so a
-        # call that would outlive that is cut off instead of running on (and being paid twice).
+        # ally-be treats a run still going at deadline + margin as dead and starts it
+        # again, so a
+        # call that would outlive that is cut off instead of running on (and being paid
+        # twice).
         steps.delay["safety-reader"] = 5.0
 
         def clock():
-            # The run starts at 1 s; once the Safety reader has been called it is hours later.
+            # The run starts at 1 s; once the Safety reader has been called it is hours
+            # later.
             return 10_000_000.0 if steps.calls else 1_000.0
 
         t0 = time.monotonic()
@@ -606,7 +610,8 @@ class TestModels:
     ):
         monkeypatch.setitem(constants.STEP_TIMEOUT_S, "safety-reader", 0.05)
         monkeypatch.setattr(
-            "app.core.debrief_graph.model_step_node.STEP_TIMEOUT_S", constants.STEP_TIMEOUT_S
+            "app.core.debrief_graph.model_step_node.STEP_TIMEOUT_S",
+            constants.STEP_TIMEOUT_S,
         )
         steps.delay["safety-reader"] = 1.0
         result = await run(steps, gateway)
