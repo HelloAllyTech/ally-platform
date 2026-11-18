@@ -35,7 +35,6 @@ for (const [name, d] of Object.entries<any>(
   }
 }
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 const { DebriefModule } = require('../debrief.module');
 const { AuthModule } = require('src/auth/auth.module');
 const {
@@ -45,7 +44,6 @@ const { CommonModule } = require('src/common/common.module');
 const { AppConfigModule } = require('src/config/config.module');
 const { PostHogModule: PosthogModule } = require('src/posthog/posthog.module');
 const { RedisModule } = require('src/redis/redis.module');
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
  * A permanent guard for the Debrief module's dependency graph. CI never compiles Nest's DI graph
@@ -102,7 +100,7 @@ const FRAMEWORK: Token[] = [
 ];
 
 const nameOf = (t: Token): string =>
-  typeof t === 'function' ? (t as Function).name : String(t);
+  typeof t === 'function' ? (t as { name: string }).name : String(t);
 
 describe('DebriefModule dependency graph', () => {
   const imports: any[] = metaOf(DebriefModule, 'imports');
