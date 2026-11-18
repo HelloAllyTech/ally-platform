@@ -28,7 +28,8 @@ function build(stored: Record<string, any> | null = null) {
     rows as any,
     settings as any,
     audit as any,
-    { get: jest.fn(() => notifier) } as any,
+    { gate: jest.fn(), view: jest.fn(async () => null) } as any,
+    notifier as any,
   );
   return { service, row, audit, notifier };
 }
@@ -166,7 +167,7 @@ describe('DebriefAutonomyService per organisation', () => {
     (service as any).dataSource = { query };
     jest.spyOn(service, 'facts').mockResolvedValue(facts());
     jest
-      .spyOn(service as any, 'agreementService')
+      .spyOn((service as any).agreement, 'view')
       .mockRejectedValue(new Error('not needed'));
     const v = await service.view();
     expect(v.orgs.map((o) => [o.tenantName, o.live, o.stopped])).toEqual([
