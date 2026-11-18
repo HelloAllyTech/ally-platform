@@ -252,6 +252,50 @@ SUMMARY_CONDENSE_CHUNK_WORDS = 2000
 # The condense (map) step's instruction, a Skills Store prompt.
 CONDENSE_CHUNK_PROMPT_PATH = "summary/condense_chunk"
 
+# Two turns whose start times differ by less than this are the same turn.
+_OVERLAP_TOLERANCE_SECONDS = 0.5
+
+
+def merge_diarized_chunks(chunks: List[List[Any]]) -> List[Any]:
+    """Join per-chunk diarization output in order, without the overlap.
+
+    split_text_by_length prepends the tail of each chunk to the next one so
+    the model has context for who is speaking. The model diarizes those
+    overlap lines again, so a plain concatenation repeats every boundary turn
+    — counsellors saw the same exchange twice and the summary read out of
+    order. A turn from a later chunk that starts at or before the last turn
+    already kept is that overlap, and is dropped.
+
+    The dedupe only runs when the timestamps are usable: if it would drop a
+    chunk's every turn (e.g. the model returned 0.0 for all start times),
+    that chunk is kept whole rather than lost.
+    """
+    merged: List[Any] = []
+    for index, messages in enumerate(chunks):
+        messages = list(messages or [])
+        if index == 0 or not merged:
+            merged.extend(messages)
+            continue
+        last_start = max(getattr(m, "start_time", 0.0) or 0.0 for m in merged)
+        kept = [
+            m
+            for m in messages
+            if (getattr(m, "start_time", 0.0) or 0.0)
+            > last_start + _OVERLAP_TOLERANCE_SECONDS
+        ]
+        if last_start <= 0 or not kept:
+            kept = messages
+        dropped = len(messages) - len(kept)
+        if dropped:
+            logger.info(
+                "Diarization merge: dropped %s overlap turn(s) at chunk %s",
+                dropped,
+                index + 1,
+            )
+        merged.extend(kept)
+    return merged
+
+
 _TIMESTAMP_REGEX = re.compile(r"\[\d{1,2}:\d{2}(:\d{2})?\]")
 
 
@@ -1340,19 +1384,12 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                     f"Failed to process chunks: {failed_chunks}"
                 )
 
-            # Combine messages from all chunks in original order
-            # This maintains the conversation flow and timing sequence
-            combined_messages = []
-            total_messages = 0
-
-            for i, result in enumerate(results):
-                if isinstance(result, StructuredDiarization):
-                    chunk_messages = result.messages
-                    combined_messages.extend(chunk_messages)
-                    total_messages += len(chunk_messages)
-                    logger.debug(
-                        f"Added {len(chunk_messages)} messages from chunk {i + 1}"
-                    )
+            # Combine messages from all chunks in original order, dropping the
+            # turns each chunk re-diarized from the previous chunk's overlap.
+            combined_messages = merge_diarized_chunks(
+                [r.messages for r in results if isinstance(r, StructuredDiarization)]
+            )
+            total_messages = len(combined_messages)
 
             logger.info(
                 f"All chunks diarized and merged successfully. "

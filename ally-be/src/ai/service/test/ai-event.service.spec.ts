@@ -7,6 +7,7 @@ import { LoggerService } from '../../../logger/logger.service';
 import { ChatSummaryStatus } from '../../../chat/entity/chat.entity';
 import { TranscribeAndSummarizeRequestMessage } from '../../dto/transcribe-and-summarize-request.model';
 import { AiService, TRANSCRIPTION_PIPELINE_PROMPT_CODES } from '../ai.service';
+import { ScribeSessionMode } from '../../../common/constants/chat.constants';
 
 const PIPELINE_PROMPTS = {
   ally_ai_audio_diarization: { prompt: 'Diarize.' },
@@ -38,6 +39,7 @@ describe('AiEventService', () => {
 
     const mockChatService = {
       updateChat: jest.fn(),
+      getSessionMode: jest.fn().mockResolvedValue(null),
     };
 
     mockLogger = {
@@ -107,6 +109,61 @@ describe('AiEventService', () => {
         expect.any(String),
         expect.objectContaining({ prompts: PIPELINE_PROMPTS }),
       );
+    });
+
+    it("fills a missing mode from the chat's recorded session mode", async () => {
+      sqsService.sendMessage.mockResolvedValue(undefined);
+      chatService.updateChat.mockResolvedValue({} as any);
+      chatService.getSessionMode.mockResolvedValueOnce(
+        ScribeSessionMode.DICTATION,
+      );
+
+      await service.publishTranscribeAudioEvent({
+        message_type: 'transcribe_and_summarize_request',
+        timestamp: 1,
+        chat_id: 7,
+        audio_url: 's3://x',
+      });
+
+      expect(chatService.getSessionMode).toHaveBeenCalledWith(7);
+      expect(sqsService.sendMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ mode: ScribeSessionMode.DICTATION }),
+      );
+    });
+
+    it('keeps a mode the caller passed without looking it up', async () => {
+      sqsService.sendMessage.mockResolvedValue(undefined);
+      chatService.updateChat.mockResolvedValue({} as any);
+
+      await service.publishTranscribeAudioEvent({
+        message_type: 'transcribe_and_summarize_request',
+        timestamp: 1,
+        chat_id: 7,
+        audio_url: 's3://x',
+        mode: ScribeSessionMode.SCRIBE,
+      });
+
+      expect(chatService.getSessionMode).not.toHaveBeenCalled();
+      expect(sqsService.sendMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ mode: ScribeSessionMode.SCRIBE }),
+      );
+    });
+
+    it('still publishes when the mode lookup fails', async () => {
+      sqsService.sendMessage.mockResolvedValue(undefined);
+      chatService.updateChat.mockResolvedValue({} as any);
+      chatService.getSessionMode.mockRejectedValueOnce(new Error('db down'));
+
+      await service.publishTranscribeAudioEvent({
+        message_type: 'transcribe_and_summarize_request',
+        timestamp: 1,
+        chat_id: 7,
+        audio_url: 's3://x',
+      });
+
+      expect(sqsService.sendMessage).toHaveBeenCalled();
     });
 
     it('queues nothing when the prompt store cannot be read', async () => {

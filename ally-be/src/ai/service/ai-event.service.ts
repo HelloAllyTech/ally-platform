@@ -31,8 +31,18 @@ export class AiEventService {
     try {
       // The pipeline's prompts from the Skills Store ride on the message:
       // ally-ai runs its own (minimal) file for any prompt missing here.
+      // A caller that doesn't pass `mode` (the audio-retry consumer) would
+      // otherwise send a DICTATION recording through the scribe summary
+      // prompt. The chat's own recorded mode is the source of truth.
+      const mode =
+        event.mode ??
+        (await this.chatService
+          .getSessionMode(event.chat_id)
+          .catch(() => null)) ??
+        undefined;
       const message: TranscribeAndSummarizeRequestMessage = {
         ...event,
+        mode,
         correlation_id: correlationId,
         prompts: await this.aiService.getPromptOverrides(
           TRANSCRIPTION_PIPELINE_PROMPT_CODES,

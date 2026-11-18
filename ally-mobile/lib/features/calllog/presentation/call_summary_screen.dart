@@ -856,7 +856,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
   /// `setState`, which rebuilt every section and field on each character.
   void _onFieldTyped(String fieldKey, dynamic value) {
     _form.set(fieldKey, value);
-    if (_form.hasChanges != _saveButtonShownDirty) _dirtyFlag.value++;
+    if (_hasDirtyChanges != _saveButtonShownDirty) _dirtyFlag.value++;
   }
 
   /// Mirrors RN's `SectionHeader`/`toggleSection` (`CallSummaryDetails.tsx`):
@@ -949,16 +949,27 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
   /// never clobbers an in-progress edit.
   void _seedCustomFieldsIfNeeded(List<CustomFieldValue> values) {
     final pending = _customValuesBeforeReseed;
+    var isVoiceReseed = false;
     if (pending != null && !identical(values, pending)) {
       _customFieldsSeededForChatId = null;
       _customValuesBeforeReseed = null;
+      isVoiceReseed = true;
     }
     final key = '$_chatId';
     if (_customFieldsSeededForChatId == key) return;
+    // A re-seed after voice dictation must not wipe picks the counsellor made
+    // but has not saved yet: they stay dirty and win over the dictated value
+    // (the counsellor's explicit choice is never overwritten by the AI).
+    final unsaved = isVoiceReseed
+        ? {for (final id in _dirtyCustomFieldIds) id: _customFieldValues[id]}
+        : const <String, String?>{};
     _customFieldValues
       ..clear()
-      ..addEntries(values.map((v) => MapEntry(v.fieldDefinitionId, v.value)));
-    _dirtyCustomFieldIds.clear();
+      ..addEntries(values.map((v) => MapEntry(v.fieldDefinitionId, v.value)))
+      ..addAll(unsaved);
+    _dirtyCustomFieldIds
+      ..clear()
+      ..addAll(unsaved.keys);
     _customFieldsSeededForChatId = key;
   }
 
@@ -984,6 +995,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
   void _onCustomFieldTyped(String fieldDefinitionId, String? value) {
     _customFieldValues[fieldDefinitionId] = value;
     _dirtyCustomFieldIds.add(fieldDefinitionId);
+    if (_hasDirtyChanges != _saveButtonShownDirty) _dirtyFlag.value++;
   }
 
   /// Applies voice-dictated field values: merges them into the form
@@ -1019,7 +1031,12 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
   // custom fields are only ever editable inside a section's edit mode
   // (gated the same way built-in fields are), so this reverts to RN's
   // actual scope.
-  bool get _hasDirtyChanges => _form.hasChanges;
+  //
+  // Scribe v2: the global Save also saves custom fields. Counsellors picked a
+  // value (e.g. Ongoing Risk → Running Away), pressed Save instead of the
+  // section's tick, and lost it — Save must persist everything on screen.
+  bool get _hasDirtyChanges =>
+      _form.hasChanges || _dirtyCustomFieldIds.isNotEmpty;
 
   /// RN's `handleSubmit` — saves every dirty built-in field across the
   /// whole form (not scoped to one section), shared by both the global
@@ -1073,6 +1090,26 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
     }
   }
 
+  /// Saves every dirty custom field, across all sections — the global Save's
+  /// half of the custom-field write (the section tick saves one section).
+  Future<bool> _saveAllCustomFields() async {
+    final changed = _dirtyCustomFieldIds.toList();
+    if (changed.isEmpty) return true;
+    try {
+      await ref.read(customFieldsRepositoryProvider).upsertValues(
+        _chatId,
+        [for (final id in changed) (fieldDefinitionId: id, value: _customFieldValues[id])],
+      );
+      if (mounted) setState(() => _dirtyCustomFieldIds.removeAll(changed));
+      return true;
+    } catch (_) {
+      if (mounted) {
+        showToast(ref.tr('summary.customFieldSaveFailed'), type: ToastType.error);
+      }
+      return false;
+    }
+  }
+
   /// RN `onSubmitButtonPress`: `handleSubmit` (a no-op without changes —
   /// the live flow shows Save regardless), then `onSaveButtonPress`.
   Future<void> _save() async {
@@ -1080,10 +1117,13 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
       _isSaving = true;
       _error = null;
     });
-    await _saveBuiltinFields();
+    final builtinsSaved = await _saveBuiltinFields();
+    final customSaved = await _saveAllCustomFields();
     if (mounted) {
       setState(() => _isSaving = false);
-      widget.onSaveButtonPress();
+      // Stay on the screen when something failed to save, so the counsellor
+      // sees the error and can retry instead of losing the edit.
+      if (builtinsSaved && customSaved) widget.onSaveButtonPress();
     }
   }
 
