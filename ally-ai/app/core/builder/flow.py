@@ -292,6 +292,37 @@ def allowed(patches: Sequence[PatchOp]) -> Tuple[List[PatchOp], int]:
     return kept, len(patches) - len(kept)
 
 
+GAP_SAVED = "Done. I added that to your notes."
+
+# Typed replies to a gap that are not its answer.
+_NOT_AN_ANSWER = re.compile(
+    r"^(ok(ay)?|sure|yes|yeah|no|nope|later|skip|not sure|i('m| am) not sure|"
+    r"(i )?(don'?t|do not) know|no idea|wait|hmm+|add it( now)?)[.!]*$",
+    re.IGNORECASE,
+)
+_QUESTION_START = re.compile(
+    r"^(what|why|how|when|where|who|which|can|could|should|would|do|does|is|are)\b",
+    re.IGNORECASE,
+)
+
+
+def _gap_answer(out: ConverseOut, typed: str) -> str:
+    """A gap's answer when the model didn't fill `answer`: the details it noted from
+    the owner's message, else the message itself unless it is a question or a
+    non-answer ("ok", "not sure")."""
+    facts = [f.text.strip() for f in out.owner_facts if f.text.strip()]
+    if facts:
+        return " ".join(facts)
+    if (
+        not typed
+        or "?" in typed
+        or _QUESTION_START.match(typed)
+        or _NOT_AN_ANSWER.match(typed)
+    ):
+        return ""
+    return typed[:1000]
+
+
 def with_note(notes: str, item: str, answer: str) -> str:
     """Owner notes with one more line for a gap the owner answered."""
     line = f"{item[:1].upper()}{item[1:]}: {answer}"
@@ -447,7 +478,15 @@ async def _gaps(step: Step) -> BuilderStepResponse:
         out = await step.converse(pending=label)
         answer = out.answer.strip()
         ack = out.message
-        if not answer or chip == "Add it now":
+        typed = request.message.strip()
+        if not answer and pending in items:
+            # The model can reply "Okay — I can add your fees" and leave `answer`
+            # empty (prod, 18 Nov), and the owner's answer was lost. A gap's
+            # answer is kept from what it understood, else from what was typed.
+            answer = _gap_answer(out, typed)
+            if answer:
+                ack = GAP_SAVED
+        if not answer or (chip == "Add it now" and not typed):
             # Not an answer yet ("Add it now", or a question of their own): stay on
             # this question.
             current = next(
