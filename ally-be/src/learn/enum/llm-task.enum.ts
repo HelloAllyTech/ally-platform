@@ -97,6 +97,10 @@ export enum LlmTask {
   NUDGE = 'nudge',
   SUMMARY = 'summary',
   DYNAMIC_SUMMARY = 'dynamic_summary',
+  // Scribe v2 note harness: main pass, per-part map step, repair rewrite.
+  SCRIBE_NOTE = 'scribe_note',
+  SCRIBE_NOTE_MAP = 'scribe_note_map',
+  SCRIBE_NOTE_REPAIR = 'scribe_note_repair',
   SCENARIO_EVALUATION = 'scenario_evaluation',
   // The same debrief evaluation re-run in another language, when a viewer
   // opens a debrief in a UI language other than the one it was written in

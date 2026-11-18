@@ -629,6 +629,50 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_summary_condense_chunk',
   },
   {
+    id: 'scribe-note',
+    task: LlmTask.SCRIBE_NOTE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A scribe or dictation session is transcribed for an org with the Scribe v2 note harness on',
+    detail:
+      'Scribe v2 (docs/scribe-v2/DESIGN.md): writes a time-ordered narrative and the ' +
+      "org's AI fields with turn evidence. Shadow mode: runs after the v1 summary is " +
+      'delivered and stores its draft for comparison only.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: ALLY_AI_DEFAULT,
+    configuredBy: ALLY_AI_DEFAULT_SOURCE,
+    promptOverride: 'ally_ai_scribe_note_generate',
+  },
+  {
+    id: 'scribe-note-map-segment',
+    task: LlmTask.SCRIBE_NOTE_MAP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: '...when the transcript is over ~22,000 words',
+    detail:
+      'Turns each ~15-minute part of a long session into timeline notes, in parallel, ' +
+      'before the main Scribe v2 pass.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: ALLY_AI_DEFAULT,
+    configuredBy: ALLY_AI_DEFAULT_SOURCE,
+    promptOverride: 'ally_ai_scribe_note_map_segment',
+  },
+  {
+    id: 'scribe-note-repair',
+    task: LlmTask.SCRIBE_NOTE_REPAIR,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      "...when the Scribe v2 narrative falls short of the session's budget",
+    detail:
+      'At most one rewrite per note; the longer of the two drafts is kept.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: ALLY_AI_DEFAULT,
+    configuredBy: ALLY_AI_DEFAULT_SOURCE,
+    promptOverride: 'ally_ai_scribe_note_repair',
+  },
+  {
     id: 'dynamic-summary',
     task: LlmTask.DYNAMIC_SUMMARY,
     runtime: LlmRuntime.ALLY_AI,

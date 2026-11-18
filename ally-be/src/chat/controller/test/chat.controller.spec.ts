@@ -3,6 +3,7 @@ import { ChatController } from '../chat.controller';
 import { ChatService } from '../../service/chat.service';
 import { AudioUploadService } from '../../service/audio-upload.service';
 import { VoiceNoteService } from '../../service/voice-note.service';
+import { ScribeNoteHarnessService } from '../../service/scribe-note-harness.service';
 import { FeedbackService } from '../../service/feedback.service';
 import { ChatSummaryService } from '../../service/chat-summary.service';
 import { TokenUser } from '../../../auth/type/auth.types';
@@ -150,6 +151,10 @@ describe('ChatController', () => {
         {
           provide: VoiceNoteService,
           useValue: { generateFromAudio: jest.fn() },
+        },
+        {
+          provide: ScribeNoteHarnessService,
+          useValue: { recordDraft: jest.fn() },
         },
         {
           provide: PermissionsService,

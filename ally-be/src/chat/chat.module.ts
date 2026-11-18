@@ -45,10 +45,17 @@ import { CustomFieldsModule } from '../custom-fields/custom-fields.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 
+import { ScribeNoteDraft } from './entity/scribe-note-draft.entity';
+import { ScribeNoteHarnessService } from './service/scribe-note-harness.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Message, Feedback, CallDetails, SummaryFeedback]),
-    TypeOrmModule.forFeature([Chat, ChatRepository, ChatSummaryAttempt]),
+    TypeOrmModule.forFeature([
+      Chat,
+      ChatRepository,
+      ChatSummaryAttempt,
+      ScribeNoteDraft,
+    ]),
     UserModule,
     forwardRef(() => AiModule),
     SettingsModule,
@@ -87,6 +94,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     ChatSummaryAttemptService,
     ChatSharedService,
     ChatSchedulerRegistrationService,
+    ScribeNoteHarnessService,
   ],
   exports: [
     ChatService,
@@ -100,6 +108,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     AudioUploadService,
     ChatTranscriptService,
     ChatSharedService,
+    ScribeNoteHarnessService,
   ],
 })
 export class ChatModule implements OnModuleInit {

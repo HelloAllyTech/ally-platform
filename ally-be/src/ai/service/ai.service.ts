@@ -162,6 +162,10 @@ export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
   'ally_ai_summary_dictation_summary',
   'ally_ai_summary_condense_chunk',
   'ally_ai_analysis_counselor_analysis',
+  // Scribe v2 note harness (shadow runs for tenants that have it on).
+  'ally_ai_scribe_note_generate',
+  'ally_ai_scribe_note_map_segment',
+  'ally_ai_scribe_note_repair',
 ] as const;
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';
