@@ -10,43 +10,24 @@ to this service.
 
 | | |
 |---|---|
-| Workflow | **Production Release** (`.github/workflows/production-release.yaml`) |
+| Workflow | `production-release-ally-ai-learn.yaml` in the monorepo's root `.github/workflows/` |
 | Release branch | `master` |
+| Tag | `learn-vX.Y.Z` |
 | Runtime in CI | Python 3.12 (`TEST_RUNTIME_VERSION`) |
 | Package manager | Poetry |
-| Deployment | AWS ECS |
+| Deployment | Ansible playbook via the `deploy-metal01` action (production stack, since the 2026-11-07 cutover) |
+| Runs migrations | None |
 
-## Deployment target
+## Deployment
 
-- **Service**: `learn-core`
-- **Cluster**: `ally-prd-mb-ecs-cluster`
-- **ECS service**: `ally-prd-svc-learn-core`
-- **Task definition**: `ally-prd-td-learn-core`
-- **Container**: `ally-prd-cntr-learn-core`
+The release workflow's deploy job runs the `ally_learn.yml` playbook from the private infra repo
+through `.github/actions/deploy-metal01`, then polls the service's health endpoint until it answers. Its
+inputs are repository secrets (the deploy SSH key, the infra deploy key and the Ansible
+vault password) — see the comment at the top of that action. Container logs, restarts and
+recovery are in the infra repo's runbook, not here: this repository is public.
 
-## Required repository variables
-
-Settings → Secrets and variables → Actions → Variables:
-
-```
-PRD_AWS_ROLE          # AWS IAM role ARN for production
-PRD_AWS_REGION
-PRD_ECR_REPOSITORY
-```
-
-## Verify a deployment
-
-```bash
-aws ecs describe-services \
-  --cluster ally-prd-mb-ecs-cluster \
-  --services ally-prd-svc-learn-core
-
-aws ecs list-tasks \
-  --cluster ally-prd-mb-ecs-cluster \
-  --service-name ally-prd-svc-learn-core
-
-aws logs tail /ecs/ally-prd-cntr-learn-core --follow
-```
+The ECS cluster, service and task-definition names this guide used to list belong to the
+pre-cutover stack and no longer receive production releases.
 
 ## Notes specific to this service
 
