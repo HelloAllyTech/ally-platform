@@ -13,6 +13,7 @@ import {
   useRoadmapV2Prefetch,
   useSetRoadmapWatchMutation,
 } from "@api";
+import { useClaimCommandPaletteShortcut } from "@components/command-palette/CommandPaletteContext";
 import { ROUTES, en } from "@constants";
 import { useUser } from "@hooks";
 import type { RoadmapQueueSort, RoadmapQueueView, RoadmapSavedView } from "@types";
@@ -176,6 +177,8 @@ export const RoadmapQueuePage: React.FC = () => {
   }, [setState, state]);
 
   // ── keyboard (§4.10) ────────────────────────────────────────────────────────────────────────
+  // ⌘K here is the Queue's own quick open, not the global page palette.
+  useClaimCommandPaletteShortcut();
   const [quickOpen, setQuickOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
