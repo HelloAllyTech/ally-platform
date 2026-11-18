@@ -804,7 +804,7 @@ describe("Settings › Autonomy, Score and Tests (v2, U4)", () => {
     expect(row).toHaveTextContent("Was 30: 4 changes passed here and then failed the next test");
     expect(within(row).getByRole("link", { name: "See change" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent?change=c-tests",
+      "/debriefs/changes?change=c-tests",
     );
     expect(screen.queryByText("Proposed")).toBeNull();
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();

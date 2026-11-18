@@ -1,6 +1,5 @@
 import { FC, useEffect, useRef, useState } from "react";
 
-import { Notification } from "@icons";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@ally-ui-mono/ui-shared";
@@ -11,6 +10,7 @@ import {
   useMarkNotificationReadMutation,
 } from "@api";
 import { en, ROUTES } from "@constants";
+import { Notification } from "@icons";
 import { AppNotification } from "@types";
 import { formatDateTime } from "@utils";
 
@@ -23,11 +23,11 @@ export const notificationHref = (n: AppNotification): string | null => {
   if (d.screen !== "DebriefConsole") return null;
   if (typeof d.runId === "string") return ROUTES.DEBRIEF_SESSION(d.runId);
   // A change opens on the PM agent page, where it is decided and talked about.
-  if (typeof d.ideaId === "string") return `${ROUTES.DEBRIEFS_PM_AGENT}?change=${d.ideaId}`;
+  if (typeof d.ideaId === "string") return `${ROUTES.DEBRIEFS_CHANGES}?change=${d.ideaId}`;
   // Autonomy: the canary can now run alone, or the system set a cell back to asks first.
   if (d.settings === "autonomy") return `${ROUTES.DEBRIEFS_SETTINGS}#autonomy`;
   if (typeof d.releaseId === "string") {
-    return ROUTES.DEBRIEFS_PM_AGENT;
+    return ROUTES.DEBRIEFS_CHANGES;
   }
   return ROUTES.DEBRIEFS;
 };

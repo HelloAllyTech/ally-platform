@@ -127,7 +127,7 @@ const buildTable = (): RouteMetaEntry[] => {
     { path: ROUTES.USER_BADGES, title: i.badges, section: "people" },
     { path: ROUTES.DEBRIEFS, title: i.debriefs, section: "people" },
     {
-      path: ROUTES.DEBRIEFS_PM_AGENT,
+      path: ROUTES.DEBRIEFS_CHANGES,
       title: p.debriefPmAgent,
       section: "people",
       parent: ROUTES.DEBRIEFS,
