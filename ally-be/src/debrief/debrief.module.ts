@@ -19,7 +19,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentHarnessModule } from '../llm-agent/harness/agent-harness.module';
 import { LearnModule } from '../learn/learn.module';
 import { PromptModule } from '../prompt/prompt.module';
-import { DebriefConsoleController } from './controller/debrief-console.controller';
+import { DebriefConsoleReleasesController } from './controller/debrief-console-releases.controller';
+import { DebriefConsolePmAgentController } from './controller/debrief-console-pm-agent.controller';
+import { DebriefConsoleReviewController } from './controller/debrief-console-review.controller';
+import { DebriefConsoleSettingsController } from './controller/debrief-console-settings.controller';
+import { DebriefConsoleTenantsController } from './controller/debrief-console-tenants.controller';
+import { DebriefConsoleViewController } from './controller/debrief-console-view.controller';
 import { DebriefChangesController } from './controller/debrief-changes.controller';
 import { DebriefChangesService } from './service/debrief-changes.service';
 import { DebriefScoreService } from './service/debrief-score.service';
@@ -146,7 +151,13 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     LearnModule,
   ],
   controllers: [
-    DebriefConsoleController,
+    // The Console API (v1/debriefs/console), split by area; one route table (debrief-console-routes.spec.ts).
+    DebriefConsoleViewController,
+    DebriefConsoleReviewController,
+    DebriefConsoleSettingsController,
+    DebriefConsoleTenantsController,
+    DebriefConsolePmAgentController,
+    DebriefConsoleReleasesController,
     // Simulation Studio: whether the new Debrief is on for a roleplay (its risk-cue question shows only then).
     DebriefRoleplayOptionsController,
     // Debrief v2: Home, Changes (Undo now, Stop now) and the cumulative score.
