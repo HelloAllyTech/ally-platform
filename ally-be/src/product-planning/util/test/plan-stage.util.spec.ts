@@ -1,5 +1,9 @@
 import { PlanStage } from '../../enum/product-planning.enum';
-import { derivePlanStage, PlanStageFacts } from '../plan-stage.util';
+import {
+  derivePlanStage,
+  PlanStageFacts,
+  simpleStageOf,
+} from '../plan-stage.util';
 
 const base: PlanStageFacts = {
   private: false,
@@ -53,5 +57,23 @@ describe('derivePlanStage', () => {
 
   it('measures, rather than declares learned, when no review is scheduled yet', () => {
     expect(stage({ shipped: true, launched: true })).toBe(PlanStage.MEASURING);
+  });
+});
+
+describe('lifecycle 2026-11-18', () => {
+  it('starts the PRD once an Owner starts planning, with nobody assigned', () => {
+    expect(stage({ planningStarted: true })).toBe(PlanStage.PRD);
+    expect(stage({})).toBe(PlanStage.FILED);
+  });
+
+  it('is To do until a builder is assigned, and Being built from then on', () => {
+    expect(simpleStageOf('submitted', null)).toBe('backlog');
+    expect(simpleStageOf('accepted', null)).toBe('backlog');
+    expect(simpleStageOf('planning', null)).toBe('backlog');
+    expect(simpleStageOf('accepted', 9)).toBe('being_built');
+    expect(simpleStageOf('planning', 9)).toBe('being_built');
+    expect(simpleStageOf('building', null)).toBe('being_built');
+    expect(simpleStageOf('shipped', 9)).toBe('shipped');
+    expect(simpleStageOf('closed', 9)).toBe('declined');
   });
 });

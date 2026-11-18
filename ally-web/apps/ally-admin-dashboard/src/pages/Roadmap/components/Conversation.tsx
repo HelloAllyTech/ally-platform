@@ -21,7 +21,7 @@ import { CommentBox, CommentItem } from "../session/CommentBox";
 import { QuestionCard } from "../session/QuestionCard";
 import { commentAnchors, isPlanPost, planStartFeedIndex } from "../session/sessionFeed";
 import { useSessionAnswers } from "../session/useSessionAnswers";
-import { personLabel, shortDate, stageWord } from "../utils/copy";
+import { personLabel, shortDate, stageWord, timelineAnchors, timelineLabel } from "../utils/copy";
 
 const noop = () => undefined;
 
@@ -62,6 +62,30 @@ const PhaseMarker: React.FC<{ label: string }> = ({ label }) => {
       {line("left")}
       <span className="shrink-0">{label}</span>
       {line("right")}
+    </li>
+  );
+};
+
+/** Where the idea started: who, when, how, and the rough idea as its author first wrote it. */
+const OriginCard: React.FC<{ origin: NonNullable<RoadmapItemDetail["origin"]> }> = ({ origin }) => {
+  const w = en.roadmapV2.idea.timeline;
+  const who = origin.startedBy ? personLabel(origin.startedBy) : en.roadmapV2.idea.unknownPerson;
+  const how = origin.captureMode === "voice" ? w.byVoice : w.typed;
+  return (
+    <li className="flex flex-col gap-1 border-b border-border-light pb-3 pt-1">
+      <span className="text-xs text-typography-secondary">
+        {en.roadmapV2.idea.phaseMarker(w.started(who, how), shortDate(origin.startedAt))}
+      </span>
+      {origin.roughIdea && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-xs font-semibold text-typography-secondary">
+            {w.roughIdea}
+          </summary>
+          <p className="m-0 whitespace-pre-wrap pt-1 text-typography-primary">
+            <CodeText text={origin.roughIdea} />
+          </p>
+        </details>
+      )}
     </li>
   );
 };
@@ -135,6 +159,24 @@ export const Conversation: React.FC<ConversationProps> = ({
   }, [feed, meta, stageSince, item.shownStage]);
   const currentMarker = copy.phaseMarker(stageWord(item.shownStage), shortDate(item.stageSince));
   const submittedMarker = copy.phases.submitted(item.author?.name ?? copy.unknownPerson);
+
+  // The idea's one history (lifecycle 2026-11-18): each milestone is a dated marker placed by
+  // time among the messages. An older server sends no timeline; the old markers stand in.
+  const hasTimeline = Array.isArray(item.timeline);
+  const milestones = useMemo(
+    () => timelineAnchors(item.timeline, feed, id => meta.get(id)?.createdAt),
+    [item.timeline, feed, meta],
+  );
+  const milestoneMarkers = (key: string | null) =>
+    (milestones.get(key) ?? []).map((entry, i) => {
+      const label = timelineLabel(entry);
+      return label ? (
+        <PhaseMarker
+          key={`${entry.kind}-${entry.at}-${i}`}
+          label={copy.phaseMarker(label, shortDate(entry.at))}
+        />
+      ) : null;
+    });
 
   const anchors = useMemo(
     () => commentAnchors(feed, meta, session.comments),
@@ -256,14 +298,17 @@ export const Conversation: React.FC<ConversationProps> = ({
       </div>
 
       <ol className="m-0 list-none p-0" aria-live="polite">
-        <PhaseMarker
-          label={copy.phaseMarker(
-            submittedMarker,
-            shortDate(
-              item.stageSince && item.shownStage === "submitted" ? item.stageSince : undefined,
-            ),
-          )}
-        />
+        {item.origin && <OriginCard origin={item.origin} />}
+        {!hasTimeline && (
+          <PhaseMarker
+            label={copy.phaseMarker(
+              submittedMarker,
+              shortDate(
+                item.stageSince && item.shownStage === "submitted" ? item.stageSince : undefined,
+              ),
+            )}
+          />
+        )}
         {isLoading && (
           <li className="py-2" aria-busy="true">
             <SkeletonText paragraph lineCount={4} />
@@ -280,8 +325,9 @@ export const Conversation: React.FC<ConversationProps> = ({
         )}
         {feed.map((message, index) => (
           <React.Fragment key={message.id}>
+            {hasTimeline && milestoneMarkers(message.id)}
             {index === planStart && <PhaseMarker label={en.roadmapV2.session.phasePlan} />}
-            {index === markerIndex && <PhaseMarker label={currentMarker} />}
+            {!hasTimeline && index === markerIndex && <PhaseMarker label={currentMarker} />}
             {(anchors.get(message.id) ?? []).map(post => (
               <CommentItem key={post.id} post={post} />
             ))}
@@ -291,7 +337,8 @@ export const Conversation: React.FC<ConversationProps> = ({
         {(anchors.get(null) ?? []).map(post => (
           <CommentItem key={post.id} post={post} />
         ))}
-        {markerIndex === -1 && item.shownStage !== "submitted" && !isLoading && (
+        {hasTimeline && !isLoading && milestoneMarkers(null)}
+        {!hasTimeline && markerIndex === -1 && item.shownStage !== "submitted" && !isLoading && (
           <PhaseMarker label={currentMarker} />
         )}
       </ol>

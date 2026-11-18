@@ -107,7 +107,7 @@ export class RoadmapReviewController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Start planning: the plan interview in the same session (the lead, or any Owner)',
+      'Start planning: an Owner expands the idea into a plan (accepts it if it was waiting)',
   })
   async startPlanning(
     @Param('code') code: string,
@@ -115,6 +115,46 @@ export class RoadmapReviewController {
   ) {
     await this.settings.assertRoadmapV2();
     return this.reviews.startPlanning(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/conversation')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Open the conversation on an older idea that has none, so it can take comments',
+  })
+  async openConversation(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.settings.assertRoadmapV2();
+    return this.reviews.openConversation(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/close-plan')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Owner: close the plan, so a builder can be assigned',
+  })
+  async closePlan(@Param('code') code: string, @CurrentUser() user: TokenUser) {
+    await this.settings.assertRoadmapV2();
+    return this.reviews.setPlanClosed(user.id, code, true);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/reopen-plan')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Owner: reopen a closed plan while no builder is assigned',
+  })
+  async reopenPlan(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.settings.assertRoadmapV2();
+    return this.reviews.setPlanClosed(user.id, code, false);
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)

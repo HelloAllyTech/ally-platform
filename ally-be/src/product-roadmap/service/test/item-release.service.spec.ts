@@ -358,7 +358,12 @@ describe('ItemReleaseService.releaseShipped', () => {
     return built;
   };
 
-  it('releases an opportunity once every service is live, stamped when it went live', async () => {
+  /**
+   * Released is a person's click (lifecycle 2026-11-18): the watcher counts
+   * the ideas whose work is all live, for the builder to mark, and never
+   * moves one itself.
+   */
+  it('counts an opportunity once every service is live, but never marks it released', async () => {
     const built = withLinkedIds(
       build({
         links: [mergedLink()],
@@ -373,18 +378,7 @@ describe('ItemReleaseService.releaseShipped', () => {
     );
 
     expect(await built.service.releaseShipped()).toBe(1);
-
-    const [where, patch] = built.opportunities.update.mock.calls[0];
-    expect(where.id).toBe('o-1');
-    // Compare-and-set: only a row still in flight moves.
-    expect(where.stage._value).toEqual([
-      RoadmapOpportunityStage.NEW,
-      RoadmapOpportunityStage.PRIORITISED,
-    ]);
-    expect(patch).toEqual({
-      stage: RoadmapOpportunityStage.RELEASED,
-      releasedAt: new Date('2026-11-11T09:20:00Z'),
-    });
+    expect(built.opportunities.update).not.toHaveBeenCalled();
   });
 
   /**
@@ -454,7 +448,7 @@ describe('ItemReleaseService.releaseShipped', () => {
     expect(built.opportunities.rows[0].stage).toBe(RoadmapOpportunityStage.NEW);
   });
 
-  it('releases the same opportunity once the PR is linked by hand', async () => {
+  it('counts the same opportunity as live once the PR is linked by hand', async () => {
     const built = withLinkedIds(
       build({
         opportunities: [
@@ -473,7 +467,7 @@ describe('ItemReleaseService.releaseShipped', () => {
    * P4 (D18): once the brief went to Claude Code, the work arrives only as
    * PRs carrying the code, so those drive release like Builder's own.
    */
-  it('releases on a live code-matched PR once the brief was sent to Claude Code', async () => {
+  it('counts a live code-matched PR once the brief was sent to Claude Code', async () => {
     const built = withLinkedIds(
       build({
         opportunities: [
@@ -527,7 +521,7 @@ describe('ItemReleaseService.releaseShipped', () => {
     expect(await built.service.releaseShipped()).toBe(0);
   });
 
-  it('counts nothing when another pass already moved the row', async () => {
+  it('never writes the stage, even for a row someone already moved', async () => {
     const built = withLinkedIds(
       build({
         links: [mergedLink()],
@@ -543,7 +537,8 @@ describe('ItemReleaseService.releaseShipped', () => {
       ['o-1'],
     );
 
-    expect(await built.service.releaseShipped()).toBe(0);
+    await built.service.releaseShipped();
+    expect(built.opportunities.update).not.toHaveBeenCalled();
     expect(built.opportunities.rows[0].stage).toBe(
       RoadmapOpportunityStage.ARCHIVED,
     );

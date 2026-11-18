@@ -2,18 +2,21 @@ import type { RoadmapItemDetail } from "@types";
 
 /**
  * The idea page holds exactly one primary action for you, chosen by stage and role (§4.5), in the
- * plan's order: Pick a lead (Owner; on an unreviewed idea this accepts it, there is no separate
- * Accept) · Start planning (lead or Owner) · Approve
- * design · Build ▾ · Merge · Release. `can` decides: a control you can't use is absent, never
- * greyed out (§4.0 #14, §4.5c). When nothing is yours to do the slot holds the quiet line instead.
+ * lifecycle's order (2026-11-18): Start planning (an Owner; accepts an idea still waiting) · Close
+ * plan (an Owner) · Pick a builder (an Owner, once the plan is closed) · then the builder's own:
+ * Approve design · Build ▾ · Merge · Release · Mark released. `can` decides: a control you can't use
+ * is absent, never greyed out (§4.0 #14, §4.5c). When nothing is yours to do the slot holds the
+ * quiet line instead.
  */
 export type PrimaryActionKind =
-  | "pickLead"
   | "startPlanning"
+  | "closePlan"
+  | "pickLead"
   | "approveDesign"
   | "build"
   | "merge"
-  | "release";
+  | "release"
+  | "markReleased";
 
 const parts = (item: Pick<RoadmapItemDetail, "statusParts">): Record<string, unknown> =>
   item.statusParts && typeof item.statusParts === "object"
@@ -27,19 +30,24 @@ export const primaryActionFor = (
   const p = parts(item);
   switch (item.shownStage) {
     case "submitted":
-      return can.review ? "pickLead" : null;
     case "accepted":
-      if (!item.lead && can.pickLead) return "pickLead";
-      return can.startPlanning ? "startPlanning" : null;
+      if (can.startPlanning) return "startPlanning";
+      // An idea given a builder before plans closed: the Owner can still change the builder.
+      return null;
     case "planning":
+      if (!item.lead) {
+        if (can.closePlan) return "closePlan";
+        if (p.planClosed && can.pickLead) return "pickLead";
+      }
       if (p.designAwaitingApproval && can.approveDesign) return "approveDesign";
       // Build ▾ holds Build here (startBuild) and the brief (exportBrief): either one is enough,
-      // so a paused agent still leaves Open in Claude Code (§4.7).
-      if (p.step === "ready" && (can.startBuild || can.exportBrief)) return "build";
+      // so a paused agent still leaves Open in Claude Code (§4.7). Only once a builder is assigned.
+      if (item.lead && (can.startBuild || can.exportBrief)) return "build";
       return null;
     case "building":
       if (p.heldReason && can.release) return "release";
       if (can.merge) return "merge";
+      if (can.markReleased) return "markReleased";
       return null;
     default:
       return null;

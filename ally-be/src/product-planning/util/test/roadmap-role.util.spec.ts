@@ -32,6 +32,7 @@ const item = (
   hasLead: false,
   hasPlan: true,
   planningStarted: false,
+  planClosed: false,
   designAwaitingApproval: false,
   readyToBuild: false,
   awaitingMerge: false,
@@ -67,6 +68,7 @@ function* everyCase(): Generator<[RoadmapRelationship, RoadmapCapabilityItem]> {
                 shownStage,
                 hasLead: hasLead || isLead,
                 planningStarted: flag,
+                planClosed: flag,
                 designAwaitingApproval: flag,
                 readyToBuild: flag,
                 awaitingMerge: flag,
@@ -185,12 +187,22 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
         'building',
       ] as ShownStage[]) {
         expect(can('idea', stranger, { shownStage })).toMatchObject({
-          vote: true,
+          vote: shownStage !== 'building',
           comment: true,
           answer: true,
           watch: true,
         });
       }
+    });
+
+    it('votes only while it is in To do: a builder locks the votes', () => {
+      expect(can('idea', stranger, { shownStage: 'planning' }).vote).toBe(true);
+      expect(
+        can('idea', stranger, { shownStage: 'planning', hasLead: true }).vote,
+      ).toBe(false);
+      expect(
+        can('idea', stranger, { shownStage: 'building', hasLead: true }).vote,
+      ).toBe(false);
     });
 
     it('stops voting once shipped but can still comment', () => {
@@ -232,17 +244,29 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
   });
 
   describe('Builder', () => {
-    it('makes the irreversible calls only on ideas it leads (D4)', () => {
-      const ready = { shownStage: 'planning' as const, readyToBuild: true };
+    // An idea a Builder was assigned to build: it has a lead, and it is them.
+    const assigned = { hasLead: true };
+
+    it('makes the build calls only on ideas it was assigned to build', () => {
+      const ready = {
+        ...assigned,
+        shownStage: 'planning' as const,
+        readyToBuild: true,
+      };
       expect(can('builder', lead, ready).startBuild).toBe(true);
       expect(can('builder', stranger, ready).startBuild).toBe(false);
       const design = {
+        ...assigned,
         shownStage: 'planning' as const,
         designAwaitingApproval: true,
       };
       expect(can('builder', lead, design).approveDesign).toBe(true);
       expect(can('builder', stranger, design).approveDesign).toBe(false);
-      const merge = { shownStage: 'building' as const, awaitingMerge: true };
+      const merge = {
+        ...assigned,
+        shownStage: 'building' as const,
+        awaitingMerge: true,
+      };
       expect(can('builder', lead, merge).merge).toBe(true);
       expect(can('builder', stranger, merge).merge).toBe(false);
       const held = { shownStage: 'building' as const, releaseHeld: true };
@@ -250,13 +274,22 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
       expect(can('builder', stranger, held).release).toBe(false);
     });
 
-    it('starts planning as the lead, once', () => {
-      expect(can('builder', lead, { hasLead: true }).startPlanning).toBe(true);
-      expect(
-        can('builder', lead, { hasLead: true, planningStarted: true })
-          .startPlanning,
-      ).toBe(false);
+    it("never expands an idea into a plan: that is the Owner's", () => {
+      expect(can('builder', lead, assigned).startPlanning).toBe(false);
       expect(can('builder', stranger, {}).startPlanning).toBe(false);
+      expect(
+        can('builder', stranger, { shownStage: 'submitted' }).startPlanning,
+      ).toBe(false);
+    });
+
+    it('never closes or reopens a plan', () => {
+      expect(
+        can('builder', stranger, { shownStage: 'planning' }).closePlan,
+      ).toBe(false);
+      expect(
+        can('builder', stranger, { shownStage: 'planning', planClosed: true })
+          .reopenPlan,
+      ).toBe(false);
     });
 
     it('raises the ceiling only as the lead, and only when a plan exists', () => {
@@ -272,10 +305,11 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
       ).toBe(false);
     });
 
-    it('curates the board (close) but never reviews, assigns or stars (D10, D11, D16)', () => {
+    it('never declines, closes, reviews, assigns or stars', () => {
       const caps = can('builder', stranger, { shownStage: 'submitted' });
       expect(caps).toMatchObject({
-        close: true,
+        close: false,
+        decline: false,
         review: false,
         pickLead: false,
         star: false,
@@ -286,21 +320,37 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
 
     it('cannot pick itself a lead (D11)', () => {
       expect(
-        can('builder', stranger, { shownStage: 'accepted' }).pickLead,
+        can('builder', stranger, {
+          shownStage: 'planning',
+          planClosed: true,
+        }).pickLead,
       ).toBe(false);
     });
 
-    it('exports the brief on its own idea once ready or building', () => {
+    it('chooses how it is built and sends the brief, on its own idea once assigned', () => {
+      for (const shownStage of ['planning', 'building'] as const) {
+        expect(can('builder', lead, { ...assigned, shownStage })).toMatchObject(
+          { setBuildMode: true, exportBrief: true },
+        );
+        expect(
+          can('builder', stranger, { hasLead: true, shownStage }),
+        ).toMatchObject({ setBuildMode: false, exportBrief: false });
+      }
+    });
+
+    it("marks its own idea Released, and no one else's", () => {
       expect(
-        can('builder', lead, { shownStage: 'planning', readyToBuild: true })
-          .exportBrief,
+        can('builder', lead, { ...assigned, shownStage: 'building' })
+          .markReleased,
       ).toBe(true);
-      expect(can('builder', lead, { shownStage: 'building' }).exportBrief).toBe(
-        true,
-      );
-      expect(can('builder', lead, { shownStage: 'planning' }).exportBrief).toBe(
-        false,
-      );
+      expect(
+        can('builder', stranger, { hasLead: true, shownStage: 'building' })
+          .markReleased,
+      ).toBe(false);
+      expect(
+        can('builder', lead, { ...assigned, shownStage: 'shipped' })
+          .markReleased,
+      ).toBe(false);
     });
   });
 
@@ -314,27 +364,85 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
       );
     });
 
-    it('picks or changes the lead from Accepted to Building (D11)', () => {
+    it('expands a submitted or accepted idea into a plan, once', () => {
+      expect(
+        can('owner', stranger, { shownStage: 'submitted' }).startPlanning,
+      ).toBe(true);
+      expect(can('owner', stranger, {}).startPlanning).toBe(true);
+      expect(
+        can('owner', stranger, { planningStarted: true }).startPlanning,
+      ).toBe(false);
+      expect(
+        can('owner', stranger, { shownStage: 'planning' }).startPlanning,
+      ).toBe(false);
+    });
+
+    it('closes the plan while planning with no builder, and reopens it until one is assigned', () => {
+      expect(can('owner', stranger, { shownStage: 'planning' })).toMatchObject({
+        closePlan: true,
+        reopenPlan: false,
+      });
+      expect(
+        can('owner', stranger, { shownStage: 'planning', planClosed: true }),
+      ).toMatchObject({ closePlan: false, reopenPlan: true });
+      expect(
+        can('owner', stranger, {
+          shownStage: 'planning',
+          planClosed: true,
+          hasLead: true,
+        }),
+      ).toMatchObject({ closePlan: false, reopenPlan: false });
+    });
+
+    it('assigns a builder only once the plan is closed, and can always change one', () => {
       for (const shownStage of STAGES) {
+        const open = !['draft', 'shipped', 'declined', 'closed'].includes(
+          shownStage,
+        );
         expect([
           shownStage,
           can('owner', stranger, { shownStage }).pickLead,
+          can('owner', stranger, { shownStage, planClosed: true }).pickLead,
+          can('owner', stranger, { shownStage, hasLead: true }).pickLead,
+        ]).toEqual([shownStage, false, open, open]);
+      }
+    });
+
+    it('declines at any point before Released', () => {
+      for (const shownStage of STAGES) {
+        expect([
+          shownStage,
+          can('owner', stranger, { shownStage }).decline,
         ]).toEqual([
           shownStage,
-          ['accepted', 'planning', 'building'].includes(shownStage),
+          ['submitted', 'accepted', 'planning', 'building'].includes(
+            shownStage,
+          ),
         ]);
       }
     });
 
-    it('acts as lead on any idea (§2.1a)', () => {
-      expect(can('owner', stranger, {}).startPlanning).toBe(true);
+    it('does everything the builder can, on any idea (§2.1a)', () => {
       expect(
-        can('owner', stranger, { shownStage: 'planning', readyToBuild: true })
-          .startBuild,
+        can('owner', stranger, {
+          shownStage: 'planning',
+          readyToBuild: true,
+          hasLead: true,
+        }).startBuild,
       ).toBe(true);
       expect(
         can('owner', stranger, { shownStage: 'planning' }).raiseCeiling,
       ).toBe(true);
+      expect(
+        can('owner', stranger, { shownStage: 'building' }).markReleased,
+      ).toBe(true);
+    });
+
+    it('starts no build before a builder is assigned', () => {
+      expect(
+        can('owner', stranger, { shownStage: 'planning', readyToBuild: true })
+          .startBuild,
+      ).toBe(false);
     });
 
     it('stars, pins views and configures', () => {
@@ -367,33 +475,47 @@ describe('editCapabilitiesFor (§4.11)', () => {
   const author = { isAuthor: true, isLead: false };
   const lead = { isAuthor: false, isLead: true };
 
-  it('lets the author edit the text only while the idea waits for review', () => {
-    expect(editCapabilitiesFor('idea', author, 'submitted')).toEqual({
-      editTitle: true,
-      editGoal: true,
-      editSummary: true,
-      editLead: false,
-      editMonth: false,
-    });
-    expect(editCapabilitiesFor('idea', author, 'accepted').editTitle).toBe(
-      false,
-    );
+  it('locks the idea to everyone but an Owner once it is submitted', () => {
+    for (const stage of [
+      'submitted',
+      'accepted',
+      'planning',
+      'building',
+    ] as const) {
+      expect(
+        Object.values(editCapabilitiesFor('idea', author, stage)).some(Boolean),
+      ).toBe(false);
+      expect(
+        Object.values(editCapabilitiesFor('builder', lead, stage)).some(
+          Boolean,
+        ),
+      ).toBe(false);
+    }
   });
 
-  it('hands the text to the lead once accepted', () => {
-    expect(editCapabilitiesFor('builder', lead, 'planning').editSummary).toBe(
-      true,
-    );
-    expect(editCapabilitiesFor('builder', none, 'planning').editSummary).toBe(
-      false,
-    );
-    expect(editCapabilitiesFor('builder', lead, 'submitted').editTitle).toBe(
-      false,
-    );
+  it('gives an Owner the lead only once the plan is closed or a builder exists', () => {
+    expect(editCapabilitiesFor('owner', none, 'planning').editLead).toBe(false);
+    expect(
+      editCapabilitiesFor('owner', none, 'planning', {
+        planClosed: true,
+        hasLead: false,
+      }).editLead,
+    ).toBe(true);
+    expect(
+      editCapabilitiesFor('owner', none, 'building', {
+        planClosed: false,
+        hasLead: true,
+      }).editLead,
+    ).toBe(true);
   });
 
-  it('gives an Owner the lead and the month, and the month stops at Shipped', () => {
-    expect(editCapabilitiesFor('owner', none, 'accepted')).toEqual({
+  it('gives an Owner the text and the month, and the month stops at Shipped', () => {
+    expect(
+      editCapabilitiesFor('owner', none, 'accepted', {
+        planClosed: true,
+        hasLead: false,
+      }),
+    ).toEqual({
       editTitle: true,
       editGoal: true,
       editSummary: true,
