@@ -30,6 +30,7 @@ import '../../reviews/data/scribe_reviews_repository.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
 import '../data/custom_fields_repository.dart';
+import '../data/custom_field_select_codec.dart';
 import '../data/summary_display_format.dart';
 import '../data/summary_form_state.dart';
 import '../../../core/chat/current_chat_provider.dart';
@@ -965,12 +966,31 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
         : const <String, String?>{};
     _customFieldValues
       ..clear()
-      ..addEntries(values.map((v) => MapEntry(v.fieldDefinitionId, v.value)))
+      ..addEntries(values.map((v) {
+        // Select values may be stored as ids (web) or labels (older builds);
+        // this form works in labels. See custom_field_select_codec.dart.
+        final def = _customFieldDefById(v.fieldDefinitionId);
+        return MapEntry(v.fieldDefinitionId, def == null ? v.value : selectValueFromWire(def, v.value));
+      }))
       ..addAll(unsaved);
     _dirtyCustomFieldIds
       ..clear()
       ..addAll(unsaved.keys);
     _customFieldsSeededForChatId = key;
+  }
+
+  CustomFieldDefinition? _customFieldDefById(String id) {
+    for (final d in _customFieldDefs) {
+      if (d.id == id) return d;
+    }
+    return null;
+  }
+
+  /// A custom field's value as the server stores it (select options as ids).
+  String? _wireValue(String id) {
+    final def = _customFieldDefById(id);
+    final value = _customFieldValues[id];
+    return def == null ? value : selectValueToWire(def, value);
   }
 
   /// RN `onCustomValuesApplied` (remount + re-seed): voice dictation wrote
@@ -1078,7 +1098,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
     try {
       await ref.read(customFieldsRepositoryProvider).upsertValues(
         _chatId,
-        [for (final id in changed) (fieldDefinitionId: id, value: _customFieldValues[id])],
+        [for (final id in changed) (fieldDefinitionId: id, value: _wireValue(id))],
       );
       if (mounted) setState(() => _dirtyCustomFieldIds.removeAll(changed));
       return true;
@@ -1098,7 +1118,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
     try {
       await ref.read(customFieldsRepositoryProvider).upsertValues(
         _chatId,
-        [for (final id in changed) (fieldDefinitionId: id, value: _customFieldValues[id])],
+        [for (final id in changed) (fieldDefinitionId: id, value: _wireValue(id))],
       );
       if (mounted) setState(() => _dirtyCustomFieldIds.removeAll(changed));
       return true;
@@ -1252,10 +1272,16 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliv
     // unconditionally on every summary open.
     final customFieldsEnabled = ref.watch(customFieldsEnabledProvider).value ?? false;
     if (customFieldsEnabled) {
-      _customFieldDefs = ref.watch(customFieldDefinitionsProvider).value ?? _customFieldDefs;
+      final defsAsync = ref.watch(customFieldDefinitionsProvider);
+      _customFieldDefs = defsAsync.value ?? _customFieldDefs;
       final valuesAsync = ref.watch(customFieldValuesProvider(_chatId));
       final values = valuesAsync.value;
-      if (values != null) _seedCustomFieldsIfNeeded(values);
+      // Seed once both are in: select values are converted to labels using
+      // the definitions, and seeding happens only once per chat. A failed
+      // definitions load still seeds (unconverted) rather than never.
+      if (values != null && (defsAsync.hasValue || defsAsync.hasError)) {
+        _seedCustomFieldsIfNeeded(values);
+      }
     } else {
       _customFieldDefs = const [];
     }
