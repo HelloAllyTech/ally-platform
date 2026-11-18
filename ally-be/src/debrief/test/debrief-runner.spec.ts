@@ -692,6 +692,15 @@ describe('DebriefRunnerService', () => {
       ]);
     });
 
+    it('records what the run ran: a hash of the release bundle and the prompt version each step used', async () => {
+      const { svc, saved } = build();
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      const run = saved[saved.length - 1];
+      expect(run?.bundleHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(run?.promptVersions).toBeDefined();
+      expect(typeof run?.promptVersions).toBe('object');
+    });
+
     it('keeps no note when every read worked', async () => {
       const { svc, saved } = build();
       await svc.run('s1', { mode: DebriefRunMode.SHADOW });

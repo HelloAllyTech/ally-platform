@@ -134,6 +134,14 @@ export class DebriefRun extends BaseWithoutTenantEntity {
   @Column({ type: 'varchar', length: 10, nullable: true })
   riskCueHandling?: 'alarm' | 'assessed' | null;
 
+  /** sha256 of the release bundle this run ran (equal hashes = equal release behaviour). */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  bundleHash?: string | null;
+
+  /** The Skills Store version each prompt used, by prompt code; `'override'` for a replay's own text. */
+  @Column({ type: 'jsonb', nullable: true })
+  promptVersions?: Record<string, number | string | null> | null;
+
   /** How the session's language was found: recorded, detected or detected_low_confidence. */
   @Column({ type: 'varchar', length: 40, nullable: true })
   languageSource?: string | null;

@@ -51,6 +51,7 @@ import { DebriefBuilderRequesterService } from './service/debrief-builder-reques
 import { DebriefPmAgentToolsService } from './service/debrief-pm-agent-tools.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefNightlyService } from './service/debrief-nightly.service';
+import { DebriefRunLogRetentionService } from './service/debrief-run-log-retention.service';
 import { DebriefRoleplayDriftService } from './service/debrief-roleplay-drift.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
@@ -223,6 +224,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     DebriefAudioService,
     DebriefNotifier,
     DebriefNightlyService,
+    DebriefRunLogRetentionService,
     DebriefRoleplayDriftService,
     DebriefReviewService,
     GuideCrisisService,

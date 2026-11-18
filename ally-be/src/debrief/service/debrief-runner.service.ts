@@ -54,6 +54,7 @@ import {
 import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefFrameworkService } from './debrief-framework.service';
 import { resolveRiskCue } from '../util/debrief-risk-cue.util';
+import { canonicalHash } from '../../llm-agent/harness/release/canonical-hash.util';
 import { DEBRIEF_CONTRACT_VERSION } from '../util/debrief-graph-contract.util';
 import {
   DataProvider,
@@ -651,6 +652,14 @@ export class DebriefRunnerService {
       run.workspace = { ...run.workspace, dataNotes: loaded.problems };
     }
     run.riskCueHandling = riskCue.handling;
+    // What this run ran, so it can be reproduced without a join.
+    run.bundleHash = canonicalHash(bundle);
+    run.promptVersions = Object.fromEntries(
+      Object.entries(promptVersions).map(([code, v]) => [
+        code,
+        v && typeof v === 'object' ? 'override' : v,
+      ]),
+    );
     run.workspace = {
       ...run.workspace,
       // What this run used, kept so a later edit never changes how a past debrief reads.
