@@ -159,23 +159,31 @@ export class ListToolsService {
     const personList = Boolean(list.settings?.person_field);
     try {
       if (def.kind === 'find') {
-        let found = await this.records.query(
+        let found = await this.freeOnly(
           ctx.chatbotId,
-          list.key,
-          actor,
-          toListQuery(list, input),
-          scope,
+          list,
+          await this.records.query(
+            ctx.chatbotId,
+            list.key,
+            actor,
+            toListQuery(list, input),
+            scope,
+          ),
         );
         // A number with an upper bound ("seats 2 to 2") found nothing: read it as "at
         // least" (chunk 8a), since a table for 3 seats 2. Only when something comes back.
         const atLeast = withoutUpperBounds(list, input);
         if (found.total === 0 && !found.aggregate && atLeast) {
-          const roomier = await this.records.query(
+          const roomier = await this.freeOnly(
             ctx.chatbotId,
-            list.key,
-            actor,
-            toListQuery(list, atLeast),
-            scope,
+            list,
+            await this.records.query(
+              ctx.chatbotId,
+              list.key,
+              actor,
+              toListQuery(list, atLeast),
+              scope,
+            ),
           );
           if (roomier.total > 0) found = roomier;
         }
@@ -273,6 +281,30 @@ export class ListToolsService {
     }
   }
   /**
+   * Only the entries still free (Q3-fast Part 0b, C19): on a list that others book into (Slots,
+   * Tables, Classes), an entry whose live bookings already fill it under the booking list's rules
+   * is left out, so "which tables are free?" never offers a taken one. Any other list is unchanged.
+   * A total that counted the taken entries drops by as many.
+   */
+  private async freeOnly<
+    T extends { records: ListRecordView[]; total: number },
+  >(chatbotId: string, list: ListDefinitionView, found: T): Promise<T> {
+    if (!found.records.length) return found;
+    const taken = await this.records.takenOf(
+      chatbotId,
+      list.key,
+      found.records.map((r) => r.id),
+    );
+    if (!taken.size) return found;
+    const records = found.records.filter((r) => !taken.has(r.id));
+    return {
+      ...found,
+      records,
+      total: Math.max(found.total - (found.records.length - records.length), 0),
+    };
+  }
+
+  /**
    * The entries nearest a time asked for, when none matches it exactly (chunk 8a). Only for a
    * find with a time (`starts_at_at`, `_from` or `_to` on a date-and-time detail). The other
    * filters stay (open, seats) except text matches ("window" may be no table's name). It looks
@@ -326,12 +358,10 @@ export class ListToolsService {
       limit: NEAREST_LOOK,
     });
     try {
-      const { records } = await this.records.query(
+      const { records } = await this.freeOnly(
         chatbotId,
-        list.key,
-        actor,
-        query,
-        scope,
+        list,
+        await this.records.query(chatbotId, list.key, actor, query, scope),
       );
       const at = (r: ListRecordView) => Date.parse(String(r.data[field.key]));
       const timed = records.filter((r) => !Number.isNaN(at(r)));

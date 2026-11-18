@@ -199,7 +199,34 @@ export class TitleResolver {
     const target = await this.listById(row.collection_id);
     if (!target) return value;
     await this.preload(target, [row]);
-    return this.title(target, row.data, depth + 1);
+    const title = await this.title(target, row.data, depth + 1);
+    const name = this.nameBesideTime(target, row.data);
+    return name ? `${title} · ${name}` : title;
+  }
+
+  /**
+   * What tells apart entries that share a time (Q3-fast Part 0b, 17 Nov C21): on a list titled by
+   * its date and time, its first required text field ("Table" on Tables). A reservation's title is
+   * then "Sat 21 Nov 2026, 20:00 · Table 1", not just the time. Lists titled otherwise, or with no
+   * such field (Slots), are unchanged.
+   */
+  private nameBesideTime(
+    list: LoadedList,
+    data: Record<string, unknown>,
+  ): string | null {
+    const titleField = list.field(list.collection.settings?.title_field);
+    if (
+      titleField?.type !== ListFieldType.DATETIME &&
+      titleField?.type !== ListFieldType.DATE
+    ) {
+      return null;
+    }
+    const name = list.fields.find(
+      (f) =>
+        f.type === ListFieldType.TEXT && f.required && this.canSee(list, f),
+    );
+    const value = name ? data?.[name.key] : undefined;
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
   }
 
   /**

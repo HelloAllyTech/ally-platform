@@ -60,6 +60,7 @@ def check_reply(
     found_nothing: bool = False,
     can_pass_on: bool = True,
     carried: int = 0,
+    refused: Sequence[str] = (),
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -92,6 +93,7 @@ def check_reply(
         found_nothing=found_nothing,
         can_pass_on=can_pass_on,
         carried=carried,
+        refused=tuple(refused),
     )
     verdict = _read_draft(step, ctx)
     # A list's times are cited from the run's records before grounding (chunk 6).
@@ -205,6 +207,13 @@ def _relabel(
 def _require_sources(
     verdict: Verdict, ctx: CheckContext, about_organisation: bool
 ) -> None:
+    if relays_refusal(verdict, ctx):
+        # "That table is taken; T3 is free", "You already have 2 bookings": the
+        # list's own refusal of this run's booking, in plain words (Q3-fast Part
+        # 0b). It is the answer to what the person asked, so it goes out as one,
+        # never as the fixed decline, and never counts toward a hand-over.
+        verdict.intent, verdict.rejection = AgentIntent.ANSWER, None
+        return
     if verdict.intent == AgentIntent.ANSWER and not verdict.citations:
         if answers_from_empty_find(verdict.answer, ctx):
             # "Nothing's free on Thursday evening": a find this run found nothing at
@@ -247,6 +256,32 @@ def _require_sources(
 
 
 _NUMBER = re.compile(r"\d+")
+
+
+def relays_refusal(verdict: Verdict, ctx: CheckContext) -> bool:
+    """An uncited reply, labelled an answer or declined by the model itself, after
+    a list write this run was refused by the list's rules (Q3-fast Part 0b), that
+    states no number the run didn't see: in the refusal, a record or passage it
+    was shown, or the conversation."""
+    if not ctx.refused or verdict.citations or not verdict.answer.strip():
+        return False
+    if verdict.intent == AgentIntent.DECLINE and not verdict.model_declined:
+        return False
+    if verdict.intent not in (AgentIntent.ANSWER, AgentIntent.DECLINE):
+        return False
+    seen = " ".join(
+        [
+            *ctx.refused,
+            ctx.question,
+            *(m.get("content") or "" for m in ctx.history),
+            *(
+                f"{p.get('section_path') or ''} {p.get('text') or ''}"
+                for p in ctx.passages
+            ),
+        ]
+    )
+    shown = set(_NUMBER.findall(seen))
+    return all(number in shown for number in _NUMBER.findall(verdict.answer))
 
 
 def answers_from_empty_find(answer: str, ctx: CheckContext) -> bool:

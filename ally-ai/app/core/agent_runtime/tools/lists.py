@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Type
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from app.core.agent_runtime.tools.base import Tool, ToolContext, ToolResult
-from app.core.agent_runtime.tools.confirmed import unconfirmed
+from app.core.agent_runtime.tools.confirmed import unconfirmed, unconsented
 
 #: At most this many definitions a run (ally-be caps them too).
 MAX_LIST_TOOLS = 12
@@ -149,6 +149,9 @@ def list_tool(definition: Mapping[str, Any]) -> Tool:
                 ctx.today,
                 updating=str(values.get("id") or "") if kind == "update" else None,
             )
+            if not why and kind == "create":
+                # Picking between offers isn't a yes (Q3-fast Part 0b, 17 Nov F1).
+                why = unconsented(properties, values, ctx.passages, ctx.latest)
             if why:
                 return ToolResult(
                     summary=f"{name}: not sent, time not confirmed",

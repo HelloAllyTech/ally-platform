@@ -113,6 +113,9 @@ class ToolContext:
     #: where the business is, to check a booked time is the one they confirmed.
     messages: Tuple[str, ...] = ()
     today: str = ""
+    #: List writes only (Q3-fast Part 0b): the person's latest message as they wrote
+    #: it, to check they said yes to a booking rather than picked between offers.
+    latest: str = ""
 
 
 @dataclass(frozen=True)

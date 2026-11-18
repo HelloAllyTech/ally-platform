@@ -109,7 +109,9 @@ export class HandoverService implements OnModuleInit {
   /**
    * What the channel sends, once the engine has decided. Marks a crisis as Safety, a request for a
    * person (or a second "I don't know" in a row) as Needs a person, and tells the inbox. A second
-   * decline is replaced by the hand-over message. Never throws: the visitor's reply comes first.
+   * decline is replaced by the hand-over message, only when the owner has hand-over on (Q3-fast
+   * Part 0b, 17 Nov F2: with it off, the chat was handed over and marked "Couldn't help twice").
+   * Never throws: the visitor's reply comes first.
    */
   async afterDecision(
     chatbot: Pick<Chatbot, 'id' | 'settings' | 'safetyPack'>,
@@ -134,6 +136,7 @@ export class HandoverService implements OnModuleInit {
         await this.markNeedsPerson(chatbot.id, conversationId, 'asked');
       } else if (
         decision.handledBy === WaHandledBy.DECLINED &&
+        handOverIsOn(chatbot) &&
         (await this.declinedJustBefore(conversationId))
       ) {
         const settings = await this.settings.getForChatbot(chatbot as Chatbot);
@@ -534,4 +537,14 @@ export class HandoverService implements OnModuleInit {
     )) as Chatbot[];
     return row;
   }
+}
+
+/**
+ * The owner's hand-over switch (Tools → Hand over, `abilities.hand_over`): only `do_it` is on. Off,
+ * the assistant never passes a chat to the team on its own.
+ */
+export function handOverIsOn(chatbot: Pick<Chatbot, 'settings'>): boolean {
+  const abilities = (chatbot.settings as { abilities?: Record<string, string> })
+    ?.abilities;
+  return abilities?.hand_over === 'do_it';
 }

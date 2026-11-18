@@ -429,6 +429,48 @@ describePg('Lists, the owner’s section (Postgres)', () => {
       expect(done).toMatchObject({ count: 104, skipped: 1, dry_run: false });
     });
 
+    it('a booked table is no longer free, and the reservation names its table (Q3-fast 0b)', async () => {
+      await owner.install(await chatbot(), 'table_reservations');
+      const at = '2026-11-21T14:30:00Z';
+      const t1 = await records.create(bot, 'tables', OWNER, {
+        starts_at: at,
+        table: 'Table 1',
+        open: true,
+      });
+      const t2 = await records.create(bot, 'tables', OWNER, {
+        starts_at: at,
+        table: 'Table 2',
+        open: true,
+      });
+      const [{ id: guest }] = await ds.query(
+        `INSERT INTO chatbot_contacts (chatbot_id, display_name) VALUES ($1, 'Priya') RETURNING id`,
+        [bot],
+      );
+      const { record } = await records.create(bot, 'reservations', OWNER, {
+        table_slot: t1.record.id,
+        guest,
+        party_size: 4,
+        status: 'booked',
+      });
+      // The test bot has no time zone, so its times read in UTC.
+      expect(record.title).toBe('Sat 21 Nov 2026, 14:30 · Table 1');
+
+      const ids = [t1.record.id, t2.record.id];
+      expect([...(await records.takenOf(bot, 'tables', ids))]).toEqual([
+        t1.record.id,
+      ]);
+      // Cancelled, it is free again: the rule's own `where`.
+      await records.update(
+        bot,
+        'reservations',
+        OWNER,
+        record.id,
+        { status: 'cancelled' },
+        record.version,
+      );
+      expect((await records.takenOf(bot, 'tables', ids)).size).toBe(0);
+    });
+
     it("refuses each on a detail that isn't text or a choice, or with no values", async () => {
       await owner.install(await chatbot(), 'table_reservations');
       for (const each of [

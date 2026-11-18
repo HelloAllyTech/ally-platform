@@ -1,0 +1,22 @@
+FAIL! bk-free-means-free (17 Nov F5/F4: free means free; a taken table is refused in words (Q3-fast 0b))
+      > [priya] Hi, I'm Priya. Can I book table T2 for 3 on Tuesday 24 Nov at 1 pm?
+      < [clarified/question v2 11140ms] Hi Priya — I can see Table T2 for 3 is open on Tue 24 Nov at 1:00 PM (that slot is available). Shall I confirm this booking for you? If yes, please tell me the 
+      > [priya] Yes please, book T2 for 3 people. The name is Priya Sharma.
+      < [rag/smalltalk v2 15174ms] All set, Priya — I’ve booked Table T2 for 3 on Tue 24 Nov at 1:00 PM under the name Priya Sharma. I saved the reservation just now.
+      > [meera] Which tables are free on Tuesday 24 Nov at 1 pm?
+      < [rag/question v2 7923ms] On Tuesday 24 Nov at 13:00 the following tables are free: T1 (3 seats), T2 (3 seats) and T3 (3 seats) (see schedule). Would you like me to book one of these for
+      ✗ says /\bT2\b/
+      > [meera] I'm Meera. Book T2 for 3 on Tuesday 24 Nov at 1 pm please
+      < [rag/question v2 16773ms] Thanks Meera — I’ve saved your name. I couldn’t book T2 at 1:00 pm because that slot is already taken. I can instead book: • T3 (3 seats) on Tue 24 Nov at 13:00
+pass  bk-limit-in-words (17 Nov F3: the at-most-2 rule reaches the person in words (Q3-fast 0b))
+      > I'm Asha. Please book table T1 for 2 on Wednesday 25 Nov at 11 am
+      < [rag/question v2 18078ms] Thanks Asha — I’ve booked Table T1 for 2 on Wednesday 25 Nov 2026 at 11:00. The reservation is recorded and the table slot shown as available at that time. Woul
+      > Yes, book it. The name is Asha Rao.
+      < [rag/question v2 14063ms] Done — I’ve recorded your reservation for Table T1, Wednesday 25 Nov 2026 at 11:00 for 2 people (reservation recorded) and noted your name as Asha Rao. The rese
+      > Please also book table T1 for 2 on Wednesday 25 Nov at 2 pm, same name
+      < [rag/question v2 18979ms] Thanks Asha — that table is already booked. I see a reservation for Table T1 on Wednesday 25 Nov 2026 at 14:00 for 2 guests under your name (reservation recorde
+      > yes please
+      < [clarified/question v2 8274ms] Thanks, Asha — please tell me the phone number you'd like me to pass to the team?
+      > And book table T1 for 2 on Thursday 26 Nov at 12 noon as well. Yes, go ahead and book it.
+      < [declined/question v2 15067ms] I can’t add a third reservation — you already have two booked (Wed 25 Nov 11:00 and 14:00) and the system won’t allow more. (I can see the Thu 26 Nov 12:00 T1 s
+1/2 cases passed in every run; 1 must-pass failed

@@ -58,6 +58,11 @@ class CheckContext:
     #: How many of `passages`, from the start, were carried over from the previous
     #: message (chunk 6b): citable, but not found by this run.
     carried: int = 0
+    #: The plain-words refusals this run's list writes got from the list's rules
+    #: (Q3-fast Part 0b): "That table is taken.", "You already have 2 Reservations…".
+    #: A reply that relays one is an answer about the person's request, not a gap
+    #: in what the assistant knows.
+    refused: Sequence[str] = ()
 
     @property
     def found(self) -> List[Dict[str, Any]]:

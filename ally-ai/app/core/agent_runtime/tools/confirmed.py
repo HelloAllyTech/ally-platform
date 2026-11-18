@@ -74,6 +74,9 @@ _RECORD_DATE = re.compile(
 
 Day = Tuple[int, int]  # day of month, month
 
+# A date in numbers, day first: "21/11", "21-11-2026". Never "11.30" (a time).
+_NUMERIC_DAY = re.compile(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](?:\d{4}|\d{2}))?\b")
+
 
 #: How many of the person's messages a time can be confirmed in (chunk 6b): a time
 #: they confirmed a few turns back ("11:00", two questions, "yes, book it") still
@@ -211,6 +214,13 @@ def named_days(texts: Sequence[str], today: Optional[date]) -> Optional[Set[Day]
         for m in _MONTH_DAY.finditer(text):
             named = True
             days.add((int(m.group(2)), _month(m.group(1))))
+        for m in _NUMERIC_DAY.finditer(text):
+            # "21/11", "21-11-2026": day first, as dates are written in India
+            # (Q3-fast Part 0b, 17 Nov C21). Not a real day and month: not a date.
+            day, month = int(m.group(1)), int(m.group(2))
+            if 1 <= day <= 31 and 1 <= month <= 12:
+                named = True
+                days.add((day, month))
         if today is None:
             continue
         for m in _WEEKDAY.finditer(text):
@@ -242,10 +252,64 @@ def _record(passages: Sequence[Dict[str, Any]], record_id: str) -> Optional[Dict
     return None
 
 
+# A booking said in so many words, not asked about: "please book T1 for 2 at 11",
+# "go ahead", "book karo". A question ("can I book Friday at 12?") is not one.
+_BOOK_NOW = re.compile(
+    r"\b(?:book|reserve|confirm|go ahead|lock (?:it|that) in|haan|haa|ji haan|"
+    r"kar do|kardo|book karo|book kar do)\b",
+    re.IGNORECASE,
+)
+
+
+def said_yes(latest: str) -> bool:
+    """The person's latest message says yes to booking (Q3-fast Part 0b, 17 Nov
+    F1): a plain yes, or an instruction to book that isn't a question. Choosing
+    between offers ("T3 please", "the window one sounds nice") is not a yes."""
+    text = latest.strip()
+    if is_plain_yes(text):
+        return True
+    return bool(_BOOK_NOW.search(text)) and "?" not in text
+
+
+def unconsented(
+    properties: Mapping[str, Mapping[str, Any]],
+    values: Mapping[str, Any],
+    passages: Sequence[Dict[str, Any]],
+    latest: str,
+) -> Optional[str]:
+    """Why a create that books a dated entry (a slot, a table, a class) can't go
+    yet: the person hasn't said yes to it (Q3-fast Part 0b). None when they have,
+    when it books nothing dated, or when their latest message isn't known."""
+    if not latest.strip() or said_yes(latest):
+        return None
+    for key, prop in properties.items():
+        value = str(values.get(key) or "").strip()
+        if not (prop.get("dated") and value):
+            continue
+        target = _record(passages, value) if prop.get("relation") else None
+        title = (
+            str(
+                target.get("section_path")
+                or target.get("record_title")
+                or target.get("document_title")
+                or ""
+            )
+            if target
+            else value
+        )
+        return NOT_SAID_YES.format(title=title)
+    return None
+
+
 #: What the agent is told when a write isn't sent (model-facing, chunk 6 follow-up).
 NOT_CONFIRMED = (
     "Not done: the person hasn't confirmed this exact day and time ({title}). Ask "
     "them to confirm the day and time before you book it."
+)
+NOT_SAID_YES = (
+    "Not done: the person picked {title} but hasn't said yes to booking it. Ask one "
+    "short question with the exact booking (day, time, how many, which one), like "
+    '"Shall I book {title} for you?", and book it only after they say yes.'
 )
 NOT_FOUND = (
     "Not done: that entry wasn't looked up in this conversation turn. Find it first, "
