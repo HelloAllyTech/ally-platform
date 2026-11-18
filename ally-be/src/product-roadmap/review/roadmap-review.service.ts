@@ -8,10 +8,16 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
+import { BuilderSessionService } from 'src/builder/service/builder-session.service';
+import {
+  BuilderSessionKind,
+  BuilderSessionVisibility,
+} from 'src/builder/enum/builder.enum';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppConfigService } from 'src/config/config.service';
 import {
   PlanEventKind,
+  PlanStage,
   RoadmapNotificationKind,
 } from 'src/product-planning/enum/product-planning.enum';
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
@@ -21,7 +27,7 @@ import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.se
 import { roleAtLeast } from 'src/product-planning/util/roadmap-role.util';
 import { RoadmapNotificationService } from '../service/roadmap-notification.service';
 import { RoadmapStrategyGoalService } from '../service/roadmap-strategy-goal.service';
-import { PlanSessionStore } from '../plan/plan-session.store';
+import { PlanSession, PlanSessionStore } from '../plan/plan-session.store';
 import { PlanStageService } from '../plan/plan-stage.service';
 import { RoadmapItemLookupService } from '../item/roadmap-item-lookup.service';
 import { RoadmapItemReadService } from '../item/roadmap-item-read.service';
@@ -35,6 +41,7 @@ import {
   SimilarIdea,
 } from '../draft/roadmap-draft.service';
 import { REVIEW_REASON_MAX } from '../draft/roadmap-draft.dto';
+import { firstLine } from '../draft/roadmap-draft.util';
 import {
   readReviewUndo,
   REVIEW_NOTICE_DELAY_MS,
@@ -104,6 +111,7 @@ export class RoadmapReviewService implements OnModuleDestroy {
     private readonly inbox: RoadmapInboxService,
     private readonly broadcast: RoadmapNotificationService,
     private readonly strategyGoals: RoadmapStrategyGoalService,
+    private readonly builderSessions: BuilderSessionService,
   ) {}
 
   // ── Review ─────────────────────────────────────────────────────────────────
@@ -272,7 +280,13 @@ export class RoadmapReviewService implements OnModuleDestroy {
   ): Promise<ItemDetail> {
     const item = await this.reader.detail(userId, code);
     const ref = await this.lookup.get(code);
-    const session = await this.planSession(ref.builderSessionId);
+    // Picking a lead on an idea filed outside the guided interview (quick add,
+    // an older idea) has no plan session yet: make one rather than refuse.
+    // Handing back needs a lead, so it never creates one.
+    const session =
+      input.action === 'assign' && item.can.pickLead
+        ? await this.ensurePlanSession(userId, ref)
+        : await this.planSession(ref.builderSessionId);
 
     if (input.action === 'assign') {
       if (!item.can.pickLead) {
@@ -354,7 +368,14 @@ export class RoadmapReviewService implements OnModuleDestroy {
   async startPlanning(userId: number, code: string): Promise<ItemDetail> {
     const item = await this.reader.detail(userId, code);
     const ref = await this.lookup.get(code);
-    const session = await this.planSession(ref.builderSessionId);
+    if (!ref.builderSessionId && !item.can.startPlanning) {
+      throw new ForbiddenException(
+        item.shownStage === 'accepted'
+          ? 'Only the lead or an Owner can start planning.'
+          : 'Planning starts once an idea is accepted.',
+      );
+    }
+    const session = await this.ensurePlanSession(userId, ref);
     if (session.plan?.planningStarted === true) return item;
     if (!item.can.startPlanning) {
       throw new ForbiddenException(
@@ -775,6 +796,83 @@ export class RoadmapReviewService implements OnModuleDestroy {
       code,
       fields: ['lead'],
     });
+  }
+
+  /**
+   * The idea's plan session, created if it has none. Only ideas filed through
+   * the guided interview are born with one; quick-added and older ideas are
+   * not, yet the lead lives on the session. The new session is shared, filed
+   * and owned by the idea's author. The column is claimed only while it is
+   * still null, so two Owners racing keep one session and the loser's empty
+   * one is archived.
+   */
+  private async ensurePlanSession(
+    userId: number,
+    ref: {
+      id: string;
+      code: string;
+      createdBy: number;
+      builderSessionId: string | null;
+    },
+  ): Promise<PlanSession> {
+    if (ref.builderSessionId) return this.planSession(ref.builderSessionId);
+
+    const [opp] = await this.dataSource.query(
+      `SELECT description FROM "roadmap_opportunities" WHERE id = $1`,
+      [ref.id],
+    );
+    const created = await this.builderSessions.createSession(
+      Number(ref.createdBy),
+      { title: firstLine(opp?.description || ref.code) },
+    );
+    const now = new Date();
+    await this.store.repository.update(
+      { id: created.id },
+      {
+        kind: BuilderSessionKind.PLAN,
+        visibility: BuilderSessionVisibility.SHARED,
+        planStage: PlanStage.FILED,
+        planStageAt: now,
+      },
+    );
+    await this.store.patchPlan(created.id, {
+      code: ref.code,
+      opportunityId: ref.id,
+      filedAt: now.toISOString(),
+      planningStarted: false,
+      lastActiveAt: now.toISOString(),
+    });
+
+    const claimed: unknown = await this.dataSource.query(
+      `UPDATE "roadmap_opportunities"
+          SET "builderSessionId" = $2, "updatedBy" = $3
+        WHERE id = $1 AND "builderSessionId" IS NULL
+        RETURNING id`,
+      [ref.id, created.id, userId],
+    );
+    const won = Array.isArray(claimed)
+      ? Array.isArray(claimed[0])
+        ? claimed[0].length > 0
+        : claimed.length > 0
+      : false;
+    if (!won) {
+      await this.store.update(created.id, {
+        archivedAt: now,
+        updatedBy: userId,
+      });
+      const current = await this.lookup.get(ref.id);
+      this.logger.warn(
+        `[ROADMAP] Concurrent plan session for ${ref.code}; keeping ${current.builderSessionId}, archiving ${created.id}`,
+      );
+      return this.planSession(current.builderSessionId);
+    }
+    await this.events.record({
+      sessionId: created.id,
+      kind: PlanEventKind.FILED,
+      actorUserId: userId,
+      detail: { by: 'lead_assignment' },
+    });
+    return this.planSession(created.id);
   }
 
   private async planSession(sessionId: string | null) {
