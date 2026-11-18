@@ -9,12 +9,32 @@ import type { BotPageView, Chatbot, TestChatbotResponse } from "@types";
 
 import { HOME, fill } from "./copy";
 import { pickCopy } from "../../botPage/copy";
+import { useLiveSteps } from "../../botPage/liveSteps";
 import { Chat, ChatItem, PendingReply } from "../../botPage/screens/Chat";
 import "../../botPage/page.css";
 import { surfaceProps } from "../../botPage/theme";
 import { readableAccent } from "../../utils/colourPicks";
 
-import type { PublicBotPage, StatusCode } from "../../botPage/types";
+import type { PublicBotPage, PublicStep, StatusCode } from "../../botPage/types";
+
+const STEP_KINDS = ["search", "find", "create", "update", "cancel", "hand_over", "writing"];
+const WHEN = /\b\d{1,2}[:.]\d{2}\b|\b(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/i;
+
+/** Try it's stream passes ally-ai's activity as it is; shown as the page shows it (chunk 6b). */
+function previewStep(activity: { kind: string; list?: string; title?: string }): PublicStep {
+  const kind = (
+    STEP_KINDS.includes(activity.kind) ? activity.kind : "writing"
+  ) as PublicStep["kind"];
+  if (kind === "find" && activity.list) return { kind, label: activity.list };
+  if (
+    ["create", "update", "cancel"].includes(kind) &&
+    activity.title &&
+    WHEN.test(activity.title)
+  ) {
+    return { kind, label: activity.title };
+  }
+  return { kind };
+}
 
 const STATUS: readonly StatusCode[] = [
   "thinking",
@@ -184,6 +204,7 @@ export const TryIt: React.FC<{
   const [test] = useTestChatbotMutation();
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [pending, setPending] = useState<PendingReply | null>(null);
+  const live = useLiveSteps();
   const [error, setError] = useState<string | null>(null);
   const conversation = useRef<string | undefined>();
   const [whys, setWhys] = useState<Why[]>([]);
@@ -198,6 +219,7 @@ export const TryIt: React.FC<{
       .map(m => ({ role: m.role as "user" | "assistant", content: m.text }));
     setMessages(list => [...list, { id: `u${Date.now()}`, role: "user", text, citations: [] }]);
     setPending({ status: "thinking", text: "" });
+    live.start();
     setError(null);
     const request = { id: bot.id, message: text, history, conversationId: conversation.current };
     let arrived = "";
@@ -216,6 +238,8 @@ export const TryIt: React.FC<{
                 },
             ),
           onStep: () => undefined,
+          // The same live steps as the page (chunk 6b); a write's title only when it's a time.
+          onActivity: activity => live.push(previewStep(activity)),
           onToken: piece => {
             arrived += piece;
             setPending(p => p && { ...p, text: arrived });
@@ -242,6 +266,7 @@ export const TryIt: React.FC<{
     } catch {
       setError(copy.errors.INTERNAL);
     } finally {
+      live.stop();
       setPending(null);
     }
   };
@@ -283,7 +308,7 @@ export const TryIt: React.FC<{
               page={preview}
               copy={copy}
               messages={messages}
-              pending={pending}
+              pending={pending ? { ...pending, step: live.current, slow: live.slow } : null}
               busy={pending !== null}
               error={error}
               onSend={text => void send(text)}

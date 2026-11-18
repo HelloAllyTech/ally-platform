@@ -1,3 +1,4 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -321,7 +322,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
     await service.handle(inbound('I want to end my life'));
 
-    expect(sentBody()).toBe(DEFAULT_WHATSAPP_SETTINGS.crisisEscalationText);
+    expect(sentBody()).toBe(GENERAL_CRISIS_TEXT);
     expect(handledBy()).toBe(WaHandledBy.CRISIS);
   });
 
@@ -349,7 +350,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
     await service.handle(inbound('I want to hurt myself'));
 
-    expect(sentBody()).toBe('Please contact a crisis line now.');
+    expect(sentBody()).toBe(GENERAL_CRISIS_TEXT);
     expect(handledBy()).toBe(WaHandledBy.CRISIS);
   });
 
@@ -658,7 +659,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
       await onNumber();
 
-      expect(sentBody()).toBe('Call now.');
+      expect(sentBody()).toBe(GENERAL_CRISIS_TEXT);
     });
 
     it('does not reply while the bot is paused', async () => {

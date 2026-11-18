@@ -225,5 +225,96 @@
         }
       }
     ]
+  },
+  {
+    "id": "lists-evening",
+    "kind": "per-bot: nothing at the time asked is an answer (chunk 6b, item 1)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "is anything free on Thursday evening?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": ["find_slots: ok"],
+          "noTools": ["create_appointments"],
+          "must": ["16:00|4(:00)? ?pm"],
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record",
+            "don't have (that|any) information",
+            "reference material"
+          ],
+          "records": {
+            "list": "appointments",
+            "count": 0
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "lists-confirmed-earlier",
+    "kind": "per-bot: a time confirmed three turns back still books (chunk 6b, item 5)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "can I book Thursday at 10:00?",
+        "expect": {
+          "crisis": false,
+          "noTools": ["create_appointments"],
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      },
+      {
+        "user": "do you take insurance?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      },
+      {
+        "user": "and is there parking?",
+        "expect": {
+          "crisis": false,
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      },
+      {
+        "user": "ok great, please book it",
+        "expect": {
+          "crisis": false,
+          "tools": ["create_appointments: ok"],
+          "records": {
+            "list": "appointments",
+            "status": "booked",
+            "count": 1
+          },
+          "mustNot": [
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]",
+            "see (the )?record"
+          ]
+        }
+      }
+    ]
   }
 ]

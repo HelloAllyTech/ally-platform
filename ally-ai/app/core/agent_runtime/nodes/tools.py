@@ -7,8 +7,10 @@ copy for one yet), only its step: the tool, `ok` or its error code, and ms. One
 that ends the run (`hand_over`) and succeeded sets the run's result, and the graph
 ends without another model step.
 
-The run's first search sets the response's `retrieval` block and is the one
-logged to the retrieval log, as v1's single search is.
+The run's first search sets the response's `retrieval` block, as v1's single
+search does. Every search is logged to the retrieval log (chunk 6b): the first, a
+later one in the same message, and one a rewrite was sent back to make. Before 6b
+only the first was.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from typing import Any, Dict, Literal, Optional
 from langgraph.graph import END
 from langgraph.runtime import get_runtime
 
+from app.core.agent_runtime import activity
 from app.core.agent_runtime.budget import extend_after_write
 from app.core.agent_runtime.gateway import AgentRunContext
 from app.core.agent_runtime.state import AgentState, json_safe
@@ -42,6 +45,7 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
         passages = list(state.get("passages") or [])
         first_search = state.get("retrieval") is None
         update: Dict[str, Any] = {}
+        did_list = list(state.get("activity") or [])
 
         tool = offered.get(name)
         if tool is None:
@@ -53,6 +57,16 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             added = []
         elif tool.kind == "gateway":
             args = tool.input_model.model_validate(step.get(name) or {})
+            # The live step the bot page shows (chunk 6b): a kind, the list's name
+            # and a record's title, never the tool, an id or the input.
+            doing = activity.describe(
+                name,
+                tool.kind,
+                args.model_dump(mode="json", by_alias=True),
+                state["bot"],
+                passages,
+            )
+            activity.started(doing)
             result = await tool.handler(
                 args,
                 ToolContext(
@@ -72,6 +86,12 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     today=state["bot"].get("gateway_today") or "",
                 ),
             )
+            if doing:
+                written = [p.get("record_id") for p in result.passages or []]
+                did = {**doing, "ok": bool(result.record.get("ok"))}
+                if result.record.get("list_kind") in ("create", "update") and written:
+                    did["record_id"] = written[0]
+                did_list.append(did)
             records.append(json_safe(result.record))
             summary = result.summary
             if result.record.get("ok") and result.record.get("list_kind") in (
@@ -90,6 +110,8 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
         else:
             args = tool.input_model.model_validate(step.get(name) or {})
             status("searching", getattr(args, "query", None) or None)
+            searching = activity.describe(name, tool.kind, {}, state["bot"], passages)
+            activity.started(searching)
             result = await tool.handler(
                 args,
                 ToolContext(
@@ -98,11 +120,13 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     limits=state["limits"],
                     passages=passages,
                     language=step.get("language") or "en",
-                    log_retrieval=first_search
-                    and state["bot"].get("log_retrieval", True),
+                    # Every search, not only the first (chunk 6b, 3a's open item).
+                    log_retrieval=state["bot"].get("log_retrieval", True),
                 ),
             )
             records.append(json_safe(result.record))
+            if searching:
+                did_list.append({**searching, "ok": True})
             summary = result.summary
             added = json_safe(result.passages)
             titles = list(
@@ -128,6 +152,7 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
 
         return {
             **update,
+            **({"activity": json_safe(did_list)} if did_list else {}),
             "tool_calls": records,
             "passages": passages + added,
             "trace": [trace_step("tool", started, summary)],

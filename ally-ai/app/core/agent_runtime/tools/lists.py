@@ -232,3 +232,13 @@ def list_tools(definitions: Optional[List[Mapping[str, Any]]]) -> List[Tool]:
 def offers_create(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
     """Whether this run can book or add something: any create tool."""
     return any((d or {}).get("kind") == "create" for d in definitions or [])
+
+
+def takes_details(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
+    """Whether this run can save the person's details for the team (chunk 6b): a
+    create tool on a list with a person or phone field (Leads, Callback requests),
+    which ally-be marks `takes_details`."""
+    return any(
+        (d or {}).get("kind") == "create" and (d or {}).get("takes_details")
+        for d in definitions or []
+    )

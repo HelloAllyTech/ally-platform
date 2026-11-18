@@ -1,5 +1,5 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import { WaHandledBy } from '../../enum/whatsapp.enum';
-import { DEFAULT_WHATSAPP_SETTINGS } from '../../type/whatsapp-settings.type';
 import { WhatsAppInboundService } from '../whatsapp-inbound.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 import { AgentRuntimeUsed } from 'src/chatbot/enum/chatbot.enum';
@@ -82,7 +82,7 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
       signal: "can't go on",
     });
     await service.handle(inbound());
-    expect(sent()).toBe(DEFAULT_WHATSAPP_SETTINGS.crisisEscalationText);
+    expect(sent()).toBe(GENERAL_CRISIS_TEXT);
     expect(sent()).not.toContain(NOTICE);
   });
 

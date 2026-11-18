@@ -19,7 +19,8 @@ const mockOpportunity = vi.fn((_id: string, opts?: { skip?: boolean }) =>
 // Partial: the real module keeps baseAPI and the store intact; only the hooks under test are stubbed.
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGetRoadmapOpportunityQuery: (id: string, opts?: { skip?: boolean }) => mockOpportunity(id, opts),
+  useGetRoadmapOpportunityQuery: (id: string, opts?: { skip?: boolean }) =>
+    mockOpportunity(id, opts),
   useGetRoadmapVoteBudgetQuery: (_arg: unknown, opts?: { skip?: boolean }) =>
     opts?.skip ? { data: undefined } : { data: { available: 10 } },
   useSetRoadmapAllocationMutation: () => [mockAllocate],
@@ -28,7 +29,11 @@ vi.mock("@api", async importOriginal => ({
   useSetRoadmapWatchMutation: () => [mockWatch],
 }));
 vi.mock("../../ProductRoadmap/VoteButton", () => ({
-  VoteButton: ({ onSetVotes }: { onSetVotes: (id: string, next: number, prev: number) => void }) => (
+  VoteButton: ({
+    onSetVotes,
+  }: {
+    onSetVotes: (id: string, next: number, prev: number) => void;
+  }) => (
     <button type="button" onClick={() => onSetVotes("opp-uuid-388", 1, 0)}>
       vote-button
     </button>
@@ -39,7 +44,13 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 import { deriveNavigationItems } from "../../../utils/navigation";
 import { setReduceMotionSwitch, __resetReduceMotionForTests } from "../../../motion/roadmapMotion";
 import { fromDropdownState, toDropdownState } from "../components/FilterControls";
-import { IdeaStar, IdeaTitle, IdeaVotes, IdeaWatch, PrimaryAction } from "../components/IdeaControls";
+import {
+  IdeaStar,
+  IdeaTitle,
+  IdeaVotes,
+  IdeaWatch,
+  PrimaryAction,
+} from "../components/IdeaControls";
 import { QueueList, sectionsFor } from "../components/QueueList";
 import { QueueRow } from "../components/QueueRow";
 import { Tracker } from "../components/Tracker";
@@ -86,7 +97,10 @@ const row = (overrides: Partial<RoadmapItemRow> = {}): RoadmapItemRow => ({
   ...overrides,
 });
 
-const detail = (can: RoadmapCan, overrides: Partial<RoadmapItemDetail> = {}): RoadmapItemDetail => ({
+const detail = (
+  can: RoadmapCan,
+  overrides: Partial<RoadmapItemDetail> = {},
+): RoadmapItemDetail => ({
   ...row(),
   summary: {},
   runs: [],
@@ -225,7 +239,11 @@ describe("QueueRow", () => {
 
   it("names the open button with the code, title and unread state", () => {
     renderRow();
-    fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.row.openUnread("OPP-388", "Streak on start screen") }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: en.roadmapV2.row.openUnread("OPP-388", "Streak on start screen"),
+      }),
+    );
     expect(actions.onOpen).toHaveBeenCalledWith("OPP-388");
     expect(screen.getByText("Plan agent asks: which learners first?")).toBeInTheDocument();
   });
@@ -258,7 +276,9 @@ describe("QueueRow", () => {
     // Revealed by swipes (hidden from AT until revealed) …
     expect(screen.getAllByText(en.roadmapV2.row.markRead).length).toBeGreaterThan(0);
     // … and the ⋯ menu is always there.
-    expect(screen.getByRole("button", { name: en.roadmapV2.row.actions("OPP-388") })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: en.roadmapV2.row.actions("OPP-388") }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -335,7 +355,13 @@ describe("QueueList", () => {
   it("offers Clear filters when a filter matches nothing", () => {
     const onClearFilters = vi.fn();
     render(
-      <QueueList {...base} filtered onClearFilters={onClearFilters} view="all" data={{ rows: [], total: 0 }} />,
+      <QueueList
+        {...base}
+        filtered
+        onClearFilters={onClearFilters}
+        view="all"
+        data={{ rows: [], total: 0 }}
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.filter.clear }));
     expect(onClearFilters).toHaveBeenCalled();
@@ -359,7 +385,9 @@ describe("QueueList", () => {
       <QueueList {...base} held view="all" data={{ rows: [a, b], total: 2 }} />,
     );
     rerender(<QueueList {...base} held view="all" data={{ rows: [b, a], total: 2 }} />);
-    const codes = [...container.querySelectorAll("[data-code]")].map(el => el.getAttribute("data-code"));
+    const codes = [...container.querySelectorAll("[data-code]")].map(el =>
+      el.getAttribute("data-code"),
+    );
     expect(codes).toEqual(["OPP-1", "OPP-2"]);
     expect(screen.getByRole("button", { name: en.roadmapV2.updatedPill })).toBeInTheDocument();
   });
@@ -391,12 +419,26 @@ describe("filter dropdown mapping", () => {
 describe("presence", () => {
   it("replaces a person's earlier beat, drops stale ones and never lists yourself", () => {
     const now = 100_000;
-    const start = applyPresence([], { code: "OPP-1", userId: 3, name: "Ana", kind: "viewing" }, now);
-    const again = applyPresence(start, { code: "OPP-1", userId: 3, name: "Ana", kind: "viewing" }, now + 1000);
+    const start = applyPresence(
+      [],
+      { code: "OPP-1", userId: 3, name: "Ana", kind: "viewing" },
+      now,
+    );
+    const again = applyPresence(
+      start,
+      { code: "OPP-1", userId: 3, name: "Ana", kind: "viewing" },
+      now + 1000,
+    );
     expect(again).toHaveLength(1);
-    const later = applyPresence(again, { code: "OPP-1", userId: 4, name: "Ravi", kind: "typing" }, now + 40_000);
+    const later = applyPresence(
+      again,
+      { code: "OPP-1", userId: 4, name: "Ravi", kind: "typing" },
+      now + 40_000,
+    );
     expect(later.map(p => p.name)).toEqual(["Ravi"]);
-    expect(applyPresence([], { code: "OPP-1", userId: 9, name: "Me", kind: "viewing" }, now, 9)).toEqual([]);
+    expect(
+      applyPresence([], { code: "OPP-1", userId: 9, name: "Me", kind: "viewing" }, now, 9),
+    ).toEqual([]);
   });
 });
 
@@ -421,4 +463,3 @@ describe("sidebar entry", () => {
     ).not.toContain("roadmap-v2");
   });
 });
-

@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import app
 from app.schemas.conversation import IdentifyResponse
 
@@ -19,7 +20,7 @@ class BaseAPITest:
         """Create a test client with API key header."""
         client = TestClient(app)
         # Add API key header for all requests
-        client.headers.update({"x-api-key": "test-api-key"})
+        client.headers.update({"x-api-key": settings.API.X_API_KEY})
         return client
 
     @pytest.fixture

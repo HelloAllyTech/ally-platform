@@ -175,4 +175,34 @@ describe('BotPagePublicController stream', () => {
       { event: 'token', data: { text: ' cost 1500.' } },
     ]);
   });
+
+  it('publicEvent passes an activity through its whitelist (chunk 6b)', () => {
+    expect(
+      publicEvent({
+        event: 'activity',
+        data: {
+          kind: 'cancel',
+          list: 'Appointments',
+          title: 'Thu 19 Nov 2026, 11:00',
+          record_id: '33333333-3333-4333-8333-333333333333',
+        },
+      }),
+    ).toEqual({
+      event: 'activity',
+      data: { kind: 'cancel', label: 'Thu 19 Nov 2026, 11:00' },
+    });
+    // A write titled by something other than a day or time (a lead's name) shows no label.
+    expect(
+      publicEvent({
+        event: 'activity',
+        data: { kind: 'create', list: 'Leads', title: 'Rahul Mehta' },
+      }),
+    ).toEqual({ event: 'activity', data: { kind: 'create' } });
+    expect(
+      publicEvent({
+        event: 'activity',
+        data: { kind: 'remember' as never, list: 'prefers evenings' },
+      }),
+    ).toBeNull();
+  });
 });

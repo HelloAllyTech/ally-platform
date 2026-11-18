@@ -23,6 +23,7 @@ class Rejection(StrEnum):
     SEARCH_AGAIN = "search_again"
     OFFERS_SLOT = "offers_slot"
     UNFOUND_SLOT = "unfound_slot"
+    REACH_TEAM = "reach_team"
 
 
 def rejection_feedback(
@@ -40,6 +41,7 @@ def rejection_feedback(
         Rejection.SEARCH_FIRST,
         Rejection.MENTIONS_SOURCES,
         Rejection.UNFOUND_SLOT,
+        Rejection.REACH_TEAM,
     ):
         feedback += " You haven't searched yet: search before you reply."
     return feedback
@@ -95,5 +97,11 @@ REJECTIONS: Dict[Rejection, str] = {
         "find_ or create_ tool returned. Look it up with find first and offer only "
         "what it shows, citing it; say something is booked only after create or "
         "update did it, citing that."
+    ),
+    Rejection.REACH_TEAM: (
+        "It promised to pass something on to the team, or that the team will get "
+        "back to them. You can't pass anything on here. Instead, tell them how to "
+        "reach the team themselves, from the information, citing it, and keep the "
+        "rest."
     ),
 }

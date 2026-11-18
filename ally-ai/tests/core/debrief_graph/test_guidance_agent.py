@@ -409,7 +409,7 @@ async def test_a_skip_by_the_planner_is_honoured(gateway, monkeypatch):
 
 async def test_the_planner_is_offered_it_only_with_cap_and_tools(gateway, monkeypatch):
     from app.core.debrief_graph.orchestrator import offered_agents
-    
+
     def offered(b):
         ctx = make_ctx(FakeSteps(), gateway, bundle=b)
         return "guidance_agent" in offered_agents({}, ctx, {"analyst": True})
@@ -515,9 +515,7 @@ async def test_writer_and_reviser_requests_are_identical_when_their_lists_are_em
     await run(base, FakeGateway(), bundle=bundle())
     steps = FakeSteps()
     steps.answers["evaluator"] = base.answers["evaluator"]
-    b = agent_bundle(
-        guidanceTools={"guidance_agent": [], "writer": [], "reviser": []}
-    )
+    b = agent_bundle(guidanceTools={"guidance_agent": [], "writer": [], "reviser": []})
     await run(steps, gateway, bundle=b)
     for path in ("writer", "reviser"):
         assert writer_bodies(steps, path) == writer_bodies(base, path) != []

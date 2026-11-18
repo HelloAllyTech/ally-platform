@@ -37,6 +37,7 @@ from app.core.agent_runtime.nodes import (
     route_after_tools,
 )
 from app.core.agent_runtime.state import RUN_SCOPED_KEYS, AgentState, BotConfig
+from app.core.agent_runtime.tools.confirmed import is_plain_yes
 from app.core.agent_runtime.trace import summarise_run
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
@@ -86,6 +87,24 @@ async def close_agent_runtime() -> None:
     get_agent_graph.cache_clear()
 
 
+#: At most this many list entries carry over from the previous message (chunk 6b).
+MAX_CARRIED_RECORDS = 10
+
+
+async def _previous_records(graph: CompiledStateGraph, config: Dict[str, Any]) -> list:
+    """The list entries the conversation's previous run found or wrote (chunk 6b),
+    renumbered from 1: a confirmation that follows ("yes, book it") books from them
+    without a find first. Documents' passages never carry over; a failed read
+    carries nothing."""
+    try:
+        snapshot = await graph.aget_state(config)
+    except Exception:  # a missing or unreadable checkpoint: start fresh
+        return []
+    values = getattr(snapshot, "values", None) or {}
+    records = [p for p in values.get("passages") or [] if p.get("record_id")]
+    return records[-MAX_CARRIED_RECORDS:]
+
+
 async def run_agent(
     graph: CompiledStateGraph,
     *,
@@ -123,6 +142,11 @@ async def run_agent(
         "run_name": "agent_run",
         "metadata": {"run_id": run_id, "chatbot_id": chatbot_id},
     }
+    # Only for a plain yes ("perfect, book it"): that's the message that repeated
+    # the look-up. A new question looks things up afresh, so the assistant never
+    # books from what it showed before without being asked to (chunk 6b).
+    if bot.get("gateway_definitions") and is_plain_yes(question):
+        inputs["carried_records"] = await _previous_records(graph, config) or None
     # recursion_limit is LangGraph's default of 25 supersteps. A run takes at most
     # about 20: MAX_TOOL_CALLS (bounded at 8) agent→tools rounds (and at most
     # MAX_TOOL_STEPS, 4, of any kind since chunk 3b), then the agent, check and

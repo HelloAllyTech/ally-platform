@@ -156,6 +156,10 @@ export interface AgentGatewayBlock {
     description: string;
     input_schema: { type: 'object'; properties: Record<string, unknown> };
     kind: 'find' | 'create' | 'update';
+    /** The list's name as the owner wrote it, for the live steps (chunk 6b). */
+    list_name?: string;
+    /** A create that saves the person's details for the team (chunk 6b). */
+    takes_details?: boolean;
   }[];
   /** List tools the bot has on that didn't fit under the cap; named in the run's trace. */
   omitted?: string[];
@@ -200,6 +204,31 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
    * than their name, never their phone or email. At most 6, each part 120 characters.
    */
   before_chat?: { label: string; value: string }[];
+  /**
+   * Live steps (chunk 6b): `activity` events while it runs and `activity` in the response. Sent
+   * only for the bot page's and Try it's streamed runs; WhatsApp never asks for them.
+   */
+  activity?: boolean;
+}
+
+/** What a run did, or is doing, as the bot page shows it (chunk 6b; ally-ai `activity.py`). */
+export type AgentActivityKind =
+  | 'search'
+  | 'find'
+  | 'create'
+  | 'update'
+  | 'cancel'
+  | 'hand_over'
+  | 'writing';
+
+export interface AgentActivity {
+  kind: AgentActivityKind;
+  /** The list's name as the owner wrote it. */
+  list?: string;
+  /** A record's title: the day and time a booking is for. */
+  title?: string;
+  /** A write's record, for the confirmation card. Never shown to a visitor. */
+  record_id?: string;
 }
 
 /** One memory write a run asks for (chunk 8a); ally-be checks and applies it after the reply. */
@@ -246,6 +275,8 @@ export interface AgentRunResponse extends KnowledgeAnswerResponse {
   handover?: boolean;
   /** What the run asked to remember (chunk 8a). Absent when nothing. */
   memory_writes?: AgentMemoryWrite[];
+  /** What the run did, when the request asked for live steps (chunk 6b). */
+  activity?: AgentActivity[];
 }
 
 /** ally-ai `/agent/memory-check` (chunk 8a). */
@@ -391,4 +422,5 @@ export type AgentStreamEvent =
       };
     }
   | { event: 'step'; data: AgentTraceStep }
+  | { event: 'activity'; data: AgentActivity }
   | { event: 'token'; data: { text: string } };

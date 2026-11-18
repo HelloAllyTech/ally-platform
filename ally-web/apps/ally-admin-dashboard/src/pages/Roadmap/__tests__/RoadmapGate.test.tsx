@@ -40,7 +40,11 @@ describe("RoadmapGate", () => {
   });
 
   it("renders the page with the caller's role when the flag is on", () => {
-    mockRole.mockReturnValue({ isLoading: false, isError: false, data: { role: "builder", can: {} } });
+    mockRole.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { role: "builder", can: {} },
+    });
     render(
       <RoadmapGate fallback={<p>not found</p>}>
         <Role />

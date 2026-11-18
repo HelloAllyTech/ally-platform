@@ -1,3 +1,4 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import type { AgentRunResponse } from '../../../ai/dto/knowledge.dto';
 import { WaKeywordTemplate } from '../../../whatsapp/entity/wa-keyword-template.entity';
 import {
@@ -313,6 +314,8 @@ describe('ChatbotEngineService in Agent mode', () => {
       expect(promptShared.getPromptsByOptions).toHaveBeenCalledWith({
         promptCode: [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES],
       });
+      // 6b: the lists prompt's live version is sent too, never ally-ai's default.
+      expect(AGENT_PROMPT_CODES).toContain('ally_ai_agent_lists');
       const prompts = aiService.runAgent.mock.calls[0][0].prompts;
       expect(prompts.ally_ai_agent_system).toMatchObject({
         prompt: 'Agent rules.',
@@ -412,9 +415,7 @@ describe('ChatbotEngineService in Agent mode', () => {
         turn({ text: "hi, I can't go on" }),
       );
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-      expect(decision.body).toBe(
-        DEFAULT_WHATSAPP_SETTINGS.crisisEscalationText,
-      );
+      expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
       expect(decision.isWelcome).toBeUndefined();
       expect(decision.agent?.runId).toBe('run-1');
     });

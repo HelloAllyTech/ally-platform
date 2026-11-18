@@ -70,6 +70,11 @@ export type ChatbotSettingsOverride = Partial<
    * this stored override like `abilities`.
    */
   memory?: { on?: boolean; neverStore?: string[] };
+  /**
+   * Where the business is (chunk 6b): an IANA zone, Asia/Kolkata when unset. Used by lists,
+   * `{today}`, Repeat weekly and memory's dates (`assistantZone`). Per bot only, like `memory`.
+   */
+  timeZone?: string;
 };
 
 export interface ChatbotSettingsView {

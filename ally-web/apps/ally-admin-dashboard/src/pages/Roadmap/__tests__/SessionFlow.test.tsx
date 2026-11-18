@@ -36,12 +36,21 @@ import { QuestionCard } from "../session/QuestionCard";
 import { useSessionAnswers } from "../session/useSessionAnswers";
 import { __resetDeviceStoreForTests } from "../utils/deviceStore";
 
-const item = (can: RoadmapItemDetail["can"] = { answer: true, comment: true }): RoadmapItemDetail => ({
+const item = (
+  can: RoadmapItemDetail["can"] = { answer: true, comment: true },
+): RoadmapItemDetail => ({
   id: "u-388",
   code: "OPP-388",
   title: "Streak on start screen",
   shownStage: "planning",
-  statusParts: { stage: "planning", step: "prd", leadUserId: 2, prdPercent: 40, openQuestions: 1, designAwaitingApproval: false },
+  statusParts: {
+    stage: "planning",
+    step: "prd",
+    leadUserId: 2,
+    prdPercent: 40,
+    openQuestions: 1,
+    designAwaitingApproval: false,
+  },
   author: { id: 1, name: "Ravi", role: "idea" },
   lead: { id: 2, name: "Priya", role: "builder" },
   votes: 3,
@@ -73,7 +82,12 @@ const question: BuilderQuestionEvent = {
   ],
 };
 
-const post = (id: string, by: { id: number; name: string; relation: "author" | "builder" | "lead" }, optionId: string, label: string) => ({
+const post = (
+  id: string,
+  by: { id: number; name: string; relation: "author" | "builder" | "lead" },
+  optionId: string,
+  label: string,
+) => ({
   id,
   seq: 1,
   kind: "answer" as const,
@@ -89,7 +103,13 @@ const Card: React.FC<{ detail: RoadmapItemDetail; breakpointWidth?: number }> = 
   const session = useSessionAnswers(detail);
   return (
     <ol>
-      <QuestionCard question={question} item={detail} session={session} agentName="Plan agent" latest />
+      <QuestionCard
+        question={question}
+        item={detail}
+        session={session}
+        agentName="Plan agent"
+        latest
+      />
     </ol>
   );
 };
@@ -115,7 +135,10 @@ afterEach(() => {
 
 describe("question cards (§4.5a)", () => {
   it("options are buttons 1–9 on a desktop, and a number key answers", async () => {
-    mockAnswer.mockImplementation(arg => ({ post: { id: "p", ...arg }, question: { questionId: "q1", answers: [] } }));
+    mockAnswer.mockImplementation(arg => ({
+      post: { id: "p", ...arg },
+      question: { questionId: "q1", answers: [] },
+    }));
     wrap(<Card detail={item()} />);
     expect(screen.getByRole("button", { name: "1. Everyone" })).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "2" });
@@ -156,7 +179,9 @@ describe("question cards (§4.5a)", () => {
     wrap(<Card detail={item()} />);
     expect(screen.getByText(en.roadmapV2.session.waitingFor("Priya"))).toBeInTheDocument();
     expect(screen.getByText(en.roadmapV2.session.answeredBy("Ravi", "author"))).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: en.roadmapV2.session.useThisAnswer })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: en.roadmapV2.session.useThisAnswer }),
+    ).not.toBeInTheDocument();
   });
 
   it("the settler sees Use this answer on each, and choosing records it", async () => {
@@ -183,7 +208,9 @@ describe("question cards (§4.5a)", () => {
     const use = screen.getAllByRole("button", { name: en.roadmapV2.session.useThisAnswer });
     expect(use).toHaveLength(2);
     fireEvent.click(use[1]);
-    await waitFor(() => expect(mockChoose).toHaveBeenCalledWith({ sessionId: "sess-1", postId: "b" }));
+    await waitFor(() =>
+      expect(mockChoose).toHaveBeenCalledWith({ sessionId: "sess-1", postId: "b" }),
+    );
   });
 
   it("an answered card condenses to one line, the same under reduced motion", () => {
@@ -243,7 +270,11 @@ describe("the comment box (§4.5a)", () => {
     fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.session.commentSend }));
     await waitFor(() =>
       expect(mockComment).toHaveBeenCalledWith(
-        expect.objectContaining({ sessionId: "sess-1", text: "Thanks @Priya", mentionUserIds: [2] }),
+        expect.objectContaining({
+          sessionId: "sess-1",
+          text: "Thanks @Priya",
+          mentionUserIds: [2],
+        }),
       ),
     );
   });

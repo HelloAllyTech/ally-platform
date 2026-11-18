@@ -50,6 +50,21 @@ class ListToolDefinition(BaseModel):
     description: str = Field("", max_length=2000)
     input_schema: Dict[str, Any] = Field(default_factory=dict)
     kind: Literal["find", "create", "update"]
+    #: The list's name as the owner wrote it ("Slots"), for the live steps on the
+    #: bot page (chunk 6b). Never shown to the model.
+    list_name: str = Field("", max_length=120)
+    #: A create on a list with a person or phone field (Leads, Callback requests):
+    #: it saves the person's details for the team (chunk 6b).
+    takes_details: bool = False
+
+    def as_bot_definition(self) -> Dict[str, Any]:
+        """The definition as the run keeps it: the 6b fields only when set, so a
+        definition without them is exactly what it was before."""
+        data = self.model_dump(mode="json")
+        for key in ("list_name", "takes_details"):
+            if not data.get(key):
+                data.pop(key, None)
+        return data
 
 
 AgentGateway.model_rebuild()
@@ -94,6 +109,14 @@ class AgentRunRequest(KnowledgeAnswerRequest):
         description=(
             "False skips the retrieval log for this run, for a caller that has "
             "already logged the same message."
+        ),
+    )
+    activity: bool = Field(
+        False,
+        description=(
+            "Emit `activity` events and return `activity` (chunk 6b), for the bot "
+            "page's and Try it's live steps. Off for WhatsApp and every other caller, "
+            "whose events and response are unchanged."
         ),
     )
     knowledge_topics: List[str] = Field(
@@ -174,12 +197,14 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             "knowledge_topics": list(self.knowledge_topics),
             "decline_text": self.decline_text,
         }
+        if self.activity:
+            bot["activity"] = True
         if self.gateway:
             bot["gateway_tools"] = list(self.gateway.tools)
             # Only when there are some, so a run without list tools is today's.
             if self.gateway.definitions:
                 bot["gateway_definitions"] = [
-                    d.model_dump(mode="json") for d in self.gateway.definitions
+                    d.as_bot_definition() for d in self.gateway.definitions
                 ]
             if self.gateway.omitted:
                 bot["gateway_omitted"] = list(self.gateway.omitted)
@@ -278,6 +303,17 @@ class AgentRunResponse(KnowledgeAnswerResponse):
         ),
     )
 
+    activity: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            'What the run did, for the bot page\'s "what I did" line and its '
+            "confirmation card (chunk 6b): each step that succeeded, as a kind "
+            "(search, find, create, update, cancel, hand_over), the list's name and a "
+            "record's title; a write also carries the record's id, which ally-be uses "
+            "to read the stored record and never shows. Sent only when there are some."
+        ),
+    )
+
     @model_serializer(mode="wrap")
     def _handover_only_when_set(
         self, handler: SerializerFunctionWrapHandler
@@ -287,6 +323,8 @@ class AgentRunResponse(KnowledgeAnswerResponse):
         data = handler(self)
         if not data.get("handover"):
             data.pop("handover", None)
+        if not data.get("activity"):
+            data.pop("activity", None)
         if not data.get("memory_writes"):
             data.pop("memory_writes", None)
         else:

@@ -12,7 +12,7 @@ import { HOME, fill } from "../copy";
 import { SectionHead, TextField } from "../fields";
 import { ListSkeleton } from "../ui/List";
 import { useHomeField } from "../useHomeField";
-import { joinAnd, purposeLimit } from "../userLists/format";
+import { joinAnd, offsetAt, purposeLimit } from "../userLists/format";
 
 import type { SectionId } from "../sections";
 import type { SectionProps } from "./props";
@@ -103,6 +103,59 @@ const Layer: React.FC<{
  * (17 Nov 2026). The owner's text is the runtime's own, so it can't drift from what the assistant
  * really does.
  */
+const DEFAULT_ZONE = "Asia/Kolkata";
+
+/** Every zone the browser knows, with the assistant's own first if it isn't listed. */
+const zonesWith = (current: string): string[] => {
+  let zones: string[] = [];
+  try {
+    zones =
+      (Intl as unknown as { supportedValuesOf?(k: string): string[] }).supportedValuesOf?.(
+        "timeZone",
+      ) ?? [];
+  } catch {
+    zones = [];
+  }
+  if (!zones.length) zones = [DEFAULT_ZONE, "Asia/Dubai", "Asia/Singapore", "Europe/London", "UTC"];
+  return zones.includes(current) ? zones : [current, ...zones];
+};
+
+/** "Asia/Kolkata (UTC+05:30)". */
+const zoneLabel = (zone: string): string => {
+  const today = new Date().toISOString().slice(0, 10);
+  return `${zone.replace(/_/g, " ")} (UTC${offsetAt(today, "12:00", zone)})`;
+};
+
+/** Where the business is (chunk 6b, item 9): a setting the owner changes here. */
+const TimeZoneSelect: React.FC<{
+  value: string;
+  disabled: boolean;
+  onChange(zone: string): void;
+}> = ({ value, disabled, onChange }) => (
+  <div className="ally-field" data-testid="time-zone">
+    <label className="ally-field__label" htmlFor="how-time-zone">
+      {t.timeZone}
+    </label>
+    <span className="ally-field__hint" id="how-time-zone-hint">
+      {t.timeZoneHint}
+    </span>
+    <select
+      id="how-time-zone"
+      className="ally-input ally-home__select"
+      value={value}
+      disabled={disabled}
+      aria-describedby="how-time-zone-hint"
+      onChange={event => onChange(event.target.value)}
+    >
+      {zonesWith(value).map(zone => (
+        <option key={zone} value={zone}>
+          {zoneLabel(zone)}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
 export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, go }) => {
   const { data: view, isLoading, isError, refetch } = useGetHowItWorksQuery(bot.id);
   const failed = HOME.saving.failed;
@@ -110,6 +163,12 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
   const name = useHomeField(bot.id, "assistantName", f.assistantName, failed);
   const tone = useHomeField(bot.id, "tone", f.tone, failed);
   const instructions = useHomeField(bot.id, "instructions", f.instructions, failed);
+  const timeZone = useHomeField(
+    bot.id,
+    "timeZone",
+    f.timeZone ?? { value: DEFAULT_ZONE, version: "" },
+    failed,
+  );
   const readOnly = !canEdit;
 
   const head = <SectionHead title={HOME.sections.how} subtitle={t.intro} help={HOME.help.how} />;
@@ -153,7 +212,14 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
   };
   const controls: Partial<Record<HowLayer, React.ReactNode>> = {
     business: (
-      <TextField label={HOME.personality.name} field={name} disabled={readOnly} maxLength={60} />
+      <>
+        <TextField label={HOME.personality.name} field={name} disabled={readOnly} maxLength={60} />
+        <TimeZoneSelect
+          value={timeZone.value}
+          disabled={readOnly}
+          onChange={zone => timeZone.set(zone, { now: true })}
+        />
+      </>
     ),
     tone: readOnly ? (
       <p className="ally-body">{TONES.find(x => x.id === toneOf(tone.value))?.label}</p>

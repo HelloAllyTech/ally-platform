@@ -55,7 +55,6 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 ## 5a: lists
 
 - [ ] **Migration `1981900950000-AddLists`** (additive: six new tables) runs with ally-be. Nothing reads or writes them until owners or the agent use lists (5b, 6) (`CHUNK-05A-NOTES.md`).
-- [ ] **Erasure doesn't reach list records yet (21a, next sprint).** Records are business data and have no retention sweep. Until 21a, when a person asks to be erased, delete their records by hand: `collection_records` where `contact_id` is theirs, in each list with a person field, and any record whose `data` names them in another relation-to-contact field.
 - [ ] **`lists:seed` is for local and staging bots only**; it refuses `NODE_ENV=production`.
 
 ## 6: list tools
@@ -63,14 +62,13 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **Push `ally_ai_agent_lists` with the code.** It's a new prompt with a `{today}` variable that ships with it (no deploy order to follow). Its text is v3 in the local Skills Store and is the same as `ally-ai/app/prompts/agent/lists.txt` (`CHUNK-06-NOTES.md`).
 - [ ] **Pilots' writes go to Do it only after this check is in:** a create or update books only the day and time the person confirmed, checked in code from their own messages (`confirmed.py`, `CHUNK-06-NOTES.md`). Then **a pilot's `create_*` and `update_*` tools go to Do it only after its action cases pass** (`npm run chatbot:basics -- --bot <id> --cases src/chatbot/basics/cases/lists.json`, adapted to its lists). Check its new records every day in its first week. `find_*` is on by default for every list with agent read: turn a list's agent read off, or its `find_` to Never, to keep it from the assistant.
 - [ ] **Bookings on WhatsApp need `sharedStoreWrites` on**, as 11a's hand-over does. Without it a WhatsApp run has no contact and isn't offered the tools of lists with a person field.
-- [ ] **The business's time zone is Asia/Kolkata unless its hand-over hours set one.** A pilot elsewhere needs hand-over hours with its zone until bots have a time zone setting.
+- [ ] **A pilot outside India sets its Time zone** (How it works, 6b). Unset, it's the hand-over hours' zone, else Asia/Kolkata.
 
 ## 5b: lists in the dashboard
 
 - [ ] **Owners can now turn on Add and Change for their own lists** (`PUT v1/chatbots/:id/lists/:key/abilities`, editors). 6's line still holds: a pilot's Add goes to Do it only after its action cases pass on its lists, and its new entries are checked daily in the first week. Ready-made lists install with Add and Change at Never.
-- [ ] **Deleting an entry that live entries point at is refused** (`in_use`). A booking made at the same moment as its slot is deleted can still slip through (rare; `CHUNK-05B-NOTES.md` §7).
+- [ ] **Deleting an entry that live entries point at is refused** (`in_use`), including a booking made at the same moment (6b locks the slot).
 - [ ] **The new list routes go on the public wiki's `repos/ally-be.md`** at PR time (Docs guard).
-- [ ] **A Bring in customers assistant with Add on may still ask for a name and number before booking**, because its purpose section asks for them. Don't turn Add on for an enquiries pilot until that prompt is settled (`CHUNK-05B-NOTES.md`, "Live action cases").
 
 ## 8a: memory, light
 
@@ -86,6 +84,16 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **Tell support: platform admins no longer see every assistant.** To look at a customer's assistant, its owner adds you to its team (Share → Team). A non-member, platform admins included, gets "You don't have access to this assistant".
 - [ ] **Custom logins are platform admins: give them only to trusted people until these routes are closed (needed before self-serve customers).** A Chatbots-only custom login can still reach the Ally-wide WhatsApp routes (settings, provider checks, phone-mappings), routes an organisation preference opens, and routes gated only by role permissions (`CHUNK-A1-NOTES.md` §4).
 - [ ] **Read `WA-NUMBERS-REPORT.md` and run its SQL in production** before deciding whether to hide the WhatsApp Numbers tab.
+
+## 6b: booking polish, live steps, assistant access
+
+- [ ] **Bookings for pilots after 6b:** a pilot's Add and Change may go to Do it once its action cases pass on its lists (6's line still holds), with every 6b prompt published.
+- [ ] **Publish the lists prompt and the other approved texts to production's Skills Store before deploying** (`6B-PROMPTS.md`): `ally_ai_agent_lists`, `ally_ai_agent_purpose_enquiries_can_book`, `ally_ai_agent_purpose_enquiries`, `ally_ai_agent_memory`, `ally_ai_agent_system` (its `{channel}` ships with the code), and the new `ally_ai_agent_purpose_answer_takes_details`. Before 6b ally-be never sent the lists prompt's code, so production has run ally-ai's built-in lists text; check each published version matches its seed.
+- [ ] **Every crisis reply carries a real number now:** medical and pharmacy get 112 / ambulance 108 and Tele-MANAS 14416; every other assistant gets 112 and Tele-MANAS 14416 plus its helplines. Tell pilots whose own crisis wording has no number that a numbers line is added after it.
+- [ ] **Run 6b's migrations with ally-be:** `1983900000000-RecountHandedOver` (the Overview's "Handed to a person" recounted as hand-overs) and `1983900000100-ChatbotsOffForAllyAdmins` (Assistants switched off for every Ally admin except Chatbots-only custom logins).
+- [ ] **After that migration, clear the feature-toggle cache** (`admin:feature-toggles:v2:*` in Redis), or admins keep the old switch for up to 30 minutes.
+- [ ] **Tell support:** Ally admins no longer see Assistants unless it's switched on for them; anyone on an assistant's team opens it without the switch, and someone with nothing else sees only their assistants.
+- [ ] **Erasure now reaches list entries** (an explicit erase only; the retention sweep never touches them). The manual step is gone.
 
 ## Checks
 

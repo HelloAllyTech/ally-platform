@@ -32,7 +32,14 @@ vi.mock("@api", () => ({
     isLoading: false,
   }),
   useGetUserFeatureTogglesQuery: () => ({ data: h.current }),
-  useGetTenantsQuery: () => ({ data: { data: [{ id: "t-1", name: "Sunrise" }] } }),
+  useGetTenantsQuery: () => ({
+    data: {
+      data: [
+        { id: "t-1", name: "Sunrise" },
+        { id: "t-ally", name: "Ally" },
+      ],
+    },
+  }),
   useAddUserMutation: step("addUser", { id: 77 }),
   useAssignPlatformAdminMutation: step("assignPlatformAdmin"),
   useSetUserFeatureTogglesMutation: step("setToggles"),
@@ -79,12 +86,32 @@ describe("Create a custom login (A1)", () => {
     h.current = [];
   });
 
-  it("offers Chatbots first, ticked, and every other feature unticked", () => {
+  it("offers Assistants first, ticked, and every other feature unticked", () => {
     render(<CustomLoginPanel onClose={vi.fn()} />);
     const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
     expect(boxes[0].getAttribute("data-testid")).toBe("custom-login-feature-whatsapp_bot");
-    expect(screen.getByText("Chatbots")).toBeTruthy();
+    expect(screen.getByText("Assistants")).toBeTruthy();
     expect(boxes.map(b => b.checked)).toEqual([true, false, false]);
+  });
+
+  it("No organisation (6b) puts the login in Ally's own organisation", async () => {
+    const onClose = vi.fn();
+    render(<CustomLoginPanel onClose={onClose} />);
+    const select = screen.getByTestId("custom-login-organisation") as HTMLSelectElement;
+    expect(Array.from(select.options).map(o => o.textContent)).toEqual([
+      "Choose an organisation",
+      "No organisation",
+      "Sunrise",
+      "Ally",
+    ]);
+    fireEvent.change(screen.getByTestId("custom-login-name"), { target: { value: "Asha Rao" } });
+    fireEvent.change(screen.getByTestId("custom-login-email"), {
+      target: { value: "asha@clinic.example" },
+    });
+    fireEvent.change(select, { target: { value: "t-ally" } });
+    fireEvent.click(screen.getByTestId("custom-login-save"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(h.calls[0].arg).toMatchObject({ tenantId: "t-ally" });
   });
 
   it("creates the user, makes them a platform admin, then sets EVERY toggle to what was ticked", async () => {

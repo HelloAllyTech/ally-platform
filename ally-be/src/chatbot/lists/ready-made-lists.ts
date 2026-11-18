@@ -123,7 +123,15 @@ const moves = (
   config: { field: 'status', initial: [initial], allowed },
 });
 
-const SERVICES = ['Consultation', 'Follow-up', 'Check-up'];
+/** Leads' examples (chunk 6b): what a lead is usually about, for any business. */
+const LEAD_INTERESTS = ['A demo', 'Pricing', 'Something else'];
+/**
+ * Example sets lists installed with before (chunk 6b): Leads' interest was a clinic's services, so
+ * an assistant that still has them must not read them out (`stillExamples`).
+ */
+const EARLIER_EXAMPLES: string[][] = [
+  ['Consultation', 'Follow-up', 'Check-up'],
+];
 /** Appointments' examples: the seed's, which 5a and 6's specs book with. */
 const APPOINTMENT_SERVICES = [
   'Individual therapy',
@@ -428,7 +436,7 @@ export const READY_MADE: ReadyMadeItem[] = [
             ...agent,
           }),
           field('email', 'Email', ListFieldType.EMAIL, agent),
-          examples('interest', 'Interest', SERVICES, agent),
+          examples('interest', 'Interest', LEAD_INTERESTS, agent),
           money('budget', 'Budget', agent),
           select(
             'source',
@@ -801,4 +809,29 @@ export function exampleOptions(
         examples: (f.options?.values as string[]) ?? [],
       })),
   );
+}
+
+/** Every example set a ready-made list installs with, now or before. */
+export function exampleSets(): string[][] {
+  const now = READY_MADE.flatMap((item) =>
+    exampleOptions(item).map((o) => o.examples),
+  );
+  return [...now, ...EARLIER_EXAMPLES];
+}
+
+const sameSet = (a: string[], b: string[]): boolean => {
+  const norm = (values: string[]) =>
+    [...new Set(values.map((v) => v.trim().toLowerCase()))]
+      .sort()
+      .join('\u0000');
+  return a.length > 0 && norm(a) === norm(b);
+};
+
+/**
+ * Whether a select's choices are still a ready-made list's examples: "Make it yours" wasn't done
+ * (chunk 6b, item 30). Compared as a set, case and spaces aside, so a list installed before 6b is
+ * recognised too.
+ */
+export function stillExamples(values: string[]): boolean {
+  return exampleSets().some((set) => sameSet(values, set));
 }

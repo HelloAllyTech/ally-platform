@@ -61,6 +61,10 @@ export const HOW = {
   packAny: "your kind of practice",
   purposeNone: "answering questions",
   instructionsLabel: "Anything else it should know or do",
+  /** Where the business is (chunk 6b, copy §30). */
+  timeZone: "Time zone",
+  timeZoneHint:
+    "Where your business is. Your lists' times, what your assistant calls today, and Repeat weekly use it.",
 } as const;
 
 export const WHY = {

@@ -4,8 +4,8 @@ import { BOT_ID, mockAssistantHome } from "./assistantHome.fixture";
 
 /**
  * A1 smoke, at 1440 only: logged out → a deep link → the login screen (no sign-up) → back on the
- * deep link; and a custom login whose only feature is Chatbots lands on its assistants, in the
- * sidebar with Assistants as its only page. The API is mocked; no backend is needed.
+ * deep link; and a custom login whose only feature is Chatbots lands on its assistants with no
+ * Sidebar, only its email and Log out (6b, item 31). The API is mocked; no backend is needed.
  */
 test.skip(({ viewport }) => (viewport?.width ?? 0) < 1000, "A1's smoke runs at 1440 only");
 
@@ -61,7 +61,9 @@ test("logged out: a deep link goes to login (no sign-up), then back to the deep 
 
   await logIn(page);
   await expect(page).toHaveURL(new RegExp(`/assistants/${BOT_ID}\\?section=lists&tool=memory$`));
-  await expect(page.getByTestId("admin-sidebar")).toBeVisible();
+  // Assistants is all it has, so it sees the assistant alone (6b, item 31).
+  await expect(page.getByTestId("assistant-only-header")).toBeVisible();
+  await expect(page.getByTestId("admin-sidebar")).toHaveCount(0);
 });
 
 test("sign-up links go to the login screen", async ({ page }) => {
@@ -77,16 +79,14 @@ test("a Chatbots-only custom login lands on its assistants and sees nothing else
   await page.goto("/login");
   await logIn(page);
   await expect(page).toHaveURL(/\/assistants$/);
-  // The sidebar, with Assistants as its one page.
-  const nav = page.getByTestId("admin-sidebar").locator("nav li");
-  await expect(nav).toHaveCount(1);
-  await expect(nav).toContainText("Assistants");
+  // No Sidebar: only its email and Log out (6b, item 31).
+  await expect(page.getByTestId("assistant-only-header")).toContainText("asha@clinic.example");
+  await expect(page.getByTestId("assistant-only-logout")).toBeVisible();
+  await expect(page.getByTestId("admin-sidebar")).toHaveCount(0);
 
-  // Ally admin's pages refuse it: Users needs a toggle it doesn't have.
+  // Ally admin's pages aren't there for it: they lead back to its assistants.
   await page.goto("/user-management");
-  await expect(
-    page.getByText(/not accessible|isn't turned on|not turned on/i).first(),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/assistants$/);
 });
 
 test("an old /chatbots link opens the same assistant under /assistants", async ({ page }) => {

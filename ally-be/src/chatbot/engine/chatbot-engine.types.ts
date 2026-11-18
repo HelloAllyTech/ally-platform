@@ -1,4 +1,5 @@
 import type {
+  AgentActivity,
   AgentStreamEvent,
   AgentMemoryWrite,
   AgentTraceStep,
@@ -127,6 +128,8 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
         writes: AgentMemoryWrite[];
         refs: Record<string, string>;
       };
+      /** What the run did, for the bot page's "what I did" and its card (chunk 6b). */
+      activity?: AgentActivity[];
     }
   | {
       runtime: AgentRuntimeUsed.V2_FALLBACK;

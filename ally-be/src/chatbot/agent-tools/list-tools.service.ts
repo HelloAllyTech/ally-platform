@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ListDefinitionsService } from '../lists/list-definitions.service';
@@ -45,6 +45,69 @@ export class ListToolsService {
     private readonly definitions: ListDefinitionsService,
     private readonly records: ListRecordsService,
   ) {}
+
+  /**
+   * A booking or change the assistant made in a reply, as its confirmation card shows it (chunk
+   * 6b): read from the stored record, scoped to the person, as the agent may see it. The record's
+   * title (the day and time) and up to three other details the agent may read, never the person
+   * field, a contact or a masked value. Null when it isn't there or isn't theirs (Try it rolls its
+   * writes back).
+   */
+  async confirmation(
+    chatbotId: string,
+    recordId: string,
+    contactId: string | null,
+    runId: string,
+  ): Promise<{
+    list: string;
+    title: string;
+    details: { label: string; value: string }[];
+  } | null> {
+    if (!UUID.test(recordId)) return null;
+    const [row] = (await this.dataSource.query(
+      `SELECT c.key FROM collection_records r
+         JOIN collections c ON c.id = r.collection_id
+        WHERE r.id = $1 AND r.chatbot_id = $2 AND r.deleted_at IS NULL`,
+      [recordId, chatbotId],
+    )) as { key: string }[];
+    if (!row) return null;
+    try {
+      const list = await this.definitions.getList(chatbotId, row.key);
+      const record = await this.records.get(
+        chatbotId,
+        list.key,
+        { kind: 'agent', runId },
+        recordId,
+        { contactId },
+      );
+      const titleKey = list.settings?.title_field;
+      const details = list.fields
+        .filter(
+          (f) =>
+            !f.archived_at &&
+            f.agent_read &&
+            !f.privacy?.masked &&
+            f.key !== titleKey &&
+            f.key !== list.settings?.person_field &&
+            !(
+              f.type === ListFieldType.RELATION &&
+              relationTarget(f) === 'contact'
+            ),
+        )
+        .map((f) => ({ label: f.label, value: record.display?.[f.key] ?? '' }))
+        .filter((d) => d.value !== '')
+        .slice(0, 3);
+      return { list: list.name, title: record.title, details };
+    } catch (error) {
+      if (
+        error instanceof ListRefusalException ||
+        error instanceof NotFoundException
+      ) {
+        return null;
+      }
+      throw error;
+    }
+  }
 
   /** The list tools this run gets. A bot without lists gets none, and its request is today's. */
   async offeredFor(
@@ -271,11 +334,21 @@ export class ListToolsService {
         scope,
       );
       const at = (r: ListRecordView) => Date.parse(String(r.data[field.key]));
-      return records
-        .filter((r) => !Number.isNaN(at(r)))
-        .sort((a, b) => Math.abs(at(a) - asked) - Math.abs(at(b) - asked))
-        .slice(0, NEAREST_MAX)
-        .sort((a, b) => at(a) - at(b));
+      const timed = records.filter((r) => !Number.isNaN(at(r)));
+      const byNearness = [...timed].sort(
+        (a, b) => Math.abs(at(a) - asked) - Math.abs(at(b) - asked),
+      );
+      const picked = nearestForWindow(
+        timed,
+        at,
+        asked,
+        Date.parse(String(input[`${field.key}_to`] ?? '')),
+      );
+      for (const r of byNearness) {
+        if (picked.length >= NEAREST_MAX) break;
+        if (!picked.includes(r)) picked.push(r);
+      }
+      return picked.slice(0, NEAREST_MAX).sort((a, b) => at(a) - at(b));
     } catch {
       return [];
     }
@@ -346,6 +419,42 @@ const PREVIEW_ROLLBACK = new Error('preview: roll back');
 /** How many entries the nearest look reads, and how many it offers. */
 const NEAREST_LOOK = 50;
 const NEAREST_MAX = 3;
+const DAY_MS = 24 * 3_600_000;
+
+/**
+ * When the person asked for a stretch of time ("Thursday evening": from 17:00 to 23:59) and it has
+ * nothing (chunk 6b, item 1): the latest entry before it on that day, then the first entries in the
+ * same stretch on the days after ("Friday has 18:00 and 19:00"). The rest of the three are filled
+ * by nearness. A single time asked ("at 11") is left to nearness alone.
+ */
+export function nearestForWindow<T>(
+  records: T[],
+  at: (r: T) => number,
+  from: number,
+  to: number,
+): T[] {
+  if (Number.isNaN(to) || to <= from || to - from >= DAY_MS) return [];
+  const ordered = [...records].sort((a, b) => at(a) - at(b));
+  const picked: T[] = [];
+  const latestBefore = [...ordered]
+    .reverse()
+    .find((r) => at(r) < from && from - at(r) < 12 * 3_600_000);
+  if (latestBefore) picked.push(latestBefore);
+  const sameStretchLater = ordered.filter((r) => {
+    const days = Math.floor((at(r) - from) / DAY_MS);
+    return days >= 1 && at(r) - days * DAY_MS <= to;
+  });
+  // The first day after that has something in the stretch: up to two of its times.
+  if (sameStretchLater.length) {
+    const firstDay = Math.floor((at(sameStretchLater[0]) - from) / DAY_MS);
+    picked.push(
+      ...sameStretchLater
+        .filter((r) => Math.floor((at(r) - from) / DAY_MS) === firstDay)
+        .slice(0, NEAREST_MAX - picked.length),
+    );
+  }
+  return picked;
+}
 
 /**
  * A refusal the agent reads: the code (stored as the run's error code), §26's message, and any

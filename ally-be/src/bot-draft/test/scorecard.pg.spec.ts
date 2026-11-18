@@ -133,6 +133,26 @@ describePg('Scorecard rollup (Postgres)', () => {
     });
   });
 
+  it('"Handed to a person" counts chats handed over, not the team\'s replies (chunk 6b)', async () => {
+    await exchange('2026-11-09T05:00:00Z', { handledBy: 'handover' });
+    await exchange('2026-11-09T06:00:00Z', { handledBy: 'handover' });
+    await exchange('2026-11-09T07:00:00Z', { handledBy: 'human' });
+    await exchange('2026-11-09T08:00:00Z', { handledBy: 'rag', citations: 1 });
+    // A second hand-over message in the same chat is still one chat handed over.
+    const [conv] = await dataSource.query(
+      `SELECT conversation_id FROM chatbot_messages WHERE handled_by = 'handover' LIMIT 1`,
+    );
+    await dataSource.query(
+      `INSERT INTO chatbot_messages (conversation_id, channel, direction, role, text, handled_by, "createdAt")
+       VALUES ($1, 'web', 'outbound', 'assistant', 'Again.', 'handover', '2026-11-09T09:00:00Z')`,
+      [conv.conversation_id],
+    );
+    const days = (await service.compute([bot], '2026-11-09', '2026-11-10')).get(
+      bot,
+    )!;
+    expect(days[0].handedOver).toBe(2);
+  });
+
   it('the job writes what the service computes, and the Overview reads it back', async () => {
     await exchange('2026-11-10T05:00:00Z', { handledBy: 'rag', citations: 1 });
     await exchange('2026-11-11T05:00:00Z', { handledBy: 'declined' });
