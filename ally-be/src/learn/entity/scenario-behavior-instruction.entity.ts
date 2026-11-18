@@ -24,6 +24,16 @@ export class ScenarioBehaviorInstruction extends BaseWithoutTenantEntity {
   })
   category!: BehaviorInstructionCategory;
 
+  /**
+   * Points added to the session score each time this behaviour is detected,
+   * an integer in [-100, 100]. NULL means "the category default"
+   * (SHOULD_DO +10 / SHOULD_NOT_DO -10) so every roleplay authored before this
+   * column existed scores exactly as it did. Read it through
+   * `resolveBehaviorInstructionScore`, never directly.
+   */
+  @Column({ type: 'int', nullable: true })
+  score?: number | null;
+
   @Column({ type: 'jsonb', nullable: true })
   @IsOptional()
   stateInstructions?: BehaviorStateInstruction[];

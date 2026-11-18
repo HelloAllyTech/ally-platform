@@ -18,6 +18,15 @@ export class BehaviorInstructionWithBehaviorsDto {
   category!: BehaviorInstructionCategory;
 
   @ApiProperty({
+    description:
+      'Points added to the session score per detection (-100..100). Null = category default (+10 / -10).',
+    required: false,
+    nullable: true,
+    example: 10,
+  })
+  score?: number | null;
+
+  @ApiProperty({
     description: 'Per-phase state instructions',
   })
   stateInstructions?: BehaviorStateInstruction[];
