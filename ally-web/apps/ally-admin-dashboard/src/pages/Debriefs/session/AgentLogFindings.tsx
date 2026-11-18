@@ -352,7 +352,7 @@ const QualityFound: React.FC<{ output: Obj }> = ({ output }) => {
     <div className="flex items-center gap-4" data-testid="found-quality">
       <span className="font-secondary text-[32px] leading-none">{overall ?? "—"}</span>
       <p className="m-0 text-[13px] text-neutral-800">
-        {fails.length ? `Hard fails: ${fails.join(", ")}.` : "No hard fails."}
+        {fails.length ? `Serious problems: ${fails.join(", ")}.` : "No serious problems."}
         {lowest ? ` Lowest: ${lowest.name} ${lowest.score}.` : ""}
         {str(output.note) ? ` ${output.note}` : ""} Scored by a separate AI reviewer that never sees
         how the debrief was written.

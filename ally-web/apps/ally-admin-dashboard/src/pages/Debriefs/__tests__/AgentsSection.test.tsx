@@ -179,7 +179,7 @@ describe("Settings › Agents", () => {
       "When the planner picks it",
     );
     expect(screen.getByTestId("agents-planner-case_agent")).toHaveTextContent("On");
-    expect(screen.getByTestId("agents-runs-checks")).toHaveTextContent("Some recipes");
+    expect(screen.getByTestId("agents-runs-checks")).toHaveTextContent("Some debrief flows");
     // No invented description where nothing describes the agent.
     expect(screen.getByTestId("agents-what-checks")).toHaveTextContent("Nothing describes it yet.");
   });
@@ -480,7 +480,7 @@ describe("Settings › Agents", () => {
       expect(screen.getByTestId("pm-acts")).toHaveTextContent("Drafts a prompt, setting");
       const block = screen.getByTestId("access-pm-agent");
       expect(block).not.toHaveTextContent("comments_read");
-      expect(block).toHaveTextContent("cannot edit pinned rules");
+      expect(block).toHaveTextContent("cannot edit locked prompts");
     });
 
     it("shows title and description as always on, and the live optional fields ticked", () => {

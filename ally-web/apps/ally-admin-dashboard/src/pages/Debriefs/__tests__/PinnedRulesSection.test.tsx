@@ -35,7 +35,7 @@ vi.mock("@api", async importOriginal => ({
 import { PinnedRulesSection } from "../settings/PinnedRulesSection";
 /* eslint-enable import/first */
 
-describe("Settings › Pinned rules (read-only)", () => {
+describe("Settings › Locked prompts (read-only)", () => {
   const renderIt = () =>
     render(
       <MemoryRouter>

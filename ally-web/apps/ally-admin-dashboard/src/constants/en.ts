@@ -11271,7 +11271,7 @@ export const en = {
           watchDays: "Watched after going live (days)",
         } as Record<string, string>,
         rolloutNote:
-          "A new missed risk cue, or cost above the session budget, undoes a change at once whatever the score. Drops are compared within the same language and recipe.",
+          "A new missed risk cue, or cost above the session budget, undoes a change at once whatever the score. Drops are compared within the same language and debrief flow.",
         perOrg: "Per organisation",
         perOrgHelp:
           "An organisation can keep changes from being tried on its learners. It then gets a change only once it is live for everyone else.",
@@ -11435,8 +11435,8 @@ export const en = {
         heading: "Your verdict",
         good: "Good",
         needsWork: "Needs work",
-        hardFails: "Hard fails",
-        hardFailsHelp: "Tick any that apply. A debrief with a hard fail needs work.",
+        hardFails: "Serious problems",
+        hardFailsHelp: "Tick any that apply. A debrief with a serious problem needs work.",
         save: "Save verdict",
         update: "Update verdict",
         saved: "Verdict saved",
@@ -11471,7 +11471,7 @@ export const en = {
           fromTurn: (turn: number) => `From your comment on turn ${turn}`,
           fromSection: (section: string) => `From your comment on ${section}`,
           fromDebrief: "From your comment on the debrief",
-          fromHardFail: "From the hard fail you ticked",
+          fromHardFail: "From the serious problem you ticked",
         },
       },
       flags: {
@@ -11519,7 +11519,7 @@ export const en = {
         quickTestMinLift: "Lift needed to pass (points)",
         gateCases: "Sessions in the pass test",
         gateRotationShare: "Share of the test sessions replaced each month",
-        gateNoNewHardFails: "No new hard fails",
+        gateNoNewHardFails: "No new serious problems",
         gateJudgeMedianNotLower: "Judge's median not lower",
         gateMaxCostIncreasePct: "Most extra cost allowed (%)",
         sealedCases: "Sealed sessions",
@@ -11677,7 +11677,7 @@ export const en = {
           fail: "Gave no draft",
         },
         reviser: {
-          name: "Reviser",
+          name: "Reviser (fixes drafts)",
           fix: "Fixed a first draft that failed a check",
           regression: "Revisions that broke a check the draft before passed",
           deadline: "Ran out of time for another revision",
@@ -11713,11 +11713,11 @@ export const en = {
           held: "Still standing 14 days after going live",
         },
         planner: {
-          name: "Planner",
+          name: "Planner (picks extra agents)",
           runs: "Debriefs it planned",
-          fallback: "Fell back to the standard plan (planner failed, timed out or could not run)",
-          timeout: "Fell back because the planner took too long",
-          reasons: "Why it fell back",
+          fallback: "Used the usual steps because the planner failed, timed out or could not run",
+          timeout: "Used the usual steps because the planner took too long",
+          reasons: "Why it used the usual steps",
           time: "Time, median / slowest 10%",
           chosen: "Agents chosen per debrief, mean / median",
           budget: "Plans that lost an agent: not enough budget",
@@ -11730,10 +11730,10 @@ export const en = {
           chosenMissedAgent: (agent: string) => `Ran ${agent}, and its miss showed up anyway`,
         },
         topUp: {
-          name: "Top-up",
-          reached: "First draft fell below the bar and reached the top-up",
-          added: "Top-up added at least one agent",
-          passAfter: "Debriefs that passed after a top-up added agents",
+          name: "Extra evidence round",
+          reached: "First draft fell below the bar and went to an extra evidence round",
+          added: "The extra round added at least one agent",
+          passAfter: "Debriefs that passed after the extra round added agents",
         },
         registry: {
           floor: "Always runs (not chosen by the planner)",
@@ -11743,8 +11743,8 @@ export const en = {
           findings: "Findings per run, mean",
           droppedQuotes: "Quotes dropped because no turn held them",
           used: "Findings the Writer used in a card",
-          hardFail: "Judged debriefs it worked on that still had a hard fail",
-          topHardFails: "Most common hard fails",
+          hardFail: "Judged debriefs it worked on that still had a serious problem",
+          topHardFails: "Most common serious problems",
           names: {
             analyst: "Analyst (agent)",
             progress_reader: "Progress reader (agent)",
@@ -11797,9 +11797,9 @@ export const en = {
           reply_too_long: "Ask Ally reply over its word limit",
         } as Record<string, string>,
         plannerFallback: {
-          planner_failed: "Planner failed or returned a bad plan",
-          no_model: "No planner model set in the release",
-          no_price: "Planner model has no known price",
+          planner_failed: "The planner failed or gave an answer that could not be used",
+          no_model: "No model is set for the planner in this release",
+          no_price: "The planner's model has no known price",
           no_budget: "Not enough run budget left",
           no_time: "Not enough time left",
           nothing_left: "Every agent had already run",
@@ -11808,7 +11808,7 @@ export const en = {
       },
       filters: {
         heading: "Filters",
-        help: "Every number on this page follows these filters, except the baselines, uptake lift and the Debrief PM agent, which always read across everything. The evals use the same filters.",
+        help: "Every number on this page follows these filters, except the reference values, uptake lift and the Debrief PM agent, which always read across everything. The evals use the same filters.",
         all: "All",
         organisation: "Organisation",
         language: "Language",
@@ -11837,7 +11837,7 @@ export const en = {
           case: "Case",
           assessment: "Assessment",
         } as Record<string, string>,
-        unfilteredNote: "Not filtered: baselines, uptake lift and the Debrief PM agent.",
+        unfilteredNote: "Not filtered: reference values, uptake lift and the Debrief PM agent.",
       },
       quality: {
         heading: "Pass rate",
@@ -11935,7 +11935,7 @@ export const en = {
           `95% range ${lo}–${hi}. ${n} of ${of} scored debriefs passed.`,
         hardFail: "Hard-fail rate",
         hardFailHelp: (n: number, of: number) =>
-          `${n} of ${of} scored debriefs had a hard fail from the independent judge.`,
+          `${n} of ${of} scored debriefs had a serious problem found by the independent judge.`,
         judge: "Judge score, mean",
         judgeHelp: (n: number) => `Out of 10, over ${n} judged debriefs.`,
         debriefs: "Debriefs",
@@ -11972,7 +11972,7 @@ export const en = {
       sections: {
         noLive: "No live debriefs in this window",
         noLiveHelp:
-          "These charts fill in once an organisation has the Debrief agent switched on (Debrief console → Organisations). Shadow runs are not counted here.",
+          "These charts fill in once an organisation has the Debrief agent switched on (Debrief console → Organisations). Background (shadow) runs are not counted here.",
         noLiveFiltered: "No live debriefs match these filters. Clear them to see the whole window.",
         loadFailedTitle: "Couldn't load the debrief metrics",
         loadFailedSubtitle: "There was a problem fetching the numbers.",
@@ -11994,7 +11994,8 @@ export const en = {
           "Lift with its 95% range per month. Coloured only when the range excludes zero.",
         uptakeEmptyLabel: "insufficient data, needs 150 pairs",
         uptakeEmpty: "No month has paired sessions yet.",
-        groupExtra: (hardFail: string, judge: string) => `Hard fail ${hardFail} · judge ${judge}`,
+        groupExtra: (hardFail: string, judge: string) =>
+          `Serious problem ${hardFail} · judge ${judge}`,
         pairs: (n: number) => `${n} pairs`,
         thisWeek: (v: string) => `This week ${v}`,
         window: (v: string) => `Whole window ${v}`,
@@ -12006,14 +12007,14 @@ export const en = {
         time: "Time per step",
         timeCaption: "Slowest first.",
         readers: "Analyst and progress reader",
-        planner: "Planner",
-        plannerReasons: "Why it fell back",
+        planner: "Planner (picks extra agents)",
+        plannerReasons: "Why it used the usual steps",
         plannerChosen: "Most chosen agents",
         skipped: "Skipped, then the miss showed up",
         skippedOverall: "Any skipped agent",
         whenSkipped: "When skipped",
         whenRan: "When it ran",
-        topUp: "Top-up",
+        topUp: "Extra evidence round",
         writerFailures: "Most common first-draft failures",
         judgeVersions: (v: string) => `Judge versions: ${v}`,
         outcome: "What happened to the changes",
@@ -12023,7 +12024,7 @@ export const en = {
           rejected: "Turned down",
           pending: "Waiting",
         },
-        registryHeading: "Agents the planner chooses",
+        registryHeading: "Optional agents (added when needed)",
         allNumbers: "Show every agent's numbers as a table",
         empty: "No agent has run in this window.",
       },
@@ -12086,7 +12087,7 @@ export const en = {
       filters: {
         org: { label: "Organisation", all: "All organisations" },
         language: { label: "Language", all: "All languages" },
-        recipe: { label: "Recipe", all: "All recipes" },
+        recipe: { label: "Debrief flow", all: "All debrief flows" },
         fallback: {
           label: "Fallback step",
           all: "Any fallback step",
@@ -12217,7 +12218,7 @@ export const en = {
       origin: {
         fixed: "Fixed",
         planned: "Planned",
-        top_up: "Top-up",
+        top_up: "Extra evidence round",
         unknown: "Source unknown",
       } as Record<string, string>,
       originHelp: {
@@ -12267,9 +12268,9 @@ export const en = {
       names: {
         plan: "Plan",
         profile: "Session profile",
-        planner: "Planner",
+        planner: "Planner (picks extra agents)",
         dispatch: "Dispatch",
-        top_up: "Top-up",
+        top_up: "Extra evidence round",
         score_draft: "Scoring",
         decide: "Decision",
         evaluator: "Draft score",
@@ -12316,7 +12317,7 @@ export const en = {
       facts: {
         session: "Session",
         organisation: "Organisation",
-        recipe: "Recipe",
+        recipe: "Debrief flow",
         language: "Language",
         judge: "Quality score",
         evaluator: "Draft score",
@@ -12565,11 +12566,11 @@ export const en = {
         decidedFlags: "Flags already decided",
       },
     },
-    // The PM agent page (redesign 2026-11-12): Ideas, Releases and Test sets.
+    // The PM agent page (redesign 2026-11-12): Changes, Releases and Test sets.
     pmPage: {
       title: "Debrief PM agent",
       tabs: {
-        ideas: "Ideas",
+        ideas: "Changes",
         releases: "Releases",
         reports: "Reports",
         "test-sets": "Test sets",
@@ -12604,7 +12605,7 @@ export const en = {
       propose: {
         button: "Propose a change",
         title: "Propose a change",
-        help: "Your change becomes an idea with its own draft release, copied from the live one. It climbs the same tests as the Debrief PM agent's ideas before it reaches learners; the live release is never edited. Budget changes the owner proposes go live directly.",
+        help: "Your change gets its own draft release, copied from the live one. It climbs the same tests as the Debrief PM agent's changes before it reaches learners; the live release is never edited. Budget changes the owner proposes go live directly.",
         titleLabel: "What it is, in a few words",
         whyLabel: "Why (optional)",
         cols: {
@@ -12624,9 +12625,9 @@ export const en = {
           monthlyCapUsd: "Monthly cap ($)",
           passScore: "Evaluator bar",
         },
-        afterwards: "It appears under Ideas › Being tested.",
+        afterwards: "It appears under Changes › Being tested.",
         submit: "Propose it",
-        done: (v: number) => `Proposed as draft release v${v}. It's under Ideas.`,
+        done: (v: number) => `Proposed as draft release v${v}. It's under Changes.`,
         doneBudget: (v: number) =>
           `Proposed as release v${v}. A budgets-only change waits for the owner.`,
       },
@@ -12780,22 +12781,22 @@ export const en = {
       previous: "Previous",
       next: "Next",
       setHelp: {
-        debrief_open: "The Debrief PM agent tries ideas here",
+        debrief_open: "The Debrief PM agent tries changes here",
         debrief_gate: "Decides whether a change may go further",
         debrief_sealed: "Never shown to the Debrief PM agent",
       } as Record<string, string>,
       releases: {
         explainer:
-          "A release is the exact set of prompt and recipe versions, models and settings learners get. Code deploys and Skills Store edits become releases by themselves and go live, unless they would undo a change a person put live. Only what has been live is listed here. Changes on their way (drafts being tested or tried on learners) live under Ideas until a person puts them live for everyone. Rolling back restores everything in a release together.",
+          "A release is the exact set of prompt versions, debrief flows, models and settings learners get. Code deploys and Skills Store edits become releases by themselves and go live, unless they would undo a change a person put live. Only what has been live is listed here. Changes on their way (drafts being tested or tried on learners) live under Changes until a person puts them live for everyone. Rolling back restores everything in a release together.",
         onTheWay: (n: number) =>
-          `${n} ${n === 1 ? "change" : "changes"} on ${n === 1 ? "its" : "their"} way · see Ideas`,
+          `${n} ${n === 1 ? "change" : "changes"} on ${n === 1 ? "its" : "their"} way · see Changes`,
         listLabel: "Releases",
         rolledBack: "Rolled back",
         retiredTag: "Retired",
         since: (when: string) => `live since ${when}`,
         liveFromTo: (from: string, to: string) => `live ${from} – ${to}`,
         origin: {
-          agentIdea: (t: string) => `From the Debrief PM agent's idea “${t}”`,
+          agentIdea: (t: string) => `From the Debrief PM agent's change “${t}”`,
           personIdea: (t: string) => `From a person's proposal “${t}”`,
           code: "A code release",
           codeTag: (tag: string) => `Code · ${tag}`,
@@ -12830,7 +12831,7 @@ export const en = {
         confirmLabel: "Confirm roll back",
         confirmTitle: (v: string) => `Roll back to ${v}?`,
         confirmBody:
-          "Every prompt, recipe, model and setting goes back to this release for all switched-on organisations. Debriefs already written don't change.",
+          "Every prompt, debrief flow, model and setting goes back to this release for all switched-on organisations. Debriefs already written don't change.",
         whatChanged: (v: string) => `What changed from ${v}`,
         whatChangedFirst: "What's in the first release",
         noNotes: "No note written.",
@@ -12858,17 +12859,17 @@ export const en = {
         stats: {
           debriefs: "Debriefs",
           judge: "Judge median",
-          hardFails: "Hard fails",
+          hardFails: "Serious problems",
           cost: "Cost a debrief",
           time: "Time to a debrief",
         },
         everything: "Everything in this release",
-        promptsHeading: "Prompts and recipes · Skills Store versions",
-        recipe: (name: string) => `Recipe: ${name} (revision rounds)`,
+        promptsHeading: "Prompts and debrief flows · Skills Store versions",
+        recipe: (name: string) => `Debrief flow: ${name} (revision rounds)`,
         current: "current",
         changed: "changed",
         unchanged: "unchanged",
-        pinnedLock: "Pinned",
+        pinnedLock: "Locked",
         releaseOnly: "Release-only",
         cols: {
           step: "Step",
@@ -12883,7 +12884,7 @@ export const en = {
         stepStatus: { on: "On", off: "Off", fixed: "Fixed" } as Record<string, string>,
         settingsHeading: "Settings in this release",
         changeInSettings: "Change in Settings (makes a new release)",
-        pinnedHeading: "Pinned rules",
+        pinnedHeading: "Locked prompts",
         locked: "locked",
       },
       steps: {
@@ -12916,7 +12917,7 @@ export const en = {
         tests: "Tests",
         autonomy: "Autonomy",
         weights: "Score",
-        pinned: "Pinned rules",
+        pinned: "Locked prompts",
         clinical: "Clinical lists",
         progress: "Progress",
         schedules: "Schedules",
@@ -12948,7 +12949,7 @@ export const en = {
         } as Record<string, string>,
         allAgents: {
           title: "All agents",
-          help: "Every agent the Debrief uses. A model change applies to every recipe that uses the agent.",
+          help: "Every agent the Debrief uses. A model change applies to every debrief flow that uses the agent.",
           none: "No agents to show.",
           columns: {
             agent: "Agent",
@@ -12960,7 +12961,7 @@ export const en = {
           },
           runs: {
             always: "Every debrief",
-            some_recipes: "Some recipes",
+            some_recipes: "Some debrief flows",
             optional: "Optional",
             planner: "When the planner picks it",
             off: "Off",
@@ -12970,14 +12971,14 @@ export const en = {
           buildDefault: "Build default",
         },
         byRecipe: {
-          title: "Which agents each recipe uses",
-          help: "A tick means the recipe runs that agent.",
+          title: "Which agents each debrief flow uses",
+          help: "A tick means the debrief flow runs that agent.",
           agent: "Agent",
           used: "Used",
           notUsed: "Not used",
           rounds: "Revision rounds",
           plannerNote:
-            "The planner chooses its own agents for each session, so they are not listed per recipe.",
+            "The planner chooses its own agents for each session, so they are not listed per debrief flow.",
         },
         dataAccess: {
           title: "What each agent can read",
@@ -13016,7 +13017,7 @@ export const en = {
             title: "Debrief PM agent",
             canRead: "It can read",
             canDo: "It can do",
-            note: "It can switch optional roleplay fields on through a proposal, but it can never change learner, case or cohort data, and it cannot edit pinned rules.",
+            note: "It can switch optional roleplay fields on through a proposal, but it can never change learner, case or cohort data, and it cannot edit locked prompts.",
           },
         },
         optional: "optional",
@@ -13167,11 +13168,11 @@ export const en = {
           },
           "debrief-pm-agent-forecasts": {
             name: "Check forecasts",
-            what: "Reads whether ideas put live moved the metric they named",
+            what: "Reads whether changes put live moved the metric they named",
           },
           "debrief-pm-agent": {
             name: "Debrief PM agent analysis",
-            what: "Reads the week’s signals and proposes ideas (learning budget)",
+            what: "Reads the week’s signals and proposes changes (learning budget)",
           },
           "debrief-pm-agent-review": {
             name: "Debrief PM agent monthly review",
@@ -13253,7 +13254,7 @@ export const en = {
         "Which organisations' learners read the new debrief. Once an organisation is live, switching it off is an emergency stop: its learners see “not available”, not today's debrief.",
       budgetHelp:
         "Every change asks you to confirm. The Debrief PM agent may propose a lower budget; a higher one always waits for you. Spend and burn rate are in Analytics › Debriefs.",
-      testsHelp: "How much an idea must prove at each step before it reaches learners.",
+      testsHelp: "How much a change must prove at each step before it reaches learners.",
       progressHelp:
         "How the Debrief agent reads a learner's progress across their recent sessions, and what learners are shown.",
       weightsHelp:
@@ -13482,7 +13483,7 @@ export const en = {
       checks: "Checks",
       round: (n: number) => (n === 0 ? "First draft" : `Revision ${n}`),
       judge: "Independent judge",
-      hardFails: "Hard fails",
+      hardFails: "Serious problems",
       cards: "The debrief",
       noCards: "No debrief was written.",
       opening: "Opening",
