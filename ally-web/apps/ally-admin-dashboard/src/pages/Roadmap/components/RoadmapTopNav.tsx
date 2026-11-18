@@ -5,7 +5,7 @@ import { Link, useLocation } from "react-router-dom";
 import { ROUTES, en } from "@constants";
 
 import { NewIdeaButton } from "./NewIdeaButton";
-import { RoadmapMoreMenu, RoleTabKey } from "./RoadmapAreaNav";
+import { RoadmapMoreMenu, RoleTabKey, tabLabel } from "./RoadmapAreaNav";
 import { useRoadmapRole } from "../RoadmapGate";
 
 type TopTab = "queue" | "drafts" | "bugs" | RoleTabKey;
@@ -19,6 +19,14 @@ const tabFor = (pathname: string): TopTab => {
   if (pathname.startsWith(ROUTES.ROADMAP_MEASURES)) return "measures";
   return "queue";
 };
+
+/** Where a role tab's own link goes. */
+const roleTabTarget = (key: RoleTabKey): string =>
+  ({
+    agent: ROUTES.ROADMAP_AGENT,
+    settings: ROUTES.ROADMAP_SETTINGS,
+    measures: ROUTES.ROADMAP_MEASURES,
+  })[key];
 
 /**
  * The Roadmap's top menu, the same on every page: the title, then Queue · Drafts · Bugs and one
@@ -40,46 +48,55 @@ export const RoadmapTopNav: React.FC<{
   const { pathname } = useLocation();
   const copy = en.roadmapV2;
   const active = tabFor(pathname);
+  const roleTab =
+    active === "agent" || active === "settings" || active === "measures" ? active : null;
+  // A tab sits on the bar's bottom edge: the selected one draws its 2px underline over the border,
+  // so the strip reads as one navigation level whichever page you are on.
   const tab = (key: TopTab, label: string, to: string) => (
     <Link
       key={key}
       to={to}
       aria-current={active === key ? "page" : undefined}
-      className={`border-b-2 pb-1.5 ${
+      className={`relative inline-flex h-full items-center px-4 text-base ${
         active === key
-          ? "border-primary-600 font-semibold text-typography-primary"
-          : "border-transparent text-typography-secondary hover:text-typography-primary"
+          ? "font-semibold text-typography-primary"
+          : "text-typography-secondary hover:bg-neutral-100 hover:text-typography-primary"
       }`}
     >
       {label}
+      {active === key && (
+        <span className="absolute inset-x-0 -bottom-px h-0.5 bg-primary-500" aria-hidden />
+      )}
     </Link>
   );
   return (
-    <header className="sticky top-0 z-[5] flex items-center justify-between gap-2 border-b border-border-light bg-white px-4 pt-3">
-      <div className="flex min-w-0 items-end gap-6">
-        <h1 className="m-0 pb-1 text-xl font-semibold text-typography-primary">
+    <header className="sticky top-0 z-[5] flex h-12 items-stretch justify-between gap-4 border-b border-border-light bg-white px-4">
+      <div className="flex min-w-0 items-stretch gap-4">
+        <h1 className="m-0 flex shrink-0 items-center text-lg font-semibold text-typography-primary">
           {phone ? (phoneTitle ?? copy.title) : copy.title}
         </h1>
         {!phone && (
-          <nav aria-label={copy.title} className="flex items-end gap-4 text-sm">
-            {tab("queue", copy.mobile.queue, ROUTES.ROADMAP)}
-            {tab("drafts", copy.mobile.drafts, ROUTES.ROADMAP_DRAFTS)}
-            {tab("bugs", copy.mobile.bugs, ROUTES.ROADMAP_BUGS)}
-            <span className="pb-1">
-              <RoadmapMoreMenu
-                role={role}
-                active={
-                  active === "agent" || active === "settings" || active === "measures"
-                    ? active
-                    : undefined
-                }
-                showShortcuts={active === "queue"}
-              />
-            </span>
-          </nav>
+          <>
+            <span className="my-3 w-px bg-border-light" aria-hidden />
+            <nav aria-label={copy.title} className="flex items-stretch">
+              {tab("queue", copy.mobile.queue, ROUTES.ROADMAP)}
+              {tab("drafts", copy.mobile.drafts, ROUTES.ROADMAP_DRAFTS)}
+              {tab("bugs", copy.mobile.bugs, ROUTES.ROADMAP_BUGS)}
+              {/* The page you are on from the menu (Agent, Settings, Measures) takes a tab of its own,
+                  so you always see where you are. */}
+              {roleTab && tab(roleTab, tabLabel(roleTab), roleTabTarget(roleTab))}
+              <span className="flex items-center pl-1">
+                <RoadmapMoreMenu
+                  role={role}
+                  active={roleTab ?? undefined}
+                  showShortcuts={active === "queue"}
+                />
+              </span>
+            </nav>
+          </>
         )}
       </div>
-      <div className="flex items-center gap-2 pb-1">
+      <div className="flex items-center gap-2">
         {!phone && withNewIdea && <NewIdeaButton />}
         {phone && phoneTrailing}
       </div>

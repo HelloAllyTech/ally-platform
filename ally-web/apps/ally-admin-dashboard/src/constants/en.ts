@@ -9496,7 +9496,7 @@ export const en = {
       selfChecked: "Self-checked: filled in by the author, not the idea agent",
     },
     triage: {
-      keysHint: "L pick a lead · D decline · X select · J/K move · U undo",
+      keysHint: "L pick a lead · D decline · J/K move · U undo",
       summaryFirst: "Summary",
       checks: "Checks",
       similar: "Similar",

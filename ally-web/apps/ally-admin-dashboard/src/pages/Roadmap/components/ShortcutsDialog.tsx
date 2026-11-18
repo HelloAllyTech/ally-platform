@@ -23,7 +23,7 @@ export const ShortcutsDialog: React.FC<ShortcutsDialogProps> = ({ open, onClose,
   ];
   if (triage) {
     const t = en.roadmapV2.triage.shortcuts;
-    rows.push(["L", t.lead], ["D", t.decline], ["X", t.select], ["U", t.undo]);
+    rows.push(["L", t.lead], ["D", t.decline], ["U", t.undo]);
   }
   return (
     <Modal

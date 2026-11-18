@@ -1,6 +1,6 @@
 import React from "react";
 
-import { Menu } from "@icons";
+import { ThreeDot } from "@icons";
 import { NavLink, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -22,7 +22,7 @@ export const roleTabsFor = (role: RoadmapRole): { key: RoleTabKey; to: string }[
 ];
 
 /** A tab's label. Measures' copy lives in its own block (P8). */
-const tabLabel = (key: RoleTabKey): string =>
+export const tabLabel = (key: RoleTabKey): string =>
   key === "measures" ? en.roadmapV2Measures.tab : en.roadmapV2Tools.tabs[key];
 
 /** Agent (Builders, Owners), Settings and Measures (Owners), as links in the Roadmap's tab row. */
@@ -99,8 +99,8 @@ export const RoadmapMoreMenu: React.FC<{
       iconDescription={label}
       flipped
       menuOptionsClass="!z-[9100] !w-72 [&_.cds--overflow-menu-options\_\_btn]:!max-w-none"
-      renderIcon={() => <Menu size={16} aria-hidden />}
-      className={`!h-8 !w-8 ${active ? "!bg-neutral-100" : ""}`}
+      renderIcon={() => <ThreeDot size={16} aria-hidden />}
+      className="!h-8 !w-8"
     >
       {roleTabsFor(role).map(tab => (
         <OverflowMenuItem

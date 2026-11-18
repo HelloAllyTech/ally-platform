@@ -74,11 +74,14 @@ describe("month choices", () => {
 describe("the banner's controls follow can{}", () => {
   it("an Owner can change the goal and the planned month, saved at once", async () => {
     wrap(<IdeaBannerControls item={item({ editGoal: true, editMonth: true, editLead: true })} />);
-    fireEvent.change(screen.getByDisplayValue("Actor realism"), { target: { value: "g2" } });
+    // The goal and month are Carbon dropdowns (the app's own listbox), not native selects.
+    fireEvent.click(screen.getByRole("combobox", { name: "Goal" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Retention" }));
     await waitFor(() =>
       expect(mockPatch).toHaveBeenCalledWith({ code: "OPP-1", patch: { goalId: "g2" } }),
     );
-    fireEvent.change(screen.getByDisplayValue("Dec 2026"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Planned" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Unscheduled" }));
     await waitFor(() =>
       expect(mockPatch).toHaveBeenCalledWith({ code: "OPP-1", patch: { plannedMonth: null } }),
     );

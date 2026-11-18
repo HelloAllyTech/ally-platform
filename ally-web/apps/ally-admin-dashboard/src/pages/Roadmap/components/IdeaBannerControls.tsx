@@ -2,11 +2,12 @@ import React, { useMemo, useState } from "react";
 
 import { toast } from "sonner";
 
-import { Button, Select, SelectItem, Tag } from "@ally-ui-mono/ui-shared";
+import { Button, Tag } from "@ally-ui-mono/ui-shared";
 import { useGetRoadmapProductGoalsQuery, usePatchRoadmapItemMutation } from "@api";
 import { en } from "@constants";
 import type { RoadmapItemDetail, RoadmapItemPatch } from "@types";
 
+import { RoadmapDropdown } from "./RoadmapDropdown";
 import { useRoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
 import { LeadPicker } from "../triage/LeadPicker";
 import { useReviewActions } from "../triage/useReviewActions";
@@ -27,7 +28,7 @@ export const monthOptions = (current: string | null | undefined, now = new Date(
   return current && !months.includes(current) ? [current, ...months] : months;
 };
 
-/** A Carbon Select with its label beside it (inline), at the small size the banner uses. */
+/** A Carbon Dropdown with its label beside it, at the small size the banner uses. */
 const SelectField: React.FC<{
   id: string;
   label: string;
@@ -36,20 +37,20 @@ const SelectField: React.FC<{
   disabled?: boolean;
   onChange: (value: string) => void;
 }> = ({ id, label, value, options, disabled, onChange }) => (
-  <Select
-    id={id}
-    inline
-    size="sm"
-    labelText={label}
-    value={value}
-    disabled={disabled}
-    onChange={(event: React.ChangeEvent<HTMLSelectElement>) => onChange(event.target.value)}
-    className="!w-auto"
-  >
-    {options.map(option => (
-      <SelectItem key={option.value} value={option.value} text={option.label} />
-    ))}
-  </Select>
+  <div className="flex items-center gap-2">
+    <span className="shrink-0 text-xs text-typography-secondary">{label}</span>
+    <RoadmapDropdown
+      id={id}
+      labelText={label}
+      hideLabel
+      size="sm"
+      value={value}
+      options={options}
+      disabled={disabled}
+      onChange={onChange}
+      className="w-52"
+    />
+  </div>
 );
 
 /** A fact you can read but not change: a Carbon Tag, "Goal: Actor realism". */

@@ -210,7 +210,7 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   const [phoneTab, setPhoneTab] = useState<"conversation" | "details">("conversation");
   // The reading pane holds the whole idea: its conversation, and its details (Summary, Design,
   // Build ...) behind a switch, so nothing needs a second page. Null until chosen.
-  const [paneView, setPaneView] = useState<"conversation" | "details" | null>(null);
+  const [paneView, setPaneView] = useState<"conversation" | IdeaPanelTab | null>(null);
 
   const setPanel = (open: boolean) => {
     setPanelOpen(open);
@@ -221,7 +221,7 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   const openDetails = useCallback(
     (next?: IdeaPanelTab) => {
       if (next) setTab(next);
-      if (mode === "pane") setPaneView("details");
+      if (mode === "pane") setPaneView(next ?? tab);
       else if (panelMode === "inline") setPanel(true);
       else if (panelMode === "tabs") setPhoneTab("details");
       else setOverlayOpen(true);
@@ -402,8 +402,9 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
 
   // ── reading pane ────────────────────────────────────────────────────────────────────────────
   if (mode === "pane") {
-    // An idea with no conversation yet (a Backlog idea) opens on its details, the useful side.
-    const shown = paneView ?? (item.sessionId ? "conversation" : "details");
+    // One row of tabs: Conversation, then the idea's own sections. An idea with no conversation yet
+    // (a Backlog idea) opens on its Summary, the useful side.
+    const shown = paneView ?? (item.sessionId ? "conversation" : tab);
     return (
       <motion.div
         key={item.code}
@@ -415,27 +416,37 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
         <div
           role="tablist"
           aria-label={copy.idea.panel}
-          className="flex shrink-0 gap-4 border-b border-border-light px-4"
+          className="flex shrink-0 overflow-x-auto border-b border-border-light px-2"
         >
-          {(["conversation", "details"] as const).map(key => (
+          {(["conversation", ...IDEA_PANEL_TABS] as const).map(key => (
             <button
               key={key}
               type="button"
               role="tab"
               aria-selected={shown === key}
-              onClick={() => setPaneView(key)}
-              className={`min-h-10 border-b-2 text-sm ${
+              onClick={() => {
+                setPaneView(key);
+                if (key !== "conversation") setTab(key);
+              }}
+              className={`relative min-h-10 shrink-0 px-4 text-sm ${
                 shown === key
-                  ? "border-primary-600 font-semibold text-typography-primary"
-                  : "border-transparent text-typography-secondary hover:text-typography-primary"
+                  ? "font-semibold text-typography-primary"
+                  : "text-typography-secondary hover:bg-neutral-100 hover:text-typography-primary"
               }`}
             >
-              {key === "conversation" ? copy.idea.conversation : copy.idea.details}
+              {key === "conversation" ? copy.idea.conversation : copy.idea.tabs[key]}
+              {shown === key && (
+                <span className="absolute inset-x-0 bottom-0 h-0.5 bg-primary-500" aria-hidden />
+              )}
             </button>
           ))}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          {shown === "conversation" ? conversation : tabbedPanel}
+          {shown === "conversation" ? (
+            conversation
+          ) : (
+            <IdeaPanelContent tab={shown} item={item} session={session} />
+          )}
         </div>
       </motion.div>
     );

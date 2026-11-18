@@ -143,7 +143,11 @@ describe("To triage (§4.6)", () => {
     // The idea has no conversation yet, so the pane opens on its details (the Summary).
     expect(await screen.findByText("Learners mid-course")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: en.roadmapV2.idea.conversation })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: en.roadmapV2.idea.details })).toBeInTheDocument();
+    // One row of tabs: Conversation, then Summary, PRD, Design, Build and Ship.
+    for (const name of ["Summary", "PRD", "Design", "Build", "Ship"]) {
+      expect(screen.getByRole("tab", { name })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("tab", { name: en.roadmapV2.idea.details })).toBeNull();
     expect(screen.getByText("OPP-212")).toBeInTheDocument();
     const pane = screen.getAllByRole("button", { name: en.roadmapV2.review.pickLead });
     expect(pane.length).toBeGreaterThan(0);
@@ -191,40 +195,12 @@ describe("To triage (§4.6)", () => {
     );
   });
 
-  it("X selects rows, then L gives them all a lead in one batch", async () => {
-    const view = renderTriage();
+  it("has no bulk select: no checkboxes and no X key", () => {
+    renderTriage();
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     fireEvent.keyDown(window, { key: "x" });
-    view.rerender(
-      <Provider store={store}>
-        <MemoryRouter>
-          <TriageView
-            data={sections()}
-            isLoading={false}
-            isError={false}
-            onRetry={vi.fn()}
-            breakpoint="desktop"
-            selected="OPP-416"
-            open="OPP-414"
-            onOpen={vi.fn()}
-            onVisibleCodes={vi.fn()}
-          />
-        </MemoryRouter>
-      </Provider>,
-    );
-    fireEvent.keyDown(window, { key: "x" });
-    expect(
-      await screen.findByRole("region", { name: en.roadmapV2.triage.selected(2) }),
-    ).toBeInTheDocument();
-    fireEvent.keyDown(window, { key: "l" });
-    fireEvent.click(
-      (await screen.findAllByRole("button", { name: en.roadmapV2.review.leadConfirm })).at(-1)!,
-    );
-    await waitFor(() =>
-      expect(mockBatch).toHaveBeenCalledWith([
-        { code: "OPP-414", decision: "accept", leadUserId: 7 },
-        { code: "OPP-416", decision: "accept", leadUserId: 7 },
-      ]),
-    );
+    expect(screen.queryByRole("region", { name: /selected/i })).toBeNull();
+    expect(mockBatch).not.toHaveBeenCalled();
   });
 
   it("keys are off while typing in a box", () => {
