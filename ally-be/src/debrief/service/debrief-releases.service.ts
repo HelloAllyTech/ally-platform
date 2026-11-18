@@ -553,8 +553,8 @@ export class DebriefReleasesService implements OnModuleInit {
     }
     for (const rc of diff.recipes) {
       changes.push({
-        area: `Recipe: ${rc.recipe}`,
-        what: what ?? 'Recipe changed',
+        area: `Debrief flow: ${rc.recipe}`,
+        what: what ?? 'Debrief flow changed',
         why,
         before: JSON.stringify(rc.before),
         after: JSON.stringify(rc.after),

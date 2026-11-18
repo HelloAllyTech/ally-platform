@@ -14047,7 +14047,7 @@ export const en = {
       slice: "Show",
       all: "All debriefs",
       language: (code: string) => `Language: ${code}`,
-      recipe: (key: string) => `Recipe: ${key}`,
+      recipe: (key: string) => `Debrief flow: ${key}`,
       alertsHeading: "What happened with the findings of the last 2 weeks",
       noAlerts: "Nothing outside the normal range in the last 2 weeks.",
       routedTo: (to: string) => `→ ${to}`,

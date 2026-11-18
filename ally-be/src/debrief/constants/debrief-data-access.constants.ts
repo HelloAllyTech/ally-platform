@@ -339,7 +339,7 @@ export const PM_AGENT_ACCESS: readonly PmToolAccess[] = [
   {
     tool: 'questions_read',
     kind: 'read',
-    reads: 'Questions people asked on its ideas',
+    reads: 'Questions people asked about its changes',
   },
   {
     tool: 'change_read',
@@ -359,7 +359,7 @@ export const PM_AGENT_ACCESS: readonly PmToolAccess[] = [
   {
     tool: 'idea_propose',
     kind: 'act',
-    reads: 'Records an idea with its evidence',
+    reads: 'Records a proposed change with its evidence',
   },
   {
     tool: 'release_draft',
@@ -394,7 +394,7 @@ export const PM_AGENT_ACCESS: readonly PmToolAccess[] = [
   {
     tool: 'question_answer',
     kind: 'act',
-    reads: 'Answers a question on one of its ideas',
+    reads: 'Answers a question about one of its changes',
   },
   {
     tool: 'change_approve',
