@@ -49,6 +49,7 @@ PIPELINE_PROMPT_CODES += [
     "ally_ai_scribe_note_generate",
     "ally_ai_scribe_note_map_segment",
     "ally_ai_scribe_note_repair",
+    "ally_ai_scribe_note_speaker_roles",
 ]
 
 # The last text of each pipeline prompt this process received, from a queue
@@ -581,6 +582,7 @@ class TranscriptionRequestHandler:
                 chat_id,
                 messages,
                 note_harness,
+                segments_text=segments_text,
                 session_mode=session_mode,
                 prompts=prompts,
                 correlation_id=correlation_id,
@@ -617,6 +619,7 @@ class TranscriptionRequestHandler:
         session_mode: Optional[str],
         prompts: Optional[Dict[str, Any]],
         correlation_id: Optional[str],
+        segments_text: Optional[str] = None,
     ) -> None:
         task = asyncio.create_task(
             self._run_note_harness_shadow(
@@ -626,6 +629,7 @@ class TranscriptionRequestHandler:
                 session_mode=session_mode,
                 prompts=prompts,
                 correlation_id=correlation_id,
+                segments_text=segments_text,
             )
         )
         # Keep a reference so the task isn't garbage-collected mid-run.
@@ -640,6 +644,7 @@ class TranscriptionRequestHandler:
         session_mode: Optional[str],
         prompts: Optional[Dict[str, Any]],
         correlation_id: Optional[str],
+        segments_text: Optional[str] = None,
     ) -> None:
         """Run the v2 harness and post its report. Never raises."""
         from app.core.note_harness.models import HarnessReport, NoteHarnessRequest
@@ -655,7 +660,11 @@ class TranscriptionRequestHandler:
         try:
             report = await asyncio.wait_for(
                 self.text_generation_service.generate_note_draft(
-                    messages, request, session_mode=session_mode, prompts=prompts
+                    messages,
+                    request,
+                    session_mode=session_mode,
+                    prompts=prompts,
+                    segments_text=segments_text,
                 ),
                 timeout=self._NOTE_HARNESS_SHADOW_TIMEOUT_SECONDS,
             )
@@ -667,6 +676,7 @@ class TranscriptionRequestHandler:
             f"[NOTE_HARNESS] chat_id={chat_id} correlation_id={correlation_id} "
             f"path={report.path} segments={report.segments} "
             f"calls={report.llm_calls} repaired={report.repaired} "
+            f"source={report.transcript_source} "
             f"duration_ms={report.duration_ms} error={report.error}"
         )
         try:

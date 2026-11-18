@@ -23,6 +23,7 @@ them can touch the v1 summary, and none of them hold the SQS message.
 | Turns, timestamps, splitting | `ally-ai/app/core/note_harness/transcript.py` |
 | JSON schema from the NoteSpec | `ally-ai/app/core/note_harness/schema.py` |
 | Validation (option ids, evidence, time order) | `ally-ai/app/core/note_harness/validate.py` |
+| Canonical transcript + roles call | `ally-ai/app/core/note_harness/canonical.py`, `pipeline.py`, prompt `scribe_note/speaker_roles.txt` |
 | Shadow run + callback | `ally-ai/app/core/queue/transcription_request_handler.py` (`_run_note_harness_shadow`) |
 | Prompts (defaults) | `ally-ai/app/prompts/scribe_note/{generate,map_segment,repair}.txt` |
 | NoteSpec from custom fields; switch; storing drafts | `ally-be/src/chat/service/scribe-note-harness.service.ts` |
@@ -39,9 +40,17 @@ them can touch the v1 summary, and none of them hold the SQS message.
 - **The budget is computed in ally-ai**, not ally-be. The transcript's length isn't known
   when ally-be publishes the job, so ally-be sends the knobs (`budget_settings`, the
   platform defaults for now) and ally-ai computes the budget once STT is done.
-- **Turns come from today's diarization** (with the phase 0 overlap fix), not the
-  canonical transcript. Phase 2 swaps the source; the harness only needs
-  `{id, speaker, start, text}`.
+- **Canonical transcript (phase 2), provider-agnostic.** Only Deepgram could label
+  speakers, so instead of provider labels the shadow run numbers the STT segments
+  (`start-end: text`, the same format from every provider, in the language spoken) and
+  makes one roles call that returns only `{id, role}`, ~3,000 words a call, in order,
+  with the previous chunk's labelled segments as context. The model never returns
+  transcript text, so nothing can be dropped, merged, reordered or translated.
+  Dictation makes no roles call. If the roles call fails, the run falls back to the
+  v1 diarized turns (`transcriptSource = diarized`, reason in `error`). The turns are
+  stored with the draft (`scribe_note_drafts.transcript`), so evidence turn ids resolve.
+  v1 still stores and shows its own rewritten transcript; switching what counsellors
+  see is phase 4.
 - **Repair floor.** The narrative is "short" only when it is under 60 % of the smaller of
   two numbers: the budget, and half the transcript's words. Without the second limit, a
   one-minute dictation would be padded to reach the 200-word base.

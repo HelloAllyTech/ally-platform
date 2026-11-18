@@ -3,7 +3,8 @@ import asyncio, json, os, sys, time
 from pathlib import Path
 from langchain_openai import ChatOpenAI
 from app.core.note_harness.harness import NoteHarness
-from app.core.note_harness.models import NoteHarnessRequest, NoteTurn
+from app.core.note_harness.pipeline import run_note_pipeline
+from app.core.note_harness.models import NoteHarnessRequest
 
 ROOT = Path("app/prompts")
 SCRIPT = [
@@ -24,7 +25,8 @@ SCRIPT = [
  ("COUNSELOR", "Would you like to call again next week so we can see how it went?"),
  ("CLIENT", "Yes, next Thursday evening is good."),
 ]
-turns = [NoteTurn(id=i+1, speaker=s, start=i*30.0, text=t) for i,(s,t) in enumerate(SCRIPT)]
+# STT-style lines with no speaker labels: the roles call has to work them out.
+SEGMENTS_TEXT = "\n".join(f"{i*30:.2f}-{i*30+25:.2f}: {t}" for i, (_, t) in enumerate(SCRIPT))
 request = NoteHarnessRequest.model_validate({
   "note_spec": {"fields": [
     {"id": "f-referral", "label": "Referral source", "type": "SINGLE_SELECT",
@@ -50,6 +52,9 @@ async def main():
     small = len(sys.argv) > 1  # force map-reduce
     h = NoteHarness(render, invoke, **({"single_pass_words": 50, "segment_words": 60} if small else {}))
     t = time.time()
-    r = await h.run(turns, request, "SCRIBE")
+    r = await run_note_pipeline(render, invoke, request, "SCRIBE", segments_text=SEGMENTS_TEXT, harness=h)
+    truth = [s for s, _ in SCRIPT]
+    got = [t["speaker"] for t in r.transcript]
+    print("roles correct:", sum(a == b for a, b in zip(truth, got)), "/", len(truth))
     print(json.dumps(r.model_dump(), indent=1)[:6000])
 asyncio.run(main())

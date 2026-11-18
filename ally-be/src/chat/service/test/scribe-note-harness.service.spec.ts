@@ -191,6 +191,29 @@ describe('ScribeNoteHarnessService', () => {
       );
     });
 
+    it('stores the canonical transcript and notes a roles fallback', async () => {
+      chatRepository.findOne.mockResolvedValue({ id: 5, tenantId: 'acme' });
+      const transcript = [
+        { id: 1, speaker: 'CLIENT', start: 0, end: 2.5, text: 'Namaste.' },
+      ];
+      await service.recordDraft({
+        chatId: 5,
+        report: {
+          transcript_source: 'diarized',
+          canonical_error: 'RuntimeError: roles down',
+          transcript,
+          draft: { narrative: [], fields: {} },
+        },
+      });
+      expect(draftRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transcriptSource: 'diarized',
+          transcript,
+          error: 'canonical: RuntimeError: roles down',
+        }),
+      );
+    });
+
     it('stores a failed run with its error and no draft', async () => {
       chatRepository.findOne.mockResolvedValue({ id: 5, tenantId: 'acme' });
       await service.recordDraft({

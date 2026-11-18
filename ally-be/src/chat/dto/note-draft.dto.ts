@@ -52,4 +52,14 @@ export interface NoteHarnessReport {
   llm_calls?: number;
   duration_ms?: number;
   error?: string | null;
+  transcript_source?: 'canonical' | 'diarized' | null;
+  transcript?: {
+    id: number;
+    speaker: string;
+    start: number;
+    end?: number | null;
+    text: string;
+  }[];
+  roles_unlabelled?: number;
+  canonical_error?: string | null;
 }

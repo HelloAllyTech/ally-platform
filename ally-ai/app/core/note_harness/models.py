@@ -124,3 +124,10 @@ class HarnessReport(BaseModel):
     llm_calls: int = 0
     duration_ms: int = 0
     error: Optional[str] = None
+    # "canonical": STT segments + a roles call (DESIGN §5). "diarized": the v1
+    # LLM-rewritten turns, used when there was no STT text or roles failed.
+    transcript_source: Optional[Literal["canonical", "diarized"]] = None
+    # The turns the draft's turn ids point into, so they can be resolved later.
+    transcript: List[Dict[str, Any]] = Field(default_factory=list)
+    roles_unlabelled: int = 0
+    canonical_error: Optional[str] = None

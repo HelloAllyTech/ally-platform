@@ -73,6 +73,20 @@ export class ScribeNoteDraft extends BaseEntity {
   @Column({ type: 'jsonb', nullable: true })
   draft?: Record<string, unknown> | null;
 
+  /**
+   * `canonical`: STT segments with speaker roles, never rewritten (DESIGN §5).
+   * `diarized`: the v1 LLM-rewritten turns (fallback).
+   */
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  transcriptSource?: string | null;
+
+  /**
+   * The turns the draft's turn ids point into: [{id, speaker, start, end,
+   * text}]. Contains PHI.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  transcript?: Record<string, unknown>[] | null;
+
   @Column({ type: 'text', nullable: true })
   error?: string | null;
 

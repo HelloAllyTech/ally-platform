@@ -520,6 +520,24 @@ class ScribeNoteMapSegmentInputs(PromptInputs):
     note_language: Optional[str] = None
 
 
+class ScribeNoteSpeakerRolesInputs(PromptInputs):
+    """`scribe_note/speaker_roles.txt` — who spoke each canonical segment."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scribe_note_speaker_roles",
+        name="Scribe note (v2): speaker roles",
+        description=(
+            "Labels each numbered transcript segment COUNSELOR or CLIENT, by id. "
+            "Never rewrites the transcript."
+        ),
+        category="Scribe",
+    )
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    segments: str
+    context: Optional[str] = None
+
+
 class ScribeNoteRepairInputs(PromptInputs):
     """`scribe_note/repair.txt` — one rewrite when the draft falls short."""
 

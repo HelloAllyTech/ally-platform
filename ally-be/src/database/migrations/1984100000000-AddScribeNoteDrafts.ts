@@ -26,6 +26,8 @@ export class AddScribeNoteDrafts1984100000000 implements MigrationInterface {
         "budget" jsonb,
         "validation" jsonb,
         "draft" jsonb,
+        "transcriptSource" character varying(20),
+        "transcript" jsonb,
         "error" text,
         "correlationId" character varying,
         CONSTRAINT "PK_scribe_note_drafts" PRIMARY KEY ("id")

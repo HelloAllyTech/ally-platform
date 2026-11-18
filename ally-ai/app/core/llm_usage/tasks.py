@@ -13,6 +13,7 @@ class LLMTask(str, Enum):
     SCRIBE_NOTE = "scribe_note"
     SCRIBE_NOTE_MAP = "scribe_note_map"
     SCRIBE_NOTE_REPAIR = "scribe_note_repair"
+    SCRIBE_NOTE_ROLES = "scribe_note_roles"
     SCENARIO_EVALUATION = "scenario_evaluation"
     # The same debrief call re-run by ally-be to regenerate a session's
     # feedback in another language, on demand, after the original debrief.

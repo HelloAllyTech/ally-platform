@@ -101,6 +101,7 @@ export enum LlmTask {
   SCRIBE_NOTE = 'scribe_note',
   SCRIBE_NOTE_MAP = 'scribe_note_map',
   SCRIBE_NOTE_REPAIR = 'scribe_note_repair',
+  SCRIBE_NOTE_ROLES = 'scribe_note_roles',
   SCENARIO_EVALUATION = 'scenario_evaluation',
   // The same debrief evaluation re-run in another language, when a viewer
   // opens a debrief in a UI language other than the one it was written in

@@ -166,6 +166,7 @@ export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
   'ally_ai_scribe_note_generate',
   'ally_ai_scribe_note_map_segment',
   'ally_ai_scribe_note_repair',
+  'ally_ai_scribe_note_speaker_roles',
 ] as const;
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';

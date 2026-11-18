@@ -155,7 +155,16 @@ export class ScribeNoteHarnessService {
         budget: (report.budget as Record<string, unknown>) ?? null,
         validation: report.validation ?? null,
         draft: (draft as Record<string, unknown>) ?? null,
-        error: report.error ?? null,
+        error:
+          [
+            report.error,
+            report.canonical_error && `canonical: ${report.canonical_error}`,
+          ]
+            .filter(Boolean)
+            .join(' | ') || null,
+        transcriptSource: report.transcript_source ?? null,
+        transcript:
+          (report.transcript as unknown as Record<string, unknown>[]) ?? null,
         correlationId: dto.correlationId ?? null,
       }),
     );

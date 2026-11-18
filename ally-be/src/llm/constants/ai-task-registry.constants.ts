@@ -659,6 +659,21 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_scribe_note_map_segment',
   },
   {
+    id: 'scribe-note-speaker-roles',
+    task: LlmTask.SCRIBE_NOTE_ROLES,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      '...before the Scribe v2 note, for a scribe (not dictation) session',
+    detail:
+      'Labels each STT segment COUNSELOR or CLIENT by id, ~3,000 words per call, in ' +
+      'order. Never rewrites the transcript (the canonical transcript, DESIGN §5).',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: ALLY_AI_DEFAULT,
+    configuredBy: ALLY_AI_DEFAULT_SOURCE,
+    promptOverride: 'ally_ai_scribe_note_speaker_roles',
+  },
+  {
     id: 'scribe-note-repair',
     task: LlmTask.SCRIBE_NOTE_REPAIR,
     runtime: LlmRuntime.ALLY_AI,

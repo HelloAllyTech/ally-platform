@@ -53,6 +53,11 @@ async def test_shadow_runs_after_v1_delivery_and_posts_the_report():
     # v1 is untouched: summary generated and delivered as before.
     handler._generate_summary.assert_awaited_once()
     text_gen.generate_note_draft.assert_awaited_once()
+    # The STT text goes along, so v2 builds its own canonical transcript.
+    assert (
+        text_gen.generate_note_draft.await_args.kwargs["segments_text"]
+        == "00:00-00:01 hi"
+    )
     args = ally_core.post_note_draft.await_args
     assert args.args[0] == 7
     assert args.args[1]["path"] == "single"

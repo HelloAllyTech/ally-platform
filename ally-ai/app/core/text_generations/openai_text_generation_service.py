@@ -997,25 +997,28 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
         request: Any,
         session_mode: Optional[str] = None,
         prompts: Optional[Dict[str, Any]] = None,
+        segments_text: Optional[str] = None,
     ) -> Any:
-        """Scribe v2: run the note harness over the diarized turns.
+        """Scribe v2: build the canonical transcript from the STT segments (or
+        fall back to the diarized turns) and run the note harness on it.
 
         `request` is a NoteHarnessRequest. Returns a HarnessReport; a failure is
         recorded on the report, never raised, so a shadow run can't affect the
         v1 summary.
         """
+        from app.core.note_harness.canonical import ROLES_PATH
         from app.core.note_harness.harness import (
             GENERATE_PATH,
             MAP_SEGMENT_PATH,
             REPAIR_PATH,
-            NoteHarness,
         )
-        from app.core.note_harness.transcript import turns_from_messages
+        from app.core.note_harness.pipeline import run_note_pipeline
 
         tasks = {
             GENERATE_PATH: LLMTask.SCRIBE_NOTE.value,
             MAP_SEGMENT_PATH: LLMTask.SCRIBE_NOTE_MAP.value,
             REPAIR_PATH: LLMTask.SCRIBE_NOTE_REPAIR.value,
+            ROLES_PATH: LLMTask.SCRIBE_NOTE_ROLES.value,
         }
 
         def render(path: str, **variables: Any) -> str:
@@ -1033,9 +1036,13 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                 llm_override=self._client_for(path, prompts),
             )
 
-        harness = NoteHarness(render=render, invoke=invoke)
-        return await harness.run(
-            turns_from_messages(chat_history), request, session_mode
+        return await run_note_pipeline(
+            render,
+            invoke,
+            request,
+            session_mode,
+            segments_text=segments_text,
+            fallback_messages=chat_history,
         )
 
     def _chat_history_to_str(self, chat_history: List[ChatMessage]) -> str:
