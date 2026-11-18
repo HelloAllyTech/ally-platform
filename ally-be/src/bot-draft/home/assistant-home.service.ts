@@ -3,9 +3,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { ListToolsService } from '../../chatbot/agent-tools/list-tools.service';
+import type { ListPlaybook } from '../../chatbot/agent-tools/list-tools';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
@@ -84,6 +87,8 @@ export class AssistantHomeService {
     private readonly ai?: AiService,
     private readonly chatbots?: ChatbotService,
     private readonly settings?: ChatbotSettingsService,
+    // Q3-fast Part 2b: How it works names each list's playbook.
+    @Optional() private readonly listToolsService?: ListToolsService,
   ) {}
 
   private readonly logger = LoggerService.getInstance(
@@ -348,7 +353,34 @@ export class AssistantHomeService {
       safetyPack: chatbot.safetyPack ?? null,
       bookingLists: await this.bookingLists(chatbotId, chatbot.settings),
       tools: await this.listTools(chatbotId, chatbot.settings),
+      playbooks: await this.playbooks(chatbotId, chatbot.settings),
     };
+  }
+
+  /**
+   * Each list's playbook (Q3-fast Part 2b), as a run gets it: "Because you added Appointments, your
+   * assistant finds free times, confirms the exact time and books it." One per list.
+   */
+  private async playbooks(
+    chatbotId: string,
+    stored: ChatbotSettingsOverride | null | undefined,
+  ): Promise<{ list: string; kind: ListPlaybook }[]> {
+    if (!this.listToolsService) return [];
+    try {
+      const { definitions } = await this.listToolsService.offeredFor(
+        chatbotId,
+        stored,
+        { knowsPerson: true },
+      );
+      const byList = new Map<string, ListPlaybook>();
+      for (const def of definitions) {
+        if (def.playbook && def.list_name)
+          byList.set(def.list_name, def.playbook);
+      }
+      return [...byList].map(([list, kind]) => ({ list, kind }));
+    } catch {
+      return [];
+    }
   }
 
   /**

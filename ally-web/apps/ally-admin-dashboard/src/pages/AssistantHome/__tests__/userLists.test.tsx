@@ -556,6 +556,23 @@ describe("details, rules and the assistant's switches", () => {
     expect(screen.getByText(t.assistant.firstNote)).toBeTruthy();
   });
 
+  it("saves the owner's line on how the assistant should use the list (Q3-fast 2b)", async () => {
+    render(
+      <AssistantBlock botId="bot-1" list={APPOINTMENTS} lists={[SLOTS, APPOINTMENTS]} canEdit />,
+    );
+    const box = screen.getByLabelText(t.assistant.instructionLabel);
+    fireEvent.change(box, { target: { value: "  Ask for the pet's name too.  " } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: t.assistant.instructionSave }));
+    });
+    expect(h.calls.setAbilities).toHaveBeenCalledWith({
+      id: "bot-1",
+      key: "appointments",
+      instruction: "Ask for the pet's name too.",
+    });
+    expect(screen.getByRole("button", { name: t.assistant.instructionSaved })).toBeTruthy();
+  });
+
   it("hides Add and Change when no detail lets the assistant fill it in", () => {
     render(<AssistantBlock botId="bot-1" list={SLOTS} lists={[SLOTS]} canEdit />);
     expect(screen.queryByRole("radiogroup", { name: t.assistant.add })).toBeNull();

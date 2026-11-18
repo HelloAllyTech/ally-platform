@@ -633,3 +633,85 @@ describe('chunk 6b: nothing in the stretch asked for', () => {
     ).toEqual([]);
   });
 });
+
+describe('playbooks (Q3-fast Part 2b): what a list’s tools add', () => {
+  const on = (names: string[]) =>
+    ({
+      abilities: Object.fromEntries(names.map((n) => [n, 'do_it'])),
+    }) as never;
+  const kinds = (offered: ReturnType<typeof offeredListTools>) =>
+    Object.fromEntries(
+      offered.definitions.map((d) => [d.name, d.playbook ?? null]),
+    );
+
+  it('a create with a date-and-time target books; a read-only list is reference', () => {
+    const offered = offeredListTools(
+      [slots, appointments],
+      on(['find_slots', 'find_appointments', 'create_appointments']),
+      { knowsPerson: true },
+    );
+    expect(kinds(offered)).toEqual({
+      find_slots: 'reference',
+      find_appointments: 'booking',
+      create_appointments: 'booking',
+    });
+  });
+
+  it('a list whose writes are at Never brings the read-only playbook', () => {
+    const offered = offeredListTools(
+      [slots, appointments],
+      on(['find_appointments']),
+      {
+        knowsPerson: true,
+      },
+    );
+    // Find is on unless set to Never, so Slots' find stays (reference too).
+    expect(kinds(offered)).toEqual({
+      find_slots: 'reference',
+      find_appointments: 'reference',
+    });
+  });
+
+  it('a create on a list with a phone field takes details', () => {
+    const leads = list(
+      'leads',
+      'Leads',
+      [
+        field('name', ListFieldType.TEXT, { agent_write: true }),
+        field('phone', ListFieldType.PHONE, { agent_write: true }),
+      ],
+      { agent_write: true },
+    );
+    const offered = offeredListTools([leads], on(['create_leads']), {
+      knowsPerson: true,
+    });
+    expect(offered.definitions[0].playbook).toBe('details');
+  });
+
+  it("carries the owner's own line on every tool of the list, trimmed", () => {
+    const products = list(
+      'products',
+      'Products',
+      [field('title', ListFieldType.TEXT)],
+      {
+        settings: {
+          instruction: '  Always mention the size chart.  ',
+        } as never,
+      },
+    );
+    const [def] = offeredListTools([products], on(['find_products']), {
+      knowsPerson: true,
+    }).definitions;
+    expect(def).toMatchObject({
+      playbook: 'reference',
+      instruction: 'Always mention the size chart.',
+    });
+  });
+
+  it('an assistant with no list tools gets no playbook at all', () => {
+    const off = { abilities: { find_slots: 'never' } } as never;
+    expect(
+      offeredListTools([slots], off, { knowsPerson: true }).definitions,
+    ).toEqual([]);
+  });
+});

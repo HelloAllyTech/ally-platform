@@ -233,10 +233,26 @@ export class ListOwnerService {
     chatbotId: string,
     key: string,
     change: Partial<ListAbilities>,
+    /** The owner's own line for the list (Q3-fast Part 2b); undefined leaves it. */
+    instruction?: string,
   ): Promise<OwnerListView> {
     const stored = await this.dataSource.transaction(async (m) => {
       const list = await loadList(m, chatbotId, key, 'update');
       if (!list) throw refuse.notFound();
+      if (instruction !== undefined) {
+        const line = instruction.trim().slice(0, 300);
+        const settings = { ...(list.collection.settings ?? {}) } as Record<
+          string,
+          unknown
+        >;
+        if (line) settings.instruction = line;
+        else delete settings.instruction;
+        await m.update(
+          Collection,
+          { id: list.collection.id },
+          { settings: settings as never },
+        );
+      }
       const [row] = await m.query(
         `SELECT settings FROM chatbots WHERE id = $1 FOR UPDATE`,
         [chatbotId],

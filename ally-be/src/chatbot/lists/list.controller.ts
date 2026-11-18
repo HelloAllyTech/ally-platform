@@ -183,7 +183,7 @@ export class ListController {
     if (dto.find) change.find = dto.find;
     if (dto.create) change.create = dto.create;
     if (dto.update) change.update = dto.update;
-    return this.owner.setAbilities(id, key, change);
+    return this.owner.setAbilities(id, key, change, dto.instruction);
   }
 
   @Post(':id/lists/:key/records/repeat')

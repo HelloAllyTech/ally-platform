@@ -89,6 +89,11 @@ export const AGENT_PROMPT_CODES = [
   // When the crisis check finds the person upset, not at risk (Q3-fast Part 1).
   'ally_ai_agent_upset',
   'ally_ai_agent_upset_support',
+  // What each kind of list tool adds, whatever the purpose (Q3-fast Part 2b).
+  'ally_ai_agent_playbook_booking',
+  'ally_ai_agent_playbook_details',
+  'ally_ai_agent_playbook_orders',
+  'ally_ai_agent_playbook_reference',
 ];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 
@@ -132,20 +137,6 @@ export function purposePromptCodes(purpose?: string | null): string[] {
     : [];
 }
 
-/**
- * A purpose's variant for an assistant with list tools, loaded with the purpose; ally-ai picks it
- * from the tools the run offers. Bring in customers when it can book (chunk 8a); Answer questions
- * when it can save a person's details for the team (chunk 6b: a create on a list `takes_details`).
- */
-export function bookingPurposePromptCodes(purpose?: string | null): string[] {
-  if (purpose === 'enquiries') {
-    return ['ally_ai_agent_purpose_enquiries_can_book'];
-  }
-  if (purpose === 'answer') {
-    return ['ally_ai_agent_purpose_answer_takes_details'];
-  }
-  return [];
-}
 /** Used by bots allowed to answer beyond their documents. */
 const GENERAL_ANSWER_PROMPT_CODE = 'ally_ai_knowledge_answer_general';
 /**
@@ -886,7 +877,6 @@ export class ChatbotEngineService {
             ? [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES]
             : KNOWLEDGE_PROMPT_CODES),
           ...purposePromptCodes(turn.chatbot.purpose),
-          ...bookingPurposePromptCodes(turn.chatbot.purpose),
         ],
       });
       prompts = (rows ?? []).reduce<Record<string, unknown>>((acc, row) => {

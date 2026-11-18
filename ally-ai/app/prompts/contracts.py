@@ -810,6 +810,75 @@ class AgentUpsetSupportInputs(PromptInputs):
     any_time: str = ""
 
 
+class AgentPlaybookBookingInputs(PromptInputs):
+    """`agent/playbook_booking.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_playbook_booking",
+        name="Chatbot Agent: Playbook, Booking",
+        description=(
+            "Added when a list's tools can book a dated entry (Appointments, "
+            "Table reservations, Site visits, Classes, Events), whatever the "
+            "purpose (Q3-fast Part 2b). Ally-written; placed after the lists "
+            "section."
+        ),
+    )
+
+    #: The names of the lists this playbook covers, as the owner wrote them.
+    lists: str
+
+
+class AgentPlaybookDetailsInputs(PromptInputs):
+    """`agent/playbook_details.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_playbook_details",
+        name="Chatbot Agent: Playbook, Taking details",
+        description=(
+            "Added when a list's tools take the person's details (Leads, Callback "
+            "requests, Admissions enquiries), whatever the purpose (Q3-fast Part "
+            "2b). Ally-written; placed after the lists section."
+        ),
+    )
+
+    #: The names of the lists this playbook covers, as the owner wrote them.
+    lists: str
+
+
+class AgentPlaybookOrdersInputs(PromptInputs):
+    """`agent/playbook_orders.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_playbook_orders",
+        name="Chatbot Agent: Playbook, Orders and requests",
+        description=(
+            "Added when a list's tools look up and change the person's own "
+            "entries (Orders, Support tickets, Memberships), whatever the purpose "
+            "(Q3-fast Part 2b). Ally-written; placed after the lists section."
+        ),
+    )
+
+    #: The names of the lists this playbook covers, as the owner wrote them.
+    lists: str
+
+
+class AgentPlaybookReferenceInputs(PromptInputs):
+    """`agent/playbook_reference.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_playbook_reference",
+        name="Chatbot Agent: Playbook, Reference lists",
+        description=(
+            "Added when a list is read-only (Products, Price list, Service areas, "
+            "Menu), whatever the purpose (Q3-fast Part 2b). Ally-written; placed "
+            "after the lists section."
+        ),
+    )
+
+    #: The names of the lists this playbook covers, as the owner wrote them.
+    lists: str
+
+
 class MemoryCheckInputs(PromptInputs):
     """`memory/check.txt`."""
 

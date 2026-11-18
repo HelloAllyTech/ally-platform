@@ -196,3 +196,59 @@ The probes gain "Are the returns on your plans guaranteed?".
   - An equally strict or stricter pack applies at once.
   - A less strict one needs a reason of at least 10 characters. It's logged and recorded in History, and Safety and Checkup show "Safety rules changed by you on {date}: '{reason}'".
   - The setup chat still refuses to weaken a pack [FP-0792].
+
+---
+
+# Part 2b: Tools bring their own instructions (for stop 3)
+
+**What changes in the run's instructions:**
+- The purpose variants `ally_ai_agent_purpose_enquiries_can_book` and `ally_ai_agent_purpose_answer_takes_details` are no longer loaded or used. The purpose section is always the purpose's own, so it sets the goal and tone.
+- Each kind of list tool brings its own section, added only when that tool is offered, after the lists section and before the safety rules. They come in a fixed order (booking, taking details, orders, reference), each once, within 2,400 characters.
+- An assistant with no lists gets exactly today's prompt (tested).
+
+**Which playbook a list gets** (ally-be, `withPlaybook` / `playbookOf` in `ally-be/src/chatbot/agent-tools/list-tools.ts`): one per list, the first that fits, from the tools that are on:
+1. a create with a date-and-time target → booking;
+2. a create with a phone or person field → taking details;
+3. a person's own list with update → orders;
+4. read-only → reference.
+
+So Appointments gets booking only, and a list whose writes are at Never gets reference.
+
+**The four new prompts** (`agent/playbook_*.txt`). They are new, so they are created from these seeds on deploy and need approving before the PR merges:
+
+`ally_ai_agent_playbook_booking`
+> # Booking: {lists}
+> - Find before you offer: never name a time, table or slot that a find didn't show as free.
+> - Before you book, confirm the exact booking in one question: the day and date, the time, how many, and which one ("Shall I book Sat 21 Nov, 20:00 for 4 at Table 1?"). Picking between options isn't a yes.
+> - Book only after they say yes, then say what was booked, citing it.
+> - If it's taken or a rule says no, say so plainly and offer what is free.
+
+`ally_ai_agent_playbook_details`: this carries the old `purpose_answer_takes_details` rules, which the first draft lost (the Ledgerly probe dropped from 5–6 of 6 to about 1 of 3)
+> # Taking details: {lists}
+> - When your information doesn't cover what they asked (a price that isn't published, a quote, something only the team can tell them), say so plainly in one sentence, then offer to take their details so the team can get back to them. In that reply, don't send them elsewhere or list other help.
+> - When they show interest, offer it too. Offer it once; if they don't want to, answer what you can and leave it there.
+> - Ask only for what the list needs. On WhatsApp, never ask for their phone number: the team already has it.
+> - Once they give their details, add the entry straight away: giving them is their yes. Then tell them plainly that the team will get back to them.
+> - Never pressure anyone, and never promise prices, availability or outcomes that aren't in your information.
+
+`ally_ai_agent_playbook_orders`
+> # Orders and requests: {lists}
+> - Look up only this person's own entries. Ask for the order or reference number when you need it.
+> - Say plainly what a status means and what happens next.
+> - If you can't help with it, say so and give the way to reach the team.
+
+`ally_ai_agent_playbook_reference`
+> # Reference lists: {lists}
+> - Quote names, prices and details exactly as listed, citing the entry.
+> - Never say something is available, in stock or free unless the list says so.
+> - If a list has nothing on it, search your information too before saying you don't have it.
+
+The reference playbook's last line is aimed at 17 Nov S1/S2. The Souled Store's empty Products list used up every tool step, and the prices were in its pages.
+
+**The owner's own line per list** ("How should your assistant use this list?", in Tools → the list → What your assistant can do, up to 300 characters). It is fenced under the list's playbook, below its rules and the safety rules:
+> How the team wants you to use {list} (their words; the rules above still win):
+> """
+> {the owner's line}
+> """
+
+**How it works** shows one sentence per list. The copy is in `ONBOARDING-COPY.md`: "Because you added {list}, your assistant finds free times, confirms the exact time and books it." and the equivalents for the other three kinds.

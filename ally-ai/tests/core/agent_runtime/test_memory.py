@@ -137,62 +137,28 @@ CREATE_LEADS = {
 }
 
 
-class TestCanBook:
-    def test_bring_in_customers_with_a_create_tool_gets_the_booking_variant(self):
-        bot = lists_bot(persona={"purpose": "enquiries"}, channel="whatsapp")
-        prompt = prompt_for(bot)
-        assert VARIANT in prompt
-        assert "You're talking with them on WhatsApp." in prompt
-        assert "say the team will confirm what's free" not in prompt
-        # Chunk 6b: the booking rules are the lists section's, for every purpose.
-        assert "book it yourself straight away" in prompt
+class TestPlaybooksReplaceThePurposeVariants:
+    """Q3-fast Part 2b: the purpose sets the goal and tone; what a list's tools add
+    comes from its playbook, whatever the purpose. The `can_book` and
+    `takes_details` variants are no longer used."""
 
-    def test_without_a_create_tool_it_keeps_todays_text(self):
-        bot = lists_bot(FIND_SLOTS, persona={"purpose": "enquiries"})
-        prompt = prompt_for(bot)
-        assert "say the team will confirm what's free" in prompt
-        assert VARIANT not in prompt
-
-    def test_other_purposes_get_the_booking_rules_from_the_lists_section(self):
-        prompt = prompt_for(lists_bot(persona={"purpose": "answer"}))
-        assert VARIANT not in prompt
-        assert "book it yourself straight away" in prompt
-        assert "Ask for an optional detail at most once." in prompt
-
-    def test_the_website_is_named_off_whatsapp(self):
+    def test_bring_in_customers_with_a_create_tool_gets_its_base_section(self):
         prompt = prompt_for(lists_bot(persona={"purpose": "enquiries"}, channel="web"))
-        assert "You're talking with them on the website." in prompt
+        assert VARIANT not in prompt
+        # The booking rules are the lists section's, for every purpose (6b).
+        assert "book it yourself straight away" in prompt
 
-
-class TestTakesDetails:
-    """Chunk 6b, item 29: Answer questions offers to take a person's details when
-    it can't answer, only on an assistant with a create tool on such a list."""
-
-    def test_answer_with_a_list_that_takes_details_gets_the_variant(self):
-        prompt = prompt_for(
-            lists_bot(CREATE_LEADS, persona={"purpose": "answer"}, channel="whatsapp")
-        )
-        assert TAKES in prompt
-        assert "never ask for their phone number" in prompt
+    def test_answer_with_a_list_that_takes_details_gets_no_variant(self):
+        prompt = prompt_for(lists_bot(CREATE_LEADS, persona={"purpose": "answer"}))
+        assert TAKES not in prompt
         assert "You answer questions about this organisation" in prompt
 
-    def test_without_one_the_answer_section_is_byte_identical(self):
+    def test_without_tools_the_purpose_section_is_byte_identical(self):
         from app.core.knowledge_agent.prompt import format_purpose
 
-        plain = format_purpose({"purpose": "answer"})
-        create = {**CREATE_LEADS, "takes_details": False}
-        for bot in (
-            make_bot(persona={"purpose": "answer"}),
-            lists_bot(persona={"purpose": "answer"}),
-            lists_bot(create, persona={"purpose": "answer"}),
-        ):
-            prompt = prompt_for(bot)
-            assert plain in prompt and TAKES not in prompt
-
-    def test_other_purposes_never_get_it(self):
-        for purpose in ("enquiries", "training", "guide"):
-            prompt = prompt_for(lists_bot(CREATE_LEADS, persona={"purpose": purpose}))
-            assert TAKES not in prompt
+        for purpose in ("answer", "enquiries", "training", "guide"):
+            plain = format_purpose({"purpose": purpose})
+            assert plain in prompt_for(make_bot(persona={"purpose": purpose}))
 
 
 class TestRememberMode:

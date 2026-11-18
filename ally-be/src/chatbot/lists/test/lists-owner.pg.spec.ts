@@ -205,6 +205,29 @@ describePg('Lists, the owner’s section (Postgres)', () => {
       expect((await abilities()).hand_over).toBe('never');
     });
 
+    it('stores the owner’s line for the list, trimmed to 300 characters; blank removes it (Q3-fast 2b)', async () => {
+      const line = async () =>
+        (
+          await ds.query(
+            `SELECT settings->>'instruction' AS line FROM collections WHERE chatbot_id = $1 AND key = 'appointments'`,
+            [bot],
+          )
+        )[0].line;
+      await owner.setAbilities(
+        bot,
+        'appointments',
+        {},
+        `  Ask for the pet's name. ${'x'.repeat(400)}`,
+      );
+      expect(await line()).toHaveLength(300);
+      expect((await line()).startsWith("Ask for the pet's name.")).toBe(true);
+      // Leaving it out keeps it; an empty line removes it.
+      await owner.setAbilities(bot, 'appointments', { create: 'do_it' });
+      expect(await line()).toHaveLength(300);
+      await owner.setAbilities(bot, 'appointments', {}, '   ');
+      expect(await line()).toBeNull();
+    });
+
     it('refuses Add on a list with nothing the assistant may fill in', async () => {
       expect(
         await refusal(owner.setAbilities(bot, 'slots', { create: 'do_it' })),

@@ -125,6 +125,21 @@ describe("How it works", () => {
     expect(tools.textContent).toContain("Menu: look up entries.");
   });
 
+  it("says in one sentence what each list's playbook makes the assistant do (Q3-fast 2b)", () => {
+    (h.how.current as { tools: unknown; playbooks: unknown }).tools = [
+      { list: "Appointments", can: ["find", "create"] },
+    ];
+    (h.how.current as { playbooks: unknown }).playbooks = [
+      { list: "Appointments", kind: "booking" },
+    ];
+    render(<HowItWorksSection {...props()} />);
+    const lines = screen.getAllByTestId("how-playbook");
+    expect(lines).toHaveLength(1);
+    expect(lines[0].textContent).toBe(
+      "Because you added Appointments, your assistant finds free times, confirms the exact time and books it.",
+    );
+  });
+
   it("edits the owner's instructions in place, with a counter, and saves them", async () => {
     vi.useFakeTimers();
     h.save.mockReturnValue({ field: "instructions", value: "Be brief.", version: "b" });

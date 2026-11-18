@@ -1,0 +1,31 @@
+pass  lead-1 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > How much does Ledgerly cost?
+      < [rag/question v2 8842ms] I don’t have Ledgerly’s pricing. Ledgerly is invoicing and GST-filing software for small businesses in India. Would you like me to take your name and phone so t
+      > Sure. I'm Rahul Mehta, 9876543201
+      < [rag/smalltalk v2 6973ms] Thanks — I’ve saved your details. The team will get back to you about Ledgerly pricing and next steps. If you’d like, I can answer product questions now (invoic
+pass  lead-2 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > Ledgerly ka price kya hai?
+      < [rag/question v2 13273ms] Ledgerly ke product ke baare mein jo jankari hai: yeh India ke small businesses ke liye invoicing aur GSTR-1 filing software hai. Kya main aapke naam aur phone 
+      > Sure. I'm Rahul Mehta, 9876543202
+      < [rag/smalltalk v2 7450ms] Thanks, Rahul — I’ve saved your details (Rahul Mehta, 9876543202). Our team will get back to you about Ledgerly pricing.
+pass  lead-3 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > i want to buy it, how much is it?
+      < [clarified/question v2 7990ms] I don’t have Ledgerly’s pricing. Would you like me to take your name and email or phone so the team can get back to you?
+      > Sure. I'm Rahul Mehta, 9876543203
+      < [rag/smalltalk v2 8819ms] Thanks Rahul — I’ve saved your details as a lead and the team will get back to you. (Saved: Rahul Mehta, 9876543203.)
+pass  lead-4 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > What's the price for a team of 10?
+      < [clarified/question v2 5586ms] I don't have pricing for team plans I can see. Would you like me to take your name and phone so the team can contact you with a quote?
+      > Sure. I'm Rahul Mehta, 9876543204
+      < [rag/smalltalk v2 8146ms] Thanks Rahul — I’ve saved your details (Rahul Mehta, 9876543204). The team will contact you with a quote for a team of 10.
+pass  lead-5 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > Do you have a monthly plan? How much is it?
+      < [declined/question v2 11108ms] I don’t have any published monthly pricing. Ledgerly is invoicing and GST filing software for small businesses. If you’d like, I can take your contact details a
+      > Sure. I'm Rahul Mehta, 9876543205
+      < [rag/smalltalk v2 7946ms] Thanks — I’ve saved your details. The team will get back to you soon.
+pass  lead-6 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > Can I get a quote for my firm?
+      < [clarified/question v2 17479ms] I don't have pricing or quote details here. May I have your firm name and phone number so I can take your details and request a quote from the team? You can als
+      > Sure. I'm Rahul Mehta, 9876543206
+      < [rag/smalltalk v2 7243ms] Thanks, Rahul — I’ve saved your details as a new lead and the team will get back to you. Saved: Rahul Mehta, 9876543206 (status: new).
+6/6 cases passed in every run; 0 must-pass failed

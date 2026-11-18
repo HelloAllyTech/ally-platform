@@ -184,6 +184,7 @@ def build_agent_prompt(
     channel: Optional[str] = None,
     takes_details: bool = False,
     mood: str = "",
+    playbooks: str = "",
 ) -> str:
     """The agent step's prompt. Empty when the template is missing (the caller
     refuses to run unguided)."""
@@ -232,6 +233,7 @@ def build_agent_prompt(
             channel=channel,
             takes_details=takes_details,
             mood=mood,
+            playbooks=playbooks,
         )
         + body
     )

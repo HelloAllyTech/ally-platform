@@ -228,6 +228,8 @@ export interface HowItWorks {
   bookingLists?: string[];
   /** What it can do with each list, where the ability is Do it. */
   tools?: { list: string; can: ("find" | "create" | "update")[] }[];
+  /** Each list's playbook (Q3-fast Part 2b): what the list's tools add to how it behaves. */
+  playbooks?: { list: string; kind: "booking" | "details" | "orders" | "reference" }[];
 }
 
 export type HowLayer =

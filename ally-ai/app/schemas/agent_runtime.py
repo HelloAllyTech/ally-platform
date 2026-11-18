@@ -56,12 +56,18 @@ class ListToolDefinition(BaseModel):
     #: A create on a list with a person or phone field (Leads, Callback requests):
     #: it saves the person's details for the team (chunk 6b).
     takes_details: bool = False
+    #: What the list's tools do, so the run gets that kind's playbook (Q3-fast Part
+    #: 2b): booking, details, orders or reference. Set by ally-be per list.
+    playbook: Optional[Literal["booking", "details", "orders", "reference"]] = None
+    #: The owner's own line for this list ("How should your assistant use this
+    #: list?"), added under its playbook as the owner's layer.
+    instruction: str = Field("", max_length=300)
 
     def as_bot_definition(self) -> Dict[str, Any]:
-        """The definition as the run keeps it: the 6b fields only when set, so a
-        definition without them is exactly what it was before."""
+        """The definition as the run keeps it: the 6b and Q3-fast fields only when
+        set, so a definition without them is exactly what it was before."""
         data = self.model_dump(mode="json")
-        for key in ("list_name", "takes_details"):
+        for key in ("list_name", "takes_details", "playbook", "instruction"):
             if not data.get(key):
                 data.pop(key, None)
         return data
