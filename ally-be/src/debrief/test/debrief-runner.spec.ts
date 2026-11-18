@@ -103,7 +103,6 @@ function build(
     /** The roleplay's two Debrief choices, and what the services answer for them. */
     riskCueOption?: string | null;
     framework?: unknown;
-    riskCue?: unknown;
   } = {},
 ) {
   const saved: any[] = [];
@@ -259,9 +258,6 @@ function build(
     opts.framework
       ? ({ forTenant: jest.fn(async () => opts.framework) } as any)
       : undefined,
-    opts.riskCue
-      ? ({ resolve: jest.fn(async () => opts.riskCue) } as any)
-      : undefined,
   );
   const request = () => (graph.run.mock.calls as any[][])[0]?.[0];
   return {
@@ -303,16 +299,6 @@ describe('DebriefRunnerService', () => {
       skills: [{ key: 'presence', name: 'Presence' }],
       areas: [],
     };
-    const option = {
-      key: 'part_of_practice',
-      name: 'Part of the practice',
-      version: 4,
-      handling: 'assessed',
-      wordListRaises: true,
-      supportLinesOnCue: false,
-      wording: 'A cue here is the practice itself.',
-    };
-
     it('sends no framework when the library has none: no skills, Standard, legacy labels', async () => {
       const { svc, request } = build();
       await svc.run('s1', { mode: DebriefRunMode.LIVE });
@@ -335,11 +321,10 @@ describe('DebriefRunnerService', () => {
       );
     });
 
-    it('sends the organisation’s framework and the chosen option, and an option’s own wording replaces the pinned definition', async () => {
+    it('sends the organisation’s framework and the practised choice; the pinned definition always stays', async () => {
       const { svc, request, context, saved } = build({
         riskCueOption: 'part_of_practice',
         framework: custom,
-        riskCue: option,
       });
       await svc.run('s1', { mode: DebriefRunMode.LIVE });
       const s = request().session;
@@ -350,8 +335,8 @@ describe('DebriefRunnerService', () => {
         handling: 'assessed',
         word_list_raises: true,
       });
-      expect(request().prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition]).toBe(
-        'A cue here is the practice itself.',
+      expect(request().prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition]).toMatch(
+        /^live /,
       );
       // The progress profile is built for this roleplay's skills and named competencies.
       expect(context.progressProfile).toHaveBeenCalledWith(
@@ -370,10 +355,10 @@ describe('DebriefRunnerService', () => {
       });
       expect(ws.riskCueOption).toMatchObject({
         key: 'part_of_practice',
-        version: 4,
+        version: 1,
         handling: 'assessed',
-        supportLinesOnCue: false,
-        wording: 'A cue here is the practice itself.',
+        supportLinesOnCue: true,
+        wording: null,
       });
     });
 

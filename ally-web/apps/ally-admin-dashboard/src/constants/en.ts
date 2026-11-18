@@ -10984,60 +10984,13 @@ export const en = {
       "The skills the debrief assesses beyond this roleplay's own competencies. Pick None to assess only the roleplay's own competencies.",
     defaultSuffix: " (default)",
     none: "None",
-    riskCueLabel: "Risk cues in this roleplay",
+    riskCueLabel: "Is handling a risk conversation the skill practised here?",
     riskCueTip:
-      "What counts as a risk cue when the debrief reads this roleplay, and what the debrief does with one. Standard suits most roleplays.",
-    loading: "Loading…",
-    loadFailed: "Couldn't load the choices. The saved choice is kept.",
-    status: {
-      draft: "Draft, only you can see it",
-      awaiting_approval: "Waiting for a clinical advisor",
-      retired: "Retired",
-    } as Record<string, string>,
-    handlingAlarm: "Every kind of risk cue is an alarm: an important moment and the support lines.",
-    handlingAssessed:
-      "The reader decides, cue by cue, which risk cues are the skill being practised. Those are assessed in the coaching cards; any other cue is still an alarm.",
-    createLink: "Create a risk-cue option",
-    editLink: "Edit",
-    dialog: {
-      titleNew: "Create a risk-cue option",
-      titleEdit: "Edit risk-cue option",
-      name: "Name",
-      wording: "What counts as a risk cue here",
-      wordingMin: "Write at least 60 characters.",
-      handling: "How a risk cue is handled",
-      alarm: "Alarm: every risk cue gets an important moment in the debrief",
-      assessed:
-        "Part of the practice: the reader decides which cues are the skill being practised; those are assessed in the coaching cards, and any other cue still raises the alarm",
-      wordListRaises: "Let the safety word list mark cues as clear",
-      supportLines: "Show the support lines after the character's risk cue",
-      cues: "Lines that ARE a risk cue here",
-      nonCues: "Lines that are NOT a risk cue here",
-      examplesHint: "One example per line.",
-      cuesMin: "Add at least one example.",
-      examplesMax: "Use at most 12 lines.",
-      nameRequired: "Give it a name.",
-      saveDraft: "Save draft",
-      save: "Save changes",
-      saved: "Saved as a draft.",
-      saveFailed: "Couldn't save. Try again.",
-      testIt: "Test it",
-      testing: "Testing… this can take up to a minute.",
-      testFailed: "The test couldn't run. Try again.",
-      testPassed: "Passed. The debrief tells these examples apart correctly.",
-      testNotPassed: "Not passed.",
-      missed: (line: string) => `Missed a risk cue: "${line}"`,
-      wrong: (line: string) => `Flagged as a risk cue by mistake: "${line}"`,
-      run: (n: number) => `Run ${n}`,
-      staleTest: "You changed it since the last test. Test it again.",
-      send: "Send for approval",
-      sent: "Sent. A clinical advisor will review it.",
-      sendFailed: "Couldn't send it for approval.",
-      needsTest: "Pass a test first.",
-      saveFirst: "Save your changes first.",
-      turnedDown: (note: string) => `A clinical advisor turned it down: ${note}`,
-      close: "Close",
-    },
+      "Choose Yes for a roleplay about assessing or responding to risk, such as thoughts of suicide. The debrief then coaches how the learner assessed and responded, instead of treating the cue as an emergency. Any other risk cue the client voices still raises the alarm.",
+    riskCueNo:
+      "No. A risk cue the client voices is a safety moment: the debrief shows it as an important moment with the support lines.",
+    riskCueYes:
+      "Yes. The debrief coaches how the learner assessed and responded. Any other risk cue still raises the alarm.",
   },
   debriefs: {
     /** A Debriefs console page the reader may not see (a 403 from ally-be). */
@@ -11151,14 +11104,11 @@ export const en = {
       },
       decision: {
         approve: "Approve",
-        signOff: "Sign it off",
         turnDown: "Turn it down",
         confirmTurnDown: "Turn it down",
         reasonLabel: "Why (the Debrief PM agent reads this)",
         reasonPlaceholder: "One line is enough",
         approved: "Approved. It goes through its tests and tries next.",
-        approvedLive: "Approved. It is live for everyone now.",
-        signedOff: "Signed off.",
         turnedDown: "Turned down. The Debrief PM agent has your reason.",
         failed: "That didn't go through. Try again.",
       },
@@ -11314,10 +11264,6 @@ export const en = {
         locked: [
           { name: "Safety reader text", why: "What counts as a risk cue" },
           { name: "Crisis lines and support copy", why: "What a learner in distress reads" },
-          {
-            name: "Pinned rules: rubric, judge and Evaluator instructions",
-            why: "The clinical advisor or owner signs these",
-          },
           { name: "Budget increases", why: "Lower budgets go ahead on their own" },
         ],
         askLowConfidence: {
@@ -12731,7 +12677,6 @@ export const en = {
       autonomyKinds: {
         settings: "Settings",
         prompts: "Prompts and agents",
-        pinned_rules: "Pinned rules",
       } as Record<string, string>,
       autonomyStates: {
         alone: "on its own",
@@ -12748,9 +12693,6 @@ export const en = {
         rejected: "Rejected or withdrawn",
         expired: "Expired (no decision)",
         reverted: "Reverted",
-      } as Record<string, string>,
-      kinds: {
-        pinned_rule: "Pinned rule",
       } as Record<string, string>,
       expired: "No decision",
       expiredNoDecision: "Expired · no decision in 14 days",
@@ -12848,72 +12790,6 @@ export const en = {
       approveCanary: "Approve and try it on some learners",
       recommended: (pct: number) =>
         `Recommended · up to ${pct}% of new debriefs; everyone only after a person puts it live`,
-      approvePinned: "Approve",
-      pinned: {
-        title: "Approve this pinned-rule change?",
-        body: "Your name and today's date are recorded as its approval. The change becomes a draft release, and the Ally team puts it live.",
-        firstTitle: "Approve the rule as it reads now?",
-        firstBody:
-          "Your name and today's date are recorded as its approval. Nothing changes in what runs.",
-        confirm: "Approve",
-        done: "Approved. The Ally team will put it live.",
-        firstDone: "Approved",
-      },
-      pinnedRule: {
-        readWhole: "Read the whole rule",
-        asItReads: (name: string, v: number | null) =>
-          v == null ? `${name} as it reads now` : `${name} v${v}, as it reads now`,
-        afterChange: "As it would read after this change. The new wording is highlighted.",
-        firstVersionIntro:
-          "Written by the Ally engineering team and not yet reviewed by a clinician. Read it, then approve it or ask for a change.",
-        stale:
-          "The rule has changed since this was proposed, and the passage is no longer in it. It can't be approved as it is.",
-        otherOpen: (n: number) =>
-          n === 1
-            ? "Another change to this rule is waiting for approval."
-            : `${n} other changes to this rule are waiting for approval.`,
-        proposedByYou: "You proposed this change.",
-        why: "Why",
-        approved: "Approved. The Ally team will put it live.",
-        approvedFirst: "Approved.",
-        approvedStatus: "Approved",
-        withdrawnStatus: "Withdrawn",
-        withdraw: "Withdraw",
-        askForChange: "Ask for a change",
-        withdrawTitle: "Withdraw your proposal?",
-        withdrawBody: "It closes as withdrawn. You can propose a change to the rule again later.",
-        withdrawDone: "Withdrawn",
-        rejectTitle: "Reject this change?",
-        rejectBody:
-          "The Debrief PM agent reads your reason before it proposes anything like this again.",
-        reasonLabel: "Why are you rejecting it?",
-        reasonRequired: "Say why you are rejecting it.",
-        rejectDone: "Rejected",
-        form: {
-          title: (name: string) => `Ask for a change to the ${name}`,
-          help: "Select the passage to change in the rule, or paste it. Then write the new wording and why.",
-          ruleLabel: "The rule as it reads now",
-          passage: "Passage to change",
-          passageHelp: "Your selection lands here. It must appear exactly once in the rule.",
-          replace: "Replace it with",
-          why: "Why",
-          whyHelp: "The person who approves it reads this.",
-          submit: "Send for approval",
-          cancel: "Cancel",
-          sent: "Sent. It waits in Debrief PM agent › Ideas for the clinical advisor or the owner.",
-          empty: "Select the passage to change in the rule, or paste it.",
-          notFound:
-            "That passage is not in the current rule. Select it in the text, or paste it exactly as it reads.",
-          notUnique:
-            "That passage appears more than once in the rule. Select a longer passage, so it is found only once.",
-          same: "The replacement is the same as the passage. Write the new wording.",
-          noWhy: "Say why the rule should change.",
-          otherOpen: (n: number) =>
-            n === 1
-              ? "Another change to this rule is already waiting. You can still send this one."
-              : `${n} other changes to this rule are already waiting. You can still send this one.`,
-        },
-      },
       basedOn: (what: string) => `Based on: ${what}.`,
       ofNeedYou: (i: number, n: number) => `${i} of ${n} that need you`,
       previous: "Previous",
@@ -13060,7 +12936,6 @@ export const en = {
         progress: "Progress",
         schedules: "Schedules",
         guidance: "Guidance",
-        "risk-cues": "Risk-cue options",
         agents: "Agents",
       } as Record<string, string>,
       agentsHelp:
@@ -13139,55 +13014,6 @@ export const en = {
         refused: "Some changes were refused. Fix or discard them and try again.",
         forbidden: "You don't have permission to change the agents.",
         failed: "Couldn't create the draft release. Try again.",
-      },
-      riskCuesHelp: "Risk-cue options written for roleplays. Test, then approve or turn down.",
-      riskCues: {
-        loading: "Loading options…",
-        loadFailed: "Couldn't load the options. Reload to try again.",
-        none: "No options yet.",
-        pick: "Select an option to see its details.",
-        list: "Options",
-        version: (n: number) => `v${n}`,
-        status: {
-          draft: "Draft",
-          awaiting_approval: "Waiting for review",
-          approved: "Approved",
-          retired: "Retired",
-        } as Record<string, string>,
-        handling: { alarm: "Alarm", assessed: "Part of the practice" } as Record<string, string>,
-        standardWording: "The standard definition",
-        wording: "What counts as a risk cue",
-        behaviour: "What it does",
-        wordListOn: "The safety word list can mark cues as clear.",
-        wordListOff: "The safety word list does not mark cues as clear.",
-        supportOn: "The support lines show after the character's risk cue.",
-        supportOff: "The support lines do not show after the character's risk cue.",
-        cues: "Lines that are a risk cue",
-        nonCues: "Lines that are not a risk cue",
-        lastTest: "Last test",
-        noTest: "Not tested yet.",
-        testPassed: (n: number) => `Passed on version ${n}.`,
-        testNotPassed: (n: number) => `Not passed on version ${n}.`,
-        testOld: (n: number) => `That test was on version ${n}, not this one.`,
-        runTest: "Run test",
-        testing: "Testing… this can take up to a minute.",
-        testFailed: "The test couldn't run. Try again.",
-        approve: "Approve",
-        approved: "Approved. It can now be picked in roleplays.",
-        approveFailed: "Couldn't approve it.",
-        turnDown: "Turn down",
-        turnedDown: "Turned down. The writer sees your note.",
-        turnDownFailed: "Couldn't turn it down.",
-        noteLabel: "Note to the writer",
-        noteRequired: "Say why, so the writer can fix it.",
-        retire: "Retire",
-        retireTitle: "Retire this option?",
-        retireBody:
-          "Roleplays that use it keep working, but nobody can pick it for another roleplay.",
-        retired: "Retired.",
-        retireFailed: "Couldn't retire it.",
-        cancel: "Cancel",
-        more: "More",
       },
       clinicalHelp:
         "Words the checks look for in every debrief and Ask Ally reply. English applies to every language.",
@@ -13375,7 +13201,7 @@ export const en = {
       weightsHelp:
         "How the weekly steering score weighs each signal, and how soon a learner's flag should be reviewed.",
       pinnedHelp:
-        "Apply to every organisation and change rarely. A change arrives as a proposal in the Debrief PM agent's “Needs you” list, and only the clinical advisor or the owner can approve it.",
+        "These prompts decide what counts as safe, and they apply to every organisation. A few named people edit them in the Skills Store. The Debrief PM agent can read them but never change them.",
       orgs: {
         change: "change",
         supportLine: (line: string) => `Support line: ${line}`,
@@ -13418,7 +13244,6 @@ export const en = {
         kinds: {
           settings: "Settings (not budgets)",
           prompts: "Prompts, agents and default plans",
-          pinned_rules: "Pinned rules",
         } as Record<string, string>,
         cells: { auto: "On its own", ask: "Asks first", off: "Off" } as Record<string, string>,
         never: "Never",
@@ -13456,7 +13281,7 @@ export const en = {
           },
           {
             lead: "Pinned rules",
-            text: "(safety rules, rubric, judge’s instructions) aren’t in this table: the clinical advisor or owner always approves them, and the Debrief PM agent can only suggest a change. Their status is under",
+            text: "(safety rules, rubric, judge’s instructions) aren’t in this table: the Debrief PM agent can never change them. A few named people edit them in the Skills Store. Their versions are under",
             link: "Pinned rules",
           },
         ],
@@ -13519,15 +13344,11 @@ export const en = {
         },
       },
       pinned: {
-        notYet: "The pinned rules' versions show here once ally-be records who approved them.",
-        signed: (who: string, when: string) => `Approved by ${who}, ${when}`,
-        unsigned: "Not approved yet",
-        askForChange: "Ask for a change",
+        notYet: "The pinned rules show here once they are loaded.",
+        updated: (who: string, when: string) => `Last changed by ${who}, ${when}`,
+        writtenByEngineering: "Written by engineering",
+        open: "Open in Skills Store",
         someone: "someone",
-        roles: { clinical_advisor: "the clinical advisor", owner: "the owner" } as Record<
-          string,
-          string
-        >,
       },
     },
     // Analytics › Debriefs additions (redesign 2026-11-12): the console's tiles and spend.

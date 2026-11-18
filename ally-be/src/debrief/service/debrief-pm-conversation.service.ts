@@ -1118,6 +1118,11 @@ export class DebriefPmConversationService {
     if (conversationAccess(viewer.can) !== 'all' && !isPinnedRuleChange(idea)) {
       refuse('the clinical advisor decides pinned-rule changes only');
     }
+    if (isPinnedRuleChange(idea)) {
+      refuse(
+        'a pinned rule is changed in the Skills Store by a pinned editor, not here',
+      );
+    }
     if (!['proposed', 'approved'].includes(idea.status)) {
       refuse(
         `${changeName(idea)} is ${idea.status}; there is nothing to decide`,
@@ -1134,11 +1139,7 @@ export class DebriefPmConversationService {
     const userId = person.authorUserId!;
     let label: string;
     if (tool === 'change_approve') {
-      if (isPinnedRuleChange(idea)) {
-        await this.pm.approvePinnedRule(idea.id, userId, note);
-      } else {
-        await this.pm.approve(idea.id, userId, note);
-      }
+      await this.pm.approve(idea.id, userId, note);
       label = `Approved ${changeName(idea)}`;
     } else {
       const reason = String(b.reason ?? '')
@@ -1149,11 +1150,7 @@ export class DebriefPmConversationService {
           'say why it is turned down; the Debrief PM agent reads the reason',
         );
       }
-      if (isPinnedRuleChange(idea)) {
-        await this.pm.rejectPinnedRule(idea.id, userId, reason);
-      } else {
-        await this.pm.reject(idea.id, userId, reason);
-      }
+      await this.pm.reject(idea.id, userId, reason);
       label = `Turned down ${changeName(idea)}`;
     }
     await this.record(person, {

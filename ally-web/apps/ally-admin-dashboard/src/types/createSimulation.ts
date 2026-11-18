@@ -79,7 +79,7 @@ export type FormData = {
    */
   feedbackTabDebrief?: boolean;
   feedbackTabTranscript?: boolean;
-  /** The Debrief's risk-cue option for this roleplay: null = Standard, or an option's key. */
+  /** Is handling a risk conversation the skill practised here: "part_of_practice", or null for No. */
   debriefRiskCueOption?: string | null;
   pauseEnabled?: boolean;
   /** Live in-session coaching hints in the learner's Supervisor sidebar tab. Opt-in. */

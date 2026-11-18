@@ -53,10 +53,7 @@ import {
 } from './debrief-run-logs.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefFrameworkService } from './debrief-framework.service';
-import {
-  DebriefRiskCueOptionService,
-  STANDARD_RISK_CUE,
-} from './debrief-risk-cue-option.service';
+import { resolveRiskCue } from '../util/debrief-risk-cue.util';
 import { emptyFramework } from '../constants/debrief-framework.constants';
 import {
   DEBRIEF_ORCHESTRATOR_TOOLS,
@@ -214,8 +211,6 @@ export class DebriefRunnerService {
     @Optional() private readonly holds?: DebriefChangeHoldsService,
     /** The organisation's skill frameworks (Context Library). Absent in unit tests: none. */
     @Optional() private readonly frameworks?: DebriefFrameworkService,
-    /** The roleplay's risk-cue option. Absent in unit tests: Standard. */
-    @Optional() private readonly riskCueOptions?: DebriefRiskCueOptionService,
   ) {}
 
   /**
@@ -595,9 +590,7 @@ export class DebriefRunnerService {
     const framework = this.frameworks
       ? await this.frameworks.forTenant(session.tenantId)
       : emptyFramework();
-    const riskCue = this.riskCueOptions
-      ? await this.riskCueOptions.resolve(session.riskCueOption)
-      : STANDARD_RISK_CUE;
+    const riskCue = resolveRiskCue(session.riskCueOption);
     const competencyNames = (session.competencies ?? []).map((c) => c.name);
     const [
       liveDetections,
@@ -653,10 +646,6 @@ export class DebriefRunnerService {
           )
         : Promise.resolve(null),
     ]);
-    // An option with its own wording replaces the pinned definition; null keeps the pinned one.
-    if (riskCue.wording) {
-      prompts[DEBRIEF_PROMPT_CODES.riskCueDefinition] = riskCue.wording;
-    }
     run.workspace = {
       ...run.workspace,
       // What this run used, kept so a later edit never changes how a past debrief reads.
@@ -674,7 +663,7 @@ export class DebriefRunnerService {
         handling: riskCue.handling,
         supportLinesOnCue: riskCue.supportLinesOnCue,
         wordListRaises: riskCue.wordListRaises,
-        // The option's own definition (null: the pinned one), so the judge reads what the run read.
+        // Always null now: the pinned definition is the only one (older runs may hold a wording).
         wording: riskCue.wording,
       },
       speakerLabels: bundle.settings?.neutralWording ? 'neutral' : 'legacy',

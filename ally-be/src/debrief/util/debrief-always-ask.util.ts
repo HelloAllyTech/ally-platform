@@ -1,12 +1,10 @@
 import { DEBRIEF_PROMPT_CODES } from '../constants/debrief-release.constants';
-import { PINNED_RULE_CODES } from './debrief-console-view.util';
 import { BUDGET_SETTING_KEYS } from './debrief-releases.util';
 
 /**
  * "Always asks a person" (Debrief v2, A1). Every other change runs the
  * ladder on its own (A3). Locked on, not settings: the Safety reader's text,
- * crisis lines and support copy, the other pinned rules (rubric, judge and
- * Evaluator instructions) and budget increases. Settings: low-confidence
+ * crisis lines and support copy, budget increases. Settings: low-confidence
  * changes (`askLowConfidence`, on by default) and new models or providers
  * (`askModels`, off by default). Model changes within budget never wait
  * otherwise; an organisation's provider allowlist always applies (elsewhere).
@@ -14,7 +12,6 @@ import { BUDGET_SETTING_KEYS } from './debrief-releases.util';
 export type AlwaysAskKind =
   | 'safety_reader'
   | 'crisis_support'
-  | 'pinned_rule'
   | 'budget_increase'
   | 'low_confidence'
   | 'new_model';
@@ -31,7 +28,6 @@ export interface AlwaysAsk {
 export const ALWAYS_ASK_LABELS: Record<AlwaysAskKind, string> = {
   safety_reader: 'Safety reader text',
   crisis_support: 'Crisis lines and support copy',
-  pinned_rule: 'Pinned rules (rubric, judge and Evaluator instructions)',
   budget_increase: 'Budget increases',
   low_confidence: 'Changes the Debrief PM agent is not sure about',
   new_model: 'New models or providers',
@@ -111,17 +107,6 @@ export function alwaysAsk(
       locked: true,
       waitsBecause:
         'It changes the crisis lines or the support copy learners see.',
-    };
-  }
-  if (
-    change.ideaKind === 'pinned_rule' ||
-    codes.some((c) => PINNED_RULE_CODES.has(c))
-  ) {
-    return {
-      kind: 'pinned_rule',
-      locked: true,
-      waitsBecause:
-        'It changes a pinned rule: the rubric or the judge’s instructions.',
     };
   }
   const budgetUp = [

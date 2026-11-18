@@ -33,7 +33,6 @@ export interface DebriefAccess {
   verdict: boolean;
   /** Approve, put live, reject, run now, quick checks, questions. */
   pmAgent: boolean;
-  approvePinnedRule: boolean;
   testSets: boolean;
   releases: boolean;
   switchOn: boolean;
@@ -58,7 +57,6 @@ export const accessFromViewer = (viewer: DebriefViewer): DebriefAccess => ({
   escalate: viewer.can.escalate,
   verdict: viewer.can.verdict,
   pmAgent: viewer.can.pmAgent,
-  approvePinnedRule: viewer.can.approvePinnedRule,
   testSets: viewer.can.testSets,
   releases: viewer.can.releases,
   switchOn: viewer.can.switchOrgOn,
@@ -86,7 +84,6 @@ export const debriefAccessFor = (permissions: string[] | undefined): DebriefAcce
     escalate: team,
     verdict: advisor,
     pmAgent: team,
-    approvePinnedRule: advisor || owner,
     testSets: team,
     releases: team,
     switchOn: owner,
