@@ -125,7 +125,6 @@ export const RoadmapTopNav: React.FC<{
         )}
       </div>
       <div className="flex items-center gap-2">
-        {/* Core Concepts (master #322): the header's book icon opens the drawer. */}
         {!phone && <RoadmapConceptsButton />}
         {!phone && withNewIdea && <NewIdeaButton />}
         {phone && phoneTrailing}

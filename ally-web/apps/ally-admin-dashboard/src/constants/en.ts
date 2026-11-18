@@ -9192,12 +9192,12 @@ export const en = {
       openUnread: (code: string, title: string) => `Open ${code}: ${title}. Unread`,
       actions: (code: string) => `Actions for ${code}`,
       votesLocked: "Voting is open only while an idea is in the Backlog. The votes it has stay.",
-      rank: (n: number) => `#${n}`,
       rankLabel: (n: number) => `Rank ${n}`,
       rankHelp: (n: number) =>
         `Rank ${n} of every idea that isn't released yet. The order is votes, voters, effort, goals helped and a director's star.`,
       votes: (count: number) => (count === 1 ? "1 vote" : `${count} votes`),
       votedByMe: "You voted",
+      rank: (n: number) => `Rank ${n} in the queue`,
       starred: "Starred",
       markRead: "Mark read",
       watch: "Watch",
@@ -9261,15 +9261,6 @@ export const en = {
         stageAge: "Longest in stage",
         stageNewest: "Newest in stage",
       } as Record<string, string>,
-    },
-    layout: {
-      label: "Layout",
-      list: "List",
-      board: "Board",
-      boardByGoal: "By goal",
-      boardByMonth: "By month",
-      boardHelp:
-        "The planning board. Goal and month lanes can be dragged; stages can't, because an idea's stage follows what has happened to it.",
     },
     savedViews: {
       save: "Save view",

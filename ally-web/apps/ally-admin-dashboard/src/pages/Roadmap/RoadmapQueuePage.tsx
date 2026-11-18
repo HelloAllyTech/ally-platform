@@ -5,7 +5,7 @@ import { MotionConfig, motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { Button, SidePanel } from "@ally-ui-mono/ui-shared";
+import { Button } from "@ally-ui-mono/ui-shared";
 import {
   rowsOfItemsResponse,
   useGetRoadmapItemsQuery,
@@ -13,8 +13,8 @@ import {
   useRoadmapV2Prefetch,
   useSetRoadmapWatchMutation,
 } from "@api";
-import { ROUTES, en } from "@constants";
 import { useClaimCommandPaletteShortcut } from "@components/command-palette/CommandPaletteContext";
+import { ROUTES, en } from "@constants";
 import { useUser } from "@hooks";
 import type { RoadmapQueueSort, RoadmapSavedView } from "@types";
 
@@ -27,7 +27,6 @@ import {
   useFilterOptions,
 } from "./components/FilterControls";
 import { IdeaView } from "./components/IdeaView";
-import { QueueBoard } from "./components/QueueBoard";
 import { QueueList } from "./components/QueueList";
 import { QueueSortSelect } from "./components/QueueSortSelect";
 import { QueueTab, QueueTabs } from "./components/QueueTabs";
@@ -55,7 +54,6 @@ import {
   DEFAULT_VIEW_IDS,
   DefaultViewId,
   QueueFilters,
-  QueueLayout,
   QueueState,
   decodeQueueState,
   defaultSortFor,
@@ -78,8 +76,6 @@ export const RoadmapQueuePage: React.FC = () => {
   const { can } = useRoadmapRole();
   const { user } = useUser();
   const breakpoint = useRoadmapBreakpoint();
-  // ⌘K here is the Queue's own quick open, not the global page palette.
-  useClaimCommandPaletteShortcut();
   const touch = breakpoint === "phone" || breakpoint === "tablet";
   const isPhone = breakpoint === "phone";
   const withPane = hasReadingPane(breakpoint);
@@ -90,14 +86,9 @@ export const RoadmapQueuePage: React.FC = () => {
     () =>
       decodeQueueState(searchParams, {
         view: readPref<string | undefined>(ROADMAP_PREF_KEYS.lastView, undefined),
-        layout: readPref<QueueLayout | undefined>(ROADMAP_PREF_KEYS.layout, undefined),
       }),
     [searchParams],
   );
-  // The List / Board switch is retired: the Queue is always the list. The Board code below stays
-  // so it can come back, but nothing selects it — not the switch, a saved pref or `?layout=board`.
-  const layout = "list" as QueueLayout;
-
   const setState = useCallback(
     (next: QueueState, replace = true) => setSearchParams(encodeQueueState(next), { replace }),
     [setSearchParams],
@@ -105,8 +96,7 @@ export const RoadmapQueuePage: React.FC = () => {
 
   useEffect(() => {
     writePref(ROADMAP_PREF_KEYS.lastView, state.view);
-    writePref(ROADMAP_PREF_KEYS.layout, state.layout);
-  }, [state.view, state.layout]);
+  }, [state.view]);
 
   // ── data ────────────────────────────────────────────────────────────────────────────────────
   // The sort in force: the URL's, else (on a default view) the one this person chose for it, else
@@ -128,9 +118,7 @@ export const RoadmapQueuePage: React.FC = () => {
   const baseKey = JSON.stringify(baseQuery);
   useEffect(() => setCursor(undefined), [baseKey]);
   const query = useMemo(() => (cursor ? { ...baseQuery, cursor } : baseQuery), [baseQuery, cursor]);
-  const { data, isLoading, isFetching, isError, refetch } = useGetRoadmapItemsQuery(query, {
-    skip: layout === "board",
-  });
+  const { data, isLoading, isFetching, isError, refetch } = useGetRoadmapItemsQuery(query);
 
   // The To do count on its tab: how many ideas are in the Backlog.
   const { data: backlog } = useGetRoadmapItemsQuery({ view: "all", stage: "backlog" });
@@ -199,6 +187,8 @@ export const RoadmapQueuePage: React.FC = () => {
   }, [setState, state]);
 
   // ── keyboard (§4.10) ────────────────────────────────────────────────────────────────────────
+  // ⌘K here is the Queue's own quick open, not the global page palette.
+  useClaimCommandPaletteShortcut();
   const [quickOpen, setQuickOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -287,8 +277,7 @@ export const RoadmapQueuePage: React.FC = () => {
       .catch(() => toast.error(copy.actions.watchFailed));
   };
 
-  const setView = (view: DefaultViewId) =>
-    setState({ view, filters: {}, layout: state.layout, open: state.open }, false);
+  const setView = (view: DefaultViewId) => setState({ view, filters: {}, open: state.open }, false);
   const setFilters = (filters: QueueFilters) => setState({ ...state, filters });
   const setSort = (sort: RoadmapQueueSort) => {
     if (state.savedViewId) {
@@ -301,7 +290,7 @@ export const RoadmapQueuePage: React.FC = () => {
   };
   const selectSaved = (view: RoadmapSavedView) =>
     setState({
-      ...stateFromSavedView(view.state.queue ?? {}, state.layout, view.id),
+      ...stateFromSavedView(view.state.queue ?? {}, view.id),
       open: state.open,
     });
 
@@ -471,11 +460,7 @@ export const RoadmapQueuePage: React.FC = () => {
 
         {viewBar}
 
-        {layout === "board" ? (
-          <div className="min-h-0 flex-1 overflow-auto">
-            <QueueBoard onOpen={openIdea} />
-          </div>
-        ) : triageMode ? (
+        {triageMode ? (
           <TriageView
             data={data}
             isLoading={isLoading}
@@ -514,27 +499,6 @@ export const RoadmapQueuePage: React.FC = () => {
           </div>
         ) : (
           list
-        )}
-
-        {/* On the Board, a card opens the same reading pane, over the lanes. */}
-        {layout === "board" && (
-          <SidePanel
-            open={!!state.open}
-            onClose={closePane}
-            title={state.open ?? ""}
-            closeLabel={copy.closePane}
-            width="min(720px, 100vw)"
-          >
-            {state.open && (
-              <IdeaView
-                key={state.open}
-                code={state.open}
-                mode="pane"
-                breakpoint={breakpoint}
-                presence={presence}
-              />
-            )}
-          </SidePanel>
         )}
 
         {isPhone && <RoadmapBottomBar hidden={barHidden || keyboardInset > 0} />}

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 
 import { toast } from "sonner";
 
-import { RadioButton, RadioButtonGroup } from "@ally-ui-mono/ui-shared";
 import { useSetRoadmapRoleForMutation } from "@api";
 import { FeatureToggleKey, en } from "@constants";
 import type { RoadmapGrantableRole, RoadmapRoleEntry } from "@types";
@@ -54,31 +53,45 @@ export const RoadmapRoleRadio: React.FC<RoadmapRoleRadioProps> = ({ entry, isSel
     <section className="flex flex-col gap-1" data-testid="admin-roadmap-role">
       <h3 className="mb-2 font-secondary text-base text-typography-900">{copy.title}</h3>
       <p className="m-0 mb-2 text-sm text-typography-600">{copy.help}</p>
-      <RadioButtonGroup
-        legendText={copy.title}
-        name={`roadmap-role-${entry.userId}`}
-        orientation="vertical"
-        valueSelected={value}
-        disabled={isSelf || isLoading}
-        onChange={(next: string | number | undefined) => void choose(next as RoadmapGrantableRole)}
+      <div
+        role="radiogroup"
+        aria-label={copy.title}
+        className="flex flex-col divide-y divide-border-light rounded-md border border-border-light"
       >
         {ROADMAP_ROLE_OPTIONS.map(option => {
           const id = `roadmap-role-${entry.userId}-${option}`;
           return (
-            <RadioButton
+            <label
               key={option}
-              id={id}
-              value={option}
-              labelText={
-                <span className="flex min-w-0 flex-col">
-                  <span className="text-sm text-typography-900">{copy.options[option]}</span>
-                  <span className="text-sm text-typography-600">{copy.optionHelp[option]}</span>
+              htmlFor={id}
+              className={`flex cursor-pointer items-start gap-3 px-3 py-3 md:px-4 ${
+                isSelf || isLoading ? "cursor-not-allowed opacity-70" : ""
+              }`}
+            >
+              <input
+                id={id}
+                type="radio"
+                name={`roadmap-role-${entry.userId}`}
+                value={option}
+                checked={value === option}
+                disabled={isSelf || isLoading}
+                onChange={() => void choose(option)}
+                aria-labelledby={`${id}-label`}
+                aria-describedby={`${id}-help`}
+                className="mt-1 h-4 w-4 shrink-0"
+              />
+              <span className="flex min-w-0 flex-col">
+                <span id={`${id}-label`} className="text-sm text-typography-900">
+                  {copy.options[option]}
                 </span>
-              }
-            />
+                <span id={`${id}-help`} className="text-sm text-typography-600">
+                  {copy.optionHelp[option]}
+                </span>
+              </span>
+            </label>
           );
         })}
-      </RadioButtonGroup>
+      </div>
       {entry.restricted && (
         <p className="m-0 mt-1 text-sm text-typography-800">{copy.restricted}</p>
       )}
