@@ -756,8 +756,9 @@ export class CreateScenarioDto {
 
   @ApiProperty({
     description:
-      "The risk-cue option this roleplay's Debrief applies: the key of an approved option " +
-      '(Debriefs › roleplay options), or null for Standard.',
+      'Is handling a risk conversation the skill practised in this roleplay? ' +
+      '"part_of_practice" = yes (the Debrief coaches how the learner assessed and responded), ' +
+      'anything else or null = Standard (a risk cue is a safety moment).',
     example: 'part_of_practice',
     required: false,
     nullable: true,

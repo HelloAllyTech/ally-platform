@@ -545,16 +545,9 @@ export const ApiEndpoints = {
     CONFIG: "/v1/debriefs/agents-config",
     CHANGES: "/v1/debriefs/agents-config/changes",
   },
-  /** Debrief choices per roleplay: risk-cue options. */
+  /** Debrief choice per roleplay: is the risk conversation the skill practised. */
   DEBRIEF_ROLEPLAY_OPTIONS: {
     AVAILABILITY: "/v1/debriefs/roleplay-options/availability",
-    RISK_CUES: "/v1/debriefs/roleplay-options/risk-cue-options",
-    RISK_CUES_REVIEW: "/v1/debriefs/roleplay-options/risk-cue-options/review",
-    RISK_CUE: (id: string) => `/v1/debriefs/roleplay-options/risk-cue-options/${id}`,
-    RISK_CUE_ACTION: (
-      id: string,
-      action: "test" | "submit" | "review-test" | "approve" | "reject" | "retire",
-    ) => `/v1/debriefs/roleplay-options/risk-cue-options/${id}/${action}`,
   },
   DEBRIEF_CONSOLE: {
     OVERVIEW: "/v1/debriefs/console/overview",
@@ -605,14 +598,7 @@ export const ApiEndpoints = {
     IDEA_START_STEP: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/start-step`,
     IDEA_APPROVE: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/approve`,
     IDEA_REJECT: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/reject`,
-    IDEA_APPROVE_PINNED: (id: string) =>
-      `/v1/debriefs/console/pm-agent/ideas/${id}/approve-pinned-rule`,
-    IDEA_WITHDRAW_PINNED: (id: string) =>
-      `/v1/debriefs/console/pm-agent/ideas/${id}/withdraw-pinned-rule`,
-    IDEA_REJECT_PINNED: (id: string) =>
-      `/v1/debriefs/console/pm-agent/ideas/${id}/reject-pinned-rule`,
     PINNED_RULES: "/v1/debriefs/console/pinned-rules",
-    PINNED_RULE_PROPOSALS: "/v1/debriefs/console/pinned-rules/proposals",
     AUTONOMY: "/v1/debriefs/console/autonomy",
     AUTONOMY_MATRIX: "/v1/debriefs/console/autonomy/matrix",
     AUTONOMY_ORG: (tenantId: string) => `/v1/debriefs/console/autonomy/orgs/${tenantId}`,

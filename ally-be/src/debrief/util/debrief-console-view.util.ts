@@ -221,11 +221,12 @@ export function approvalState(
 /**
  * The kinds of change the PM agent's policy covers (spec C3, C4). Settings:
  * non-budget settings. Prompts: prompt (skill) edits, registry agents and
- * default plans. Pinned rules: always never. Guidance is not here: the PM
+ * default plans. Pinned rules are not here: the PM agent can never edit one (they are
+ * Skills Store prompts for the named pinned editors). Guidance is not here: the PM
  * agent never touches Context Library chunks (C4). Models are not here:
  * model trials are Release 2.
  */
-export const CHANGE_KINDS = ['settings', 'prompts', 'pinned_rules'] as const;
+export const CHANGE_KINDS = ['settings', 'prompts'] as const;
 export type ChangeKind = (typeof CHANGE_KINDS)[number];
 
 /** Pinned rules: the safety rules, the rubric, and the judge's instructions. */
@@ -261,18 +262,12 @@ export function changeKindOf(
   change: Record<string, any> | null | undefined,
 ): ChangeKind | null {
   switch (change?.ideaKind) {
-    case 'pinned_rule':
-      return 'pinned_rules';
     case 'setting':
       return 'settings';
     case 'prompt_edit':
-      return PINNED_RULE_CODES.has(change.promptCode)
-        ? 'pinned_rules'
-        : 'prompts';
     case 'registry_agent':
     case 'default_plan':
-    // A proposed change (its own draft release) climbs the same ladder
-    // (v2 A3); a pinned rule in it waits through the always-ask list.
+    // A proposed change (its own draft release) climbs the same ladder (v2 A3).
     case 'release':
       return 'prompts';
     default:
@@ -307,10 +302,8 @@ export type OrgPolicy = 'default' | 'ask' | 'never';
 export const ORG_POLICY_STEPS = ['paired_trial', 'canary'] as const;
 export type OrgPolicyStep = (typeof ORG_POLICY_STEPS)[number];
 
-/** The kinds whose cells the owner may set; pinned rules are always never. */
-export const CONFIGURABLE_KINDS = CHANGE_KINDS.filter(
-  (k) => k !== 'pinned_rules',
-) as Array<Exclude<ChangeKind, 'pinned_rules'>>;
+/** The kinds whose cells the owner may set. */
+export const CONFIGURABLE_KINDS: readonly ChangeKind[] = CHANGE_KINDS;
 
 export type AutonomyMatrix = Record<
   ChangeKind,
@@ -349,7 +342,7 @@ export interface AutonomyPolicy {
  * check, pass test, side-by-side trial) always run on their own, paid from
  * the learning budget (plan §11.1 "Experiment: free"; decided 2026-11-12):
  * they are not settings. A learner try-out (the canary) waits for a person
- * until the owner switches it on. Pinned rules never.
+ * until the owner switches it on.
  */
 export function defaultAutonomyMatrix(): AutonomyMatrix {
   const row = (): Record<AutonomyStep, StepPolicy> => ({
@@ -362,12 +355,6 @@ export function defaultAutonomyMatrix(): AutonomyMatrix {
   return {
     settings: row(),
     prompts: row(),
-    pinned_rules: {
-      quick_test: 'off',
-      gate_test: 'off',
-      paired_trial: 'off',
-      canary: 'off',
-    },
   };
 }
 
@@ -530,20 +517,13 @@ function gateMeasureState(c: { kappa: number | null; n?: number }): string {
  * 2026-11-12; the learning budget is the limit). The canary (a learner
  * try-out) reaches learners: it needs a clean track record and the
  * independent check to agree with the clinical advisor (κ ≥ 0.6 on the
- * gated measures). Live for everyone is always a person; pinned rules never.
+ * gated measures). Live for everyone is always a person.
  */
 export function kindEligibility(
   kind: ChangeKind,
   f: AutonomyFacts,
   step: AutonomyStep = 'canary',
 ): KindEligibility {
-  if (kind === 'pinned_rules') {
-    return {
-      kind,
-      eligible: false,
-      reason: 'Never: the clinical advisor or the owner approves every change.',
-    };
-  }
   if (LEARNER_FREE_STEPS.includes(step)) {
     return {
       kind,
@@ -585,7 +565,7 @@ export function stepEligibility(
 
 /**
  * Why an owner's change to the matrix is refused (null when it is fine):
- * pinned rules are not configurable; the steps learners never see always run
+ * the steps learners never see always run
  * on their own and can't be changed; "auto" on the canary needs the kind
  * eligible (the κ gate), unless the owner confirms an override.
  */
@@ -598,9 +578,6 @@ export function matrixChangeRefusal(
 ): string | null {
   if (!(CHANGE_KINDS as readonly string[]).includes(kind)) {
     return `${kind} is not a kind of change`;
-  }
-  if (kind === 'pinned_rules') {
-    return 'pinned rules always need the clinical advisor or the owner';
   }
   if (!(AUTONOMY_STEPS as readonly string[]).includes(step)) {
     return `${step} is not a test step (putting a change live for everyone is always a person)`;

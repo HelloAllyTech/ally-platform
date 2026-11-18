@@ -31,7 +31,6 @@ import { AgentsSection } from "./AgentsSection";
 import { ClinicalListsSection } from "./ClinicalListsSection";
 import { OrganisationsSection } from "./OrganisationsSection";
 import { PinnedRulesSection } from "./PinnedRulesSection";
-import { RiskCueOptionsSection } from "./RiskCueOptionsSection";
 import { SchedulesSection } from "./SchedulesSection";
 import { SettingsGroups } from "./SettingsGroups";
 import { AutonomyV2, ScoreSettingsV2, TestsV2 } from "./V2Sections";
@@ -230,20 +229,12 @@ export const DebriefSettingsPage: React.FC = () => {
   const views: SettingsSection[] = [
     ...TABS,
     ...(schedules ? (["schedules"] as const) : []),
-    // A clinical advisor's review of risk-cue options: for whoever may approve pinned rules.
-    ...(access.approvePinnedRule ? (["risk-cues"] as const) : []),
     "agents",
     "guidance",
   ];
-  // The Debriefs home banner for a waiting option links here as `?category=risk_cue_options`.
   // `?category=agents` opens the Agents section.
   const category = new URLSearchParams(location.search).get("category");
-  const fromBanner =
-    !location.hash && category === "risk_cue_options"
-      ? ("risk-cues" as const)
-      : !location.hash && category === "agents"
-        ? ("agents" as const)
-        : null;
+  const fromBanner = !location.hash && category === "agents" ? ("agents" as const) : null;
   const hash = (location.hash.slice(1) || fromBanner) as SettingsSection;
   const current: SettingsSection = views.includes(hash) ? hash : TABS[0];
   const to = (id: SettingsSection) => ({
@@ -317,12 +308,6 @@ export const DebriefSettingsPage: React.FC = () => {
               onClick={() => navigate(to("schedules"))}
             />
           )}
-          {access.approvePinnedRule && (
-            <OverflowMenuItem
-              itemText={s.nav["risk-cues"]}
-              onClick={() => navigate(to("risk-cues"))}
-            />
-          )}
           <OverflowMenuItem itemText={s.nav.agents} onClick={() => navigate(to("agents"))} />
           {canOpenGuidance && (
             <OverflowMenuItem
@@ -362,7 +347,7 @@ export const DebriefSettingsPage: React.FC = () => {
         )}
         {current === "pinned" && (
           <Section id="pinned" title={s.nav.pinned} help={s.pinnedHelp}>
-            <PinnedRulesSection canAsk={access.approvePinnedRule} />
+            <PinnedRulesSection />
           </Section>
         )}
         {current === "clinical" && (
@@ -382,11 +367,6 @@ export const DebriefSettingsPage: React.FC = () => {
         {current === "schedules" && (
           <Section id="schedules" title={s.nav.schedules} help={s.schedulesHelp}>
             <SchedulesSection />
-          </Section>
-        )}
-        {current === "risk-cues" && (
-          <Section id="risk-cues" title={s.nav["risk-cues"]} help={s.riskCuesHelp}>
-            <RiskCueOptionsSection canReview={access.approvePinnedRule} />
           </Section>
         )}
         {current === "agents" && (

@@ -1,6 +1,6 @@
 import type { DebriefAction, DebriefCan } from './debrief-console-roles.util';
 import { alwaysAsk } from './debrief-always-ask.util';
-import { changeKindOf } from './debrief-console-view.util';
+import { PINNED_RULE_CODES } from './debrief-console-view.util';
 import { normaliseForQuote, unmatchedQuotes } from './debrief-cards.util';
 import type {
   DebriefPmMessage,
@@ -33,8 +33,10 @@ export function isPinnedRuleChange(idea: {
   change?: Record<string, any> | null;
 }): boolean {
   const change = idea.change ?? {};
+  // Only history holds one now: pinned rules are edited in the Skills Store.
   return (
-    change.ideaKind === 'pinned_rule' || changeKindOf(change) === 'pinned_rules'
+    change.ideaKind === 'pinned_rule' ||
+    PINNED_RULE_CODES.has(change.promptCode)
   );
 }
 
@@ -55,12 +57,7 @@ export function requiredAction(
     askLowConfidence: false,
     askModels: false,
   })?.kind;
-  if (
-    decision &&
-    (isPinnedRuleChange(idea) ||
-      kind === 'pinned_rule' ||
-      kind === 'safety_reader')
-  ) {
+  if (decision && (isPinnedRuleChange(idea) || kind === 'safety_reader')) {
     return 'approvePinnedRule';
   }
   if (

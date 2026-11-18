@@ -164,6 +164,24 @@ describe('releases from the Skills Store and code', () => {
     expect(t.notifier.owner).toHaveBeenCalled();
   });
 
+  it('a pinned rule published in the Skills Store becomes a release like any other prompt', async () => {
+    const t = build();
+    const SAFETY = DEBRIEF_PROMPT_CODES.safetyReader;
+    const out = await t.svc.fromPublish({
+      promptId: 'p',
+      promptCode: SAFETY,
+      version: 3,
+      previousVersion: 2,
+      createdBy: 9,
+      source: 'dashboard',
+      note: 'Tighten the cue wording',
+    });
+    expect(out).toMatchObject({ live: true, conflicts: 0 });
+    const draft = t.releases.createDraft.mock.calls[0];
+    expect((draft[1] as DebriefBundle).prompts[SAFETY]).toBe(3);
+    expect(t.releases.makeGa).toHaveBeenCalled();
+  });
+
   it('a publish that would undo a promoted change waits as a draft, and people are told', async () => {
     const t = build();
     const out = await t.svc.fromPublish({

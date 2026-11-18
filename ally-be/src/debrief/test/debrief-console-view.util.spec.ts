@@ -124,7 +124,7 @@ describe('approvals expire after 14 days as "no decision"', () => {
 });
 
 describe('Debrief PM agent autonomy policy', () => {
-  it('v2: no step can be set; the learner try-out runs on its own; pinned rules never', () => {
+  it('v2: no step can be set; the learner try-out runs on its own', () => {
     // v2 A3: what waits for a person is the always-ask list, not this table.
     expect(
       matrixChangeRefusal('prompts', 'canary', 'auto', ineligible),
@@ -137,23 +137,17 @@ describe('Debrief PM agent autonomy policy', () => {
           /always runs on its own/,
         );
       }
-      expect(
-        matrixChangeRefusal('pinned_rules', step, 'auto', eligible),
-      ).toMatch(/pinned rules/);
     }
     expect(matrixChangeRefusal('prompts', 'canary', 'ask', ineligible)).toMatch(
       /always-ask list/,
     );
+    // Pinned rules are not a kind of change any more: nobody edits one here.
     expect(
       matrixChangeRefusal('pinned_rules', 'canary', 'ask', eligible),
-    ).toMatch(/pinned rules/);
+    ).toMatch(/is not a kind of change/);
     expect(matrixChangeRefusal('prompts', 'promote', 'auto', eligible)).toMatch(
       /always a person/,
     );
-    expect(kindEligibility('pinned_rules', eligible).eligible).toBe(false);
-    expect(
-      kindEligibility('pinned_rules', eligible, 'quick_test').eligible,
-    ).toBe(false);
     // v2 A6: κ is information only.
     expect(kindEligibility('prompts', ineligible).eligible).toBe(true);
     expect(
@@ -187,7 +181,7 @@ describe('Debrief PM agent autonomy policy', () => {
         ],
       },
     };
-    for (const kind of ['settings', 'prompts', 'pinned_rules'] as const) {
+    for (const kind of ['settings', 'prompts'] as const) {
       for (const e of Object.values(stepEligibility(kind, f))) {
         expect(e.reason).not.toMatch(/[a-z]+_[a-z]+/);
       }
@@ -258,7 +252,11 @@ describe('Debrief PM agent autonomy policy', () => {
       paired_trial: 'auto',
       canary: 'auto',
     });
-    expect(normaliseAutonomy(null).matrix.pinned_rules.quick_test).toBe('off');
+    // No row for pinned rules: they are Skills Store prompts for the named pinned editors.
+    expect(Object.keys(normaliseAutonomy(null).matrix)).toEqual([
+      'settings',
+      'prompts',
+    ]);
   });
 
   it('re-locks on 2 reverts in 4 weeks, a failed baseline or judge drift, not on κ alone', () => {

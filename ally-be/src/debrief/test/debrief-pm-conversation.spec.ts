@@ -147,9 +147,7 @@ function build(opts: {
   const pm = {
     getIdea: jest.fn(async (id: string) => ideas[id]),
     approve: jest.fn(async () => ({ stage: 'canary' })),
-    approvePinnedRule: jest.fn(async () => ({ releaseId: 'r' })),
     reject: jest.fn(async () => undefined),
-    rejectPinnedRule: jest.fn(async () => undefined),
     audit: jest.fn(async () => undefined),
     writeEvidence: jest.fn(async () => undefined),
     screen: jest.fn(async () => ({ status: 'running' })),
@@ -355,7 +353,6 @@ describe('Debrief PM agent conversation: approvals pause for a yes, from someone
       plan: 'Approve it.',
     });
     expect(out.refused).toMatch(/waits for the person’s yes/);
-    expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
     // A yes to one change never carries out another.
     const other = await t.svc.callTool(
       'change_approve',
@@ -363,26 +360,25 @@ describe('Debrief PM agent conversation: approvals pause for a yes, from someone
       { idea_id: PINNED },
     );
     expect(other.refused).toMatch(/waits for the person’s yes/);
-    expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
   });
 
   it('a resumed approval carries it out as the person who said yes', async () => {
     const t = build({
-      person: { authorUserId: 9, text: 'Yes, go ahead.' },
-      perms: { 9: ADVISOR },
+      person: { authorUserId: 1, text: 'Yes, go ahead.' },
+      perms: { 1: TEAM },
     });
     const out = await t.svc.callTool(
       'change_approve',
-      approved('change_approve', PINNED),
-      { idea_id: PINNED, plan: 'Approve it.' },
+      approved('change_approve', PROMPT),
+      { idea_id: PROMPT, plan: 'Approve it.' },
     );
     expect(out).toMatchObject({ ok: true });
-    expect(t.pm.approvePinnedRule).toHaveBeenCalledWith(
-      PINNED,
-      9,
+    expect(t.pm.approve).toHaveBeenCalledWith(
+      PROMPT,
+      1,
       expect.stringContaining('Yes, go ahead.'),
     );
-    expect(t.actions().pop()).toMatchObject({ status: 'done', ideaId: PINNED });
+    expect(t.actions().pop()).toMatchObject({ status: 'done', ideaId: PROMPT });
     // The person's words are on the change.
     expect(
       t.queries.some(
@@ -392,21 +388,21 @@ describe('Debrief PM agent conversation: approvals pause for a yes, from someone
     ).toBe(true);
   });
 
-  it('a resumed approval by someone without the permission is refused and the deciders asked', async () => {
+  it('a pinned rule is never decided here: it is changed in the Skills Store by a pinned editor', async () => {
     const t = build({
-      person: { authorUserId: 1, text: 'yes' },
-      perms: { 1: TEAM },
+      person: { authorUserId: 9, text: 'Yes, go ahead.' },
+      perms: { 9: ADVISOR },
     });
     const out = await t.svc.callTool(
       'change_approve',
       approved('change_approve', PINNED),
       { idea_id: PINNED },
     );
-    expect(out.refused).toBe(
-      "Only the clinical advisor or the owner can approve this; I've asked them.",
+    expect(out.refused).toMatch(
+      /changed in the Skills Store by a pinned editor/,
     );
-    expect(t.notifier.pinnedRuleDeciders).toHaveBeenCalled();
-    expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
+    expect(t.pm.approve).not.toHaveBeenCalled();
+    expect(t.pm.reject).not.toHaveBeenCalled();
   });
 
   it('a turn-down needs a reason the Debrief PM agent reads', async () => {
@@ -514,7 +510,6 @@ describe('Debrief PM agent conversation: a turn, paused and resumed (ally-ai hum
       askedUserId: 9,
       actions: [{ tool: 'change_approve', ideaId: PINNED }],
     });
-    expect(t.pm.approvePinnedRule).not.toHaveBeenCalled();
   });
 
   it('the same allowed person’s clear yes resumes with approve and a token for them', async () => {
