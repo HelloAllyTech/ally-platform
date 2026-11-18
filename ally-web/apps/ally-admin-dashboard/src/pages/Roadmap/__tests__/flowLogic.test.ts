@@ -120,7 +120,7 @@ describe("triage helpers", () => {
   });
 
   it("a swipe commits past 40% of the width and springs back short of it", () => {
-    expect(swipeDecision(161, 400)).toBe("accept");
+    expect(swipeDecision(161, 400)).toBe("pickLead");
     expect(swipeDecision(-161, 400)).toBe("decline");
     expect(swipeDecision(150, 400)).toBeNull();
     expect(swipeDecision(-100, 400)).toBeNull();

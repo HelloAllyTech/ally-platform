@@ -329,9 +329,6 @@ export const PrimaryAction: React.FC<{
   }
   if (!PRIMARY_ACTIONS_BUILT.includes(action)) {
     switch (action) {
-      case "accept":
-        // Rendered by IdeaFlowAction above (P3).
-        return null;
       case "pickLead":
         // Rendered by IdeaFlowAction above (P3).
         return null;

@@ -282,7 +282,7 @@ describe('RoadmapItemReadService.list', () => {
     });
   });
 
-  it('builds To triage for an Owner: the Backlog only, never an idea someone leads', async () => {
+  it('builds To triage for an Owner: one Backlog list, never an idea someone leads', async () => {
     const pending = item(1, {}, { reviewState: 'pending' });
     const noLead = item(2, { builderSessionId: 's2' }, planSession('s2'));
     const idle = item(
@@ -312,15 +312,20 @@ describe('RoadmapItemReadService.list', () => {
     )) as unknown as {
       sections: Record<string, { code: string; whyHere?: any }[]>;
     };
-    expect(result.sections.awaitingReview.map((r) => r.code)).toEqual([
+    // One Backlog list: the unreviewed idea and the accepted one with no lead. The led ideas
+    // (idle or busy) are Being built: Leading shows them, To triage does not.
+    expect(Object.keys(result.sections)).toEqual(['backlog']);
+    expect(result.sections.backlog.map((r) => r.code).sort()).toEqual([
       'OPP-0001',
+      'OPP-0002',
     ]);
-    expect(result.sections.needsLead.map((r) => r.code)).toEqual(['OPP-0002']);
-    // Led ideas (idle or busy) are Being built: Leading shows them, To triage does not.
-    expect(Object.keys(result.sections).sort()).toEqual([
-      'awaitingReview',
-      'needsLead',
-    ]);
+    const why = Object.fromEntries(
+      result.sections.backlog.map((r) => [r.code, r.whyHere?.kind]),
+    );
+    expect(why).toEqual({
+      'OPP-0001': 'awaitingReview',
+      'OPP-0002': 'needsLead',
+    });
   });
 
   it('marks a row unread only when something happened since it was opened', async () => {

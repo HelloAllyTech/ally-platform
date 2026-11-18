@@ -33,8 +33,6 @@ interface LeadPickerProps {
   /** The idea the suggestion is scored for (the first, in a bulk pick). */
   code: string;
   count?: number;
-  /** Accept + lead says so on its button. */
-  accepting?: boolean;
   onClose: () => void;
   onPick: (lead: { id: number; name: string }) => Promise<boolean>;
   sheet: boolean;
@@ -48,7 +46,6 @@ export const LeadPicker: React.FC<LeadPickerProps> = ({
   open,
   code,
   count = 1,
-  accepting,
   onClose,
   onPick,
   sheet,
@@ -82,7 +79,7 @@ export const LeadPicker: React.FC<LeadPickerProps> = ({
       open={open}
       onClose={onClose}
       title={count > 1 ? copy.leadTitleMany(count) : copy.leadTitle(code)}
-      primaryText={accepting ? copy.leadAcceptConfirm : copy.leadConfirm}
+      primaryText={copy.leadConfirm}
       onPrimary={() => void confirm()}
       primaryDisabled={!person || sending}
       secondaryText={copy.cancel}

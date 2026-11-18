@@ -104,7 +104,7 @@ function detail(code: string, overrides: Partial<RoadmapItemDetail> = {}): Roadm
 }
 
 const sections = (): RoadmapItemsResponse => ({
-  sections: { awaitingReview: [row("OPP-414"), row("OPP-416")], needsLead: [], reassign: [] },
+  sections: { backlog: [row("OPP-414"), row("OPP-416")] },
 });
 
 const wrap = (ui: React.ReactElement) =>
@@ -138,34 +138,72 @@ const renderTriage = (props: Partial<React.ComponentProps<typeof TriageView>> = 
   );
 
 describe("To triage (§4.6)", () => {
-  it("shows the Summary first, with similar ideas and goal fit, then the three actions", () => {
+  it("shows the Summary first, with similar ideas and goal fit, then Pick a lead and Decline", () => {
     renderTriage();
     const pane = screen.getByRole("article");
     expect(within(pane).getByText("Learners mid-course")).toBeInTheDocument();
     expect(within(pane).getByText("OPP-212")).toBeInTheDocument();
     expect(
-      within(pane).getByRole("button", { name: en.roadmapV2.review.accept }),
-    ).toBeInTheDocument();
-    expect(
-      within(pane).getByRole("button", { name: en.roadmapV2.review.acceptWithLead }),
+      within(pane).getByRole("button", { name: en.roadmapV2.review.pickLead }),
     ).toBeInTheDocument();
     expect(
       within(pane).getByRole("button", { name: en.roadmapV2.review.decline }),
     ).toBeInTheDocument();
+    // There is no separate Accept: picking the lead is what accepts an unreviewed idea.
+    expect(within(pane).queryByRole("button", { name: /^Accept/ })).not.toBeInTheDocument();
   });
 
-  it("A accepts the selected idea and offers an 8-second undo", async () => {
+  it("shows each idea's queue rank on its row", () => {
+    renderTriage({
+      data: { sections: { backlog: [row("OPP-414", { rank: 3 }), row("OPP-416", { rank: 4 })] } },
+    });
+    expect(screen.getByText("#3")).toBeInTheDocument();
+    expect(screen.getByText("#4")).toBeInTheDocument();
+  });
+
+  it("an idea someone has already accepted offers Pick a lead but not Decline", () => {
+    renderTriage({
+      data: {
+        sections: {
+          backlog: [row("OPP-414", { shownStage: "accepted", whyHere: undefined })],
+        },
+      },
+    });
+    const pane = screen.getByRole("article");
+    expect(
+      within(pane).getByRole("button", { name: en.roadmapV2.review.pickLead }),
+    ).toBeInTheDocument();
+    expect(
+      within(pane).queryByRole("button", { name: en.roadmapV2.review.decline }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("A does nothing any more", () => {
     renderTriage();
     fireEvent.keyDown(window, { key: "a" });
+    expect(mockReview).not.toHaveBeenCalled();
+    expect(mockBatch).not.toHaveBeenCalled();
+  });
+
+  it("L opens the lead picker, and picking the lead accepts the idea with that lead", async () => {
+    renderTriage();
+    fireEvent.keyDown(window, { key: "l" });
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: en.roadmapV2.review.leadConfirm })).at(-1)!,
+    );
     await waitFor(() =>
-      expect(mockReview).toHaveBeenCalledWith({ code: "OPP-414", decision: "accept" }),
+      expect(mockReview).toHaveBeenCalledWith({
+        code: "OPP-414",
+        decision: "accept",
+        leadUserId: 7,
+      }),
     );
     await waitFor(() =>
       expect(toast.custom).toHaveBeenCalledWith(expect.any(Function), { duration: 8_000 }),
     );
   });
 
-  it("X selects rows, then A applies to all of them in one batch", async () => {
+  it("X selects rows, then L gives them all a lead in one batch", async () => {
     const view = renderTriage();
     fireEvent.keyDown(window, { key: "x" });
     view.rerender(
@@ -189,11 +227,14 @@ describe("To triage (§4.6)", () => {
     expect(
       await screen.findByRole("region", { name: en.roadmapV2.triage.selected(2) }),
     ).toBeInTheDocument();
-    fireEvent.keyDown(window, { key: "a" });
+    fireEvent.keyDown(window, { key: "l" });
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: en.roadmapV2.review.leadConfirm })).at(-1)!,
+    );
     await waitFor(() =>
       expect(mockBatch).toHaveBeenCalledWith([
-        { code: "OPP-414", decision: "accept" },
-        { code: "OPP-416", decision: "accept" },
+        { code: "OPP-414", decision: "accept", leadUserId: 7 },
+        { code: "OPP-416", decision: "accept", leadUserId: 7 },
       ]),
     );
   });
@@ -202,13 +243,13 @@ describe("To triage (§4.6)", () => {
     renderTriage();
     const input = document.createElement("input");
     document.body.appendChild(input);
-    fireEvent.keyDown(input, { key: "a" });
+    fireEvent.keyDown(input, { key: "l" });
     expect(mockReview).not.toHaveBeenCalled();
     input.remove();
   });
 
   it("an empty To triage is all caught up", () => {
-    renderTriage({ data: { sections: { awaitingReview: [], needsLead: [], reassign: [] } } });
+    renderTriage({ data: { sections: { backlog: [] } } });
     expect(screen.getByText(en.roadmapV2.empty.allCaughtUp)).toBeInTheDocument();
   });
 
@@ -262,10 +303,11 @@ describe("the lead picker", () => {
 });
 
 describe("the idea page's primary action (P3 / P3b)", () => {
-  it("an Owner gets Accept, Accept + lead and Decline on a submitted idea", () => {
+  it("an Owner gets Pick a lead and Decline on a submitted idea, and no Accept", () => {
     wrap(<PrimaryAction item={detail("OPP-414")} onApproveDesign={vi.fn()} />);
-    expect(screen.getByRole("button", { name: en.roadmapV2.review.accept })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.roadmapV2.review.pickLead })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: en.roadmapV2.review.decline })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Accept/ })).not.toBeInTheDocument();
   });
 
   it("Pick a lead on an accepted idea without one", () => {

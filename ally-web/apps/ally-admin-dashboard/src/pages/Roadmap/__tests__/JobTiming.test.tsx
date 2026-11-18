@@ -1,11 +1,12 @@
 import "@constants";
 import React from "react";
 
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { en } from "@constants";
 import { store } from "@store";
 import type { RoadmapItemDetail, RoadmapItemRow, RoadmapItemsResponse } from "@types";
 
@@ -25,7 +26,24 @@ vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
   useUndoRoadmapReviewMutation: () => [unwrapOf(vi.fn())],
   useSetRoadmapLeadMutation: () => [unwrapOf(vi.fn())],
   useGetRoadmapItemSimilarQuery: () => ({ data: { matches: [] } }),
-  useGetRoadmapLeadSuggestionsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useGetRoadmapLeadSuggestionsQuery: () => ({
+    data: {
+      suggestedUserId: 7,
+      candidates: [
+        {
+          user: { id: 7, name: "Priya", role: "builder" },
+          leading: 1,
+          limit: 3,
+          freeSlots: 2,
+          appsTouched: [],
+          matchingIdeas: 0,
+          score: 5,
+        },
+      ],
+    },
+    isLoading: false,
+    isError: false,
+  }),
 }));
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -71,9 +89,13 @@ function detail(code: string): RoadmapItemDetail {
 
 const data = (): RoadmapItemsResponse => ({
   sections: {
-    awaitingReview: [row("OPP-414")],
-    needsLead: [row("OPP-402", { whyHere: { kind: "needsLead", since: "2026-11-01T00:00:00Z" } })],
-    reassign: [],
+    backlog: [
+      row("OPP-414"),
+      row("OPP-402", {
+        shownStage: "accepted",
+        whyHere: { kind: "needsLead", since: "2026-11-01T00:00:00Z" },
+      }),
+    ],
   },
 });
 
@@ -109,13 +131,16 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("triage_one timing (P8, §4.16)", () => {
-  it("starts when a row awaiting review takes focus and completes on Accept", async () => {
+  it("starts when a row awaiting review takes focus and completes on picking its lead", async () => {
     renderTriage("OPP-414");
     expect(events("roadmap_job_started")).toEqual([
       ["roadmap_job_started", { job: "triage_one", role: "owner", item_id: "OPP-414" }],
     ]);
 
-    fireEvent.keyDown(window, { key: "a" });
+    fireEvent.keyDown(window, { key: "l" });
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: en.roadmapV2.review.leadConfirm })).at(-1)!,
+    );
     await waitFor(() => expect(events("roadmap_job_completed")).toHaveLength(1));
     const [, props] = events("roadmap_job_completed")[0];
     expect(props).toMatchObject({ job: "triage_one", role: "owner", item_id: "OPP-414" });

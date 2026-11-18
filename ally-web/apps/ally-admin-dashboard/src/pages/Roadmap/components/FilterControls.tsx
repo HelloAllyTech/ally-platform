@@ -32,7 +32,6 @@ import {
 type FilterDropdownState = Record<string, string[]>;
 
 const STAGE_OPTIONS = ["backlog", "being_built", "shipped", "declined"];
-const REVIEW_OPTIONS = ["pending", "accepted", "declined"];
 const SERVICE_OPTIONS = ["be", "ai", "learn", "frontend", "mobile"];
 
 /** The next 6 and the last 6 months, newest first, as YYYY-MM. */
@@ -90,11 +89,6 @@ export const useFilterOptions = (rows: RoadmapItemRow[]): FilterOptions => {
         id: "stage",
         label: f.stage,
         options: STAGE_OPTIONS.map(v => ({ value: v, label: stages[v] })),
-      },
-      {
-        id: "review",
-        label: f.review,
-        options: REVIEW_OPTIONS.map(v => ({ value: v, label: f.reviewStates[v] })),
       },
       { id: "goal", label: f.goal, options: toOptions(goalMap) },
       { id: "author", label: f.author, options: toOptions(authors) },

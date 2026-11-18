@@ -135,13 +135,11 @@ export interface ForYouSections {
 }
 
 /**
- * To triage is the Backlog: every idea nobody leads yet. Unreviewed ones come first in their own
- * section; the rest need a lead. Ideas that already have a lead are Being built and live under
- * Leading, not here.
+ * To triage is the Backlog: every idea nobody leads yet, in one list. Ideas that already have a
+ * lead are Being built and live under Leading, not here.
  */
 export interface ToTriageSections {
-  awaitingReview: ItemRow[];
-  needsLead: ItemRow[];
+  backlog: ItemRow[];
 }
 
 export type ItemListResponse =

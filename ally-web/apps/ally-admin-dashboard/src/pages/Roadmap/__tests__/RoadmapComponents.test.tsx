@@ -186,7 +186,10 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
 
 describe("primaryActionFor", () => {
   it("picks one action by stage and can{}", () => {
-    expect(primaryActionFor(detail({ review: true }, { shownStage: "submitted" }))).toBe("accept");
+    // Picking the lead is what accepts an unreviewed idea, so that is its action too.
+    expect(primaryActionFor(detail({ review: true }, { shownStage: "submitted" }))).toBe(
+      "pickLead",
+    );
     expect(
       primaryActionFor(detail({ pickLead: true }, { shownStage: "accepted", lead: undefined })),
     ).toBe("pickLead");

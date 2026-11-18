@@ -23,7 +23,7 @@ import { isTypingTarget } from "../utils/keyboard";
 /** Waiting more than this many working days turns the age amber (§4.6). */
 export const AMBER_AFTER_WORKING_DAYS = 5;
 
-type Decision = "accept" | "decline";
+type Decision = "assign" | "decline";
 
 interface TriageViewProps {
   data?: RoadmapItemsResponse;
@@ -42,10 +42,11 @@ interface TriageViewProps {
 }
 
 /**
- * To triage (§4.6, D10, D11) [FP-1684]: Awaiting review · Needs a lead · Reassign?, built for
- * speed. Single keys: A accept · L accept + lead · D decline · X select · U undo (J/K/Enter/Esc
- * stay the queue's). X selects rows, and A, D or L then apply to every selected row; bulk decline
- * asks one reason, editable per idea; one undo reverses the whole batch (§4.11).
+ * To triage (§4.6, D10, D11) [FP-1684]: the Backlog, every idea nobody leads yet, built for speed.
+ * An Owner does one of two things with each: pick a lead (which accepts an unreviewed idea; there
+ * is no separate Accept) or decline it. Single keys: L pick a lead · D decline · X select · U undo
+ * (J/K/Enter/Esc stay the queue's). X selects rows, and D or L then apply to every selected row;
+ * bulk decline asks one reason, editable per idea; one undo reverses the whole batch (§4.11).
  *
  * The reading pane shows the Summary first, not the conversation. On a phone or tablet the list
  * opens Review mode: one card at a time, swipe to decide (§4.17). Bulk select isn't offered there.
@@ -90,9 +91,10 @@ export const TriageView: React.FC<TriageViewProps> = ({
   }, [codes]);
 
   const rowBy = useCallback((code: string) => rows.find(r => r.code === code), [rows]);
-  const sectionOf = useCallback(
-    (code: string) => sections.find(s => s.rows.some(r => r.code === code))?.key,
-    [sections],
+  /** Still awaiting review (nobody has accepted it), so it can be declined too. */
+  const needsReview = useCallback(
+    (code: string) => rowBy(code)?.shownStage === "submitted",
+    [rowBy],
   );
 
   const markLeaving = (list: string[], decision: Decision) =>
@@ -114,33 +116,28 @@ export const TriageView: React.FC<TriageViewProps> = ({
     return list.map(rowBy).filter(Boolean) as RoadmapItemRow[];
   }, [checked, selected, open, rowBy]);
 
-  const acceptRows = useCallback(
-    async (list: RoadmapItemRow[], lead?: { id: number; name: string }) => {
-      const review = list.filter(r => sectionOf(r.code) === "awaitingReview");
-      const assign = list.filter(r => sectionOf(r.code) !== "awaitingReview");
+  /** Give these ideas a lead. An unreviewed one is accepted by it; an accepted one just gets it. */
+  const assignRows = useCallback(
+    async (list: RoadmapItemRow[], lead: { id: number; name: string }) => {
+      const review = list.filter(r => needsReview(r.code));
+      const assign = list.filter(r => !needsReview(r.code));
       const codesNow = list.map(r => r.code);
-      markLeaving(codesNow, "accept");
+      markLeaving(codesNow, "assign");
       let ok = true;
       if (review.length === 1 && assign.length === 0) {
-        ok = await actions.accept(review[0].code, lead, () => unmark(codesNow));
+        ok = await actions.assign(review[0].code, lead, () => unmark(codesNow));
       } else if (review.length) {
         ok = await actions.reviewMany(
-          review.map(r => ({
-            code: r.code,
-            decision: "accept" as const,
-            ...(lead ? { leadUserId: lead.id } : {}),
-          })),
+          review.map(r => ({ code: r.code, decision: "accept" as const, leadUserId: lead.id })),
           () => unmark(codesNow),
         );
       }
-      if (lead) {
-        for (const r of assign) ok = (await actions.pickLead(r.code, lead)) && ok;
-      }
+      for (const r of assign) ok = (await actions.pickLead(r.code, lead)) && ok;
       if (!ok) unmark(codesNow);
       else setChecked(new Set());
       return ok;
     },
-    [actions, sectionOf],
+    [actions, needsReview],
   );
 
   const declineRows = useCallback(
@@ -162,7 +159,7 @@ export const TriageView: React.FC<TriageViewProps> = ({
   );
 
   const startDecline = (list: RoadmapItemRow[]) => {
-    const declinable = list.filter(r => sectionOf(r.code) === "awaitingReview");
+    const declinable = list.filter(r => needsReview(r.code));
     if (declinable.length)
       setDeclineFor(
         declinable.map(r => ({ code: r.code, title: r.title, goalName: r.goal?.name })),
@@ -177,7 +174,7 @@ export const TriageView: React.FC<TriageViewProps> = ({
       if (isTypingTarget(event.target) || declineFor || leadFor) return;
       if ((event.target as HTMLElement | null)?.closest?.("[role='dialog'], [role='menu']")) return;
       const key = event.key.toLowerCase();
-      if (!["a", "l", "d", "x", "u"].includes(key)) return;
+      if (!["l", "d", "x", "u"].includes(key)) return;
       event.preventDefault();
       if (key === "u") {
         undoLastReview();
@@ -196,20 +193,19 @@ export const TriageView: React.FC<TriageViewProps> = ({
       }
       const list = targets();
       if (list.length === 0) return;
-      if (key === "a") void acceptRows(list);
       if (key === "l") setLeadFor(list);
       if (key === "d") startDecline(list);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [touch, declineFor, leadFor, selected, open, targets, acceptRows]);
+  }, [touch, declineFor, leadFor, selected, open, targets, assignRows]);
 
-  // P8: a row awaiting review taking focus (J/K or opened) starts "triage one" for it; Accept or
-  // Decline ends it (useReviewActions). Moving away and back starts a fresh attempt.
+  // P8: a row awaiting review taking focus (J/K or opened) starts "triage one" for it; picking a
+  // lead or Decline ends it (useReviewActions). Moving away and back starts a fresh attempt.
   const jobs = useRoadmapJobTimer();
   const focusedCode = open ?? selected;
-  const focusedAwaiting = !!focusedCode && sectionOf(focusedCode) === "awaitingReview";
+  const focusedAwaiting = !!focusedCode && needsReview(focusedCode);
   useEffect(() => {
     if (focusedCode && focusedAwaiting) {
       jobs.start("triage_one", { itemId: focusedCode, restart: true });
@@ -271,7 +267,7 @@ export const TriageView: React.FC<TriageViewProps> = ({
                   <TriageRow
                     key={row.code}
                     row={row}
-                    section={section.key}
+                    awaitingReview={row.shownStage === "submitted"}
                     current={paneCode === row.code}
                     checked={checked.has(row.code)}
                     selectMode={selectMode && !touch}
@@ -317,11 +313,8 @@ export const TriageView: React.FC<TriageViewProps> = ({
               <Button kind="secondary" size="sm" onClick={() => startDecline(targets())}>
                 {copy.review.decline}
               </Button>
-              <Button kind="tertiary" size="sm" onClick={() => setLeadFor(targets())}>
-                {copy.review.acceptWithLead}
-              </Button>
-              <Button kind="primary" size="sm" onClick={() => void acceptRows(targets())}>
-                {copy.review.accept}
+              <Button kind="primary" size="sm" onClick={() => setLeadFor(targets())}>
+                {copy.review.pickLead}
               </Button>
             </span>
           </motion.div>
@@ -343,9 +336,8 @@ export const TriageView: React.FC<TriageViewProps> = ({
         open={!!leadFor}
         code={leadFor?.[0]?.code ?? ""}
         count={leadFor?.length ?? 1}
-        accepting={!!leadFor?.some(r => sectionOf(r.code) === "awaitingReview")}
         onClose={() => setLeadFor(null)}
-        onPick={lead => acceptRows(leadFor ?? [], lead)}
+        onPick={lead => assignRows(leadFor ?? [], lead)}
         sheet={touch}
       />
     </>
@@ -358,12 +350,9 @@ export const TriageView: React.FC<TriageViewProps> = ({
         {dialogs}
         <TriageReviewMode
           open={reviewMode}
-          rows={rows.filter(
-            r => sectionOf(r.code) === "awaitingReview" || sectionOf(r.code) === "needsLead",
-          )}
-          sectionOf={sectionOf}
+          rows={rows}
+          needsReview={needsReview}
           onClose={() => setReviewMode(false)}
-          onAccept={row => acceptRows([row])}
           onDecline={row => startDecline([row])}
           onPickLead={row => setLeadFor([row])}
         />
@@ -379,9 +368,8 @@ export const TriageView: React.FC<TriageViewProps> = ({
           <TriageSummary
             key={paneCode}
             code={paneCode}
-            section={sectionOf(paneCode)}
-            onAccept={() => void acceptRows([rowBy(paneCode)!])}
-            onAcceptWithLead={() => setLeadFor([rowBy(paneCode)!])}
+            awaitingReview={needsReview(paneCode)}
+            onPickLead={() => setLeadFor([rowBy(paneCode)!])}
             onDecline={() => startDecline([rowBy(paneCode)!])}
           />
         ) : (
@@ -395,7 +383,7 @@ export const TriageView: React.FC<TriageViewProps> = ({
 
 const TriageRow: React.FC<{
   row: RoadmapItemRow;
-  section: string;
+  awaitingReview: boolean;
   current: boolean;
   checked: boolean;
   selectMode: boolean;
@@ -403,19 +391,15 @@ const TriageRow: React.FC<{
   touch: boolean;
   onToggle: () => void;
   onOpen: () => void;
-}> = ({ row, section, current, checked, selectMode, leaving, touch, onToggle, onOpen }) => {
+}> = ({ row, awaitingReview, current, checked, selectMode, leaving, touch, onToggle, onOpen }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.triage;
   const why = row.whyHere;
   const since = why && "since" in why ? why.since : row.stageSince;
   const days = workingDaysSince(since);
-  const amber = section === "awaitingReview" && days > AMBER_AFTER_WORKING_DAYS;
-  const age =
-    section === "reassign" && why?.kind === "reassign"
-      ? copy.idle(why.idleDays)
-      : section === "needsLead"
-        ? en.roadmapV2.stages.accepted
-        : copy.waiting(days);
+  // Unreviewed ideas that have waited too long turn amber; the age is the same plain "3d" for all.
+  const amber = awaitingReview && days > AMBER_AFTER_WORKING_DAYS;
+  const age = copy.waiting(days);
 
   return (
     <motion.li
@@ -424,12 +408,12 @@ const TriageRow: React.FC<{
       animate={{
         opacity: leaving ? 0.7 : 1,
         height: "auto",
-        x: leaving && !reduced ? (leaving === "accept" ? 24 : -24) : 0,
+        x: leaving && !reduced ? (leaving === "assign" ? 24 : -24) : 0,
       }}
       exit={reduced ? { opacity: 0 } : { ...triageExit(leaving, reduced), height: 0 }}
       transition={motionTransition("moderate", "productive", reduced)}
       className={`relative list-none overflow-hidden border-b border-border-light ${
-        leaving === "accept"
+        leaving === "assign"
           ? "bg-success-50"
           : leaving === "decline"
             ? "bg-neutral-100"
@@ -470,6 +454,15 @@ const TriageRow: React.FC<{
           aria-current={current ? "true" : undefined}
           className="flex min-w-0 flex-1 items-baseline gap-2 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
         >
+          {row.rank != null && (
+            <span
+              className="min-w-[2.25rem] shrink-0 text-right text-xs font-semibold tabular-nums text-primary-700"
+              title={en.roadmapV2.row.rankHelp(row.rank)}
+            >
+              <span aria-hidden>{en.roadmapV2.row.rank(row.rank)}</span>
+              <span className="sr-only">{en.roadmapV2.row.rankLabel(row.rank)}</span>
+            </span>
+          )}
           <span className="shrink-0 text-xs tabular-nums text-typography-secondary">
             {row.code}
           </span>
@@ -477,7 +470,7 @@ const TriageRow: React.FC<{
         </button>
         <span
           className={`shrink-0 text-xs tabular-nums ${amber ? "font-semibold text-warning-700" : "text-typography-secondary"}`}
-          title={section === "awaitingReview" ? copy.waitingLong(days) : undefined}
+          title={awaitingReview ? copy.waitingLong(days) : undefined}
         >
           {age}
           {amber && <span className="sr-only"> · {copy.waitingLong(days)}</span>}

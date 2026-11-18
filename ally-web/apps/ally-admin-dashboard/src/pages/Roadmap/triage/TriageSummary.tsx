@@ -65,15 +65,15 @@ export const SimilarLine: React.FC<{ code: string }> = ({ code }) => {
 
 /**
  * The triage reading pane (§4.6): the Summary first, not the conversation — who, pain, outcome,
- * similar ideas, votes and goal fit — then Accept · Accept + lead · Decline.
+ * similar ideas, votes and goal fit — then Pick a lead (which accepts it) and Decline.
  */
 export const TriageSummary: React.FC<{
   code: string;
-  section?: string;
-  onAccept: () => void;
-  onAcceptWithLead: () => void;
+  /** Still awaiting review, so it can be declined as well as given a lead. */
+  awaitingReview: boolean;
+  onPickLead: () => void;
   onDecline: () => void;
-}> = ({ code, section, onAccept, onAcceptWithLead, onDecline }) => {
+}> = ({ code, awaitingReview, onPickLead, onDecline }) => {
   const copy = en.roadmapV2;
   const { data: item, isLoading } = useGetRoadmapItemQuery(code);
   if (isLoading || !item) {
@@ -84,7 +84,6 @@ export const TriageSummary: React.FC<{
       </div>
     );
   }
-  const awaiting = section === "awaitingReview";
   return (
     <article className="flex flex-col gap-4 p-6" aria-label={`${item.code} ${item.title}`}>
       <header className="flex flex-col gap-1">
@@ -108,21 +107,12 @@ export const TriageSummary: React.FC<{
         </p>
       </section>
       <div className="flex flex-wrap gap-2">
-        {awaiting ? (
-          <>
-            <Button kind="primary" size="md" onClick={onAccept} aria-keyshortcuts="a">
-              {copy.review.accept}
-            </Button>
-            <Button kind="tertiary" size="md" onClick={onAcceptWithLead} aria-keyshortcuts="l">
-              {copy.review.acceptWithLead}
-            </Button>
-            <Button kind="secondary" size="md" onClick={onDecline} aria-keyshortcuts="d">
-              {copy.review.decline}
-            </Button>
-          </>
-        ) : (
-          <Button kind="primary" size="md" onClick={onAcceptWithLead} aria-keyshortcuts="l">
-            {copy.review.pickLead}
+        <Button kind="primary" size="md" onClick={onPickLead} aria-keyshortcuts="l">
+          {copy.review.pickLead}
+        </Button>
+        {awaitingReview && (
+          <Button kind="secondary" size="md" onClick={onDecline} aria-keyshortcuts="d">
+            {copy.review.decline}
           </Button>
         )}
         <Link

@@ -587,21 +587,26 @@ export class RoadmapItemReadService {
     return undefined;
   }
 
-  /** To triage (§4.3, §4.6): the Backlog, every idea nobody leads yet. Idle leads are Being built, not here. */
+  /**
+   * To triage (§4.3, §4.6): the Backlog, every idea nobody leads yet, as one list. An unreviewed
+   * idea says it awaits review; the rest say they need a lead. Either way the Owner's move is the
+   * same: pick a lead (which accepts an unreviewed idea) or decline it. Led ideas are Being built.
+   */
   private toTriage(cores: ItemCore[]): CoreSections<ToTriageSections> {
-    const awaitingReview = cores
-      .filter((c) => c.shownStage === 'submitted')
+    const backlog = cores
+      .filter(
+        (c) =>
+          c.shownStage === 'submitted' ||
+          (c.shownStage === 'accepted' && c.leadId === null),
+      )
       .map((c) => ({
         ...c,
-        whyHere: { kind: 'awaitingReview' as const, since: c.stageSince },
+        whyHere:
+          c.shownStage === 'submitted'
+            ? { kind: 'awaitingReview' as const, since: c.stageSince }
+            : { kind: 'needsLead' as const, since: c.stageSince },
       }));
-    const needsLead = cores
-      .filter((c) => c.shownStage === 'accepted' && c.leadId === null)
-      .map((c) => ({
-        ...c,
-        whyHere: { kind: 'needsLead' as const, since: c.stageSince },
-      }));
-    return { awaitingReview, needsLead };
+    return { backlog };
   }
 
   // ── Loading ────────────────────────────────────────────────────────────────
