@@ -1,7 +1,7 @@
 """`progress_reader`: today's Progress reader as a registry agent: the
 learner's earlier Work-on-this points against this session's evidence."""
 
-from app.core.debrief_graph import model_steps
+from app.core.debrief_graph import model_step_inputs
 from app.core.debrief_graph.constants import Step
 from app.core.debrief_graph.registry.agents._common import registry_step
 from app.core.debrief_graph.registry.manifest import AgentManifest, register
@@ -48,7 +48,7 @@ MANIFEST = register(
         writer_has_own_block=True,
         step=registry_step(
             "progress_reader",
-            model_steps.PROGRESS_READER,
+            model_step_inputs.PROGRESS_READER,
             Step.PROGRESS_READER,
             findings=_as_findings,
         ),

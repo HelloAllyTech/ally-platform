@@ -204,7 +204,7 @@ async def test_evaluator_with_partial_scores_is_no_answer(dispatch_returns):
 async def test_a_step_with_no_usable_answer_is_a_502_failure(monkeypatch):
     """The graph treats it like any failed attempt: retry on the backup model."""
     from app.core.debrief import steps
-    from app.core.debrief_graph.step_functions import InProcessSteps, StepError
+    from app.core.debrief_graph.step_wire import InProcessSteps, StepError
 
     async def _none(*args, **kwargs):
         return None, "gemini-2.5-pro"
@@ -428,7 +428,7 @@ async def test_the_rationale_never_reaches_the_cards_or_the_evidence(monkeypatch
     only in `reasoning`: nothing a learner reads can carry it."""
     from app.core.debrief import steps
     from app.core.debrief.schemas import DebriefCardsReasoned, EvidenceMapReasoned
-    from app.core.debrief_graph.step_functions import InProcessSteps
+    from app.core.debrief_graph.step_wire import InProcessSteps
 
     async def _analyse(*args, **kwargs):
         return EvidenceMapReasoned(reasoning="Why I read it so."), "gemini-2.5-pro"

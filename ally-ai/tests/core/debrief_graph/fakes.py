@@ -15,7 +15,7 @@ from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import GatewayError
 from app.core.debrief_graph.graph import build_graph
 from app.core.debrief_graph.runner import run_debrief
-from app.core.debrief_graph.step_functions import StepError
+from app.core.debrief_graph.step_wire import StepError
 
 DIMENSIONS = [
     "evidence_specificity",

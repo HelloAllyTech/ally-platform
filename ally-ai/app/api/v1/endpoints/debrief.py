@@ -30,7 +30,7 @@ from app.core.debrief_graph.gateway import HttpGateway
 from app.core.debrief_graph.graph import get_debrief_graph
 from app.core.debrief_graph.runner import run_debrief
 from app.core.debrief_graph.schemas import DebriefRunRequest, DebriefRunResponse
-from app.core.debrief_graph.step_functions import InProcessSteps
+from app.core.debrief_graph.step_wire import InProcessSteps
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
